@@ -40,7 +40,7 @@
         {
           "id": "return_to_nia_marker",
           "type": "goto",
-          "description": "Return near Nia's marker.",
+          "description": "Return to Nia.",
           "optional": false,
           "params": {
             "marker": "losttales:quest_giver_nia",

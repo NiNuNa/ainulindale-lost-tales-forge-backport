@@ -243,28 +243,20 @@ item.community_moria_goblin_spear.name=Moria Goblin Spear
 item.community_moria_goblin_spear.lore.line1=TODO...
 item.community_moria_goblin_spear.lore.line2=TODO...
 
-#   Blocks
-# Urns
+#   Blocks - Urns
 tile.urn.name=Urn
-tile.urn.lore.line1=Stores a small offering.
+tile.urn.lore.line1=Stores a smallUrns offering.
 tile.urn.lore.line2=Use clay to seal it.
 
-tile.amphora.name=Urn Amphora
-tile.amphora.lore.line1=TODO...
-tile.amphora.lore.line2=TODO...
+tile.amphora.name=Amphora
+tile.amphora.lore.line1=Stores a small offering.
+tile.amphora.lore.line2=Use clay to seal it.
 
-tile.amphora_ancient.name=Ancient Urn Amphora
-tile.amphora_ancient.lore.line1=TODO...
-tile.amphora_ancient.lore.line2=TODO...
+tile.loutrophoros.name=Loutrophoros
+tile.loutrophoros.lore.line1=Stores several offerings.
+tile.loutrophoros.lore.line2=Use clay to seal it.
 
-tile.loutrophoros.name=Urn Loutrophoros
-tile.loutrophoros.lore.line1=TODO...
-tile.loutrophoros.lore.line2=TODO...
-
-tile.loutrophoros_ancient.name=Ancient Urn Loutrophoros
-tile.loutrophoros_ancient.lore.line1=TODO...
-tile.loutrophoros_ancient.lore.line2=TODO...
-
+#   Blocks - Decorative
 tile.watch_stone.name=Watch Stone
 tile.watch_stone.lore.line1=TODO...
 tile.watch_stone.lore.line2=TODO...
@@ -470,14 +462,6 @@ lotr.achievement.category.LOSSOTH=Lossoth
 
 #   Commands
 #   Backported NeoForge HUD / vessel / food entries
-tile.amphora.lore.line1=Stores a small offering.
-tile.amphora.lore.line2=Use clay to seal it.
-tile.amphora_ancient.lore.line1=Stores a small offering.
-tile.amphora_ancient.lore.line2=Use clay to seal it.
-tile.loutrophoros.lore.line1=Stores several offerings.
-tile.loutrophoros.lore.line2=Use clay to seal it.
-tile.loutrophoros_ancient.lore.line1=Stores several offerings.
-tile.loutrophoros_ancient.lore.line2=Use clay to seal it.
 tile.cheese_wheel.name=Cheese Wheel
 
 item.plum.name=Plum

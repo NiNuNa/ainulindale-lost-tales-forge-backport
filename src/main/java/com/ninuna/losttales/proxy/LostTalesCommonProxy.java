@@ -20,6 +20,9 @@ import com.ninuna.losttales.crafting.ELostTalesCrafting;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.util.LostTalesUtil;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
+import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
@@ -73,6 +76,19 @@ public class LostTalesCommonProxy {
         GameRegistry.registerTileEntity(LostTalesTileEntityLamp.class, "lamp");
         GameRegistry.registerTileEntity(LostTalesTileEntityPlushie.class, "plushie");
     }
+
+    /**
+     * Client-bound packet hooks. The common/server proxy deliberately does
+     * nothing here; the client proxy overrides these methods and updates
+     * client-only caches. Packet handlers can safely call through this proxy on
+     * either physical side without loading Minecraft client classes on a
+     * dedicated server.
+     */
+    public void handleQuickLootContainerSync(LostTalesQuickLootContainerSyncPacket packet) {}
+
+    public void handleQuestSync(LostTalesQuestSyncPacket packet) {}
+
+    public void handleMobAggroSync(LostTalesMobAggroSyncPacket packet) {}
 
     public void onServerStarting(FMLServerStartingEvent event) {
         ELostTalesCommand.initAndRegisterCommands(event);

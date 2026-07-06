@@ -45,8 +45,13 @@ public class LostTalesQuickLootDropItemPacket implements IMessage {
     public static class Handler implements IMessageHandler<LostTalesQuickLootDropItemPacket, IMessage> {
         @Override
         public IMessage onMessage(LostTalesQuickLootDropItemPacket message, MessageContext ctx) {
+            if (message == null || ctx == null || ctx.getServerHandler() == null) {
+                return null;
+            }
+
             EntityPlayerMP player = ctx.getServerHandler().playerEntity;
-            if (player == null || player.worldObj == null) return null;
+            if (player == null || player.worldObj == null || player.worldObj.isRemote) return null;
+            if (!player.worldObj.blockExists(message.x, message.y, message.z)) return null;
 
             double dx = player.posX - ((double) message.x + 0.5D);
             double dy = player.posY - ((double) message.y + 0.5D);
@@ -54,20 +59,23 @@ public class LostTalesQuickLootDropItemPacket implements IMessage {
             if (dx * dx + dy * dy + dz * dz > 64.0D) return null;
 
             TileEntity tileEntity = player.worldObj.getTileEntity(message.x, message.y, message.z);
-            if (!(tileEntity instanceof IInventory)) return null;
+            if (!(tileEntity instanceof IInventory) || tileEntity.isInvalid()) return null;
             if (tileEntity instanceof LostTalesTileEntityUrn && ((LostTalesTileEntityUrn) tileEntity).isSealed()) return null;
 
             IInventory inventory = (IInventory) tileEntity;
+            if (!inventory.isUseableByPlayer(player)) return null;
             if (message.slot < 0 || message.slot >= inventory.getSizeInventory()) return null;
 
             ItemStack stack = inventory.getStackInSlot(message.slot);
             if (stack == null || stack.stackSize <= 0) return null;
 
-            inventory.setInventorySlotContents(message.slot, null);
+            ItemStack removed = inventory.decrStackSize(message.slot, stack.stackSize);
+            if (removed == null || removed.stackSize <= 0) return null;
+
             inventory.markDirty();
             player.worldObj.markBlockForUpdate(message.x, message.y, message.z);
 
-            EntityItem entityItem = new EntityItem(player.worldObj, (double) message.x + 0.5D, (double) message.y + 1.0D, (double) message.z + 0.5D, stack.copy());
+            EntityItem entityItem = new EntityItem(player.worldObj, (double) message.x + 0.5D, (double) message.y + 1.0D, (double) message.z + 0.5D, removed.copy());
             player.worldObj.spawnEntityInWorld(entityItem);
             player.worldObj.playSoundEffect((double) message.x + 0.5D, (double) message.y + 0.5D, (double) message.z + 0.5D, "random.pop", 0.5F, 1.0F);
             return null;

@@ -19,10 +19,10 @@ import net.minecraft.world.World;
 
 public class LostTalesBlockUrnBase extends LostTalesBlockDirectionalContainerBase {
     /**
-     * 1.7.10 has no honeycomb, so the modern urn sealing interaction is mapped
-     * to clay balls. This keeps the behavior thematically tied to pottery.
+     * The modern branch seals urns with honeycomb. Minecraft 1.7.10 does not
+     * have honeycomb, so this backport intentionally uses vanilla clay balls.
      */
-    public static final Item LEGACY_SEALING_ITEM = Items.clay_ball;
+    public static final Item SEALING_ITEM = Items.clay_ball;
 
     public LostTalesBlockUrnBase(ELostTalesUser credits) {
         super(Material.circuits, credits);
@@ -102,7 +102,7 @@ public class LostTalesBlockUrnBase extends LostTalesBlockDirectionalContainerBas
                 return true;
             }
 
-            if (held != null && held.getItem() == LEGACY_SEALING_ITEM) {
+            if (held != null && this.isSealingItem(held)) {
                 urn.setSealed(true);
                 urn.playFillAnimation();
                 this.consumeHeldItem(player, held);
@@ -121,6 +121,10 @@ public class LostTalesBlockUrnBase extends LostTalesBlockDirectionalContainerBas
             world.playSoundEffect((double) bottom[0] + 0.5D, (double) bottom[1] + 0.5D, (double) bottom[2] + 0.5D, "random.click", 0.4F, 1.0F);
         }
         return true;
+    }
+
+    private boolean isSealingItem(ItemStack stack) {
+        return stack != null && stack.getItem() == SEALING_ITEM;
     }
 
     private void consumeHeldItem(EntityPlayer player, ItemStack held) {

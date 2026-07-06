@@ -170,7 +170,20 @@ public final class LostTalesQuestManager {
         }
         boolean changed = data.clearPinnedQuestId();
         if (changed) {
-            sendQuestChat(player, EnumChatFormatting.AQUA + "Stopped tracking quest.");
+            sendQuestChat(player, EnumChatFormatting.AQUA + "Stopped tracking all quests.");
+            syncToClient(player);
+        }
+        return changed;
+    }
+
+    public static boolean unpinQuest(EntityPlayer player, String questId) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null || questId == null || questId.length() == 0) {
+            return false;
+        }
+        boolean changed = data.unpinQuestId(questId);
+        if (changed) {
+            sendQuestChat(player, EnumChatFormatting.AQUA + "Stopped tracking quest: " + questTitle(questId));
             syncToClient(player);
         }
         return changed;
@@ -179,6 +192,11 @@ public final class LostTalesQuestManager {
     public static String getPinnedQuestId(EntityPlayer player) {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         return data == null ? "" : data.getPinnedQuestId();
+    }
+
+    public static Set<String> getPinnedQuestIds(EntityPlayer player) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        return data == null ? Collections.<String>emptySet() : data.getPinnedQuestIds();
     }
 
     public static Set<String> getDiscoveredMarkerIds(EntityPlayer player) {

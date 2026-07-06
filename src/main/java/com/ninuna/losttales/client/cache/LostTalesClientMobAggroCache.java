@@ -24,7 +24,7 @@ public final class LostTalesClientMobAggroCache {
 
     private LostTalesClientMobAggroCache() {}
 
-    public static void accept(Iterable<Integer> entityIds) {
+    public static synchronized void accept(Iterable<Integer> entityIds) {
         long now = getClientTick();
         long until = now + TTL_TICKS;
         if (entityIds != null) {
@@ -37,7 +37,7 @@ public final class LostTalesClientMobAggroCache {
         pruneExpired(now);
     }
 
-    public static boolean isAggro(int entityId) {
+    public static synchronized boolean isAggro(int entityId) {
         long now = getClientTick();
         Long until = AGGRO_UNTIL_TICK.get(entityId);
         if (until == null) {
@@ -50,7 +50,7 @@ public final class LostTalesClientMobAggroCache {
         return true;
     }
 
-    public static void clear() {
+    public static synchronized void clear() {
         AGGRO_UNTIL_TICK.clear();
     }
 

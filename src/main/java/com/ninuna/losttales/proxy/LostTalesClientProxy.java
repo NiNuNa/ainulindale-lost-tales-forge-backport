@@ -5,24 +5,24 @@ import com.ninuna.losttales.block.tileentity.LostTalesTileEntityPlushie;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityStatue;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
+import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
+import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
+import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
+import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
+import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.config.client.LostTalesConfigGuiEventHandler;
 import com.ninuna.losttales.eventhandler.LostTalesClientEventHandler;
 import com.ninuna.losttales.gui.ELostTalesMapLabels;
 import com.ninuna.losttales.item.armor.LostTalesItemArmor3D;
+import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import com.ninuna.losttales.rendering.renderer.tileentity.LostTalesTileEntityRendererLamp;
 import com.ninuna.losttales.rendering.renderer.tileentity.LostTalesTileEntityRendererPlushie;
 import com.ninuna.losttales.rendering.renderer.tileentity.LostTalesTileEntityRendererUrn;
 import com.ninuna.losttales.rendering.renderer.item.LostTalesItemRendererArmor3D;
 import com.ninuna.losttales.rendering.renderer.tileentity.LostTalesTileEntityRendererStatue;
-import com.ninuna.losttales.network.LostTalesNetworkHandler;
-import com.ninuna.losttales.client.network.LostTalesQuickLootContainerSyncHandler;
-import com.ninuna.losttales.client.network.LostTalesQuestSyncHandler;
-import com.ninuna.losttales.client.network.LostTalesMobAggroSyncHandler;
-import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
-import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
-import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import cpw.mods.fml.common.FMLCommonHandler;
-import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
@@ -46,9 +46,6 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(keyBindings);
         FMLCommonHandler.instance().bus().register(clientEventHandler);
         FMLCommonHandler.instance().bus().register(new LostTalesConfigGuiEventHandler());
-        LostTalesNetworkHandler.CHANNEL.registerMessage(LostTalesQuickLootContainerSyncHandler.class, LostTalesQuickLootContainerSyncPacket.class, 2, Side.CLIENT);
-        LostTalesNetworkHandler.CHANNEL.registerMessage(LostTalesQuestSyncHandler.class, LostTalesQuestSyncPacket.class, 3, Side.CLIENT);
-        LostTalesNetworkHandler.CHANNEL.registerMessage(LostTalesMobAggroSyncHandler.class, LostTalesMobAggroSyncPacket.class, 5, Side.CLIENT);
         ELostTalesMapLabels.initAndRegisterMapLabels();
 
         GeoArmorRenderer.registerArmorRenderer(LostTalesItemArmor3D.class, new LostTalesItemRendererArmor3D());
@@ -66,6 +63,29 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityPlushie.class, new LostTalesTileEntityRendererPlushie());
 
         super.init(event);
+    }
+
+    @Override
+    public void handleQuickLootContainerSync(LostTalesQuickLootContainerSyncPacket packet) {
+        if (packet != null) {
+            LostTalesClientQuickLootCache.update(packet.getX(), packet.getY(), packet.getZ(), packet.getTitle(), packet.isSealed(), packet.getItems());
+        }
+    }
+
+    @Override
+    public void handleQuestSync(LostTalesQuestSyncPacket packet) {
+        if (packet != null) {
+            LostTalesClientQuestNotificationStore.notifyForIncomingSync(packet.getActiveQuests(), packet.getCompletedQuestIds());
+            LostTalesClientMapMarkerStore.setDynamicMarkers(packet.getDynamicMapMarkers());
+            LostTalesClientQuestProgressStore.update(packet.getActiveQuests(), packet.getCompletedQuestIds(), packet.getPinnedQuestIds(), packet.getDiscoveredMarkerIds(), packet.getPinnedMapMarkerId());
+        }
+    }
+
+    @Override
+    public void handleMobAggroSync(LostTalesMobAggroSyncPacket packet) {
+        if (packet != null) {
+            LostTalesClientMobAggroCache.accept(packet.getEntityIds());
+        }
     }
 
     @Override

@@ -8,22 +8,22 @@ import java.util.Collections;
 import java.util.List;
 
 public final class LostTalesClientQuickLootCache {
-    private static Snapshot snapshot;
+    private static volatile Snapshot snapshot;
 
     private LostTalesClientQuickLootCache() {}
 
-    public static void update(int x, int y, int z, String title, boolean sealed, ItemStack[] items) {
+    public static synchronized void update(int x, int y, int z, String title, boolean sealed, ItemStack[] items) {
         snapshot = new Snapshot(x, y, z, title, sealed, items);
     }
 
-    public static Snapshot get(int x, int y, int z) {
+    public static synchronized Snapshot get(int x, int y, int z) {
         if (snapshot != null && snapshot.x == x && snapshot.y == y && snapshot.z == z) {
             return snapshot;
         }
         return null;
     }
 
-    public static void clear() {
+    public static synchronized void clear() {
         snapshot = null;
     }
 

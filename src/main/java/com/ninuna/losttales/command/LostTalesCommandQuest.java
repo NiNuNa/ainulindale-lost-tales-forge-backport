@@ -79,9 +79,16 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         }
 
         if ("unpin".equalsIgnoreCase(action)) {
-            EntityPlayerMP player = getTargetPlayer(sender, args, 1);
-            if (player != null) {
-                unpinQuest(sender, player);
+            if (args.length >= 2 && LostTalesQuestRegistry.getQuest(args[1]) != null) {
+                EntityPlayerMP player = getTargetPlayer(sender, args, 2);
+                if (player != null) {
+                    unpinQuest(sender, player, args[1]);
+                }
+            } else {
+                EntityPlayerMP player = getTargetPlayer(sender, args, 1);
+                if (player != null) {
+                    unpinQuest(sender, player);
+                }
             }
             return;
         }
@@ -153,12 +160,12 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
     private void sendPlayerQuests(ICommandSender sender, EntityPlayerMP player) {
         Collection<LostTalesQuestProgress> active = LostTalesQuestManager.getActiveQuests(player);
         Set<String> completed = LostTalesQuestManager.getCompletedQuestIds(player);
-        String pinnedQuestId = LostTalesQuestManager.getPinnedQuestId(player);
+        Set<String> pinnedQuestIds = LostTalesQuestManager.getPinnedQuestIds(player);
         String pinnedMarkerId = LostTalesQuestManager.getPinnedMapMarkerId(player);
         Set<String> discoveredMarkers = LostTalesQuestManager.getDiscoveredMarkerIds(player);
 
         send(sender, EnumChatFormatting.GOLD + "Quest state for " + player.getCommandSenderName() + ":");
-        send(sender, EnumChatFormatting.GRAY + "Tracked quest: " + (pinnedQuestId.length() == 0 ? "none" : pinnedQuestId));
+        send(sender, EnumChatFormatting.GRAY + "Tracked quests: " + (pinnedQuestIds.isEmpty() ? "none" : join(pinnedQuestIds)));
         send(sender, EnumChatFormatting.GRAY + "Tracked marker: " + (pinnedMarkerId.length() == 0 ? "none" : pinnedMarkerId));
         send(sender, EnumChatFormatting.GRAY + "Discovered markers: " + (discoveredMarkers.isEmpty() ? "none" : join(discoveredMarkers)));
         if (active.isEmpty()) {
@@ -241,9 +248,17 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
 
     private void unpinQuest(ICommandSender sender, EntityPlayerMP player) {
         if (LostTalesQuestManager.unpinQuest(player)) {
-            send(sender, EnumChatFormatting.GREEN + "Stopped tracking quest for " + player.getCommandSenderName() + ".");
+            send(sender, EnumChatFormatting.GREEN + "Stopped tracking all quests for " + player.getCommandSenderName() + ".");
         } else {
-            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " had no tracked quest.");
+            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " had no tracked quests.");
+        }
+    }
+
+    private void unpinQuest(ICommandSender sender, EntityPlayerMP player, String questId) {
+        if (LostTalesQuestManager.unpinQuest(player, questId)) {
+            send(sender, EnumChatFormatting.GREEN + "Stopped tracking quest " + questId + " for " + player.getCommandSenderName() + ".");
+        } else {
+            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " was not tracking " + questId + ".");
         }
     }
 

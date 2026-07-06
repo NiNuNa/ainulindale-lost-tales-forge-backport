@@ -57,7 +57,7 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
         if ("quest".equalsIgnoreCase(name) || "quests".equalsIgnoreCase(name) || "q".equalsIgnoreCase(name)) {
             return questCommand;
         }
-        if ("mapmarker".equalsIgnoreCase(name) || "mapmarkers".equalsIgnoreCase(name) || "marker".equalsIgnoreCase(name) || "markers".equalsIgnoreCase(name) || "map_marker".equalsIgnoreCase(name)) {
+        if ("mapmarker".equalsIgnoreCase(name) || "mapmarkers".equalsIgnoreCase(name) || "marker".equalsIgnoreCase(name) || "markers".equalsIgnoreCase(name)) {
             return mapMarkerCommand;
         }
         if ("hud".equalsIgnoreCase(name) || "overlay".equalsIgnoreCase(name)) {
@@ -82,7 +82,7 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " mapmarker <known|list|discover|forget|track|untrack>");
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " hud <status|preset|set|move|toggle>");
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " summon <entity> [x] [y] [z] [dataTag]");
-        send(sender, EnumChatFormatting.DARK_GRAY + "Legacy shortcuts like /losttales_quest still exist for old scripts.");
+        send(sender, EnumChatFormatting.DARK_GRAY + "Use /losttales <subcommand>; legacy underscore commands are no longer registered.");
     }
 
     private void send(ICommandSender sender, String message) {

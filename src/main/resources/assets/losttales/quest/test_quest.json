@@ -42,7 +42,7 @@
         {
           "id":"return",
           "type":"goto",
-          "description":"Move to the map marker.",
+          "description":"Travel to the destination.",
           "optional":false,
           "params":{
             "x":"120",

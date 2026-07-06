@@ -50,6 +50,10 @@ public class LostTalesQuestActionPacket implements IMessage {
             }
 
             EntityPlayerMP player = ctx.getServerHandler().playerEntity;
+            if (player.worldObj == null || player.worldObj.isRemote) {
+                return null;
+            }
+
             String action = message.action == null ? "" : message.action.trim().toLowerCase();
             String questId = message.questId == null ? "" : message.questId.trim();
 
@@ -62,7 +66,11 @@ public class LostTalesQuestActionPacket implements IMessage {
             } else if (ACTION_PIN.equals(action) && questId.length() > 0) {
                 LostTalesQuestManager.pinQuest(player, questId);
             } else if (ACTION_UNPIN.equals(action)) {
-                LostTalesQuestManager.unpinQuest(player);
+                if (questId.length() > 0) {
+                    LostTalesQuestManager.unpinQuest(player, questId);
+                } else {
+                    LostTalesQuestManager.unpinQuest(player);
+                }
             } else if (ACTION_REVEAL_MARKERS.equals(action) && questId.length() > 0) {
                 LostTalesQuestManager.revealQuestMarkers(player, questId);
             } else if (ACTION_PIN_MARKER.equals(action) && questId.length() > 0) {

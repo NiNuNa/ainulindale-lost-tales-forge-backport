@@ -1,0 +1,57 @@
+{
+  "id": "losttales:path/survivalist/first_sparks",
+  "title": "Path of the Survivalist: First Sparks",
+  "description": "The first lesson of the trail is simple: gather what the land gives freely and keep a flame ready before dusk.",
+  "repeatable": false,
+  "startMode": "item",
+  "journalLog": {
+    "10": "I have taken my first steps on the survivalist path. Before I can call myself prepared, I need simple fuel, a few branches, and a reliable flame.",
+    "20": "I have gathered the makings of a small camp. With torches in hand, night should be less threatening."
+  },
+  "stages": [
+    {
+      "id": "10",
+      "objectives": [
+        {
+          "id": "gather_logs",
+          "type": "gather",
+          "description": "Gather 4 logs.",
+          "optional": false,
+          "params": {
+            "ore": "logWood",
+            "count": "4"
+          }
+        },
+        {
+          "id": "gather_sticks",
+          "type": "gather",
+          "description": "Gather 8 sticks.",
+          "optional": false,
+          "params": {
+            "item": "minecraft:stick",
+            "count": "8"
+          }
+        }
+      ]
+    },
+    {
+      "id": "20",
+      "objectives": [
+        {
+          "id": "craft_torches",
+          "type": "craft",
+          "description": "Craft 8 torches.",
+          "optional": false,
+          "params": {
+            "item": "minecraft:torch",
+            "count": "8"
+          }
+        }
+      ]
+    }
+  ],
+  "rewards": {
+    "experience": "20",
+    "items": "minecraft:apple*2,minecraft:torch*4"
+  }
+}

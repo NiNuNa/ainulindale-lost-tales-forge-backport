@@ -5,11 +5,7 @@ import lotr.common.command.LOTRCommandStrScan;
 import net.minecraft.command.CommandBase;
 
 public enum ELostTalesCommand {
-    ROOT(new LostTalesCommandRoot()),
-    SUMMON(new LostTalesCommandSummon()),
-    QUEST(new LostTalesCommandQuest()),
-    MAP_MARKER(new LostTalesCommandMapMarker()),
-    HUD(new LostTalesCommandHud());
+    ROOT(new LostTalesCommandRoot());
 
     private final CommandBase command;
 

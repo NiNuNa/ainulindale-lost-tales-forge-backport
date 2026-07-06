@@ -18,10 +18,8 @@ public enum ELostTalesBlock {
     //  The block registry names for amphora/loutrophoros intentionally stay legacy-compatible,
     //  while the enum/API names use the newer urn terminology.
     URN_AMPHORA(new LostTalesBlockUrnBase(ELostTalesUser.SCOSHER).setBlockName("amphora").setCreativeTab(ELostTalesCreativeTabs.BLOCKS_DECORATION.getCreativeTab())),
-    URN_AMPHORA_ANCIENT(new LostTalesBlockUrnAncient(ELostTalesUser.SCOSHER).setBlockName("amphora_ancient").setCreativeTab(ELostTalesCreativeTabs.BLOCKS_DECORATION.getCreativeTab())),
     URN(new LostTalesBlockUrnBase(ELostTalesUser.SCOSHER).setBlockName("urn").setCreativeTab(ELostTalesCreativeTabs.BLOCKS_DECORATION.getCreativeTab())),
     URN_LOUTROPHOROS(new LostTalesBlockUrnTall(ELostTalesUser.SCOSHER).setBlockName("loutrophoros").setCreativeTab(ELostTalesCreativeTabs.BLOCKS_DECORATION.getCreativeTab())),
-    URN_LOUTROPHOROS_ANCIENT(new LostTalesBlockUrnAncientTall(ELostTalesUser.SCOSHER).setBlockName("loutrophoros_ancient").setCreativeTab(ELostTalesCreativeTabs.BLOCKS_DECORATION.getCreativeTab())),
 
     //  Blocks - Statue.
     STATUE_WATCH_STONE(new LostTalesBlockStatueTall(Material.rock, ELostTalesUser.SCOSHER).setBlockName("watch_stone").setCreativeTab(ELostTalesCreativeTabs.BLOCKS_DECORATION.getCreativeTab())),
@@ -42,11 +40,11 @@ public enum ELostTalesBlock {
     /**
      * Deprecated source-level aliases kept so older internal/add-on code that still
      * references the old amphora/loutrophoros enum names can be migrated gradually.
+     *
+     * The old ancient urn variants were intentionally removed from the registry.
      */
     @Deprecated public static final ELostTalesBlock AMPHORA = URN_AMPHORA;
-    @Deprecated public static final ELostTalesBlock AMPHORA_ANCIENT = URN_AMPHORA_ANCIENT;
     @Deprecated public static final ELostTalesBlock LOUTROPHOROS = URN_LOUTROPHOROS;
-    @Deprecated public static final ELostTalesBlock LOUTROPHOROS_ANCIENT = URN_LOUTROPHOROS_ANCIENT;
 
     private final Block block;
 

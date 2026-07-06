@@ -32,7 +32,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     private final Set<String> completedQuests = new LinkedHashSet<String>();
     private final Set<String> discoveredMarkerIds = new LinkedHashSet<String>();
     private final Map<String, LostTalesMapMarkerDefinition> dynamicMapMarkers = new LinkedHashMap<String, LostTalesMapMarkerDefinition>();
-    private String pinnedQuestId = "";
+    private final Set<String> pinnedQuestIds = new LinkedHashSet<String>();
     private String pinnedMapMarkerId = "";
     private EntityPlayer player;
 
@@ -69,7 +69,21 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             completedList.appendTag(questTag);
         }
         data.setTag("CompletedQuests", completedList);
-        data.setString("PinnedQuestId", this.pinnedQuestId == null ? "" : this.pinnedQuestId);
+
+        // Keep the old single-string tag as a migration/compatibility hint, but
+        // store the real tracked quest state as a list so multiple quests can be
+        // tracked at the same time.
+        data.setString("PinnedQuestId", getPinnedQuestId());
+        NBTTagList pinnedQuestList = new NBTTagList();
+        for (String questId : this.pinnedQuestIds) {
+            if (questId == null || questId.length() == 0 || !this.activeQuests.containsKey(questId)) {
+                continue;
+            }
+            NBTTagCompound questTag = new NBTTagCompound();
+            questTag.setString("QuestId", questId);
+            pinnedQuestList.appendTag(questTag);
+        }
+        data.setTag("PinnedQuestIds", pinnedQuestList);
 
         NBTTagList markerList = new NBTTagList();
         for (String markerId : this.discoveredMarkerIds) {
@@ -108,7 +122,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.completedQuests.clear();
         this.discoveredMarkerIds.clear();
         this.dynamicMapMarkers.clear();
-        this.pinnedQuestId = "";
+        this.pinnedQuestIds.clear();
         this.pinnedMapMarkerId = "";
 
         if (compound == null || !compound.hasKey(PROPERTY_ID)) {
@@ -124,9 +138,20 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             }
         }
 
-        this.pinnedQuestId = data.getString("PinnedQuestId");
-        if (this.pinnedQuestId == null || !this.activeQuests.containsKey(this.pinnedQuestId)) {
-            this.pinnedQuestId = "";
+        NBTTagList pinnedQuestList = data.getTagList("PinnedQuestIds", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < pinnedQuestList.tagCount(); i++) {
+            String questId = pinnedQuestList.getCompoundTagAt(i).getString("QuestId");
+            if (questId != null && questId.length() > 0 && this.activeQuests.containsKey(questId)) {
+                this.pinnedQuestIds.add(questId);
+            }
+        }
+
+        // Migration path for worlds saved before multi-tracking existed.
+        if (this.pinnedQuestIds.isEmpty()) {
+            String legacyPinnedQuestId = data.getString("PinnedQuestId");
+            if (legacyPinnedQuestId != null && this.activeQuests.containsKey(legacyPinnedQuestId)) {
+                this.pinnedQuestIds.add(legacyPinnedQuestId);
+            }
         }
 
         NBTTagList completedList = data.getTagList("CompletedQuests", Constants.NBT.TAG_COMPOUND);
@@ -214,13 +239,29 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             return;
         }
         this.activeQuests.put(questId, new LostTalesQuestProgress(questId, 0, firstStageId));
-        if (this.pinnedQuestId == null || this.pinnedQuestId.length() == 0) {
-            this.pinnedQuestId = questId;
-        }
     }
 
     public String getPinnedQuestId() {
-        return this.pinnedQuestId == null ? "" : this.pinnedQuestId;
+        for (String questId : this.pinnedQuestIds) {
+            if (questId != null && questId.length() > 0 && this.activeQuests.containsKey(questId)) {
+                return questId;
+            }
+        }
+        return "";
+    }
+
+    public Set<String> getPinnedQuestIds() {
+        LinkedHashSet<String> copy = new LinkedHashSet<String>();
+        for (String questId : this.pinnedQuestIds) {
+            if (questId != null && questId.length() > 0 && this.activeQuests.containsKey(questId)) {
+                copy.add(questId);
+            }
+        }
+        return Collections.unmodifiableSet(copy);
+    }
+
+    public boolean isQuestPinned(String questId) {
+        return questId != null && this.pinnedQuestIds.contains(questId) && this.activeQuests.containsKey(questId);
     }
 
     public String getPinnedMapMarkerId() {
@@ -297,22 +338,26 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean setPinnedQuestId(String questId) {
+        return pinQuestId(questId);
+    }
+
+    public boolean pinQuestId(String questId) {
+        if (questId == null || questId.length() == 0 || !this.activeQuests.containsKey(questId)) {
+            return false;
+        }
+        return this.pinnedQuestIds.add(questId);
+    }
+
+    public boolean unpinQuestId(String questId) {
         if (questId == null || questId.length() == 0) {
-            return clearPinnedQuestId();
-        }
-        if (!this.activeQuests.containsKey(questId)) {
             return false;
         }
-        if (questId.equals(this.pinnedQuestId)) {
-            return false;
-        }
-        this.pinnedQuestId = questId;
-        return true;
+        return this.pinnedQuestIds.remove(questId);
     }
 
     public boolean clearPinnedQuestId() {
-        boolean changed = this.pinnedQuestId != null && this.pinnedQuestId.length() > 0;
-        this.pinnedQuestId = "";
+        boolean changed = !this.pinnedQuestIds.isEmpty();
+        this.pinnedQuestIds.clear();
         return changed;
     }
 
@@ -321,9 +366,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             return false;
         }
         boolean wasActive = this.activeQuests.remove(questId) != null;
-        if (questId.equals(this.pinnedQuestId)) {
-            this.pinnedQuestId = "";
-        }
+        this.pinnedQuestIds.remove(questId);
         boolean wasNewlyCompleted = this.completedQuests.add(questId);
         return wasActive || wasNewlyCompleted;
     }
@@ -360,9 +403,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             return false;
         }
         boolean removedActive = this.activeQuests.remove(questId) != null;
-        if (questId.equals(this.pinnedQuestId)) {
-            this.pinnedQuestId = "";
-        }
+        this.pinnedQuestIds.remove(questId);
         boolean removedCompleted = this.completedQuests.remove(questId);
         return removedActive || removedCompleted;
     }
@@ -372,9 +413,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             return false;
         }
         boolean changed = this.activeQuests.remove(questId) != null;
-        if (questId.equals(this.pinnedQuestId)) {
-            this.pinnedQuestId = "";
-        }
+        this.pinnedQuestIds.remove(questId);
         return changed;
     }
 
@@ -383,7 +422,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.completedQuests.clear();
         this.discoveredMarkerIds.clear();
         this.dynamicMapMarkers.clear();
-        this.pinnedQuestId = "";
+        this.pinnedQuestIds.clear();
         this.pinnedMapMarkerId = "";
         if (oldData == null) {
             return;
@@ -395,7 +434,11 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.completedQuests.addAll(oldData.completedQuests);
         this.discoveredMarkerIds.addAll(oldData.discoveredMarkerIds);
         this.dynamicMapMarkers.putAll(oldData.dynamicMapMarkers);
-        this.pinnedQuestId = oldData.pinnedQuestId != null && this.activeQuests.containsKey(oldData.pinnedQuestId) ? oldData.pinnedQuestId : "";
+        for (String questId : oldData.pinnedQuestIds) {
+            if (questId != null && this.activeQuests.containsKey(questId)) {
+                this.pinnedQuestIds.add(questId);
+            }
+        }
         this.pinnedMapMarkerId = oldData.pinnedMapMarkerId != null && this.discoveredMarkerIds.contains(oldData.pinnedMapMarkerId) ? oldData.pinnedMapMarkerId : "";
     }
 

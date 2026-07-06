@@ -28,9 +28,8 @@ public final class LostTalesQuestObjectiveTextHelper {
         if (includeCheckbox) {
             line.append(current >= target ? "- [x] " : "- [ ] ");
         }
-        line.append(getReadableObjectiveType(objective.getType())).append(": ");
         String description = objective.getDescription();
-        line.append(description == null || description.length() == 0 ? objective.getId() : description);
+        line.append(description == null || description.length() == 0 ? buildFallbackObjectiveText(objective) : description);
         line.append(" (").append(current).append('/').append(target).append(')');
 
         if (includeDetails) {
@@ -43,6 +42,47 @@ public final class LostTalesQuestObjectiveTextHelper {
             line.append(" optional");
         }
         return line.toString();
+    }
+
+    private static String buildFallbackObjectiveText(LostTalesQuestObjectiveDefinition objective) {
+        if (objective == null) {
+            return "Objective";
+        }
+        int target = getObjectiveTargetCount(objective);
+        String type = objective.getType() == null ? "" : objective.getType();
+        if ("goto".equalsIgnoreCase(type)) {
+            return "Travel to the destination.";
+        }
+        if ("gather".equalsIgnoreCase(type) || "gather_item".equalsIgnoreCase(type) || "pickup".equalsIgnoreCase(type) || "pickup_item".equalsIgnoreCase(type) || "collect".equalsIgnoreCase(type)) {
+            String item = firstNonEmpty(objective.getParam("item", ""), objective.getParam("itemId", ""), objective.getParam("target", ""));
+            return "Gather " + target + (item.length() > 0 ? " " + prettifyResourceName(item) : " item" + (target == 1 ? "" : "s")) + ".";
+        }
+        if ("craft".equalsIgnoreCase(type)) {
+            String item = firstNonEmpty(objective.getParam("item", ""), objective.getParam("itemId", ""), objective.getParam("target", ""));
+            return "Craft " + target + (item.length() > 0 ? " " + prettifyResourceName(item) : " item" + (target == 1 ? "" : "s")) + ".";
+        }
+        if ("kill".equalsIgnoreCase(type)) {
+            String entity = firstNonEmpty(objective.getParam("entity", ""), objective.getParam("entityId", ""), objective.getParam("target", ""), objective.getParam("group", ""));
+            return "Defeat " + target + (entity.length() > 0 ? " " + prettifyResourceName(entity) : " enem" + (target == 1 ? "y" : "ies")) + ".";
+        }
+        return getReadableObjectiveType(type);
+    }
+
+    private static String prettifyResourceName(String value) {
+        if (value == null) {
+            return "";
+        }
+        String text = value.trim();
+        int colon = text.indexOf(':');
+        if (colon >= 0 && colon + 1 < text.length()) {
+            text = text.substring(colon + 1);
+        }
+        int at = text.indexOf('@');
+        if (at >= 0) {
+            text = text.substring(0, at);
+        }
+        text = text.replace('-', ' ').replace('_', ' ');
+        return text;
     }
 
     public static String getReadableObjectiveType(String type) {

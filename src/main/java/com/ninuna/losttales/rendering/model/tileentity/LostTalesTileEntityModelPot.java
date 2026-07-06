@@ -10,12 +10,10 @@ public class LostTalesTileEntityModelPot extends AnimatedGeoModel<LostTalesTileE
 
     @Override
     public ResourceLocation getModelLocation(LostTalesTileEntityPot tileEntityPot) {
-        if (tileEntityPot.getBlockType().getUnlocalizedName().equals(ELostTalesBlock.AMPHORA.getBlock().getUnlocalizedName())
-                || tileEntityPot.getBlockType().getUnlocalizedName().equals(ELostTalesBlock.AMPHORA_ANCIENT.getBlock().getUnlocalizedName())) {
+        if (tileEntityPot.getBlockType().getUnlocalizedName().equals(ELostTalesBlock.AMPHORA.getBlock().getUnlocalizedName())) {
             return new ResourceLocation(LostTalesMetaData.MOD_ID, "geo/amphora.geo.json");
 
-        } else if (tileEntityPot.getBlockType().getUnlocalizedName().equals(ELostTalesBlock.LOUTROPHOROS.getBlock().getUnlocalizedName())
-                || tileEntityPot.getBlockType().getUnlocalizedName().equals(ELostTalesBlock.LOUTROPHOROS_ANCIENT.getBlock().getUnlocalizedName())) {
+        } else if (tileEntityPot.getBlockType().getUnlocalizedName().equals(ELostTalesBlock.LOUTROPHOROS.getBlock().getUnlocalizedName())) {
             return new ResourceLocation(LostTalesMetaData.MOD_ID, "geo/loutrophoros.geo.json");
         } else {
             return null;
@@ -24,12 +22,10 @@ public class LostTalesTileEntityModelPot extends AnimatedGeoModel<LostTalesTileE
 
     @Override
     public ResourceLocation getTextureLocation(LostTalesTileEntityPot tileEntityPot) {
-        if (tileEntityPot.getBlockType().getUnlocalizedName().equals(ELostTalesBlock.AMPHORA.getBlock().getUnlocalizedName())
-                || tileEntityPot.getBlockType().getUnlocalizedName().equals(ELostTalesBlock.AMPHORA_ANCIENT.getBlock().getUnlocalizedName())) {
+        if (tileEntityPot.getBlockType().getUnlocalizedName().equals(ELostTalesBlock.AMPHORA.getBlock().getUnlocalizedName())) {
             return new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/models/amphora.png");
 
-        } else if (tileEntityPot.getBlockType().getUnlocalizedName().equals(ELostTalesBlock.LOUTROPHOROS.getBlock().getUnlocalizedName())
-                || tileEntityPot.getBlockType().getUnlocalizedName().equals(ELostTalesBlock.LOUTROPHOROS_ANCIENT.getBlock().getUnlocalizedName())) {
+        } else if (tileEntityPot.getBlockType().getUnlocalizedName().equals(ELostTalesBlock.LOUTROPHOROS.getBlock().getUnlocalizedName())) {
             return new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/models/loutrophoros.png");
         } else {
             return null;

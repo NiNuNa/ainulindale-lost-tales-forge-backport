@@ -20,7 +20,11 @@ import net.minecraft.world.World;
 import java.util.Random;
 
 public class LostTalesBlockUrn extends LostTalesBlockDirectionalContainerBase {
-    public static final Item LEGACY_SEALING_ITEM = Items.clay_ball;
+    /**
+     * The modern branch seals urns with honeycomb. Minecraft 1.7.10 does not
+     * have honeycomb, so this backport intentionally uses vanilla clay balls.
+     */
+    public static final Item SEALING_ITEM = Items.clay_ball;
 
     private final int inventorySlots;
     private final boolean tall;
@@ -103,7 +107,7 @@ public class LostTalesBlockUrn extends LostTalesBlockDirectionalContainerBase {
                 return true;
             }
 
-            if (held != null && held.getItem() == LEGACY_SEALING_ITEM) {
+            if (held != null && this.isSealingItem(held)) {
                 urn.setSealed(true);
                 urn.playFillAnimation();
                 if (!player.capabilities.isCreativeMode) {
@@ -128,6 +132,10 @@ public class LostTalesBlockUrn extends LostTalesBlockDirectionalContainerBase {
             world.playSoundEffect((double) bottom[0] + 0.5D, (double) bottom[1] + 0.5D, (double) bottom[2] + 0.5D, "random.click", 0.4F, 1.0F);
         }
         return true;
+    }
+
+    private boolean isSealingItem(ItemStack stack) {
+        return stack != null && stack.getItem() == SEALING_ITEM;
     }
 
     @Override

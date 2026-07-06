@@ -1,6 +1,9 @@
 package com.ninuna.losttales.network.packet;
 
+import com.ninuna.losttales.LostTalesMod;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
+import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
+import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 
 import java.util.ArrayList;
@@ -57,5 +60,16 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
 
     public List<Integer> getEntityIds() {
         return Collections.unmodifiableList(new ArrayList<Integer>(this.entityIds));
+    }
+
+    /** Common-safe clientbound handler; real client work is delegated to the sided proxy. */
+    public static class Handler implements IMessageHandler<LostTalesMobAggroSyncPacket, IMessage> {
+        @Override
+        public IMessage onMessage(LostTalesMobAggroSyncPacket message, MessageContext ctx) {
+            if (LostTalesMod.proxy != null) {
+                LostTalesMod.proxy.handleMobAggroSync(message);
+            }
+            return null;
+        }
     }
 }

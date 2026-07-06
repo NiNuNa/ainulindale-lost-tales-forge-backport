@@ -1,10 +1,13 @@
 package com.ninuna.losttales.network.packet;
 
+import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import cpw.mods.fml.common.network.ByteBufUtils;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
+import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
+import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 
 import java.util.ArrayList;
@@ -19,33 +22,37 @@ import java.util.Set;
 /**
  * Server-to-client snapshot of a player's quest state.
  *
- * This packet intentionally stays snapshot-based for Forge 1.7.10 simplicity. It
- * carries active/completed quests, objective counters, the tracked quest, and the
- * player's discovered/tracked map marker IDs.
+ * <p>This packet intentionally stays snapshot-based for Forge 1.7.10 simplicity. It
+ * carries active/completed quests, objective counters, tracked quests, and the
+ * player's discovered/tracked map marker IDs.</p>
  */
 public class LostTalesQuestSyncPacket implements IMessage {
     private final List<LostTalesQuestProgress> activeQuests = new ArrayList<LostTalesQuestProgress>();
     private final Set<String> completedQuestIds = new LinkedHashSet<String>();
     private final Set<String> discoveredMarkerIds = new LinkedHashSet<String>();
+    private final Set<String> pinnedQuestIds = new LinkedHashSet<String>();
     private final List<LostTalesMapMarkerDefinition> dynamicMapMarkers = new ArrayList<LostTalesMapMarkerDefinition>();
-    private String pinnedQuestId = "";
     private String pinnedMapMarkerId = "";
 
     public LostTalesQuestSyncPacket() {}
 
     public LostTalesQuestSyncPacket(Collection<LostTalesQuestProgress> activeQuests, Collection<String> completedQuestIds) {
-        this(activeQuests, completedQuestIds, "", Collections.<String>emptySet(), "", Collections.<LostTalesMapMarkerDefinition>emptyList());
+        this(activeQuests, completedQuestIds, Collections.<String>emptySet(), Collections.<String>emptySet(), "", Collections.<LostTalesMapMarkerDefinition>emptyList());
     }
 
     public LostTalesQuestSyncPacket(Collection<LostTalesQuestProgress> activeQuests, Collection<String> completedQuestIds, String pinnedQuestId) {
-        this(activeQuests, completedQuestIds, pinnedQuestId, Collections.<String>emptySet(), "", Collections.<LostTalesMapMarkerDefinition>emptyList());
+        this(activeQuests, completedQuestIds, singlePinned(pinnedQuestId), Collections.<String>emptySet(), "", Collections.<LostTalesMapMarkerDefinition>emptyList());
     }
 
     public LostTalesQuestSyncPacket(Collection<LostTalesQuestProgress> activeQuests, Collection<String> completedQuestIds, String pinnedQuestId, Collection<String> discoveredMarkerIds, String pinnedMapMarkerId) {
-        this(activeQuests, completedQuestIds, pinnedQuestId, discoveredMarkerIds, pinnedMapMarkerId, Collections.<LostTalesMapMarkerDefinition>emptyList());
+        this(activeQuests, completedQuestIds, singlePinned(pinnedQuestId), discoveredMarkerIds, pinnedMapMarkerId, Collections.<LostTalesMapMarkerDefinition>emptyList());
     }
 
     public LostTalesQuestSyncPacket(Collection<LostTalesQuestProgress> activeQuests, Collection<String> completedQuestIds, String pinnedQuestId, Collection<String> discoveredMarkerIds, String pinnedMapMarkerId, Collection<LostTalesMapMarkerDefinition> dynamicMapMarkers) {
+        this(activeQuests, completedQuestIds, singlePinned(pinnedQuestId), discoveredMarkerIds, pinnedMapMarkerId, dynamicMapMarkers);
+    }
+
+    public LostTalesQuestSyncPacket(Collection<LostTalesQuestProgress> activeQuests, Collection<String> completedQuestIds, Collection<String> pinnedQuestIds, Collection<String> discoveredMarkerIds, String pinnedMapMarkerId, Collection<LostTalesMapMarkerDefinition> dynamicMapMarkers) {
         if (activeQuests != null) {
             for (LostTalesQuestProgress progress : activeQuests) {
                 if (progress != null) {
@@ -57,6 +64,13 @@ public class LostTalesQuestSyncPacket implements IMessage {
             for (String questId : completedQuestIds) {
                 if (questId != null && questId.length() > 0) {
                     this.completedQuestIds.add(questId);
+                }
+            }
+        }
+        if (pinnedQuestIds != null) {
+            for (String questId : pinnedQuestIds) {
+                if (questId != null && questId.length() > 0) {
+                    this.pinnedQuestIds.add(questId);
                 }
             }
         }
@@ -74,7 +88,6 @@ public class LostTalesQuestSyncPacket implements IMessage {
                 }
             }
         }
-        this.pinnedQuestId = pinnedQuestId == null ? "" : pinnedQuestId;
         this.pinnedMapMarkerId = pinnedMapMarkerId == null ? "" : pinnedMapMarkerId;
     }
 
@@ -82,7 +95,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
         if (data == null) {
             return new LostTalesQuestSyncPacket();
         }
-        return new LostTalesQuestSyncPacket(data.getActiveQuests(), data.getCompletedQuestIds(), data.getPinnedQuestId(), data.getDiscoveredMarkerIds(), data.getPinnedMapMarkerId(), data.getDynamicMapMarkers());
+        return new LostTalesQuestSyncPacket(data.getActiveQuests(), data.getCompletedQuestIds(), data.getPinnedQuestIds(), data.getDiscoveredMarkerIds(), data.getPinnedMapMarkerId(), data.getDynamicMapMarkers());
     }
 
     @Override
@@ -90,8 +103,8 @@ public class LostTalesQuestSyncPacket implements IMessage {
         this.activeQuests.clear();
         this.completedQuestIds.clear();
         this.discoveredMarkerIds.clear();
+        this.pinnedQuestIds.clear();
         this.dynamicMapMarkers.clear();
-        this.pinnedQuestId = "";
         this.pinnedMapMarkerId = "";
 
         int activeCount = buf.readInt();
@@ -115,7 +128,20 @@ public class LostTalesQuestSyncPacket implements IMessage {
             }
         }
 
-        this.pinnedQuestId = ByteBufUtils.readUTF8String(buf);
+        // Legacy first tracked quest, kept for old getter compatibility.
+        String legacyPinnedQuestId = ByteBufUtils.readUTF8String(buf);
+        if (legacyPinnedQuestId != null && legacyPinnedQuestId.length() > 0) {
+            this.pinnedQuestIds.add(legacyPinnedQuestId);
+        }
+
+        int pinnedQuestCount = buf.readInt();
+        for (int i = 0; i < pinnedQuestCount; i++) {
+            String questId = ByteBufUtils.readUTF8String(buf);
+            if (questId != null && questId.length() > 0) {
+                this.pinnedQuestIds.add(questId);
+            }
+        }
+
         this.pinnedMapMarkerId = ByteBufUtils.readUTF8String(buf);
 
         int markerCount = buf.readInt();
@@ -167,7 +193,11 @@ public class LostTalesQuestSyncPacket implements IMessage {
             }
         }
 
-        ByteBufUtils.writeUTF8String(buf, safe(this.pinnedQuestId));
+        ByteBufUtils.writeUTF8String(buf, safe(getPinnedQuestId()));
+        buf.writeInt(this.pinnedQuestIds.size());
+        for (String questId : this.pinnedQuestIds) {
+            ByteBufUtils.writeUTF8String(buf, safe(questId));
+        }
         ByteBufUtils.writeUTF8String(buf, safe(this.pinnedMapMarkerId));
 
         buf.writeInt(this.discoveredMarkerIds.size());
@@ -215,14 +245,40 @@ public class LostTalesQuestSyncPacket implements IMessage {
     }
 
     public String getPinnedQuestId() {
-        return this.pinnedQuestId == null ? "" : this.pinnedQuestId;
+        for (String questId : this.pinnedQuestIds) {
+            return questId == null ? "" : questId;
+        }
+        return "";
+    }
+
+    public Set<String> getPinnedQuestIds() {
+        return Collections.unmodifiableSet(new LinkedHashSet<String>(this.pinnedQuestIds));
     }
 
     public String getPinnedMapMarkerId() {
         return this.pinnedMapMarkerId == null ? "" : this.pinnedMapMarkerId;
     }
 
+    private static Set<String> singlePinned(String questId) {
+        LinkedHashSet<String> pinned = new LinkedHashSet<String>();
+        if (questId != null && questId.length() > 0) {
+            pinned.add(questId);
+        }
+        return pinned;
+    }
+
     private String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    /** Common-safe clientbound handler; real client work is delegated to the sided proxy. */
+    public static class Handler implements IMessageHandler<LostTalesQuestSyncPacket, IMessage> {
+        @Override
+        public IMessage onMessage(LostTalesQuestSyncPacket message, MessageContext ctx) {
+            if (LostTalesMod.proxy != null) {
+                LostTalesMod.proxy.handleQuestSync(message);
+            }
+            return null;
+        }
     }
 }

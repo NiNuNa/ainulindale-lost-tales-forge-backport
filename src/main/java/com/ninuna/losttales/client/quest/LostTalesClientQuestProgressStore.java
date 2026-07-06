@@ -15,24 +15,37 @@ public final class LostTalesClientQuestProgressStore {
     private static final Map<String, LostTalesQuestProgress> ACTIVE_QUESTS = new LinkedHashMap<String, LostTalesQuestProgress>();
     private static final Set<String> COMPLETED_QUESTS = new LinkedHashSet<String>();
     private static final Set<String> DISCOVERED_MARKERS = new LinkedHashSet<String>();
-    private static String pinnedQuestId = "";
+    private static final Set<String> PINNED_QUESTS = new LinkedHashSet<String>();
     private static String pinnedMapMarkerId = "";
     private static boolean receivedSync;
 
     private LostTalesClientQuestProgressStore() {}
 
     public static synchronized void update(Collection<LostTalesQuestProgress> activeQuests, Collection<String> completedQuestIds) {
-        update(activeQuests, completedQuestIds, "", Collections.<String>emptySet(), "");
+        update(activeQuests, completedQuestIds, Collections.<String>emptySet(), Collections.<String>emptySet(), "");
     }
 
     public static synchronized void update(Collection<LostTalesQuestProgress> activeQuests, Collection<String> completedQuestIds, String pinnedQuestIdIn) {
-        update(activeQuests, completedQuestIds, pinnedQuestIdIn, Collections.<String>emptySet(), "");
+        LinkedHashSet<String> pinned = new LinkedHashSet<String>();
+        if (pinnedQuestIdIn != null && pinnedQuestIdIn.length() > 0) {
+            pinned.add(pinnedQuestIdIn);
+        }
+        update(activeQuests, completedQuestIds, pinned, Collections.<String>emptySet(), "");
     }
 
     public static synchronized void update(Collection<LostTalesQuestProgress> activeQuests, Collection<String> completedQuestIds, String pinnedQuestIdIn, Collection<String> discoveredMarkerIds, String pinnedMapMarkerIdIn) {
+        LinkedHashSet<String> pinned = new LinkedHashSet<String>();
+        if (pinnedQuestIdIn != null && pinnedQuestIdIn.length() > 0) {
+            pinned.add(pinnedQuestIdIn);
+        }
+        update(activeQuests, completedQuestIds, pinned, discoveredMarkerIds, pinnedMapMarkerIdIn);
+    }
+
+    public static synchronized void update(Collection<LostTalesQuestProgress> activeQuests, Collection<String> completedQuestIds, Collection<String> pinnedQuestIdsIn, Collection<String> discoveredMarkerIds, String pinnedMapMarkerIdIn) {
         ACTIVE_QUESTS.clear();
         COMPLETED_QUESTS.clear();
         DISCOVERED_MARKERS.clear();
+        PINNED_QUESTS.clear();
         receivedSync = true;
 
         if (activeQuests != null) {
@@ -59,7 +72,13 @@ public final class LostTalesClientQuestProgressStore {
             }
         }
 
-        pinnedQuestId = pinnedQuestIdIn != null && ACTIVE_QUESTS.containsKey(pinnedQuestIdIn) ? pinnedQuestIdIn : "";
+        if (pinnedQuestIdsIn != null) {
+            for (String questId : pinnedQuestIdsIn) {
+                if (questId != null && ACTIVE_QUESTS.containsKey(questId)) {
+                    PINNED_QUESTS.add(questId);
+                }
+            }
+        }
         pinnedMapMarkerId = pinnedMapMarkerIdIn != null && DISCOVERED_MARKERS.contains(pinnedMapMarkerIdIn) ? pinnedMapMarkerIdIn : "";
     }
 
@@ -67,7 +86,7 @@ public final class LostTalesClientQuestProgressStore {
         ACTIVE_QUESTS.clear();
         COMPLETED_QUESTS.clear();
         DISCOVERED_MARKERS.clear();
-        pinnedQuestId = "";
+        PINNED_QUESTS.clear();
         pinnedMapMarkerId = "";
         receivedSync = false;
     }
@@ -106,11 +125,26 @@ public final class LostTalesClientQuestProgressStore {
     }
 
     public static synchronized String getPinnedQuestId() {
-        return pinnedQuestId == null ? "" : pinnedQuestId;
+        for (String questId : PINNED_QUESTS) {
+            if (ACTIVE_QUESTS.containsKey(questId)) {
+                return questId;
+            }
+        }
+        return "";
+    }
+
+    public static synchronized Set<String> getPinnedQuestIds() {
+        LinkedHashSet<String> copy = new LinkedHashSet<String>();
+        for (String questId : PINNED_QUESTS) {
+            if (ACTIVE_QUESTS.containsKey(questId)) {
+                copy.add(questId);
+            }
+        }
+        return Collections.unmodifiableSet(copy);
     }
 
     public static synchronized boolean isQuestPinned(String questId) {
-        return questId != null && questId.equals(pinnedQuestId);
+        return questId != null && PINNED_QUESTS.contains(questId) && ACTIVE_QUESTS.containsKey(questId);
     }
 
     public static synchronized LostTalesQuestProgress getPinnedQuest() {
@@ -118,8 +152,19 @@ public final class LostTalesClientQuestProgressStore {
         return progress == null ? null : progress.copy();
     }
 
+    public static synchronized Collection<LostTalesQuestProgress> getPinnedQuests() {
+        ArrayList<LostTalesQuestProgress> copy = new ArrayList<LostTalesQuestProgress>();
+        for (String questId : PINNED_QUESTS) {
+            LostTalesQuestProgress progress = ACTIVE_QUESTS.get(questId);
+            if (progress != null) {
+                copy.add(progress.copy());
+            }
+        }
+        return Collections.unmodifiableCollection(copy);
+    }
+
     public static synchronized boolean hasPinnedQuest() {
-        return pinnedQuestId != null && pinnedQuestId.length() > 0 && ACTIVE_QUESTS.containsKey(pinnedQuestId);
+        return !getPinnedQuestIds().isEmpty();
     }
 
     public static synchronized String getPinnedMapMarkerId() {

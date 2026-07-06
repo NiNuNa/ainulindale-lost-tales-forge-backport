@@ -8,7 +8,6 @@ import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Locale;
@@ -19,18 +18,17 @@ import java.util.Set;
  * Client-side helper for deciding which quest/map markers should be emphasized.
  *
  * The modern NeoForge branch marks map markers as active quest markers before
- * rendering. In 1.7.10 we keep that state derived from the synced active quest
- * list and the bundled client quest definitions.
+ * rendering. In 1.7.10 we derive that state from the server-synced tracked quest
+ * and the bundled client quest definitions.
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesClientQuestMarkerHelper {
     private LostTalesClientQuestMarkerHelper() {}
 
-    /** Returns marker id -> display label for every marker referenced by an active quest. */
+    /** Returns marker id -> display label for every marker referenced by any tracked quest. */
     public static Map<String, String> collectActiveQuestMarkerLabels() {
         Map<String, String> labels = new LinkedHashMap<String, String>();
-        Collection<LostTalesQuestProgress> activeQuests = LostTalesClientQuestProgressStore.getActiveQuests();
-        for (LostTalesQuestProgress progress : activeQuests) {
+        for (LostTalesQuestProgress progress : LostTalesClientQuestProgressStore.getPinnedQuests()) {
             LostTalesQuestDefinition quest = LostTalesClientQuestDefinitionStore.getQuest(progress.getQuestId());
             if (quest == null) {
                 continue;
@@ -43,11 +41,10 @@ public final class LostTalesClientQuestMarkerHelper {
         return labels;
     }
 
-    /** Returns all temporary coordinate markers produced by current-stage goto objectives. */
+    /** Returns temporary coordinate markers produced by current-stage goto objectives for tracked quests. */
     public static Set<ActiveCoordinateMarker> collectActiveCoordinateMarkers() {
         Set<ActiveCoordinateMarker> markers = new LinkedHashSet<ActiveCoordinateMarker>();
-        Collection<LostTalesQuestProgress> activeQuests = LostTalesClientQuestProgressStore.getActiveQuests();
-        for (LostTalesQuestProgress progress : activeQuests) {
+        for (LostTalesQuestProgress progress : LostTalesClientQuestProgressStore.getPinnedQuests()) {
             LostTalesQuestDefinition quest = LostTalesClientQuestDefinitionStore.getQuest(progress.getQuestId());
             LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
             if (quest == null || stage == null) {

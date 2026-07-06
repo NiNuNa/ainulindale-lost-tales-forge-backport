@@ -1,0 +1,61 @@
+{
+  "id": "losttales:path/survivalist/food_for_the_road",
+  "title": "Path of the Survivalist: Food for the Road",
+  "description": "No trail is safe on an empty stomach. A careful wanderer learns to hunt, harvest, and keep enough food for the next day.",
+  "repeatable": false,
+  "startMode": "item",
+  "prerequisites": {
+    "completed": "losttales:path/survivalist/stone_and_shelter"
+  },
+  "journalLog": {
+    "10": "My supplies will not last forever. I need food that can carry me beyond the next hill.",
+    "20": "I have gathered enough food to keep moving, and I have learned to waste less of what the wilds provide."
+  },
+  "stages": [
+    {
+      "id": "10",
+      "objectives": [
+        {
+          "id": "gather_wheat",
+          "type": "gather",
+          "description": "Gather 6 wheat.",
+          "optional": false,
+          "params": {
+            "item": "minecraft:wheat",
+            "count": "6"
+          }
+        },
+        {
+          "id": "hunt_animals",
+          "type": "kill",
+          "description": "Hunt 2 animals for meat.",
+          "optional": false,
+          "params": {
+            "group": "animal",
+            "count": "2",
+            "radius": "48"
+          }
+        }
+      ]
+    },
+    {
+      "id": "20",
+      "objectives": [
+        {
+          "id": "craft_bread",
+          "type": "craft",
+          "description": "Bake 2 loaves of bread.",
+          "optional": false,
+          "params": {
+            "item": "minecraft:bread",
+            "count": "2"
+          }
+        }
+      ]
+    }
+  ],
+  "rewards": {
+    "experience": "30",
+    "items": "minecraft:cooked_beef*2,minecraft:apple*2"
+  }
+}

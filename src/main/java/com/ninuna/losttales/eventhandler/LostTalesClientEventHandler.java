@@ -2,6 +2,7 @@ package com.ninuna.losttales.eventhandler;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
+import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
@@ -53,6 +54,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientQuestNotificationStore.clear();
         LostTalesClientMapMarkerStore.clearDynamicMarkers();
         LostTalesClientMobAggroCache.clear();
+        LostTalesClientQuickLootCache.clear();
+        LostTalesQuickLootHudRenderer.resetHud();
     }
 
     @SubscribeEvent
@@ -90,7 +93,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         if (event.type == RenderGameOverlayEvent.ElementType.ALL) {
             LostTalesQuickLootHudRenderer.render(Minecraft.getMinecraft());
             LostTalesCompassHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
-            LostTalesQuestHudRenderer.render(Minecraft.getMinecraft());
+            LostTalesQuestHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
         }
     }
 

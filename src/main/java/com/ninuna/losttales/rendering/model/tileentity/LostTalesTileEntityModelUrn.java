@@ -45,12 +45,10 @@ public class LostTalesTileEntityModelUrn extends AnimatedGeoModel<LostTalesTileE
     }
 
     private boolean isAmphora(Block block) {
-        return block != null && (block.getUnlocalizedName().equals(ELostTalesBlock.URN_AMPHORA.getBlock().getUnlocalizedName())
-                || block.getUnlocalizedName().equals(ELostTalesBlock.URN_AMPHORA_ANCIENT.getBlock().getUnlocalizedName()));
+        return block != null && block.getUnlocalizedName().equals(ELostTalesBlock.URN_AMPHORA.getBlock().getUnlocalizedName());
     }
 
     private boolean isLoutrophoros(Block block) {
-        return block != null && (block.getUnlocalizedName().equals(ELostTalesBlock.URN_LOUTROPHOROS.getBlock().getUnlocalizedName())
-                || block.getUnlocalizedName().equals(ELostTalesBlock.URN_LOUTROPHOROS_ANCIENT.getBlock().getUnlocalizedName()));
+        return block != null && block.getUnlocalizedName().equals(ELostTalesBlock.URN_LOUTROPHOROS.getBlock().getUnlocalizedName());
     }
 }

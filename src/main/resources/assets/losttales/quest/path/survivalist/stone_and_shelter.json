@@ -1,0 +1,60 @@
+{
+  "id": "losttales:path/survivalist/stone_and_shelter",
+  "title": "Path of the Survivalist: Stone and Shelter",
+  "description": "A traveler who relies only on wood will not last long. Stone tools, storage, and a fire-safe hearth make a camp worth keeping.",
+  "repeatable": false,
+  "startMode": "item",
+  "prerequisites": {
+    "completed": "losttales:path/survivalist/first_sparks"
+  },
+  "journalLog": {
+    "10": "The trail has taught me that a camp is more than a place to sleep. I need stone, storage, and a hearth before I can settle anywhere for long.",
+    "20": "My camp now has the bones of a proper shelter: a place for supplies and a furnace for warmth and work."
+  },
+  "stages": [
+    {
+      "id": "10",
+      "objectives": [
+        {
+          "id": "gather_cobblestone",
+          "type": "gather",
+          "description": "Gather 16 cobblestone.",
+          "optional": false,
+          "params": {
+            "item": "minecraft:cobblestone",
+            "count": "16"
+          }
+        }
+      ]
+    },
+    {
+      "id": "20",
+      "objectives": [
+        {
+          "id": "craft_furnace",
+          "type": "craft",
+          "description": "Craft a furnace.",
+          "optional": false,
+          "params": {
+            "item": "minecraft:furnace",
+            "count": "1"
+          }
+        },
+        {
+          "id": "craft_chest",
+          "type": "craft",
+          "description": "Craft a chest for spare supplies.",
+          "optional": false,
+          "params": {
+            "item": "minecraft:chest",
+            "count": "1"
+          }
+        }
+      ]
+    }
+  ],
+  "rewards": {
+    "experience": "25",
+    "items": "minecraft:coal*6,minecraft:bread*1"
+  }
+}

@@ -39,8 +39,13 @@ public class LostTalesQuickLootRequestPacket implements IMessage {
     public static class Handler implements IMessageHandler<LostTalesQuickLootRequestPacket, IMessage> {
         @Override
         public IMessage onMessage(LostTalesQuickLootRequestPacket message, MessageContext ctx) {
+            if (message == null || ctx == null || ctx.getServerHandler() == null) {
+                return null;
+            }
+
             EntityPlayerMP player = ctx.getServerHandler().playerEntity;
-            if (player == null || player.worldObj == null) return null;
+            if (player == null || player.worldObj == null || player.worldObj.isRemote) return null;
+            if (!player.worldObj.blockExists(message.x, message.y, message.z)) return null;
 
             double dx = player.posX - ((double) message.x + 0.5D);
             double dy = player.posY - ((double) message.y + 0.5D);
@@ -48,10 +53,13 @@ public class LostTalesQuickLootRequestPacket implements IMessage {
             if (dx * dx + dy * dy + dz * dz > 64.0D) return null;
 
             TileEntity tileEntity = player.worldObj.getTileEntity(message.x, message.y, message.z);
-            if (!(tileEntity instanceof IInventory)) return null;
+            if (!(tileEntity instanceof IInventory) || tileEntity.isInvalid()) return null;
+
+            IInventory inventory = (IInventory) tileEntity;
+            if (!inventory.isUseableByPlayer(player)) return null;
 
             LostTalesNetworkHandler.CHANNEL.sendTo(
-                    LostTalesQuickLootContainerSyncPacket.fromInventory(message.x, message.y, message.z, (IInventory) tileEntity),
+                    LostTalesQuickLootContainerSyncPacket.fromInventory(message.x, message.y, message.z, inventory),
                     player
             );
             return null;
