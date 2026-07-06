@@ -11,6 +11,7 @@ import com.ninuna.losttales.entity.ELostTalesEntity;
 import com.ninuna.losttales.faction.ELostTalesFaction;
 import com.ninuna.losttales.eventhandler.LostTalesQuestPlayerEventHandler;
 import com.ninuna.losttales.eventhandler.LostTalesQuestObjectiveEventHandler;
+import com.ninuna.losttales.eventhandler.LostTalesMobAggroEventHandler;
 import com.ninuna.losttales.world.biome.ELostTalesBiome;
 import com.ninuna.losttales.world.spawning.ELostTalesSpawnList;
 import com.ninuna.losttales.block.ELostTalesBlock;
@@ -39,10 +40,12 @@ public class LostTalesCommonProxy {
         LostTalesQuestRegistry.loadFromClasspath();
         LostTalesQuestPlayerEventHandler questPlayerEventHandler = new LostTalesQuestPlayerEventHandler();
         LostTalesQuestObjectiveEventHandler questObjectiveEventHandler = new LostTalesQuestObjectiveEventHandler();
+        LostTalesMobAggroEventHandler mobAggroEventHandler = new LostTalesMobAggroEventHandler();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
         MinecraftForge.EVENT_BUS.register(questObjectiveEventHandler);
         FMLCommonHandler.instance().bus().register(questPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(questObjectiveEventHandler);
+        FMLCommonHandler.instance().bus().register(mobAggroEventHandler);
 
         ELostTalesItem.initAndRegisterItems();
         ELostTalesBlock.initAndRegisterBlocks();

@@ -34,6 +34,7 @@ public class LostTalesCompassHudRenderer {
     public static final int MAP_MARKER_NAME_LABEL_OFFSET_Y = 3;
     public static final int MAP_MARKER_DISTANCE_LABEL_OFFSET_Y = 4;
     public static final float MAP_MARKER_SCALE_MODIFIER = 0.18F;
+    /** Minimum opacity for positioned markers that are still inside their configured distance threshold. */
     public static final float MAP_MARKER_DISTANCE_FADE_IN_FLOOR_ALPHA = 0.4F;
     public static final float MAP_MARKER_SHADOW_ALPHA = 0.6F;
     public static final int MAP_MARKER_VERTICAL_ARROW_INDICATOR_OFFSET_X = 2;
@@ -69,7 +70,15 @@ public class LostTalesCompassHudRenderer {
         GL11.glDisable(GL11.GL_LIGHTING);
         GL11.glDisable(GL11.GL_DEPTH_TEST);
 
-        LostTalesCompassHudRenderHelper.drawTexturedRect(
+        /*
+         * Draw the original compass HUD PNG as a single sprite.  The texture
+         * already contains both the soft dark fade and the sharp guide line;
+         * forcing linear filtering blurs the line, while alpha testing clips
+         * the low-alpha fade pixels.  Temporarily disabling alpha test lets the
+         * PNG's own transparency render as authored, without changing texture
+         * filtering or splitting the art into separate files.
+         */
+        LostTalesCompassHudRenderHelper.drawTexturedRectNoAlphaTest(
                 minecraft,
                 COMPASS_HUD_TEXTURE,
                 compassX,
@@ -90,7 +99,7 @@ public class LostTalesCompassHudRenderer {
     }
 
     private static void renderMarkers(Minecraft minecraft, int compassY, int centerX, float yawDeg, float pxPerDeg, int visibleDeg, float partialTicks) {
-        List<LostTalesCompassMarker> markers = collectMarkers(minecraft);
+        List<LostTalesCompassMarker> markers = collectMarkers(minecraft, partialTicks);
         if (markers.isEmpty()) return;
 
         LostTalesCompassHudRenderHelper.PlayerPos playerPos = LostTalesCompassHudRenderHelper.lerpPlayerPos(minecraft.thePlayer, partialTicks);
@@ -134,7 +143,8 @@ public class LostTalesCompassHudRenderer {
         }
 
         FontRenderer fontRenderer = minecraft.fontRenderer;
-        int alpha = MathHelper.clamp_int((int) (batch.focusEmphasis * 255.0F), 0, 255);
+        float labelAlphaF = MathHelper.clamp_float(batch.focusEmphasis * batch.focusAlpha, 0.0F, 1.0F);
+        int alpha = MathHelper.clamp_int((int) (labelAlphaF * 255.0F), 0, 255);
         int color = (alpha << 24) | 0xFFFFFF;
         int nameY = compassY + COMPASS_HEIGHT + MAP_MARKER_NAME_LABEL_OFFSET_Y;
         int distY = compassY - fontRenderer.FONT_HEIGHT - MAP_MARKER_DISTANCE_LABEL_OFFSET_Y;
@@ -173,18 +183,18 @@ public class LostTalesCompassHudRenderer {
                         h,
                         COMPASS_HUD_TEXTURE_WIDTH,
                         COMPASS_HUD_TEXTURE_HEIGHT,
-                        batch.focusEmphasis,
-                        Math.min(MAP_MARKER_SHADOW_ALPHA, batch.focusEmphasis)
+                        labelAlphaF,
+                        Math.min(MAP_MARKER_SHADOW_ALPHA, labelAlphaF)
                 );
             }
         }
     }
 
-    private static List<LostTalesCompassMarker> collectMarkers(Minecraft minecraft) {
+    private static List<LostTalesCompassMarker> collectMarkers(Minecraft minecraft, float partialTicks) {
         List<LostTalesCompassMarker> markers = new ArrayList<LostTalesCompassMarker>();
         for (LostTalesCompassMarkerProvider provider : MARKER_PROVIDERS) {
             try {
-                List<LostTalesCompassMarker> collected = provider.collectMarkers(minecraft);
+                List<LostTalesCompassMarker> collected = provider.collectMarkers(minecraft, partialTicks);
                 if (collected != null && !collected.isEmpty()) {
                     markers.addAll(collected);
                 }

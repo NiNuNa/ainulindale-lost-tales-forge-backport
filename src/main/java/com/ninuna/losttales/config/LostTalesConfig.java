@@ -41,7 +41,8 @@ public final class LostTalesConfig {
     public static boolean showStaticCompassMarkers = true;
     public static boolean showLotrWaypointCompassMarkers = true;
     public static boolean onlyShowUnlockedLotrWaypoints = true;
-    public static boolean showHostileCompassMarkers = false;
+    public static boolean showHostileCompassMarkers = true;
+    public static boolean onlyShowAggroHostileCompassMarkers = false;
 
     public static boolean showQuickLootHud = true;
     public static boolean linkShowQuickLootHud = false;
@@ -150,7 +151,13 @@ public final class LostTalesConfig {
                     "showHostileCompassMarkers",
                     CATEGORY_CLIENT,
                     showHostileCompassMarkers,
-                    "Render nearby mobs that are actively targeting the player. Disabled by default because LOTR NPC targeting varies."
+                    "Render nearby hostile mobs on the Lost Tales compass. Enabled by default so the red hostile marker sprite is visible during normal testing."
+            );
+            onlyShowAggroHostileCompassMarkers = config.getBoolean(
+                    "onlyShowAggroHostileCompassMarkers",
+                    CATEGORY_CLIENT,
+                    onlyShowAggroHostileCompassMarkers,
+                    "When true, hostile compass markers are shown only for mobs the server recently confirmed are targeting you. When false, the legacy 1.7.10 fallback also shows ordinary vanilla IMob hostiles."
             );
 
             showQuickLootHud = config.getBoolean(
@@ -553,6 +560,7 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "showLotrWaypointCompassMarkers", showLotrWaypointCompassMarkers).set(showLotrWaypointCompassMarkers);
         config.get(CATEGORY_CLIENT, "onlyShowUnlockedLotrWaypoints", onlyShowUnlockedLotrWaypoints).set(onlyShowUnlockedLotrWaypoints);
         config.get(CATEGORY_CLIENT, "showHostileCompassMarkers", showHostileCompassMarkers).set(showHostileCompassMarkers);
+        config.get(CATEGORY_CLIENT, "onlyShowAggroHostileCompassMarkers", onlyShowAggroHostileCompassMarkers).set(onlyShowAggroHostileCompassMarkers);
         config.get(CATEGORY_CLIENT, "showQuickLootHud", showQuickLootHud).set(showQuickLootHud);
         config.get(CATEGORY_CLIENT, "linkShowQuickLootHud", linkShowQuickLootHud).set(linkShowQuickLootHud);
         config.get(CATEGORY_CLIENT, "quickLootHudOffsetX", quickLootHudOffsetX).set(quickLootHudOffsetX);

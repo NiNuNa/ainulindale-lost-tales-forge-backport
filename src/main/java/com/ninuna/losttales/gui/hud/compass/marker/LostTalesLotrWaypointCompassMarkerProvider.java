@@ -21,7 +21,7 @@ public class LostTalesLotrWaypointCompassMarkerProvider implements LostTalesComp
     private static final double DEFAULT_FADE_IN_RADIUS = 640.0D;
 
     @Override
-    public List<LostTalesCompassMarker> collectMarkers(Minecraft minecraft) {
+    public List<LostTalesCompassMarker> collectMarkers(Minecraft minecraft, float partialTicks) {
         if (!LostTalesConfig.showStaticCompassMarkers || !LostTalesConfig.showLotrWaypointCompassMarkers || minecraft == null || minecraft.theWorld == null || minecraft.thePlayer == null) {
             return Collections.emptyList();
         }

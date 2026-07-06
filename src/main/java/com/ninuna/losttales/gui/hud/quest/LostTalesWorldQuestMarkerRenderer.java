@@ -2,6 +2,7 @@ package com.ninuna.losttales.gui.hud.quest;
 
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
+import com.ninuna.losttales.client.quest.LostTalesClientQuestMarkerHelper;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.relauncher.Side;
@@ -14,6 +15,7 @@ import net.minecraft.util.MathHelper;
 import org.lwjgl.opengl.GL11;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -38,12 +40,17 @@ public final class LostTalesWorldQuestMarkerRenderer {
         EntityPlayer player = minecraft.thePlayer;
         Set<String> discoveredMarkers = LostTalesClientQuestProgressStore.getDiscoveredMarkerIds();
         String pinnedMarkerId = LostTalesClientQuestProgressStore.getPinnedMapMarkerId();
-        if (discoveredMarkers.isEmpty() && (pinnedMarkerId == null || pinnedMarkerId.length() == 0)) {
+        Map<String, String> activeQuestMarkers = LostTalesClientQuestMarkerHelper.collectActiveQuestMarkerLabels();
+        Set<LostTalesClientQuestMarkerHelper.ActiveCoordinateMarker> activeCoordinateMarkers = LostTalesClientQuestMarkerHelper.collectActiveCoordinateMarkers();
+        if (discoveredMarkers.isEmpty()
+                && activeQuestMarkers.isEmpty()
+                && activeCoordinateMarkers.isEmpty()
+                && (pinnedMarkerId == null || pinnedMarkerId.length() == 0)) {
             return;
         }
 
         List<LostTalesMapMarkerData> markers = LostTalesClientMapMarkerStore.getSharedMarkers();
-        if (markers.isEmpty()) {
+        if (markers.isEmpty() && activeCoordinateMarkers.isEmpty()) {
             return;
         }
 
@@ -68,8 +75,9 @@ public final class LostTalesWorldQuestMarkerRenderer {
                 }
 
                 boolean pinned = marker.getId().equals(pinnedMarkerId);
+                boolean activeQuestMarker = activeQuestMarkers.containsKey(marker.getId());
                 boolean discoveredQuestMarker = marker.isHiddenUntilDiscovered() && discoveredMarkers.contains(marker.getId());
-                if (!pinned && !discoveredQuestMarker) {
+                if (!pinned && !activeQuestMarker && !discoveredQuestMarker) {
                     continue;
                 }
 
@@ -77,14 +85,29 @@ public final class LostTalesWorldQuestMarkerRenderer {
                 double dyPlayer = player.posY - marker.getY();
                 double dzPlayer = player.posZ - marker.getZ();
                 double distSq = dxPlayer * dxPlayer + dyPlayer * dyPlayer + dzPlayer * dzPlayer;
-                if (distSq > maxDistanceSq && !pinned) {
+                if (distSq > maxDistanceSq && !pinned && !activeQuestMarker) {
                     continue;
                 }
                 if (distSq > maxDistanceSq * 4.0D) {
                     continue;
                 }
 
-                renderMarkerLabel(minecraft.fontRenderer, marker, pinned, Math.sqrt(distSq), maxDistance, cameraX, cameraY, cameraZ);
+                String label = activeQuestMarker ? activeQuestMarkers.get(marker.getId()) : marker.getName();
+                renderMarkerLabel(minecraft.fontRenderer, label, marker.getX(), marker.getY(), marker.getZ(), pinned, activeQuestMarker, Math.sqrt(distSq), maxDistance, cameraX, cameraY, cameraZ);
+            }
+
+            for (LostTalesClientQuestMarkerHelper.ActiveCoordinateMarker marker : activeCoordinateMarkers) {
+                if (marker == null || marker.getDimensionId() != dimension) {
+                    continue;
+                }
+                double dxPlayer = player.posX - marker.getX();
+                double dyPlayer = player.posY - marker.getY();
+                double dzPlayer = player.posZ - marker.getZ();
+                double distSq = dxPlayer * dxPlayer + dyPlayer * dyPlayer + dzPlayer * dzPlayer;
+                if (distSq > maxDistanceSq * 4.0D) {
+                    continue;
+                }
+                renderMarkerLabel(minecraft.fontRenderer, marker.getLabel(), marker.getX(), marker.getY(), marker.getZ(), false, true, Math.sqrt(distSq), maxDistance, cameraX, cameraY, cameraZ);
             }
         } finally {
             GL11.glDepthMask(true);
@@ -104,18 +127,19 @@ public final class LostTalesWorldQuestMarkerRenderer {
                 && !minecraft.gameSettings.hideGUI;
     }
 
-    private static void renderMarkerLabel(FontRenderer fontRenderer, LostTalesMapMarkerData marker, boolean pinned, double distance, double maxDistance, double cameraX, double cameraY, double cameraZ) {
-        double renderX = marker.getX() + 0.5D - cameraX;
-        double renderY = marker.getY() + LABEL_Y_OFFSET - cameraY;
-        double renderZ = marker.getZ() + 0.5D - cameraZ;
+    private static void renderMarkerLabel(FontRenderer fontRenderer, String markerName, double markerX, double markerY, double markerZ, boolean pinned, boolean activeQuestMarker, double distance, double maxDistance, double cameraX, double cameraY, double cameraZ) {
+        double renderX = markerX + 0.5D - cameraX;
+        double renderY = markerY + LABEL_Y_OFFSET - cameraY;
+        double renderZ = markerZ + 0.5D - cameraZ;
 
-        float alpha = distance <= maxDistance * 0.65D
+        float alpha = distance <= maxDistance * 0.65D || activeQuestMarker
                 ? 1.0F
                 : 1.0F - MathHelper.clamp_float((float) ((distance - maxDistance * 0.65D) / (maxDistance * 0.35D)), 0.0F, 0.75F);
         int alphaByte = MathHelper.clamp_int((int) (alpha * 255.0F), 48, 255);
-        int textColor = (alphaByte << 24) | (pinned ? 0xFFD37A : 0xFFFFFF);
+        int textColor = (alphaByte << 24) | (pinned ? 0xFFD37A : activeQuestMarker ? 0xFFFBDE : 0xFFFFFF);
         int shadowColor = (MathHelper.clamp_int((int) (alpha * 160.0F), 32, 160) << 24);
-        String label = (pinned ? "* " : "^ ") + marker.getName();
+        String safeName = markerName == null || markerName.length() == 0 ? "Quest Marker" : markerName;
+        String label = (pinned ? "* " : activeQuestMarker ? "^ " : "^ ") + safeName;
         String distanceLabel = Math.round(distance) + "m";
 
         RenderManager renderManager = RenderManager.instance;

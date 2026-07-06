@@ -5,5 +5,5 @@ import net.minecraft.client.Minecraft;
 import java.util.List;
 
 public interface LostTalesCompassMarkerProvider {
-    List<LostTalesCompassMarker> collectMarkers(Minecraft minecraft);
+    List<LostTalesCompassMarker> collectMarkers(Minecraft minecraft, float partialTicks);
 }

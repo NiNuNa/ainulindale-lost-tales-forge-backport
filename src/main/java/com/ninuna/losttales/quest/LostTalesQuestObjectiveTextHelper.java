@@ -101,13 +101,18 @@ public final class LostTalesQuestObjectiveTextHelper {
 
         if ("gather".equalsIgnoreCase(type) || "gather_item".equalsIgnoreCase(type) || "pickup".equalsIgnoreCase(type) || "pickup_item".equalsIgnoreCase(type) || "collect".equalsIgnoreCase(type) || "craft".equalsIgnoreCase(type)) {
             String item = firstNonEmpty(objective.getParam("item", ""), objective.getParam("itemId", ""), objective.getParam("target", ""));
-            return item.length() == 0 ? "" : "Item " + item;
+            if (item.length() > 0) {
+                return "Item " + item;
+            }
+            String tag = firstNonEmpty(objective.getParam("tag", ""), objective.getParam("ore", ""), objective.getParam("oreDict", ""), objective.getParam("oredict", ""));
+            return tag.length() == 0 ? "" : "Tag " + tag;
         }
 
         if ("kill".equalsIgnoreCase(type)) {
             String entity = firstNonEmpty(objective.getParam("entity", ""), objective.getParam("entityId", ""), objective.getParam("target", ""));
+            String group = firstNonEmpty(objective.getParam("tag", ""), objective.getParam("group", ""));
             String radius = objective.getParam("radius", "");
-            String text = entity.length() == 0 ? "" : "Target " + entity;
+            String text = entity.length() > 0 ? "Target " + entity : group.length() > 0 ? "Group " + group : "";
             if (radius.length() > 0) {
                 text += (text.length() == 0 ? "" : ", ") + "within " + radius + " blocks";
             }

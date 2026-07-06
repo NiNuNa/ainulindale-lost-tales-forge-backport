@@ -1,6 +1,7 @@
 package com.ninuna.losttales.eventhandler;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
@@ -51,6 +52,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientQuestProgressStore.clear();
         LostTalesClientQuestNotificationStore.clear();
         LostTalesClientMapMarkerStore.clearDynamicMarkers();
+        LostTalesClientMobAggroCache.clear();
     }
 
     @SubscribeEvent

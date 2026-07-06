@@ -10,7 +10,7 @@ public class LostTalesDirectionCompassMarkerProvider implements LostTalesCompass
     private static final List<LostTalesCompassMarker> DIRECTION_MARKERS = createDirectionMarkers();
 
     @Override
-    public List<LostTalesCompassMarker> collectMarkers(Minecraft minecraft) {
+    public List<LostTalesCompassMarker> collectMarkers(Minecraft minecraft, float partialTicks) {
         if (minecraft == null || minecraft.theWorld == null || minecraft.thePlayer == null) {
             return Collections.emptyList();
         }

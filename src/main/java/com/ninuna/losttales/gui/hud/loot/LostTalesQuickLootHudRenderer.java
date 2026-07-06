@@ -11,6 +11,7 @@ import com.ninuna.losttales.network.packet.LostTalesQuickLootRequestPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.entity.RenderItem;
 import net.minecraft.item.ItemStack;
@@ -167,12 +168,12 @@ public final class LostTalesQuickLootHudRenderer {
         GL11.glDisable(GL11.GL_LIGHTING);
         GL11.glDisable(GL11.GL_DEPTH_TEST);
 
-        LostTalesCompassHudRenderHelper.drawTexturedRect(minecraft, TEXTURE, panelX, panelY, 0, 0, TEXTURE_WIDTH, TOP_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+        drawQuickLootTexture(minecraft, TEXTURE, panelX, panelY, 0, 0, TEXTURE_WIDTH, TOP_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
         renderHorizontalOrnament(minecraft, font, panelX, panelY, snapshot.title);
         font.drawStringWithShadow(snapshot.title == null ? "Container" : snapshot.title, panelX + 3, panelY + font.FONT_HEIGHT / 2, 0xFFFFFF);
 
         if (slots.isEmpty()) {
-            LostTalesCompassHudRenderHelper.drawTexturedRect(minecraft, TEXTURE, panelX, rowY, 0, 25, TEXTURE_WIDTH, ROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+            drawQuickLootTexture(minecraft, TEXTURE, panelX, rowY, 0, 25, TEXTURE_WIDTH, ROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
             font.drawStringWithShadow(StatCollector.translateToLocal("quickLootHud.losttales.empty"), itemNameX, rowY + 7, 0xFFFFFF);
         } else {
             for (int i = 0; i < rowsToDraw; i++) {
@@ -181,9 +182,9 @@ public final class LostTalesQuickLootHudRenderer {
                 ItemStack stack = snapshot.getStack(slot);
                 int y = rowY + i * ROW_HEIGHT;
 
-                LostTalesCompassHudRenderHelper.drawTexturedRect(minecraft, TEXTURE, panelX, y, 0, 25, TEXTURE_WIDTH, ROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+                drawQuickLootTexture(minecraft, TEXTURE, panelX, y, 0, 25, TEXTURE_WIDTH, ROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
                 if (actualRow == selectedRow) {
-                    LostTalesCompassHudRenderHelper.drawTexturedRect(minecraft, TEXTURE, panelX + SELECTION_OFFSET_X, y + 1, 0, 74, SELECTION_WIDTH, SELECTION_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+                    drawQuickLootTexture(minecraft, TEXTURE, panelX + SELECTION_OFFSET_X, y + 1, 0, 74, SELECTION_WIDTH, SELECTION_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
                 }
                 renderStack(minecraft, stack, itemX, y + 3);
                 String name = stack == null ? "" : stack.getDisplayName();
@@ -192,7 +193,7 @@ public final class LostTalesQuickLootHudRenderer {
         }
 
         int bottomY = panelY + TOP_HEIGHT + rowsToDraw * ROW_HEIGHT;
-        LostTalesCompassHudRenderHelper.drawTexturedRect(minecraft, TEXTURE, panelX, bottomY, 0, 49, TEXTURE_WIDTH, BOTTOM_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+        drawQuickLootTexture(minecraft, TEXTURE, panelX, bottomY, 0, 49, TEXTURE_WIDTH, BOTTOM_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
         renderScrollArrows(minecraft, panelX, rowY, bottomY, rowsToDraw, slots.size());
         renderHints(minecraft, font, panelX + 3, bottomY + BOTTOM_HEIGHT + 3, !snapshot.sealed);
         renderVerticalOrnament(minecraft, panelX, panelY, rowsToDraw);
@@ -201,10 +202,23 @@ public final class LostTalesQuickLootHudRenderer {
         GL11.glPopMatrix();
     }
 
+    /**
+     * Draws the authored quick-loot HUD texture without alpha testing.
+     *
+     * <p>The PNG already contains its own soft transparent fade, just like the
+     * compass HUD art.  Minecraft 1.7.10 GUI rendering can leave alpha testing
+     * enabled, which clips those low-alpha pixels and makes the background look
+     * harsh or pixelated.  We keep the normal texture filtering untouched and
+     * only disable alpha testing during these HUD texture blits.</p>
+     */
+    private static void drawQuickLootTexture(Minecraft minecraft, ResourceLocation texture, float x, float y, int u, int v, int width, int height, int textureWidth, int textureHeight, float alpha) {
+        LostTalesCompassHudRenderHelper.drawTexturedRectNoAlphaTest(minecraft, texture, x, y, u, v, width, height, textureWidth, textureHeight, alpha);
+    }
+
     private static void renderHorizontalOrnament(Minecraft minecraft, FontRenderer font, int panelX, int panelY, String title) {
         int ornamentX = panelX + 3 + font.getStringWidth(title == null ? "" : title) + 5;
         int ornamentY = panelY + font.FONT_HEIGHT / 2 - 1;
-        LostTalesCompassHudRenderHelper.drawTexturedRect(
+        drawQuickLootTexture(
                 minecraft,
                 TEXTURE,
                 ornamentX,
@@ -222,10 +236,10 @@ public final class LostTalesQuickLootHudRenderer {
     private static void renderScrollArrows(Minecraft minecraft, int panelX, int rowY, int bottomY, int rowsToDraw, int totalRows) {
         int arrowX = panelX + ARROW_OFFSET_X;
         if (scrollOffset > 0) {
-            LostTalesCompassHudRenderHelper.drawTexturedRect(minecraft, TEXTURE, arrowX, rowY - ARROW_HEIGHT, 6, 132, ARROW_WIDTH, ARROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+            drawQuickLootTexture(minecraft, TEXTURE, arrowX, rowY - ARROW_HEIGHT, 6, 132, ARROW_WIDTH, ARROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
         }
         if (scrollOffset + rowsToDraw < totalRows) {
-            LostTalesCompassHudRenderHelper.drawTexturedRect(minecraft, TEXTURE, arrowX, bottomY, 0, 132, ARROW_WIDTH, ARROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+            drawQuickLootTexture(minecraft, TEXTURE, arrowX, bottomY, 0, 132, ARROW_WIDTH, ARROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
         }
     }
 
@@ -235,7 +249,7 @@ public final class LostTalesQuickLootHudRenderer {
         int lineX = panelX + ORNAMENT_VERTICAL_LINE_OFFSET_X;
         int extraLineHeight = Math.max(0, (rowsToDraw - 1) * ROW_HEIGHT / 2 + 3);
 
-        LostTalesCompassHudRenderHelper.drawTexturedRect(
+        drawQuickLootTexture(
                 minecraft,
                 TEXTURE,
                 ornamentX,
@@ -254,12 +268,100 @@ public final class LostTalesQuickLootHudRenderer {
         }
     }
 
+    /**
+     * Renders item stacks with a normal inventory-like GUI state.
+     *
+     * <p>The quick-loot panel itself is drawn with alpha testing disabled so the
+     * authored PNG fades are preserved.  Item icons should not inherit that HUD
+     * state: vanilla inventory rendering expects alpha testing and GUI item
+     * lighting, and leaving the translucent HUD state active can make block
+     * icons look dark or as though they are behind the panel.  This method
+     * temporarily switches to a clean item-render state and then restores the
+     * HUD state for the remaining overlay text and ornaments.</p>
+     */
     private static void renderStack(Minecraft minecraft, ItemStack stack, int x, int y) {
         if (stack == null) return;
-        RenderHelper.enableGUIStandardItemLighting();
-        RENDER_ITEM.renderItemAndEffectIntoGUI(minecraft.fontRenderer, minecraft.getTextureManager(), stack, x, y);
-        RENDER_ITEM.renderItemOverlayIntoGUI(minecraft.fontRenderer, minecraft.getTextureManager(), stack, x, y);
-        RenderHelper.disableStandardItemLighting();
+
+        boolean previousAlphaTest = GL11.glIsEnabled(GL11.GL_ALPHA_TEST);
+        boolean previousBlend = GL11.glIsEnabled(GL11.GL_BLEND);
+        boolean previousDepthTest = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
+        boolean previousDepthMask = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
+        boolean previousLighting = GL11.glIsEnabled(GL11.GL_LIGHTING);
+        boolean previousTexture2D = GL11.glIsEnabled(GL11.GL_TEXTURE_2D);
+        float previousZLevel = RENDER_ITEM.zLevel;
+
+        float previousLightmapX = OpenGlHelper.lastBrightnessX;
+        float previousLightmapY = OpenGlHelper.lastBrightnessY;
+
+        GL11.glPushMatrix();
+        try {
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
+            GL11.glEnable(GL11.GL_ALPHA_TEST);
+            GL11.glEnable(GL11.GL_BLEND);
+            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+
+            /*
+             * In-game HUD rendering still has the world depth buffer around.
+             * If the inventory item renderer is allowed to test against that
+             * stale world depth, parts of block icons can fail the depth test
+             * and appear dark or as if they are behind the translucent HUD.
+             * Clearing the depth buffer here mirrors the clean GUI state used
+             * by vanilla inventory/hotbar item rendering, while the HUD panel
+             * itself has already been drawn with depth disabled.
+             */
+            GL11.glDepthMask(true);
+            GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
+            GL11.glEnable(GL11.GL_DEPTH_TEST);
+
+            /*
+             * Keep quick-loot stack icons full-bright like normal GUI items.
+             * Without this, 1.7.10 can inherit the world's current lightmap
+             * values, which makes block items look much darker than they do
+             * in the inventory or hotbar, especially under trees or at night.
+             */
+            OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, 240.0F, 240.0F);
+            OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
+
+            RenderHelper.enableGUIStandardItemLighting();
+            RENDER_ITEM.zLevel = 200.0F;
+            RENDER_ITEM.renderItemAndEffectIntoGUI(minecraft.fontRenderer, minecraft.getTextureManager(), stack, x, y);
+            RENDER_ITEM.renderItemOverlayIntoGUI(minecraft.fontRenderer, minecraft.getTextureManager(), stack, x, y);
+        } finally {
+            RENDER_ITEM.zLevel = previousZLevel;
+            RenderHelper.disableStandardItemLighting();
+            OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, previousLightmapX, previousLightmapY);
+            OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+
+            if (previousTexture2D) {
+                GL11.glEnable(GL11.GL_TEXTURE_2D);
+            } else {
+                GL11.glDisable(GL11.GL_TEXTURE_2D);
+            }
+            if (previousAlphaTest) {
+                GL11.glEnable(GL11.GL_ALPHA_TEST);
+            } else {
+                GL11.glDisable(GL11.GL_ALPHA_TEST);
+            }
+            if (previousBlend) {
+                GL11.glEnable(GL11.GL_BLEND);
+            } else {
+                GL11.glDisable(GL11.GL_BLEND);
+            }
+            if (previousDepthTest) {
+                GL11.glEnable(GL11.GL_DEPTH_TEST);
+            } else {
+                GL11.glDisable(GL11.GL_DEPTH_TEST);
+            }
+            if (previousLighting) {
+                GL11.glEnable(GL11.GL_LIGHTING);
+            } else {
+                GL11.glDisable(GL11.GL_LIGHTING);
+            }
+            GL11.glDepthMask(previousDepthMask);
+            GL11.glPopMatrix();
+        }
     }
 
     private static void renderHints(Minecraft minecraft, FontRenderer font, int x, int y, boolean drawDropKey) {
@@ -267,7 +369,7 @@ public final class LostTalesQuickLootHudRenderer {
         int textureAltX;
 
         if (drawDropKey) {
-            LostTalesCompassHudRenderHelper.drawTexturedRect(minecraft, TEXTURE, x, y, 0, 59, KEY_R_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+            drawQuickLootTexture(minecraft, TEXTURE, x, y, 0, 59, KEY_R_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
             int textDropX = x + KEY_R_WIDTH + 3;
             String drop = StatCollector.translateToLocal("quickLootHud.losttales.drop");
             font.drawStringWithShadow(drop, textDropX, textY, 0xFFFFFF);
@@ -282,9 +384,9 @@ public final class LostTalesQuickLootHudRenderer {
         int textureScrollX = textAltX + font.getStringWidth(plus) + 3;
         int textScrollX = textureScrollX + KEY_SCROLL_WIDTH + 3;
 
-        LostTalesCompassHudRenderHelper.drawTexturedRect(minecraft, TEXTURE, textureAltX, y, 15, 59, KEY_ALT_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+        drawQuickLootTexture(minecraft, TEXTURE, textureAltX, y, 15, 59, KEY_ALT_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
         font.drawStringWithShadow(plus, textAltX, textY, 0xFFFFFF);
-        LostTalesCompassHudRenderHelper.drawTexturedRect(minecraft, TEXTURE, textureScrollX, y, 36, 59, KEY_SCROLL_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+        drawQuickLootTexture(minecraft, TEXTURE, textureScrollX, y, 36, 59, KEY_SCROLL_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
         font.drawStringWithShadow(scroll, textScrollX, textY, 0xFFFFFF);
     }
 

@@ -13,7 +13,6 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChatComponentText;
@@ -22,7 +21,6 @@ import net.minecraft.util.EnumChatFormatting;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -408,7 +406,7 @@ public final class LostTalesQuestManager {
                 if (!"kill".equalsIgnoreCase(objective.getType())) {
                     continue;
                 }
-                if (!matchesEntity(victim, objective.getParam("entity", ""))) {
+                if (!LostTalesQuestObjectiveMatcher.matchesEntity(victim, objective)) {
                     continue;
                 }
                 if (!isWithinObjectiveRadius(player, victim, objective)) {
@@ -440,7 +438,7 @@ public final class LostTalesQuestManager {
                 if (!isGatherObjective(objective)) {
                     continue;
                 }
-                if (!matchesItem(pickedUp, objective.getParam("item", ""))) {
+                if (!LostTalesQuestObjectiveMatcher.matchesItem(pickedUp, objective)) {
                     continue;
                 }
                 changed |= addObjectiveProgressAndEvaluate(player, quest, objective, amount);
@@ -469,7 +467,7 @@ public final class LostTalesQuestManager {
                 if (!"craft".equalsIgnoreCase(objective.getType())) {
                     continue;
                 }
-                if (!matchesItem(crafted, objective.getParam("item", ""))) {
+                if (!LostTalesQuestObjectiveMatcher.matchesItem(crafted, objective)) {
                     continue;
                 }
                 changed |= addObjectiveProgressAndEvaluate(player, quest, objective, amount);
@@ -727,7 +725,7 @@ public final class LostTalesQuestManager {
             }
 
             int target = getObjectiveTargetCount(objective);
-            int inventoryCount = Math.min(target, countMatchingInventoryItems(player, objective.getParam("item", "")));
+            int inventoryCount = Math.min(target, countMatchingInventoryItems(player, objective));
             int before = data.getObjectiveProgress(quest.getId(), objective.getId());
             if (inventoryCount > before) {
                 data.setObjectiveProgress(quest.getId(), objective.getId(), inventoryCount);
@@ -741,15 +739,15 @@ public final class LostTalesQuestManager {
         return changed;
     }
 
-    private static int countMatchingInventoryItems(EntityPlayerMP player, String itemSpec) {
-        if (player == null || player.inventory == null || itemSpec == null || itemSpec.length() == 0) {
+    private static int countMatchingInventoryItems(EntityPlayerMP player, LostTalesQuestObjectiveDefinition objective) {
+        if (player == null || player.inventory == null || objective == null) {
             return 0;
         }
 
         int count = 0;
         ItemStack[] inventory = player.inventory.mainInventory;
         for (ItemStack stack : inventory) {
-            if (stack != null && stack.stackSize > 0 && matchesItem(stack, itemSpec)) {
+            if (stack != null && stack.stackSize > 0 && LostTalesQuestObjectiveMatcher.matchesItem(stack, objective)) {
                 count += stack.stackSize;
             }
         }
@@ -857,94 +855,6 @@ public final class LostTalesQuestManager {
         double dy = player.posY - victim.posY;
         double dz = player.posZ - victim.posZ;
         return dx * dx + dy * dy + dz * dz <= radius * radius;
-    }
-
-    private static boolean matchesItem(ItemStack stack, String itemSpec) {
-        if (stack == null || stack.getItem() == null || itemSpec == null || itemSpec.trim().length() == 0) {
-            return false;
-        }
-
-        String[] entries = itemSpec.split(",");
-        for (String entry : entries) {
-            String normalized = normalizeResourceId(entry);
-            if (normalized.length() == 0 || normalized.startsWith("#")) {
-                continue;
-            }
-
-            Object registered = Item.itemRegistry.getObject(normalized);
-            if (registered instanceof Item && stack.getItem() == registered) {
-                return true;
-            }
-
-            Object stackName = Item.itemRegistry.getNameForObject(stack.getItem());
-            if (stackName != null && normalizeResourceId(stackName.toString()).equals(normalized)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean matchesEntity(Entity victim, String entitySpec) {
-        if (victim == null || entitySpec == null || entitySpec.trim().length() == 0) {
-            return true;
-        }
-
-        String[] entries = entitySpec.split(",");
-        String legacyName = normalizeLoose(EntityList.getEntityString(victim));
-        String className = normalizeLoose(victim.getClass().getSimpleName().replace("Entity", ""));
-
-        for (String entry : entries) {
-            if (entry == null || entry.trim().startsWith("#")) {
-                continue;
-            }
-            String normalized = normalizeLoose(entry);
-            String pathOnly = normalizeLoose(stripNamespace(entry));
-            if (normalized.length() == 0) {
-                continue;
-            }
-            if (normalized.equals(legacyName) || pathOnly.equals(legacyName) || normalized.equals(className) || pathOnly.equals(className)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static String normalizeResourceId(String value) {
-        if (value == null) {
-            return "";
-        }
-        String normalized = value.trim().toLowerCase(Locale.ROOT);
-        if (normalized.startsWith("#")) {
-            return normalized;
-        }
-        if (normalized.indexOf(':') < 0 && normalized.length() > 0) {
-            normalized = "minecraft:" + normalized;
-        }
-        return normalized;
-    }
-
-    private static String stripNamespace(String value) {
-        if (value == null) {
-            return "";
-        }
-        String trimmed = value.trim();
-        int colon = trimmed.indexOf(':');
-        return colon >= 0 && colon + 1 < trimmed.length() ? trimmed.substring(colon + 1) : trimmed;
-    }
-
-    private static String normalizeLoose(String value) {
-        if (value == null) {
-            return "";
-        }
-        String stripped = stripNamespace(value).toLowerCase(Locale.ROOT);
-        StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < stripped.length(); i++) {
-            char c = stripped.charAt(i);
-            if (c >= 'a' && c <= 'z' || c >= '0' && c <= '9') {
-                builder.append(c);
-            }
-        }
-        return builder.toString();
     }
 
     private static String objectiveDescription(LostTalesQuestObjectiveDefinition objective) {

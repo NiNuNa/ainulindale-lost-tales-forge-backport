@@ -17,8 +17,10 @@ import com.ninuna.losttales.rendering.renderer.tileentity.LostTalesTileEntityRen
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.client.network.LostTalesQuickLootContainerSyncHandler;
 import com.ninuna.losttales.client.network.LostTalesQuestSyncHandler;
+import com.ninuna.losttales.client.network.LostTalesMobAggroSyncHandler;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.client.registry.ClientRegistry;
@@ -46,6 +48,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(new LostTalesConfigGuiEventHandler());
         LostTalesNetworkHandler.CHANNEL.registerMessage(LostTalesQuickLootContainerSyncHandler.class, LostTalesQuickLootContainerSyncPacket.class, 2, Side.CLIENT);
         LostTalesNetworkHandler.CHANNEL.registerMessage(LostTalesQuestSyncHandler.class, LostTalesQuestSyncPacket.class, 3, Side.CLIENT);
+        LostTalesNetworkHandler.CHANNEL.registerMessage(LostTalesMobAggroSyncHandler.class, LostTalesMobAggroSyncPacket.class, 5, Side.CLIENT);
         ELostTalesMapLabels.initAndRegisterMapLabels();
 
         GeoArmorRenderer.registerArmorRenderer(LostTalesItemArmor3D.class, new LostTalesItemRendererArmor3D());

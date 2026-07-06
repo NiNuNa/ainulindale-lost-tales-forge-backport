@@ -21,6 +21,7 @@ public final class LostTalesCompassMarkerBatchBuilder {
         LostTalesCompassMarker focusedMarker = null;
         float focusedPx = 0.0F;
         float bestEmphasis = 0.0F;
+        float bestAlpha = 0.0F;
         double bestDx = 0.0D;
         double bestDy = 0.0D;
         double bestDz = 0.0D;
@@ -30,17 +31,20 @@ public final class LostTalesCompassMarkerBatchBuilder {
             double dy = marker.getY() - playerPos.y;
             double dz = marker.getZ() - playerPos.z;
 
+            boolean activeQuestMarker = marker.isActiveQuestMarker();
             float targetDeg = marker.isBearingMarker()
                     ? LostTalesCompassHudRenderHelper.normalizeViewYaw(marker.getBearingDegrees())
                     : LostTalesCompassHudRenderHelper.angleDegToTarget(dx, dz);
             float delta = LostTalesCompassHudRenderHelper.shortestDeltaDegrees(targetDeg, yawDeg);
 
-            if (Math.abs(delta) > visibleDeg / 2.0F) continue;
+            if (!activeQuestMarker && Math.abs(delta) > visibleDeg / 2.0F) continue;
 
             float px = centerX + delta * pxPerDeg;
             px = MathHelper.clamp_float(px, minX, maxX);
 
-            float edgeT = LostTalesCompassHudRenderHelper.edgeCenterFactor(px, centerX, halfWidth, LostTalesCompassHudRenderer.MAP_MARKER_BEGIN_EDGE_FADE_OUT_OFFSET);
+            float edgeT = activeQuestMarker
+                    ? 1.0F
+                    : LostTalesCompassHudRenderHelper.edgeCenterFactor(px, centerX, halfWidth, LostTalesCompassHudRenderer.MAP_MARKER_BEGIN_EDGE_FADE_OUT_OFFSET);
             if (edgeT <= 0.0F) continue;
 
             float centerDistPx = Math.abs(px - centerX);
@@ -52,16 +56,16 @@ public final class LostTalesCompassMarkerBatchBuilder {
                 double dist = Math.sqrt(distSq);
                 double radius = marker.getFadeInRadius();
                 if (dist > radius) continue;
-                float t = (float) (dist / radius);
+                float t = MathHelper.clamp_float((float) (dist / radius), 0.0F, 1.0F);
+                // Distance fade is strongest when standing on the marker and eases out
+                // to the configured opacity floor at the distance threshold. Cardinal/bearing
+                // icons do not have a world distance, so they are intentionally skipped.
                 distT = 1.0F - (t * t * (3.0F - 2.0F * t));
             }
 
-            float alpha = MathHelper.clamp_float(
-                    LostTalesCompassHudRenderer.MAP_MARKER_DISTANCE_FADE_IN_FLOOR_ALPHA
-                            + (1.0F - LostTalesCompassHudRenderer.MAP_MARKER_DISTANCE_FADE_IN_FLOOR_ALPHA) * distT,
-                    0.0F,
-                    1.0F
-            ) * edgeT;
+            float distanceAlpha = LostTalesCompassHudRenderer.MAP_MARKER_DISTANCE_FADE_IN_FLOOR_ALPHA
+                    + (1.0F - LostTalesCompassHudRenderer.MAP_MARKER_DISTANCE_FADE_IN_FLOOR_ALPHA) * MathHelper.clamp_float(distT, 0.0F, 1.0F);
+            float alpha = MathHelper.clamp_float(distanceAlpha, 0.0F, 1.0F) * edgeT;
 
             if (alpha <= 0.0F) continue;
 
@@ -71,6 +75,7 @@ public final class LostTalesCompassMarkerBatchBuilder {
                 boolean better = emphasis > bestEmphasis || (emphasis == bestEmphasis && Math.abs(px - centerX) < Math.abs(focusedPx - centerX));
                 if (better) {
                     bestEmphasis = emphasis;
+                    bestAlpha = alpha;
                     focusedMarker = marker;
                     focusedPx = px;
                     bestDx = dx;
@@ -94,7 +99,7 @@ public final class LostTalesCompassMarkerBatchBuilder {
             }
         });
 
-        return new LostTalesCompassMarkerBatch(renderItems, focusedMarker, focusedPx, bestEmphasis, bestDx, bestDy, bestDz);
+        return new LostTalesCompassMarkerBatch(renderItems, focusedMarker, focusedPx, bestEmphasis, bestAlpha, bestDx, bestDy, bestDz);
     }
 
     public static final class LostTalesCompassMarkerBatch {
@@ -102,15 +107,17 @@ public final class LostTalesCompassMarkerBatchBuilder {
         public final LostTalesCompassMarker focusedMarker;
         public final float focusedPx;
         public final float focusEmphasis;
+        public final float focusAlpha;
         public final double dx;
         public final double dy;
         public final double dz;
 
-        private LostTalesCompassMarkerBatch(List<LostTalesCompassMarkerRenderItem> renderItems, LostTalesCompassMarker focusedMarker, float focusedPx, float focusEmphasis, double dx, double dy, double dz) {
+        private LostTalesCompassMarkerBatch(List<LostTalesCompassMarkerRenderItem> renderItems, LostTalesCompassMarker focusedMarker, float focusedPx, float focusEmphasis, float focusAlpha, double dx, double dy, double dz) {
             this.renderItems = renderItems;
             this.focusedMarker = focusedMarker;
             this.focusedPx = focusedPx;
             this.focusEmphasis = focusEmphasis;
+            this.focusAlpha = focusAlpha;
             this.dx = dx;
             this.dy = dy;
             this.dz = dz;

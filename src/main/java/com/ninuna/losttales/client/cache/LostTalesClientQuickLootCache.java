@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.cache;
 
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.StatCollector;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -38,9 +39,21 @@ public final class LostTalesClientQuickLootCache {
             this.x = x;
             this.y = y;
             this.z = z;
-            this.title = title == null || title.length() == 0 ? "Container" : title;
+            this.title = localizeTitle(title);
             this.sealed = sealed;
             this.items = items == null ? new ItemStack[0] : copy(items);
+        }
+
+        private static String localizeTitle(String title) {
+            if (title == null || title.length() == 0) {
+                return "Container";
+            }
+
+            String translated = StatCollector.translateToLocal(title);
+            if (translated != null && translated.length() > 0) {
+                return translated;
+            }
+            return title;
         }
 
         public List<Integer> getNonEmptySlots() {

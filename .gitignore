@@ -1,39 +1,43 @@
+# Gradle / ForgeGradle build output
 **/build/
 !src/**/build/
-build/*
-
-# Ignore Gradle GUI config
-gradle-app.setting
-
-# Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
-!gradle-wrapper.jar
-
-# Avoid ignore Gradle wrappper properties
-!gradle-wrapper.properties
-
-# Cache of project
+build/
+.gradle/
 .gradletasknamecache
 
-# Eclipse Core
+# Gradle GUI config
+gradle-app.setting
+
+# Keep Gradle wrapper files even if jar/properties rules are added elsewhere
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# IDE: IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# IDE: Eclipse
 .project
-
-# JDT-specific (Eclipse Java Development Tools)
 .classpath
+.settings/
+eclipse/
 
-# Eclipse folder
-eclipse
+# Local libraries / manually dropped dependencies
+libs/
+lib/
 
-# out folder
-out
+# Forge/Minecraft local runtime output
+run/
+crash-reports/
+logs/
 
-# lib/libs folder
-libs
-lib
-
-# .gradle folder
-.gradle
-
-# Intelij files
-Ainulindale-Lost-Tales.iml
-Ainulindale-Lost-Tales.ipr
-Ainulindale-Lost-Tales.iws
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
