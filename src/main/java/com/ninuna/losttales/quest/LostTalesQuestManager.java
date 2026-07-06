@@ -1,0 +1,1014 @@
+package com.ninuna.losttales.quest;
+
+import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.network.LostTalesNetworkHandler;
+import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
+import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
+import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
+import com.ninuna.losttales.util.LostTalesDimensionHelper;
+import net.minecraft.block.Block;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityList;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.EnumChatFormatting;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+/** Server-side helper methods for basic quest state changes and objective progress. */
+public final class LostTalesQuestManager {
+
+    private LostTalesQuestManager() {}
+
+    public static LostTalesQuestPlayerData getPlayerData(EntityPlayer player) {
+        return LostTalesQuestPlayerData.get(player);
+    }
+
+    public static StartResult startQuest(EntityPlayer player, String questId) {
+        return startQuest(player, questId, LostTalesQuestStartSource.COMMAND);
+    }
+
+    public static StartResult startQuest(EntityPlayer player, String questId, LostTalesQuestStartSource source) {
+        LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
+        if (quest == null) {
+            sendQuestChat(player, EnumChatFormatting.RED + "Unknown quest: " + questId);
+            return StartResult.UNKNOWN_QUEST;
+        }
+
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null) {
+            sendQuestChat(player, EnumChatFormatting.RED + "Quest data is not available.");
+            return StartResult.NO_PLAYER_DATA;
+        }
+        if (data.isQuestActive(questId)) {
+            sendQuestChat(player, EnumChatFormatting.YELLOW + "Quest already active: " + EnumChatFormatting.WHITE + quest.getTitle());
+            return StartResult.ALREADY_ACTIVE;
+        }
+        if (data.isQuestCompleted(questId) && !quest.isRepeatable()) {
+            sendQuestChat(player, EnumChatFormatting.YELLOW + "Quest already completed: " + EnumChatFormatting.WHITE + quest.getTitle());
+            return StartResult.ALREADY_COMPLETED;
+        }
+        if (!canStartFromSource(quest, source)) {
+            sendQuestChat(player, EnumChatFormatting.RED + "This quest cannot be started from here.");
+            return StartResult.START_NOT_ALLOWED;
+        }
+        if (LostTalesConfig.enableQuestPrerequisites) {
+            String failureReason = LostTalesQuestPrerequisiteHelper.getFailureReason(quest, player, data);
+            if (failureReason != null) {
+                sendQuestChat(player, EnumChatFormatting.RED + failureReason);
+                return StartResult.REQUIREMENTS_NOT_MET;
+            }
+        }
+
+        LostTalesQuestStageDefinition firstStage = quest.getFirstStage();
+        data.startQuest(questId, firstStage == null ? "" : firstStage.getId());
+        if (LostTalesConfig.autoRevealQuestMarkersOnStart) {
+            revealQuestMarkers(player, quest, false);
+        }
+        sendQuestChat(player, EnumChatFormatting.GOLD + "Quest started: " + EnumChatFormatting.YELLOW + quest.getTitle());
+        playQuestSound(player, "random.orb", 0.35F, 1.0F);
+
+        if (player instanceof EntityPlayerMP) {
+            EntityPlayerMP serverPlayer = (EntityPlayerMP) player;
+            if (scanCurrentStageGatherObjectives(serverPlayer, quest)) {
+                evaluateStageProgress(serverPlayer, questId);
+            } else if (quest.getStages().isEmpty() || firstStage == null || firstStage.getObjectives().isEmpty()) {
+                evaluateStageProgress(serverPlayer, questId);
+            }
+        }
+
+        syncToClient(player);
+        return StartResult.STARTED;
+    }
+
+    public static StartResult startQuestFromItem(EntityPlayerMP player, ItemStack stack) {
+        if (player == null || stack == null || !LostTalesConfig.allowQuestItemStarts || !stack.hasTagCompound()) {
+            return StartResult.START_NOT_ALLOWED;
+        }
+
+        NBTTagCompound tag = stack.getTagCompound();
+        String questId = tag.getString("LostTalesQuestId");
+        if (questId == null || questId.length() == 0) {
+            return StartResult.UNKNOWN_QUEST;
+        }
+
+        StartResult result = startQuest(player, questId, LostTalesQuestStartSource.ITEM);
+        if (result == StartResult.STARTED && tag.getBoolean("LostTalesQuestConsume") && !player.capabilities.isCreativeMode) {
+            stack.stackSize--;
+            if (stack.stackSize <= 0) {
+                player.inventory.setInventorySlotContents(player.inventory.currentItem, null);
+            }
+            player.inventory.markDirty();
+        }
+        return result;
+    }
+
+    public static boolean completeQuest(EntityPlayer player, String questId) {
+        LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
+        if (quest == null) {
+            return false;
+        }
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        boolean changed = data != null && data.completeQuest(questId);
+        if (changed) {
+            revealQuestMarkers(player, quest, false);
+            grantQuestRewards(player, quest);
+            sendQuestChat(player, EnumChatFormatting.GREEN + "Quest completed: " + EnumChatFormatting.YELLOW + quest.getTitle());
+            playQuestSound(player, "random.levelup", 0.45F, 1.0F);
+            syncToClient(player);
+        }
+        return changed;
+    }
+
+    public static boolean resetQuest(EntityPlayer player, String questId) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        boolean changed = data != null && data.resetQuest(questId);
+        if (changed) {
+            sendQuestChat(player, EnumChatFormatting.YELLOW + "Quest reset: " + questTitle(questId));
+            syncToClient(player);
+        }
+        return changed;
+    }
+
+    public static boolean abandonQuest(EntityPlayer player, String questId) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        boolean changed = data != null && data.abandonQuest(questId);
+        if (changed) {
+            sendQuestChat(player, EnumChatFormatting.YELLOW + "Quest abandoned: " + questTitle(questId));
+            syncToClient(player);
+        }
+        return changed;
+    }
+
+
+    public static boolean pinQuest(EntityPlayer player, String questId) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null) {
+            return false;
+        }
+        boolean changed = data.setPinnedQuestId(questId);
+        if (changed) {
+            sendQuestChat(player, EnumChatFormatting.AQUA + "Tracking quest: " + questTitle(questId));
+            syncToClient(player);
+        }
+        return changed;
+    }
+
+    public static boolean unpinQuest(EntityPlayer player) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null) {
+            return false;
+        }
+        boolean changed = data.clearPinnedQuestId();
+        if (changed) {
+            sendQuestChat(player, EnumChatFormatting.AQUA + "Stopped tracking quest.");
+            syncToClient(player);
+        }
+        return changed;
+    }
+
+    public static String getPinnedQuestId(EntityPlayer player) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        return data == null ? "" : data.getPinnedQuestId();
+    }
+
+    public static Set<String> getDiscoveredMarkerIds(EntityPlayer player) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        return data == null ? Collections.<String>emptySet() : data.getDiscoveredMarkerIds();
+    }
+
+    public static String getPinnedMapMarkerId(EntityPlayer player) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        return data == null ? "" : data.getPinnedMapMarkerId();
+    }
+
+    public static Collection<LostTalesMapMarkerDefinition> getDynamicMapMarkers(EntityPlayer player) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        return data == null ? Collections.<LostTalesMapMarkerDefinition>emptyList() : data.getDynamicMapMarkers();
+    }
+
+    public static boolean revealQuestMarkers(EntityPlayer player, String questId) {
+        LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
+        if (quest == null) {
+            sendQuestChat(player, EnumChatFormatting.RED + "Unknown quest: " + questId);
+            return false;
+        }
+        boolean changed = revealQuestMarkers(player, quest, true);
+        if (changed) {
+            syncToClient(player);
+        }
+        return changed;
+    }
+
+    public static boolean revealMapMarker(EntityPlayer player, String markerId) {
+        if (!LostTalesConfig.enableQuestMarkerDiscovery) {
+            return false;
+        }
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null || markerId == null || markerId.trim().length() == 0) {
+            return false;
+        }
+        markerId = markerId.trim();
+        boolean changed = data.discoverMarker(markerId);
+        if (changed) {
+            sendQuestChat(player, EnumChatFormatting.AQUA + "Map marker discovered: " + EnumChatFormatting.WHITE + markerId);
+            syncToClient(player);
+        }
+        return changed;
+    }
+
+
+    public static boolean revealQuestGiverMarker(EntityPlayer player, LostTalesQuestDefinition quest, Entity target, boolean sync) {
+        if (!LostTalesConfig.enableQuestMarkerDiscovery || player == null || quest == null || target == null || player.worldObj == null) {
+            return false;
+        }
+        List<String> markerIds = LostTalesQuestMarkerHelper.collectDynamicQuestGiverMarkerIds(quest);
+        if (markerIds.isEmpty()) {
+            return false;
+        }
+
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null) {
+            return false;
+        }
+
+        boolean changed = false;
+        for (String markerId : markerIds) {
+            LostTalesMapMarkerDefinition marker = new LostTalesMapMarkerDefinition(
+                    markerId,
+                    getEntityMarkerName(target, quest),
+                    "quest",
+                    "blue",
+                    target.worldObj == null ? player.worldObj.provider.dimensionId : target.worldObj.provider.dimensionId,
+                    target.posX,
+                    target.posY,
+                    target.posZ,
+                    true
+            );
+            changed |= data.discoverDynamicMarker(marker);
+        }
+        if (changed) {
+            sendQuestChat(player, EnumChatFormatting.AQUA + "Quest giver marker discovered: " + EnumChatFormatting.WHITE + getEntityMarkerName(target, quest));
+            if (sync) {
+                syncToClient(player);
+            }
+        }
+        return changed;
+    }
+
+    public static boolean revealQuestGiverMarker(EntityPlayer player, LostTalesQuestDefinition quest, Block block, int x, int y, int z, boolean sync) {
+        if (!LostTalesConfig.enableQuestMarkerDiscovery || player == null || quest == null || block == null || player.worldObj == null) {
+            return false;
+        }
+        List<String> markerIds = LostTalesQuestMarkerHelper.collectDynamicQuestGiverMarkerIds(quest);
+        if (markerIds.isEmpty()) {
+            return false;
+        }
+
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null) {
+            return false;
+        }
+
+        String name = getBlockMarkerName(block, quest);
+        boolean changed = false;
+        for (String markerId : markerIds) {
+            LostTalesMapMarkerDefinition marker = new LostTalesMapMarkerDefinition(
+                    markerId,
+                    name,
+                    "quest",
+                    "yellow",
+                    player.worldObj.provider.dimensionId,
+                    x + 0.5D,
+                    y + 0.5D,
+                    z + 0.5D,
+                    true
+            );
+            changed |= data.discoverDynamicMarker(marker);
+        }
+        if (changed) {
+            sendQuestChat(player, EnumChatFormatting.AQUA + "Quest marker discovered: " + EnumChatFormatting.WHITE + name);
+            if (sync) {
+                syncToClient(player);
+            }
+        }
+        return changed;
+    }
+
+    public static boolean forgetMapMarker(EntityPlayer player, String markerId) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null || markerId == null || markerId.trim().length() == 0) {
+            return false;
+        }
+        markerId = markerId.trim();
+        boolean changed = data.forgetMarker(markerId);
+        if (changed) {
+            sendQuestChat(player, EnumChatFormatting.YELLOW + "Map marker forgotten: " + EnumChatFormatting.WHITE + markerId);
+            syncToClient(player);
+        }
+        return changed;
+    }
+
+    public static boolean pinMapMarker(EntityPlayer player, String markerId) {
+        if (!LostTalesConfig.enableQuestMarkerDiscovery) {
+            return false;
+        }
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null || markerId == null || markerId.trim().length() == 0) {
+            return false;
+        }
+        markerId = markerId.trim();
+        if (!data.isMarkerDiscovered(markerId)) {
+            sendQuestChat(player, EnumChatFormatting.YELLOW + "Map marker is not discovered yet: " + markerId);
+            return false;
+        }
+        boolean changed = data.setPinnedMapMarkerId(markerId);
+        if (changed) {
+            sendQuestChat(player, EnumChatFormatting.AQUA + "Tracking map marker: " + markerId);
+            syncToClient(player);
+        }
+        return changed;
+    }
+
+    public static boolean unpinMapMarker(EntityPlayer player) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null) {
+            return false;
+        }
+        boolean changed = data.clearPinnedMapMarkerId();
+        if (changed) {
+            sendQuestChat(player, EnumChatFormatting.AQUA + "Stopped tracking map marker.");
+            syncToClient(player);
+        }
+        return changed;
+    }
+
+    /**
+     * Recount gather/pickup objectives from the player's current inventory.
+     * This is useful after starting a quest when the player already has the requested item.
+     */
+    public static boolean refreshGatherProgressFromInventory(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null || player.worldObj.isRemote) {
+            return false;
+        }
+
+        boolean changed = false;
+        for (LostTalesQuestProgress progress : getActiveQuests(player)) {
+            LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
+            if (quest != null) {
+                boolean questChanged = scanCurrentStageGatherObjectives(player, quest);
+                if (questChanged) {
+                    evaluateStageProgress(player, quest.getId());
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed) {
+            syncToClient(player);
+        }
+        return changed;
+    }
+
+    public static Collection<LostTalesQuestProgress> getActiveQuests(EntityPlayer player) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        return data == null ? Collections.<LostTalesQuestProgress>emptyList() : data.getActiveQuests();
+    }
+
+    public static Set<String> getCompletedQuestIds(EntityPlayer player) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        return data == null ? Collections.<String>emptySet() : data.getCompletedQuestIds();
+    }
+
+    public static void handleEntityKilled(EntityPlayerMP player, Entity victim) {
+        if (player == null || victim == null || player.worldObj == null || player.worldObj.isRemote) {
+            return;
+        }
+
+        boolean changed = false;
+        for (LostTalesQuestProgress progress : getActiveQuests(player)) {
+            LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
+            LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
+            if (quest == null || stage == null) {
+                continue;
+            }
+
+            for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
+                if (!"kill".equalsIgnoreCase(objective.getType())) {
+                    continue;
+                }
+                if (!matchesEntity(victim, objective.getParam("entity", ""))) {
+                    continue;
+                }
+                if (!isWithinObjectiveRadius(player, victim, objective)) {
+                    continue;
+                }
+                changed |= addObjectiveProgressAndEvaluate(player, quest, objective, 1);
+            }
+        }
+        if (changed) {
+            syncToClient(player);
+        }
+    }
+
+    public static void handleItemPickedUp(EntityPlayerMP player, ItemStack pickedUp) {
+        if (player == null || pickedUp == null || pickedUp.getItem() == null || player.worldObj == null || player.worldObj.isRemote) {
+            return;
+        }
+
+        boolean changed = false;
+        int amount = Math.max(1, pickedUp.stackSize);
+        for (LostTalesQuestProgress progress : getActiveQuests(player)) {
+            LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
+            LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
+            if (quest == null || stage == null) {
+                continue;
+            }
+
+            for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
+                if (!isGatherObjective(objective)) {
+                    continue;
+                }
+                if (!matchesItem(pickedUp, objective.getParam("item", ""))) {
+                    continue;
+                }
+                changed |= addObjectiveProgressAndEvaluate(player, quest, objective, amount);
+            }
+        }
+        if (changed) {
+            syncToClient(player);
+        }
+    }
+
+    public static void handleItemCrafted(EntityPlayerMP player, ItemStack crafted) {
+        if (player == null || crafted == null || crafted.getItem() == null || player.worldObj == null || player.worldObj.isRemote) {
+            return;
+        }
+
+        boolean changed = false;
+        int amount = Math.max(1, crafted.stackSize);
+        for (LostTalesQuestProgress progress : getActiveQuests(player)) {
+            LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
+            LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
+            if (quest == null || stage == null) {
+                continue;
+            }
+
+            for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
+                if (!"craft".equalsIgnoreCase(objective.getType())) {
+                    continue;
+                }
+                if (!matchesItem(crafted, objective.getParam("item", ""))) {
+                    continue;
+                }
+                changed |= addObjectiveProgressAndEvaluate(player, quest, objective, amount);
+            }
+        }
+        if (changed) {
+            syncToClient(player);
+        }
+    }
+
+    public static void handlePlayerTick(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null || player.worldObj.isRemote) {
+            return;
+        }
+
+        boolean changed = false;
+        for (LostTalesQuestProgress progress : getActiveQuests(player)) {
+            LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
+            LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
+            if (quest == null || stage == null) {
+                continue;
+            }
+
+            for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
+                if (!"goto".equalsIgnoreCase(objective.getType())) {
+                    continue;
+                }
+                if (isAtObjectiveLocation(player, objective)) {
+                    changed |= setObjectiveProgressAndEvaluate(player, quest, objective, 1);
+                }
+            }
+        }
+        if (changed) {
+            syncToClient(player);
+        }
+    }
+
+    private static boolean addObjectiveProgressAndEvaluate(EntityPlayerMP player, LostTalesQuestDefinition quest, LostTalesQuestObjectiveDefinition objective, int amount) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null || quest == null || objective == null) {
+            return false;
+        }
+
+        int target = getObjectiveTargetCount(objective);
+        int before = data.getObjectiveProgress(quest.getId(), objective.getId());
+        if (target > 0 && before >= target) {
+            return false;
+        }
+
+        int now = data.addObjectiveProgress(quest.getId(), objective.getId(), Math.max(1, amount), target);
+        boolean changed = now != before;
+        if (changed) {
+            if (before < target && now >= target) {
+                sendQuestChat(player, EnumChatFormatting.GREEN + "Objective complete: " + EnumChatFormatting.WHITE + objectiveDescription(objective));
+                playQuestSound(player, "random.orb", 0.35F, 1.25F);
+            }
+            evaluateStageProgress(player, quest.getId());
+        }
+        return changed;
+    }
+
+    private static boolean setObjectiveProgressAndEvaluate(EntityPlayerMP player, LostTalesQuestDefinition quest, LostTalesQuestObjectiveDefinition objective, int value) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null || quest == null || objective == null) {
+            return false;
+        }
+
+        int before = data.getObjectiveProgress(quest.getId(), objective.getId());
+        int target = getObjectiveTargetCount(objective);
+        int clamped = target > 0 ? Math.min(value, target) : value;
+        if (before == clamped) {
+            return false;
+        }
+
+        data.setObjectiveProgress(quest.getId(), objective.getId(), clamped);
+        if (before < target && clamped >= target) {
+            sendQuestChat(player, EnumChatFormatting.GREEN + "Objective complete: " + EnumChatFormatting.WHITE + objectiveDescription(objective));
+            playQuestSound(player, "random.orb", 0.35F, 1.25F);
+        }
+        evaluateStageProgress(player, quest.getId());
+        return true;
+    }
+
+    public static boolean evaluateStageProgress(EntityPlayerMP player, String questId) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
+        LostTalesQuestProgress progress = data == null ? null : data.getActiveQuest(questId);
+        LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
+        if (data == null || quest == null || progress == null || stage == null) {
+            return false;
+        }
+
+        for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
+            if (objective.isOptional()) {
+                continue;
+            }
+            int target = getObjectiveTargetCount(objective);
+            int current = progress.getObjectiveProgress(objective.getId());
+            if (current < target) {
+                return false;
+            }
+        }
+
+        List<LostTalesQuestStageDefinition> stages = quest.getStages();
+        int stageIndex = getStageIndex(quest, progress);
+        int nextStageIndex = stageIndex + 1;
+        if (nextStageIndex >= 0 && nextStageIndex < stages.size()) {
+            LostTalesQuestStageDefinition nextStage = stages.get(nextStageIndex);
+            boolean changed = data.setQuestStage(questId, nextStageIndex, nextStage.getId());
+            if (changed) {
+                sendQuestChat(player, EnumChatFormatting.AQUA + "Quest advanced: " + EnumChatFormatting.YELLOW + quest.getTitle());
+                playQuestSound(player, "random.orb", 0.35F, 1.05F);
+                if (scanCurrentStageGatherObjectives(player, quest)) {
+                    evaluateStageProgress(player, questId);
+                }
+            }
+            return changed;
+        }
+
+        boolean completed = data.completeQuest(questId);
+        if (completed) {
+            revealQuestMarkers(player, quest, false);
+            grantQuestRewards(player, quest);
+            sendQuestChat(player, EnumChatFormatting.GREEN + "Quest completed: " + EnumChatFormatting.YELLOW + quest.getTitle());
+            playQuestSound(player, "random.levelup", 0.45F, 1.0F);
+        }
+        return completed;
+    }
+
+    private static boolean revealQuestMarkers(EntityPlayer player, LostTalesQuestDefinition quest, boolean notify) {
+        if (!LostTalesConfig.enableQuestMarkerDiscovery || player == null || quest == null || quest.getMarkers().isEmpty()) {
+            return false;
+        }
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null) {
+            return false;
+        }
+
+        boolean changed = false;
+        StringBuilder revealed = new StringBuilder();
+        for (String markerId : LostTalesQuestMarkerHelper.collectStaticQuestMarkerIds(quest)) {
+            if (data.discoverMarker(markerId)) {
+                appendMarkerDisplay(revealed, markerId);
+                changed = true;
+            }
+        }
+        for (String markerId : LostTalesQuestMarkerHelper.collectDynamicQuestGiverMarkerIds(quest)) {
+            if (data.getDynamicMapMarker(markerId) != null && data.discoverMarker(markerId)) {
+                appendMarkerDisplay(revealed, markerId);
+                changed = true;
+            }
+        }
+
+        if (changed && notify) {
+            sendQuestChat(player, EnumChatFormatting.AQUA + "Map marker hints revealed: " + EnumChatFormatting.WHITE + revealed.toString());
+        }
+        return changed;
+    }
+
+
+    private static void appendMarkerDisplay(StringBuilder builder, String markerId) {
+        if (builder == null) {
+            return;
+        }
+        if (builder.length() > 0) {
+            builder.append(", ");
+        }
+        builder.append(LostTalesMapMarkerCatalog.getDisplayName(markerId));
+    }
+
+    private static String getEntityMarkerName(Entity entity, LostTalesQuestDefinition quest) {
+        if (entity != null) {
+            try {
+                String name = entity.getCommandSenderName();
+                if (name != null && name.length() > 0) {
+                    return name;
+                }
+            } catch (RuntimeException ignored) {}
+            String entityName = EntityList.getEntityString(entity);
+            if (entityName != null && entityName.length() > 0) {
+                return entityName;
+            }
+        }
+        return quest == null ? "Quest Giver" : quest.getTitle();
+    }
+
+    private static String getBlockMarkerName(Block block, LostTalesQuestDefinition quest) {
+        if (block != null) {
+            try {
+                String name = block.getLocalizedName();
+                if (name != null && name.length() > 0) {
+                    return name;
+                }
+            } catch (RuntimeException ignored) {}
+            Object registeredName = Block.blockRegistry.getNameForObject(block);
+            if (registeredName != null) {
+                return registeredName.toString();
+            }
+        }
+        return quest == null ? "Quest Marker" : quest.getTitle();
+    }
+
+    private static boolean canStartFromSource(LostTalesQuestDefinition quest, LostTalesQuestStartSource source) {
+        if (quest == null) {
+            return false;
+        }
+        if (source == LostTalesQuestStartSource.COMMAND) {
+            return true;
+        }
+        if (source == LostTalesQuestStartSource.JOURNAL) {
+            return LostTalesConfig.allowQuestJournalStarts && quest.canStartFromJournal();
+        }
+        if (source == LostTalesQuestStartSource.ITEM) {
+            return LostTalesConfig.allowQuestItemStarts && quest.canStartFromItem();
+        }
+        if (source == LostTalesQuestStartSource.INTERACTION) {
+            return LostTalesConfig.allowQuestInteractionStarts && quest.canStartFromInteraction();
+        }
+        return false;
+    }
+
+    private static void grantQuestRewards(EntityPlayer player, LostTalesQuestDefinition quest) {
+        if (!LostTalesConfig.enableQuestRewards || !(player instanceof EntityPlayerMP) || quest == null || quest.getRewards().isEmpty()) {
+            return;
+        }
+        LostTalesQuestRewardHelper.grantRewards((EntityPlayerMP) player, quest);
+    }
+
+    public static void syncToClient(EntityPlayer player) {
+        if (player instanceof EntityPlayerMP) {
+            syncToClient((EntityPlayerMP) player);
+        }
+    }
+
+    public static void syncToClient(EntityPlayerMP player) {
+        if (player == null) {
+            return;
+        }
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        LostTalesNetworkHandler.CHANNEL.sendTo(LostTalesQuestSyncPacket.fromPlayerData(data), player);
+    }
+
+    private static boolean scanCurrentStageGatherObjectives(EntityPlayerMP player, LostTalesQuestDefinition quest) {
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        LostTalesQuestProgress progress = data == null || quest == null ? null : data.getActiveQuest(quest.getId());
+        LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
+        if (data == null || progress == null || stage == null) {
+            return false;
+        }
+
+        boolean changed = false;
+        for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
+            if (!isGatherObjective(objective)) {
+                continue;
+            }
+
+            int target = getObjectiveTargetCount(objective);
+            int inventoryCount = Math.min(target, countMatchingInventoryItems(player, objective.getParam("item", "")));
+            int before = data.getObjectiveProgress(quest.getId(), objective.getId());
+            if (inventoryCount > before) {
+                data.setObjectiveProgress(quest.getId(), objective.getId(), inventoryCount);
+                changed = true;
+                if (before < target && inventoryCount >= target) {
+                    sendQuestChat(player, EnumChatFormatting.GREEN + "Objective complete: " + EnumChatFormatting.WHITE + objectiveDescription(objective));
+                    playQuestSound(player, "random.orb", 0.35F, 1.25F);
+                }
+            }
+        }
+        return changed;
+    }
+
+    private static int countMatchingInventoryItems(EntityPlayerMP player, String itemSpec) {
+        if (player == null || player.inventory == null || itemSpec == null || itemSpec.length() == 0) {
+            return 0;
+        }
+
+        int count = 0;
+        ItemStack[] inventory = player.inventory.mainInventory;
+        for (ItemStack stack : inventory) {
+            if (stack != null && stack.stackSize > 0 && matchesItem(stack, itemSpec)) {
+                count += stack.stackSize;
+            }
+        }
+        return count;
+    }
+
+    private static LostTalesQuestStageDefinition getCurrentStage(LostTalesQuestDefinition quest, LostTalesQuestProgress progress) {
+        if (quest == null || progress == null || quest.getStages().isEmpty()) {
+            return null;
+        }
+
+        for (LostTalesQuestStageDefinition stage : quest.getStages()) {
+            if (stage.getId() != null && stage.getId().equals(progress.getStageId())) {
+                return stage;
+            }
+        }
+
+        int index = progress.getStageIndex();
+        if (index >= 0 && index < quest.getStages().size()) {
+            return quest.getStages().get(index);
+        }
+        return quest.getFirstStage();
+    }
+
+    private static int getStageIndex(LostTalesQuestDefinition quest, LostTalesQuestProgress progress) {
+        if (quest == null || progress == null) {
+            return -1;
+        }
+
+        List<LostTalesQuestStageDefinition> stages = quest.getStages();
+        for (int i = 0; i < stages.size(); i++) {
+            LostTalesQuestStageDefinition stage = stages.get(i);
+            if (stage.getId() != null && stage.getId().equals(progress.getStageId())) {
+                return i;
+            }
+        }
+        return progress.getStageIndex();
+    }
+
+    private static boolean isGatherObjective(LostTalesQuestObjectiveDefinition objective) {
+        String type = objective.getType();
+        return "gather".equalsIgnoreCase(type) || "gather_item".equalsIgnoreCase(type) || "pickup".equalsIgnoreCase(type) || "pickup_item".equalsIgnoreCase(type);
+    }
+
+    private static int getObjectiveTargetCount(LostTalesQuestObjectiveDefinition objective) {
+        if (objective == null) {
+            return 1;
+        }
+        if ("goto".equalsIgnoreCase(objective.getType())) {
+            return 1;
+        }
+        return parseInt(objective.getParam("count", "1"), 1);
+    }
+
+    private static boolean isAtObjectiveLocation(EntityPlayerMP player, LostTalesQuestObjectiveDefinition objective) {
+        Map<String, String> params = objective.getParams();
+        LostTalesMapMarkerDefinition marker = getObjectiveLocationMarker(player, objective);
+        boolean hasExplicitCoordinates = params.containsKey("x") || params.containsKey("y") || params.containsKey("z");
+
+        if (marker == null && !hasExplicitCoordinates) {
+            return false;
+        }
+
+        double x = marker != null ? marker.getX() : parseDouble(params.get("x"), 0.0D);
+        double y = marker != null ? marker.getY() : parseDouble(params.get("y"), 0.0D);
+        double z = marker != null ? marker.getZ() : parseDouble(params.get("z"), 0.0D);
+        double radius = Math.max(0.5D, parseDouble(params.get("radius"), 3.0D));
+        int targetDimension = marker != null ? marker.getDimensionId() : LostTalesDimensionHelper.parseDimensionId(params.get("dimension"), player.worldObj.provider.dimensionId);
+        if (player.worldObj.provider.dimensionId != targetDimension) {
+            return false;
+        }
+
+        double dx = player.posX - x;
+        double dy = player.posY - y;
+        double dz = player.posZ - z;
+        return dx * dx + dy * dy + dz * dz <= radius * radius;
+    }
+
+    private static LostTalesMapMarkerDefinition getObjectiveLocationMarker(EntityPlayerMP player, LostTalesQuestObjectiveDefinition objective) {
+        if (player == null || objective == null) {
+            return null;
+        }
+        String markerId = firstNonEmpty(objective.getParam("marker", ""), objective.getParam("markerId", ""), objective.getParam("mapMarker", ""));
+        if (markerId.length() == 0) {
+            return null;
+        }
+
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        LostTalesMapMarkerDefinition dynamic = data == null ? null : data.getDynamicMapMarker(markerId);
+        if (dynamic != null) {
+            return dynamic;
+        }
+        return LostTalesMapMarkerCatalog.getMarker(markerId);
+    }
+
+    private static boolean isWithinObjectiveRadius(EntityPlayerMP player, Entity victim, LostTalesQuestObjectiveDefinition objective) {
+        double radius = parseDouble(objective.getParam("radius", "0"), 0.0D);
+        if (radius <= 0.0D || player == null || victim == null) {
+            return true;
+        }
+        if (player.worldObj == null || victim.worldObj == null || player.worldObj.provider.dimensionId != victim.worldObj.provider.dimensionId) {
+            return false;
+        }
+        double dx = player.posX - victim.posX;
+        double dy = player.posY - victim.posY;
+        double dz = player.posZ - victim.posZ;
+        return dx * dx + dy * dy + dz * dz <= radius * radius;
+    }
+
+    private static boolean matchesItem(ItemStack stack, String itemSpec) {
+        if (stack == null || stack.getItem() == null || itemSpec == null || itemSpec.trim().length() == 0) {
+            return false;
+        }
+
+        String[] entries = itemSpec.split(",");
+        for (String entry : entries) {
+            String normalized = normalizeResourceId(entry);
+            if (normalized.length() == 0 || normalized.startsWith("#")) {
+                continue;
+            }
+
+            Object registered = Item.itemRegistry.getObject(normalized);
+            if (registered instanceof Item && stack.getItem() == registered) {
+                return true;
+            }
+
+            Object stackName = Item.itemRegistry.getNameForObject(stack.getItem());
+            if (stackName != null && normalizeResourceId(stackName.toString()).equals(normalized)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesEntity(Entity victim, String entitySpec) {
+        if (victim == null || entitySpec == null || entitySpec.trim().length() == 0) {
+            return true;
+        }
+
+        String[] entries = entitySpec.split(",");
+        String legacyName = normalizeLoose(EntityList.getEntityString(victim));
+        String className = normalizeLoose(victim.getClass().getSimpleName().replace("Entity", ""));
+
+        for (String entry : entries) {
+            if (entry == null || entry.trim().startsWith("#")) {
+                continue;
+            }
+            String normalized = normalizeLoose(entry);
+            String pathOnly = normalizeLoose(stripNamespace(entry));
+            if (normalized.length() == 0) {
+                continue;
+            }
+            if (normalized.equals(legacyName) || pathOnly.equals(legacyName) || normalized.equals(className) || pathOnly.equals(className)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String normalizeResourceId(String value) {
+        if (value == null) {
+            return "";
+        }
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        if (normalized.startsWith("#")) {
+            return normalized;
+        }
+        if (normalized.indexOf(':') < 0 && normalized.length() > 0) {
+            normalized = "minecraft:" + normalized;
+        }
+        return normalized;
+    }
+
+    private static String stripNamespace(String value) {
+        if (value == null) {
+            return "";
+        }
+        String trimmed = value.trim();
+        int colon = trimmed.indexOf(':');
+        return colon >= 0 && colon + 1 < trimmed.length() ? trimmed.substring(colon + 1) : trimmed;
+    }
+
+    private static String normalizeLoose(String value) {
+        if (value == null) {
+            return "";
+        }
+        String stripped = stripNamespace(value).toLowerCase(Locale.ROOT);
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < stripped.length(); i++) {
+            char c = stripped.charAt(i);
+            if (c >= 'a' && c <= 'z' || c >= '0' && c <= '9') {
+                builder.append(c);
+            }
+        }
+        return builder.toString();
+    }
+
+    private static String objectiveDescription(LostTalesQuestObjectiveDefinition objective) {
+        if (objective == null) {
+            return "objective";
+        }
+        String description = objective.getDescription();
+        return description == null || description.length() == 0 ? objective.getId() : description;
+    }
+
+    private static String questTitle(String questId) {
+        LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
+        return quest == null ? questId : quest.getTitle();
+    }
+
+    private static void sendQuestChat(EntityPlayer player, String message) {
+        if (!LostTalesConfig.showQuestChatFeedback || player == null || player.worldObj == null || player.worldObj.isRemote || message == null || message.length() == 0) {
+            return;
+        }
+        player.addChatMessage(new ChatComponentText(EnumChatFormatting.DARK_AQUA + "[Lost Tales] " + EnumChatFormatting.RESET + message));
+    }
+
+    private static void playQuestSound(EntityPlayer player, String soundName, float volume, float pitch) {
+        if (!LostTalesConfig.playQuestSounds || player == null || player.worldObj == null || player.worldObj.isRemote) {
+            return;
+        }
+        player.worldObj.playSoundAtEntity(player, soundName, volume, pitch);
+    }
+
+    private static int parseInt(String value, int fallback) {
+        try {
+            return Integer.parseInt(value);
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private static double parseDouble(String value, double fallback) {
+        try {
+            return Double.parseDouble(value);
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private static String firstNonEmpty(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && value.trim().length() > 0) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
+    public enum StartResult {
+        STARTED,
+        UNKNOWN_QUEST,
+        NO_PLAYER_DATA,
+        ALREADY_ACTIVE,
+        ALREADY_COMPLETED,
+        START_NOT_ALLOWED,
+        REQUIREMENTS_NOT_MET
+    }
+}

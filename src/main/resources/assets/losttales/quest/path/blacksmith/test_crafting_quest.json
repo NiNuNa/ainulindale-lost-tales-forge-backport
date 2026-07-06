@@ -1,0 +1,36 @@
+{
+  "id": "losttales:path/blacksmith/test_crafting_quest",
+  "title": "Path of the Blacksmith: The Beginning",
+  "description": "Quest Description Text",
+  "repeatable": true,
+  "journalLog": {
+    "10": "I've finished part 1 of the quest."
+  },
+  "stages": [
+    {
+      "id": "10",
+      "objectives": [
+        {
+          "id": "craft_sticks",
+          "type": "craft",
+          "description": "Craft 5 Sticks",
+          "optional": false,
+          "params": {
+            "item": "minecraft:stick",
+            "count": "5"
+          }
+        }
+      ]
+    }
+  ],
+  "prerequisites": {
+    "completed": "losttales:missive/gather_gold_ore"
+  },
+  "rewards": {
+    "experience": "18",
+    "items": "minecraft:iron_ingot*2"
+  },
+  "markers": {
+    "hint": "losttales:quest_blacksmith_hint"
+  }
+}

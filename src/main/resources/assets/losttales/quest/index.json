@@ -1,0 +1,11 @@
+{
+  "quests": [
+    "quest/test_quest.json",
+    "quest/missive/gather_gold_ore.json",
+    "quest/missive/kill_orc.json",
+    "quest/path/blacksmith/test_crafting_quest.json",
+    "quest/tutorial/meet_nia.json",
+    "quest/tutorial/cheese_cache.json",
+    "quest/tutorial/starter_note.json"
+  ]
+}

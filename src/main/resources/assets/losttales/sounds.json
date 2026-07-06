@@ -1,0 +1,60 @@
+{
+    "plushie.squeak": {
+        "category":"neutral",
+        "sounds": [
+            "plushie/squeak",
+            "plushie/squeak2",
+            "plushie/squeak3",
+            "plushie/squeak4",
+            "plushie/squeak5"
+        ]
+    },
+    "break.ceramic": {
+        "category":"block",
+        "sounds": [
+            "block/ceramic_break",
+            "block/ceramic_break2",
+            "block/ceramic_break3"
+        ]
+    },
+    "step.ceramic": {
+        "category":"block",
+        "sounds": [
+            "block/ceramic_step",
+            "block/ceramic_step2",
+            "block/ceramic_step3"
+        ]
+    },
+    "place.ceramic": {
+        "category":"block",
+        "sounds": [
+            "block/ceramic_place",
+            "block/ceramic_place2",
+            "block/ceramic_place3"
+        ]
+    },
+    "break.clay": {
+        "category":"block",
+        "sounds": [
+            "block/clay_break",
+            "block/clay_break2",
+            "block/clay_break3"
+        ]
+    },
+    "step.clay": {
+        "category":"block",
+        "sounds": [
+            "block/clay_step",
+            "block/clay_step2",
+            "block/clay_step3"
+        ]
+    },
+    "place.clay": {
+        "category":"block",
+        "sounds": [
+            "block/clay_place",
+            "block/clay_place2",
+            "block/clay_place3"
+        ]
+    }
+}

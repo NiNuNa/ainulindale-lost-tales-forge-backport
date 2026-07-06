@@ -1,0 +1,53 @@
+{
+  "id": "losttales:tutorial/meet_nia",
+  "title": "A Conversation with Nia",
+  "description": "Nia has a small task for travelers who stop to speak with her. This quest demonstrates the 1.7.10 interaction-start hook and a simple reward.",
+  "repeatable": false,
+  "startMode": "interaction",
+  "interaction": {
+    "entity": "Nia,losttalesnia,losttalesentitynia"
+  },
+  "markers": {
+    "giver": "losttales:quest_giver_nia"
+  },
+  "rewards": {
+    "experience": "20",
+    "items": "minecraft:bread*2,minecraft:emerald*1"
+  },
+  "journalLog": {
+    "10": "Nia asked me to bring her a few sticks for repairs.",
+    "20": "I gathered the sticks Nia requested."
+  },
+  "stages": [
+    {
+      "id": "10",
+      "objectives": [
+        {
+          "id": "gather_sticks",
+          "type": "gather",
+          "description": "Bring Nia 4 sticks.",
+          "optional": false,
+          "params": {
+            "item": "minecraft:stick",
+            "count": "4"
+          }
+        }
+      ]
+    },
+    {
+      "id": "20",
+      "objectives": [
+        {
+          "id": "return_to_nia_marker",
+          "type": "goto",
+          "description": "Return near Nia's marker.",
+          "optional": false,
+          "params": {
+            "marker": "losttales:quest_giver_nia",
+            "radius": "8"
+          }
+        }
+      ]
+    }
+  ]
+}

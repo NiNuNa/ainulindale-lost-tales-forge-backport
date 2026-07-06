@@ -1,0 +1,34 @@
+{
+  "id": "losttales:tutorial/starter_note",
+  "title": "The Sealed Note",
+  "description": "A development quest that starts from an NBT-tagged item. Use /losttales quest starter losttales:tutorial/starter_note to create the note.",
+  "repeatable": true,
+  "startMode": "item",
+  "markers": {
+    "hint": "losttales:quest_hint_starter_note"
+  },
+  "rewards": {
+    "experience": "12",
+    "items": "minecraft:paper*1"
+  },
+  "journalLog": {
+    "10": "The note asks me to craft a torch before nightfall."
+  },
+  "stages": [
+    {
+      "id": "10",
+      "objectives": [
+        {
+          "id": "craft_torches",
+          "type": "craft",
+          "description": "Craft 4 torches.",
+          "optional": false,
+          "params": {
+            "item": "minecraft:torch",
+            "count": "4"
+          }
+        }
+      ]
+    }
+  ]
+}

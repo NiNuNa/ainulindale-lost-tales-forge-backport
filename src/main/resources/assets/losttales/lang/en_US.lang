@@ -1,0 +1,520 @@
+#   Armor - Arnor
+item.arnorian_helmet_light.name=Arnorian Light Helmet
+item.arnorian_helmet_light.lore.line1=An ancient light helmet forged in
+item.arnorian_helmet_light.lore.line2=the lost realm of Arnor
+
+item.arnorian_helmet_light_2.name=Arnorian Light Helmet
+item.arnorian_helmet_light_2.lore.line1=An ancient light helmet forged in
+item.arnorian_helmet_light_2.lore.line2=the lost realm of Arnor
+
+item.arnorian_armor_light.name=Arnorian Light Armor
+item.arnorian_armor_light.lore.line1=An ancient light chest-guard forged
+item.arnorian_armor_light.lore.line2=in the lost realm of Arnor
+
+item.arnorian_leggings_light.name=Arnorian Light Leggings
+item.arnorian_leggings_light.lore.line1=Ancient light leggings forged
+item.arnorian_leggings_light.lore.line2=in the lost realm of Arnor
+
+item.arnorian_boots_light.name=Arnorian Light Boots
+item.arnorian_boots_light.lore.line1=Ancient light boots forged
+item.arnorian_boots_light.lore.line2=in the lost realm of Arnor
+
+item.arnorian_helmet_heavy.name=Arnorian Heavy Helmet
+item.arnorian_helmet_heavy.lore.line1=An ancient heavy helmet forged in
+item.arnorian_helmet_heavy.lore.line2=the lost realm of Arnor
+
+item.arnorian_helmet_heavy_2.name=Arnorian Heavy Helmet
+item.arnorian_helmet_heavy_2.lore.line1=An ancient heavy helmet forged in
+item.arnorian_helmet_heavy_2.lore.line2=the lost realm of Arnor
+
+item.arnorian_armor_heavy.name=Arnorian Heavy Armor
+item.arnorian_armor_heavy.lore.line1=An ancient heavy chest-guard forged
+item.arnorian_armor_heavy.lore.line2=in the lost realm of Arnor
+
+item.arnorian_leggings_heavy.name=Arnorian Heavy Leggings
+item.arnorian_leggings_heavy.lore.line1=Ancient heavy leggings forged
+item.arnorian_leggings_heavy.lore.line2=in the lost realm of Arnor
+
+item.arnorian_boots_heavy.name=Arnorian Heavy Boots
+item.arnorian_boots_heavy.lore.line1=Ancient heavy boots forged
+item.arnorian_boots_heavy.lore.line2=in the lost realm of Arnor
+
+item.arnorian_helmet_light_captain.name=Arnorian Light Captain's Helmet
+item.arnorian_helmet_light_captain.lore.line1=An ancient captain's light helmet
+item.arnorian_helmet_light_captain.lore.line2=forged in the lost realm of Arnor
+
+item.arnorian_armor_light_captain.name=Arnorian Light Captain's Armor
+item.arnorian_armor_light_captain.lore.line1=An ancient captain's light chest-guard
+item.arnorian_armor_light_captain.lore.line2=forged in the lost realm of Arnor
+
+item.arnorian_leggings_light_captain.name=Arnorian Light Captain's Leggings
+item.arnorian_leggings_light_captain.lore.line1=An ancient captain's light leggings
+item.arnorian_leggings_light_captain.lore.line2=forged in the lost realm of Arnor
+
+item.arnorian_boots_light_captain.name=Arnorian Light Captain's Boots
+item.arnorian_boots_light_captain.lore.line1=An ancient captain's light boots
+item.arnorian_boots_light_captain.lore.line2=forged in the lost realm of Arnor
+
+item.arnorian_helmet_heavy_captain.name=Arnorian Heavy Captain's Helmet
+item.arnorian_helmet_heavy_captain.lore.line1=An ancient captain's heavy helmet
+item.arnorian_helmet_heavy_captain.lore.line2=forged in the lost realm of Arnor
+
+item.arnorian_armor_heavy_captain.name=Arnorian Heavy Captain's Armor
+item.arnorian_armor_heavy_captain.lore.line1=An ancient captain's heavy chest-guard
+item.arnorian_armor_heavy_captain.lore.line2=forged in the lost realm of Arnor
+
+item.arnorian_leggings_heavy_captain.name=Arnorian Heavy Captain's Leggings
+item.arnorian_leggings_heavy_captain.lore.line1=An ancient captain's heavy leggings
+item.arnorian_leggings_heavy_captain.lore.line2=forged in the lost realm of Arnor
+
+item.arnorian_boots_heavy_captain.name=Arnorian Heavy Captain's Boots
+item.arnorian_boots_heavy_captain.lore.line1=An ancient captain's heavy boots
+item.arnorian_boots_heavy_captain.lore.line2=forged in the lost realm of Arnor
+
+#   Weapons - Arnor
+item.arnorian_sword.name=Arnorian Sword
+item.arnorian_sword.lore.line1=An ancient sword forged in
+item.arnorian_sword.lore.line2=the lost realm of Arnor
+
+item.arnorian_longsword.name=Arnorian Longsword
+item.arnorian_longsword.lore.line1=An ancient longsword forged in
+item.arnorian_longsword.lore.line2=the lost realm of Arnor
+
+item.arnorian_dagger.name=Arnorian Dagger
+item.arnorian_dagger.lore.line1=An ancient dagger forged in
+item.arnorian_dagger.lore.line2=the lost realm of Arnor
+
+item.arnorian_dagger_poisoned.name=Poisoned Arnorian Dagger
+item.arnorian_dagger_poisoned.lore.line1=An ancient dagger forged in the lost
+item.arnorian_dagger_poisoned.lore.line2=realm of Arnor, coated with poison
+
+item.arnorian_spear.name=Arnorian Spear
+item.arnorian_spear.lore.line1=An ancient spear forged in
+item.arnorian_spear.lore.line2=the lost realm of Arnor
+
+item.arnorian_pike.name=Arnorian Pike
+item.arnorian_pike.lore.line1=An ancient pike forged in
+item.arnorian_pike.lore.line2=the lost realm of Arnor
+
+item.arnorian_halberd.name=Arnorian Halberd
+item.arnorian_halberd.lore.line1=An ancient halberd forged in
+item.arnorian_halberd.lore.line2=the lost realm of Arnor
+
+#   Armors - Orocarni
+item.orocarni_helmet_light.name=Orocarni Light Helmet
+item.orocarni_helmet_light.lore.line1=A light-weighted helm forged by the
+item.orocarni_helmet_light.lore.line2=Dwarf-smiths of the Red Mountains
+
+item.orocarni_helmet_light_2.name=Orocarni Light Helmet
+item.orocarni_helmet_light_2.lore.line1=A light-weighted helm forged by the
+item.orocarni_helmet_light_2.lore.line2=Dwarf-smiths of the Red Mountains
+
+item.orocarni_helmet_light_3.name=Orocarni Light Helmet
+item.orocarni_helmet_light_3.lore.line1=A light-weighted helm forged by the
+item.orocarni_helmet_light_3.lore.line2=Dwarf-smiths of the Red Mountains
+
+item.orocarni_armor_light.name=Orocarni Light Armor
+item.orocarni_armor_light.lore.line1=A light-weighted chest-guard forged by
+item.orocarni_armor_light.lore.line2=the Dwarf-smiths of the Red Mountains
+
+item.orocarni_leggings_light.name=Orocarni Light Leggings
+item.orocarni_leggings_light.lore.line1=Light-weighted leggings forged by the
+item.orocarni_leggings_light.lore.line2=Dwarf-smiths of the Red Mountains
+
+item.orocarni_boots_light.name=Orocarni Light Boots
+item.orocarni_boots_light.lore.line1=Light-weighted boots forged by the
+item.orocarni_boots_light.lore.line2=Dwarf-smiths of the Red Mountains
+
+item.orocarni_helmet_light_captain.name=Orocarni Light Captain's Helmet
+item.orocarni_helmet_light_captain.lore.line1=A Dwarf-captain's light-weighted boots forged
+item.orocarni_helmet_light_captain.lore.line2=by the Dwarf-smiths of the Red Mountains
+
+item.orocarni_armor_light_captain.name=Orocarni Light Captain's Armor
+item.orocarni_armor_light_captain.lore.line1=A Dwarf-captain's light-weighted chest-guard
+item.orocarni_armor_light_captain.lore.line2=forged by the Dwarf-smiths of the Red Mountains
+
+item.orocarni_leggings_light_captain.name=Orocarni Light Captain's Leggings
+item.orocarni_leggings_light_captain.lore.line1=A Dwarf-captain's light-weighted leggings
+item.orocarni_leggings_light_captain.lore.line2=forged by the Dwarf-smiths of the Red Mountains
+
+item.orocarni_boots_light_captain.name=Orocarni Light Captain's Boots
+item.orocarni_boots_light_captain.lore.line1=A Dwarf-captain's light-weighted boots forged
+item.orocarni_boots_light_captain.lore.line2=by the Dwarf-smiths of the Red Mountains
+
+#    Weapons - Orocarni
+item.orocarni_sword.name=Orocarni Sword
+item.orocarni_sword.lore.line1=A blade forged by the Dwarf-
+item.orocarni_sword.lore.line2=smiths of the Red Mountains
+
+item.orocarni_dagger.name=Orocarni Dagger
+item.orocarni_dagger.lore.line1=TODO...
+item.orocarni_dagger.lore.line2=TODO....
+
+item.orocarni_dagger_poisoned.name=Poisoned Orocarni Dagger
+item.orocarni_dagger_poisoned.lore.line1=TODO...
+item.orocarni_dagger_poisoned.lore.line2=TODO....
+
+item.orocarni_battleaxe.name=Orocarni Battleaxe
+item.orocarni_battleaxe.lore.line1=TODO...
+item.orocarni_battleaxe.lore.line2=TODO....
+
+item.orocarni_mace.name=Orocarni Mace
+item.orocarni_mace.lore.line1=TODO...
+item.orocarni_mace.lore.line2=TODO....
+
+item.orocarni_warhammer.name=Orocarni Warhammer
+item.orocarni_warhammer.lore.line1=TODO...
+item.orocarni_warhammer.lore.line2=TODO....
+
+item.orocarni_pike.name=Orocarni Pike
+item.orocarni_pike.lore.line1=TODO...
+item.orocarni_pike.lore.line2=TODO....
+
+item.orocarni_halberd.name=Orocarni Halberd
+item.orocarni_halberd.lore.line1=TODO...
+item.orocarni_halberd.lore.line2=TODO...
+
+item.orocarni_spear.name=Orocarni Spear
+item.orocarni_spear.lore.line1=TODO...
+item.orocarni_spear.lore.line2=TODO...
+
+#    Armors - Galadhrim
+item.galadhrim_helmet_light.name=Galadhrim Light Helmet
+item.galadhrim_helmet_light.lore.line1=TODO...
+item.galadhrim_helmet_light.lore.line2=TODO...
+
+item.galadhrim_helmet_light_hood.name=Hooded Galadhrim Light Helmet
+item.galadhrim_helmet_light_hood.lore.line1=TODO...
+item.galadhrim_helmet_light_hood.lore.line2=TODO...
+
+item.galadhrim_helmet_heavy.name=Galadhrim Heavy Helmet
+item.galadhrim_helmet_heavy.lore.line1=TODO...
+item.galadhrim_helmet_heavy.lore.line2=TODO...
+
+item.galadhrim_helmet_heavy_hood.name=Hooded Galadhrim Heavy Helmet
+item.galadhrim_helmet_heavy_hood.lore.line1=TODO...
+item.galadhrim_helmet_heavy_hood.lore.line2=TODO...
+
+#   Armors - Moon Elves
+item.moon_elf_helmet_light.name=Ithildhrim Light Helmet
+item.moon_elf_helmet_light.lore.line1=TODO...
+item.moon_elf_helmet_light.lore.line2=TODO...
+
+item.moon_elf_armor_light.name=Ithildhrim Light Armor
+item.moon_elf_armor_light.lore.line1=TODO...
+item.moon_elf_armor_light.lore.line2=TODO...
+
+item.moon_elf_leggings_light.name=Ithildhrim Light Leggings
+item.moon_elf_leggings_light.lore.line1=TODO...
+item.moon_elf_leggings_light.lore.line2=TODO...
+
+item.moon_elf_boots_light.name=Ithildhrim Light Boots
+item.moon_elf_boots_light.lore.line1=TODO...
+item.moon_elf_boots_light.lore.line2=TODO...
+
+#   Items - Story
+item.dains_hammer.name=Dains Hammer Testing
+item.dains_hammer.lore.line1=TODO...
+item.dains_hammer.lore.line2=TODO...
+
+#   Consumables - Food
+item.pear.name=Pear
+item.pear.lore.line1=TODO...
+item.pear.lore.line2=TODO...
+
+#   Items - Community
+item.community_lossoth_harpoon.name=Lossoth Harpoon
+item.community_lossoth_harpoon.lore.line1=A makeshift harpoon crafted by the Northmen
+item.community_lossoth_harpoon.lore.line2=of Forodwaith for the hunting of sea-creatures
+
+item.community_moria_goblin_pike.name=Moria Goblin Pike
+item.community_moria_goblin_pike.lore.line1=TODO...
+item.community_moria_goblin_pike.lore.line2=TODO...
+
+item.community_moria_goblin_scimitar.name=Moria Goblin Scimitar
+item.community_moria_goblin_scimitar.lore.line1=TODO...
+item.community_moria_goblin_scimitar.lore.line2=TODO...
+
+item.community_moria_goblin_mace.name=Moria Goblin Mace
+item.community_moria_goblin_mace.lore.line1=TODO...
+item.community_moria_goblin_mace.lore.line2=TODO...
+
+item.community_moria_goblin_spear.name=Moria Goblin Spear
+item.community_moria_goblin_spear.lore.line1=TODO...
+item.community_moria_goblin_spear.lore.line2=TODO...
+
+#   Blocks
+# Urns
+tile.urn.name=Urn
+tile.urn.lore.line1=Stores a small offering.
+tile.urn.lore.line2=Use clay to seal it.
+
+tile.amphora.name=Urn Amphora
+tile.amphora.lore.line1=TODO...
+tile.amphora.lore.line2=TODO...
+
+tile.amphora_ancient.name=Ancient Urn Amphora
+tile.amphora_ancient.lore.line1=TODO...
+tile.amphora_ancient.lore.line2=TODO...
+
+tile.loutrophoros.name=Urn Loutrophoros
+tile.loutrophoros.lore.line1=TODO...
+tile.loutrophoros.lore.line2=TODO...
+
+tile.loutrophoros_ancient.name=Ancient Urn Loutrophoros
+tile.loutrophoros_ancient.lore.line1=TODO...
+tile.loutrophoros_ancient.lore.line2=TODO...
+
+tile.watch_stone.name=Watch Stone
+tile.watch_stone.lore.line1=TODO...
+tile.watch_stone.lore.line2=TODO...
+
+#   Blocks - Plushies
+tile.plushie_bear.name=Bear Plushie
+tile.plushie_bear.lore.line1=TODO...
+tile.plushie_bear.lore.line2=TODO...
+
+tile.plushie_fox.name=Fox Plushie
+tile.plushie_fox.lore.line1=TODO...
+tile.plushie_fox.lore.line2=TODO...
+
+tile.plushie_gandalf.name=Gandalf Plushie
+tile.plushie_gandalf.lore.line1=TODO...
+tile.plushie_gandalf.lore.line2=TODO...
+
+#   Creative Tabs
+itemGroup.creativeTabBlocksBuilding=Lost Tales - Building Blocks
+itemGroup.creativeTabBlocksDecoration=Lost Tales - Decoration Blocks
+itemGroup.creativeTabPlushies=Lost Tales - Plushies
+itemGroup.creativeTabFood=Lost Tales - Food
+itemGroup.creativeTabCombat=Lost Tales - Combat
+itemGroup.creativeTabStory=Lost Tales - Story
+itemGroup.creativeTabMisc=Lost Tales - Miscellaneous
+itemGroup.creativeTabCommunity=Lost Tales - Community
+
+#   Factions - Active
+lotr.faction.OROCARNI.name=Orocarni
+lotr.faction.OROCARNI.entity=TODO...
+lotr.faction.OROCARNI.subtitle=Dwarves of the Red Mountain
+lotr.faction.OROCARNI.achieveRank=Reach %s alignment with the Orocarni Dwarves
+lotr.faction.OROCARNI.achieveRankPledge=Pledge and reach %s alignment with the Orocarni Dwarves
+lotr.faction.OROCARNI.rank.a=Welp
+lotr.faction.OROCARNI.rank.a.f=Orocarni Welp
+lotr.faction.OROCARNI.rank.b=Snaga
+lotr.faction.OROCARNI.rank.b.f=Orocarni Snaga
+lotr.faction.OROCARNI.rank.c=Brawler
+lotr.faction.OROCARNI.rank.c.f=Orocarni Brawler
+lotr.faction.OROCARNI.rank.d=Pit-fighter
+lotr.faction.OROCARNI.rank.d.f=Orocarni Pit-fighter
+lotr.faction.OROCARNI.rank.e=Taskmaster
+lotr.faction.OROCARNI.rank.e.f=Orocarni Taskmaster
+lotr.faction.OROCARNI.rank.f=Captain
+lotr.faction.OROCARNI.rank.f.f=Orocarni Captain
+lotr.faction.OROCARNI.rank.g=Master
+lotr.faction.OROCARNI.rank.g.f=Orocarni Master
+lotr.faction.OROCARNI.rank.h=Crimson Lord
+lotr.faction.OROCARNI.rank.h.f=Crimson Lord
+
+lotr.faction.LOSSOTH.name=Lossoth
+lotr.faction.LOSSOTH.entity=TODO...
+lotr.faction.LOSSOTH.subtitle=Peoples of Lossoth
+lotr.faction.LOSSOTH.achieveRank=Reach %s alignment with the Lossoth Peoples
+lotr.faction.LOSSOTH.achieveRankPledge=Pledge and reach %s alignment with the Lossoth Peoples
+lotr.faction.LOSSOTH.rank.a=Pup
+lotr.faction.LOSSOTH.rank.a.f=Lossoth Pup
+lotr.faction.LOSSOTH.rank.b=Tribesman
+lotr.faction.LOSSOTH.rank.b.f=Lossoth Tribesman
+lotr.faction.LOSSOTH.rank.b.fm=Lossoth Tribeswoman
+lotr.faction.LOSSOTH.rank.c=Hunter
+lotr.faction.LOSSOTH.rank.c.f=Lossoth Hunter
+lotr.faction.LOSSOTH.rank.d=Fighter
+lotr.faction.LOSSOTH.rank.d.f=Lossoth Fighter
+lotr.faction.LOSSOTH.rank.e=Warmonger
+lotr.faction.LOSSOTH.rank.e.f=Lossoth Warmonger
+lotr.faction.LOSSOTH.rank.f=Elder
+lotr.faction.LOSSOTH.rank.f.f=Lossoth Elder
+lotr.faction.LOSSOTH.rank.g=Shaman
+lotr.faction.LOSSOTH.rank.g.f=Lossoth Shaman
+lotr.faction.LOSSOTH.rank.h=Chief
+lotr.faction.LOSSOTH.rank.h.f=Lossoth Chief
+
+lotr.faction.MORIA_GOBLINS.name=Moria Goblins
+lotr.faction.MORIA_GOBLINS.entity=Moria Goblin
+lotr.faction.MORIA_GOBLINS.subtitle=Dwellers of Moria
+lotr.faction.MORIA_GOBLINS.achieveRank=Reach %s alignment with the Moria Goblins
+lotr.faction.MORIA_GOBLINS.achieveRankPledge=Pledge and reach %s alignment with the Moria Goblins
+lotr.faction.MORIA_GOBLINS.rank.a=Gimp
+lotr.faction.MORIA_GOBLINS.rank.a.f=Moria Goblin Gimp
+lotr.faction.MORIA_GOBLINS.rank.b=Scrounger
+lotr.faction.MORIA_GOBLINS.rank.b.f=Moria Scrounger
+lotr.faction.MORIA_GOBLINS.rank.c=Goblin Fighter
+lotr.faction.MORIA_GOBLINS.rank.c.f=Moria Goblin Fighter
+lotr.faction.MORIA_GOBLINS.rank.d=Hall-Plunderer
+lotr.faction.MORIA_GOBLINS.rank.d.f=Moria Hall-Plunderer
+lotr.faction.MORIA_GOBLINS.rank.e=Fell Goblin
+lotr.faction.MORIA_GOBLINS.rank.e.f=Fell Moria Goblin
+lotr.faction.MORIA_GOBLINS.rank.f=Goblin Captain
+lotr.faction.MORIA_GOBLINS.rank.f.f=Moria Goblin Captain
+lotr.faction.MORIA_GOBLINS.rank.g=Tyrant
+lotr.faction.MORIA_GOBLINS.rank.g.f=Moria Tyrant
+lotr.faction.MORIA_GOBLINS.rank.h=Shadowed Terror
+lotr.faction.MORIA_GOBLINS.rank.h.f=Shadowed Terror
+
+lotr.faction.MOON_ELVES.name=Naldossë
+lotr.faction.MOON_ELVES.entity=TODO...
+lotr.faction.MOON_ELVES.subtitle=Ithildhrim of the Forgotten Vale
+lotr.faction.MOON_ELVES.achieveRank=Reach %s alignment with the Ithildhrim
+lotr.faction.MOON_ELVES.achieveRankPledge=Pledge and reach %s alignment with the Ithildhrim
+lotr.faction.MOON_ELVES.rank.a=TODO...
+lotr.faction.MOON_ELVES.rank.a.f=TODO...
+lotr.faction.MOON_ELVES.rank.b=TODO...
+lotr.faction.MOON_ELVES.rank.b.f=TODO...
+lotr.faction.MOON_ELVES.rank.c=TODO...
+lotr.faction.MOON_ELVES.rank.c.f=TODO...
+lotr.faction.MOON_ELVES.rank.d=TODO...
+lotr.faction.MOON_ELVES.rank.d.f=TODO...
+lotr.faction.MOON_ELVES.rank.e=TODO...
+lotr.faction.MOON_ELVES.rank.e.f=TODO...
+lotr.faction.MOON_ELVES.rank.f=TODO...
+lotr.faction.MOON_ELVES.rank.f.f=TODO...
+lotr.faction.MOON_ELVES.rank.g=TODO...
+lotr.faction.MOON_ELVES.rank.g.f=TODO...
+lotr.faction.MOON_ELVES.rank.h=TODO...
+lotr.faction.MOON_ELVES.rank.h.f=TODO...
+
+lotr.faction.SUN_ELVES.name=Ancalitsë
+lotr.faction.SUN_ELVES.entity=TODO...
+lotr.faction.SUN_ELVES.subtitle=Anardhrim of the Desert
+lotr.faction.SUN_ELVES.achieveRank=Reach %s alignment with the Anardhrim
+lotr.faction.SUN_ELVES.achieveRankPledge=Pledge and reach %s alignment with the Anardhrim
+lotr.faction.SUN_ELVES.rank.a=TODO...
+lotr.faction.SUN_ELVES.rank.a.f=TODO...
+lotr.faction.SUN_ELVES.rank.b=TODO...
+lotr.faction.SUN_ELVES.rank.b.f=TODO...
+lotr.faction.SUN_ELVES.rank.c=TODO...
+lotr.faction.SUN_ELVES.rank.c.f=TODO...
+lotr.faction.SUN_ELVES.rank.d=TODO...
+lotr.faction.SUN_ELVES.rank.d.f=TODO...
+lotr.faction.SUN_ELVES.rank.e=TODO...
+lotr.faction.SUN_ELVES.rank.e.f=TODO...
+lotr.faction.SUN_ELVES.rank.f=TODO...
+lotr.faction.SUN_ELVES.rank.f.f=TODO...
+lotr.faction.SUN_ELVES.rank.g=TODO...
+lotr.faction.SUN_ELVES.rank.g.f=TODO...
+lotr.faction.SUN_ELVES.rank.h=TODO...
+lotr.faction.SUN_ELVES.rank.h.f=TODO...
+
+lotr.faction.BLUE_GOBLINS.name=Blue Goblins
+lotr.faction.BLUE_GOBLINS.entity=TODO...
+lotr.faction.BLUE_GOBLINS.subtitle=Balcmog's Warhost of the West
+lotr.faction.BLUE_GOBLINS.achieveRank=Reach %s alignment with the Blue Goblins
+lotr.faction.BLUE_GOBLINS.achieveRankPledge=Pledge and reach %s alignment with the Blue Goblins
+lotr.faction.BLUE_GOBLINS.rank.a=Pit-Spawn
+lotr.faction.BLUE_GOBLINS.rank.a.f=Blue Goblin Spawn
+lotr.faction.BLUE_GOBLINS.rank.b=Thrall
+lotr.faction.BLUE_GOBLINS.rank.b.f=Blue Goblin Thrall
+lotr.faction.BLUE_GOBLINS.rank.c=Shadow Scout
+lotr.faction.BLUE_GOBLINS.rank.c.f=Goblin Shadow Scout
+lotr.faction.BLUE_GOBLINS.rank.d=Shadow Acolyte
+lotr.faction.BLUE_GOBLINS.rank.d.f=Goblin Shadow Acolyte
+lotr.faction.BLUE_GOBLINS.rank.e=Shadowed Ravager
+lotr.faction.BLUE_GOBLINS.rank.e.f=Goblin Shadowed Ravager
+lotr.faction.BLUE_GOBLINS.rank.f=Mountain Warlord
+lotr.faction.BLUE_GOBLINS.rank.f.f=Goblin Mountain Warlord
+lotr.faction.BLUE_GOBLINS.rank.g=Blue Mountains Tyrant
+lotr.faction.BLUE_GOBLINS.rank.g.f=Blue Mountains Tyrant
+lotr.faction.BLUE_GOBLINS.rank.h=Master of Shadowed Ways
+lotr.faction.BLUE_GOBLINS.rank.h.f=Master of Shadowed Ways
+
+lotr.faction.THARBAD.name=Tharbad
+lotr.faction.THARBAD.entity=TODO...
+lotr.faction.THARBAD.subtitle=Treasure Collectors of Tharbad
+lotr.faction.THARBAD.achieveRank=Reach %s alignment with Tharbad
+lotr.faction.THARBAD.achieveRankPledge=Pledge and reach %s alignment with the Tharbad
+lotr.faction.THARBAD.rank.a=Serf
+lotr.faction.THARBAD.rank.a.f=Tharbad Serf
+lotr.faction.THARBAD.rank.b=Hunter
+lotr.faction.THARBAD.rank.b.f=Tharbad Hunter
+lotr.faction.THARBAD.rank.c=Brigand
+lotr.faction.THARBAD.rank.c.f=Tharbad Brigand
+lotr.faction.THARBAD.rank.d=Bounty Hunter
+lotr.faction.THARBAD.rank.d.f=Tharbad Bounty Hunter
+lotr.faction.THARBAD.rank.e=Mercenary
+lotr.faction.THARBAD.rank.e.f=Tharbad Mercenary
+lotr.faction.THARBAD.rank.f=Treasure Hunter
+lotr.faction.THARBAD.rank.f.f=Tharbad Treasure Hunter
+lotr.faction.THARBAD.rank.g=Mercenary Captain
+lotr.faction.THARBAD.rank.g.f=Mercenary Captain
+lotr.faction.THARBAD.rank.h=Oddment Collector
+lotr.faction.THARBAD.rank.h.f=Tharbad Oddment Collector
+
+#   Dimensions
+lotr.dimension.MiddleEarth.north=Northern Wastes
+
+#   Waypoints
+lotr.waypoint.MOON_ELVES=TODO...
+lotr.waypoint.MOON_ELVES.info=TODO...
+
+#   Map Labels
+lotr.map.MOON_ELVES=Naldossë
+
+#   Achievement Categories
+lotr.achievement.category.BLUE_GOBLINS=Blue Goblins
+lotr.achievement.category.MOON_ELVES=Naldossë
+lotr.achievement.category.THARBAD=Tharbad
+lotr.achievement.category.SUN_ELVES=Ancalitsë
+lotr.achievement.category.MORIA_GOBLINS=Moria Goblins
+lotr.achievement.category.LOSSOTH=Lossoth
+
+#   Achievements
+
+#   Commands
+#   Backported NeoForge HUD / vessel / food entries
+tile.amphora.lore.line1=Stores a small offering.
+tile.amphora.lore.line2=Use clay to seal it.
+tile.amphora_ancient.lore.line1=Stores a small offering.
+tile.amphora_ancient.lore.line2=Use clay to seal it.
+tile.loutrophoros.lore.line1=Stores several offerings.
+tile.loutrophoros.lore.line2=Use clay to seal it.
+tile.loutrophoros_ancient.lore.line1=Stores several offerings.
+tile.loutrophoros_ancient.lore.line2=Use clay to seal it.
+tile.cheese_wheel.name=Cheese Wheel
+
+item.plum.name=Plum
+item.plum.lore.line1=Backported from the modern Lost Tales branch.
+item.plum.lore.line2=Placeholder texture pending final art.
+item.pear_baked.name=Baked Pear
+item.pear_baked.lore.line1=Warm, soft, and sweeter than a fresh pear.
+item.pear_baked.lore.line2=Backported from the modern branch.
+item.plum_juice.name=Plum Juice
+item.plum_juice.lore.line1=A simple fruit drink.
+item.plum_juice.lore.line2=Placeholder texture pending final art.
+item.pear_juice.name=Pear Juice
+item.pear_juice.lore.line1=A simple fruit drink.
+item.pear_juice.lore.line2=Placeholder texture pending final art.
+item.creation_tool_loot_respawner.name=Loot Respawner Tool
+item.creation_tool_loot_respawner.lore.line1=Creative-only utility tool.
+item.creation_tool_loot_respawner.lore.line2=Use on sealed vessels to toggle respawn state.
+item.horn_test.name=Test Horn
+item.horn_test.lore.line1=Experimental backported instrument item.
+item.horn_test.lore.line2=Sound behavior is placeholder.
+
+key.categories.losttales.mappings=Ainulindale: Lost Tales
+key.losttales.toggleHud=Toggle Lost Tales HUD
+key.losttales.use=Activate / Use
+key.losttales.characterMenu=Open Character Menu
+key.losttales.questJournal=Open Quest Journal
+
+#   GUI
+quickLootHud.losttales.empty=Empty
+quickLootHud.losttales.drop=Drop
+quickLootHud.losttales.scroll=Scroll Up/Down
+quickLootHud.losttales.plus=+
+characterMenu.title=Character Menu
+questJournal.title=Quest Journal
+
+#   Config GUI
+losttales.config.category.client=Client / HUD
+losttales.config.category.client.tooltip=HUD visibility, placement, compass, quick-loot, quest tracker, and client feedback options.
+losttales.config.category.quests=Quests
+losttales.config.category.quests.tooltip=Quest start rules, prerequisites, rewards, and marker discovery behavior.

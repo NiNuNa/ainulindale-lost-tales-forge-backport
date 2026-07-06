@@ -1,0 +1,38 @@
+{
+  "id": "losttales:tutorial/cheese_cache",
+  "title": "The Cheese Cache",
+  "description": "A tiny block-interaction quest used to test right-click quest starts on the Lost Tales cheese wheel block.",
+  "repeatable": true,
+  "startMode": "interaction",
+  "interaction": {
+    "block": "losttales:cheese_wheel",
+    "metadata": "*"
+  },
+  "markers": {
+    "giver": "losttales:quest_giver_cheese_cache"
+  },
+  "rewards": {
+    "experience": "8",
+    "items": "minecraft:bread*1"
+  },
+  "journalLog": {
+    "10": "The cheese cache needs a little extra wheat before it can be shared."
+  },
+  "stages": [
+    {
+      "id": "10",
+      "objectives": [
+        {
+          "id": "gather_wheat",
+          "type": "gather",
+          "description": "Gather 3 wheat for the cache.",
+          "optional": false,
+          "params": {
+            "item": "minecraft:wheat",
+            "count": "3"
+          }
+        }
+      ]
+    }
+  ]
+}

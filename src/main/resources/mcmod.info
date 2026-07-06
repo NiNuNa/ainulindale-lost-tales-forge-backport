@@ -1,0 +1,16 @@
+[
+{
+  "modid": "losttales",
+  "name": "\u00A79Ainulindale: Lost Tales",
+  "description": "Extending the Minecraft Lord of the Rings mod with new content and features!",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "\u00A79https://discord.com/invite/usgvW2t6qY",
+  "updateUrl": "",
+  "authorList": ["NiNuNa"],
+  "credits": "Thanks to the Lost Tales team and all the community contributors \u00A79<3",
+  "logoFile": "assets/losttales/logo.png",
+  "screenshots": [],
+  "dependencies": []
+}
+]

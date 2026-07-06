@@ -1,0 +1,43 @@
+{
+  "map_markers": [
+    {
+      "id": "losttales:quest_gold_ore_hint",
+      "name": "Gold Ore Hint",
+      "icon": "undiscovered",
+      "color": "yellow",
+      "dimension": "minecraft:overworld",
+      "x": 36.0,
+      "y": 32.0,
+      "z": 36.0,
+      "fadeInRadius": 128.0,
+      "unlockRadius": 10.0,
+      "hiddenUntilDiscovered": true
+    },
+    {
+      "id": "losttales:quest_blacksmith_hint",
+      "name": "Blacksmith Practice",
+      "icon": "fort",
+      "color": "white",
+      "dimension": "minecraft:overworld",
+      "x": 18.0,
+      "y": 64.0,
+      "z": 18.0,
+      "fadeInRadius": 96.0,
+      "unlockRadius": 8.0,
+      "hiddenUntilDiscovered": true
+    },
+    {
+      "id": "losttales:quest_hint_starter_note",
+      "name": "Sealed Note Hint",
+      "icon": "undiscovered",
+      "color": "white",
+      "dimension": "minecraft:overworld",
+      "x": 12.0,
+      "y": 64.0,
+      "z": 12.0,
+      "fadeInRadius": 64.0,
+      "unlockRadius": 6.0,
+      "hiddenUntilDiscovered": true
+    }
+  ]
+}
