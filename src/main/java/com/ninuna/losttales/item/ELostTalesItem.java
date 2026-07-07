@@ -2,8 +2,8 @@ package com.ninuna.losttales.item;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.creativetab.ELostTalesCreativeTabs;
-import com.ninuna.losttales.item.armor.LostTalesItemArmorBase;
 import com.ninuna.losttales.item.armor.LostTalesItemArmor3D;
+import com.ninuna.losttales.item.armor.LostTalesItemArmorBase;
 import com.ninuna.losttales.item.consumable.LostTalesItemDrink;
 import com.ninuna.losttales.item.consumable.LostTalesItemFood;
 import com.ninuna.losttales.item.weapon.*;

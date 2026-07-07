@@ -1,6 +1,7 @@
 package com.ninuna.losttales.gui.screen;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderHelper;
@@ -12,16 +13,6 @@ import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
-import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.world.World;
-import org.lwjgl.input.Keyboard;
-import org.lwjgl.input.Mouse;
-import org.lwjgl.opengl.GL11;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -30,7 +21,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.world.World;
+import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
+import org.lwjgl.opengl.GL11;
 /**
  * Skyrim-inspired quest journal layout for 1.7.10.
  *
@@ -46,6 +45,7 @@ public class LostTalesQuestJournalGui extends GuiScreen {
     private static final int LIST_ROW_HEIGHT = 24;
     private static final int CATEGORY_ROW_HEIGHT = 24;
     private static final int DETAIL_LINE_HEIGHT = 10;
+    private static final long DOUBLE_CLICK_TRACK_MS = 350L;
 
     private static final int QUEST_BUTTON_WIDTH = 175;
     private static final int QUEST_BUTTON_HEIGHT = 18;
@@ -63,6 +63,9 @@ public class LostTalesQuestJournalGui extends GuiScreen {
     private int selectedQuestIndex;
     private int listScroll;
     private int detailScroll;
+    private QuestFilter filter = QuestFilter.ALL;
+    private int lastClickedQuestIndex = -1;
+    private long lastQuestClickMs;
 
     public LostTalesQuestJournalGui(GuiScreen parent) {
         this.parent = parent;
@@ -106,6 +109,9 @@ public class LostTalesQuestJournalGui extends GuiScreen {
         LostTalesSkyrimUiStyle.drawDiamond(OUTER_PADDING + this.fontRendererObj.getStringWidth(title) + 14, 18, LostTalesSkyrimUiStyle.TEXT_MUTED);
 
         drawQuestLevelBar(this.width / 2 - 92, 10, 184, 18);
+
+        String filterInfo = "Filter: " + this.filter.displayName;
+        this.fontRendererObj.drawStringWithShadow(filterInfo, OUTER_PADDING, 26, LostTalesSkyrimUiStyle.TEXT_MUTED);
 
         String worldInfo = getWorldTimeText();
         this.fontRendererObj.drawStringWithShadow(worldInfo, this.width - OUTER_PADDING - this.fontRendererObj.getStringWidth(worldInfo), 14, LostTalesSkyrimUiStyle.TEXT);
@@ -315,6 +321,7 @@ public class LostTalesQuestJournalGui extends GuiScreen {
         boolean pinned = LostTalesClientQuestProgressStore.isQuestPinned(quest.getId());
 
         addTitleHeader(lines, quest.getTitle(), width);
+        addQuestStatusLines(lines, quest, progress, completed, pinned, width);
         addBlankLine(lines);
 
         String loreText = getCurrentJournalText(quest, progress, completed);
@@ -386,7 +393,7 @@ public class LostTalesQuestJournalGui extends GuiScreen {
                 boolean objectiveComplete = isObjectiveComplete(progress, objective, current, stageComplete || completed);
                 int objectiveColor = completed ? LostTalesSkyrimUiStyle.TEXT_DIM : objectiveComplete ? LostTalesSkyrimUiStyle.GREEN : current ? LostTalesSkyrimUiStyle.TEXT : LostTalesSkyrimUiStyle.TEXT_MUTED;
                 String line = buildObjectiveLine(progress, objective, current, completed || stageComplete);
-                addObjectiveLine(lines, line, objectiveColor, 12, objectiveComplete, current && !objectiveComplete);
+                addObjectiveWrappedLines(lines, line, objectiveColor, 12, width - 16, objectiveComplete, current && !objectiveComplete);
                 addedAny = true;
             }
         }
@@ -409,6 +416,16 @@ public class LostTalesQuestJournalGui extends GuiScreen {
             addWrappedLines(lines, rewardLine, completed ? LostTalesSkyrimUiStyle.TEXT_DIM : LostTalesSkyrimUiStyle.TEXT_MUTED, 16, width - 16);
         }
         addBlankLine(lines);
+    }
+
+    private void addQuestStatusLines(List<DetailLine> lines, LostTalesQuestDefinition quest, LostTalesQuestProgress progress, boolean completed, boolean pinned, int width) {
+        String status = completed ? "Completed" : progress != null ? "Active" : "Known";
+        String tracking = pinned ? "tracked" : "not tracked";
+        String stageText = progress == null ? "" : " | Stage " + (progress.getStageIndex() + 1) + "/" + Math.max(1, quest.getStages().size());
+        addWrappedLines(lines, "Status: " + status + " | " + tracking + stageText, LostTalesSkyrimUiStyle.TEXT_MUTED, 8, width - 16);
+        if (progress != null && !completed) {
+            addWrappedLines(lines, "Press Space or Enter to " + (pinned ? "stop tracking this quest." : "track this quest on the HUD."), LostTalesSkyrimUiStyle.TEXT_MUTED, 8, width - 16);
+        }
     }
 
     private List<String> buildRewardLines(LostTalesQuestDefinition quest) {
@@ -549,6 +566,25 @@ public class LostTalesQuestJournalGui extends GuiScreen {
         lines.add(line);
     }
 
+    private void addObjectiveWrappedLines(List<DetailLine> lines, String text, int color, int indent, int width, boolean complete, boolean active) {
+        if (text == null || text.length() == 0) {
+            return;
+        }
+        int wrapWidth = Math.max(30, width - indent - 24);
+        List<String> wrapped = this.fontRendererObj.listFormattedStringToWidth(text, wrapWidth);
+        if (wrapped.isEmpty()) {
+            addObjectiveLine(lines, text, color, indent, complete, active);
+            return;
+        }
+        for (int i = 0; i < wrapped.size(); i++) {
+            if (i == 0) {
+                addObjectiveLine(lines, wrapped.get(i), color, indent, complete, active);
+            } else {
+                lines.add(new DetailLine(wrapped.get(i), color, indent + 22, false));
+            }
+        }
+    }
+
     private void addWrappedLines(List<DetailLine> lines, String text, int color, int indent, int width) {
         if (text == null || text.length() == 0) {
             return;
@@ -596,7 +632,9 @@ public class LostTalesQuestJournalGui extends GuiScreen {
 
     private void drawFooterHelp() {
         String sync = LostTalesClientQuestProgressStore.hasReceivedSync() ? "Server-synced" : "Waiting for server sync";
-        String help = "Mouse wheel: scroll   Click quest: select/track active quest   J/Esc: close   Caps: character menu   " + sync;
+        String help = "Wheel: scroll   Click: select   Double-click/Space/Enter: track   F: filter   "
+                + LostTalesKeyBindings.getQuestJournalKeyDisplayName() + "/Esc: close   "
+                + LostTalesKeyBindings.getCharacterMenuKeyDisplayName() + ": character   " + sync;
         this.fontRendererObj.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, help, this.width - OUTER_PADDING * 2), OUTER_PADDING, this.height - FOOTER_HEIGHT + 11, LostTalesSkyrimUiStyle.TEXT_MUTED);
     }
 
@@ -625,9 +663,18 @@ public class LostTalesQuestJournalGui extends GuiScreen {
             }
             // The journal is a record of collected/started quests. Startable-but-not-collected
             // definitions stay hidden so the journal does not reveal future content.
-            if (LostTalesClientQuestProgressStore.isQuestActive(quest.getId()) || LostTalesClientQuestProgressStore.isQuestCompleted(quest.getId())) {
-                visible.add(quest);
+            boolean active = LostTalesClientQuestProgressStore.isQuestActive(quest.getId());
+            boolean completed = LostTalesClientQuestProgressStore.isQuestCompleted(quest.getId());
+            if (!active && !completed) {
+                continue;
             }
+            if (this.filter == QuestFilter.ACTIVE && !active) {
+                continue;
+            }
+            if (this.filter == QuestFilter.COMPLETED && !completed) {
+                continue;
+            }
+            visible.add(quest);
         }
         return visible;
     }
@@ -869,8 +916,14 @@ public class LostTalesQuestJournalGui extends GuiScreen {
                         return;
                     }
                     if (row.quest != null) {
+                        long now = System.currentTimeMillis();
+                        boolean doubleClick = this.lastClickedQuestIndex == row.questIndex && now - this.lastQuestClickMs <= DOUBLE_CLICK_TRACK_MS;
                         setSelectedQuestIndex(row.questIndex);
-                        toggleSelectedQuestTracking(row.quest);
+                        if (doubleClick) {
+                            toggleSelectedQuestTracking(row.quest);
+                        }
+                        this.lastClickedQuestIndex = row.questIndex;
+                        this.lastQuestClickMs = now;
                         return;
                     }
                     break;
@@ -933,12 +986,20 @@ public class LostTalesQuestJournalGui extends GuiScreen {
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) {
-        if (keyCode == Keyboard.KEY_ESCAPE || keyCode == Keyboard.KEY_J) {
+        if (keyCode == Keyboard.KEY_ESCAPE || LostTalesKeyBindings.isQuestJournalKey(keyCode)) {
             this.mc.displayGuiScreen(this.parent);
             return;
         }
-        if (keyCode == Keyboard.KEY_CAPITAL) {
+        if (LostTalesKeyBindings.isCharacterMenuKey(keyCode)) {
             this.mc.displayGuiScreen(new LostTalesCharacterMenuGui(this.parent));
+            return;
+        }
+        if (keyCode == Keyboard.KEY_SPACE || keyCode == Keyboard.KEY_RETURN) {
+            toggleSelectedQuestTracking(getSelectedQuest());
+            return;
+        }
+        if (keyCode == Keyboard.KEY_F) {
+            cycleFilter();
             return;
         }
         if (keyCode == Keyboard.KEY_UP) {
@@ -968,6 +1029,14 @@ public class LostTalesQuestJournalGui extends GuiScreen {
         super.keyTyped(typedChar, keyCode);
     }
 
+    private void cycleFilter() {
+        this.filter = this.filter.next();
+        this.selectedQuestIndex = 0;
+        this.listScroll = 0;
+        this.detailScroll = 0;
+        clampSelectionAndScroll();
+    }
+
     private void enableScissor(int x, int y, int width, int height) {
         ScaledResolution scaled = new ScaledResolution(this.mc, this.mc.displayWidth, this.mc.displayHeight);
         int scale = scaled.getScaleFactor();
@@ -993,6 +1062,23 @@ public class LostTalesQuestJournalGui extends GuiScreen {
         int rightX = dividerX + 28;
         int rightWidth = Math.max(120, this.width - rightX - OUTER_PADDING);
         return new JournalLayout(leftX, leftWidth, rightX, rightWidth, dividerX, contentTop, contentBottom);
+    }
+
+    private enum QuestFilter {
+        ALL("All"),
+        ACTIVE("Active"),
+        COMPLETED("Completed");
+
+        private final String displayName;
+
+        QuestFilter(String displayName) {
+            this.displayName = displayName;
+        }
+
+        private QuestFilter next() {
+            QuestFilter[] values = values();
+            return values[(ordinal() + 1) % values.length];
+        }
     }
 
     private static final class JournalLayout {

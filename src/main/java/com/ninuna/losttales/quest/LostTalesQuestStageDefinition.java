@@ -3,7 +3,6 @@ package com.ninuna.losttales.quest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
 /** Simple immutable quest stage definition loaded from JSON. */
 public final class LostTalesQuestStageDefinition {
     private final String id;

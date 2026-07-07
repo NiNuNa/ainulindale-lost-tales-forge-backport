@@ -1,10 +1,18 @@
 package com.ninuna.losttales.block;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.block.custom.LostTalesBlockCeramicTile;
+import com.ninuna.losttales.block.custom.LostTalesBlockCheeseWheel;
+import com.ninuna.losttales.block.custom.LostTalesBlockLampTall;
+import com.ninuna.losttales.block.custom.LostTalesBlockPlushie;
+import com.ninuna.losttales.block.custom.LostTalesBlockStatueTall;
+import com.ninuna.losttales.block.custom.LostTalesBlockUrnBase;
+import com.ninuna.losttales.block.custom.LostTalesBlockUrnTall;
 import com.ninuna.losttales.creativetab.ELostTalesCreativeTabs;
 import com.ninuna.losttales.entity.ELostTalesUser;
 import com.ninuna.losttales.item.block.LostTalesItemBlockBase;
 import com.ninuna.losttales.item.block.LostTalesItemBlockPlushie;
+import com.ninuna.losttales.item.block.LostTalesItemBlockUrn;
 import cpw.mods.fml.common.registry.GameRegistry;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
@@ -31,9 +39,9 @@ public enum ELostTalesBlock {
     CHEESE_WHEEL(new LostTalesBlockCheeseWheel().setBlockName("cheese_wheel").setCreativeTab(ELostTalesCreativeTabs.FOOD.getCreativeTab())),
 
     //  Blocks - Plushie.
-    PLUSHIE_BEAR(new LostTalesBlockPlushie(EnumRarity.common, ELostTalesUser.NINUNA).setBlockName("plushie_bear").setCreativeTab(ELostTalesCreativeTabs.PLUSHIES.getCreativeTab())),
-    PLUSHIE_FOX(new LostTalesBlockPlushie(EnumRarity.common, ELostTalesUser.NINUNA).setBlockName("plushie_fox").setCreativeTab(ELostTalesCreativeTabs.PLUSHIES.getCreativeTab())),
-    PLUSHIE_GANDALF(new LostTalesBlockPlushie(EnumRarity.uncommon, ELostTalesUser.NINUNA).setBlockName("plushie_gandalf").setCreativeTab(ELostTalesCreativeTabs.PLUSHIES.getCreativeTab()));
+    PLUSHIE_BEAR(new LostTalesBlockPlushie(EnumRarity.uncommon, ELostTalesUser.NINUNA).setBlockName("plushie_bear").setCreativeTab(ELostTalesCreativeTabs.PLUSHIES.getCreativeTab())),
+    PLUSHIE_FOX(new LostTalesBlockPlushie(EnumRarity.uncommon, ELostTalesUser.NINUNA).setBlockName("plushie_fox").setCreativeTab(ELostTalesCreativeTabs.PLUSHIES.getCreativeTab())),
+    PLUSHIE_GANDALF(new LostTalesBlockPlushie(EnumRarity.rare, ELostTalesUser.NINUNA).setBlockName("plushie_gandalf").setCreativeTab(ELostTalesCreativeTabs.PLUSHIES.getCreativeTab()));
 
     //  Blocks - Miscellaneous.
 
@@ -57,6 +65,8 @@ public enum ELostTalesBlock {
             b.getBlock().setBlockTextureName(LostTalesMetaData.MOD_ID + ":" + b.getBlock().getUnlocalizedName().substring(5));
             if (b.getBlock() instanceof LostTalesBlockPlushie) {
                 GameRegistry.registerBlock(b.getBlock(), LostTalesItemBlockPlushie.class, b.getBlock().getUnlocalizedName().substring(5));
+            } else if (b.getBlock() instanceof LostTalesBlockUrnBase) {
+                GameRegistry.registerBlock(b.getBlock(), LostTalesItemBlockUrn.class, b.getBlock().getUnlocalizedName().substring(5));
             } else {
                 GameRegistry.registerBlock(b.getBlock(), LostTalesItemBlockBase.class, b.getBlock().getUnlocalizedName().substring(5));
             }

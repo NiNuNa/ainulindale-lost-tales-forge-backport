@@ -8,7 +8,6 @@ import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
-
 /** Client-to-server quest action request from the legacy 1.7.10 quest journal. */
 public class LostTalesQuestActionPacket implements IMessage {
     public static final String ACTION_START = "start";

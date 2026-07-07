@@ -2,12 +2,10 @@ package com.ninuna.losttales.client.cache;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import net.minecraft.client.Minecraft;
-
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-
+import net.minecraft.client.Minecraft;
 /**
  * Client-side cache of mobs that the server recently confirmed are attacking
  * the local player.

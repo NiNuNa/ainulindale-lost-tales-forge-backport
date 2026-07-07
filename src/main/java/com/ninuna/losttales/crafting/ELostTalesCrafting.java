@@ -1,13 +1,12 @@
 package com.ninuna.losttales.crafting;
 
 import com.ninuna.losttales.item.ELostTalesItem;
+import cpw.mods.fml.common.registry.GameRegistry;
+import java.util.List;
 import lotr.common.LOTRMod;
 import lotr.common.recipe.LOTRRecipes;
-import cpw.mods.fml.common.registry.GameRegistry;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.oredict.ShapelessOreRecipe;
-
-import java.util.List;
 
 public enum ELostTalesCrafting {
     MORIA_GOBLINS(LOTRRecipes.gundabadRecipes, new ShapelessOreRecipe[] {

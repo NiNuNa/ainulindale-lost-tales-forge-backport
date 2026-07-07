@@ -1,28 +1,29 @@
 package com.ninuna.losttales.gui.hud.loot;
 
 import com.ninuna.losttales.LostTalesMetaData;
-import com.ninuna.losttales.block.LostTalesBlockUrnTall;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
+import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.inventory.LostTalesQuickLootInventoryHelper;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderHelper;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootDropItemPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootRequestPacket;
+import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.RenderHelper;
+import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderItem;
 import net.minecraft.item.ItemStack;
-import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
-
-import java.util.List;
+import org.lwjgl.opengl.GL12;
 
 public final class LostTalesQuickLootHudRenderer {
     private static final ResourceLocation TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/quickloothud.png");
@@ -45,6 +46,7 @@ public final class LostTalesQuickLootHudRenderer {
     private static final int KEYS_HEIGHT = 13;
     private static final int KEY_R_WIDTH = 14;
     private static final int KEY_ALT_WIDTH = 20;
+    private static final int KEY_MIN_WIDTH = 14;
     private static final int KEY_SCROLL_WIDTH = 16;
 
     private static final int ARROW_WIDTH = 5;
@@ -282,44 +284,33 @@ public final class LostTalesQuickLootHudRenderer {
     private static void renderStack(Minecraft minecraft, ItemStack stack, int x, int y) {
         if (stack == null) return;
 
-        boolean previousAlphaTest = GL11.glIsEnabled(GL11.GL_ALPHA_TEST);
-        boolean previousBlend = GL11.glIsEnabled(GL11.GL_BLEND);
-        boolean previousDepthTest = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
-        boolean previousDepthMask = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
-        boolean previousLighting = GL11.glIsEnabled(GL11.GL_LIGHTING);
-        boolean previousTexture2D = GL11.glIsEnabled(GL11.GL_TEXTURE_2D);
         float previousZLevel = RENDER_ITEM.zLevel;
-
         float previousLightmapX = OpenGlHelper.lastBrightnessX;
         float previousLightmapY = OpenGlHelper.lastBrightnessY;
 
+        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
         GL11.glPushMatrix();
         try {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glEnable(GL11.GL_TEXTURE_2D);
             GL11.glEnable(GL11.GL_ALPHA_TEST);
-            GL11.glEnable(GL11.GL_BLEND);
-            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
-
-            /*
-             * In-game HUD rendering still has the world depth buffer around.
-             * If the inventory item renderer is allowed to test against that
-             * stale world depth, parts of block icons can fail the depth test
-             * and appear dark or as if they are behind the translucent HUD.
-             * Clearing the depth buffer here mirrors the clean GUI state used
-             * by vanilla inventory/hotbar item rendering, while the HUD panel
-             * itself has already been drawn with depth disabled.
-             */
-            GL11.glDepthMask(true);
-            GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
+            GL11.glDisable(GL11.GL_BLEND);
             GL11.glEnable(GL11.GL_DEPTH_TEST);
+            GL11.glDepthMask(true);
+            GL11.glDepthFunc(GL11.GL_LEQUAL);
+            GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
+            GL11.glEnable(GL12.GL_RESCALE_NORMAL);
 
             /*
-             * Keep quick-loot stack icons full-bright like normal GUI items.
-             * Without this, 1.7.10 can inherit the world's current lightmap
-             * values, which makes block items look much darker than they do
-             * in the inventory or hotbar, especially under trees or at night.
+             * Render the item using a clean vanilla GUI item state.  The quick-loot panel is
+             * intentionally drawn with alpha testing disabled so its soft PNG fades survive,
+             * but block item icons inherit that state very badly in 1.7.10 and can become
+             * almost black.  Pushing the full GL attribute state here keeps the HUD's translucent
+             * state away from RenderItem and makes block stacks match the inventory/hotbar more
+             * closely.
              */
+            OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
             OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, 240.0F, 240.0F);
             OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
 
@@ -333,61 +324,105 @@ public final class LostTalesQuickLootHudRenderer {
             OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, previousLightmapX, previousLightmapY);
             OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-
-            if (previousTexture2D) {
-                GL11.glEnable(GL11.GL_TEXTURE_2D);
-            } else {
-                GL11.glDisable(GL11.GL_TEXTURE_2D);
-            }
-            if (previousAlphaTest) {
-                GL11.glEnable(GL11.GL_ALPHA_TEST);
-            } else {
-                GL11.glDisable(GL11.GL_ALPHA_TEST);
-            }
-            if (previousBlend) {
-                GL11.glEnable(GL11.GL_BLEND);
-            } else {
-                GL11.glDisable(GL11.GL_BLEND);
-            }
-            if (previousDepthTest) {
-                GL11.glEnable(GL11.GL_DEPTH_TEST);
-            } else {
-                GL11.glDisable(GL11.GL_DEPTH_TEST);
-            }
-            if (previousLighting) {
-                GL11.glEnable(GL11.GL_LIGHTING);
-            } else {
-                GL11.glDisable(GL11.GL_LIGHTING);
-            }
-            GL11.glDepthMask(previousDepthMask);
             GL11.glPopMatrix();
+            GL11.glPopAttrib();
         }
     }
 
     private static void renderHints(Minecraft minecraft, FontRenderer font, int x, int y, boolean drawDropKey) {
         int textY = y + KEYS_HEIGHT / 2 - font.FONT_HEIGHT / 2;
-        int textureAltX;
+        int cursorX = x;
 
         if (drawDropKey) {
-            drawQuickLootTexture(minecraft, TEXTURE, x, y, 0, 59, KEY_R_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
-            int textDropX = x + KEY_R_WIDTH + 3;
+            cursorX += drawUseKey(minecraft, font, cursorX, y) + 3;
             String drop = StatCollector.translateToLocal("quickLootHud.losttales.drop");
-            font.drawStringWithShadow(drop, textDropX, textY, 0xFFFFFF);
-            textureAltX = textDropX + font.getStringWidth(drop) + 7;
-        } else {
-            textureAltX = x;
+            font.drawStringWithShadow(drop, cursorX, textY, 0xFFFFFF);
+            cursorX += font.getStringWidth(drop) + 7;
         }
 
+        cursorX += drawModifierKey(minecraft, font, cursorX, y) + 3;
         String plus = StatCollector.translateToLocal("quickLootHud.losttales.plus");
-        String scroll = StatCollector.translateToLocal("quickLootHud.losttales.scroll");
-        int textAltX = textureAltX + KEY_ALT_WIDTH + 3;
-        int textureScrollX = textAltX + font.getStringWidth(plus) + 3;
-        int textScrollX = textureScrollX + KEY_SCROLL_WIDTH + 3;
+        font.drawStringWithShadow(plus, cursorX, textY, 0xFFFFFF);
+        cursorX += font.getStringWidth(plus) + 3;
 
-        drawQuickLootTexture(minecraft, TEXTURE, textureAltX, y, 15, 59, KEY_ALT_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
-        font.drawStringWithShadow(plus, textAltX, textY, 0xFFFFFF);
-        drawQuickLootTexture(minecraft, TEXTURE, textureScrollX, y, 36, 59, KEY_SCROLL_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
-        font.drawStringWithShadow(scroll, textScrollX, textY, 0xFFFFFF);
+        drawQuickLootTexture(minecraft, TEXTURE, cursorX, y, 36, 59, KEY_SCROLL_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+        cursorX += KEY_SCROLL_WIDTH + 3;
+        String scroll = StatCollector.translateToLocal("quickLootHud.losttales.scroll");
+        font.drawStringWithShadow(scroll, cursorX, textY, 0xFFFFFF);
+    }
+
+    private static int drawUseKey(Minecraft minecraft, FontRenderer font, int x, int y) {
+        String label = LostTalesKeyBindings.getUseKeyDisplayName();
+        if (isUseKeySprite(label)) {
+            drawQuickLootTexture(minecraft, TEXTURE, x, y, 0, 59, KEY_R_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+            return KEY_R_WIDTH;
+        }
+        return drawKeyLabel(font, label, x, y);
+    }
+
+    private static int drawModifierKey(Minecraft minecraft, FontRenderer font, int x, int y) {
+        String label = LostTalesKeyBindings.getModifierKeyDisplayName();
+        if (isAltKeySprite(label)) {
+            drawQuickLootTexture(minecraft, TEXTURE, x, y, 15, 59, KEY_ALT_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+            return KEY_ALT_WIDTH;
+        }
+        return drawKeyLabel(font, label, x, y);
+    }
+
+    private static boolean isUseKeySprite(String label) {
+        return label != null && "R".equalsIgnoreCase(label.trim());
+    }
+
+    private static boolean isAltKeySprite(String label) {
+        if (label == null) return false;
+        String normalized = label.trim().toLowerCase();
+        return "left alt".equals(normalized) || "lmenu".equals(normalized) || "alt".equals(normalized);
+    }
+
+    private static int drawKeyLabel(FontRenderer font, String label, int x, int y) {
+        if (label == null || label.length() == 0) label = "?";
+        int width = Math.max(KEY_MIN_WIDTH, font.getStringWidth(label) + 8);
+        drawSolidRect(x, y, x + width, y + KEYS_HEIGHT, 0xAA080808);
+        drawSolidRect(x, y, x + width, y + 1, 0xCCB8B8B8);
+        drawSolidRect(x, y + KEYS_HEIGHT - 1, x + width, y + KEYS_HEIGHT, 0xCC303030);
+        drawSolidRect(x, y, x + 1, y + KEYS_HEIGHT, 0xCC909090);
+        drawSolidRect(x + width - 1, y, x + width, y + KEYS_HEIGHT, 0xCC303030);
+        font.drawStringWithShadow(label, x + 4, y + KEYS_HEIGHT / 2 - font.FONT_HEIGHT / 2, 0xFFFFFF);
+        return width;
+    }
+
+    private static void drawSolidRect(int left, int top, int right, int bottom, int color) {
+        float alpha = (float) (color >> 24 & 255) / 255.0F;
+        float red = (float) (color >> 16 & 255) / 255.0F;
+        float green = (float) (color >> 8 & 255) / 255.0F;
+        float blue = (float) (color & 255) / 255.0F;
+
+        boolean previousTexture2D = GL11.glIsEnabled(GL11.GL_TEXTURE_2D);
+        boolean previousBlend = GL11.glIsEnabled(GL11.GL_BLEND);
+        GL11.glDisable(GL11.GL_TEXTURE_2D);
+        GL11.glEnable(GL11.GL_BLEND);
+        OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+        GL11.glColor4f(red, green, blue, alpha);
+
+        Tessellator tessellator = Tessellator.instance;
+        tessellator.startDrawingQuads();
+        tessellator.addVertex(left, bottom, 0.0D);
+        tessellator.addVertex(right, bottom, 0.0D);
+        tessellator.addVertex(right, top, 0.0D);
+        tessellator.addVertex(left, top, 0.0D);
+        tessellator.draw();
+
+        if (previousTexture2D) {
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
+        } else {
+            GL11.glDisable(GL11.GL_TEXTURE_2D);
+        }
+        if (previousBlend) {
+            GL11.glEnable(GL11.GL_BLEND);
+        } else {
+            GL11.glDisable(GL11.GL_BLEND);
+        }
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     private static Target getLookTarget(Minecraft minecraft) {
@@ -395,16 +430,14 @@ public final class LostTalesQuickLootHudRenderer {
             return null;
         }
 
-        int x = minecraft.objectMouseOver.blockX;
-        int y = minecraft.objectMouseOver.blockY;
-        int z = minecraft.objectMouseOver.blockZ;
-        if (minecraft.theWorld.getBlock(x, y, z) instanceof LostTalesBlockUrnTall && minecraft.theWorld.getBlockMetadata(x, y, z) == 4) {
-            y--;
-        }
-
-        TileEntity tileEntity = minecraft.theWorld.getTileEntity(x, y, z);
-        if (!(tileEntity instanceof net.minecraft.inventory.IInventory)) return null;
-        return new Target(x, y, z);
+        LostTalesQuickLootInventoryHelper.InventoryAccess access = LostTalesQuickLootInventoryHelper.resolve(
+                minecraft.theWorld,
+                minecraft.objectMouseOver.blockX,
+                minecraft.objectMouseOver.blockY,
+                minecraft.objectMouseOver.blockZ
+        );
+        if (access == null) return null;
+        return new Target(access.getX(), access.getY(), access.getZ());
     }
 
     private static void requestSnapshotIfNeeded(Target target) {

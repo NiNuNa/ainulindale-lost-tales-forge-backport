@@ -5,13 +5,11 @@ import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import cpw.mods.fml.common.FMLLog;
-import net.minecraft.client.resources.IResourceManager;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-
+import net.minecraft.client.resources.IResourceManager;
 /**
  * Client cache for bundled quest definitions.
  *

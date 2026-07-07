@@ -2,12 +2,11 @@ package com.ninuna.losttales.gui.hud.compass.marker;
 
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderHelper;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
-import net.minecraft.util.MathHelper;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import net.minecraft.util.MathHelper;
 
 public final class LostTalesCompassMarkerBatchBuilder {
     private LostTalesCompassMarkerBatchBuilder() {}

@@ -1,11 +1,9 @@
 package com.ninuna.losttales.config.client;
 
 import cpw.mods.fml.client.IModGuiFactory;
+import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
-
-import java.util.Set;
-
 /**
  * Enables the Forge 1.7.10 Mod List "Config" button for Lost Tales.
  */

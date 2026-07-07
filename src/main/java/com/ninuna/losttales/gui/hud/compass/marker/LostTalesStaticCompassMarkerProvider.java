@@ -5,12 +5,11 @@ import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestMarkerHelper;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.config.LostTalesConfig;
-import net.minecraft.client.Minecraft;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.client.Minecraft;
 
 public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMarkerProvider {
     @Override

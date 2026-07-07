@@ -2,12 +2,10 @@ package com.ninuna.losttales.command;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.config.LostTalesConfig;
+import java.util.List;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
-
-import java.util.List;
-
 /**
  * Small config command for HUD placement presets and percent-based offsets.
  *
@@ -158,7 +156,7 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
                 + ", compass " + formatOffset("compass")
                 + ", quick loot " + formatOffset("quickloot")
                 + ", quest " + formatOffset("quest"));
-        send(sender, EnumChatFormatting.DARK_GRAY + "Tip: use Shift+H client-side to open the HUD placement preview.");
+        send(sender, EnumChatFormatting.DARK_GRAY + "Tip: hold the Lost Tales Modifier Key and press H client-side to open the HUD placement preview.");
     }
 
     private String formatOffset(String element) {

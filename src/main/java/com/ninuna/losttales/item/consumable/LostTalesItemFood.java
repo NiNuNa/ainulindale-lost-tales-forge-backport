@@ -3,11 +3,10 @@ package com.ninuna.losttales.item.consumable;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.material.ELostTalesItemMaterial;
 import com.ninuna.losttales.util.LostTalesUtil;
+import java.util.List;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemFood;
 import net.minecraft.item.ItemStack;
-
-import java.util.List;
 
 public class LostTalesItemFood extends ItemFood {
     private final String credits;

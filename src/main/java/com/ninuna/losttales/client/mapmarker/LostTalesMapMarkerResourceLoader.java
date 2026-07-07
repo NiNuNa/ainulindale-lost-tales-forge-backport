@@ -6,16 +6,15 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.util.LostTalesDimensionHelper;
-import net.minecraft.client.resources.IResource;
-import net.minecraft.client.resources.IResourceManager;
-import net.minecraft.util.ResourceLocation;
-
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.client.resources.IResource;
+import net.minecraft.client.resources.IResourceManager;
+import net.minecraft.util.ResourceLocation;
 
 final class LostTalesMapMarkerResourceLoader {
     private static final String[] SHARED_MARKER_FILES = new String[] {

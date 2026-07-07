@@ -1,9 +1,8 @@
 package com.ninuna.losttales.gui.hud.compass.marker;
 
 import com.ninuna.losttales.LostTalesMetaData;
-import net.minecraft.util.ResourceLocation;
-
 import java.util.Locale;
+import net.minecraft.util.ResourceLocation;
 
 public enum LostTalesCompassMarkerIcon {
     N(0, 19),

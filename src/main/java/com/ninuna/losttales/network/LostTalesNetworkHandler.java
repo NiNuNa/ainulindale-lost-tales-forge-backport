@@ -2,11 +2,11 @@ package com.ninuna.losttales.network;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesQuestActionPacket;
+import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootDropItemPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootRequestPacket;
-import com.ninuna.losttales.network.packet.LostTalesQuestActionPacket;
-import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import cpw.mods.fml.common.network.NetworkRegistry;
 import cpw.mods.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import cpw.mods.fml.relauncher.Side;

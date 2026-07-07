@@ -8,6 +8,11 @@ import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import com.ninuna.losttales.util.LostTalesDimensionHelper;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import net.minecraft.block.Block;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
@@ -17,13 +22,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
-
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 /** Server-side helper methods for basic quest state changes and objective progress. */
 public final class LostTalesQuestManager {
 
@@ -71,6 +69,9 @@ public final class LostTalesQuestManager {
 
         LostTalesQuestStageDefinition firstStage = quest.getFirstStage();
         data.startQuest(questId, firstStage == null ? "" : firstStage.getId());
+        if (LostTalesConfig.autoPinQuestOnStart && !data.isQuestPinned(questId)) {
+            data.pinQuestId(questId);
+        }
         if (LostTalesConfig.autoRevealQuestMarkersOnStart) {
             revealQuestMarkers(player, quest, false);
         }
@@ -235,7 +236,7 @@ public final class LostTalesQuestManager {
         if (data == null || markerId == null || markerId.trim().length() == 0) {
             return false;
         }
-        markerId = markerId.trim();
+        markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
         boolean changed = data.discoverMarker(markerId);
         if (changed) {
             sendQuestChat(player, EnumChatFormatting.AQUA + "Map marker discovered: " + EnumChatFormatting.WHITE + markerId);
@@ -327,7 +328,7 @@ public final class LostTalesQuestManager {
         if (data == null || markerId == null || markerId.trim().length() == 0) {
             return false;
         }
-        markerId = markerId.trim();
+        markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
         boolean changed = data.forgetMarker(markerId);
         if (changed) {
             sendQuestChat(player, EnumChatFormatting.YELLOW + "Map marker forgotten: " + EnumChatFormatting.WHITE + markerId);
@@ -344,10 +345,19 @@ public final class LostTalesQuestManager {
         if (data == null || markerId == null || markerId.trim().length() == 0) {
             return false;
         }
-        markerId = markerId.trim();
+        markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
+        LostTalesMapMarkerDefinition bundledMarker = LostTalesMapMarkerCatalog.getMarker(markerId);
+        boolean knownDynamicMarker = data.getDynamicMapMarker(markerId) != null;
         if (!data.isMarkerDiscovered(markerId)) {
-            sendQuestChat(player, EnumChatFormatting.YELLOW + "Map marker is not discovered yet: " + markerId);
-            return false;
+            if (bundledMarker != null && !bundledMarker.isHiddenUntilDiscovered()) {
+                data.discoverMarker(markerId);
+            } else {
+                sendQuestChat(player, EnumChatFormatting.YELLOW + "Map marker is not discovered yet: " + markerId);
+                return false;
+            }
+        }
+        if (bundledMarker == null && !knownDynamicMarker) {
+            sendQuestChat(player, EnumChatFormatting.YELLOW + "Tracking experimental marker id: " + markerId);
         }
         boolean changed = data.setPinnedMapMarkerId(markerId);
         if (changed) {
@@ -502,6 +512,9 @@ public final class LostTalesQuestManager {
         }
 
         boolean changed = false;
+        if (shouldScanMarkerDiscovery(player)) {
+            changed |= discoverNearbyMapMarkers(player, false);
+        }
         for (LostTalesQuestProgress progress : getActiveQuests(player)) {
             LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
             LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
@@ -510,7 +523,7 @@ public final class LostTalesQuestManager {
             }
 
             for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
-                if (!"goto".equalsIgnoreCase(objective.getType())) {
+                if (!isGotoObjective(objective)) {
                     continue;
                 }
                 if (isAtObjectiveLocation(player, objective)) {
@@ -521,6 +534,70 @@ public final class LostTalesQuestManager {
         if (changed) {
             syncToClient(player);
         }
+    }
+
+    /**
+     * Revalidates state after login, respawn, or dimension travel and sends one
+     * clean snapshot. Keeping this in the manager avoids packet timing differences
+     * between old Forge player events.
+     */
+    public static void refreshPlayerState(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null || player.worldObj.isRemote) {
+            return;
+        }
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        boolean changed = data != null && data.pruneInvalidReferences();
+        for (LostTalesQuestProgress progress : getActiveQuests(player)) {
+            LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
+            if (quest != null) {
+                changed |= scanCurrentStageGatherObjectives(player, quest);
+            }
+        }
+        changed |= discoverNearbyMapMarkers(player, false);
+        if (changed) {
+            for (LostTalesQuestProgress progress : getActiveQuests(player)) {
+                evaluateStageProgress(player, progress.getQuestId());
+            }
+        }
+        syncToClient(player);
+    }
+
+    public static boolean discoverNearbyMapMarkers(EntityPlayerMP player, boolean notifyVisibleMarkers) {
+        if (!LostTalesConfig.enableQuestMarkerDiscovery || !LostTalesConfig.autoDiscoverNearbyMapMarkers || player == null || player.worldObj == null || player.worldObj.isRemote) {
+            return false;
+        }
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null) {
+            return false;
+        }
+        boolean changed = false;
+        int playerDimension = player.worldObj.provider.dimensionId;
+        for (LostTalesMapMarkerDefinition marker : LostTalesMapMarkerCatalog.getMarkers()) {
+            if (marker == null || marker.getId() == null || marker.getId().length() == 0 || marker.getDimensionId() != playerDimension || data.isMarkerDiscovered(marker.getId())) {
+                continue;
+            }
+            double radius = Math.max(1.0D, marker.getUnlockRadius());
+            double dx = player.posX - marker.getX();
+            double dy = player.posY - marker.getY();
+            double dz = player.posZ - marker.getZ();
+            if (dx * dx + dy * dy + dz * dz <= radius * radius) {
+                if (data.discoverMarker(marker.getId())) {
+                    changed = true;
+                    if (marker.isHiddenUntilDiscovered() || notifyVisibleMarkers) {
+                        sendQuestChat(player, EnumChatFormatting.AQUA + "Map marker discovered: " + EnumChatFormatting.WHITE + marker.getName());
+                    }
+                }
+            }
+        }
+        return changed;
+    }
+
+    private static boolean shouldScanMarkerDiscovery(EntityPlayerMP player) {
+        if (!LostTalesConfig.enableQuestMarkerDiscovery || !LostTalesConfig.autoDiscoverNearbyMapMarkers || player == null) {
+            return false;
+        }
+        int interval = Math.max(20, LostTalesConfig.mapMarkerDiscoveryScanIntervalTicks);
+        return player.ticksExisted % interval == 0;
     }
 
     private static boolean addObjectiveProgressAndEvaluate(EntityPlayerMP player, LostTalesQuestDefinition quest, LostTalesQuestObjectiveDefinition objective, int amount) {
@@ -814,10 +891,18 @@ public final class LostTalesQuestManager {
         if (objective == null) {
             return 1;
         }
-        if ("goto".equalsIgnoreCase(objective.getType())) {
+        if (isGotoObjective(objective)) {
             return 1;
         }
         return parseInt(objective.getParam("count", "1"), 1);
+    }
+
+    private static boolean isGotoObjective(LostTalesQuestObjectiveDefinition objective) {
+        if (objective == null || objective.getType() == null) {
+            return false;
+        }
+        String type = objective.getType();
+        return "goto".equalsIgnoreCase(type) || "go_to".equalsIgnoreCase(type) || "travel".equalsIgnoreCase(type) || "location".equalsIgnoreCase(type);
     }
 
     private static boolean isAtObjectiveLocation(EntityPlayerMP player, LostTalesQuestObjectiveDefinition objective) {
@@ -848,7 +933,14 @@ public final class LostTalesQuestManager {
         if (player == null || objective == null) {
             return null;
         }
-        String markerId = firstNonEmpty(objective.getParam("marker", ""), objective.getParam("markerId", ""), objective.getParam("mapMarker", ""));
+        String markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(firstNonEmpty(
+                objective.getParam("marker", ""),
+                objective.getParam("markerId", ""),
+                objective.getParam("mapMarker", ""),
+                objective.getParam("map_marker", ""),
+                objective.getParam("targetMarker", ""),
+                objective.getParam("target_marker", "")
+        ));
         if (markerId.length() == 0) {
             return null;
         }

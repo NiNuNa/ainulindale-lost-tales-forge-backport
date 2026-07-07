@@ -1,10 +1,9 @@
 package com.ninuna.losttales.gui.hud.compass.marker;
 
-import net.minecraft.client.Minecraft;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import net.minecraft.client.Minecraft;
 
 public class LostTalesDirectionCompassMarkerProvider implements LostTalesCompassMarkerProvider {
     private static final List<LostTalesCompassMarker> DIRECTION_MARKERS = createDirectionMarkers();

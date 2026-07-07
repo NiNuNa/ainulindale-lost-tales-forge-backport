@@ -1,13 +1,12 @@
 package com.ninuna.losttales.network.packet;
 
+import com.ninuna.losttales.inventory.LostTalesQuickLootInventoryHelper;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.inventory.IInventory;
-import net.minecraft.tileentity.TileEntity;
 
 public class LostTalesQuickLootRequestPacket implements IMessage {
     private int x;
@@ -45,21 +44,12 @@ public class LostTalesQuickLootRequestPacket implements IMessage {
 
             EntityPlayerMP player = ctx.getServerHandler().playerEntity;
             if (player == null || player.worldObj == null || player.worldObj.isRemote) return null;
-            if (!player.worldObj.blockExists(message.x, message.y, message.z)) return null;
 
-            double dx = player.posX - ((double) message.x + 0.5D);
-            double dy = player.posY - ((double) message.y + 0.5D);
-            double dz = player.posZ - ((double) message.z + 0.5D);
-            if (dx * dx + dy * dy + dz * dz > 64.0D) return null;
-
-            TileEntity tileEntity = player.worldObj.getTileEntity(message.x, message.y, message.z);
-            if (!(tileEntity instanceof IInventory) || tileEntity.isInvalid()) return null;
-
-            IInventory inventory = (IInventory) tileEntity;
-            if (!inventory.isUseableByPlayer(player)) return null;
+            LostTalesQuickLootInventoryHelper.InventoryAccess access = LostTalesQuickLootInventoryHelper.resolve(player.worldObj, message.x, message.y, message.z);
+            if (!LostTalesQuickLootInventoryHelper.isUsableBy(player, access)) return null;
 
             LostTalesNetworkHandler.CHANNEL.sendTo(
-                    LostTalesQuickLootContainerSyncPacket.fromInventory(message.x, message.y, message.z, inventory),
+                    LostTalesQuickLootContainerSyncPacket.fromInventory(access.getX(), access.getY(), access.getZ(), access.getInventory()),
                     player
             );
             return null;

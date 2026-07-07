@@ -1,10 +1,8 @@
 package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
-import net.minecraft.entity.player.EntityPlayer;
-
 import java.util.Map;
-
+import net.minecraft.entity.player.EntityPlayer;
 /** Small server-side evaluator for optional quest JSON prerequisites. */
 public final class LostTalesQuestPrerequisiteHelper {
 

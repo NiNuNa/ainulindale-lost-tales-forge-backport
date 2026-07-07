@@ -6,7 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-
 /**
  * Data-only quest definition compatible with the JSON files used by the modern branch.
  *

@@ -6,6 +6,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.material.ELostTalesItemMaterial;
 import com.ninuna.losttales.util.LostTalesUtil;
+import java.util.List;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.entity.ai.attributes.AttributeModifier;
@@ -13,8 +14,6 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemArmor;
 import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
-
-import java.util.List;
 
 public class LostTalesItemArmorBase extends ItemArmor {
     private final String armorTextureName;

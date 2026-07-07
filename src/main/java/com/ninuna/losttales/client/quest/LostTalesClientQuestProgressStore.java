@@ -1,7 +1,6 @@
 package com.ninuna.losttales.client.quest;
 
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -9,7 +8,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-
 /** Client-side cache of the quest state most recently synced by the server. */
 public final class LostTalesClientQuestProgressStore {
     private static final Map<String, LostTalesQuestProgress> ACTIVE_QUESTS = new LinkedHashMap<String, LostTalesQuestProgress>();

@@ -13,6 +13,11 @@ import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -20,24 +25,18 @@ import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.MathHelper;
 import org.lwjgl.opengl.GL11;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-
 /** Lightweight 1.7.10 quest HUD: tracked quest/objective list plus short sync-derived toasts. */
 public final class LostTalesQuestHudRenderer {
     private static final int PANEL_WIDTH = 238;
     private static final int PANEL_PADDING = 6;
-    private static final int QUEST_ENTRY_HEIGHT = 28;
+    private static final int QUEST_ENTRY_BASE_HEIGHT = 18;
+    private static final int QUEST_ENTRY_LINE_HEIGHT = 10;
+    private static final int QUEST_ENTRY_PROGRESS_HEIGHT = 5;
     private static final int QUEST_ENTRY_GAP = 5;
-    private static final int MAX_DISPLAYED_TRACKED_QUESTS = 4;
     private static final float QUEST_MARKER_VISIBLE_HALF_ANGLE_DEGREES = 42.0F;
     private static final double QUEST_MARKER_NEAR_DISTANCE_SQ = 16.0D;
-    private static final int NOTIFICATION_WIDTH = 250;
-    private static final int NOTIFICATION_HEIGHT = 18;
+    private static final int NOTIFICATION_WIDTH = 272;
+    private static final int NOTIFICATION_HEIGHT = 34;
 
     private LostTalesQuestHudRenderer() {}
 
@@ -64,9 +63,15 @@ public final class LostTalesQuestHudRenderer {
             return;
         }
 
-        int displayed = Math.min(MAX_DISPLAYED_TRACKED_QUESTS, entries.size());
+        int displayed = Math.min(getConfiguredTrackedQuestCount(), entries.size());
         int overflow = entries.size() - displayed;
-        int panelHeight = PANEL_PADDING * 2 + displayed * QUEST_ENTRY_HEIGHT + Math.max(0, displayed - 1) * QUEST_ENTRY_GAP + (overflow > 0 ? 12 : 0);
+        int panelHeight = PANEL_PADDING * 2 + (overflow > 0 ? 12 : 0);
+        for (int i = 0; i < displayed; i++) {
+            panelHeight += getEntryHeight(entries.get(i));
+            if (i + 1 < displayed) {
+                panelHeight += QUEST_ENTRY_GAP;
+            }
+        }
 
         int screenWidth = resolution.getScaledWidth();
         int screenHeight = resolution.getScaledHeight();
@@ -85,29 +90,57 @@ public final class LostTalesQuestHudRenderer {
         int lineY = y + PANEL_PADDING;
         for (int i = 0; i < displayed; i++) {
             TrackedQuestHudEntry entry = entries.get(i);
-            drawQuestEntry(font, entry, x, lineY, PANEL_WIDTH);
-            lineY += QUEST_ENTRY_HEIGHT + QUEST_ENTRY_GAP;
+            int entryHeight = getEntryHeight(entry);
+            drawQuestEntry(font, entry, x, lineY, PANEL_WIDTH, entryHeight);
+            lineY += entryHeight + QUEST_ENTRY_GAP;
         }
 
         if (overflow > 0) {
-            String more = "+" + overflow;
+            String more = "+" + overflow + " more tracked";
             font.drawStringWithShadow(more, x + PANEL_WIDTH - PANEL_PADDING - font.getStringWidth(more), lineY - 1, 0xCCCCCC);
         }
     }
 
-    private static void drawQuestEntry(FontRenderer font, TrackedQuestHudEntry entry, int x, int y, int width) {
+    private static int getEntryHeight(TrackedQuestHudEntry entry) {
+        int lines = Math.max(1, Math.min(getConfiguredObjectiveLineCount(), entry.objectiveLines.size()));
+        return QUEST_ENTRY_BASE_HEIGHT + lines * QUEST_ENTRY_LINE_HEIGHT + (entry.target > 1 ? QUEST_ENTRY_PROGRESS_HEIGHT : 0);
+    }
+
+    private static int getConfiguredTrackedQuestCount() {
+        return Math.max(1, Math.min(8, LostTalesConfig.questHudMaxTrackedQuests));
+    }
+
+    private static int getConfiguredObjectiveLineCount() {
+        return Math.max(1, Math.min(3, LostTalesConfig.questHudObjectiveLineCount));
+    }
+
+    private static void drawQuestEntry(FontRenderer font, TrackedQuestHudEntry entry, int x, int y, int width, int height) {
         int left = x + PANEL_PADDING;
         int right = x + width - PANEL_PADDING;
         int titleY = y + 1;
-        int objectiveY = y + 15;
         String title = trimToWidth(font, entry.title, right - left - 28);
-        String objective = trimToWidth(font, "\u25C7 " + entry.objectiveText, right - left - 12);
 
-        Gui.drawRect(left + 17, titleY + 5, right - font.getStringWidth(title) - 10, titleY + 6, 0x88FFFFFF);
+        Gui.drawRect(left + 17, titleY + 5, Math.max(left + 17, right - font.getStringWidth(title) - 10), titleY + 6, 0x88FFFFFF);
         Gui.drawRect(right - 8, titleY + 5, right, titleY + 6, 0x88FFFFFF);
-        drawSmallDiamond(left + 5, titleY + 5, 0xFFFBDE);
-        font.drawStringWithShadow(title, right - font.getStringWidth(title), titleY, 0xFFFBDE);
-        font.drawStringWithShadow(objective, left + 4, objectiveY, entry.complete ? 0x77DD77 : 0xDDDDDD);
+        drawSmallDiamond(left + 5, titleY + 5, entry.complete ? 0x77DD77 : 0xFFFBDE);
+        font.drawStringWithShadow(title, right - font.getStringWidth(title), titleY, entry.complete ? 0xBBDD88 : 0xFFFBDE);
+
+        int objectiveY = y + 15;
+        int maxLines = Math.max(1, Math.min(getConfiguredObjectiveLineCount(), entry.objectiveLines.size()));
+        for (int i = 0; i < maxLines; i++) {
+            String line = trimToWidth(font, entry.objectiveLines.get(i), right - left - 10);
+            font.drawStringWithShadow(line, left + 4, objectiveY + i * QUEST_ENTRY_LINE_HEIGHT, entry.complete ? 0x77DD77 : 0xDDDDDD);
+        }
+
+        if (entry.target > 1) {
+            int barY = y + height - 4;
+            int barWidth = right - left - 8;
+            int filled = MathHelper.clamp_int(barWidth * Math.min(entry.current, entry.target) / Math.max(1, entry.target), 0, barWidth);
+            Gui.drawRect(left + 4, barY, left + 4 + barWidth, barY + 2, 0x663D3A33);
+            if (filled > 0) {
+                Gui.drawRect(left + 4, barY, left + 4 + filled, barY + 2, entry.complete ? 0xAA77DD77 : 0xAADDBB77);
+            }
+        }
     }
 
     private static void drawSmallDiamond(int centerX, int centerY, int color) {
@@ -131,12 +164,20 @@ public final class LostTalesQuestHudRenderer {
             if (!shouldShowQuestForCurrentView(minecraft, quest, stage, partialTicks)) {
                 continue;
             }
-            LostTalesQuestObjectiveDefinition objective = findPrimaryObjective(progress, stage);
-            String objectiveText = objective == null
-                    ? (stage == null ? "No active stage" : "No objectives")
-                    : LostTalesQuestObjectiveTextHelper.buildObjectiveLine(progress, objective, true, false, false, false);
-            boolean complete = objective != null && progress.getObjectiveProgress(objective.getId()) >= LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
-            entries.add(new TrackedQuestHudEntry(quest.getTitle(), objectiveText, complete));
+            List<LostTalesQuestObjectiveDefinition> objectives = collectPrimaryObjectives(progress, stage);
+            if (objectives.isEmpty()) {
+                String objectiveText = stage == null ? "No active stage" : "No objectives";
+                entries.add(new TrackedQuestHudEntry(quest.getTitle(), objectiveText, 0, 1, false, minecraft.fontRenderer));
+                continue;
+            }
+
+            for (LostTalesQuestObjectiveDefinition objective : objectives) {
+                int target = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
+                int current = progress == null ? 0 : progress.getObjectiveProgress(objective.getId());
+                String objectiveText = LostTalesQuestObjectiveTextHelper.buildObjectiveLine(progress, objective, true, false, false, false);
+                boolean complete = current >= target;
+                entries.add(new TrackedQuestHudEntry(quest.getTitle(), objectiveText, current, target, complete, minecraft.fontRenderer));
+            }
         }
         return entries;
     }
@@ -228,10 +269,13 @@ public final class LostTalesQuestHudRenderer {
         return new HudQuestTarget(x.doubleValue(), y.doubleValue(), z.doubleValue());
     }
 
-    private static LostTalesQuestObjectiveDefinition findPrimaryObjective(LostTalesQuestProgress progress, LostTalesQuestStageDefinition stage) {
+    private static List<LostTalesQuestObjectiveDefinition> collectPrimaryObjectives(LostTalesQuestProgress progress, LostTalesQuestStageDefinition stage) {
+        List<LostTalesQuestObjectiveDefinition> result = new ArrayList<LostTalesQuestObjectiveDefinition>();
         if (stage == null || stage.getObjectives().isEmpty()) {
-            return null;
+            return result;
         }
+
+        int limit = Math.max(1, Math.min(6, LostTalesConfig.questHudMaxObjectives));
         for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
             if (objective == null) {
                 continue;
@@ -239,10 +283,17 @@ public final class LostTalesQuestHudRenderer {
             int target = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
             int current = progress == null ? 0 : progress.getObjectiveProgress(objective.getId());
             if (current < target) {
-                return objective;
+                result.add(objective);
+            }
+            if (result.size() >= limit) {
+                return result;
             }
         }
-        return stage.getObjectives().get(0);
+
+        if (result.isEmpty()) {
+            result.add(stage.getObjectives().get(0));
+        }
+        return result;
     }
 
     private static boolean isGotoObjective(LostTalesQuestObjectiveDefinition objective) {
@@ -304,6 +355,9 @@ public final class LostTalesQuestHudRenderer {
     }
 
     private static void renderNotifications(Minecraft minecraft, ScaledResolution resolution) {
+        if (!LostTalesConfig.showQuestHudNotifications) {
+            return;
+        }
         List<LostTalesClientQuestNotificationStore.Notification> notifications = LostTalesClientQuestNotificationStore.getVisibleNotifications();
         if (notifications.isEmpty()) {
             return;
@@ -329,10 +383,13 @@ public final class LostTalesQuestHudRenderer {
             int textColor = (MathHelper.clamp_int((int) (alpha * 255.0F), 0, 255) << 24) | 0xFFFFFF;
             int accentColor = (MathHelper.clamp_int((int) (alpha * 255.0F), 0, 255) << 24) | notification.getType().getColor();
 
+            Gui.drawRect(x + 1, y + 1, x + NOTIFICATION_WIDTH + 1, y + NOTIFICATION_HEIGHT + 1, MathHelper.clamp_int((int) (alpha * 95.0F), 0, 95) << 24);
             Gui.drawRect(x, y, x + NOTIFICATION_WIDTH, y + NOTIFICATION_HEIGHT, background);
             Gui.drawRect(x, y, x + 3, y + NOTIFICATION_HEIGHT, border);
-            font.drawStringWithShadow(trimToWidth(font, notification.getMessage(), NOTIFICATION_WIDTH - 12), x + 8, y + 5, textColor);
             Gui.drawRect(x, y + NOTIFICATION_HEIGHT - 1, x + NOTIFICATION_WIDTH, y + NOTIFICATION_HEIGHT, accentColor);
+            String title = notification.getType().getDisplayTitle();
+            font.drawStringWithShadow(trimToWidth(font, title, NOTIFICATION_WIDTH - 16), x + 8, y + 4, accentColor);
+            font.drawStringWithShadow(trimToWidth(font, notification.getMessage(), NOTIFICATION_WIDTH - 16), x + 8, y + 17, textColor);
         }
     }
 
@@ -367,13 +424,24 @@ public final class LostTalesQuestHudRenderer {
 
     private static final class TrackedQuestHudEntry {
         private final String title;
-        private final String objectiveText;
+        private final List<String> objectiveLines;
+        private final int current;
+        private final int target;
         private final boolean complete;
 
-        private TrackedQuestHudEntry(String title, String objectiveText, boolean complete) {
+        private TrackedQuestHudEntry(String title, String objectiveText, int current, int target, boolean complete, FontRenderer font) {
             this.title = title == null || title.length() == 0 ? "Tracked Quest" : title;
-            this.objectiveText = objectiveText == null || objectiveText.length() == 0 ? "No objective" : objectiveText;
+            this.current = Math.max(0, current);
+            this.target = Math.max(1, target);
             this.complete = complete;
+            String safeObjective = objectiveText == null || objectiveText.length() == 0 ? "No objective" : "\u25C7 " + objectiveText;
+            List<String> wrapped = font == null
+                    ? new ArrayList<String>()
+                    : font.listFormattedStringToWidth(safeObjective, PANEL_WIDTH - PANEL_PADDING * 2 - 10);
+            if (wrapped.isEmpty()) {
+                wrapped.add(safeObjective);
+            }
+            this.objectiveLines = wrapped;
         }
     }
 

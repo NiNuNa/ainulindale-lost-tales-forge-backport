@@ -7,20 +7,18 @@ import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.LinkedHashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-
 /**
  * Legacy Forge companion to the modern map-marker command.
  *

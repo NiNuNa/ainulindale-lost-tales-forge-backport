@@ -1,9 +1,7 @@
 package com.ninuna.losttales.util;
 
-import lotr.common.LOTRDimension;
-
 import java.util.Locale;
-
+import lotr.common.LOTRDimension;
 /** Small dimension-name adapter for modern JSON ids in a Forge 1.7.10 world. */
 public final class LostTalesDimensionHelper {
     private LostTalesDimensionHelper() {}

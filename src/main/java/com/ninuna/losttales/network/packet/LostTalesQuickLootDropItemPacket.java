@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet;
 
-import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
+import com.ninuna.losttales.inventory.LostTalesQuickLootInventoryHelper;
+import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -9,7 +10,6 @@ import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
-import net.minecraft.tileentity.TileEntity;
 
 public class LostTalesQuickLootDropItemPacket implements IMessage {
     private int x;
@@ -51,19 +51,12 @@ public class LostTalesQuickLootDropItemPacket implements IMessage {
 
             EntityPlayerMP player = ctx.getServerHandler().playerEntity;
             if (player == null || player.worldObj == null || player.worldObj.isRemote) return null;
-            if (!player.worldObj.blockExists(message.x, message.y, message.z)) return null;
 
-            double dx = player.posX - ((double) message.x + 0.5D);
-            double dy = player.posY - ((double) message.y + 0.5D);
-            double dz = player.posZ - ((double) message.z + 0.5D);
-            if (dx * dx + dy * dy + dz * dz > 64.0D) return null;
+            LostTalesQuickLootInventoryHelper.InventoryAccess access = LostTalesQuickLootInventoryHelper.resolve(player.worldObj, message.x, message.y, message.z);
+            if (!LostTalesQuickLootInventoryHelper.isUsableBy(player, access)) return null;
+            if (access.isSealed()) return null;
 
-            TileEntity tileEntity = player.worldObj.getTileEntity(message.x, message.y, message.z);
-            if (!(tileEntity instanceof IInventory) || tileEntity.isInvalid()) return null;
-            if (tileEntity instanceof LostTalesTileEntityUrn && ((LostTalesTileEntityUrn) tileEntity).isSealed()) return null;
-
-            IInventory inventory = (IInventory) tileEntity;
-            if (!inventory.isUseableByPlayer(player)) return null;
+            IInventory inventory = access.getInventory();
             if (message.slot < 0 || message.slot >= inventory.getSizeInventory()) return null;
 
             ItemStack stack = inventory.getStackInSlot(message.slot);
@@ -73,11 +66,23 @@ public class LostTalesQuickLootDropItemPacket implements IMessage {
             if (removed == null || removed.stackSize <= 0) return null;
 
             inventory.markDirty();
-            player.worldObj.markBlockForUpdate(message.x, message.y, message.z);
+            player.worldObj.markBlockForUpdate(access.getX(), access.getY(), access.getZ());
 
-            EntityItem entityItem = new EntityItem(player.worldObj, (double) message.x + 0.5D, (double) message.y + 1.0D, (double) message.z + 0.5D, removed.copy());
+            EntityItem entityItem = new EntityItem(
+                    player.worldObj,
+                    (double) access.getX() + 0.5D,
+                    (double) access.getY() + 1.0D,
+                    (double) access.getZ() + 0.5D,
+                    removed.copy()
+            );
+            entityItem.delayBeforeCanPickup = 10;
             player.worldObj.spawnEntityInWorld(entityItem);
-            player.worldObj.playSoundEffect((double) message.x + 0.5D, (double) message.y + 0.5D, (double) message.z + 0.5D, "random.pop", 0.5F, 1.0F);
+            player.worldObj.playSoundEffect((double) access.getX() + 0.5D, (double) access.getY() + 0.5D, (double) access.getZ() + 0.5D, "random.pop", 0.5F, 1.0F);
+
+            LostTalesNetworkHandler.CHANNEL.sendTo(
+                    LostTalesQuickLootContainerSyncPacket.fromInventory(access.getX(), access.getY(), access.getZ(), inventory),
+                    player
+            );
             return null;
         }
     }

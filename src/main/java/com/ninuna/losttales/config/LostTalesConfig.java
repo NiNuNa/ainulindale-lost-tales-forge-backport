@@ -1,10 +1,8 @@
 package com.ninuna.losttales.config;
 
+import java.io.File;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
-
-import java.io.File;
-
 /**
  * Small legacy Forge config holder.
  *
@@ -43,6 +41,7 @@ public final class LostTalesConfig {
     public static boolean onlyShowUnlockedLotrWaypoints = true;
     public static boolean showHostileCompassMarkers = true;
     public static boolean onlyShowAggroHostileCompassMarkers = false;
+    public static int hostileCompassMarkerScanRadius = 48;
 
     public static boolean showQuickLootHud = true;
     public static boolean linkShowQuickLootHud = false;
@@ -55,7 +54,11 @@ public final class LostTalesConfig {
     public static int questHudOffsetX = 2;
     public static int questHudOffsetY = 38;
     public static int questHudMaxObjectives = 3;
+    public static int questHudMaxTrackedQuests = 4;
+    public static int questHudObjectiveLineCount = 2;
+    public static boolean showQuestHudNotifications = true;
     public static boolean showWorldQuestMarkers = true;
+    public static boolean showDiscoveredWorldMapMarkers = true;
     public static int worldQuestMarkerMaxDistance = 128;
 
     public static boolean showQuestChatFeedback = true;
@@ -68,6 +71,9 @@ public final class LostTalesConfig {
     public static boolean allowQuestInteractionStarts = true;
     public static boolean enableQuestMarkerDiscovery = true;
     public static boolean autoRevealQuestMarkersOnStart = true;
+    public static boolean autoPinQuestOnStart = true;
+    public static boolean autoDiscoverNearbyMapMarkers = true;
+    public static int mapMarkerDiscoveryScanIntervalTicks = 40;
 
     private LostTalesConfig() {}
 
@@ -157,7 +163,15 @@ public final class LostTalesConfig {
                     "onlyShowAggroHostileCompassMarkers",
                     CATEGORY_CLIENT,
                     onlyShowAggroHostileCompassMarkers,
-                    "When true, hostile compass markers are shown only for mobs the server recently confirmed are targeting you. When false, the legacy 1.7.10 fallback also shows ordinary vanilla IMob hostiles."
+                    "When true, hostile compass markers are shown only for mobs the server recently confirmed are targeting you. When false, the legacy 1.7.10 fallback also shows ordinary vanilla IMob hostiles and unfriendly LOTR NPCs."
+            );
+            hostileCompassMarkerScanRadius = config.getInt(
+                    "hostileCompassMarkerScanRadius",
+                    CATEGORY_CLIENT,
+                    hostileCompassMarkerScanRadius,
+                    8,
+                    128,
+                    "Scan radius in blocks for hostile compass markers and server-side aggro sync."
             );
 
             showQuickLootHud = config.getBoolean(
@@ -231,13 +245,41 @@ public final class LostTalesConfig {
                     questHudMaxObjectives,
                     1,
                     6,
-                    "Maximum number of current-stage objectives shown on the quest HUD."
+                    "Maximum number of current-stage objectives shown per tracked quest on the quest HUD."
+            );
+            questHudMaxTrackedQuests = config.getInt(
+                    "questHudMaxTrackedQuests",
+                    CATEGORY_CLIENT,
+                    questHudMaxTrackedQuests,
+                    1,
+                    8,
+                    "Maximum number of tracked quests drawn on the quest HUD before showing an overflow count."
+            );
+            questHudObjectiveLineCount = config.getInt(
+                    "questHudObjectiveLineCount",
+                    CATEGORY_CLIENT,
+                    questHudObjectiveLineCount,
+                    1,
+                    3,
+                    "Maximum wrapped text lines drawn for each objective on the quest HUD."
+            );
+            showQuestHudNotifications = config.getBoolean(
+                    "showQuestHudNotifications",
+                    CATEGORY_CLIENT,
+                    showQuestHudNotifications,
+                    "Render centered quest notification banners for quest starts, objective progress, and completions."
             );
             showWorldQuestMarkers = config.getBoolean(
                     "showWorldQuestMarkers",
                     CATEGORY_CLIENT,
                     showWorldQuestMarkers,
                     "Render lightweight world-space labels above discovered quest map markers. Uses legacy 1.7.10 nameplate rendering instead of the modern NeoForge level overlay system."
+            );
+            showDiscoveredWorldMapMarkers = config.getBoolean(
+                    "showDiscoveredWorldMapMarkers",
+                    CATEGORY_CLIENT,
+                    showDiscoveredWorldMapMarkers,
+                    "Also render world-space labels for discovered non-quest map markers. Disable this if too many map markers clutter the world view."
             );
             worldQuestMarkerMaxDistance = config.getInt(
                     "worldQuestMarkerMaxDistance",
@@ -301,6 +343,26 @@ public final class LostTalesConfig {
                     CATEGORY_QUESTS,
                     autoRevealQuestMarkersOnStart,
                     "Automatically reveal marker hints from a quest when that quest starts."
+            );
+            autoPinQuestOnStart = config.getBoolean(
+                    "autoPinQuestOnStart",
+                    CATEGORY_QUESTS,
+                    autoPinQuestOnStart,
+                    "Automatically track a quest on the HUD when it starts, as long as the player is not already tracking it."
+            );
+            autoDiscoverNearbyMapMarkers = config.getBoolean(
+                    "autoDiscoverNearbyMapMarkers",
+                    CATEGORY_QUESTS,
+                    autoDiscoverNearbyMapMarkers,
+                    "Automatically discover bundled map markers when a player walks within that marker's unlock radius."
+            );
+            mapMarkerDiscoveryScanIntervalTicks = config.getInt(
+                    "mapMarkerDiscoveryScanIntervalTicks",
+                    CATEGORY_QUESTS,
+                    mapMarkerDiscoveryScanIntervalTicks,
+                    20,
+                    200,
+                    "How often, in ticks, nearby map marker discovery is checked on the server."
             );
 
             if (!HUD_PRESET_CUSTOM.equals(hudPlacementPreset)) {
@@ -561,6 +623,7 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "onlyShowUnlockedLotrWaypoints", onlyShowUnlockedLotrWaypoints).set(onlyShowUnlockedLotrWaypoints);
         config.get(CATEGORY_CLIENT, "showHostileCompassMarkers", showHostileCompassMarkers).set(showHostileCompassMarkers);
         config.get(CATEGORY_CLIENT, "onlyShowAggroHostileCompassMarkers", onlyShowAggroHostileCompassMarkers).set(onlyShowAggroHostileCompassMarkers);
+        config.get(CATEGORY_CLIENT, "hostileCompassMarkerScanRadius", hostileCompassMarkerScanRadius).set(hostileCompassMarkerScanRadius);
         config.get(CATEGORY_CLIENT, "showQuickLootHud", showQuickLootHud).set(showQuickLootHud);
         config.get(CATEGORY_CLIENT, "linkShowQuickLootHud", linkShowQuickLootHud).set(linkShowQuickLootHud);
         config.get(CATEGORY_CLIENT, "quickLootHudOffsetX", quickLootHudOffsetX).set(quickLootHudOffsetX);
@@ -571,7 +634,11 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "questHudOffsetX", questHudOffsetX).set(questHudOffsetX);
         config.get(CATEGORY_CLIENT, "questHudOffsetY", questHudOffsetY).set(questHudOffsetY);
         config.get(CATEGORY_CLIENT, "questHudMaxObjectives", questHudMaxObjectives).set(questHudMaxObjectives);
+        config.get(CATEGORY_CLIENT, "questHudMaxTrackedQuests", questHudMaxTrackedQuests).set(questHudMaxTrackedQuests);
+        config.get(CATEGORY_CLIENT, "questHudObjectiveLineCount", questHudObjectiveLineCount).set(questHudObjectiveLineCount);
+        config.get(CATEGORY_CLIENT, "showQuestHudNotifications", showQuestHudNotifications).set(showQuestHudNotifications);
         config.get(CATEGORY_CLIENT, "showWorldQuestMarkers", showWorldQuestMarkers).set(showWorldQuestMarkers);
+        config.get(CATEGORY_CLIENT, "showDiscoveredWorldMapMarkers", showDiscoveredWorldMapMarkers).set(showDiscoveredWorldMapMarkers);
         config.get(CATEGORY_CLIENT, "worldQuestMarkerMaxDistance", worldQuestMarkerMaxDistance).set(worldQuestMarkerMaxDistance);
         config.get(CATEGORY_CLIENT, "showQuestChatFeedback", showQuestChatFeedback).set(showQuestChatFeedback);
         config.get(CATEGORY_CLIENT, "playQuestSounds", playQuestSounds).set(playQuestSounds);
@@ -582,5 +649,8 @@ public final class LostTalesConfig {
         config.get(CATEGORY_QUESTS, "allowQuestInteractionStarts", allowQuestInteractionStarts).set(allowQuestInteractionStarts);
         config.get(CATEGORY_QUESTS, "enableQuestMarkerDiscovery", enableQuestMarkerDiscovery).set(enableQuestMarkerDiscovery);
         config.get(CATEGORY_QUESTS, "autoRevealQuestMarkersOnStart", autoRevealQuestMarkersOnStart).set(autoRevealQuestMarkersOnStart);
+        config.get(CATEGORY_QUESTS, "autoPinQuestOnStart", autoPinQuestOnStart).set(autoPinQuestOnStart);
+        config.get(CATEGORY_QUESTS, "autoDiscoverNearbyMapMarkers", autoDiscoverNearbyMapMarkers).set(autoDiscoverNearbyMapMarkers);
+        config.get(CATEGORY_QUESTS, "mapMarkerDiscoveryScanIntervalTicks", mapMarkerDiscoveryScanIntervalTicks).set(mapMarkerDiscoveryScanIntervalTicks);
     }
 }

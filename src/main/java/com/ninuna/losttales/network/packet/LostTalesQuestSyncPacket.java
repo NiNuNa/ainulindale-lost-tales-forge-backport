@@ -9,7 +9,6 @@ import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -18,7 +17,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 /**
  * Server-to-client snapshot of a player's quest state.
  *
@@ -166,13 +164,17 @@ public class LostTalesQuestSyncPacket implements IMessage {
             String name = ByteBufUtils.readUTF8String(buf);
             String icon = ByteBufUtils.readUTF8String(buf);
             String color = ByteBufUtils.readUTF8String(buf);
+            String category = ByteBufUtils.readUTF8String(buf);
+            boolean waypoint = buf.readBoolean();
             int dimensionId = buf.readInt();
             double x = buf.readDouble();
             double y = buf.readDouble();
             double z = buf.readDouble();
+            double fadeInRadius = buf.readDouble();
+            double unlockRadius = buf.readDouble();
             boolean hidden = buf.readBoolean();
             if (markerId != null && markerId.length() > 0) {
-                this.dynamicMapMarkers.add(new LostTalesMapMarkerDefinition(markerId, name, icon, color, dimensionId, x, y, z, hidden));
+                this.dynamicMapMarkers.add(new LostTalesMapMarkerDefinition(markerId, name, icon, color, category, waypoint, dimensionId, x, y, z, fadeInRadius, unlockRadius, hidden));
             }
         }
     }
@@ -216,10 +218,14 @@ public class LostTalesQuestSyncPacket implements IMessage {
             ByteBufUtils.writeUTF8String(buf, safe(marker.getName()));
             ByteBufUtils.writeUTF8String(buf, safe(marker.getIconName()));
             ByteBufUtils.writeUTF8String(buf, safe(marker.getColorName()));
+            ByteBufUtils.writeUTF8String(buf, safe(marker.getCategoryName()));
+            buf.writeBoolean(marker.isWaypoint());
             buf.writeInt(marker.getDimensionId());
             buf.writeDouble(marker.getX());
             buf.writeDouble(marker.getY());
             buf.writeDouble(marker.getZ());
+            buf.writeDouble(marker.getFadeInRadius());
+            buf.writeDouble(marker.getUnlockRadius());
             buf.writeBoolean(marker.isHiddenUntilDiscovered());
         }
     }

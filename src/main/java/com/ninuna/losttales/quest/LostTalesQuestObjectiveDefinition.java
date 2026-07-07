@@ -3,7 +3,6 @@ package com.ninuna.losttales.quest;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-
 /**
  * Immutable description of one quest objective loaded from JSON.
  *

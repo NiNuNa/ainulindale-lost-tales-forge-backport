@@ -1,7 +1,6 @@
 package com.ninuna.losttales.util;
 
 import net.minecraft.entity.EntityLivingBase;
-
 /**
  * Small legacy equivalent of the placement-rotation helper used by the modern NeoForge code.
  *
@@ -27,13 +26,46 @@ public final class LostTalesBlockRotationHelper {
 
     /**
      * Converts the modern 16-step rotation idea into the metadata value expected by the
-     * existing 1.7.10 plushie renderer.
+     * existing 1.7.10 plushie renderer. New placements also persist the exact float
+     * rotation on the tile entity, but this is still useful for old saves and broken NBT.
      */
     public static int getLegacyPlushieMetadata(EntityLivingBase entity) {
         return (14 - getSnappedRotationIndex(entity, 16)) & 15;
     }
 
     public static float getLegacyPlushieRenderRotation(int metadata) {
-        return 90.0F + ((14 - metadata) & 15) * (360.0F / 16.0F);
+        return normalizeDegrees(90.0F + ((14 - metadata) & 15) * (360.0F / 16.0F));
+    }
+
+    public static int getLegacyDirectionalMetadata(EntityLivingBase entity) {
+        int index = ((int)Math.floor((double)(entity.rotationYaw * 4.0F / 360.0F) + 0.5D) & 3);
+        int legacyDirection = (index + 2) % 4;
+
+        if (legacyDirection == 0) return 1;
+        if (legacyDirection == 1) return 3;
+        if (legacyDirection == 2) return 0;
+        return 2;
+    }
+
+    public static float getLegacyDirectionalRenderRotation(int metadata) {
+        switch (metadata & 3) {
+            case 1:
+                return 180.0F;
+            case 2:
+                return 270.0F;
+            case 3:
+                return 90.0F;
+            case 0:
+            default:
+                return 0.0F;
+        }
+    }
+
+    public static float normalizeDegrees(float rotation) {
+        rotation %= 360.0F;
+        if (rotation < 0.0F) {
+            rotation += 360.0F;
+        }
+        return rotation;
     }
 }

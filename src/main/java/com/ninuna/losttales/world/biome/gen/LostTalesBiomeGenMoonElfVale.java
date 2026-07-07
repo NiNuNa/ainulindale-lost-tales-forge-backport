@@ -1,8 +1,9 @@
 package com.ninuna.losttales.world.biome.gen;
 
 import com.ninuna.losttales.achievement.ELostTalesAchievement;
-import com.ninuna.losttales.world.map.waypoint.ELostTalesWaypoint;
 import com.ninuna.losttales.world.biome.LostTalesBiomeBase;
+import com.ninuna.losttales.world.map.waypoint.ELostTalesWaypoint;
+import java.util.Random;
 import lotr.common.LOTRAchievement;
 import lotr.common.LOTRMod;
 import lotr.common.world.biome.LOTRMusicRegion;
@@ -18,8 +19,6 @@ import net.minecraft.init.Blocks;
 import net.minecraft.world.World;
 import net.minecraft.world.gen.feature.WorldGenMinable;
 import net.minecraft.world.gen.feature.WorldGenerator;
-
-import java.util.Random;
 
 public class LostTalesBiomeGenMoonElfVale extends LostTalesBiomeBase {
     private WorldGenerator boulderGen;

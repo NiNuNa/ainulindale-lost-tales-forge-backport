@@ -2,8 +2,6 @@ package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
-import net.minecraft.client.resources.IResourceManager;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -12,7 +10,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
+import net.minecraft.client.resources.IResourceManager;
 /**
  * Client cache for shared/static and server-synced map markers.
  *
@@ -106,14 +104,14 @@ public final class LostTalesClientMapMarkerStore {
                 name,
                 icon,
                 color,
-                "Quest Marker",
-                false,
+                marker.getCategoryName(),
+                marker.isWaypoint(),
                 marker.getDimensionId(),
                 marker.getX(),
                 marker.getY(),
                 marker.getZ(),
-                128.0D,
-                8.0D,
+                marker.getFadeInRadius(),
+                marker.getUnlockRadius(),
                 marker.isHiddenUntilDiscovered()
         );
     }

@@ -2,15 +2,13 @@ package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.util.LostTalesDimensionHelper;
+import java.util.Locale;
+import java.util.Map;
 import net.minecraft.block.Block;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
-
-import java.util.Locale;
-import java.util.Map;
-
 /**
  * Small server-side bridge for quest giver interactions.
  *

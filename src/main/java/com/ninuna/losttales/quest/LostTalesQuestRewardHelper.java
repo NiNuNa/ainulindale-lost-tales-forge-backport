@@ -1,14 +1,12 @@
 package com.ninuna.losttales.quest;
 
+import java.util.Locale;
+import java.util.Map;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumChatFormatting;
-
-import java.util.Locale;
-import java.util.Map;
-
 /** Grants simple optional quest rewards using systems available in Minecraft 1.7.10. */
 public final class LostTalesQuestRewardHelper {
 

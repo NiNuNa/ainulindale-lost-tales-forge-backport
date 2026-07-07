@@ -1,13 +1,11 @@
 package com.ninuna.losttales.quest.progress;
 
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
-import net.minecraftforge.common.util.Constants;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraftforge.common.util.Constants;
 /** Runtime state for one active player quest. */
 public final class LostTalesQuestProgress {
     private final String questId;

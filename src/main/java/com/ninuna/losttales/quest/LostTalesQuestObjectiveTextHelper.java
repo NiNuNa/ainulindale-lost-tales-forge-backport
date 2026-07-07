@@ -1,9 +1,7 @@
 package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
-
 import java.util.Map;
-
 /**
  * Shared readable objective text used by both the journal and the HUD tracker.
  *

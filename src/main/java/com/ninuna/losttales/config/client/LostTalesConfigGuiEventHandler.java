@@ -4,7 +4,6 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.client.event.ConfigChangedEvent;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
-
 /**
  * Keeps the static legacy config values synced after the Forge Mod List config
  * GUI writes changes to disk.

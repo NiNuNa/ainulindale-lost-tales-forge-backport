@@ -1,20 +1,19 @@
 package com.ninuna.losttales.gui.hud.compass.marker;
 
 import com.ninuna.losttales.config.LostTalesConfig;
-import lotr.common.LOTRDimension;
-import lotr.common.world.map.LOTRWaypoint;
-import net.minecraft.client.Minecraft;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
+import lotr.common.LOTRDimension;
+import lotr.common.world.map.LOTRAbstractWaypoint;
+import lotr.common.world.map.LOTRWaypoint;
+import net.minecraft.client.Minecraft;
 /**
  * Read-only bridge from Lord of the Rings Legacy public waypoints into the Lost Tales compass.
  *
  * This does not create, unlock, teleport to, or otherwise modify LOTR waypoints. It only reads
- * the public LOTR waypoint enum and renders compatible entries as Point of Interest markers.
- * Private/custom waypoints are intentionally left for a later pass.
+ * LOTR's own waypoint data and renders compatible entries as Point of Interest markers.
+ * Private/custom waypoints are intentionally left for a later pass if LOTR exposes a stable API.
  */
 public class LostTalesLotrWaypointCompassMarkerProvider implements LostTalesCompassMarkerProvider {
     public static final String CATEGORY_NAME = "Point of Interest";
@@ -30,7 +29,7 @@ public class LostTalesLotrWaypointCompassMarkerProvider implements LostTalesComp
         }
 
         List<LostTalesCompassMarker> markers = new ArrayList<LostTalesCompassMarker>();
-        for (LOTRWaypoint waypoint : LOTRWaypoint.values()) {
+        for (LOTRAbstractWaypoint waypoint : getLotrWaypoints()) {
             if (waypoint == null) {
                 continue;
             }
@@ -47,15 +46,17 @@ public class LostTalesLotrWaypointCompassMarkerProvider implements LostTalesComp
                     name = waypoint.getCodeName();
                 }
                 if (name == null || name.length() == 0) {
-                    name = waypoint.name();
+                    name = "Waypoint";
                 }
 
+                int x = waypoint.getXCoord();
+                int z = waypoint.getZCoord();
                 markers.add(LostTalesCompassMarker.position(
                         name,
                         LostTalesCompassMarkerIcon.FORT,
-                        waypoint.getXCoord(),
-                        getWaypointY(waypoint),
-                        waypoint.getZCoord(),
+                        x,
+                        getWaypointY(minecraft, waypoint, x, z),
+                        z,
                         true,
                         true,
                         DEFAULT_FADE_IN_RADIUS
@@ -67,8 +68,34 @@ public class LostTalesLotrWaypointCompassMarkerProvider implements LostTalesComp
         return markers;
     }
 
-    private static int getWaypointY(LOTRWaypoint waypoint) {
+    private static List<LOTRAbstractWaypoint> getLotrWaypoints() {
+        try {
+            List<LOTRAbstractWaypoint> waypoints = LOTRWaypoint.listAllWaypoints();
+            return waypoints == null ? Collections.<LOTRAbstractWaypoint>emptyList() : waypoints;
+        } catch (Throwable ignored) {
+            LOTRWaypoint[] values = LOTRWaypoint.values();
+            List<LOTRAbstractWaypoint> fallback = new ArrayList<LOTRAbstractWaypoint>(values.length);
+            for (LOTRWaypoint waypoint : values) {
+                fallback.add(waypoint);
+            }
+            return fallback;
+        }
+    }
+
+    private static int getWaypointY(Minecraft minecraft, LOTRAbstractWaypoint waypoint, int x, int z) {
         int y = waypoint.getYCoordSaved();
-        return y > 0 ? y : 64;
+        if (y > 0) {
+            return y;
+        }
+        try {
+            if (minecraft != null && minecraft.theWorld != null) {
+                y = waypoint.getYCoord(minecraft.theWorld, x, z);
+                if (y > 0) {
+                    return y;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return 64;
     }
 }

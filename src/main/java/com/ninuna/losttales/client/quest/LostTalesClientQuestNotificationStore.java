@@ -4,7 +4,6 @@ import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -13,7 +12,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 /**
  * Small client-side notification queue for quest HUD messages.
  *
@@ -207,18 +205,24 @@ public final class LostTalesClientQuestNotificationStore {
     }
 
     public enum Type {
-        INFO(0xDDBB77),
-        PROGRESS(0xAADDFF),
-        COMPLETE(0x77DD77);
+        INFO(0xDDBB77, "Quest Updated"),
+        PROGRESS(0xAADDFF, "Objective Progress"),
+        COMPLETE(0x77DD77, "Quest Complete");
 
         private final int color;
+        private final String displayTitle;
 
-        Type(int color) {
+        Type(int color, String displayTitle) {
             this.color = color;
+            this.displayTitle = displayTitle;
         }
 
         public int getColor() {
             return this.color;
+        }
+
+        public String getDisplayTitle() {
+            return this.displayTitle;
         }
     }
 

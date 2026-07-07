@@ -11,16 +11,15 @@ import com.ninuna.losttales.gui.hud.compass.marker.LostTalesDirectionCompassMark
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesHostileCompassMarkerProvider;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesLotrWaypointCompassMarkerProvider;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesStaticCompassMarkerProvider;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 public class LostTalesCompassHudRenderer {
     public static final ResourceLocation COMPASS_HUD_TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/compasshud.png");

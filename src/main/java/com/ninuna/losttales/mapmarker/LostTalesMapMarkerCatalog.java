@@ -9,7 +9,6 @@ import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.util.LostTalesDimensionHelper;
 import cpw.mods.fml.common.FMLLog;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -24,7 +23,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 /**
  * Server-safe catalog of bundled map marker JSON.
  *
@@ -103,6 +101,16 @@ public final class LostTalesMapMarkerCatalog {
         return marker.getId() + " (" + marker.getName() + ")";
     }
 
+    public static boolean isHiddenUntilDiscovered(String markerId) {
+        LostTalesMapMarkerDefinition marker = getMarker(markerId);
+        return marker != null && marker.isHiddenUntilDiscovered();
+    }
+
+    public static boolean isVisibleByDefault(String markerId) {
+        LostTalesMapMarkerDefinition marker = getMarker(markerId);
+        return marker != null && !marker.isHiddenUntilDiscovered();
+    }
+
     public static void logQuestMarkerWarnings(Collection<LostTalesQuestDefinition> quests) {
         if (quests == null || quests.isEmpty()) {
             return;
@@ -172,15 +180,19 @@ public final class LostTalesMapMarkerCatalog {
         }
         String icon = getString(object, "icon", "undiscovered");
         String color = getString(object, "color", "white");
+        boolean waypoint = getBoolean(object, "waypoint", getBoolean(object, "isWaypoint", getBoolean(object, "lotrWaypoint", false)));
+        String category = getString(object, "category", waypoint ? LostTalesMapMarkerDefinition.CATEGORY_POINT_OF_INTEREST : LostTalesMapMarkerDefinition.CATEGORY_DEFAULT);
         int dimensionId = LostTalesDimensionHelper.parseDimensionId(getString(object, "dimension", "minecraft:overworld"), 0);
         double x = object.get("x").getAsDouble();
         double y = object.get("y").getAsDouble();
         double z = object.get("z").getAsDouble();
+        double fadeInRadius = getDouble(object, "fadeInRadius", 128.0D);
+        double unlockRadius = Math.max(1.0D, getDouble(object, "unlockRadius", 8.0D));
         boolean hidden = getBoolean(object, "hiddenUntilDiscovered", getBoolean(object, "requiresDiscovery", false));
         if (getBoolean(object, "discoveredByDefault", false)) {
             hidden = false;
         }
-        return new LostTalesMapMarkerDefinition(id, name, icon, color, dimensionId, x, y, z, hidden);
+        return new LostTalesMapMarkerDefinition(id, name, icon, color, category, waypoint, dimensionId, x, y, z, fadeInRadius, unlockRadius, hidden);
     }
 
     private static boolean hasNumber(JsonObject object, String key) {
@@ -195,6 +207,18 @@ public final class LostTalesMapMarkerCatalog {
         }
         try {
             return element.getAsString();
+        } catch (RuntimeException ignored) {
+            return fallback;
+        }
+    }
+
+    private static double getDouble(JsonObject object, String key, double fallback) {
+        JsonElement element = object.get(key);
+        if (element == null || element.isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return element.getAsDouble();
         } catch (RuntimeException ignored) {
             return fallback;
         }

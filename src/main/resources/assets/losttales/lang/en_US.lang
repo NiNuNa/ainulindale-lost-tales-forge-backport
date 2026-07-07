@@ -147,80 +147,80 @@ item.orocarni_sword.lore.line1=A blade forged by the Dwarf-
 item.orocarni_sword.lore.line2=smiths of the Red Mountains
 
 item.orocarni_dagger.name=Orocarni Dagger
-item.orocarni_dagger.lore.line1=TODO...
-item.orocarni_dagger.lore.line2=TODO....
+item.orocarni_dagger.lore.line1=A short blade forged by the Dwarf-smiths
+item.orocarni_dagger.lore.line2=of the Red Mountains
 
 item.orocarni_dagger_poisoned.name=Poisoned Orocarni Dagger
-item.orocarni_dagger_poisoned.lore.line1=TODO...
-item.orocarni_dagger_poisoned.lore.line2=TODO....
+item.orocarni_dagger_poisoned.lore.line1=A Red Mountain blade with a venomous edge
+item.orocarni_dagger_poisoned.lore.line2=made for swift and silent strikes
 
 item.orocarni_battleaxe.name=Orocarni Battleaxe
-item.orocarni_battleaxe.lore.line1=TODO...
-item.orocarni_battleaxe.lore.line2=TODO....
+item.orocarni_battleaxe.lore.line1=A heavy axe forged by the Dwarf-smiths
+item.orocarni_battleaxe.lore.line2=of the Red Mountains
 
 item.orocarni_mace.name=Orocarni Mace
-item.orocarni_mace.lore.line1=TODO...
-item.orocarni_mace.lore.line2=TODO....
+item.orocarni_mace.lore.line1=A crushing mace forged by the Dwarf-smiths
+item.orocarni_mace.lore.line2=of the Red Mountains
 
 item.orocarni_warhammer.name=Orocarni Warhammer
-item.orocarni_warhammer.lore.line1=TODO...
-item.orocarni_warhammer.lore.line2=TODO....
+item.orocarni_warhammer.lore.line1=A warhammer made for breaking shields
+item.orocarni_warhammer.lore.line2=and armor alike
 
 item.orocarni_pike.name=Orocarni Pike
-item.orocarni_pike.lore.line1=TODO...
-item.orocarni_pike.lore.line2=TODO....
+item.orocarni_pike.lore.line1=A long pike carried by Red Mountain guards
+item.orocarni_pike.lore.line2=to hold enemies at a distance
 
 item.orocarni_halberd.name=Orocarni Halberd
-item.orocarni_halberd.lore.line1=TODO...
-item.orocarni_halberd.lore.line2=TODO...
+item.orocarni_halberd.lore.line1=A polearm with a broad axe-head
+item.orocarni_halberd.lore.line2=forged in the Red Mountains
 
 item.orocarni_spear.name=Orocarni Spear
-item.orocarni_spear.lore.line1=TODO...
-item.orocarni_spear.lore.line2=TODO...
+item.orocarni_spear.lore.line1=A sturdy spear from the halls
+item.orocarni_spear.lore.line2=of the Orocarni Dwarves
 
 #    Armors - Galadhrim
 item.galadhrim_helmet_light.name=Galadhrim Light Helmet
-item.galadhrim_helmet_light.lore.line1=TODO...
-item.galadhrim_helmet_light.lore.line2=TODO...
+item.galadhrim_helmet_light.lore.line1=A light helm worn by the wardens
+item.galadhrim_helmet_light.lore.line2=of the Golden Wood
 
 item.galadhrim_helmet_light_hood.name=Hooded Galadhrim Light Helmet
-item.galadhrim_helmet_light_hood.lore.line1=TODO...
-item.galadhrim_helmet_light_hood.lore.line2=TODO...
+item.galadhrim_helmet_light_hood.lore.line1=A hooded helm for silent patrols
+item.galadhrim_helmet_light_hood.lore.line2=beneath the golden leaves
 
 item.galadhrim_helmet_heavy.name=Galadhrim Heavy Helmet
-item.galadhrim_helmet_heavy.lore.line1=TODO...
-item.galadhrim_helmet_heavy.lore.line2=TODO...
+item.galadhrim_helmet_heavy.lore.line1=A reinforced helm of Galadhrim make
+item.galadhrim_helmet_heavy.lore.line2=bright beneath the forest boughs
 
 item.galadhrim_helmet_heavy_hood.name=Hooded Galadhrim Heavy Helmet
-item.galadhrim_helmet_heavy_hood.lore.line1=TODO...
-item.galadhrim_helmet_heavy_hood.lore.line2=TODO...
+item.galadhrim_helmet_heavy_hood.lore.line1=A hooded heavy helm for the guards
+item.galadhrim_helmet_heavy_hood.lore.line2=of Lórien
 
 #   Armors - Moon Elves
 item.moon_elf_helmet_light.name=Ithildhrim Light Helmet
-item.moon_elf_helmet_light.lore.line1=TODO...
-item.moon_elf_helmet_light.lore.line2=TODO...
+item.moon_elf_helmet_light.lore.line1=A moonlit helm worn by the Ithildhrim
+item.moon_elf_helmet_light.lore.line2=of the Forgotten Vale
 
 item.moon_elf_armor_light.name=Ithildhrim Light Armor
-item.moon_elf_armor_light.lore.line1=TODO...
-item.moon_elf_armor_light.lore.line2=TODO...
+item.moon_elf_armor_light.lore.line1=Light armor woven with silvered plates
+item.moon_elf_armor_light.lore.line2=for the wardens of Naldossë
 
 item.moon_elf_leggings_light.name=Ithildhrim Light Leggings
-item.moon_elf_leggings_light.lore.line1=TODO...
-item.moon_elf_leggings_light.lore.line2=TODO...
+item.moon_elf_leggings_light.lore.line1=Light leggings made for quiet steps
+item.moon_elf_leggings_light.lore.line2=under moonlit trees
 
 item.moon_elf_boots_light.name=Ithildhrim Light Boots
-item.moon_elf_boots_light.lore.line1=TODO...
-item.moon_elf_boots_light.lore.line2=TODO...
+item.moon_elf_boots_light.lore.line1=Soft boots of the Ithildhrim
+item.moon_elf_boots_light.lore.line2=made for silent travel
 
 #   Items - Story
-item.dains_hammer.name=Dains Hammer Testing
-item.dains_hammer.lore.line1=TODO...
-item.dains_hammer.lore.line2=TODO...
+item.dains_hammer.name=Dain's Hammer
+item.dains_hammer.lore.line1=A heavy testing relic of Dwarven make
+item.dains_hammer.lore.line2=kept for unfinished story content
 
 #   Consumables - Food
 item.pear.name=Pear
-item.pear.lore.line1=TODO...
-item.pear.lore.line2=TODO...
+item.pear.lore.line1=A crisp fruit from well-kept orchards.
+item.pear.lore.line2=Sweet, light, and refreshing.
 
 #   Items - Community
 item.community_lossoth_harpoon.name=Lossoth Harpoon
@@ -228,24 +228,24 @@ item.community_lossoth_harpoon.lore.line1=A makeshift harpoon crafted by the Nor
 item.community_lossoth_harpoon.lore.line2=of Forodwaith for the hunting of sea-creatures
 
 item.community_moria_goblin_pike.name=Moria Goblin Pike
-item.community_moria_goblin_pike.lore.line1=TODO...
-item.community_moria_goblin_pike.lore.line2=TODO...
+item.community_moria_goblin_pike.lore.line1=A crude pike carried in the dark halls
+item.community_moria_goblin_pike.lore.line2=by goblins of Moria
 
 item.community_moria_goblin_scimitar.name=Moria Goblin Scimitar
-item.community_moria_goblin_scimitar.lore.line1=TODO...
-item.community_moria_goblin_scimitar.lore.line2=TODO...
+item.community_moria_goblin_scimitar.lore.line1=A jagged scimitar of Moria Goblin make
+item.community_moria_goblin_scimitar.lore.line2=scarred by raids beneath the mountains
 
 item.community_moria_goblin_mace.name=Moria Goblin Mace
-item.community_moria_goblin_mace.lore.line1=TODO...
-item.community_moria_goblin_mace.lore.line2=TODO...
+item.community_moria_goblin_mace.lore.line1=A battered mace from the pits of Moria
+item.community_moria_goblin_mace.lore.line2=heavy enough to crack old mail
 
 item.community_moria_goblin_spear.name=Moria Goblin Spear
-item.community_moria_goblin_spear.lore.line1=TODO...
-item.community_moria_goblin_spear.lore.line2=TODO...
+item.community_moria_goblin_spear.lore.line1=A rough spear with an uneven iron head
+item.community_moria_goblin_spear.lore.line2=used by goblin patrols in the deep roads
 
 #   Blocks - Urns
 tile.urn.name=Urn
-tile.urn.lore.line1=Stores a smallUrns offering.
+tile.urn.lore.line1=Stores a small offering.
 tile.urn.lore.line2=Use clay to seal it.
 
 tile.amphora.name=Amphora
@@ -258,21 +258,21 @@ tile.loutrophoros.lore.line2=Use clay to seal it.
 
 #   Blocks - Decorative
 tile.watch_stone.name=Watch Stone
-tile.watch_stone.lore.line1=TODO...
-tile.watch_stone.lore.line2=TODO...
+tile.watch_stone.lore.line1=A weathered stone figure standing watch.
+tile.watch_stone.lore.line2=Its gaze follows the road ahead.
 
 #   Blocks - Plushies
 tile.plushie_bear.name=Bear Plushie
-tile.plushie_bear.lore.line1=TODO...
-tile.plushie_bear.lore.line2=TODO...
+tile.plushie_bear.lore.line1=Carefully hand-stitched in a hearth-lit cottage,
+tile.plushie_bear.lore.line2=this loyal companion brings warmth and comfort.
 
 tile.plushie_fox.name=Fox Plushie
-tile.plushie_fox.lore.line1=TODO...
-tile.plushie_fox.lore.line2=TODO...
+tile.plushie_fox.lore.line1=A bright-eyed plush fox with a soft tail.
+tile.plushie_fox.lore.line2=Squeaks cheerfully when handled.
 
 tile.plushie_gandalf.name=Gandalf Plushie
-tile.plushie_gandalf.lore.line1=TODO...
-tile.plushie_gandalf.lore.line2=TODO...
+tile.plushie_gandalf.lore.line1=A tiny grey pilgrim with a pointed hat.
+tile.plushie_gandalf.lore.line2=It seems wiser than most plushies.
 
 #   Creative Tabs
 itemGroup.creativeTabBlocksBuilding=Lost Tales - Building Blocks
@@ -286,7 +286,7 @@ itemGroup.creativeTabCommunity=Lost Tales - Community
 
 #   Factions - Active
 lotr.faction.OROCARNI.name=Orocarni
-lotr.faction.OROCARNI.entity=TODO...
+lotr.faction.OROCARNI.entity=Orocarni Dwarf
 lotr.faction.OROCARNI.subtitle=Dwarves of the Red Mountain
 lotr.faction.OROCARNI.achieveRank=Reach %s alignment with the Orocarni Dwarves
 lotr.faction.OROCARNI.achieveRankPledge=Pledge and reach %s alignment with the Orocarni Dwarves
@@ -308,7 +308,7 @@ lotr.faction.OROCARNI.rank.h=Crimson Lord
 lotr.faction.OROCARNI.rank.h.f=Crimson Lord
 
 lotr.faction.LOSSOTH.name=Lossoth
-lotr.faction.LOSSOTH.entity=TODO...
+lotr.faction.LOSSOTH.entity=Lossoth
 lotr.faction.LOSSOTH.subtitle=Peoples of Lossoth
 lotr.faction.LOSSOTH.achieveRank=Reach %s alignment with the Lossoth Peoples
 lotr.faction.LOSSOTH.achieveRankPledge=Pledge and reach %s alignment with the Lossoth Peoples
@@ -353,51 +353,51 @@ lotr.faction.MORIA_GOBLINS.rank.h=Shadowed Terror
 lotr.faction.MORIA_GOBLINS.rank.h.f=Shadowed Terror
 
 lotr.faction.MOON_ELVES.name=Naldossë
-lotr.faction.MOON_ELVES.entity=TODO...
+lotr.faction.MOON_ELVES.entity=Ithildhrim Elf
 lotr.faction.MOON_ELVES.subtitle=Ithildhrim of the Forgotten Vale
 lotr.faction.MOON_ELVES.achieveRank=Reach %s alignment with the Ithildhrim
 lotr.faction.MOON_ELVES.achieveRankPledge=Pledge and reach %s alignment with the Ithildhrim
-lotr.faction.MOON_ELVES.rank.a=TODO...
-lotr.faction.MOON_ELVES.rank.a.f=TODO...
-lotr.faction.MOON_ELVES.rank.b=TODO...
-lotr.faction.MOON_ELVES.rank.b.f=TODO...
-lotr.faction.MOON_ELVES.rank.c=TODO...
-lotr.faction.MOON_ELVES.rank.c.f=TODO...
-lotr.faction.MOON_ELVES.rank.d=TODO...
-lotr.faction.MOON_ELVES.rank.d.f=TODO...
-lotr.faction.MOON_ELVES.rank.e=TODO...
-lotr.faction.MOON_ELVES.rank.e.f=TODO...
-lotr.faction.MOON_ELVES.rank.f=TODO...
-lotr.faction.MOON_ELVES.rank.f.f=TODO...
-lotr.faction.MOON_ELVES.rank.g=TODO...
-lotr.faction.MOON_ELVES.rank.g.f=TODO...
-lotr.faction.MOON_ELVES.rank.h=TODO...
-lotr.faction.MOON_ELVES.rank.h.f=TODO...
+lotr.faction.MOON_ELVES.rank.a=Stargazer
+lotr.faction.MOON_ELVES.rank.a.f=Ithildhrim Stargazer
+lotr.faction.MOON_ELVES.rank.b=Moonlit Scout
+lotr.faction.MOON_ELVES.rank.b.f=Ithildhrim Scout
+lotr.faction.MOON_ELVES.rank.c=Vale Warden
+lotr.faction.MOON_ELVES.rank.c.f=Ithildhrim Warden
+lotr.faction.MOON_ELVES.rank.d=Silver Archer
+lotr.faction.MOON_ELVES.rank.d.f=Ithildhrim Silver Archer
+lotr.faction.MOON_ELVES.rank.e=Moonblade
+lotr.faction.MOON_ELVES.rank.e.f=Ithildhrim Moonblade
+lotr.faction.MOON_ELVES.rank.f=Loremaster
+lotr.faction.MOON_ELVES.rank.f.f=Ithildhrim Loremaster
+lotr.faction.MOON_ELVES.rank.g=Moon Captain
+lotr.faction.MOON_ELVES.rank.g.f=Ithildhrim Moon Captain
+lotr.faction.MOON_ELVES.rank.h=Keeper of Naldossë
+lotr.faction.MOON_ELVES.rank.h.f=Keeper of Naldossë
 
 lotr.faction.SUN_ELVES.name=Ancalitsë
-lotr.faction.SUN_ELVES.entity=TODO...
+lotr.faction.SUN_ELVES.entity=Anardhrim Elf
 lotr.faction.SUN_ELVES.subtitle=Anardhrim of the Desert
 lotr.faction.SUN_ELVES.achieveRank=Reach %s alignment with the Anardhrim
 lotr.faction.SUN_ELVES.achieveRankPledge=Pledge and reach %s alignment with the Anardhrim
-lotr.faction.SUN_ELVES.rank.a=TODO...
-lotr.faction.SUN_ELVES.rank.a.f=TODO...
-lotr.faction.SUN_ELVES.rank.b=TODO...
-lotr.faction.SUN_ELVES.rank.b.f=TODO...
-lotr.faction.SUN_ELVES.rank.c=TODO...
-lotr.faction.SUN_ELVES.rank.c.f=TODO...
-lotr.faction.SUN_ELVES.rank.d=TODO...
-lotr.faction.SUN_ELVES.rank.d.f=TODO...
-lotr.faction.SUN_ELVES.rank.e=TODO...
-lotr.faction.SUN_ELVES.rank.e.f=TODO...
-lotr.faction.SUN_ELVES.rank.f=TODO...
-lotr.faction.SUN_ELVES.rank.f.f=TODO...
-lotr.faction.SUN_ELVES.rank.g=TODO...
-lotr.faction.SUN_ELVES.rank.g.f=TODO...
-lotr.faction.SUN_ELVES.rank.h=TODO...
-lotr.faction.SUN_ELVES.rank.h.f=TODO...
+lotr.faction.SUN_ELVES.rank.a=Sunseeker
+lotr.faction.SUN_ELVES.rank.a.f=Anardhrim Sunseeker
+lotr.faction.SUN_ELVES.rank.b=Dune Scout
+lotr.faction.SUN_ELVES.rank.b.f=Anardhrim Dune Scout
+lotr.faction.SUN_ELVES.rank.c=Desert Warden
+lotr.faction.SUN_ELVES.rank.c.f=Anardhrim Warden
+lotr.faction.SUN_ELVES.rank.d=Sun Archer
+lotr.faction.SUN_ELVES.rank.d.f=Anardhrim Sun Archer
+lotr.faction.SUN_ELVES.rank.e=Sunblade
+lotr.faction.SUN_ELVES.rank.e.f=Anardhrim Sunblade
+lotr.faction.SUN_ELVES.rank.f=Flame Guard
+lotr.faction.SUN_ELVES.rank.f.f=Anardhrim Flame Guard
+lotr.faction.SUN_ELVES.rank.g=Sun Captain
+lotr.faction.SUN_ELVES.rank.g.f=Anardhrim Sun Captain
+lotr.faction.SUN_ELVES.rank.h=Keeper of Ancalitsë
+lotr.faction.SUN_ELVES.rank.h.f=Keeper of Ancalitsë
 
 lotr.faction.BLUE_GOBLINS.name=Blue Goblins
-lotr.faction.BLUE_GOBLINS.entity=TODO...
+lotr.faction.BLUE_GOBLINS.entity=Blue Goblin
 lotr.faction.BLUE_GOBLINS.subtitle=Balcmog's Warhost of the West
 lotr.faction.BLUE_GOBLINS.achieveRank=Reach %s alignment with the Blue Goblins
 lotr.faction.BLUE_GOBLINS.achieveRankPledge=Pledge and reach %s alignment with the Blue Goblins
@@ -419,7 +419,7 @@ lotr.faction.BLUE_GOBLINS.rank.h=Master of Shadowed Ways
 lotr.faction.BLUE_GOBLINS.rank.h.f=Master of Shadowed Ways
 
 lotr.faction.THARBAD.name=Tharbad
-lotr.faction.THARBAD.entity=TODO...
+lotr.faction.THARBAD.entity=Tharbad Adventurer
 lotr.faction.THARBAD.subtitle=Treasure Collectors of Tharbad
 lotr.faction.THARBAD.achieveRank=Reach %s alignment with Tharbad
 lotr.faction.THARBAD.achieveRankPledge=Pledge and reach %s alignment with the Tharbad
@@ -444,8 +444,8 @@ lotr.faction.THARBAD.rank.h.f=Tharbad Oddment Collector
 lotr.dimension.MiddleEarth.north=Northern Wastes
 
 #   Waypoints
-lotr.waypoint.MOON_ELVES=TODO...
-lotr.waypoint.MOON_ELVES.info=TODO...
+lotr.waypoint.MOON_ELVES=Naldossë
+lotr.waypoint.MOON_ELVES.info=The hidden refuge of the Ithildhrim in the Forgotten Vale.
 
 #   Map Labels
 lotr.map.MOON_ELVES=Naldossë
@@ -465,27 +465,28 @@ lotr.achievement.category.LOSSOTH=Lossoth
 tile.cheese_wheel.name=Cheese Wheel
 
 item.plum.name=Plum
-item.plum.lore.line1=Backported from the modern Lost Tales branch.
-item.plum.lore.line2=Placeholder texture pending final art.
+item.plum.lore.line1=A juicy fruit with a dusky skin.
+item.plum.lore.line2=Sweet, tart, and best eaten fresh.
 item.pear_baked.name=Baked Pear
 item.pear_baked.lore.line1=Warm, soft, and sweeter than a fresh pear.
-item.pear_baked.lore.line2=Backported from the modern branch.
+item.pear_baked.lore.line2=Best enjoyed beside a warm fire.
 item.plum_juice.name=Plum Juice
-item.plum_juice.lore.line1=A simple fruit drink.
-item.plum_juice.lore.line2=Placeholder texture pending final art.
+item.plum_juice.lore.line1=A sweet drink pressed from ripe plums.
+item.plum_juice.lore.line2=Refreshing after a long road.
 item.pear_juice.name=Pear Juice
-item.pear_juice.lore.line1=A simple fruit drink.
-item.pear_juice.lore.line2=Placeholder texture pending final art.
+item.pear_juice.lore.line1=A clear drink pressed from ripe pears.
+item.pear_juice.lore.line2=Light, sweet, and refreshing.
 item.creation_tool_loot_respawner.name=Loot Respawner Tool
 item.creation_tool_loot_respawner.lore.line1=Creative-only utility tool.
 item.creation_tool_loot_respawner.lore.line2=Use on sealed vessels to toggle respawn state.
-item.horn_test.name=Test Horn
-item.horn_test.lore.line1=Experimental backported instrument item.
-item.horn_test.lore.line2=Sound behavior is placeholder.
+item.horn_test.name=Practice Horn
+item.horn_test.lore.line1=A simple horn for testing your call.
+item.horn_test.lore.line2=Plays a low note when used.
 
-key.categories.losttales.mappings=Ainulindale: Lost Tales
-key.losttales.toggleHud=Toggle Lost Tales HUD
+key.categories.losttales.mappings=Ainulindalë: Lost Tales
+key.losttales.toggleHud=Toggle HUD
 key.losttales.use=Activate / Use
+key.losttales.modifier=Modifier Key
 key.losttales.characterMenu=Open Character Menu
 key.losttales.questJournal=Open Quest Journal
 
@@ -502,3 +503,15 @@ losttales.config.category.client=Client / HUD
 losttales.config.category.client.tooltip=HUD visibility, placement, compass, quick-loot, quest tracker, and client feedback options.
 losttales.config.category.quests=Quests
 losttales.config.category.quests.tooltip=Quest start rules, prerequisites, rewards, and marker discovery behavior.
+losttales.config.category.client.hud=HUD Visibility & Placement
+losttales.config.category.client.hud.tooltip=Master HUD toggles, visible HUD pieces, and percentage offsets edited by the placement preview.
+losttales.config.category.client.compass=Compass Markers
+losttales.config.category.client.compass.tooltip=Compass range, map markers, LOTR waypoints, and hostile marker options.
+losttales.config.category.client.quickLoot=Quick Loot
+losttales.config.category.client.quickLoot.tooltip=Quick-loot HUD display limits and behavior.
+losttales.config.category.client.questHud=Quest HUD & Notifications
+losttales.config.category.client.questHud.tooltip=Tracked quest HUD, wrapped objective text, world-space markers, and quest notification banners.
+losttales.config.category.client.other=Other Client Options
+losttales.config.category.client.other.tooltip=Additional client options not shown in the main groups.
+losttales.config.category.quests.rules=Quest Rules & Discovery
+losttales.config.category.quests.rules.tooltip=Quest starts, prerequisites, rewards, and marker discovery behavior.

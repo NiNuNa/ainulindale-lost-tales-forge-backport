@@ -1,6 +1,7 @@
 package com.ninuna.losttales.util;
 
-import com.ninuna.losttales.block.LostTalesBlockPlushie;
+import com.ninuna.losttales.block.custom.LostTalesBlockPlushie;
+import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.entity.ELostTalesUser;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.armor.LostTalesItemArmorBase;
@@ -11,6 +12,17 @@ import cpw.mods.fml.common.ModContainer;
 import cpw.mods.fml.relauncher.ReflectionHelper;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.List;
+import javax.imageio.ImageIO;
 import lotr.client.LOTRTextures;
 import lotr.client.gui.LOTRMapLabels;
 import lotr.common.LOTRAchievement;
@@ -33,18 +45,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.util.EnumHelper;
 import org.lwjgl.input.Keyboard;
-
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.List;
 
 public abstract class LostTalesUtil {
 
@@ -130,7 +130,7 @@ public abstract class LostTalesUtil {
         //Display armor set progress when armor is equipped.
         if (itemStack == helmet || itemStack == armor || itemStack == leggings || itemStack == boots) {
             list.add("");
-            if (Keyboard.isKeyDown(Keyboard.KEY_LMENU)) {
+            if (LostTalesKeyBindings.isModifierKeyDown()) {
                 if (itemStack.getItem() instanceof LostTalesItemArmorBase) {
                     if (((LostTalesItemArmorBase)itemStack.getItem()).getItemType() == ELostTalesItem.Type.ARMOR_HEAVY) {
                         setCounter = displayArmorSetDetails(true, names, helmet, armor, leggings, boots);
@@ -159,7 +159,7 @@ public abstract class LostTalesUtil {
                     }
                 }
             } else {
-                list.add("Hold §e[ALT] §r§7to view armor set information.");
+                list.add("Hold §e[" + LostTalesKeyBindings.getModifierKeyDisplayName() + "] §r§7to view armor set information.");
             }
         }
     }

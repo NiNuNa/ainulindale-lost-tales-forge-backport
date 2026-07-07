@@ -1,11 +1,10 @@
 package com.ninuna.losttales.world.biome.gen;
 
+import java.util.Random;
 import lotr.common.world.biome.variant.LOTRBiomeVariant;
 import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
 import net.minecraft.world.World;
-
-import java.util.Random;
 
 public class LostTalesBiomeGenMoonElfMountains extends LostTalesBiomeGenMoonElfVale {
 

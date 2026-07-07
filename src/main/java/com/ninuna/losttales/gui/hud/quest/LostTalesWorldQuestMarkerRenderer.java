@@ -7,17 +7,15 @@ import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.MathHelper;
 import org.lwjgl.opengl.GL11;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 /**
  * Lightweight 1.7.10 world-space quest marker labels.
  *
@@ -76,8 +74,10 @@ public final class LostTalesWorldQuestMarkerRenderer {
 
                 boolean pinned = marker.getId().equals(pinnedMarkerId);
                 boolean activeQuestMarker = activeQuestMarkers.containsKey(marker.getId());
-                boolean discoveredQuestMarker = marker.isHiddenUntilDiscovered() && discoveredMarkers.contains(marker.getId());
-                if (!pinned && !activeQuestMarker && !discoveredQuestMarker) {
+                boolean discoveredMarker = discoveredMarkers.contains(marker.getId());
+                boolean discoveredQuestMarker = marker.isHiddenUntilDiscovered() && discoveredMarker;
+                boolean discoveredWorldMarker = LostTalesConfig.showDiscoveredWorldMapMarkers && discoveredMarker;
+                if (!pinned && !activeQuestMarker && !discoveredQuestMarker && !discoveredWorldMarker) {
                     continue;
                 }
 

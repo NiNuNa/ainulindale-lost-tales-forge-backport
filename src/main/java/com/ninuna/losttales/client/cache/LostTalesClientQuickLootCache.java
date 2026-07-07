@@ -1,11 +1,10 @@
 package com.ninuna.losttales.client.cache;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.StatCollector;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.StatCollector;
 
 public final class LostTalesClientQuickLootCache {
     private static volatile Snapshot snapshot;

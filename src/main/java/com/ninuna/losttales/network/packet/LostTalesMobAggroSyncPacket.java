@@ -5,12 +5,10 @@ import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-
 /** Server-to-client snapshot of nearby mobs currently targeting the player. */
 public class LostTalesMobAggroSyncPacket implements IMessage {
     private static final int MAX_ENTITY_IDS = 4096;

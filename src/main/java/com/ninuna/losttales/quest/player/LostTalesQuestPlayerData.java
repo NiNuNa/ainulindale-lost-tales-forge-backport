@@ -3,14 +3,6 @@ package com.ninuna.losttales.quest.player;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
-import net.minecraft.world.World;
-import net.minecraftforge.common.IExtendedEntityProperties;
-import net.minecraftforge.common.util.Constants;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -18,7 +10,13 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.world.World;
+import net.minecraftforge.common.IExtendedEntityProperties;
+import net.minecraftforge.common.util.Constants;
 /**
  * Forge 1.7.10 player quest storage.
  *
@@ -103,10 +101,14 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             markerTag.setString("Name", marker.getName() == null ? marker.getId() : marker.getName());
             markerTag.setString("Icon", marker.getIconName() == null ? "quest" : marker.getIconName());
             markerTag.setString("Color", marker.getColorName() == null ? "white" : marker.getColorName());
+            markerTag.setString("Category", marker.getCategoryName() == null ? LostTalesMapMarkerDefinition.CATEGORY_DEFAULT : marker.getCategoryName());
+            markerTag.setBoolean("Waypoint", marker.isWaypoint());
             markerTag.setInteger("DimensionId", marker.getDimensionId());
             markerTag.setDouble("X", marker.getX());
             markerTag.setDouble("Y", marker.getY());
             markerTag.setDouble("Z", marker.getZ());
+            markerTag.setDouble("FadeInRadius", marker.getFadeInRadius());
+            markerTag.setDouble("UnlockRadius", marker.getUnlockRadius());
             markerTag.setBoolean("HiddenUntilDiscovered", marker.isHiddenUntilDiscovered());
             dynamicMarkerList.appendTag(markerTag);
         }
@@ -166,8 +168,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         NBTTagList markerList = data.getTagList("DiscoveredMarkers", Constants.NBT.TAG_COMPOUND);
         for (int i = 0; i < markerList.tagCount(); i++) {
             NBTTagCompound markerTag = markerList.getCompoundTagAt(i);
-            String markerId = markerTag.getString("MarkerId");
-            if (markerId != null && markerId.length() > 0) {
+            String markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerTag.getString("MarkerId"));
+            if (markerId.length() > 0) {
                 this.discoveredMarkerIds.add(markerId);
             }
         }
@@ -180,10 +182,11 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             }
         }
 
-        this.pinnedMapMarkerId = data.getString("PinnedMapMarkerId");
-        if (this.pinnedMapMarkerId == null || !this.discoveredMarkerIds.contains(this.pinnedMapMarkerId)) {
+        this.pinnedMapMarkerId = LostTalesQuestMarkerHelper.normalizeMarkerId(data.getString("PinnedMapMarkerId"));
+        if (!this.discoveredMarkerIds.contains(this.pinnedMapMarkerId)) {
             this.pinnedMapMarkerId = "";
         }
+        pruneInvalidReferences();
     }
 
     @Override
@@ -286,10 +289,14 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 marker.getName() == null || marker.getName().length() == 0 ? markerId : marker.getName(),
                 marker.getIconName() == null || marker.getIconName().length() == 0 ? "quest" : marker.getIconName(),
                 marker.getColorName() == null || marker.getColorName().length() == 0 ? "white" : marker.getColorName(),
+                marker.getCategoryName() == null || marker.getCategoryName().length() == 0 ? LostTalesMapMarkerDefinition.CATEGORY_DEFAULT : marker.getCategoryName(),
+                marker.isWaypoint(),
                 marker.getDimensionId(),
                 marker.getX(),
                 marker.getY(),
                 marker.getZ(),
+                marker.getFadeInRadius(),
+                marker.getUnlockRadius(),
                 marker.isHiddenUntilDiscovered()
         );
         LostTalesMapMarkerDefinition old = this.dynamicMapMarkers.put(markerId, normalized);
@@ -298,14 +305,15 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean isMarkerDiscovered(String markerId) {
-        return markerId != null && this.discoveredMarkerIds.contains(markerId);
+        markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
+        return markerId.length() > 0 && this.discoveredMarkerIds.contains(markerId);
     }
 
     public boolean forgetMarker(String markerId) {
-        if (markerId == null || markerId.trim().length() == 0) {
+        markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
+        if (markerId.length() == 0) {
             return false;
         }
-        markerId = markerId.trim();
         boolean changed = this.discoveredMarkerIds.remove(markerId);
         if (this.dynamicMapMarkers.remove(markerId) != null) {
             changed = true;
@@ -318,7 +326,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean setPinnedMapMarkerId(String markerId) {
-        if (markerId == null || markerId.length() == 0) {
+        markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
+        if (markerId.length() == 0) {
             return clearPinnedMapMarkerId();
         }
         if (!this.discoveredMarkerIds.contains(markerId)) {
@@ -346,6 +355,10 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             return false;
         }
         return this.pinnedQuestIds.add(questId);
+    }
+
+    public boolean hasPinnedQuest() {
+        return !getPinnedQuestIds().isEmpty();
     }
 
     public boolean unpinQuestId(String questId) {
@@ -440,8 +453,31 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             }
         }
         this.pinnedMapMarkerId = oldData.pinnedMapMarkerId != null && this.discoveredMarkerIds.contains(oldData.pinnedMapMarkerId) ? oldData.pinnedMapMarkerId : "";
+        pruneInvalidReferences();
     }
 
+    /**
+     * Removes references that can become stale after a quest completes, is abandoned,
+     * or older NBT is loaded. Returns true when anything was cleaned up.
+     */
+    public boolean pruneInvalidReferences() {
+        boolean changed = false;
+        ArrayList<String> invalidPinnedQuests = new ArrayList<String>();
+        for (String questId : this.pinnedQuestIds) {
+            if (questId == null || questId.length() == 0 || !this.activeQuests.containsKey(questId)) {
+                invalidPinnedQuests.add(questId);
+            }
+        }
+        if (!invalidPinnedQuests.isEmpty()) {
+            this.pinnedQuestIds.removeAll(invalidPinnedQuests);
+            changed = true;
+        }
+        if (this.pinnedMapMarkerId != null && this.pinnedMapMarkerId.length() > 0 && !this.discoveredMarkerIds.contains(this.pinnedMapMarkerId)) {
+            this.pinnedMapMarkerId = "";
+            changed = true;
+        }
+        return changed;
+    }
 
     private static LostTalesMapMarkerDefinition readDynamicMarker(NBTTagCompound markerTag) {
         if (markerTag == null) {
@@ -456,10 +492,14 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 safe(markerTag.getString("Name"), markerId),
                 safe(markerTag.getString("Icon"), "quest"),
                 safe(markerTag.getString("Color"), "white"),
+                safe(markerTag.getString("Category"), LostTalesMapMarkerDefinition.CATEGORY_DEFAULT),
+                markerTag.hasKey("Waypoint") && markerTag.getBoolean("Waypoint"),
                 markerTag.getInteger("DimensionId"),
                 markerTag.getDouble("X"),
                 markerTag.getDouble("Y"),
                 markerTag.getDouble("Z"),
+                markerTag.hasKey("FadeInRadius") ? markerTag.getDouble("FadeInRadius") : 128.0D,
+                markerTag.hasKey("UnlockRadius") ? markerTag.getDouble("UnlockRadius") : 8.0D,
                 !markerTag.hasKey("HiddenUntilDiscovered") || markerTag.getBoolean("HiddenUntilDiscovered")
         );
     }
@@ -475,10 +515,14 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 && safe(left.getName(), "").equals(safe(right.getName(), ""))
                 && safe(left.getIconName(), "").equals(safe(right.getIconName(), ""))
                 && safe(left.getColorName(), "").equals(safe(right.getColorName(), ""))
+                && safe(left.getCategoryName(), "").equals(safe(right.getCategoryName(), ""))
+                && left.isWaypoint() == right.isWaypoint()
                 && left.getDimensionId() == right.getDimensionId()
                 && Math.abs(left.getX() - right.getX()) < 0.01D
                 && Math.abs(left.getY() - right.getY()) < 0.01D
                 && Math.abs(left.getZ() - right.getZ()) < 0.01D
+                && Math.abs(left.getFadeInRadius() - right.getFadeInRadius()) < 0.01D
+                && Math.abs(left.getUnlockRadius() - right.getUnlockRadius()) < 0.01D
                 && left.isHiddenUntilDiscovered() == right.isHiddenUntilDiscovered();
     }
 

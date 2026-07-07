@@ -1,5 +1,6 @@
 package com.ninuna.losttales.block.tileentity;
 
+import com.ninuna.losttales.util.LostTalesBlockRotationHelper;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
@@ -17,7 +18,6 @@ import software.bernie.geckolib3.core.controller.AnimationController;
 import software.bernie.geckolib3.core.event.predicate.AnimationEvent;
 import software.bernie.geckolib3.core.manager.AnimationData;
 import software.bernie.geckolib3.core.manager.AnimationFactory;
-
 /**
  * Urn/amphora tile entity with the modern urn storage behavior backported onto it.
  * The common proxy still registers this class with the original legacy tile entity
@@ -31,6 +31,8 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
     private ItemStack[] inventory = new ItemStack[2];
     private boolean sealed;
     private boolean respawn;
+    private float rotation;
+    private boolean hasStoredRotation;
     private int desiredSlots = 2;
     private String queuedAnimation;
 
@@ -133,6 +135,33 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
         return this.respawn;
     }
 
+    public void setRotation(float rotation) {
+        this.rotation = LostTalesBlockRotationHelper.normalizeDegrees(rotation);
+        this.hasStoredRotation = true;
+        this.markDirtyAndSync();
+    }
+
+    public float getRotation() {
+        return this.rotation;
+    }
+
+    public float getRenderRotation(int metadata) {
+        return this.hasStoredRotation ? this.rotation : LostTalesBlockRotationHelper.getLegacyDirectionalRenderRotation(metadata);
+    }
+
+    public boolean hasStoredRotation() {
+        return this.hasStoredRotation;
+    }
+
+    public boolean isEmpty() {
+        for (int slot = 0; slot < this.inventory.length; slot++) {
+            if (this.inventory[slot] != null && this.inventory[slot].stackSize > 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void markDirtyAndSync() {
         this.markDirty();
         if (this.worldObj != null) {
@@ -224,6 +253,8 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
         super.readFromNBT(nbt);
         this.sealed = nbt.getBoolean("sealed");
         this.respawn = nbt.getBoolean("respawn");
+        this.hasStoredRotation = nbt.hasKey("rotation");
+        this.rotation = this.hasStoredRotation ? LostTalesBlockRotationHelper.normalizeDegrees(nbt.getFloat("rotation")) : 0.0F;
         this.desiredSlots = nbt.hasKey("slots") ? nbt.getInteger("slots") : this.desiredSlots;
         this.setInventorySize(this.desiredSlots);
 
@@ -245,6 +276,9 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
         super.writeToNBT(nbt);
         nbt.setBoolean("sealed", this.sealed);
         nbt.setBoolean("respawn", this.respawn);
+        if (this.hasStoredRotation) {
+            nbt.setFloat("rotation", this.rotation);
+        }
         nbt.setInteger("slots", this.desiredSlots);
 
         NBTTagList list = new NBTTagList();

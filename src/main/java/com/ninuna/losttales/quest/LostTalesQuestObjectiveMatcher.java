@@ -1,5 +1,7 @@
 package com.ninuna.losttales.quest;
 
+import java.util.Locale;
+import java.util.Map;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
 import net.minecraft.entity.EntityLivingBase;
@@ -9,10 +11,6 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.oredict.OreDictionary;
-
-import java.util.Locale;
-import java.util.Map;
-
 /**
  * Small compatibility matcher for data-driven quest objectives.
  *

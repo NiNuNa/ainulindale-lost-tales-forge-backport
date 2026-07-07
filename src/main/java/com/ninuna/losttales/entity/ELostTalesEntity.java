@@ -7,7 +7,6 @@ import cpw.mods.fml.common.registry.EntityRegistry;
 import lotr.common.entity.LOTREntities;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
-
 import java.util.*;
 
 public enum ELostTalesEntity {

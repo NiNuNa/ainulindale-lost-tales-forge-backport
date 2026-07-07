@@ -2,11 +2,9 @@ package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import cpw.mods.fml.common.FMLLog;
-
 import java.util.Collection;
 import java.util.Locale;
 import java.util.Map;
-
 /** Logs lightweight quest data warnings without preventing older worlds from loading. */
 public final class LostTalesQuestDefinitionValidator {
     private LostTalesQuestDefinitionValidator() {}

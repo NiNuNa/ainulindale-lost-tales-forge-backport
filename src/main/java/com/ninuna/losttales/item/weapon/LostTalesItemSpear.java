@@ -3,11 +3,10 @@ package com.ninuna.losttales.item.weapon;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.material.ELostTalesItemMaterial;
 import com.ninuna.losttales.util.LostTalesUtil;
+import java.util.List;
 import lotr.common.item.LOTRItemSpear;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
-
-import java.util.List;
 
 public class LostTalesItemSpear extends LOTRItemSpear {
     private final String credits;

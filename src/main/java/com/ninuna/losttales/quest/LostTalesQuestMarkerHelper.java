@@ -3,7 +3,6 @@ package com.ninuna.losttales.quest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
 /** Small shared helper for the comma-separated marker-id fields used in quest JSON. */
 public final class LostTalesQuestMarkerHelper {
     private LostTalesQuestMarkerHelper() {}

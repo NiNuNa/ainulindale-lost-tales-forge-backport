@@ -5,13 +5,11 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.ninuna.losttales.LostTalesMetaData;
-
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
 /**
  * Shared parser for bundled Lost Tales quest JSON files.
  *

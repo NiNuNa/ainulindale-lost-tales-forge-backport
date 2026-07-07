@@ -3,10 +3,6 @@ package com.ninuna.losttales.client.quest;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestDefinitionJsonParser;
-import net.minecraft.client.resources.IResource;
-import net.minecraft.client.resources.IResourceManager;
-import net.minecraft.util.ResourceLocation;
-
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -17,6 +13,9 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.client.resources.IResource;
+import net.minecraft.client.resources.IResourceManager;
+import net.minecraft.util.ResourceLocation;
 
 final class LostTalesQuestDefinitionResourceLoader {
     private static final String INDEX_FILE = "quest/index.json";

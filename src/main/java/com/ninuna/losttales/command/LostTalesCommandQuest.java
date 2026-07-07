@@ -5,6 +5,10 @@ import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Set;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -13,12 +17,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Set;
-
 /**
  * Small server-side debug/admin command for the first quest runtime stage.
  *

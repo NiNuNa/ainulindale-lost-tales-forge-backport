@@ -8,7 +8,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
-
 /** Client-side HUD helpers adapted from the modern branch for Forge 1.7.10. */
 @SideOnly(Side.CLIENT)
 public final class LostTalesHudHelper {

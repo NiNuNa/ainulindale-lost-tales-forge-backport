@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.screen;
 
+import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
 import net.minecraft.client.gui.GuiButton;
@@ -8,7 +9,6 @@ import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.MathHelper;
 import org.lwjgl.input.Keyboard;
-
 /**
  * Lightweight client-side HUD placement preview for Minecraft 1.7.10.
  *
@@ -50,6 +50,7 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         addButton(31, centerX + 88, y, 76, 20, "LOTR-safe");
         addButton(32, centerX + 18, y + 24, 66, 20, "Compact");
         addButton(33, centerX + 88, y + 24, 76, 20, "Minimal");
+        addButton(34, centerX + 18, y + 48, 146, 20, "Reset Selected");
     }
 
     private void addButton(int id, int x, int y, int width, int height, String text) {
@@ -82,7 +83,7 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             return;
         }
 
-        int step = isPlacementShiftKeyDown() ? STEP_FAST : STEP_NORMAL;
+        int step = LostTalesKeyBindings.isModifierKeyDown() ? STEP_FAST : STEP_NORMAL;
         if (button.id == 20) {
             moveSelected(0, -step);
         } else if (button.id == 21) {
@@ -99,11 +100,23 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             LostTalesConfig.applyHudPreset("compact");
         } else if (button.id == 33) {
             LostTalesConfig.applyHudPreset("minimal");
+        } else if (button.id == 34) {
+            resetSelectedElement();
         }
     }
 
     private void moveSelected(int dx, int dy) {
         LostTalesConfig.moveHudOffset(selected.configKey, dx, dy);
+    }
+
+    private void resetSelectedElement() {
+        if (selected == HudElement.COMPASS) {
+            LostTalesConfig.setHudOffset(selected.configKey, 50, 2);
+        } else if (selected == HudElement.QUICK_LOOT) {
+            LostTalesConfig.setHudOffset(selected.configKey, 24, 32);
+        } else if (selected == HudElement.QUEST) {
+            LostTalesConfig.setHudOffset(selected.configKey, 2, 38);
+        }
     }
 
     @Override
@@ -113,7 +126,7 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             this.mc.displayGuiScreen(parent);
             return;
         }
-        int step = isPlacementShiftKeyDown() ? STEP_FAST : STEP_NORMAL;
+        int step = LostTalesKeyBindings.isModifierKeyDown() ? STEP_FAST : STEP_NORMAL;
         if (keyCode == Keyboard.KEY_UP) {
             moveSelected(0, -step);
         } else if (keyCode == Keyboard.KEY_DOWN) {
@@ -125,18 +138,34 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         } else if (keyCode == Keyboard.KEY_TAB) {
             selected = selected.next();
             initGui();
+        } else if (keyCode == Keyboard.KEY_R) {
+            resetSelectedElement();
         }
+    }
+
+    @Override
+    protected void mouseClicked(int mouseX, int mouseY, int mouseButton) {
+        if (mouseButton == 0) {
+            HudElement clicked = getElementAt(mouseX, mouseY);
+            if (clicked != null) {
+                selected = clicked;
+                initGui();
+                return;
+            }
+        }
+        super.mouseClicked(mouseX, mouseY, mouseButton);
     }
 
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         drawDefaultBackground();
         drawCenteredString(this.fontRendererObj, "Lost Tales HUD Placement", this.width / 2, 12, 0xFFD37A);
-        drawCenteredString(this.fontRendererObj, "Selected: " + selected.displayName + "  Offset: " + selected.offsetText(), this.width / 2, 24, 0xFFFFFF);
+        drawCenteredString(this.fontRendererObj, "Preset: " + LostTalesConfig.hudPlacementPreset + "  Selected: " + selected.displayName + "  Offset: " + selected.offsetText(), this.width / 2, 24, 0xFFFFFF);
 
+        drawPlacementGrid();
         drawPreview();
 
-        String help = "Arrow buttons/keys move by 2%. Hold Shift for 10%. Presets save immediately.";
+        String help = "Click a preview box or use Tab to select. Arrows move 2%. Hold " + LostTalesKeyBindings.getModifierKeyDisplayName() + " for 10%. R resets selected.";
         drawCenteredString(this.fontRendererObj, EnumChatFormatting.GRAY + help, this.width / 2, this.height - 42, 0xAAAAAA);
         super.drawScreen(mouseX, mouseY, partialTicks);
     }
@@ -151,34 +180,75 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         drawQuestPreview(screenWidth, screenHeight);
     }
 
+    private void drawPlacementGrid() {
+        int left = 4;
+        int top = 76;
+        int right = this.width - 4;
+        int bottom = this.height - 52;
+        for (int x = left; x <= right; x += 40) {
+            drawRect(x, top, x + 1, bottom, 0x22333333);
+        }
+        for (int y = top; y <= bottom; y += 30) {
+            drawRect(left, y, right, y + 1, 0x22333333);
+        }
+        drawRect(this.width / 2, top, this.width / 2 + 1, bottom, 0x33555555);
+        drawRect(left, this.height / 2, right, this.height / 2 + 1, 0x33555555);
+    }
+
     private void drawCompassPreview(int screenWidth, int screenHeight) {
-        int width = Math.min(LostTalesCompassHudRenderer.COMPASS_WIDTH, screenWidth - 8);
-        int height = 32;
-        int x = (screenWidth - width) * LostTalesConfig.compassHudOffsetX / 100;
-        int y = screenHeight * LostTalesConfig.compassHudOffsetY / 100 + this.fontRendererObj.FONT_HEIGHT + 4;
-        drawPreviewBox(x, y, width, height, HudElement.COMPASS, "Compass / marker label");
+        int[] bounds = getPreviewBounds(HudElement.COMPASS, screenWidth, screenHeight);
+        drawPreviewBox(bounds[0], bounds[1], bounds[2], bounds[3], HudElement.COMPASS, "Compass / marker label");
     }
 
     private void drawQuickLootPreview(int screenWidth, int screenHeight) {
-        int width = 280;
-        int height = 25 + Math.max(1, Math.min(5, LostTalesConfig.quickLootHudMaxRows)) * 24 + 30;
-        int x = screenWidth / 2 + screenWidth / 2 * LostTalesConfig.quickLootHudOffsetX / 100;
-        int y = screenHeight * LostTalesConfig.quickLootHudOffsetY / 100;
-        if (x + width > screenWidth - 4) {
-            x = screenWidth - width - 4;
-        }
-        drawPreviewBox(x, y, width, height, HudElement.QUICK_LOOT, "Quick Loot HUD");
+        int[] bounds = getPreviewBounds(HudElement.QUICK_LOOT, screenWidth, screenHeight);
+        drawPreviewBox(bounds[0], bounds[1], bounds[2], bounds[3], HudElement.QUICK_LOOT, "Quick Loot HUD");
     }
 
     private void drawQuestPreview(int screenWidth, int screenHeight) {
-        int width = 216;
-        int height = 72;
-        int x = screenWidth * LostTalesConfig.questHudOffsetX / 100;
-        int y = screenHeight * LostTalesConfig.questHudOffsetY / 100;
-        if (x + width > screenWidth - 4) {
-            x = screenWidth - width - 4;
+        int[] bounds = getPreviewBounds(HudElement.QUEST, screenWidth, screenHeight);
+        drawPreviewBox(bounds[0], bounds[1], bounds[2], bounds[3], HudElement.QUEST, "Tracked Quest HUD");
+    }
+
+    private HudElement getElementAt(int mouseX, int mouseY) {
+        ScaledResolution resolution = new ScaledResolution(this.mc, this.mc.displayWidth, this.mc.displayHeight);
+        HudElement[] elements = HudElement.values();
+        for (int i = 0; i < elements.length; i++) {
+            int[] bounds = getPreviewBounds(elements[i], resolution.getScaledWidth(), resolution.getScaledHeight());
+            if (mouseX >= bounds[0] && mouseX < bounds[0] + bounds[2] && mouseY >= bounds[1] && mouseY < bounds[1] + bounds[3]) {
+                return elements[i];
+            }
         }
-        drawPreviewBox(x, y, width, height, HudElement.QUEST, "Tracked Quest HUD");
+        return null;
+    }
+
+    private int[] getPreviewBounds(HudElement element, int screenWidth, int screenHeight) {
+        int boxWidth;
+        int boxHeight;
+        int x;
+        int y;
+        if (element == HudElement.COMPASS) {
+            boxWidth = Math.min(LostTalesCompassHudRenderer.COMPASS_WIDTH, screenWidth - 8);
+            boxHeight = 32;
+            x = (screenWidth - boxWidth) * LostTalesConfig.compassHudOffsetX / 100;
+            y = screenHeight * LostTalesConfig.compassHudOffsetY / 100 + this.fontRendererObj.FONT_HEIGHT + 4;
+        } else if (element == HudElement.QUICK_LOOT) {
+            boxWidth = 280;
+            boxHeight = 25 + Math.max(1, Math.min(5, LostTalesConfig.quickLootHudMaxRows)) * 24 + 30;
+            x = screenWidth / 2 + screenWidth / 2 * LostTalesConfig.quickLootHudOffsetX / 100;
+            y = screenHeight * LostTalesConfig.quickLootHudOffsetY / 100;
+        } else {
+            boxWidth = 216;
+            boxHeight = 72;
+            x = screenWidth * LostTalesConfig.questHudOffsetX / 100;
+            y = screenHeight * LostTalesConfig.questHudOffsetY / 100;
+        }
+        if (x + boxWidth > screenWidth - 4) {
+            x = screenWidth - boxWidth - 4;
+        }
+        x = MathHelper.clamp_int(x, 4, Math.max(4, screenWidth - boxWidth - 4));
+        y = MathHelper.clamp_int(y, 76, Math.max(76, screenHeight - boxHeight - 52));
+        return new int[] { x, y, boxWidth, boxHeight };
     }
 
     private void drawPreviewBox(int x, int y, int width, int height, HudElement element, String label) {
@@ -200,9 +270,6 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         return element == selected ? "> " + element.displayName + " <" : element.displayName;
     }
 
-    private boolean isPlacementShiftKeyDown() {
-        return Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT);
-    }
 
     @Override
     public boolean doesGuiPauseGame() {

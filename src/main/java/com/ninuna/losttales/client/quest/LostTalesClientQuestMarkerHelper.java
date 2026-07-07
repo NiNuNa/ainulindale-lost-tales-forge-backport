@@ -7,13 +7,11 @@ import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-
 /**
  * Client-side helper for deciding which quest/map markers should be emphasized.
  *

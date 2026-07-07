@@ -1,10 +1,8 @@
 package com.ninuna.losttales.gui.style;
 
+import java.util.Locale;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
-
-import java.util.Locale;
-
 /**
  * Small primitive-drawn UI style used by the quest journal/HUD.
  *

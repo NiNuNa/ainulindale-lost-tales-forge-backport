@@ -1,14 +1,13 @@
 package com.ninuna.losttales.item.block;
 
-import com.ninuna.losttales.block.LostTalesBlockDirectionalContainerBase;
+import com.ninuna.losttales.block.base.LostTalesBlockDirectionalContainerBase;
 import com.ninuna.losttales.entity.ELostTalesUser;
 import com.ninuna.losttales.util.LostTalesUtil;
+import java.util.List;
 import net.minecraft.block.Block;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
-
-import java.util.List;
 
 public class LostTalesItemBlockBase extends ItemBlock {
 
