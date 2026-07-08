@@ -100,6 +100,15 @@ public enum ELostTalesFaction {
             new LOTRMapRegion(2550, 1475, 225)
             ),
 
+    ODANE(
+            //  Faction:
+            LostTalesUtil.addFaction("ODANE", 0xB45A32, LOTRDimension.DimensionRegion.EAST, EnumSet.of(LOTRFaction.FactionType.TYPE_MAN)),
+            //  Active?, Approves of War Crimes?, Isolationist?:
+            true, false, false,
+            //  Faction Map Region:
+            new LOTRMapRegion(3128, 790, 150)
+    ),
+
     BLUE_GOBLINS(
             //  Faction:
             LostTalesUtil.addFaction("BLUE_GOBLINS", 0x0d2436, LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_ORC)),
@@ -164,6 +173,13 @@ public enum ELostTalesFaction {
                 new LostTalesPair(ELostTalesFaction.SUN_ELVES.getFaction(), LOTRFactionRelations.Relation.MORTAL_ENEMY)
         });
 
+        ODANE.setFactionRelations( new LostTalesPair[]{
+                new LostTalesPair(LOTRFaction.DALE, LOTRFactionRelations.Relation.FRIEND),
+                new LostTalesPair(LOTRFaction.DORWINION, LOTRFactionRelations.Relation.FRIEND),
+                new LostTalesPair(LOTRFaction.RHUDEL, LOTRFactionRelations.Relation.ENEMY),
+                new LostTalesPair(LOTRFaction.MORDOR, LOTRFactionRelations.Relation.ENEMY)
+        });
+
         for (ELostTalesFaction f : ELostTalesFaction.values()) {
             if (f.getFactionRelations() != null) {
                 for (LostTalesPair factionRelations : f.getFactionRelations()) {
@@ -197,6 +213,13 @@ public enum ELostTalesFaction {
 
         LOSSOTH.setFactionControlZones( new LostTalesPair[]{
                 new LostTalesPair(ELostTalesWaypoint.SUN_ELVES.getWaypoint(), 175)
+        });
+
+        ODANE.setFactionControlZones( new LostTalesPair[]{
+                new LostTalesPair(ELostTalesWaypoint.ODANE.getWaypoint(), 70),
+                new LostTalesPair(ELostTalesWaypoint.ODANE_MOUNTAINS.getWaypoint(), 45),
+                new LostTalesPair(ELostTalesWaypoint.ODANE_PORT.getWaypoint(), 45),
+                new LostTalesPair(ELostTalesWaypoint.ODANE_EASTWATCH.getWaypoint(), 45)
         });
 
         for (ELostTalesFaction f : ELostTalesFaction.values()) {

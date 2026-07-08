@@ -440,15 +440,58 @@ lotr.faction.THARBAD.rank.g.f=Mercenary Captain
 lotr.faction.THARBAD.rank.h=Oddment Collector
 lotr.faction.THARBAD.rank.h.f=Tharbad Oddment Collector
 
+lotr.faction.ODANE.name=Odane
+lotr.faction.ODANE.entity=Odane Warrior
+lotr.faction.ODANE.subtitle=Island Clans of the Far East
+lotr.faction.ODANE.achieveRank=Reach %s alignment with the Odane
+lotr.faction.ODANE.achieveRankPledge=Pledge and reach %s alignment with the Odane
+lotr.faction.ODANE.rank.a=Hinin
+lotr.faction.ODANE.rank.a.f=Odane Hinin
+lotr.faction.ODANE.rank.b=Nōmin
+lotr.faction.ODANE.rank.b.f=Odane Nōmin
+lotr.faction.ODANE.rank.c=Chōnin
+lotr.faction.ODANE.rank.c.f=Odane Chōnin
+lotr.faction.ODANE.rank.d=Samurai
+lotr.faction.ODANE.rank.d.f=Odane Samurai
+lotr.faction.ODANE.rank.e=Gunji
+lotr.faction.ODANE.rank.e.f=Odane Gunji
+lotr.faction.ODANE.rank.f=Taishō
+lotr.faction.ODANE.rank.f.f=Odane Taishō
+lotr.faction.ODANE.rank.g=Daimyō
+lotr.faction.ODANE.rank.g.f=Odane Daimyō
+lotr.faction.ODANE.rank.h=Shōgun
+lotr.faction.ODANE.rank.h.f=Odane Shōgun
+
+#   Biomes
+lotr.biome.odaneIsland.name=Odane Isles
+lotr.biome.odaneMountains.name=Odane Mountains
+lotr.biome.moonElfVale.name=Naldossë Vale
+lotr.biome.moonElfMountains.name=Naldossë Mountains
+
 #   Dimensions
 lotr.dimension.MiddleEarth.north=Northern Wastes
 
 #   Waypoints
 lotr.waypoint.MOON_ELVES=Naldossë
 lotr.waypoint.MOON_ELVES.info=The hidden refuge of the Ithildhrim in the Forgotten Vale.
+lotr.waypoint.ODANE=Odane
+lotr.waypoint.ODANE.info=The island home of the Odane clans in the eastern sea.
+lotr.waypoint.ODANE_MOUNTAINS=Odane Mountains
+lotr.waypoint.ODANE_MOUNTAINS.info=Red peaks overlooking the Odane island clans.
+lotr.waypoint.ODANE_PORT=Odane Port
+lotr.waypoint.ODANE_PORT.info=A sheltered harbour where Odane ships gather before crossing the eastern sea.
+lotr.waypoint.ODANE_EASTWATCH=Odane Eastwatch
+lotr.waypoint.ODANE_EASTWATCH.info=A coastal watchpost guarding the outer edge of Odane.
 
 #   Map Labels
 lotr.map.MOON_ELVES=Naldossë
+lotr.map.ODANE=Odane
+
+
+#   Roads
+lotr.road.OdaneCoastRoad=Odane Coast Road
+lotr.road.OdaneMountainRoad=Odane Mountain Road
+lotr.road.OdaneSouthRoad=Odane South Road
 
 #   Achievement Categories
 lotr.achievement.category.BLUE_GOBLINS=Blue Goblins
@@ -457,6 +500,7 @@ lotr.achievement.category.THARBAD=Tharbad
 lotr.achievement.category.SUN_ELVES=Ancalitsë
 lotr.achievement.category.MORIA_GOBLINS=Moria Goblins
 lotr.achievement.category.LOSSOTH=Lossoth
+lotr.achievement.category.ODANE=Odane
 
 #   Achievements
 

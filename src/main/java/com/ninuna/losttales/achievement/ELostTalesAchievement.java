@@ -28,6 +28,7 @@ public enum ELostTalesAchievement {
         LOSSOTH(LostTalesUtil.addAchievementCategory(ELostTalesFaction.LOSSOTH.getFaction().codeName(), ELostTalesFaction.LOSSOTH.getFaction())),
         MORIA_GOBLINS(LostTalesUtil.addAchievementCategory(ELostTalesFaction.MORIA_GOBLINS.getFaction().codeName(), ELostTalesFaction.MORIA_GOBLINS.getFaction())),
         THARBAD(LostTalesUtil.addAchievementCategory(ELostTalesFaction.THARBAD.getFaction().codeName(), ELostTalesFaction.THARBAD.getFaction())),
+        ODANE(LostTalesUtil.addAchievementCategory(ELostTalesFaction.ODANE.getFaction().codeName(), ELostTalesFaction.ODANE.getFaction())),
         BLUE_GOBLINS(LostTalesUtil.addAchievementCategory(ELostTalesFaction.BLUE_GOBLINS.getFaction().codeName(), ELostTalesFaction.BLUE_GOBLINS.getFaction()));
 
         private final LOTRAchievement.Category category;

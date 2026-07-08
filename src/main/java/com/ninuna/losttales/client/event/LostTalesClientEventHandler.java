@@ -18,7 +18,7 @@ import com.ninuna.losttales.item.weapon.LostTalesItemBattleaxe;
 import com.ninuna.losttales.item.weapon.LostTalesItemDagger;
 import com.ninuna.losttales.item.weapon.LostTalesItemSpear;
 import com.ninuna.losttales.item.weapon.LostTalesItemSword;
-import com.ninuna.losttales.util.LostTalesUtil;
+import com.ninuna.losttales.world.map.LostTalesMapOverlay;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.network.FMLNetworkEvent.ClientDisconnectionFromServerEvent;
@@ -27,7 +27,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.client.resources.IResourceManagerReloadListener;
-import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.MinecraftForgeClient;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
@@ -42,7 +41,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
 
     @Override
     public void onResourceManagerReload(IResourceManager resManager) {
-        LostTalesUtil.setClientMapImage(new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/map/map.png"));
+        LostTalesMapOverlay.applyClientMap();
         LostTalesClientMapMarkerStore.reloadFromResources(resManager);
         LostTalesClientQuestDefinitionStore.reloadFromResources(resManager);
     }

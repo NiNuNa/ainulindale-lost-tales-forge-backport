@@ -1,6 +1,5 @@
 package com.ninuna.losttales.proxy;
 
-import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.achievement.ELostTalesAchievement;
 import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
@@ -21,8 +20,9 @@ import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
-import com.ninuna.losttales.util.LostTalesUtil;
 import com.ninuna.losttales.world.biome.ELostTalesBiome;
+import com.ninuna.losttales.world.map.LostTalesMapOverlay;
+import com.ninuna.losttales.world.map.road.ELostTalesRoad;
 import com.ninuna.losttales.world.spawning.ELostTalesSpawnList;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
@@ -30,7 +30,6 @@ import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.registry.GameRegistry;
-import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.MinecraftForge;
 import software.bernie.geckolib3.GeckoLib;
 
@@ -63,7 +62,8 @@ public class LostTalesCommonProxy {
         ELostTalesFaction.initAndRegisterFactions();
         ELostTalesAchievement.initAndRegisterAchievements();
 
-        LostTalesUtil.setWorldGenMapImage(new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/map/map.png"));
+        LostTalesMapOverlay.applyWorldGenerationMap();
+        ELostTalesRoad.initAndRegisterRoads();
     }
 
     public void postInit(FMLPostInitializationEvent event) {}

@@ -33,6 +33,7 @@ import lotr.common.fac.LOTRFactionRank;
 import lotr.common.fac.LOTRMapRegion;
 import lotr.common.world.biome.LOTRBiome;
 import lotr.common.world.genlayer.LOTRGenLayerWorld;
+import lotr.common.world.map.LOTRRoads;
 import lotr.common.world.map.LOTRWaypoint;
 import lotr.common.world.spawning.LOTRSpawnEntry;
 import lotr.common.world.spawning.LOTRSpawnList;
@@ -248,22 +249,64 @@ public abstract class LostTalesUtil {
         return EnumHelper.addEnum(LOTRWaypoint.class, name, classArr, args);
     }
 
+    public static void addRoad(String name, Object... routePoints) {
+        findAndInvokeMethod(new Object[]{name, routePoints}, LOTRRoads.class, null, "registerRoad", String.class, Object[].class);
+    }
+
+    public static void addDisplayOnlyRoad(String name, Object... routePoints) {
+        findAndInvokeMethod(new Object[]{name, routePoints}, LOTRRoads.class, null, "registerDisplayOnlyRoad", String.class, Object[].class);
+    }
+
     public static void setWorldGenMapImage (ResourceLocation res) {
         BufferedImage img = getImage(getInputStream(res));
-        LOTRGenLayerWorld.imageWidth = img.getWidth();
-        LOTRGenLayerWorld.imageHeight = img.getHeight();
+        setWorldGenMapImage(img, null, null);
+    }
 
-        int[] colors = img.getRGB(0, 0, LOTRGenLayerWorld.imageWidth, LOTRGenLayerWorld.imageHeight, null, 0, LOTRGenLayerWorld.imageWidth);
+    public static void setWorldGenMapImageWithOverlay(ResourceLocation baseMap, ResourceLocation overlayMap, LOTRBiome overlayBiome) {
+        BufferedImage baseImage = getImage(getInputStream(baseMap));
+        BufferedImage overlayImage = getImage(getInputStream(overlayMap));
+        setWorldGenMapImage(baseImage, overlayImage, null, null, overlayBiome);
+    }
+
+    public static void setWorldGenMapImageWithOverlayBiomes(ResourceLocation baseMap, ResourceLocation overlayMap, int[] overlayRgbColors, LOTRBiome[] overlayBiomes, LOTRBiome fallbackOverlayBiome) {
+        BufferedImage baseImage = getImage(getInputStream(baseMap));
+        BufferedImage overlayImage = getImage(getInputStream(overlayMap));
+        setWorldGenMapImage(baseImage, overlayImage, overlayRgbColors, overlayBiomes, fallbackOverlayBiome);
+    }
+
+    private static void setWorldGenMapImage(BufferedImage baseImage, BufferedImage overlayImage, LOTRBiome overlayBiome) {
+        setWorldGenMapImage(baseImage, overlayImage, null, null, overlayBiome);
+    }
+
+    private static void setWorldGenMapImage(BufferedImage baseImage, BufferedImage overlayImage, int[] overlayRgbColors, LOTRBiome[] overlayBiomes, LOTRBiome fallbackOverlayBiome) {
+        if (baseImage == null) {
+            FMLLog.severe("Failed to load LOTR world generation map image", new Object[0]);
+            return;
+        }
+
+        LOTRGenLayerWorld.imageWidth = baseImage.getWidth();
+        LOTRGenLayerWorld.imageHeight = baseImage.getHeight();
+
+        int[] baseColors = baseImage.getRGB(0, 0, LOTRGenLayerWorld.imageWidth, LOTRGenLayerWorld.imageHeight, null, 0, LOTRGenLayerWorld.imageWidth);
+        int[] overlayColors = getOverlayColors(overlayImage, LOTRGenLayerWorld.imageWidth, LOTRGenLayerWorld.imageHeight);
         byte[] biomeImageData = new byte[LOTRGenLayerWorld.imageWidth * LOTRGenLayerWorld.imageHeight];
 
-        for (int i = 0; i < colors.length; ++i) {
-            int color = colors[i];
-            Integer biomeID = LOTRDimension.MIDDLE_EARTH.colorsToBiomeIDs.get (color);
+        for (int i = 0; i < baseColors.length; ++i) {
+            if (overlayColors != null && isVisibleOverlayPixel(overlayColors[i])) {
+                LOTRBiome overlayBiome = getOverlayBiomeForPixel(overlayColors[i], overlayRgbColors, overlayBiomes, fallbackOverlayBiome);
+                if (overlayBiome != null) {
+                    biomeImageData[i] = (byte) overlayBiome.biomeID;
+                    continue;
+                }
+            }
+
+            int color = baseColors[i];
+            Integer biomeID = LOTRDimension.MIDDLE_EARTH.colorsToBiomeIDs.get(color);
             if (biomeID != null) {
-                biomeImageData[i] = (byte) biomeID.intValue ();
+                biomeImageData[i] = (byte) biomeID.intValue();
                 continue;
             }
-            System.out.println("Found unknown biome on map: " + Integer.toHexString (color) + " at location: " + (i % LOTRGenLayerWorld.imageWidth) + ", " + (i / LOTRGenLayerWorld.imageWidth));
+            System.out.println("Found unknown biome on map: " + Integer.toHexString(color) + " at location: " + (i % LOTRGenLayerWorld.imageWidth) + ", " + (i / LOTRGenLayerWorld.imageWidth));
             biomeImageData[i] = (byte) LOTRBiome.ocean.biomeID;
         }
         ReflectionHelper.setPrivateValue(LOTRGenLayerWorld.class, null, biomeImageData, "biomeImageData");
@@ -286,8 +329,126 @@ public abstract class LostTalesUtil {
         ReflectionHelper.setPrivateValue(LOTRTextures.class, null, sepiaMapTexture, "sepiaMapTexture");
     }
 
+    @SideOnly(Side.CLIENT)
+    public static void setClientMapImageWithOverlay(ResourceLocation baseMap, ResourceLocation overlayMap) {
+        BufferedImage mergedMapImage = getMergedClientMapImage(baseMap, overlayMap);
+        if (mergedMapImage == null) {
+            setClientMapImage(baseMap);
+            return;
+        }
+
+        ResourceLocation mergedMapTexture = Minecraft.getMinecraft().getTextureManager().getDynamicTextureLocation("losttales_lotr_map", new DynamicTexture(mergedMapImage));
+        ReflectionHelper.setPrivateValue(LOTRTextures.class, null, mergedMapTexture, "mapTexture");
+
+        ResourceLocation sepiaMapTexture;
+        try {
+            sepiaMapTexture = findAndInvokeMethod(new Object[]{mergedMapImage, new ResourceLocation("losttales:map_sepia")}, LOTRTextures.class, null, "convertToSepia", BufferedImage.class, ResourceLocation.class);
+        } catch (RuntimeException e) {
+            FMLLog.severe("Failed to generate Lost Tales LOTR sepia map", new Object[0]);
+            e.printStackTrace();
+            sepiaMapTexture = mergedMapTexture;
+        }
+        ReflectionHelper.setPrivateValue(LOTRTextures.class, null, sepiaMapTexture, "sepiaMapTexture");
+    }
+
+    @SideOnly(Side.CLIENT)
+    private static BufferedImage getMergedClientMapImage(ResourceLocation baseMap, ResourceLocation overlayMap) {
+        try {
+            BufferedImage baseImage = getImage(Minecraft.getMinecraft().getResourceManager().getResource(baseMap).getInputStream());
+            BufferedImage overlayImage = getImage(Minecraft.getMinecraft().getResourceManager().getResource(overlayMap).getInputStream());
+            return mergeMapImages(baseImage, overlayImage);
+        } catch (IOException e) {
+            FMLLog.severe("Failed to load Lost Tales map overlay", new Object[0]);
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private static BufferedImage mergeMapImages(BufferedImage baseImage, BufferedImage overlayImage) {
+        if (baseImage == null) {
+            return null;
+        }
+        if (overlayImage == null) {
+            return baseImage;
+        }
+
+        int width = baseImage.getWidth();
+        int height = baseImage.getHeight();
+        int[] baseColors = baseImage.getRGB(0, 0, width, height, null, 0, width);
+        int[] overlayColors = getOverlayColors(overlayImage, width, height);
+
+        if (overlayColors == null) {
+            return baseImage;
+        }
+
+        int[] mergedColors = new int[baseColors.length];
+        for (int i = 0; i < baseColors.length; i++) {
+            mergedColors[i] = blendOver(baseColors[i], overlayColors[i]);
+        }
+
+        BufferedImage mergedImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        mergedImage.setRGB(0, 0, width, height, mergedColors, 0, width);
+        return mergedImage;
+    }
+
+    private static int[] getOverlayColors(BufferedImage overlayImage, int width, int height) {
+        if (overlayImage == null) {
+            return null;
+        }
+        if (overlayImage.getWidth() != width || overlayImage.getHeight() != height) {
+            FMLLog.warning("Lost Tales map overlay size does not match the LOTR map size. Overlay will be ignored.", new Object[0]);
+            return null;
+        }
+        return overlayImage.getRGB(0, 0, width, height, null, 0, width);
+    }
+
+    private static boolean isVisibleOverlayPixel(int overlayColor) {
+        return ((overlayColor >> 24) & 255) > 0;
+    }
+
+    private static LOTRBiome getOverlayBiomeForPixel(int overlayColor, int[] overlayRgbColors, LOTRBiome[] overlayBiomes, LOTRBiome fallbackOverlayBiome) {
+        if (overlayRgbColors == null || overlayBiomes == null || overlayRgbColors.length != overlayBiomes.length) {
+            return fallbackOverlayBiome;
+        }
+
+        int rgb = overlayColor & 0x00FFFFFF;
+        for (int i = 0; i < overlayRgbColors.length; i++) {
+            if ((overlayRgbColors[i] & 0x00FFFFFF) == rgb) {
+                return overlayBiomes[i];
+            }
+        }
+
+        return fallbackOverlayBiome;
+    }
+
+    private static int blendOver(int baseColor, int overlayColor) {
+        int overlayAlpha = (overlayColor >> 24) & 255;
+        if (overlayAlpha <= 0) {
+            return baseColor;
+        }
+        if (overlayAlpha >= 255) {
+            return 0xFF000000 | (overlayColor & 0x00FFFFFF);
+        }
+
+        int baseRed = (baseColor >> 16) & 255;
+        int baseGreen = (baseColor >> 8) & 255;
+        int baseBlue = baseColor & 255;
+        int overlayRed = (overlayColor >> 16) & 255;
+        int overlayGreen = (overlayColor >> 8) & 255;
+        int overlayBlue = overlayColor & 255;
+        int inverseAlpha = 255 - overlayAlpha;
+
+        int red = (overlayRed * overlayAlpha + baseRed * inverseAlpha) / 255;
+        int green = (overlayGreen * overlayAlpha + baseGreen * inverseAlpha) / 255;
+        int blue = (overlayBlue * overlayAlpha + baseBlue * inverseAlpha) / 255;
+        return 0xFF000000 | red << 16 | green << 8 | blue;
+    }
+
 
     public static BufferedImage getImage(InputStream in) {
+        if (in == null) {
+            return null;
+        }
         try {
             return ImageIO.read(in);
         }
