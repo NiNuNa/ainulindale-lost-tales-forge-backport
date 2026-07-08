@@ -17,18 +17,22 @@ import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntit
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererStatue;
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererUrn;
 import com.ninuna.losttales.config.client.LostTalesConfigGuiEventHandler;
+import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneGuard;
+import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneMan;
 import com.ninuna.losttales.gui.ELostTalesMapLabels;
 import com.ninuna.losttales.item.armor.LostTalesItemArmor3D;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import cpw.mods.fml.client.registry.ClientRegistry;
+import cpw.mods.fml.client.registry.RenderingRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.IReloadableResourceManager;
+import lotr.client.render.entity.LOTRRenderBreeMan;
 import net.minecraftforge.common.MinecraftForge;
 import software.bernie.geckolib3.renderers.geo.GeoArmorRenderer;
 
@@ -61,6 +65,9 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityStatue.class, new LostTalesTileEntityRendererStatue());
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityLamp.class, new LostTalesTileEntityRendererLamp());
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityPlushie.class, new LostTalesTileEntityRendererPlushie());
+
+        RenderingRegistry.registerEntityRenderingHandler(LostTalesEntityOdaneMan.class, new LOTRRenderBreeMan());
+        RenderingRegistry.registerEntityRenderingHandler(LostTalesEntityOdaneGuard.class, new LOTRRenderBreeMan());
 
         super.init(event);
     }

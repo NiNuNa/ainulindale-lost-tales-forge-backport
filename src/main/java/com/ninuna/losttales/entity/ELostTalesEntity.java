@@ -3,6 +3,8 @@ package com.ninuna.losttales.entity;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.entity.npc.LostTalesEntityBlueGoblinSoldier;
 import com.ninuna.losttales.entity.npc.LostTalesEntityNia;
+import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneGuard;
+import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneMan;
 import cpw.mods.fml.common.registry.EntityRegistry;
 import lotr.common.entity.LOTREntities;
 import net.minecraft.entity.Entity;
@@ -11,7 +13,9 @@ import java.util.*;
 
 public enum ELostTalesEntity {
     TEST_PERSON(LostTalesEntityBlueGoblinSoldier.class, "TestPerson", 7000, 13521151, 373075),
-    NIA(LostTalesEntityNia.class, "Nia", 7001, 854606, 6097486);
+    NIA(LostTalesEntityNia.class, "Nia", 7001, 854606, 6097486),
+    ODANE_MAN(LostTalesEntityOdaneMan.class, "OdaneMan", 7002, 0x8A5A38, 0xB45A32),
+    ODANE_GUARD(LostTalesEntityOdaneGuard.class, "OdaneGuard", 7003, 0x4F5A33, 0xC89B5A);
 
     private final Class<? extends Entity> entityClass;
     private final String name;

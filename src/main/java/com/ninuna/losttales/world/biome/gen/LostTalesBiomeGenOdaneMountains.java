@@ -1,8 +1,10 @@
 package com.ninuna.losttales.world.biome.gen;
 
 import com.ninuna.losttales.world.map.waypoint.ELostTalesWaypoint;
+import com.ninuna.losttales.world.structure.odane.LostTalesWorldGenOdaneGlowstoneHouse;
 import java.util.Random;
 import lotr.common.world.biome.variant.LOTRBiomeVariant;
+import lotr.common.world.feature.LOTRTreeType;
 import lotr.common.world.map.LOTRWaypoint;
 import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
@@ -12,10 +14,37 @@ public class LostTalesBiomeGenOdaneMountains extends LostTalesBiomeGenOdaneIslan
 
     public LostTalesBiomeGenOdaneMountains(int i, boolean major) {
         super(i, major);
-        this.decorator.treesPerChunk = 3;
-        this.decorator.flowersPerChunk = 2;
-        this.decorator.grassPerChunk = 6;
-        this.decorator.doubleGrassPerChunk = 1;
+
+        this.clearBiomeVariants();
+        this.addBiomeVariant(LOTRBiomeVariant.HILLS, 0.8F);
+        this.addBiomeVariant(LOTRBiomeVariant.HILLS_FOREST, 0.7F);
+        this.addBiomeVariant(LOTRBiomeVariant.MOUNTAIN, 0.5F);
+        this.addBiomeVariant(LOTRBiomeVariant.FOREST_MAPLE, 0.45F);
+        this.addBiomeVariant(LOTRBiomeVariant.FLOWERS, 0.25F);
+
+        this.decorator.clearTrees();
+        this.decorator.clearRandomStructures();
+        this.decorator.setTreeCluster(4, 14);
+        this.decorator.treesPerChunk = 4;
+        this.decorator.flowersPerChunk = 4;
+        this.decorator.doubleFlowersPerChunk = 1;
+        this.decorator.grassPerChunk = 8;
+        this.decorator.doubleGrassPerChunk = 2;
+        this.decorator.willowPerChunk = 0;
+        this.decorator.reedPerChunk = 0;
+        this.decorator.canePerChunk = 0;
+
+        this.decorator.addTree(LOTRTreeType.CHERRY, 220);
+        this.decorator.addTree(LOTRTreeType.PLUM, 120);
+        this.decorator.addTree(LOTRTreeType.MAPLE, 280);
+        this.decorator.addTree(LOTRTreeType.MAPLE_LARGE, 90);
+        this.decorator.addTree(LOTRTreeType.PINE, 160);
+        this.decorator.addTree(LOTRTreeType.FIR, 120);
+
+        this.decorator.addRandomStructure(new LostTalesWorldGenOdaneGlowstoneHouse(false), 1100);
+
+        this.biomeColors.setGrass(0x607F47);
+        this.biomeColors.setFoliage(0x526E3B);
     }
 
     @Override

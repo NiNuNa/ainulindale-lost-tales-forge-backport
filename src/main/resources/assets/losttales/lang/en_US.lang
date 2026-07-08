@@ -559,3 +559,14 @@ losttales.config.category.client.other=Other Client Options
 losttales.config.category.client.other.tooltip=Additional client options not shown in the main groups.
 losttales.config.category.quests.rules=Quest Rules & Discovery
 losttales.config.category.quests.rules.tooltip=Quest starts, prerequisites, rewards, and marker discovery behavior.
+
+# Lost Tales entities
+entity.losttales.OdaneMan.name=Odane Man
+entity.losttales.OdaneGuard.name=Odane Guard
+entity.LostTales.OdaneMan.name=Odane Man
+entity.LostTales.OdaneGuard.name=Odane Guard
+
+# Lost Tales structure spawners
+lotr.structure.OdaneGlowstoneHouse.name=Odane Glowstone House
+entity.OdaneMan.name=Odane Man
+entity.OdaneGuard.name=Odane Guard

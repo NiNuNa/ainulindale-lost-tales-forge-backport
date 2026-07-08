@@ -24,6 +24,7 @@ import com.ninuna.losttales.world.biome.ELostTalesBiome;
 import com.ninuna.losttales.world.map.LostTalesMapOverlay;
 import com.ninuna.losttales.world.map.road.ELostTalesRoad;
 import com.ninuna.losttales.world.spawning.ELostTalesSpawnList;
+import com.ninuna.losttales.world.structure.ELostTalesStructure;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
@@ -58,6 +59,7 @@ public class LostTalesCommonProxy {
     }
 
     public void init(FMLInitializationEvent event) {
+        ELostTalesStructure.initAndRegisterStructures();
         ELostTalesCrafting.initAndRegisterCrafting();
         ELostTalesFaction.initAndRegisterFactions();
         ELostTalesAchievement.initAndRegisterAchievements();
