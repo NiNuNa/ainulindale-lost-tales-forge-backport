@@ -35,6 +35,16 @@ public final class LostTalesCompassHudRenderHelper {
         return t * t * (3.0F - 2.0F * t);
     }
 
+    public static float edgeIntervalFactor(float centerDistPx, float fadeStartDistPx, float fadeEndDistPx) {
+        if (fadeEndDistPx <= fadeStartDistPx) {
+            return centerDistPx < fadeEndDistPx ? 1.0F : 0.0F;
+        }
+        if (centerDistPx <= fadeStartDistPx) return 1.0F;
+        if (centerDistPx >= fadeEndDistPx) return 0.0F;
+        float t = (fadeEndDistPx - centerDistPx) / (fadeEndDistPx - fadeStartDistPx);
+        return t * t * (3.0F - 2.0F * t);
+    }
+
     /** atan2(-dx, dz), normalized into [0, 360). Matches Minecraft yaw where south is 0 degrees. */
     public static float angleDegToTarget(double dx, double dz) {
         float deg = (float) Math.toDegrees(Math.atan2(-dx, dz));

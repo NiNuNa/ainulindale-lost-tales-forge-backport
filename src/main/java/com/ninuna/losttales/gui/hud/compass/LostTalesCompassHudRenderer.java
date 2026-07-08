@@ -37,10 +37,32 @@ public class LostTalesCompassHudRenderer {
     public static final float MAP_MARKER_DISTANCE_FADE_IN_FLOOR_ALPHA = 0.4F;
     public static final float MAP_MARKER_SHADOW_ALPHA = 0.6F;
     public static final int MAP_MARKER_VERTICAL_ARROW_INDICATOR_OFFSET_X = 2;
-    public static final int MAP_MARKER_BEGIN_EDGE_FADE_OUT_OFFSET = COMPASS_WIDTH / 4;
+    public static final int MAP_MARKER_BEGIN_EDGE_FADE_OUT_OFFSET = 24;
     public static final int MAP_MARKER_BEGIN_CENTER_FOCUS_OFFSET = 26;
+    /**
+     * Width of the focused-label fade-out band before the normal marker edge
+     * fade begins. Keeping this separate from the icon edge fade lets labels
+     * disappear before markers naturally fade out at the compass border.
+     */
+    public static final int MAP_MARKER_FOCUS_EDGE_FADE_OUT_WIDTH = 22;
+    /**
+     * The focused-marker label becomes latched once it is nearly centered. This
+     * avoids missing the exact center pixel on fast or low-FPS camera movement,
+     * while still using MAP_MARKER_BEGIN_CENTER_FOCUS_OFFSET for the visible
+     * fade-in interval.
+     */
+    private static final float MAP_MARKER_FOCUS_LATCH_ALPHA = 0.98F;
+    /**
+     * Minecraft 1.7.10 FontRenderer treats colors whose top alpha bits are zero
+     * as legacy RGB colors and forces them back to fully opaque. Keep compass
+     * marker text below this byte alpha invisible instead of letting it flash.
+     */
+    private static final int MAP_MARKER_MIN_TEXT_ALPHA = 4;
 
     private static final List<LostTalesCompassMarkerProvider> MARKER_PROVIDERS = createMarkerProviders();
+    private static String focusedMarkerStateKey;
+    private static boolean focusedMarkerLabelLatched;
+    private static float focusedMarkerLastEffectAlpha;
 
     private LostTalesCompassHudRenderer() {}
 
@@ -99,16 +121,24 @@ public class LostTalesCompassHudRenderer {
 
     private static void renderMarkers(Minecraft minecraft, int compassY, int centerX, float yawDeg, float pxPerDeg, int visibleDeg, float partialTicks) {
         List<LostTalesCompassMarker> markers = collectMarkers(minecraft, partialTicks);
-        if (markers.isEmpty()) return;
+        if (markers.isEmpty()) {
+            resetFocusedMarkerState();
+            return;
+        }
 
         LostTalesCompassHudRenderHelper.PlayerPos playerPos = LostTalesCompassHudRenderHelper.lerpPlayerPos(minecraft.thePlayer, partialTicks);
-        LostTalesCompassMarkerBatchBuilder.LostTalesCompassMarkerBatch batch = LostTalesCompassMarkerBatchBuilder.build(markers, playerPos, yawDeg, pxPerDeg, visibleDeg, centerX);
-        if (batch.renderItems.isEmpty()) return;
+        LostTalesCompassMarkerBatchBuilder.LostTalesCompassMarkerBatch batch = LostTalesCompassMarkerBatchBuilder.build(markers, playerPos, yawDeg, pxPerDeg, visibleDeg, centerX, focusedMarkerStateKey);
+        if (batch.renderItems.isEmpty()) {
+            resetFocusedMarkerState();
+            return;
+        }
+
+        float focusedEffectAlpha = updateFocusedMarkerEffectAlpha(batch);
 
         for (LostTalesCompassMarkerRenderItem item : batch.renderItems) {
             LostTalesCompassMarkerIcon icon = item.marker.getIcon();
             float scale = item.marker == batch.focusedMarker && item.marker.isScaleWithCenterFocus()
-                    ? 1.0F + MAP_MARKER_SCALE_MODIFIER * batch.focusEmphasis
+                    ? 1.0F + MAP_MARKER_SCALE_MODIFIER * focusedEffectAlpha
                     : 1.0F;
             float shadowAlpha = Math.min(MAP_MARKER_SHADOW_ALPHA, item.alpha);
 
@@ -132,18 +162,78 @@ public class LostTalesCompassHudRenderer {
             GL11.glPopMatrix();
         }
 
-        renderFocusedMarkerLabel(minecraft, compassY, batch);
+        renderFocusedMarkerLabel(minecraft, compassY, batch, focusedEffectAlpha);
     }
 
-    private static void renderFocusedMarkerLabel(Minecraft minecraft, int compassY, LostTalesCompassMarkerBatchBuilder.LostTalesCompassMarkerBatch batch) {
+    private static float updateFocusedMarkerEffectAlpha(LostTalesCompassMarkerBatchBuilder.LostTalesCompassMarkerBatch batch) {
         LostTalesCompassMarker marker = batch.focusedMarker;
-        if (marker == null || batch.focusEmphasis <= 0.0F || marker.getName() == null || marker.getName().length() == 0) {
+        if (marker == null || batch.focusFadeOutAlpha <= 0.0F) {
+            resetFocusedMarkerState();
+            return 0.0F;
+        }
+
+        String stateKey = LostTalesCompassMarkerBatchBuilder.getFocusStateKey(marker);
+        boolean targetChanged = focusedMarkerStateKey == null || !focusedMarkerStateKey.equals(stateKey);
+        if (targetChanged) {
+            /*
+             * If another map marker becomes the closest marker while the old
+             * label is still visible, keep the label/highlight alive instead
+             * of forcing a second green-zone fade-in. The orange-zone fade-out
+             * still applies to the new target below.
+             */
+            focusedMarkerLabelLatched = focusedMarkerLastEffectAlpha >= (float) MAP_MARKER_MIN_TEXT_ALPHA / 255.0F;
+            focusedMarkerStateKey = stateKey;
+        }
+
+        if (!focusedMarkerLabelLatched && batch.focusFadeInAlpha >= MAP_MARKER_FOCUS_LATCH_ALPHA) {
+            focusedMarkerLabelLatched = true;
+        }
+
+        float alpha = focusedMarkerLabelLatched
+                ? batch.focusFadeOutAlpha
+                : Math.min(batch.focusFadeInAlpha, batch.focusFadeOutAlpha);
+        alpha = MathHelper.clamp_float(alpha, 0.0F, 1.0F);
+
+        if (alpha <= 0.0F) {
+            resetFocusedMarkerState();
+        } else {
+            focusedMarkerLastEffectAlpha = alpha;
+        }
+        return alpha;
+    }
+
+    private static void resetFocusedMarkerState() {
+        focusedMarkerStateKey = null;
+        focusedMarkerLabelLatched = false;
+        focusedMarkerLastEffectAlpha = 0.0F;
+    }
+
+    private static void renderFocusedMarkerLabel(Minecraft minecraft, int compassY, LostTalesCompassMarkerBatchBuilder.LostTalesCompassMarkerBatch batch, float focusedEffectAlpha) {
+        LostTalesCompassMarker marker = batch.focusedMarker;
+        if (marker == null || focusedEffectAlpha <= 0.0F || marker.getName() == null || marker.getName().length() == 0) {
             return;
         }
 
         FontRenderer fontRenderer = minecraft.fontRenderer;
-        float labelAlphaF = MathHelper.clamp_float(batch.focusEmphasis * batch.focusAlpha, 0.0F, 1.0F);
+        float labelAlphaF = MathHelper.clamp_float(focusedEffectAlpha * batch.focusDistanceAlpha, 0.0F, 1.0F);
         int alpha = MathHelper.clamp_int((int) (labelAlphaF * 255.0F), 0, 255);
+
+        /*
+         * FontRenderer in Minecraft 1.7.10 does not only special-case an
+         * alpha byte of 0. It checks the top alpha bits and treats alpha values
+         * 0..3 as if no alpha was supplied, then ORs in full opacity. The
+         * center-focus fade can legitimately produce those tiny alpha values
+         * at the edge of the label visibility radius, which makes the marker
+         * text flash back at full opacity for one frame or a very small angle.
+         *
+         * The textured height indicator does not flicker because it uses GL
+         * float alpha directly. For text, skip the draw while the quantized
+         * alpha is in FontRenderer's unsafe legacy-color range.
+         */
+        if (alpha < MAP_MARKER_MIN_TEXT_ALPHA) {
+            return;
+        }
+
         int color = (alpha << 24) | 0xFFFFFF;
         int nameY = compassY + COMPASS_HEIGHT + MAP_MARKER_NAME_LABEL_OFFSET_Y;
         int distY = compassY - fontRenderer.FONT_HEIGHT - MAP_MARKER_DISTANCE_LABEL_OFFSET_Y;
