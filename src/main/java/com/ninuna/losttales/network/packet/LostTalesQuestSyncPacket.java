@@ -170,11 +170,13 @@ public class LostTalesQuestSyncPacket implements IMessage {
             double x = buf.readDouble();
             double y = buf.readDouble();
             double z = buf.readDouble();
-            double fadeInRadius = buf.readDouble();
-            double unlockRadius = buf.readDouble();
+            double compassFadeInRadius = buf.readDouble();
+            double discoveryRadius = buf.readDouble();
             boolean hidden = buf.readBoolean();
+            boolean discoverable = buf.readBoolean();
+            boolean ignoredDiscoveryNotification = buf.readBoolean();
             if (markerId != null && markerId.length() > 0) {
-                this.dynamicMapMarkers.add(new LostTalesMapMarkerDefinition(markerId, name, icon, color, category, waypoint, dimensionId, x, y, z, fadeInRadius, unlockRadius, hidden));
+                this.dynamicMapMarkers.add(new LostTalesMapMarkerDefinition(markerId, name, icon, color, category, waypoint, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hidden, discoverable, ignoredDiscoveryNotification));
             }
         }
     }
@@ -224,9 +226,11 @@ public class LostTalesQuestSyncPacket implements IMessage {
             buf.writeDouble(marker.getX());
             buf.writeDouble(marker.getY());
             buf.writeDouble(marker.getZ());
-            buf.writeDouble(marker.getFadeInRadius());
-            buf.writeDouble(marker.getUnlockRadius());
+            buf.writeDouble(marker.getCompassFadeInRadius());
+            buf.writeDouble(marker.getDiscoveryRadius());
             buf.writeBoolean(marker.isHiddenUntilDiscovered());
+            buf.writeBoolean(marker.isDiscoverable());
+            buf.writeBoolean(marker.isDiscoverable());
         }
     }
 

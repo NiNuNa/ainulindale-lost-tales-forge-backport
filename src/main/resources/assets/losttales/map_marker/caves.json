@@ -1,6 +1,20 @@
 {
   "map_markers": [
     {
+      "id": "losttales:mossy_cave",
+      "name": "Mossy Cave",
+      "icon": "undiscovered",
+      "color": "gray",
+      "dimension": "lotr:middle_earth",
+      "x": -370.0,
+      "y": 58.0,
+      "z": 40.0,
+      "compassFadeInRadius": 220.0,
+      "discoveryRadius": 9.0,
+      "discoverable": true,
+      "hiddenUntilDiscovered": true,
+      "waypoint": true,
+      "description": "A damp cave mouth hidden beneath moss and roots, easy to miss until you stand nearby."
     }
   ]
 }

@@ -29,27 +29,42 @@ public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMar
             boolean activeQuestMarker = activeQuestMarkers.containsKey(entry.getId());
             boolean discovered = LostTalesClientQuestProgressStore.isMarkerDiscovered(entry.getId());
             boolean pinned = entry.getId() != null && entry.getId().equals(pinnedMarkerId);
-            if (entry.isHiddenUntilDiscovered() && !discovered && !activeQuestMarker && !pinned) {
-                continue;
-            }
+            boolean undiscovered = entry.isDiscoverable() && !discovered;
 
             String name = activeQuestMarker ? activeQuestMarkers.get(entry.getId()) : entry.getName();
             if (pinned) {
                 name = "Tracked: " + name;
             }
-            double fadeInRadius = activeQuestMarker || pinned ? Math.max(entry.getFadeInRadius(), 512.0D) : entry.getFadeInRadius();
+
+            LostTalesCompassMarkerIcon icon = LostTalesCompassMarkerIcon.fromName(pinned ? "quest" : entry.getIconName());
+            String color = entry.getColorName();
+            boolean scaleWithFocus = true;
+            boolean showDistanceLabel = true;
+
+            if (undiscovered) {
+                icon = LostTalesCompassMarkerIcon.UNDISCOVERED;
+                name = "???";
+                color = "white";
+                // Undiscovered markers still need to be valid center-focus
+                // candidates so the compass can show "???" and distance.
+                scaleWithFocus = true;
+                showDistanceLabel = true;
+            }
+
+            double compassFadeInRadius = activeQuestMarker || pinned ? Math.max(entry.getCompassFadeInRadius(), 512.0D) : entry.getCompassFadeInRadius();
             if (activeQuestMarker) {
-                markers.add(LostTalesCompassMarker.questPosition(name, entry.getX(), entry.getY(), entry.getZ(), true, fadeInRadius));
+                markers.add(LostTalesCompassMarker.questPosition(name, entry.getX(), entry.getY(), entry.getZ(), true, compassFadeInRadius));
             } else {
                 markers.add(LostTalesCompassMarker.position(
                         name,
-                        LostTalesCompassMarkerIcon.fromName(pinned ? "quest" : entry.getIconName()),
+                        icon,
                         entry.getX(),
                         entry.getY(),
                         entry.getZ(),
-                        true,
-                        true,
-                        fadeInRadius
+                        scaleWithFocus,
+                        showDistanceLabel,
+                        compassFadeInRadius,
+                        color
                 ));
             }
         }

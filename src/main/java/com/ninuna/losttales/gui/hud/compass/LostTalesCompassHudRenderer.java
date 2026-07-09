@@ -9,7 +9,6 @@ import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerProvide
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerRenderItem;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesDirectionCompassMarkerProvider;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesHostileCompassMarkerProvider;
-import com.ninuna.losttales.gui.hud.compass.marker.LostTalesLotrWaypointCompassMarkerProvider;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesStaticCompassMarkerProvider;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -145,7 +144,7 @@ public class LostTalesCompassHudRenderer {
             GL11.glPushMatrix();
             GL11.glTranslatef(item.x, compassY + MAP_MARKER_OFFSET_Y + LostTalesCompassMarkerIcon.HEIGHT / 2.0F, 0.0F);
             GL11.glScalef(scale, scale, 1.0F);
-            LostTalesCompassHudRenderHelper.drawTexturedRectWithShadow(
+            LostTalesCompassHudRenderHelper.drawTexturedRectWithShadowTinted(
                     minecraft,
                     LostTalesCompassMarkerIcon.TEXTURE,
                     -LostTalesCompassMarkerIcon.WIDTH / 2.0F,
@@ -156,6 +155,9 @@ public class LostTalesCompassHudRenderer {
                     LostTalesCompassMarkerIcon.HEIGHT,
                     LostTalesCompassMarkerIcon.TEXTURE_WIDTH,
                     LostTalesCompassMarkerIcon.TEXTURE_HEIGHT,
+                    item.marker.getRed(),
+                    item.marker.getGreen(),
+                    item.marker.getBlue(),
                     item.alpha,
                     shadowAlpha
             );
@@ -298,7 +300,6 @@ public class LostTalesCompassHudRenderer {
         List<LostTalesCompassMarkerProvider> providers = new ArrayList<LostTalesCompassMarkerProvider>();
         providers.add(new LostTalesDirectionCompassMarkerProvider());
         providers.add(new LostTalesStaticCompassMarkerProvider());
-        providers.add(new LostTalesLotrWaypointCompassMarkerProvider());
         providers.add(new LostTalesHostileCompassMarkerProvider());
         return Collections.unmodifiableList(providers);
     }

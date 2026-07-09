@@ -3,7 +3,9 @@ package com.ninuna.losttales.client.event;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
+import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
+import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapMarkerIconOverlay;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
@@ -11,6 +13,7 @@ import com.ninuna.losttales.client.render.renderer.item.LostTalesItemRendererHam
 import com.ninuna.losttales.client.render.renderer.item.LostTalesRendererLargeItems;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
+import com.ninuna.losttales.gui.hud.mapmarker.LostTalesMapMarkerHudRenderer;
 import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
 import com.ninuna.losttales.gui.hud.quest.LostTalesWorldQuestMarkerRenderer;
 import com.ninuna.losttales.item.ELostTalesItem;
@@ -28,6 +31,7 @@ import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.client.resources.IResourceManagerReloadListener;
 import net.minecraftforge.client.MinecraftForgeClient;
+import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.client.event.TextureStitchEvent;
@@ -50,6 +54,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     public void onClientDisconnect(ClientDisconnectionFromServerEvent event) {
         LostTalesClientQuestProgressStore.clear();
         LostTalesClientQuestNotificationStore.clear();
+        LostTalesClientMapMarkerNotificationStore.clear();
         LostTalesClientMapMarkerStore.clearDynamicMarkers();
         LostTalesClientMobAggroCache.clear();
         LostTalesClientQuickLootCache.clear();
@@ -87,10 +92,20 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void renderLotrMapMarkerIcons(GuiScreenEvent.DrawScreenEvent.Post event) {
+        try {
+            LostTalesLotrMapMarkerIconOverlay.render(event.gui, event.mouseX, event.mouseY);
+        } catch (Throwable ignored) {
+            // The LOTR map should remain usable even if this cosmetic overlay fails.
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public void renderHud(RenderGameOverlayEvent.Post event) {
         if (event.type == RenderGameOverlayEvent.ElementType.ALL) {
             LostTalesQuickLootHudRenderer.render(Minecraft.getMinecraft());
             LostTalesCompassHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
+            LostTalesMapMarkerHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
             LostTalesQuestHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
         }
     }

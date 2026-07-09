@@ -1,5 +1,7 @@
 package com.ninuna.losttales.gui.hud.compass.marker;
 
+import java.util.Locale;
+
 public class LostTalesCompassMarker {
     private final String name;
     private final LostTalesCompassMarkerIcon icon;
@@ -12,8 +14,11 @@ public class LostTalesCompassMarker {
     private final boolean showDistanceLabel;
     private final double fadeInRadius;
     private final boolean activeQuestMarker;
+    private final float red;
+    private final float green;
+    private final float blue;
 
-    private LostTalesCompassMarker(String name, LostTalesCompassMarkerIcon icon, boolean bearingMarker, float bearingDegrees, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius, boolean activeQuestMarker) {
+    private LostTalesCompassMarker(String name, LostTalesCompassMarkerIcon icon, boolean bearingMarker, float bearingDegrees, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius, boolean activeQuestMarker, float red, float green, float blue) {
         this.name = name;
         this.icon = icon;
         this.bearingMarker = bearingMarker;
@@ -25,18 +30,26 @@ public class LostTalesCompassMarker {
         this.showDistanceLabel = showDistanceLabel;
         this.fadeInRadius = fadeInRadius;
         this.activeQuestMarker = activeQuestMarker;
+        this.red = clampColor(red);
+        this.green = clampColor(green);
+        this.blue = clampColor(blue);
     }
 
     public static LostTalesCompassMarker bearing(String name, LostTalesCompassMarkerIcon icon, float bearingDegrees) {
-        return new LostTalesCompassMarker(name, icon, true, bearingDegrees, 0.0D, 0.0D, 0.0D, false, false, 0.0D, false);
+        return new LostTalesCompassMarker(name, icon, true, bearingDegrees, 0.0D, 0.0D, 0.0D, false, false, 0.0D, false, 1.0F, 1.0F, 1.0F);
     }
 
     public static LostTalesCompassMarker position(String name, LostTalesCompassMarkerIcon icon, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius) {
-        return new LostTalesCompassMarker(name, icon, false, 0.0F, x, y, z, scaleWithCenterFocus, showDistanceLabel, fadeInRadius, false);
+        return position(name, icon, x, y, z, scaleWithCenterFocus, showDistanceLabel, fadeInRadius, "white");
+    }
+
+    public static LostTalesCompassMarker position(String name, LostTalesCompassMarkerIcon icon, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius, String colorName) {
+        float[] color = parseColor(colorName);
+        return new LostTalesCompassMarker(name, icon, false, 0.0F, x, y, z, scaleWithCenterFocus, showDistanceLabel, fadeInRadius, false, color[0], color[1], color[2]);
     }
 
     public static LostTalesCompassMarker questPosition(String name, double x, double y, double z, boolean showDistanceLabel, double fadeInRadius) {
-        return new LostTalesCompassMarker(name, LostTalesCompassMarkerIcon.QUEST, false, 0.0F, x, y, z, true, showDistanceLabel, fadeInRadius, true);
+        return new LostTalesCompassMarker(name, LostTalesCompassMarkerIcon.QUEST, false, 0.0F, x, y, z, true, showDistanceLabel, fadeInRadius, true, 1.0F, 1.0F, 1.0F);
     }
 
     public String getName() {
@@ -81,5 +94,63 @@ public class LostTalesCompassMarker {
 
     public boolean isActiveQuestMarker() {
         return activeQuestMarker;
+    }
+
+    public float getRed() {
+        return red;
+    }
+
+    public float getGreen() {
+        return green;
+    }
+
+    public float getBlue() {
+        return blue;
+    }
+
+    private static float clampColor(float value) {
+        if (value < 0.0F) return 0.0F;
+        if (value > 1.0F) return 1.0F;
+        return value;
+    }
+
+    public static float[] parseColor(String colorName) {
+        if (colorName == null || colorName.trim().length() == 0) {
+            return new float[] {1.0F, 1.0F, 1.0F};
+        }
+
+        String value = colorName.trim().toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+        if (value.startsWith("#")) {
+            return parseHexColor(value.substring(1));
+        }
+        if (value.startsWith("0x")) {
+            return parseHexColor(value.substring(2));
+        }
+        if ("white".equals(value)) return new float[] {1.0F, 1.0F, 1.0F};
+        if ("red".equals(value)) return new float[] {1.0F, 0.25F, 0.25F};
+        if ("green".equals(value)) return new float[] {0.35F, 1.0F, 0.35F};
+        if ("blue".equals(value)) return new float[] {0.35F, 0.55F, 1.0F};
+        if ("yellow".equals(value) || "gold".equals(value)) return new float[] {1.0F, 0.85F, 0.25F};
+        if ("orange".equals(value)) return new float[] {1.0F, 0.55F, 0.2F};
+        if ("purple".equals(value) || "violet".equals(value)) return new float[] {0.75F, 0.45F, 1.0F};
+        if ("gray".equals(value) || "grey".equals(value)) return new float[] {0.65F, 0.65F, 0.65F};
+        if ("dark_gray".equals(value) || "dark_grey".equals(value)) return new float[] {0.35F, 0.35F, 0.35F};
+        if ("black".equals(value)) return new float[] {0.15F, 0.15F, 0.15F};
+        return new float[] {1.0F, 1.0F, 1.0F};
+    }
+
+    private static float[] parseHexColor(String hex) {
+        if (hex == null || hex.length() != 6) {
+            return new float[] {1.0F, 1.0F, 1.0F};
+        }
+        try {
+            int value = Integer.parseInt(hex, 16);
+            float red = ((value >> 16) & 255) / 255.0F;
+            float green = ((value >> 8) & 255) / 255.0F;
+            float blue = (value & 255) / 255.0F;
+            return new float[] {red, green, blue};
+        } catch (NumberFormatException ignored) {
+            return new float[] {1.0F, 1.0F, 1.0F};
+        }
     }
 }

@@ -1,6 +1,34 @@
 {
   "map_markers": [
     {
+      "id": "losttales:ranger_camp",
+      "name": "Ranger Camp",
+      "icon": "tavern",
+      "color": "blue",
+      "dimension": "lotr:middle_earth",
+      "x": 90.0,
+      "y": 65.0,
+      "z": -210.0,
+      "compassFadeInRadius": 220.0,
+      "discoveryRadius": 10.0,
+      "discoverable": true,
+      "hiddenUntilDiscovered": true,
+      "waypoint": false
+    },
+    {
+      "id": "losttales:old_oak_camp",
+      "name": "Old Oak Camp",
+      "icon": "tavern",
+      "color": "green",
+      "dimension": "lotr:middle_earth",
+      "x": -260.0,
+      "y": 64.0,
+      "z": -250.0,
+      "compassFadeInRadius": 240.0,
+      "discoveryRadius": 10.0,
+      "discoverable": true,
+      "hiddenUntilDiscovered": true,
+      "waypoint": false
     }
   ]
 }

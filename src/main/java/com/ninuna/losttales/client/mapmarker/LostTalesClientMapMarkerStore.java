@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
+import lotr.common.LOTRDimension;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -105,22 +106,25 @@ public final class LostTalesClientMapMarkerStore {
                 icon,
                 color,
                 marker.getCategoryName(),
+                marker.getDescription(),
                 marker.isWaypoint(),
+                marker.getLotrWaypointCode(),
                 marker.getDimensionId(),
                 marker.getX(),
                 marker.getY(),
                 marker.getZ(),
-                marker.getFadeInRadius(),
-                marker.getUnlockRadius(),
-                marker.isHiddenUntilDiscovered()
+                marker.getCompassFadeInRadius(),
+                marker.getDiscoveryRadius(),
+                marker.isHiddenUntilDiscovered(),
+                marker.isDiscoverable()
         );
     }
 
     private static List<LostTalesMapMarkerData> createFallbackMarkers() {
         List<LostTalesMapMarkerData> markers = new ArrayList<LostTalesMapMarkerData>();
-        markers.add(new LostTalesMapMarkerData("fallback-town", "Town", LostTalesCompassMarkerIcon.FORT.name(), "red", 0, 15.0D, 64.0D, 15.0D, 80.0D, 8.0D));
-        markers.add(new LostTalesMapMarkerData("fallback-cheese-fort", "Cheese's Fort", LostTalesCompassMarkerIcon.FORT.name(), "white", 0, -14.0D, 64.0D, -23.0D, 250.0D, 8.0D));
-        markers.add(new LostTalesMapMarkerData("fallback-nether-hub", "Nether Hub", LostTalesCompassMarkerIcon.FORT.name(), "red", -1, 10.0D, 70.0D, -12.0D, 64.0D, 10.0D));
+        int middleEarth = LOTRDimension.MIDDLE_EARTH.dimensionID;
+        markers.add(new LostTalesMapMarkerData("fallback-town", "Town", LostTalesCompassMarkerIcon.FORT.name(), "red", middleEarth, 15.0D, 64.0D, 15.0D, 160.0D, 10.0D));
+        markers.add(new LostTalesMapMarkerData("fallback-cheese-fort", "Cheese's Fort", LostTalesCompassMarkerIcon.FORT.name(), "white", middleEarth, -180.0D, 64.0D, -140.0D, 250.0D, 10.0D));
         return Collections.unmodifiableList(markers);
     }
 }

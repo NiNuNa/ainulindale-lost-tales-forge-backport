@@ -1,6 +1,19 @@
 {
   "map_markers": [
     {
+      "id": "losttales:riverbend_farmstead",
+      "name": "Riverbend Farmstead",
+      "icon": "fort",
+      "color": "purple",
+      "dimension": "lotr:middle_earth",
+      "x": 75.0,
+      "y": 64.0,
+      "z": 270.0,
+      "compassFadeInRadius": 240.0,
+      "discoveryRadius": 12.0,
+      "discoverable": true,
+      "hiddenUntilDiscovered": true,
+      "waypoint": false
     }
   ]
 }

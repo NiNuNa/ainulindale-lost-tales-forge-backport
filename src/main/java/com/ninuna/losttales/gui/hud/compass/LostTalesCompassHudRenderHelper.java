@@ -180,8 +180,12 @@ public final class LostTalesCompassHudRenderHelper {
     }
 
     public static void drawTexturedRectWithShadow(Minecraft minecraft, ResourceLocation texture, float x, float y, int u, int v, int width, int height, int textureWidth, int textureHeight, float alpha, float shadowAlpha) {
+        drawTexturedRectWithShadowTinted(minecraft, texture, x, y, u, v, width, height, textureWidth, textureHeight, 1.0F, 1.0F, 1.0F, alpha, shadowAlpha);
+    }
+
+    public static void drawTexturedRectWithShadowTinted(Minecraft minecraft, ResourceLocation texture, float x, float y, int u, int v, int width, int height, int textureWidth, int textureHeight, float red, float green, float blue, float alpha, float shadowAlpha) {
         drawTexturedRectTinted(minecraft, texture, x + 1.0F, y + 1.0F, u, v, width, height, textureWidth, textureHeight, 0.0F, 0.0F, 0.0F, shadowAlpha);
-        drawTexturedRect(minecraft, texture, x, y, u, v, width, height, textureWidth, textureHeight, alpha);
+        drawTexturedRectTinted(minecraft, texture, x, y, u, v, width, height, textureWidth, textureHeight, red, green, blue, alpha);
     }
 
     /**

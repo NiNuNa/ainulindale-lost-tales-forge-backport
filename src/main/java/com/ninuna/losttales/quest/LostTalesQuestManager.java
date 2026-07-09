@@ -4,10 +4,12 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
+import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import com.ninuna.losttales.util.LostTalesDimensionHelper;
+import com.ninuna.losttales.world.map.waypoint.LostTalesMapMarkerWaypointUnlockHelper;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -239,7 +241,7 @@ public final class LostTalesQuestManager {
         markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
         boolean changed = data.discoverMarker(markerId);
         if (changed) {
-            sendQuestChat(player, EnumChatFormatting.AQUA + "Map marker discovered: " + EnumChatFormatting.WHITE + markerId);
+            addLotrWaypointForDiscoveredMarker(player, markerId);
             syncToClient(player);
         }
         return changed;
@@ -331,6 +333,7 @@ public final class LostTalesQuestManager {
         markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
         boolean changed = data.forgetMarker(markerId);
         if (changed) {
+            LostTalesMapMarkerWaypointUnlockHelper.lockWaypointForForgottenMarker(player, markerId);
             sendQuestChat(player, EnumChatFormatting.YELLOW + "Map marker forgotten: " + EnumChatFormatting.WHITE + markerId);
             syncToClient(player);
         }
@@ -350,7 +353,9 @@ public final class LostTalesQuestManager {
         boolean knownDynamicMarker = data.getDynamicMapMarker(markerId) != null;
         if (!data.isMarkerDiscovered(markerId)) {
             if (bundledMarker != null && !bundledMarker.isHiddenUntilDiscovered()) {
-                data.discoverMarker(markerId);
+                if (data.discoverMarker(markerId)) {
+                    addLotrWaypointForDiscoveredMarker(player, bundledMarker);
+                }
             } else {
                 sendQuestChat(player, EnumChatFormatting.YELLOW + "Map marker is not discovered yet: " + markerId);
                 return false;
@@ -554,12 +559,35 @@ public final class LostTalesQuestManager {
             }
         }
         changed |= discoverNearbyMapMarkers(player, false);
+        changed |= ensureLotrWaypointsForDiscoveredMapMarkers(player);
         if (changed) {
             for (LostTalesQuestProgress progress : getActiveQuests(player)) {
                 evaluateStageProgress(player, progress.getQuestId());
             }
         }
         syncToClient(player);
+    }
+
+    public static boolean ensureLotrWaypointsForDiscoveredMapMarkers(EntityPlayerMP player) {
+        if (!LostTalesConfig.enableQuestMarkerDiscovery || player == null || player.worldObj == null || player.worldObj.isRemote) {
+            return false;
+        }
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null) {
+            return false;
+        }
+
+        boolean changed = false;
+        for (String markerId : data.getDiscoveredMarkerIds()) {
+            if (LostTalesMapMarkerWaypointUnlockHelper.unlockWaypointForDiscoveredMarker(player, LostTalesMapMarkerCatalog.getMarker(markerId))) {
+                changed = true;
+            }
+            LostTalesMapMarkerDefinition dynamicMarker = data.getDynamicMapMarker(markerId);
+            if (LostTalesMapMarkerWaypointUnlockHelper.unlockWaypointForDiscoveredMarker(player, dynamicMarker)) {
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     public static boolean discoverNearbyMapMarkers(EntityPlayerMP player, boolean notifyVisibleMarkers) {
@@ -573,23 +601,29 @@ public final class LostTalesQuestManager {
         boolean changed = false;
         int playerDimension = player.worldObj.provider.dimensionId;
         for (LostTalesMapMarkerDefinition marker : LostTalesMapMarkerCatalog.getMarkers()) {
-            if (marker == null || marker.getId() == null || marker.getId().length() == 0 || marker.getDimensionId() != playerDimension || data.isMarkerDiscovered(marker.getId())) {
+            if (marker == null || marker.getId() == null || marker.getId().length() == 0 || marker.getDimensionId() != playerDimension || !marker.isDiscoverable() || data.isMarkerDiscovered(marker.getId())) {
                 continue;
             }
-            double radius = Math.max(1.0D, marker.getUnlockRadius());
+            double radius = Math.max(1.0D, marker.getDiscoveryRadius());
             double dx = player.posX - marker.getX();
             double dy = player.posY - marker.getY();
             double dz = player.posZ - marker.getZ();
             if (dx * dx + dy * dy + dz * dz <= radius * radius) {
                 if (data.discoverMarker(marker.getId())) {
                     changed = true;
-                    if (marker.isHiddenUntilDiscovered() || notifyVisibleMarkers) {
-                        sendQuestChat(player, EnumChatFormatting.AQUA + "Map marker discovered: " + EnumChatFormatting.WHITE + marker.getName());
-                    }
+                    addLotrWaypointForDiscoveredMarker(player, marker);
+                    sendMapMarkerDiscoveryNotification(player, marker);
                 }
             }
         }
         return changed;
+    }
+
+    private static void sendMapMarkerDiscoveryNotification(EntityPlayerMP player, LostTalesMapMarkerDefinition marker) {
+        if (player == null || marker == null || !marker.isDiscoverable()) {
+            return;
+        }
+        LostTalesNetworkHandler.CHANNEL.sendTo(new LostTalesMapMarkerDiscoveryPacket(marker.getId(), marker.getName()), player);
     }
 
     private static boolean shouldScanMarkerDiscovery(EntityPlayerMP player) {
@@ -705,12 +739,15 @@ public final class LostTalesQuestManager {
         StringBuilder revealed = new StringBuilder();
         for (String markerId : LostTalesQuestMarkerHelper.collectStaticQuestMarkerIds(quest)) {
             if (data.discoverMarker(markerId)) {
+                addLotrWaypointForDiscoveredMarker(player, markerId);
                 appendMarkerDisplay(revealed, markerId);
                 changed = true;
             }
         }
         for (String markerId : LostTalesQuestMarkerHelper.collectDynamicQuestGiverMarkerIds(quest)) {
-            if (data.getDynamicMapMarker(markerId) != null && data.discoverMarker(markerId)) {
+            LostTalesMapMarkerDefinition dynamicMarker = data.getDynamicMapMarker(markerId);
+            if (dynamicMarker != null && data.discoverMarker(markerId)) {
+                addLotrWaypointForDiscoveredMarker(player, dynamicMarker);
                 appendMarkerDisplay(revealed, markerId);
                 changed = true;
             }
@@ -978,6 +1015,16 @@ public final class LostTalesQuestManager {
     private static String questTitle(String questId) {
         LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
         return quest == null ? questId : quest.getTitle();
+    }
+
+    private static void addLotrWaypointForDiscoveredMarker(EntityPlayer player, String markerId) {
+        addLotrWaypointForDiscoveredMarker(player, LostTalesMapMarkerCatalog.getMarker(markerId));
+    }
+
+    private static void addLotrWaypointForDiscoveredMarker(EntityPlayer player, LostTalesMapMarkerDefinition marker) {
+        if (player instanceof EntityPlayerMP) {
+            LostTalesMapMarkerWaypointUnlockHelper.unlockWaypointForDiscoveredMarker((EntityPlayerMP) player, marker);
+        }
     }
 
     private static void sendQuestChat(EntityPlayer player, String message) {

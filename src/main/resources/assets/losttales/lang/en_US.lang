@@ -570,3 +570,25 @@ entity.LostTales.OdaneGuard.name=Odane Guard
 lotr.structure.OdaneGlowstoneHouse.name=Odane Glowstone House
 entity.OdaneMan.name=Odane Man
 entity.OdaneGuard.name=Odane Guard
+
+# Lost Tales public map-marker waypoints
+lotr.waypoint.LOSTTALES_LOSTTALES_TEST_TOWN=Town
+lotr.waypoint.LOSTTALES_LOSTTALES_GREENWAY_MARKET=Greenway Market
+lotr.waypoint.LOSTTALES_LOSTTALES_CHEESE_FORT=Cheese's Fort
+lotr.waypoint.LOSTTALES_LOSTTALES_WATCHTOWER_RUINS=Watchtower Ruins
+lotr.waypoint.LOSTTALES_LOSTTALES_MOSSY_CAVE=Mossy Cave
+lotr.waypoint.LOSTTALES_MOSSY_CAVE=Mossy Cave
+lotr.waypoint.LOSTTALES_MOSSY_CAVE.info=A damp cave mouth hidden beneath moss and roots, easy to miss until you stand nearby.
+lotr.waypoint.LOSTTALES_LOSTTALES_MOSSY_CAVE.info=A damp cave mouth hidden beneath moss and roots, easy to miss until you stand nearby.
+lotr.waypoint.LOSTTALES_CHEESE_FORT=Cheese's Fort
+lotr.waypoint.LOSTTALES_CHEESE_FORT.info=A fortified test outpost claimed by Cheese, useful for checking discovered fort markers and public waypoint rendering.
+lotr.waypoint.LOSTTALES_LOSTTALES_CHEESE_FORT.info=A fortified test outpost claimed by Cheese, useful for checking discovered fort markers and public waypoint rendering.
+lotr.waypoint.LOSTTALES_WATCHTOWER_RUINS=Watchtower Ruins
+lotr.waypoint.LOSTTALES_WATCHTOWER_RUINS.info=A ruined watchtower overlooking the road, still useful as a landmark for wandering travellers.
+lotr.waypoint.LOSTTALES_LOSTTALES_WATCHTOWER_RUINS.info=A ruined watchtower overlooking the road, still useful as a landmark for wandering travellers.
+lotr.waypoint.LOSTTALES_TEST_TOWN=Town
+lotr.waypoint.LOSTTALES_TEST_TOWN.info=A small test town marker used to verify Lost Tales discovery, compass labels, and public LOTR waypoint unlocking.
+lotr.waypoint.LOSTTALES_LOSTTALES_TEST_TOWN.info=A small test town marker used to verify Lost Tales discovery, compass labels, and public LOTR waypoint unlocking.
+lotr.waypoint.LOSTTALES_GREENWAY_MARKET=Greenway Market
+lotr.waypoint.LOSTTALES_GREENWAY_MARKET.info=A modest market along the Greenway where travellers gather before continuing through the Shire borderlands.
+lotr.waypoint.LOSTTALES_LOSTTALES_GREENWAY_MARKET.info=A modest market along the Greenway where travellers gather before continuing through the Shire borderlands.

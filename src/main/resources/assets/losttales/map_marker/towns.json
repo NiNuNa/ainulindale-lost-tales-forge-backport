@@ -1,27 +1,51 @@
 {
   "map_markers": [
     {
-      "id": "6b3ce13a-08a4-4e2a-9b56-8a7d6f0a6e11",
+      "id": "losttales:test_town",
       "name": "Town",
       "icon": "fort",
       "color": "red",
-      "dimension": "minecraft:overworld",
-      "x": 15.0, "y": 64.0,
+      "dimension": "lotr:middle_earth",
+      "x": 15.0,
+      "y": 64.0,
       "z": 15.0,
-      "fadeInRadius": 80.0,
-      "unlockRadius": 8.0
+      "compassFadeInRadius": 180.0,
+      "discoveryRadius": 12.0,
+      "discoverable": true,
+      "hiddenUntilDiscovered": true,
+      "waypoint": true,
+      "description": "A small test town marker used to verify Lost Tales discovery, compass labels, and public LOTR waypoint unlocking."
     },
     {
-      "id": "e1d7a7e1-cc1a-4a83-9b77-4c2f7d4efabb",
-      "name": "Nether Hub",
+      "id": "losttales:greenway_market",
+      "name": "Greenway Market",
+      "icon": "tavern",
+      "color": "yellow",
+      "dimension": "lotr:middle_earth",
+      "x": 180.0,
+      "y": 64.0,
+      "z": 40.0,
+      "compassFadeInRadius": 220.0,
+      "discoveryRadius": 14.0,
+      "discoverable": true,
+      "hiddenUntilDiscovered": true,
+      "waypoint": true,
+      "description": "A modest market along the Greenway where travellers gather before continuing through the Shire borderlands."
+    },
+    {
+      "id": "losttales:south_road_hamlet",
+      "name": "South Road Hamlet",
       "icon": "fort",
-      "color": "red",
-      "dimension": "minecraft:the_nether",
-      "x": 10.0,
-      "y": 70.0,
-      "z": -12.0,
-      "fadeInRadius": 64.0,
-      "unlockRadius": 10.0
+      "color": "green",
+      "dimension": "lotr:middle_earth",
+      "x": -210.0,
+      "y": 66.0,
+      "z": 95.0,
+      "compassFadeInRadius": 240.0,
+      "discoveryRadius": 14.0,
+      "discoverable": true,
+      "hiddenUntilDiscovered": true,
+      "waypoint": false
     }
   ]
 }

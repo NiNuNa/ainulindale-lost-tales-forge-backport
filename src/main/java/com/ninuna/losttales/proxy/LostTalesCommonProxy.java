@@ -16,6 +16,7 @@ import com.ninuna.losttales.event.LostTalesQuestPlayerEventHandler;
 import com.ninuna.losttales.faction.ELostTalesFaction;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
+import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
@@ -23,6 +24,7 @@ import com.ninuna.losttales.quest.LostTalesQuestRegistry;
 import com.ninuna.losttales.world.biome.ELostTalesBiome;
 import com.ninuna.losttales.world.map.LostTalesMapOverlay;
 import com.ninuna.losttales.world.map.road.ELostTalesRoad;
+import com.ninuna.losttales.world.map.waypoint.LostTalesMapMarkerWaypointRegistry;
 import com.ninuna.losttales.world.spawning.ELostTalesSpawnList;
 import com.ninuna.losttales.world.structure.ELostTalesStructure;
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -62,6 +64,7 @@ public class LostTalesCommonProxy {
         ELostTalesStructure.initAndRegisterStructures();
         ELostTalesCrafting.initAndRegisterCrafting();
         ELostTalesFaction.initAndRegisterFactions();
+        LostTalesMapMarkerWaypointRegistry.initAndRegisterWaypoints();
         ELostTalesAchievement.initAndRegisterAchievements();
 
         LostTalesMapOverlay.applyWorldGenerationMap();
@@ -91,6 +94,8 @@ public class LostTalesCommonProxy {
     public void handleQuestSync(LostTalesQuestSyncPacket packet) {}
 
     public void handleMobAggroSync(LostTalesMobAggroSyncPacket packet) {}
+
+    public void handleMapMarkerDiscovery(LostTalesMapMarkerDiscoveryPacket packet) {}
 
     public void onServerStarting(FMLServerStartingEvent event) {
         ELostTalesCommand.initAndRegisterCommands(event);

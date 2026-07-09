@@ -36,14 +36,9 @@ public final class LostTalesWorldQuestMarkerRenderer {
         }
 
         EntityPlayer player = minecraft.thePlayer;
-        Set<String> discoveredMarkers = LostTalesClientQuestProgressStore.getDiscoveredMarkerIds();
-        String pinnedMarkerId = LostTalesClientQuestProgressStore.getPinnedMapMarkerId();
         Map<String, String> activeQuestMarkers = LostTalesClientQuestMarkerHelper.collectActiveQuestMarkerLabels();
         Set<LostTalesClientQuestMarkerHelper.ActiveCoordinateMarker> activeCoordinateMarkers = LostTalesClientQuestMarkerHelper.collectActiveCoordinateMarkers();
-        if (discoveredMarkers.isEmpty()
-                && activeQuestMarkers.isEmpty()
-                && activeCoordinateMarkers.isEmpty()
-                && (pinnedMarkerId == null || pinnedMarkerId.length() == 0)) {
+        if (activeQuestMarkers.isEmpty() && activeCoordinateMarkers.isEmpty()) {
             return;
         }
 
@@ -72,12 +67,9 @@ public final class LostTalesWorldQuestMarkerRenderer {
                     continue;
                 }
 
-                boolean pinned = marker.getId().equals(pinnedMarkerId);
+                boolean pinned = false;
                 boolean activeQuestMarker = activeQuestMarkers.containsKey(marker.getId());
-                boolean discoveredMarker = discoveredMarkers.contains(marker.getId());
-                boolean discoveredQuestMarker = marker.isHiddenUntilDiscovered() && discoveredMarker;
-                boolean discoveredWorldMarker = LostTalesConfig.showDiscoveredWorldMapMarkers && discoveredMarker;
-                if (!pinned && !activeQuestMarker && !discoveredQuestMarker && !discoveredWorldMarker) {
+                if (!activeQuestMarker) {
                     continue;
                 }
 
@@ -85,7 +77,7 @@ public final class LostTalesWorldQuestMarkerRenderer {
                 double dyPlayer = player.posY - marker.getY();
                 double dzPlayer = player.posZ - marker.getZ();
                 double distSq = dxPlayer * dxPlayer + dyPlayer * dyPlayer + dzPlayer * dzPlayer;
-                if (distSq > maxDistanceSq && !pinned && !activeQuestMarker) {
+                if (distSq > maxDistanceSq && !activeQuestMarker) {
                     continue;
                 }
                 if (distSq > maxDistanceSq * 4.0D) {

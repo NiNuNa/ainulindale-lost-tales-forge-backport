@@ -8,6 +8,7 @@ import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.event.LostTalesClientEventHandler;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
+import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
@@ -21,6 +22,7 @@ import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneGuard;
 import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneMan;
 import com.ninuna.losttales.gui.ELostTalesMapLabels;
 import com.ninuna.losttales.item.armor.LostTalesItemArmor3D;
+import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
@@ -82,9 +84,17 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleQuestSync(LostTalesQuestSyncPacket packet) {
         if (packet != null) {
-            LostTalesClientQuestNotificationStore.notifyForIncomingSync(packet.getActiveQuests(), packet.getCompletedQuestIds());
             LostTalesClientMapMarkerStore.setDynamicMarkers(packet.getDynamicMapMarkers());
+            LostTalesClientQuestNotificationStore.notifyForIncomingSync(packet.getActiveQuests(), packet.getCompletedQuestIds());
             LostTalesClientQuestProgressStore.update(packet.getActiveQuests(), packet.getCompletedQuestIds(), packet.getPinnedQuestIds(), packet.getDiscoveredMarkerIds(), packet.getPinnedMapMarkerId());
+        }
+    }
+
+
+    @Override
+    public void handleMapMarkerDiscovery(LostTalesMapMarkerDiscoveryPacket packet) {
+        if (packet != null) {
+            LostTalesClientMapMarkerNotificationStore.showDiscovery(packet.getMarkerId(), packet.getMarkerName());
         }
     }
 

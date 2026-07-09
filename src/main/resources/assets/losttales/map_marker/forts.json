@@ -1,16 +1,36 @@
 {
   "map_markers": [
     {
-      "id": "6c3ce13a-08a4-4e2a-9b56-8a7d6f0a6e11",
+      "id": "losttales:cheese_fort",
       "name": "Cheese's Fort",
       "icon": "fort",
       "color": "white",
-      "dimension": "minecraft:overworld",
-      "x": -14.0,
+      "dimension": "lotr:middle_earth",
+      "x": -180.0,
       "y": 64.0,
-      "z": -23.0,
-      "fadeInRadius": 250.0,
-      "unlockRadius": 8.0
+      "z": -140.0,
+      "compassFadeInRadius": 250.0,
+      "discoveryRadius": 12.0,
+      "discoverable": true,
+      "hiddenUntilDiscovered": true,
+      "waypoint": true,
+      "description": "A fortified test outpost claimed by Cheese, useful for checking discovered fort markers and public waypoint rendering."
+    },
+    {
+      "id": "losttales:watchtower_ruins",
+      "name": "Watchtower Ruins",
+      "icon": "fort",
+      "color": "orange",
+      "dimension": "lotr:middle_earth",
+      "x": 300.0,
+      "y": 72.0,
+      "z": -110.0,
+      "compassFadeInRadius": 280.0,
+      "discoveryRadius": 16.0,
+      "discoverable": true,
+      "hiddenUntilDiscovered": true,
+      "waypoint": true,
+      "description": "A ruined watchtower overlooking the road, still useful as a landmark for wandering travellers."
     }
   ]
 }
