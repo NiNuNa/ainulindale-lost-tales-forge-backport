@@ -39,7 +39,6 @@ public final class LostTalesMapMarkerCatalog {
             "forts",
             "camps",
             "caves",
-            "quest_hints",
             "lotr_waypoints"
     };
 
@@ -110,7 +109,7 @@ public final class LostTalesMapMarkerCatalog {
 
     public static boolean isVisibleByDefault(String markerId) {
         LostTalesMapMarkerDefinition marker = getMarker(markerId);
-        return marker != null && !marker.isHiddenUntilDiscovered();
+        return marker != null && (!marker.isDiscoverable() || !marker.isHiddenUntilDiscovered());
     }
 
     public static void logQuestMarkerWarnings(Collection<LostTalesQuestDefinition> quests) {
@@ -180,11 +179,11 @@ public final class LostTalesMapMarkerCatalog {
         if (id.length() == 0) {
             return null;
         }
-        String icon = getString(object, "icon", "undiscovered");
+        boolean hasFastTravel = getBoolean(object, "hasFastTravel", false);
+        String icon = getString(object, "icon", hasFastTravel ? "fort" : "undiscovered");
         String color = getString(object, "color", "white");
-        boolean waypoint = getBoolean(object, "waypoint", getBoolean(object, "isWaypoint", getBoolean(object, "lotrWaypoint", getBoolean(object, "createLotrWaypoint", false))));
-        String lotrWaypointCode = getString(object, "lotrWaypointCode", getString(object, "lotrWaypointName", getString(object, "existingLotrWaypoint", "")));
-        String category = getString(object, "category", waypoint ? LostTalesMapMarkerDefinition.CATEGORY_POINT_OF_INTEREST : LostTalesMapMarkerDefinition.CATEGORY_DEFAULT);
+        String fastTravelWaypointCode = getString(object, "fastTravelWaypointCode", "");
+        String category = getString(object, "category", hasFastTravel ? LostTalesMapMarkerDefinition.CATEGORY_POINT_OF_INTEREST : LostTalesMapMarkerDefinition.CATEGORY_DEFAULT);
         String description = getString(object, "description", getString(object, "info", getString(object, "lore", "")));
         int dimensionId = LostTalesDimensionHelper.parseDimensionId(getString(object, "dimension", "lotr:middle_earth"), LOTRDimension.MIDDLE_EARTH.dimensionID);
         double x = object.get("x").getAsDouble();
@@ -193,12 +192,12 @@ public final class LostTalesMapMarkerCatalog {
         double compassFadeInRadius = getDouble(object, "compassFadeInRadius", getDouble(object, "fadeInRadius", 128.0D));
         double discoveryRadius = Math.max(1.0D, getDouble(object, "discoveryRadius", getDouble(object, "unlockRadius", 8.0D)));
         boolean hidden = getBoolean(object, "hiddenUntilDiscovered", getBoolean(object, "requiresDiscovery", false));
-        boolean discoverable = getBoolean(object, "discoverable", getBoolean(object, "discoverOnApproach", hidden));
+        boolean discoverable = getBoolean(object, "isDiscoverable", hidden);
         if (getBoolean(object, "discoveredByDefault", false)) {
             hidden = false;
             discoverable = false;
         }
-        return new LostTalesMapMarkerDefinition(id, name, icon, color, category, description, waypoint, lotrWaypointCode, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hidden, discoverable);
+        return new LostTalesMapMarkerDefinition(id, name, icon, color, category, description, hasFastTravel, fastTravelWaypointCode, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hidden, discoverable);
     }
 
     private static boolean hasNumber(JsonObject object, String key) {

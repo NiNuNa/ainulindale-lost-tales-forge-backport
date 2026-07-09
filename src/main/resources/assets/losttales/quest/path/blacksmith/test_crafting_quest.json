@@ -29,8 +29,5 @@
   "rewards": {
     "experience": "18",
     "items": "minecraft:iron_ingot*2"
-  },
-  "markers": {
-    "hint": "losttales:quest_blacksmith_hint"
   }
 }

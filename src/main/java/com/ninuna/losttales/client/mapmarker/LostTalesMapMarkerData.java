@@ -17,8 +17,8 @@ public final class LostTalesMapMarkerData {
     private final String colorName;
     private final String categoryName;
     private final String description;
-    private final boolean waypoint;
-    private final String lotrWaypointCode;
+    private final boolean hasFastTravel;
+    private final String fastTravelWaypointCode;
     private final int dimensionId;
     private final double x;
     private final double y;
@@ -36,27 +36,27 @@ public final class LostTalesMapMarkerData {
         this(id, name, iconName, colorName, CATEGORY_DEFAULT, false, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, hiddenUntilDiscovered);
     }
 
-    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, boolean waypoint, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered) {
-        this(id, name, iconName, colorName, categoryName, waypoint, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, hiddenUntilDiscovered);
+    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, boolean hasFastTravel, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered) {
+        this(id, name, iconName, colorName, categoryName, hasFastTravel, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, hiddenUntilDiscovered);
     }
 
-    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, boolean waypoint, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
-        this(id, name, iconName, colorName, categoryName, waypoint, "", dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, discoverable);
+    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, boolean hasFastTravel, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
+        this(id, name, iconName, colorName, categoryName, hasFastTravel, "", dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, discoverable);
     }
 
-    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, boolean waypoint, String lotrWaypointCode, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
-        this(id, name, iconName, colorName, categoryName, "", waypoint, lotrWaypointCode, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, discoverable);
+    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, boolean hasFastTravel, String fastTravelWaypointCode, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
+        this(id, name, iconName, colorName, categoryName, "", hasFastTravel, fastTravelWaypointCode, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, discoverable);
     }
 
-    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, String description, boolean waypoint, String lotrWaypointCode, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
+    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, String description, boolean hasFastTravel, String fastTravelWaypointCode, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
         this.id = id;
         this.name = name;
         this.iconName = iconName;
         this.colorName = colorName;
-        this.categoryName = categoryName == null || categoryName.length() == 0 ? (waypoint ? CATEGORY_POINT_OF_INTEREST : CATEGORY_DEFAULT) : categoryName;
+        this.categoryName = categoryName == null || categoryName.length() == 0 ? (hasFastTravel ? CATEGORY_POINT_OF_INTEREST : CATEGORY_DEFAULT) : categoryName;
         this.description = normalizeDescription(description, this.categoryName);
-        this.waypoint = waypoint;
-        this.lotrWaypointCode = lotrWaypointCode == null ? "" : lotrWaypointCode.trim();
+        this.hasFastTravel = hasFastTravel;
+        this.fastTravelWaypointCode = fastTravelWaypointCode == null ? "" : fastTravelWaypointCode.trim();
         this.dimensionId = dimensionId;
         this.x = x;
         this.y = y;
@@ -67,14 +67,6 @@ public final class LostTalesMapMarkerData {
         this.discoverable = discoverable;
     }
 
-    /**
-     * Compatibility constructor for older packets/builds that still carried the
-     * removed discoveryNotification field. Discoverable markers now always show
-     * the first-discovery notification.
-     */
-    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, boolean waypoint, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable, boolean ignoredDiscoveryNotification) {
-        this(id, name, iconName, colorName, categoryName, waypoint, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, discoverable);
-    }
 
     private static String normalizeDescription(String description, String categoryName) {
         if (description != null && description.trim().length() > 0) {
@@ -110,13 +102,15 @@ public final class LostTalesMapMarkerData {
         return this.description;
     }
 
-    public boolean isWaypoint() {
-        return this.waypoint;
+    public boolean hasFastTravel() {
+        return this.hasFastTravel;
     }
 
-    public String getLotrWaypointCode() {
-        return this.lotrWaypointCode;
+
+    public String getFastTravelWaypointCode() {
+        return this.fastTravelWaypointCode;
     }
+
 
     public int getDimensionId() {
         return this.dimensionId;
@@ -138,24 +132,16 @@ public final class LostTalesMapMarkerData {
         return this.compassFadeInRadius;
     }
 
-    /** Backwards-compatible alias for older compass code/resource packs. */
-    public double getFadeInRadius() {
-        return this.compassFadeInRadius;
-    }
 
     public double getDiscoveryRadius() {
         return this.discoveryRadius;
     }
 
-    /** Backwards-compatible alias for older compass code/resource packs. */
-    public double getUnlockRadius() {
-        return this.discoveryRadius;
-    }
 
     /**
-     * True for quest/location hints that should only appear with their real icon
-     * and label after discovery. Before discovery they render as an undiscovered
-     * icon, rather than being completely invisible.
+     * If true, this marker has no Lost Tales map/compass presentation before
+     * discovery unless it is an existing LOTR waypoint, in which case LOTR's own
+     * vanilla dot remains visible until Lost Tales discovery replaces it.
      */
     public boolean isHiddenUntilDiscovered() {
         return this.hiddenUntilDiscovered;
@@ -165,8 +151,4 @@ public final class LostTalesMapMarkerData {
         return this.discoverable;
     }
 
-    /** Compatibility alias. Discoverable markers now always notify. */
-    public boolean hasDiscoveryNotification() {
-        return this.discoverable;
-    }
 }

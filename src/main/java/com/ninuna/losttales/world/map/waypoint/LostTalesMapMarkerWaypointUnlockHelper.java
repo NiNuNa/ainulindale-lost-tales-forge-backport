@@ -17,7 +17,7 @@ public final class LostTalesMapMarkerWaypointUnlockHelper {
     }
 
     public static boolean unlockWaypointForDiscoveredMarker(EntityPlayer player, LostTalesMapMarkerDefinition marker) {
-        if (!(player instanceof EntityPlayerMP) || marker == null || !marker.isWaypoint()) {
+        if (!(player instanceof EntityPlayerMP) || marker == null || !marker.hasFastTravel()) {
             return false;
         }
         if (LostTalesMapMarkerWaypointRegistry.isExistingLotrWaypointMarker(marker)) {

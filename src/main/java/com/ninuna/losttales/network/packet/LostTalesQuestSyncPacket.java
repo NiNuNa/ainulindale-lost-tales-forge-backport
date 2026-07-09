@@ -165,7 +165,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
             String icon = ByteBufUtils.readUTF8String(buf);
             String color = ByteBufUtils.readUTF8String(buf);
             String category = ByteBufUtils.readUTF8String(buf);
-            boolean waypoint = buf.readBoolean();
+            boolean hasFastTravel = buf.readBoolean();
             int dimensionId = buf.readInt();
             double x = buf.readDouble();
             double y = buf.readDouble();
@@ -174,9 +174,8 @@ public class LostTalesQuestSyncPacket implements IMessage {
             double discoveryRadius = buf.readDouble();
             boolean hidden = buf.readBoolean();
             boolean discoverable = buf.readBoolean();
-            boolean ignoredDiscoveryNotification = buf.readBoolean();
             if (markerId != null && markerId.length() > 0) {
-                this.dynamicMapMarkers.add(new LostTalesMapMarkerDefinition(markerId, name, icon, color, category, waypoint, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hidden, discoverable, ignoredDiscoveryNotification));
+                this.dynamicMapMarkers.add(new LostTalesMapMarkerDefinition(markerId, name, icon, color, category, hasFastTravel, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hidden, discoverable));
             }
         }
     }
@@ -221,7 +220,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
             ByteBufUtils.writeUTF8String(buf, safe(marker.getIconName()));
             ByteBufUtils.writeUTF8String(buf, safe(marker.getColorName()));
             ByteBufUtils.writeUTF8String(buf, safe(marker.getCategoryName()));
-            buf.writeBoolean(marker.isWaypoint());
+            buf.writeBoolean(marker.hasFastTravel());
             buf.writeInt(marker.getDimensionId());
             buf.writeDouble(marker.getX());
             buf.writeDouble(marker.getY());
@@ -229,7 +228,6 @@ public class LostTalesQuestSyncPacket implements IMessage {
             buf.writeDouble(marker.getCompassFadeInRadius());
             buf.writeDouble(marker.getDiscoveryRadius());
             buf.writeBoolean(marker.isHiddenUntilDiscovered());
-            buf.writeBoolean(marker.isDiscoverable());
             buf.writeBoolean(marker.isDiscoverable());
         }
     }

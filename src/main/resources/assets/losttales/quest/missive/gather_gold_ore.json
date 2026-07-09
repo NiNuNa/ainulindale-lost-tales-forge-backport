@@ -26,8 +26,5 @@
   "rewards": {
     "experience": "30",
     "items": "minecraft:gold_ingot*2,minecraft:emerald*1"
-  },
-  "markers": {
-    "objective": "losttales:quest_gold_ore_hint"
   }
 }

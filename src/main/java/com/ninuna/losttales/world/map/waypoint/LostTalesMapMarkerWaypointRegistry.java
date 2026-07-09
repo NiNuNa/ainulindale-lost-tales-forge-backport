@@ -62,7 +62,7 @@ public final class LostTalesMapMarkerWaypointRegistry {
         if (marker == null) {
             return false;
         }
-        String code = marker.getLotrWaypointCode();
+        String code = marker.getFastTravelWaypointCode();
         if (code != null && code.length() > 0) {
             return true;
         }
@@ -71,7 +71,7 @@ public final class LostTalesMapMarkerWaypointRegistry {
     }
 
     private static void registerMarkerWaypoint(LostTalesMapMarkerDefinition marker) {
-        if (marker == null || !marker.isWaypoint()) {
+        if (marker == null || !marker.hasFastTravel()) {
             return;
         }
         if (marker.getDimensionId() != LOTRDimension.MIDDLE_EARTH.dimensionID) {

@@ -43,10 +43,10 @@ public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMar
 
             if (undiscovered) {
                 icon = LostTalesCompassMarkerIcon.UNDISCOVERED;
-                name = "???";
+                name = "?";
                 color = "white";
                 // Undiscovered markers still need to be valid center-focus
-                // candidates so the compass can show "???" and distance.
+                // candidates so the compass can show "?" and distance.
                 scaleWithFocus = true;
                 showDistanceLabel = true;
             }

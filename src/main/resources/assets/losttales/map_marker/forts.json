@@ -11,9 +11,9 @@
       "z": -140.0,
       "compassFadeInRadius": 250.0,
       "discoveryRadius": 12.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
+      "hasFastTravel": true,
       "description": "A fortified test outpost claimed by Cheese, useful for checking discovered fort markers and public waypoint rendering."
     },
     {
@@ -27,9 +27,9 @@
       "z": -110.0,
       "compassFadeInRadius": 280.0,
       "discoveryRadius": 16.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
+      "hasFastTravel": true,
       "description": "A ruined watchtower overlooking the road, still useful as a landmark for wandering travellers."
     }
   ]

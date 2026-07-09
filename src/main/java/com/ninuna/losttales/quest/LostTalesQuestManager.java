@@ -352,8 +352,8 @@ public final class LostTalesQuestManager {
         LostTalesMapMarkerDefinition bundledMarker = LostTalesMapMarkerCatalog.getMarker(markerId);
         boolean knownDynamicMarker = data.getDynamicMapMarker(markerId) != null;
         if (!data.isMarkerDiscovered(markerId)) {
-            if (bundledMarker != null && !bundledMarker.isHiddenUntilDiscovered()) {
-                if (data.discoverMarker(markerId)) {
+            if (bundledMarker != null && LostTalesMapMarkerCatalog.isVisibleByDefault(markerId)) {
+                if (bundledMarker.isDiscoverable() && data.discoverMarker(markerId)) {
                     addLotrWaypointForDiscoveredMarker(player, bundledMarker);
                 }
             } else {

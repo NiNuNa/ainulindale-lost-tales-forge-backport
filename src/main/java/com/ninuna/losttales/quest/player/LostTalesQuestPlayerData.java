@@ -1,5 +1,6 @@
 package com.ninuna.losttales.quest.player;
 
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
@@ -102,7 +103,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             markerTag.setString("Icon", marker.getIconName() == null ? "quest" : marker.getIconName());
             markerTag.setString("Color", marker.getColorName() == null ? "white" : marker.getColorName());
             markerTag.setString("Category", marker.getCategoryName() == null ? LostTalesMapMarkerDefinition.CATEGORY_DEFAULT : marker.getCategoryName());
-            markerTag.setBoolean("Waypoint", marker.isWaypoint());
+            markerTag.setBoolean("HasFastTravel", marker.hasFastTravel());
+            markerTag.setBoolean("Waypoint", marker.hasFastTravel());
             markerTag.setInteger("DimensionId", marker.getDimensionId());
             markerTag.setDouble("X", marker.getX());
             markerTag.setDouble("Y", marker.getY());
@@ -110,6 +112,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             markerTag.setDouble("CompassFadeInRadius", marker.getCompassFadeInRadius());
             markerTag.setDouble("DiscoveryRadius", marker.getDiscoveryRadius());
             markerTag.setBoolean("HiddenUntilDiscovered", marker.isHiddenUntilDiscovered());
+            markerTag.setBoolean("IsDiscoverable", marker.isDiscoverable());
             markerTag.setBoolean("Discoverable", marker.isDiscoverable());
             dynamicMarkerList.appendTag(markerTag);
         }
@@ -291,7 +294,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 marker.getIconName() == null || marker.getIconName().length() == 0 ? "quest" : marker.getIconName(),
                 marker.getColorName() == null || marker.getColorName().length() == 0 ? "white" : marker.getColorName(),
                 marker.getCategoryName() == null || marker.getCategoryName().length() == 0 ? LostTalesMapMarkerDefinition.CATEGORY_DEFAULT : marker.getCategoryName(),
-                marker.isWaypoint(),
+                marker.hasFastTravel(),
                 marker.getDimensionId(),
                 marker.getX(),
                 marker.getY(),
@@ -474,7 +477,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             this.pinnedQuestIds.removeAll(invalidPinnedQuests);
             changed = true;
         }
-        if (this.pinnedMapMarkerId != null && this.pinnedMapMarkerId.length() > 0 && !this.discoveredMarkerIds.contains(this.pinnedMapMarkerId)) {
+        if (this.pinnedMapMarkerId != null && this.pinnedMapMarkerId.length() > 0 && !this.discoveredMarkerIds.contains(this.pinnedMapMarkerId) && !LostTalesMapMarkerCatalog.isVisibleByDefault(this.pinnedMapMarkerId)) {
             this.pinnedMapMarkerId = "";
             changed = true;
         }
@@ -495,7 +498,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 safe(markerTag.getString("Icon"), "quest"),
                 safe(markerTag.getString("Color"), "white"),
                 safe(markerTag.getString("Category"), LostTalesMapMarkerDefinition.CATEGORY_DEFAULT),
-                markerTag.hasKey("Waypoint") && markerTag.getBoolean("Waypoint"),
+                (markerTag.hasKey("HasFastTravel") ? markerTag.getBoolean("HasFastTravel") : (markerTag.hasKey("Waypoint") && markerTag.getBoolean("Waypoint"))),
                 markerTag.getInteger("DimensionId"),
                 markerTag.getDouble("X"),
                 markerTag.getDouble("Y"),
@@ -503,7 +506,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 markerTag.hasKey("CompassFadeInRadius") ? markerTag.getDouble("CompassFadeInRadius") : (markerTag.hasKey("FadeInRadius") ? markerTag.getDouble("FadeInRadius") : 128.0D),
                 markerTag.hasKey("DiscoveryRadius") ? markerTag.getDouble("DiscoveryRadius") : (markerTag.hasKey("UnlockRadius") ? markerTag.getDouble("UnlockRadius") : 8.0D),
                 !markerTag.hasKey("HiddenUntilDiscovered") || markerTag.getBoolean("HiddenUntilDiscovered"),
-                markerTag.hasKey("Discoverable") ? markerTag.getBoolean("Discoverable") : (!markerTag.hasKey("HiddenUntilDiscovered") || markerTag.getBoolean("HiddenUntilDiscovered"))
+                markerTag.hasKey("IsDiscoverable") ? markerTag.getBoolean("IsDiscoverable") : (markerTag.hasKey("Discoverable") ? markerTag.getBoolean("Discoverable") : (!markerTag.hasKey("HiddenUntilDiscovered") || markerTag.getBoolean("HiddenUntilDiscovered")))
         );
     }
 
@@ -519,7 +522,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 && safe(left.getIconName(), "").equals(safe(right.getIconName(), ""))
                 && safe(left.getColorName(), "").equals(safe(right.getColorName(), ""))
                 && safe(left.getCategoryName(), "").equals(safe(right.getCategoryName(), ""))
-                && left.isWaypoint() == right.isWaypoint()
+                && left.hasFastTravel() == right.hasFastTravel()
                 && left.getDimensionId() == right.getDimensionId()
                 && Math.abs(left.getX() - right.getX()) < 0.01D
                 && Math.abs(left.getY() - right.getY()) < 0.01D

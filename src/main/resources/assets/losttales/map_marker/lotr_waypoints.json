@@ -11,10 +11,10 @@
       "z": -26432.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HIMLING"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HIMLING"
     },
     {
       "id": "lotr:waypoint:tol_fuin",
@@ -27,10 +27,10 @@
       "z": -24000.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "TOL_FUIN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "TOL_FUIN"
     },
     {
       "id": "lotr:waypoint:tol_morwen",
@@ -43,10 +43,10 @@
       "z": -4032.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "TOL_MORWEN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "TOL_MORWEN"
     },
     {
       "id": "lotr:waypoint:meneltarma_summit",
@@ -59,10 +59,10 @@
       "z": 128448.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MENELTARMA_SUMMIT"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MENELTARMA_SUMMIT"
     },
     {
       "id": "lotr:waypoint:hobbiton",
@@ -75,10 +75,10 @@
       "z": -320.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HOBBITON"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HOBBITON"
     },
     {
       "id": "lotr:waypoint:brandywine_bridge",
@@ -91,10 +91,10 @@
       "z": -576.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "BRANDYWINE_BRIDGE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "BRANDYWINE_BRIDGE"
     },
     {
       "id": "lotr:waypoint:sarn_ford",
@@ -107,10 +107,10 @@
       "z": 9280.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "SARN_FORD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "SARN_FORD"
     },
     {
       "id": "lotr:waypoint:longbottom",
@@ -123,10 +123,10 @@
       "z": 4544.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "LONGBOTTOM"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "LONGBOTTOM"
     },
     {
       "id": "lotr:waypoint:michel_delving",
@@ -139,10 +139,10 @@
       "z": 1216.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MICHEL_DELVING"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MICHEL_DELVING"
     },
     {
       "id": "lotr:waypoint:willowbottom",
@@ -155,10 +155,10 @@
       "z": 2880.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "WILLOWBOTTOM"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "WILLOWBOTTOM"
     },
     {
       "id": "lotr:waypoint:bucklebury",
@@ -171,10 +171,10 @@
       "z": 576.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "BUCKLEBURY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "BUCKLEBURY"
     },
     {
       "id": "lotr:waypoint:whitfurrows",
@@ -187,10 +187,10 @@
       "z": -320.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "WHITFURROWS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "WHITFURROWS"
     },
     {
       "id": "lotr:waypoint:frogmorton",
@@ -203,10 +203,10 @@
       "z": -192.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "FROGMORTON"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "FROGMORTON"
     },
     {
       "id": "lotr:waypoint:oatbarton",
@@ -219,10 +219,10 @@
       "z": -3648.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "OATBARTON"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "OATBARTON"
     },
     {
       "id": "lotr:waypoint:scary",
@@ -235,10 +235,10 @@
       "z": -2112.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "SCARY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "SCARY"
     },
     {
       "id": "lotr:waypoint:needlehole",
@@ -251,10 +251,10 @@
       "z": -2752.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "NEEDLEHOLE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "NEEDLEHOLE"
     },
     {
       "id": "lotr:waypoint:little_delving",
@@ -267,10 +267,10 @@
       "z": -1472.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "LITTLE_DELVING"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "LITTLE_DELVING"
     },
     {
       "id": "lotr:waypoint:waymeet",
@@ -283,10 +283,10 @@
       "z": 448.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "WAYMEET"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "WAYMEET"
     },
     {
       "id": "lotr:waypoint:tuckborough",
@@ -299,10 +299,10 @@
       "z": 1472.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "TUCKBOROUGH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "TUCKBOROUGH"
     },
     {
       "id": "lotr:waypoint:nobottle",
@@ -315,10 +315,10 @@
       "z": -2496.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "NOBOTTLE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "NOBOTTLE"
     },
     {
       "id": "lotr:waypoint:tighfield",
@@ -331,10 +331,10 @@
       "z": -2240.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "TIGHFIELD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "TIGHFIELD"
     },
     {
       "id": "lotr:waypoint:brockenborings",
@@ -347,10 +347,10 @@
       "z": -2496.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "BROCKENBORINGS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "BROCKENBORINGS"
     },
     {
       "id": "lotr:waypoint:deephallow",
@@ -363,10 +363,10 @@
       "z": 2496.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DEEPHALLOW"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DEEPHALLOW"
     },
     {
       "id": "lotr:waypoint:stock",
@@ -379,10 +379,10 @@
       "z": 960.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "STOCK"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "STOCK"
     },
     {
       "id": "lotr:waypoint:bywater",
@@ -395,10 +395,10 @@
       "z": 64.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "BYWATER"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "BYWATER"
     },
     {
       "id": "lotr:waypoint:overhill",
@@ -411,10 +411,10 @@
       "z": -1216.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "OVERHILL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "OVERHILL"
     },
     {
       "id": "lotr:waypoint:haysend",
@@ -427,10 +427,10 @@
       "z": 2240.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HAYSEND"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HAYSEND"
     },
     {
       "id": "lotr:waypoint:hay_gate",
@@ -443,10 +443,10 @@
       "z": -192.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HAY_GATE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HAY_GATE"
     },
     {
       "id": "lotr:waypoint:greenholm",
@@ -459,10 +459,10 @@
       "z": 1984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GREENHOLM"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GREENHOLM"
     },
     {
       "id": "lotr:waypoint:withywindle_valley",
@@ -475,10 +475,10 @@
       "z": 2496.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "WITHYWINDLE_VALLEY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "WITHYWINDLE_VALLEY"
     },
     {
       "id": "lotr:waypoint:forlond",
@@ -491,10 +491,10 @@
       "z": -1472.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "FORLOND"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "FORLOND"
     },
     {
       "id": "lotr:waypoint:harlond",
@@ -507,10 +507,10 @@
       "z": 6848.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HARLOND"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HARLOND"
     },
     {
       "id": "lotr:waypoint:mithlond_north",
@@ -523,10 +523,10 @@
       "z": -1600.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MITHLOND_NORTH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MITHLOND_NORTH"
     },
     {
       "id": "lotr:waypoint:mithlond_south",
@@ -539,10 +539,10 @@
       "z": -64.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MITHLOND_SOUTH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MITHLOND_SOUTH"
     },
     {
       "id": "lotr:waypoint:forlindon",
@@ -555,10 +555,10 @@
       "z": -11712.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "FORLINDON"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "FORLINDON"
     },
     {
       "id": "lotr:waypoint:harlindon",
@@ -571,10 +571,10 @@
       "z": 19008.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HARLINDON"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HARLINDON"
     },
     {
       "id": "lotr:waypoint:tower_hills",
@@ -587,10 +587,10 @@
       "z": 1600.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "TOWER_HILLS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "TOWER_HILLS"
     },
     {
       "id": "lotr:waypoint:amon_ereb",
@@ -603,10 +603,10 @@
       "z": -2752.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "AMON_EREB"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "AMON_EREB"
     },
     {
       "id": "lotr:waypoint:belegost",
@@ -619,10 +619,10 @@
       "z": -16576.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "BELEGOST"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "BELEGOST"
     },
     {
       "id": "lotr:waypoint:nogrod",
@@ -635,10 +635,10 @@
       "z": -11968.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "NOGROD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "NOGROD"
     },
     {
       "id": "lotr:waypoint:mount_rerir",
@@ -651,10 +651,10 @@
       "z": -26176.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MOUNT_RERIR"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MOUNT_RERIR"
     },
     {
       "id": "lotr:waypoint:mount_dolmed",
@@ -667,10 +667,10 @@
       "z": -13120.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MOUNT_DOLMED"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MOUNT_DOLMED"
     },
     {
       "id": "lotr:waypoint:thorin_halls",
@@ -683,10 +683,10 @@
       "z": -7488.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "THORIN_HALLS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "THORIN_HALLS"
     },
     {
       "id": "lotr:waypoint:arvedui_mines",
@@ -699,10 +699,10 @@
       "z": -30784.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ARVEDUI_MINES"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ARVEDUI_MINES"
     },
     {
       "id": "lotr:waypoint:thrain_halls",
@@ -715,10 +715,10 @@
       "z": 8128.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "THRAIN_HALLS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "THRAIN_HALLS"
     },
     {
       "id": "lotr:waypoint:north_downs",
@@ -731,10 +731,10 @@
       "z": -13248.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "NORTH_DOWNS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "NORTH_DOWNS"
     },
     {
       "id": "lotr:waypoint:south_downs",
@@ -747,10 +747,10 @@
       "z": 4928.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "SOUTH_DOWNS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "SOUTH_DOWNS"
     },
     {
       "id": "lotr:waypoint:eryn_vorn",
@@ -763,10 +763,10 @@
       "z": 29120.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ERYN_VORN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ERYN_VORN"
     },
     {
       "id": "lotr:waypoint:tharbad",
@@ -779,10 +779,10 @@
       "z": 19008.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "THARBAD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "THARBAD"
     },
     {
       "id": "lotr:waypoint:fornost",
@@ -795,10 +795,10 @@
       "z": -9920.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "FORNOST"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "FORNOST"
     },
     {
       "id": "lotr:waypoint:annuminas",
@@ -811,10 +811,10 @@
       "z": -8768.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ANNUMINAS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ANNUMINAS"
     },
     {
       "id": "lotr:waypoint:greenway_crossroads",
@@ -827,10 +827,10 @@
       "z": 10304.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GREENWAY_CROSSROADS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GREENWAY_CROSSROADS"
     },
     {
       "id": "lotr:waypoint:bree",
@@ -843,10 +843,10 @@
       "z": 576.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "BREE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "BREE"
     },
     {
       "id": "lotr:waypoint:staddle",
@@ -859,10 +859,10 @@
       "z": 576.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "STADDLE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "STADDLE"
     },
     {
       "id": "lotr:waypoint:combe",
@@ -875,10 +875,10 @@
       "z": 192.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "COMBE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "COMBE"
     },
     {
       "id": "lotr:waypoint:archet",
@@ -891,10 +891,10 @@
       "z": -192.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ARCHET"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ARCHET"
     },
     {
       "id": "lotr:waypoint:forsaken_inn",
@@ -907,10 +907,10 @@
       "z": 1728.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "FORSAKEN_INN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "FORSAKEN_INN"
     },
     {
       "id": "lotr:waypoint:weathertop",
@@ -923,10 +923,10 @@
       "z": -832.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "WEATHERTOP"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "WEATHERTOP"
     },
     {
       "id": "lotr:waypoint:last_bridge",
@@ -939,10 +939,10 @@
       "z": -1984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "LAST_BRIDGE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "LAST_BRIDGE"
     },
     {
       "id": "lotr:waypoint:old_elf_way",
@@ -955,10 +955,10 @@
       "z": 15040.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "OLD_ELF_WAY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "OLD_ELF_WAY"
     },
     {
       "id": "lotr:waypoint:rivendell",
@@ -971,10 +971,10 @@
       "z": -1088.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RIVENDELL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RIVENDELL"
     },
     {
       "id": "lotr:waypoint:ford_bruinen",
@@ -987,10 +987,10 @@
       "z": -832.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "FORD_BRUINEN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "FORD_BRUINEN"
     },
     {
       "id": "lotr:waypoint:the_trollshaws",
@@ -1003,10 +1003,10 @@
       "z": -3392.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "THE_TROLLSHAWS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "THE_TROLLSHAWS"
     },
     {
       "id": "lotr:waypoint:carn_dum",
@@ -1019,10 +1019,10 @@
       "z": -28992.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CARN_DUM"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CARN_DUM"
     },
     {
       "id": "lotr:waypoint:west_gate",
@@ -1035,10 +1035,10 @@
       "z": 18368.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "WEST_GATE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "WEST_GATE"
     },
     {
       "id": "lotr:waypoint:ost_in_edhil",
@@ -1051,10 +1051,10 @@
       "z": 17984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "OST_IN_EDHIL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "OST_IN_EDHIL"
     },
     {
       "id": "lotr:waypoint:north_dunland",
@@ -1067,10 +1067,10 @@
       "z": 27712.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "NORTH_DUNLAND"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "NORTH_DUNLAND"
     },
     {
       "id": "lotr:waypoint:south_dunland",
@@ -1083,10 +1083,10 @@
       "z": 38080.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "SOUTH_DUNLAND"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "SOUTH_DUNLAND"
     },
     {
       "id": "lotr:waypoint:fords_of_isen",
@@ -1099,10 +1099,10 @@
       "z": 45760.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "FORDS_OF_ISEN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "FORDS_OF_ISEN"
     },
     {
       "id": "lotr:waypoint:dwarrowvale",
@@ -1115,10 +1115,10 @@
       "z": 33344.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DWARROWVALE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DWARROWVALE"
     },
     {
       "id": "lotr:waypoint:wulfburg",
@@ -1131,10 +1131,10 @@
       "z": 47168.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "WULFBURG"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "WULFBURG"
     },
     {
       "id": "lotr:waypoint:lond_daer",
@@ -1147,10 +1147,10 @@
       "z": 35136.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "LOND_DAER"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "LOND_DAER"
     },
     {
       "id": "lotr:waypoint:enedwaith_road",
@@ -1163,10 +1163,10 @@
       "z": 41024.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ENEDWAITH_ROAD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ENEDWAITH_ROAD"
     },
     {
       "id": "lotr:waypoint:mouths_isen",
@@ -1179,10 +1179,10 @@
       "z": 50880.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MOUTHS_ISEN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MOUTHS_ISEN"
     },
     {
       "id": "lotr:waypoint:isengard",
@@ -1195,10 +1195,10 @@
       "z": 42496.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ISENGARD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ISENGARD"
     },
     {
       "id": "lotr:waypoint:cape_of_forochel",
@@ -1211,10 +1211,10 @@
       "z": -43456.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CAPE_OF_FOROCHEL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CAPE_OF_FOROCHEL"
     },
     {
       "id": "lotr:waypoint:south_forochel",
@@ -1227,10 +1227,10 @@
       "z": -34624.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "SOUTH_FOROCHEL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "SOUTH_FOROCHEL"
     },
     {
       "id": "lotr:waypoint:withered_heath",
@@ -1243,10 +1243,10 @@
       "z": -22208.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "WITHERED_HEATH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "WITHERED_HEATH"
     },
     {
       "id": "lotr:waypoint:mount_gundabad",
@@ -1259,10 +1259,10 @@
       "z": -17600.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MOUNT_GUNDABAD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MOUNT_GUNDABAD"
     },
     {
       "id": "lotr:waypoint:mount_gram",
@@ -1275,10 +1275,10 @@
       "z": -17984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MOUNT_GRAM"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MOUNT_GRAM"
     },
     {
       "id": "lotr:waypoint:high_pass",
@@ -1291,10 +1291,10 @@
       "z": -3008.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HIGH_PASS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HIGH_PASS"
     },
     {
       "id": "lotr:waypoint:mount_caradhras",
@@ -1307,10 +1307,10 @@
       "z": 14784.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MOUNT_CARADHRAS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MOUNT_CARADHRAS"
     },
     {
       "id": "lotr:waypoint:mount_celebdil",
@@ -1323,10 +1323,10 @@
       "z": 17216.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MOUNT_CELEBDIL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MOUNT_CELEBDIL"
     },
     {
       "id": "lotr:waypoint:mount_fanuidhol",
@@ -1339,10 +1339,10 @@
       "z": 15936.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MOUNT_FANUIDHOL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MOUNT_FANUIDHOL"
     },
     {
       "id": "lotr:waypoint:mount_methedras",
@@ -1355,10 +1355,10 @@
       "z": 38592.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MOUNT_METHEDRAS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MOUNT_METHEDRAS"
     },
     {
       "id": "lotr:waypoint:goblin_town",
@@ -1371,10 +1371,10 @@
       "z": -4288.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GOBLIN_TOWN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GOBLIN_TOWN"
     },
     {
       "id": "lotr:waypoint:eagles_eyrie",
@@ -1387,10 +1387,10 @@
       "z": -5696.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "EAGLES_EYRIE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "EAGLES_EYRIE"
     },
     {
       "id": "lotr:waypoint:dains_halls",
@@ -1403,10 +1403,10 @@
       "z": -22464.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DAINS_HALLS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DAINS_HALLS"
     },
     {
       "id": "lotr:waypoint:scatha",
@@ -1419,10 +1419,10 @@
       "z": -21440.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "SCATHA"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "SCATHA"
     },
     {
       "id": "lotr:waypoint:carrock",
@@ -1435,10 +1435,10 @@
       "z": -6208.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CARROCK"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CARROCK"
     },
     {
       "id": "lotr:waypoint:old_ford",
@@ -1451,10 +1451,10 @@
       "z": -3520.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "OLD_FORD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "OLD_FORD"
     },
     {
       "id": "lotr:waypoint:gladden_fields",
@@ -1467,10 +1467,10 @@
       "z": 7744.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GLADDEN_FIELDS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GLADDEN_FIELDS"
     },
     {
       "id": "lotr:waypoint:dimrill_dale",
@@ -1483,10 +1483,10 @@
       "z": 17216.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DIMRILL_DALE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DIMRILL_DALE"
     },
     {
       "id": "lotr:waypoint:field_of_celebrant",
@@ -1499,10 +1499,10 @@
       "z": 29504.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "FIELD_OF_CELEBRANT"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "FIELD_OF_CELEBRANT"
     },
     {
       "id": "lotr:waypoint:rauros",
@@ -1515,10 +1515,10 @@
       "z": 51264.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RAUROS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RAUROS"
     },
     {
       "id": "lotr:waypoint:beorn",
@@ -1531,10 +1531,10 @@
       "z": -6336.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "BEORN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "BEORN"
     },
     {
       "id": "lotr:waypoint:forest_gate",
@@ -1547,10 +1547,10 @@
       "z": -9536.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "FOREST_GATE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "FOREST_GATE"
     },
     {
       "id": "lotr:waypoint:framsburg",
@@ -1563,10 +1563,10 @@
       "z": -17856.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "FRAMSBURG"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "FRAMSBURG"
     },
     {
       "id": "lotr:waypoint:anduin_crossroads",
@@ -1579,10 +1579,10 @@
       "z": 22464.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ANDUIN_CROSSROADS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ANDUIN_CROSSROADS"
     },
     {
       "id": "lotr:waypoint:east_rhovanion_road",
@@ -1595,10 +1595,10 @@
       "z": 30272.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "EAST_RHOVANION_ROAD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "EAST_RHOVANION_ROAD"
     },
     {
       "id": "lotr:waypoint:thranduil_halls",
@@ -1611,10 +1611,10 @@
       "z": -12352.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "THRANDUIL_HALLS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "THRANDUIL_HALLS"
     },
     {
       "id": "lotr:waypoint:dol_guldur",
@@ -1627,10 +1627,10 @@
       "z": 21056.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DOL_GULDUR"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DOL_GULDUR"
     },
     {
       "id": "lotr:waypoint:mirkwood_mountains",
@@ -1643,10 +1643,10 @@
       "z": -7360.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MIRKWOOD_MOUNTAINS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MIRKWOOD_MOUNTAINS"
     },
     {
       "id": "lotr:waypoint:rhosgobel",
@@ -1659,10 +1659,10 @@
       "z": 4160.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RHOSGOBEL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RHOSGOBEL"
     },
     {
       "id": "lotr:waypoint:enchanted_river",
@@ -1675,10 +1675,10 @@
       "z": -10176.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ENCHANTED_RIVER"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ENCHANTED_RIVER"
     },
     {
       "id": "lotr:waypoint:river_gate",
@@ -1691,10 +1691,10 @@
       "z": -4288.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RIVER_GATE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RIVER_GATE"
     },
     {
       "id": "lotr:waypoint:east_bight",
@@ -1707,10 +1707,10 @@
       "z": 12096.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "EAST_BIGHT"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "EAST_BIGHT"
     },
     {
       "id": "lotr:waypoint:old_rhovanion",
@@ -1723,10 +1723,10 @@
       "z": 17984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "OLD_RHOVANION"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "OLD_RHOVANION"
     },
     {
       "id": "lotr:waypoint:dorwinion_crossroads",
@@ -1739,10 +1739,10 @@
       "z": 19520.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DORWINION_CROSSROADS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DORWINION_CROSSROADS"
     },
     {
       "id": "lotr:waypoint:erebor",
@@ -1755,10 +1755,10 @@
       "z": -15424.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "EREBOR"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "EREBOR"
     },
     {
       "id": "lotr:waypoint:dale_city",
@@ -1771,10 +1771,10 @@
       "z": -14656.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DALE_CITY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DALE_CITY"
     },
     {
       "id": "lotr:waypoint:long_lake",
@@ -1787,10 +1787,10 @@
       "z": -12480.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "LONG_LAKE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "LONG_LAKE"
     },
     {
       "id": "lotr:waypoint:running_ford",
@@ -1803,10 +1803,10 @@
       "z": 2496.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RUNNING_FORD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RUNNING_FORD"
     },
     {
       "id": "lotr:waypoint:redwater_ford",
@@ -1819,10 +1819,10 @@
       "z": -5056.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "REDWATER_FORD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "REDWATER_FORD"
     },
     {
       "id": "lotr:waypoint:dale_crossroads",
@@ -1835,10 +1835,10 @@
       "z": -6336.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DALE_CROSSROADS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DALE_CROSSROADS"
     },
     {
       "id": "lotr:waypoint:dale_port",
@@ -1851,10 +1851,10 @@
       "z": 4928.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DALE_PORT"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DALE_PORT"
     },
     {
       "id": "lotr:waypoint:west_peak",
@@ -1867,10 +1867,10 @@
       "z": -15552.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "WEST_PEAK"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "WEST_PEAK"
     },
     {
       "id": "lotr:waypoint:east_peak",
@@ -1883,10 +1883,10 @@
       "z": -15296.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "EAST_PEAK"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "EAST_PEAK"
     },
     {
       "id": "lotr:waypoint:caras_galadhon",
@@ -1899,10 +1899,10 @@
       "z": 22080.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CARAS_GALADHON"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CARAS_GALADHON"
     },
     {
       "id": "lotr:waypoint:cerin_amroth",
@@ -1915,10 +1915,10 @@
       "z": 21440.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CERIN_AMROTH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CERIN_AMROTH"
     },
     {
       "id": "lotr:waypoint:nimrodel",
@@ -1931,10 +1931,10 @@
       "z": 21056.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "NIMRODEL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "NIMRODEL"
     },
     {
       "id": "lotr:waypoint:derndingle",
@@ -1947,10 +1947,10 @@
       "z": 38464.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DERNDINGLE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DERNDINGLE"
     },
     {
       "id": "lotr:waypoint:wellinghall",
@@ -1963,10 +1963,10 @@
       "z": 36416.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "WELLINGHALL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "WELLINGHALL"
     },
     {
       "id": "lotr:waypoint:treebeard_hill",
@@ -1979,10 +1979,10 @@
       "z": 38464.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "TREEBEARD_HILL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "TREEBEARD_HILL"
     },
     {
       "id": "lotr:waypoint:wold",
@@ -1995,10 +1995,10 @@
       "z": 36544.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "WOLD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "WOLD"
     },
     {
       "id": "lotr:waypoint:edoras",
@@ -2011,10 +2011,10 @@
       "z": 53568.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "EDORAS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "EDORAS"
     },
     {
       "id": "lotr:waypoint:helms_deep",
@@ -2027,10 +2027,10 @@
       "z": 49344.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HELMS_DEEP"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HELMS_DEEP"
     },
     {
       "id": "lotr:waypoint:helms_crossroads",
@@ -2043,10 +2043,10 @@
       "z": 48448.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HELMS_CROSSROADS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HELMS_CROSSROADS"
     },
     {
       "id": "lotr:waypoint:uruk_highlands",
@@ -2059,10 +2059,10 @@
       "z": 41920.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "URUK_HIGHLANDS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "URUK_HIGHLANDS"
     },
     {
       "id": "lotr:waypoint:mering_stream",
@@ -2075,10 +2075,10 @@
       "z": 60480.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MERING_STREAM"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MERING_STREAM"
     },
     {
       "id": "lotr:waypoint:entwade",
@@ -2091,10 +2091,10 @@
       "z": 47936.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ENTWADE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ENTWADE"
     },
     {
       "id": "lotr:waypoint:eastmark",
@@ -2107,10 +2107,10 @@
       "z": 51264.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "EASTMARK"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "EASTMARK"
     },
     {
       "id": "lotr:waypoint:aldburg",
@@ -2123,10 +2123,10 @@
       "z": 57408.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ALDBURG"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ALDBURG"
     },
     {
       "id": "lotr:waypoint:grimslade",
@@ -2139,10 +2139,10 @@
       "z": 50240.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GRIMSLADE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GRIMSLADE"
     },
     {
       "id": "lotr:waypoint:corsairs_landing",
@@ -2155,10 +2155,10 @@
       "z": 49088.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CORSAIRS_LANDING"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CORSAIRS_LANDING"
     },
     {
       "id": "lotr:waypoint:freca_hold",
@@ -2171,10 +2171,10 @@
       "z": 53056.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "FRECA_HOLD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "FRECA_HOLD"
     },
     {
       "id": "lotr:waypoint:dunharrow",
@@ -2187,10 +2187,10 @@
       "z": 54336.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DUNHARROW"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DUNHARROW"
     },
     {
       "id": "lotr:waypoint:tarlang",
@@ -2203,10 +2203,10 @@
       "z": 61888.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "TARLANG"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "TARLANG"
     },
     {
       "id": "lotr:waypoint:ras_morthil",
@@ -2219,10 +2219,10 @@
       "z": 77120.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RAS_MORTHIL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RAS_MORTHIL"
     },
     {
       "id": "lotr:waypoint:minas_tirith",
@@ -2235,10 +2235,10 @@
       "z": 66240.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MINAS_TIRITH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MINAS_TIRITH"
     },
     {
       "id": "lotr:waypoint:cair_andros",
@@ -2251,10 +2251,10 @@
       "z": 61120.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CAIR_ANDROS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CAIR_ANDROS"
     },
     {
       "id": "lotr:waypoint:halifirien",
@@ -2267,10 +2267,10 @@
       "z": 60864.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HALIFIRIEN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HALIFIRIEN"
     },
     {
       "id": "lotr:waypoint:calenhad",
@@ -2283,10 +2283,10 @@
       "z": 61760.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CALENHAD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CALENHAD"
     },
     {
       "id": "lotr:waypoint:minrimmon",
@@ -2299,10 +2299,10 @@
       "z": 62656.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MINRIMMON"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MINRIMMON"
     },
     {
       "id": "lotr:waypoint:erelas",
@@ -2315,10 +2315,10 @@
       "z": 63040.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ERELAS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ERELAS"
     },
     {
       "id": "lotr:waypoint:nardol",
@@ -2331,10 +2331,10 @@
       "z": 63808.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "NARDOL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "NARDOL"
     },
     {
       "id": "lotr:waypoint:eilenach",
@@ -2347,10 +2347,10 @@
       "z": 63808.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "EILENACH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "EILENACH"
     },
     {
       "id": "lotr:waypoint:amon_din",
@@ -2363,10 +2363,10 @@
       "z": 64192.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "AMON_DIN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "AMON_DIN"
     },
     {
       "id": "lotr:waypoint:osgiliath_west",
@@ -2379,10 +2379,10 @@
       "z": 66112.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "OSGILIATH_WEST"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "OSGILIATH_WEST"
     },
     {
       "id": "lotr:waypoint:osgiliath_east",
@@ -2395,10 +2395,10 @@
       "z": 66112.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "OSGILIATH_EAST"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "OSGILIATH_EAST"
     },
     {
       "id": "lotr:waypoint:emyn_arnen",
@@ -2411,10 +2411,10 @@
       "z": 68800.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "EMYN_ARNEN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "EMYN_ARNEN"
     },
     {
       "id": "lotr:waypoint:henneth_annun",
@@ -2427,10 +2427,10 @@
       "z": 59200.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HENNETH_ANNUN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HENNETH_ANNUN"
     },
     {
       "id": "lotr:waypoint:crossroads_ithilien",
@@ -2443,10 +2443,10 @@
       "z": 64832.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CROSSROADS_ITHILIEN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CROSSROADS_ITHILIEN"
     },
     {
       "id": "lotr:waypoint:north_ithilien",
@@ -2459,10 +2459,10 @@
       "z": 53952.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "NORTH_ITHILIEN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "NORTH_ITHILIEN"
     },
     {
       "id": "lotr:waypoint:crossings_of_poros",
@@ -2475,10 +2475,10 @@
       "z": 81984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CROSSINGS_OF_POROS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CROSSINGS_OF_POROS"
     },
     {
       "id": "lotr:waypoint:pelargir",
@@ -2491,10 +2491,10 @@
       "z": 79168.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "PELARGIR"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "PELARGIR"
     },
     {
       "id": "lotr:waypoint:linhir",
@@ -2507,10 +2507,10 @@
       "z": 78400.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "LINHIR"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "LINHIR"
     },
     {
       "id": "lotr:waypoint:anduin_mouth",
@@ -2523,10 +2523,10 @@
       "z": 81856.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ANDUIN_MOUTH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ANDUIN_MOUTH"
     },
     {
       "id": "lotr:waypoint:imloth_melui",
@@ -2539,10 +2539,10 @@
       "z": 67136.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "IMLOTH_MELUI"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "IMLOTH_MELUI"
     },
     {
       "id": "lotr:waypoint:crossings_erui",
@@ -2555,10 +2555,10 @@
       "z": 69440.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CROSSINGS_ERUI"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CROSSINGS_ERUI"
     },
     {
       "id": "lotr:waypoint:calembel",
@@ -2571,10 +2571,10 @@
       "z": 66368.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CALEMBEL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CALEMBEL"
     },
     {
       "id": "lotr:waypoint:ethring",
@@ -2587,10 +2587,10 @@
       "z": 67776.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ETHRING"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ETHRING"
     },
     {
       "id": "lotr:waypoint:erech",
@@ -2603,10 +2603,10 @@
       "z": 60864.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ERECH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ERECH"
     },
     {
       "id": "lotr:waypoint:green_hills",
@@ -2619,10 +2619,10 @@
       "z": 69568.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GREEN_HILLS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GREEN_HILLS"
     },
     {
       "id": "lotr:waypoint:dol_amroth",
@@ -2635,10 +2635,10 @@
       "z": 77248.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DOL_AMROTH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DOL_AMROTH"
     },
     {
       "id": "lotr:waypoint:edhellond",
@@ -2651,10 +2651,10 @@
       "z": 72128.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "EDHELLOND"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "EDHELLOND"
     },
     {
       "id": "lotr:waypoint:tarnost",
@@ -2667,10 +2667,10 @@
       "z": 73024.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "TARNOST"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "TARNOST"
     },
     {
       "id": "lotr:waypoint:tolfalas_island",
@@ -2683,10 +2683,10 @@
       "z": 87616.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "TOLFALAS_ISLAND"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "TOLFALAS_ISLAND"
     },
     {
       "id": "lotr:waypoint:amon_hen",
@@ -2699,10 +2699,10 @@
       "z": 51392.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "AMON_HEN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "AMON_HEN"
     },
     {
       "id": "lotr:waypoint:amon_lhaw",
@@ -2715,10 +2715,10 @@
       "z": 49984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "AMON_LHAW"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "AMON_LHAW"
     },
     {
       "id": "lotr:waypoint:argonath",
@@ -2731,10 +2731,10 @@
       "z": 48960.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ARGONATH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ARGONATH"
     },
     {
       "id": "lotr:waypoint:north_undeep",
@@ -2747,10 +2747,10 @@
       "z": 33088.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "NORTH_UNDEEP"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "NORTH_UNDEEP"
     },
     {
       "id": "lotr:waypoint:south_undeep",
@@ -2763,10 +2763,10 @@
       "z": 37696.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "SOUTH_UNDEEP"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "SOUTH_UNDEEP"
     },
     {
       "id": "lotr:waypoint:morannon",
@@ -2779,10 +2779,10 @@
       "z": 51392.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MORANNON"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MORANNON"
     },
     {
       "id": "lotr:waypoint:udun",
@@ -2795,10 +2795,10 @@
       "z": 53184.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "UDUN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "UDUN"
     },
     {
       "id": "lotr:waypoint:mount_doom",
@@ -2811,10 +2811,10 @@
       "z": 60736.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MOUNT_DOOM"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MOUNT_DOOM"
     },
     {
       "id": "lotr:waypoint:barad_dur",
@@ -2827,10 +2827,10 @@
       "z": 59712.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "BARAD_DUR"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "BARAD_DUR"
     },
     {
       "id": "lotr:waypoint:minas_morgul",
@@ -2843,10 +2843,10 @@
       "z": 65216.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MINAS_MORGUL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MINAS_MORGUL"
     },
     {
       "id": "lotr:waypoint:durthang",
@@ -2859,10 +2859,10 @@
       "z": 54976.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DURTHANG"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DURTHANG"
     },
     {
       "id": "lotr:waypoint:carach_angren",
@@ -2875,10 +2875,10 @@
       "z": 55872.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CARACH_ANGREN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CARACH_ANGREN"
     },
     {
       "id": "lotr:waypoint:cirith_ungol",
@@ -2891,10 +2891,10 @@
       "z": 63424.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CIRITH_UNGOL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CIRITH_UNGOL"
     },
     {
       "id": "lotr:waypoint:morigost",
@@ -2907,10 +2907,10 @@
       "z": 71232.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MORIGOST"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MORIGOST"
     },
     {
       "id": "lotr:waypoint:nargroth",
@@ -2923,10 +2923,10 @@
       "z": 66368.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "NARGROTH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "NARGROTH"
     },
     {
       "id": "lotr:waypoint:amon_angren",
@@ -2939,10 +2939,10 @@
       "z": 65984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "AMON_ANGREN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "AMON_ANGREN"
     },
     {
       "id": "lotr:waypoint:seregost",
@@ -2955,10 +2955,10 @@
       "z": 62016.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "SEREGOST"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "SEREGOST"
     },
     {
       "id": "lotr:waypoint:fellbeasts",
@@ -2971,10 +2971,10 @@
       "z": 55616.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "FELLBEASTS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "FELLBEASTS"
     },
     {
       "id": "lotr:waypoint:eastern_guard",
@@ -2987,10 +2987,10 @@
       "z": 52160.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "EASTERN_GUARD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "EASTERN_GUARD"
     },
     {
       "id": "lotr:waypoint:nurnen_northern_shore",
@@ -3003,10 +3003,10 @@
       "z": 76096.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "NURNEN_NORTHERN_SHORE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "NURNEN_NORTHERN_SHORE"
     },
     {
       "id": "lotr:waypoint:nurnen_southern_shore",
@@ -3019,10 +3019,10 @@
       "z": 81856.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "NURNEN_SOUTHERN_SHORE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "NURNEN_SOUTHERN_SHORE"
     },
     {
       "id": "lotr:waypoint:nurnen_western_shore",
@@ -3035,10 +3035,10 @@
       "z": 81088.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "NURNEN_WESTERN_SHORE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "NURNEN_WESTERN_SHORE"
     },
     {
       "id": "lotr:waypoint:nurnen_eastern_shore",
@@ -3051,10 +3051,10 @@
       "z": 75072.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "NURNEN_EASTERN_SHORE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "NURNEN_EASTERN_SHORE"
     },
     {
       "id": "lotr:waypoint:thaurband",
@@ -3067,10 +3067,10 @@
       "z": 79936.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "THAURBAND"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "THAURBAND"
     },
     {
       "id": "lotr:waypoint:valley_of_spiders",
@@ -3083,10 +3083,10 @@
       "z": 85824.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "VALLEY_OF_SPIDERS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "VALLEY_OF_SPIDERS"
     },
     {
       "id": "lotr:waypoint:dorwinion_port",
@@ -3099,10 +3099,10 @@
       "z": 17088.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DORWINION_PORT"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DORWINION_PORT"
     },
     {
       "id": "lotr:waypoint:dorwinion_court",
@@ -3115,10 +3115,10 @@
       "z": 26816.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DORWINION_COURT"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DORWINION_COURT"
     },
     {
       "id": "lotr:waypoint:dorwinion_ford",
@@ -3131,10 +3131,10 @@
       "z": 32832.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DORWINION_FORD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DORWINION_FORD"
     },
     {
       "id": "lotr:waypoint:dorwinion_hills",
@@ -3147,10 +3147,10 @@
       "z": 28224.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DORWINION_HILLS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DORWINION_HILLS"
     },
     {
       "id": "lotr:waypoint:rhun_road_way",
@@ -3163,10 +3163,10 @@
       "z": 13504.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RHUN_ROAD_WAY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RHUN_ROAD_WAY"
     },
     {
       "id": "lotr:waypoint:balcaras",
@@ -3179,10 +3179,10 @@
       "z": 42048.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "BALCARAS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "BALCARAS"
     },
     {
       "id": "lotr:waypoint:khand_north_road",
@@ -3195,10 +3195,10 @@
       "z": 76992.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "KHAND_NORTH_ROAD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "KHAND_NORTH_ROAD"
     },
     {
       "id": "lotr:waypoint:rhun_capital",
@@ -3211,10 +3211,10 @@
       "z": 32576.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RHUN_CAPITAL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RHUN_CAPITAL"
     },
     {
       "id": "lotr:waypoint:khamul_tower",
@@ -3227,10 +3227,10 @@
       "z": 19008.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "KHAMUL_TOWER"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "KHAMUL_TOWER"
     },
     {
       "id": "lotr:waypoint:mordor_ford",
@@ -3243,10 +3243,10 @@
       "z": 48960.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MORDOR_FORD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MORDOR_FORD"
     },
     {
       "id": "lotr:waypoint:rhun_north_city",
@@ -3259,10 +3259,10 @@
       "z": 23616.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RHUN_NORTH_CITY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RHUN_NORTH_CITY"
     },
     {
       "id": "lotr:waypoint:bazylan",
@@ -3275,10 +3275,10 @@
       "z": 20416.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "BAZYLAN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "BAZYLAN"
     },
     {
       "id": "lotr:waypoint:border_town",
@@ -3291,10 +3291,10 @@
       "z": 31936.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "BORDER_TOWN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "BORDER_TOWN"
     },
     {
       "id": "lotr:waypoint:rhun_sea_city",
@@ -3307,10 +3307,10 @@
       "z": 28992.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RHUN_SEA_CITY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RHUN_SEA_CITY"
     },
     {
       "id": "lotr:waypoint:rhun_north_ford",
@@ -3323,10 +3323,10 @@
       "z": 10432.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RHUN_NORTH_FORD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RHUN_NORTH_FORD"
     },
     {
       "id": "lotr:waypoint:rhun_northeast",
@@ -3339,10 +3339,10 @@
       "z": 10944.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RHUN_NORTHEAST"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RHUN_NORTHEAST"
     },
     {
       "id": "lotr:waypoint:rhun_south_pass",
@@ -3355,10 +3355,10 @@
       "z": 41664.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RHUN_SOUTH_PASS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RHUN_SOUTH_PASS"
     },
     {
       "id": "lotr:waypoint:rhun_east_city",
@@ -3371,10 +3371,10 @@
       "z": 29760.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RHUN_EAST_CITY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RHUN_EAST_CITY"
     },
     {
       "id": "lotr:waypoint:rhun_east_town",
@@ -3387,10 +3387,10 @@
       "z": 26432.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RHUN_EAST_TOWN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RHUN_EAST_TOWN"
     },
     {
       "id": "lotr:waypoint:rhun_southeast",
@@ -3403,10 +3403,10 @@
       "z": 52672.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "RHUN_SOUTHEAST"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "RHUN_SOUTHEAST"
     },
     {
       "id": "lotr:waypoint:baraz_dum",
@@ -3419,10 +3419,10 @@
       "z": 9024.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "BARAZ_DUM"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "BARAZ_DUM"
     },
     {
       "id": "lotr:waypoint:crossings_of_harad",
@@ -3435,10 +3435,10 @@
       "z": 104256.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CROSSINGS_OF_HARAD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CROSSINGS_OF_HARAD"
     },
     {
       "id": "lotr:waypoint:harnen_sea_town",
@@ -3451,10 +3451,10 @@
       "z": 106432.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HARNEN_SEA_TOWN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HARNEN_SEA_TOWN"
     },
     {
       "id": "lotr:waypoint:harnen_road_town",
@@ -3467,10 +3467,10 @@
       "z": 106688.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HARNEN_ROAD_TOWN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HARNEN_ROAD_TOWN"
     },
     {
       "id": "lotr:waypoint:harnen_black_town",
@@ -3483,10 +3483,10 @@
       "z": 96320.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HARNEN_BLACK_TOWN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HARNEN_BLACK_TOWN"
     },
     {
       "id": "lotr:waypoint:crossings_of_lithnen",
@@ -3499,10 +3499,10 @@
       "z": 104384.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CROSSINGS_OF_LITHNEN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CROSSINGS_OF_LITHNEN"
     },
     {
       "id": "lotr:waypoint:harnen_river_town",
@@ -3515,10 +3515,10 @@
       "z": 106048.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HARNEN_RIVER_TOWN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HARNEN_RIVER_TOWN"
     },
     {
       "id": "lotr:waypoint:khand_ford",
@@ -3531,10 +3531,10 @@
       "z": 89920.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "KHAND_FORD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "KHAND_FORD"
     },
     {
       "id": "lotr:waypoint:umbar_city",
@@ -3547,10 +3547,10 @@
       "z": 122816.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "UMBAR_CITY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "UMBAR_CITY"
     },
     {
       "id": "lotr:waypoint:umbar_gate",
@@ -3563,10 +3563,10 @@
       "z": 123968.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "UMBAR_GATE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "UMBAR_GATE"
     },
     {
       "id": "lotr:waypoint:gate_herumor",
@@ -3579,10 +3579,10 @@
       "z": 126912.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GATE_HERUMOR"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GATE_HERUMOR"
     },
     {
       "id": "lotr:waypoint:cedar_road",
@@ -3595,10 +3595,10 @@
       "z": 143168.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "CEDAR_ROAD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "CEDAR_ROAD"
     },
     {
       "id": "lotr:waypoint:fertile_valley",
@@ -3611,10 +3611,10 @@
       "z": 139712.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "FERTILE_VALLEY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "FERTILE_VALLEY"
     },
     {
       "id": "lotr:waypoint:gardens_beruthiel",
@@ -3627,10 +3627,10 @@
       "z": 134592.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GARDENS_BERUTHIEL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GARDENS_BERUTHIEL"
     },
     {
       "id": "lotr:waypoint:ain_al_harad",
@@ -3643,10 +3643,10 @@
       "z": 128960.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "AIN_AL_HARAD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "AIN_AL_HARAD"
     },
     {
       "id": "lotr:waypoint:gate_fuinur",
@@ -3659,10 +3659,10 @@
       "z": 115392.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GATE_FUINUR"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GATE_FUINUR"
     },
     {
       "id": "lotr:waypoint:coast_fortress",
@@ -3675,10 +3675,10 @@
       "z": 109120.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "COAST_FORTRESS"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "COAST_FORTRESS"
     },
     {
       "id": "lotr:waypoint:sandhill_town",
@@ -3691,10 +3691,10 @@
       "z": 111424.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "SANDHILL_TOWN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "SANDHILL_TOWN"
     },
     {
       "id": "lotr:waypoint:coast_river_town",
@@ -3707,10 +3707,10 @@
       "z": 141760.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "COAST_RIVER_TOWN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "COAST_RIVER_TOWN"
     },
     {
       "id": "lotr:waypoint:coast_city",
@@ -3723,10 +3723,10 @@
       "z": 129600.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "COAST_CITY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "COAST_CITY"
     },
     {
       "id": "lotr:waypoint:desert_town",
@@ -3739,10 +3739,10 @@
       "z": 112832.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DESERT_TOWN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DESERT_TOWN"
     },
     {
       "id": "lotr:waypoint:south_desert_town",
@@ -3755,10 +3755,10 @@
       "z": 159552.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "SOUTH_DESERT_TOWN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "SOUTH_DESERT_TOWN"
     },
     {
       "id": "lotr:waypoint:desert_river_town",
@@ -3771,10 +3771,10 @@
       "z": 160576.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "DESERT_RIVER_TOWN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "DESERT_RIVER_TOWN"
     },
     {
       "id": "lotr:waypoint:gulf_of_harad",
@@ -3787,10 +3787,10 @@
       "z": 160320.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GULF_OF_HARAD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GULF_OF_HARAD"
     },
     {
       "id": "lotr:waypoint:gulf_city",
@@ -3803,10 +3803,10 @@
       "z": 152640.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GULF_CITY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GULF_CITY"
     },
     {
       "id": "lotr:waypoint:gulf_ford",
@@ -3819,10 +3819,10 @@
       "z": 166720.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GULF_FORD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GULF_FORD"
     },
     {
       "id": "lotr:waypoint:gulf_trade_town",
@@ -3835,10 +3835,10 @@
       "z": 162752.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GULF_TRADE_TOWN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GULF_TRADE_TOWN"
     },
     {
       "id": "lotr:waypoint:gulf_north_town",
@@ -3851,10 +3851,10 @@
       "z": 146496.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GULF_NORTH_TOWN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GULF_NORTH_TOWN"
     },
     {
       "id": "lotr:waypoint:gulf_east_bay",
@@ -3867,10 +3867,10 @@
       "z": 172992.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GULF_EAST_BAY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GULF_EAST_BAY"
     },
     {
       "id": "lotr:waypoint:gulf_east_port",
@@ -3883,10 +3883,10 @@
       "z": 168896.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GULF_EAST_PORT"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GULF_EAST_PORT"
     },
     {
       "id": "lotr:waypoint:mount_sand",
@@ -3899,10 +3899,10 @@
       "z": 149696.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MOUNT_SAND"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MOUNT_SAND"
     },
     {
       "id": "lotr:waypoint:mount_green",
@@ -3915,10 +3915,10 @@
       "z": 210240.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MOUNT_GREEN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MOUNT_GREEN"
     },
     {
       "id": "lotr:waypoint:mount_thunder",
@@ -3931,10 +3931,10 @@
       "z": 238144.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "MOUNT_THUNDER"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "MOUNT_THUNDER"
     },
     {
       "id": "lotr:waypoint:great_plains_north",
@@ -3947,10 +3947,10 @@
       "z": 171200.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GREAT_PLAINS_NORTH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GREAT_PLAINS_NORTH"
     },
     {
       "id": "lotr:waypoint:great_plains_south",
@@ -3963,10 +3963,10 @@
       "z": 220480.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GREAT_PLAINS_SOUTH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GREAT_PLAINS_SOUTH"
     },
     {
       "id": "lotr:waypoint:great_plains_west",
@@ -3979,10 +3979,10 @@
       "z": 190144.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GREAT_PLAINS_WEST"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GREAT_PLAINS_WEST"
     },
     {
       "id": "lotr:waypoint:great_plains_east",
@@ -3995,10 +3995,10 @@
       "z": 185152.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GREAT_PLAINS_EAST"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GREAT_PLAINS_EAST"
     },
     {
       "id": "lotr:waypoint:green_valley",
@@ -4011,10 +4011,10 @@
       "z": 242240.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "GREEN_VALLEY"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "GREEN_VALLEY"
     },
     {
       "id": "lotr:waypoint:harad_lakes",
@@ -4027,10 +4027,10 @@
       "z": 202304.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HARAD_LAKES"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HARAD_LAKES"
     },
     {
       "id": "lotr:waypoint:lake_harad",
@@ -4043,10 +4043,10 @@
       "z": 238400.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "LAKE_HARAD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "LAKE_HARAD"
     },
     {
       "id": "lotr:waypoint:haraduin_mouth",
@@ -4059,10 +4059,10 @@
       "z": 269888.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HARADUIN_MOUTH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HARADUIN_MOUTH"
     },
     {
       "id": "lotr:waypoint:isle_mist",
@@ -4075,10 +4075,10 @@
       "z": 363968.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "ISLE_MIST"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "ISLE_MIST"
     },
     {
       "id": "lotr:waypoint:taurelonde",
@@ -4091,10 +4091,10 @@
       "z": 241088.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "TAURELONDE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "TAURELONDE"
     },
     {
       "id": "lotr:waypoint:harad_horn",
@@ -4107,10 +4107,10 @@
       "z": 390208.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HARAD_HORN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HARAD_HORN"
     },
     {
       "id": "lotr:waypoint:town_bones",
@@ -4123,10 +4123,10 @@
       "z": 186688.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "TOWN_BONES"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "TOWN_BONES"
     },
     {
       "id": "lotr:waypoint:haraduin_bridge",
@@ -4139,10 +4139,10 @@
       "z": 248768.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "HARADUIN_BRIDGE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "HARADUIN_BRIDGE"
     },
     {
       "id": "lotr:waypoint:jungle_city_trade",
@@ -4155,10 +4155,10 @@
       "z": 246592.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "JUNGLE_CITY_TRADE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "JUNGLE_CITY_TRADE"
     },
     {
       "id": "lotr:waypoint:jungle_city_old",
@@ -4171,10 +4171,10 @@
       "z": 248384.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "JUNGLE_CITY_OLD"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "JUNGLE_CITY_OLD"
     },
     {
       "id": "lotr:waypoint:jungle_city_north",
@@ -4187,10 +4187,10 @@
       "z": 239936.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "JUNGLE_CITY_NORTH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "JUNGLE_CITY_NORTH"
     },
     {
       "id": "lotr:waypoint:jungle_city_east",
@@ -4203,10 +4203,10 @@
       "z": 260672.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "JUNGLE_CITY_EAST"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "JUNGLE_CITY_EAST"
     },
     {
       "id": "lotr:waypoint:jungle_city_capital",
@@ -4219,10 +4219,10 @@
       "z": 272832.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "JUNGLE_CITY_CAPITAL"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "JUNGLE_CITY_CAPITAL"
     },
     {
       "id": "lotr:waypoint:jungle_city_deep",
@@ -4235,10 +4235,10 @@
       "z": 320960.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "JUNGLE_CITY_DEEP"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "JUNGLE_CITY_DEEP"
     },
     {
       "id": "lotr:waypoint:jungle_city_watch",
@@ -4251,10 +4251,10 @@
       "z": 282944.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "JUNGLE_CITY_WATCH"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "JUNGLE_CITY_WATCH"
     },
     {
       "id": "lotr:waypoint:jungle_city_caves",
@@ -4267,10 +4267,10 @@
       "z": 297536.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "JUNGLE_CITY_CAVES"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "JUNGLE_CITY_CAVES"
     },
     {
       "id": "lotr:waypoint:jungle_city_stone",
@@ -4283,10 +4283,10 @@
       "z": 263360.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "JUNGLE_CITY_STONE"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "JUNGLE_CITY_STONE"
     },
     {
       "id": "lotr:waypoint:jungle_lakes",
@@ -4299,10 +4299,10 @@
       "z": 272192.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "JUNGLE_LAKES"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "JUNGLE_LAKES"
     },
     {
       "id": "lotr:waypoint:troll_island",
@@ -4315,10 +4315,10 @@
       "z": 206400.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "TROLL_ISLAND"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "TROLL_ISLAND"
     },
     {
       "id": "lotr:waypoint:black_coast",
@@ -4331,10 +4331,10 @@
       "z": 226112.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "BLACK_COAST"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "BLACK_COAST"
     },
     {
       "id": "lotr:waypoint:blood_river",
@@ -4347,10 +4347,10 @@
       "z": 240064.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "BLOOD_RIVER"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "BLOOD_RIVER"
     },
     {
       "id": "lotr:waypoint:shadow_point",
@@ -4363,10 +4363,10 @@
       "z": 273088.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "SHADOW_POINT"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "SHADOW_POINT"
     },
     {
       "id": "lotr:waypoint:old_jungle_ruin",
@@ -4379,10 +4379,10 @@
       "z": 229568.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
-      "lotrWaypointCode": "OLD_JUNGLE_RUIN"
+      "hasFastTravel": true,
+      "fastTravelWaypointCode": "OLD_JUNGLE_RUIN"
     }
   ]
 }

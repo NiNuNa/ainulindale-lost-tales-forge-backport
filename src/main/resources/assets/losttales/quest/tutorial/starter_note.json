@@ -4,9 +4,6 @@
   "description": "A development quest that starts from an NBT-tagged item. Use /losttales quest starter losttales:tutorial/starter_note to create the note.",
   "repeatable": true,
   "startMode": "item",
-  "markers": {
-    "hint": "losttales:quest_hint_starter_note"
-  },
   "rewards": {
     "experience": "12",
     "items": "minecraft:paper*1"

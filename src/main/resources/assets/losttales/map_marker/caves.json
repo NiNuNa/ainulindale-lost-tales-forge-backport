@@ -11,9 +11,9 @@
       "z": 40.0,
       "compassFadeInRadius": 220.0,
       "discoveryRadius": 9.0,
-      "discoverable": true,
+      "isDiscoverable": true,
       "hiddenUntilDiscovered": true,
-      "waypoint": true,
+      "hasFastTravel": true,
       "description": "A damp cave mouth hidden beneath moss and roots, easy to miss until you stand nearby."
     }
   ]

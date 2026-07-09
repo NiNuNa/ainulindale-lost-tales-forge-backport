@@ -5,7 +5,7 @@ import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
-import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapMarkerIconOverlay;
+import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
@@ -31,7 +31,8 @@ import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.client.resources.IResourceManagerReloadListener;
 import net.minecraftforge.client.MinecraftForgeClient;
-import net.minecraftforge.client.event.GuiScreenEvent;
+import lotr.client.gui.LOTRGuiMap;
+import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.client.event.TextureStitchEvent;
@@ -92,11 +93,9 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public void renderLotrMapMarkerIcons(GuiScreenEvent.DrawScreenEvent.Post event) {
-        try {
-            LostTalesLotrMapMarkerIconOverlay.render(event.gui, event.mouseX, event.mouseY);
-        } catch (Throwable ignored) {
-            // The LOTR map should remain usable even if this cosmetic overlay fails.
+    public void replaceLotrMapGui(GuiOpenEvent event) {
+        if (event.gui != null && event.gui.getClass() == LOTRGuiMap.class) {
+            event.gui = new LostTalesLotrMapGui();
         }
     }
 
