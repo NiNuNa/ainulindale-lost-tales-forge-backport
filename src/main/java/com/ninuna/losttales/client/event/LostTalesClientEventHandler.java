@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.event;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
+import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
@@ -46,6 +47,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
 
     @Override
     public void onResourceManagerReload(IResourceManager resManager) {
+        LostTalesInputIconRenderer.onResourceManagerReload(resManager);
         LostTalesMapOverlay.applyClientMap();
         LostTalesClientMapMarkerStore.reloadFromResources(resManager);
         LostTalesClientQuestDefinitionStore.reloadFromResources(resManager);

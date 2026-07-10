@@ -2,6 +2,7 @@ package com.ninuna.losttales.gui.hud.loot;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
+import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.inventory.LostTalesQuickLootInventoryHelper;
@@ -15,7 +16,6 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.RenderHelper;
-import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.MathHelper;
@@ -29,7 +29,7 @@ public final class LostTalesQuickLootHudRenderer {
     private static final ResourceLocation TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/quickloothud.png");
 
     private static final int TEXTURE_WIDTH = 280;
-    private static final int TEXTURE_HEIGHT = 160;
+    private static final int TEXTURE_HEIGHT = 120;
     private static final int TOP_HEIGHT = 23;
     private static final int ROW_HEIGHT = 22;
     private static final int BOTTOM_HEIGHT = 8;
@@ -43,11 +43,12 @@ public final class LostTalesQuickLootHudRenderer {
     private static final int ORNAMENT_VERTICAL_OFFSET_X = -5;
     private static final int ORNAMENT_VERTICAL_LINE_OFFSET_X = 5;
 
-    private static final int KEYS_HEIGHT = 13;
-    private static final int KEY_R_WIDTH = 14;
-    private static final int KEY_ALT_WIDTH = 20;
-    private static final int KEY_MIN_WIDTH = 14;
-    private static final int KEY_SCROLL_WIDTH = 16;
+    private static final int INPUT_HINT_HEIGHT = LostTalesInputIconRenderer.BASE_ICON_HEIGHT;
+
+    private static final int SELECTION_TEXTURE_V = 59;
+    private static final int VERTICAL_ORNAMENT_TEXTURE_V = 81;
+    private static final int HORIZONTAL_ORNAMENT_TEXTURE_V = 105;
+    private static final int ARROW_TEXTURE_V = 117;
 
     private static final int ARROW_WIDTH = 5;
     private static final int ARROW_HEIGHT = 3;
@@ -151,7 +152,7 @@ public final class LostTalesQuickLootHudRenderer {
 
         int panelX = screenWidth / 2 + screenWidth / 2 * LostTalesConfig.quickLootHudOffsetX / 100;
         int panelY = screenHeight * LostTalesConfig.quickLootHudOffsetY / 100;
-        int estimatedPanelHeight = TOP_HEIGHT + Math.max(1, LostTalesConfig.quickLootHudMaxRows) * ROW_HEIGHT + BOTTOM_HEIGHT + KEYS_HEIGHT + 8;
+        int estimatedPanelHeight = TOP_HEIGHT + Math.max(1, LostTalesConfig.quickLootHudMaxRows) * ROW_HEIGHT + BOTTOM_HEIGHT + INPUT_HINT_HEIGHT + 8;
         panelX = MathHelper.clamp_int(panelX, 4, Math.max(4, screenWidth - TEXTURE_WIDTH - 4));
         panelY = MathHelper.clamp_int(panelY, 4, Math.max(4, screenHeight - estimatedPanelHeight - 4));
         int itemX = panelX + 17;
@@ -186,7 +187,7 @@ public final class LostTalesQuickLootHudRenderer {
 
                 drawQuickLootTexture(minecraft, TEXTURE, panelX, y, 0, 25, TEXTURE_WIDTH, ROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
                 if (actualRow == selectedRow) {
-                    drawQuickLootTexture(minecraft, TEXTURE, panelX + SELECTION_OFFSET_X, y + 1, 0, 74, SELECTION_WIDTH, SELECTION_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+                    drawQuickLootTexture(minecraft, TEXTURE, panelX + SELECTION_OFFSET_X, y + 1, 0, SELECTION_TEXTURE_V, SELECTION_WIDTH, SELECTION_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
                 }
                 renderStack(minecraft, stack, itemX, y + 3);
                 String name = stack == null ? "" : stack.getDisplayName();
@@ -226,7 +227,7 @@ public final class LostTalesQuickLootHudRenderer {
                 ornamentX,
                 ornamentY,
                 0,
-                120,
+                HORIZONTAL_ORNAMENT_TEXTURE_V,
                 TEXTURE_WIDTH,
                 ORNAMENT_HORIZONTAL_HEIGHT,
                 TEXTURE_WIDTH,
@@ -238,10 +239,10 @@ public final class LostTalesQuickLootHudRenderer {
     private static void renderScrollArrows(Minecraft minecraft, int panelX, int rowY, int bottomY, int rowsToDraw, int totalRows) {
         int arrowX = panelX + ARROW_OFFSET_X;
         if (scrollOffset > 0) {
-            drawQuickLootTexture(minecraft, TEXTURE, arrowX, rowY - ARROW_HEIGHT, 6, 132, ARROW_WIDTH, ARROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+            drawQuickLootTexture(minecraft, TEXTURE, arrowX, rowY - ARROW_HEIGHT, 6, ARROW_TEXTURE_V, ARROW_WIDTH, ARROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
         }
         if (scrollOffset + rowsToDraw < totalRows) {
-            drawQuickLootTexture(minecraft, TEXTURE, arrowX, bottomY, 0, 132, ARROW_WIDTH, ARROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+            drawQuickLootTexture(minecraft, TEXTURE, arrowX, bottomY, 0, ARROW_TEXTURE_V, ARROW_WIDTH, ARROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
         }
     }
 
@@ -257,7 +258,7 @@ public final class LostTalesQuickLootHudRenderer {
                 ornamentX,
                 ornamentY,
                 0,
-                96,
+                VERTICAL_ORNAMENT_TEXTURE_V,
                 ORNAMENT_VERTICAL_WIDTH,
                 ORNAMENT_VERTICAL_HEIGHT,
                 TEXTURE_WIDTH,
@@ -330,99 +331,24 @@ public final class LostTalesQuickLootHudRenderer {
     }
 
     private static void renderHints(Minecraft minecraft, FontRenderer font, int x, int y, boolean drawDropKey) {
-        int textY = y + KEYS_HEIGHT / 2 - font.FONT_HEIGHT / 2;
+        int textY = y + INPUT_HINT_HEIGHT / 2 - font.FONT_HEIGHT / 2;
         int cursorX = x;
 
         if (drawDropKey) {
-            cursorX += drawUseKey(minecraft, font, cursorX, y) + 3;
+            cursorX += LostTalesInputIconRenderer.drawKeyBinding(minecraft, LostTalesKeyBindings.getUseKeyBinding(), cursorX, y, 1.0F) + 3;
             String drop = StatCollector.translateToLocal("quickLootHud.losttales.drop");
             font.drawStringWithShadow(drop, cursorX, textY, 0xFFFFFF);
             cursorX += font.getStringWidth(drop) + 7;
         }
 
-        cursorX += drawModifierKey(minecraft, font, cursorX, y) + 3;
+        cursorX += LostTalesInputIconRenderer.drawKeyBinding(minecraft, LostTalesKeyBindings.getModifierKeyBinding(), cursorX, y, 1.0F) + 3;
         String plus = StatCollector.translateToLocal("quickLootHud.losttales.plus");
         font.drawStringWithShadow(plus, cursorX, textY, 0xFFFFFF);
         cursorX += font.getStringWidth(plus) + 3;
 
-        drawQuickLootTexture(minecraft, TEXTURE, cursorX, y, 36, 59, KEY_SCROLL_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
-        cursorX += KEY_SCROLL_WIDTH + 3;
+        cursorX += LostTalesInputIconRenderer.drawMouseWheel(minecraft, cursorX, y, 1.0F) + 3;
         String scroll = StatCollector.translateToLocal("quickLootHud.losttales.scroll");
         font.drawStringWithShadow(scroll, cursorX, textY, 0xFFFFFF);
-    }
-
-    private static int drawUseKey(Minecraft minecraft, FontRenderer font, int x, int y) {
-        String label = LostTalesKeyBindings.getUseKeyDisplayName();
-        if (isUseKeySprite(label)) {
-            drawQuickLootTexture(minecraft, TEXTURE, x, y, 0, 59, KEY_R_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
-            return KEY_R_WIDTH;
-        }
-        return drawKeyLabel(font, label, x, y);
-    }
-
-    private static int drawModifierKey(Minecraft minecraft, FontRenderer font, int x, int y) {
-        String label = LostTalesKeyBindings.getModifierKeyDisplayName();
-        if (isAltKeySprite(label)) {
-            drawQuickLootTexture(minecraft, TEXTURE, x, y, 15, 59, KEY_ALT_WIDTH, KEYS_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
-            return KEY_ALT_WIDTH;
-        }
-        return drawKeyLabel(font, label, x, y);
-    }
-
-    private static boolean isUseKeySprite(String label) {
-        return label != null && "R".equalsIgnoreCase(label.trim());
-    }
-
-    private static boolean isAltKeySprite(String label) {
-        if (label == null) return false;
-        String normalized = label.trim().toLowerCase();
-        return "left alt".equals(normalized) || "lmenu".equals(normalized) || "alt".equals(normalized);
-    }
-
-    private static int drawKeyLabel(FontRenderer font, String label, int x, int y) {
-        if (label == null || label.length() == 0) label = "?";
-        int width = Math.max(KEY_MIN_WIDTH, font.getStringWidth(label) + 8);
-        drawSolidRect(x, y, x + width, y + KEYS_HEIGHT, 0xAA080808);
-        drawSolidRect(x, y, x + width, y + 1, 0xCCB8B8B8);
-        drawSolidRect(x, y + KEYS_HEIGHT - 1, x + width, y + KEYS_HEIGHT, 0xCC303030);
-        drawSolidRect(x, y, x + 1, y + KEYS_HEIGHT, 0xCC909090);
-        drawSolidRect(x + width - 1, y, x + width, y + KEYS_HEIGHT, 0xCC303030);
-        font.drawStringWithShadow(label, x + 4, y + KEYS_HEIGHT / 2 - font.FONT_HEIGHT / 2, 0xFFFFFF);
-        return width;
-    }
-
-    private static void drawSolidRect(int left, int top, int right, int bottom, int color) {
-        float alpha = (float) (color >> 24 & 255) / 255.0F;
-        float red = (float) (color >> 16 & 255) / 255.0F;
-        float green = (float) (color >> 8 & 255) / 255.0F;
-        float blue = (float) (color & 255) / 255.0F;
-
-        boolean previousTexture2D = GL11.glIsEnabled(GL11.GL_TEXTURE_2D);
-        boolean previousBlend = GL11.glIsEnabled(GL11.GL_BLEND);
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_BLEND);
-        OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
-        GL11.glColor4f(red, green, blue, alpha);
-
-        Tessellator tessellator = Tessellator.instance;
-        tessellator.startDrawingQuads();
-        tessellator.addVertex(left, bottom, 0.0D);
-        tessellator.addVertex(right, bottom, 0.0D);
-        tessellator.addVertex(right, top, 0.0D);
-        tessellator.addVertex(left, top, 0.0D);
-        tessellator.draw();
-
-        if (previousTexture2D) {
-            GL11.glEnable(GL11.GL_TEXTURE_2D);
-        } else {
-            GL11.glDisable(GL11.GL_TEXTURE_2D);
-        }
-        if (previousBlend) {
-            GL11.glEnable(GL11.GL_BLEND);
-        } else {
-            GL11.glDisable(GL11.GL_BLEND);
-        }
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     private static Target getLookTarget(Minecraft minecraft) {

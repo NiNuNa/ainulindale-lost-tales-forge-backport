@@ -55,7 +55,6 @@ public abstract class LostTalesUtil {
         if (itemStack.getItem() instanceof LostTalesItemArmorBase) {
             addArmorSetInformation(itemStack, player, list, "Test Bonus!");
         }
-        addUniqueItemDetails();
     }
 
     public static void addItemBlockInformation(List list, ItemStack itemStack, Block block, ELostTalesUser credits) {
@@ -195,7 +194,6 @@ public abstract class LostTalesUtil {
         return setCounter;
     }
 
-    private static void addUniqueItemDetails() {}
 
     //  LOTR Reflections
     public static LOTRFaction addFaction(String enumName, int color, LOTRDimension.DimensionRegion region, EnumSet<LOTRFaction.FactionType> types) {

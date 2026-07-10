@@ -13,7 +13,6 @@ import net.minecraft.entity.ai.attributes.AttributeModifier;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemArmor;
 import net.minecraft.item.ItemStack;
-import net.minecraft.world.World;
 
 public class LostTalesItemArmorBase extends ItemArmor {
     private final String armorTextureName;
@@ -90,50 +89,4 @@ public class LostTalesItemArmorBase extends ItemArmor {
         return itemType;
     }
 
-    @Override
-    public void onArmorTick(World world, EntityPlayer player, ItemStack itemStack) {
-        ELostTalesItem.Type helmetType = null;
-        ELostTalesItem.Type armorType = null;
-        ELostTalesItem.Type leggingsType = null;
-        ELostTalesItem.Type bootsType = null;
-
-        ItemStack helmet = player.getCurrentArmor(3);
-        ItemStack armor = player.getCurrentArmor(2);
-        ItemStack leggings = player.getCurrentArmor(1);
-        ItemStack boots = player.getCurrentArmor(0);
-
-        if (helmet != null && helmet.getItem() instanceof LostTalesItemArmorBase) {
-            helmetType = ((LostTalesItemArmorBase) helmet.getItem()).getItemType();
-        }
-
-        if (armor != null && armor.getItem() instanceof LostTalesItemArmorBase) {
-            armorType = ((LostTalesItemArmorBase) armor.getItem()).getItemType();
-        }
-
-        if (leggings != null && leggings.getItem() instanceof LostTalesItemArmorBase) {
-            leggingsType = ((LostTalesItemArmorBase) leggings.getItem()).getItemType();
-        }
-
-        if (boots != null && boots.getItem() instanceof LostTalesItemArmorBase) {
-            bootsType = ((LostTalesItemArmorBase) boots.getItem()).getItemType();
-        }
-
-        if (helmetType != null && armorType != null && leggingsType != null && bootsType != null) {
-            // Player is wearing full light armor set.
-            if (helmetType == ELostTalesItem.Type.ARMOR_LIGHT && armorType == ELostTalesItem.Type.ARMOR_LIGHT && leggingsType == ELostTalesItem.Type.ARMOR_LIGHT && bootsType == ELostTalesItem.Type.ARMOR_LIGHT) {
-                //Todo...
-                System.out.println("Light Set!");
-            }
-            // Player is wearing full heavy armor set.
-            else if (helmetType == ELostTalesItem.Type.ARMOR_HEAVY && armorType == ELostTalesItem.Type.ARMOR_HEAVY && leggingsType == ELostTalesItem.Type.ARMOR_HEAVY && bootsType == ELostTalesItem.Type.ARMOR_HEAVY) {
-                //Todo...
-                System.out.println("Heavy Set!");
-            }
-            // Player is wearing a mix of heavy and light armor.
-            else {
-                //Todo...
-                System.out.println("Medium Set!");
-            }
-        }
-    }
 }

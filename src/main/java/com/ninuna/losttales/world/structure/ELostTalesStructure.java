@@ -44,8 +44,7 @@ public final class ELostTalesStructure {
             registerStructure.setAccessible(true);
             registerStructure.invoke(null, Integer.valueOf(id), provider, name, Integer.valueOf(colorBackground), Integer.valueOf(colorForeground), Boolean.valueOf(hidden));
         } catch (Exception e) {
-            FMLLog.warning("Failed to register Lost Tales structure spawner %s with ID %d", name, Integer.valueOf(id));
-            e.printStackTrace();
+            FMLLog.warning("Failed to register Lost Tales structure spawner %s with ID %d: %s", name, Integer.valueOf(id), e.toString());
         }
     }
 

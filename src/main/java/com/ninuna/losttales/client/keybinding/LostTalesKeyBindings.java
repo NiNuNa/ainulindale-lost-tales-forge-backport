@@ -33,6 +33,15 @@ public class LostTalesKeyBindings {
 
     @SubscribeEvent
     public void onKeyInput(InputEvent.KeyInputEvent event) {
+        handleBindingPresses();
+    }
+
+    @SubscribeEvent
+    public void onMouseInput(InputEvent.MouseInputEvent event) {
+        handleBindingPresses();
+    }
+
+    private static void handleBindingPresses() {
         Minecraft minecraft = Minecraft.getMinecraft();
 
         if (CHARACTER_MENU.isPressed()) {
@@ -59,6 +68,14 @@ public class LostTalesKeyBindings {
             LostTalesQuickLootHudRenderer.moveSelection(event.dwheel > 0 ? -1 : 1);
             event.setCanceled(true);
         }
+    }
+
+    public static KeyBinding getUseKeyBinding() {
+        return USE;
+    }
+
+    public static KeyBinding getModifierKeyBinding() {
+        return MODIFIER;
     }
 
     public static boolean isModifierKeyDown() {
