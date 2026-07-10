@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.block.custom.LostTalesBlockCeramicTile;
 import com.ninuna.losttales.block.custom.LostTalesBlockCheeseWheel;
 import com.ninuna.losttales.block.custom.LostTalesBlockLampTall;
+import com.ninuna.losttales.block.custom.LostTalesBlockMissiveBoard;
 import com.ninuna.losttales.block.custom.LostTalesBlockPlushie;
 import com.ninuna.losttales.block.custom.LostTalesBlockStatueTall;
 import com.ninuna.losttales.block.custom.LostTalesBlockUrnBase;
@@ -41,9 +42,11 @@ public enum ELostTalesBlock {
     //  Blocks - Plushie.
     PLUSHIE_BEAR(new LostTalesBlockPlushie(EnumRarity.uncommon, ELostTalesUser.NINUNA).setBlockName("plushie_bear").setCreativeTab(ELostTalesCreativeTabs.PLUSHIES.getCreativeTab())),
     PLUSHIE_FOX(new LostTalesBlockPlushie(EnumRarity.uncommon, ELostTalesUser.NINUNA).setBlockName("plushie_fox").setCreativeTab(ELostTalesCreativeTabs.PLUSHIES.getCreativeTab())),
-    PLUSHIE_GANDALF(new LostTalesBlockPlushie(EnumRarity.rare, ELostTalesUser.NINUNA).setBlockName("plushie_gandalf").setCreativeTab(ELostTalesCreativeTabs.PLUSHIES.getCreativeTab()));
+    PLUSHIE_GANDALF(new LostTalesBlockPlushie(EnumRarity.rare, ELostTalesUser.NINUNA).setBlockName("plushie_gandalf").setCreativeTab(ELostTalesCreativeTabs.PLUSHIES.getCreativeTab())),
 
     //  Blocks - Miscellaneous.
+    MISSIVE_BOARD(new LostTalesBlockMissiveBoard().setBlockName("missive_board").setCreativeTab(ELostTalesCreativeTabs.BLOCKS_DECORATION.getCreativeTab()));
+
 
     /**
      * Deprecated source-level aliases kept so older internal/add-on code that still

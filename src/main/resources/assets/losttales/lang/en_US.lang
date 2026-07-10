@@ -592,3 +592,26 @@ lotr.waypoint.LOSTTALES_LOSTTALES_TEST_TOWN.info=A small test town marker used t
 lotr.waypoint.LOSTTALES_GREENWAY_MARKET=Greenway Market
 lotr.waypoint.LOSTTALES_GREENWAY_MARKET.info=A modest market along the Greenway where travellers gather before continuing through the Shire borderlands.
 lotr.waypoint.LOSTTALES_LOSTTALES_GREENWAY_MARKET.info=A modest market along the Greenway where travellers gather before continuing through the Shire borderlands.
+#   Quest - Items
+item.missive_letter.name=Missive Letter
+item.missive_letter.lore.line1=A sealed notice bearing work
+item.missive_letter.lore.line2=for willing hands and sharp blades
+
+
+#   Quest - Blocks
+tile.missive_board.name=Missive Board
+container.losttales.missive_board=Missive Board
+gui.losttales.missive_board.accept=Accept
+gui.losttales.missive_board.select=Select a notice, then accept it.
+gui.losttales.missive_board.selected=Selected notice %s
+gui.losttales.missive_board.available=%s/%s notices
+losttales.config.category.missives=Dynamic Missives
+losttales.config.category.missives.tooltip=Missive board refill, notice expiration, and generated timed quest options.
+# Missive letter reader
+gui.losttales.missive_board.instructions=Take a notice, right-click to read it, or place it back.
+gui.losttales.missive_letter.accept=Accept
+gui.losttales.missive_letter.invalid=This missive is blank or damaged.
+gui.losttales.missive_letter.issuer=By order of %s:
+gui.losttales.missive_letter.objectives=Work required:
+gui.losttales.missive_letter.reward=Reward: %s
+gui.losttales.missive_letter.time_limit=Time limit after acceptance: %s

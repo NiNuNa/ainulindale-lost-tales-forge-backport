@@ -30,7 +30,8 @@ public final class LostTalesQuestRegistry {
             "quest/path/blacksmith/test_crafting_quest.json"
     };
 
-    private static final Map<String, LostTalesQuestDefinition> QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
+    private static final Map<String, LostTalesQuestDefinition> STATIC_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
+    private static final Map<String, LostTalesQuestDefinition> RUNTIME_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static List<LostTalesQuestDefinition> sortedQuests = Collections.emptyList();
     private static boolean loaded;
 
@@ -47,17 +48,9 @@ public final class LostTalesQuestRegistry {
             }
         }
 
-        List<LostTalesQuestDefinition> sorted = new ArrayList<LostTalesQuestDefinition>(loadedQuests.values());
-        Collections.sort(sorted, new Comparator<LostTalesQuestDefinition>() {
-            @Override
-            public int compare(LostTalesQuestDefinition left, LostTalesQuestDefinition right) {
-                return left.getTitle().compareToIgnoreCase(right.getTitle());
-            }
-        });
-
-        QUESTS_BY_ID.clear();
-        QUESTS_BY_ID.putAll(loadedQuests);
-        sortedQuests = Collections.unmodifiableList(sorted);
+        STATIC_QUESTS_BY_ID.clear();
+        STATIC_QUESTS_BY_ID.putAll(loadedQuests);
+        rebuildSortedQuests();
         loaded = true;
 
         LostTalesMapMarkerCatalog.reloadFromClasspath();
@@ -71,18 +64,102 @@ public final class LostTalesQuestRegistry {
         }
     }
 
-    public static LostTalesQuestDefinition getQuest(String questId) {
+    public static synchronized LostTalesQuestDefinition getQuest(String questId) {
         ensureLoaded();
-        return QUESTS_BY_ID.get(questId);
+        LostTalesQuestDefinition runtimeQuest = RUNTIME_QUESTS_BY_ID.get(questId);
+        return runtimeQuest == null ? STATIC_QUESTS_BY_ID.get(questId) : runtimeQuest;
     }
 
-    public static Collection<LostTalesQuestDefinition> getQuests() {
+    public static synchronized Collection<LostTalesQuestDefinition> getQuests() {
         ensureLoaded();
         return sortedQuests;
     }
 
-    public static boolean containsQuest(String questId) {
+    public static synchronized Collection<LostTalesQuestDefinition> getRuntimeQuests() {
+        ensureLoaded();
+        return Collections.unmodifiableCollection(new ArrayList<LostTalesQuestDefinition>(RUNTIME_QUESTS_BY_ID.values()));
+    }
+
+    public static synchronized boolean containsQuest(String questId) {
         return getQuest(questId) != null;
+    }
+
+    /**
+     * Registers or replaces a runtime-authored quest definition.
+     *
+     * Runtime quests are kept in memory and are intended for generated systems such
+     * as missives. The owning system must also persist the definition, usually in
+     * player or tile-entity NBT, then re-register it after load.
+     */
+    public static synchronized boolean registerRuntimeQuest(LostTalesQuestDefinition quest) {
+        ensureLoaded();
+        if (quest == null || quest.getId() == null || quest.getId().length() == 0) {
+            return false;
+        }
+        RUNTIME_QUESTS_BY_ID.put(quest.getId(), quest);
+        rebuildSortedQuests();
+        return true;
+    }
+
+    public static synchronized int registerRuntimeQuests(Collection<LostTalesQuestDefinition> quests) {
+        ensureLoaded();
+        if (quests == null || quests.isEmpty()) {
+            return 0;
+        }
+        int registered = 0;
+        for (LostTalesQuestDefinition quest : quests) {
+            if (quest != null && quest.getId() != null && quest.getId().length() > 0) {
+                RUNTIME_QUESTS_BY_ID.put(quest.getId(), quest);
+                registered++;
+            }
+        }
+        if (registered > 0) {
+            rebuildSortedQuests();
+        }
+        return registered;
+    }
+
+    public static synchronized boolean unregisterRuntimeQuest(String questId) {
+        ensureLoaded();
+        if (questId == null || questId.length() == 0) {
+            return false;
+        }
+        boolean removed = RUNTIME_QUESTS_BY_ID.remove(questId) != null;
+        if (removed) {
+            rebuildSortedQuests();
+        }
+        return removed;
+    }
+
+    public static synchronized void clearRuntimeQuests() {
+        ensureLoaded();
+        if (!RUNTIME_QUESTS_BY_ID.isEmpty()) {
+            RUNTIME_QUESTS_BY_ID.clear();
+            rebuildSortedQuests();
+        }
+    }
+
+    private static void rebuildSortedQuests() {
+        LinkedHashMap<String, LostTalesQuestDefinition> merged = new LinkedHashMap<String, LostTalesQuestDefinition>();
+        merged.putAll(STATIC_QUESTS_BY_ID);
+        merged.putAll(RUNTIME_QUESTS_BY_ID);
+
+        List<LostTalesQuestDefinition> sorted = new ArrayList<LostTalesQuestDefinition>(merged.values());
+        Collections.sort(sorted, new Comparator<LostTalesQuestDefinition>() {
+            @Override
+            public int compare(LostTalesQuestDefinition left, LostTalesQuestDefinition right) {
+                String leftTitle = left == null || left.getTitle() == null ? "" : left.getTitle();
+                String rightTitle = right == null || right.getTitle() == null ? "" : right.getTitle();
+                int titleCompare = leftTitle.compareToIgnoreCase(rightTitle);
+                if (titleCompare != 0) {
+                    return titleCompare;
+                }
+                String leftId = left == null || left.getId() == null ? "" : left.getId();
+                String rightId = right == null || right.getId() == null ? "" : right.getId();
+                return leftId.compareToIgnoreCase(rightId);
+            }
+        });
+        sortedQuests = Collections.unmodifiableList(sorted);
     }
 
     private static List<String> loadQuestIndexFromClasspath() {

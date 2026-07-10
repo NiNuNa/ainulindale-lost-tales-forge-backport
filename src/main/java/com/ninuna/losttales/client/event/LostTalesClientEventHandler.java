@@ -55,6 +55,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     public void onClientDisconnect(ClientDisconnectionFromServerEvent event) {
         LostTalesClientQuestProgressStore.clear();
         LostTalesClientQuestNotificationStore.clear();
+        LostTalesClientQuestDefinitionStore.clearDynamicQuestDefinitions();
         LostTalesClientMapMarkerNotificationStore.clear();
         LostTalesClientMapMarkerStore.clearDynamicMarkers();
         LostTalesClientMobAggroCache.clear();

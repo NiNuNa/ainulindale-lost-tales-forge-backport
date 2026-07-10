@@ -12,6 +12,7 @@ import net.minecraftforge.common.config.Property;
 public final class LostTalesConfig {
     public static final String CATEGORY_CLIENT = "client";
     public static final String CATEGORY_QUESTS = "quests";
+    public static final String CATEGORY_MISSIVES = "missives";
 
     public static final String HUD_PRESET_CUSTOM = "custom";
     public static final String HUD_PRESET_DEFAULT = "default";
@@ -74,6 +75,19 @@ public final class LostTalesConfig {
     public static boolean autoPinQuestOnStart = true;
     public static boolean autoDiscoverNearbyMapMarkers = true;
     public static int mapMarkerDiscoveryScanIntervalTicks = 40;
+
+    public static boolean enableDynamicMissiveBoards = true;
+    public static int missiveBoardMinAvailable = 5;
+    public static int missiveBoardMaxAvailable = 9;
+    public static int missiveBoardGenerationIntervalTicks = 36000;
+    public static int missiveBoardMinGeneratedPerCycle = 1;
+    public static int missiveBoardMaxGeneratedPerCycle = 3;
+    public static boolean expireMissiveBoardNotices = true;
+    public static int missiveBoardNoticeExpirationDays = 7;
+    public static boolean enableTimedMissives = true;
+    public static int timedMissiveChancePercent = 25;
+    public static int timedMissiveMinDays = 1;
+    public static int timedMissiveMaxDays = 3;
 
     private LostTalesConfig() {}
 
@@ -365,6 +379,98 @@ public final class LostTalesConfig {
                     "How often, in ticks, nearby map marker discovery is checked on the server."
             );
 
+            enableDynamicMissiveBoards = config.getBoolean(
+                    "enableDynamicMissiveBoards",
+                    CATEGORY_MISSIVES,
+                    enableDynamicMissiveBoards,
+                    "When true, missive board tile entities generate dynamic missive letters on the server."
+            );
+            missiveBoardMinAvailable = config.getInt(
+                    "missiveBoardMinAvailable",
+                    CATEGORY_MISSIVES,
+                    missiveBoardMinAvailable,
+                    0,
+                    9,
+                    "Desired minimum number of notices a board tries to keep available. Existing boards clamp this to their 9-slot inventory."
+            );
+            missiveBoardMaxAvailable = config.getInt(
+                    "missiveBoardMaxAvailable",
+                    CATEGORY_MISSIVES,
+                    missiveBoardMaxAvailable,
+                    1,
+                    9,
+                    "Maximum number of notices a board can keep available. The missive board inventory has 9 notice slots."
+            );
+            missiveBoardGenerationIntervalTicks = config.getInt(
+                    "missiveBoardGenerationIntervalTicks",
+                    CATEGORY_MISSIVES,
+                    missiveBoardGenerationIntervalTicks,
+                    1200,
+                    240000,
+                    "Server-side interval in ticks between ordinary board refill attempts. 36000 ticks is roughly half an in-game hour."
+            );
+            missiveBoardMinGeneratedPerCycle = config.getInt(
+                    "missiveBoardMinGeneratedPerCycle",
+                    CATEGORY_MISSIVES,
+                    missiveBoardMinGeneratedPerCycle,
+                    1,
+                    9,
+                    "Minimum number of new notices generated per refill cycle when space is available."
+            );
+            missiveBoardMaxGeneratedPerCycle = config.getInt(
+                    "missiveBoardMaxGeneratedPerCycle",
+                    CATEGORY_MISSIVES,
+                    missiveBoardMaxGeneratedPerCycle,
+                    1,
+                    9,
+                    "Maximum number of new notices generated per refill cycle when space is available."
+            );
+            expireMissiveBoardNotices = config.getBoolean(
+                    "expireMissiveBoardNotices",
+                    CATEGORY_MISSIVES,
+                    expireMissiveBoardNotices,
+                    "When true, old unaccepted notices are removed from missive boards so they can be replaced over time."
+            );
+            missiveBoardNoticeExpirationDays = config.getInt(
+                    "missiveBoardNoticeExpirationDays",
+                    CATEGORY_MISSIVES,
+                    missiveBoardNoticeExpirationDays,
+                    1,
+                    30,
+                    "How many in-game days an unaccepted generated board notice remains available before expiring."
+            );
+            enableTimedMissives = config.getBoolean(
+                    "enableTimedMissives",
+                    CATEGORY_MISSIVES,
+                    enableTimedMissives,
+                    "When true, some generated missives receive a deadline after being accepted."
+            );
+            timedMissiveChancePercent = config.getInt(
+                    "timedMissiveChancePercent",
+                    CATEGORY_MISSIVES,
+                    timedMissiveChancePercent,
+                    0,
+                    100,
+                    "Percent chance that a generated missive receives a deadline."
+            );
+            timedMissiveMinDays = config.getInt(
+                    "timedMissiveMinDays",
+                    CATEGORY_MISSIVES,
+                    timedMissiveMinDays,
+                    1,
+                    30,
+                    "Minimum accepted-quest deadline length in in-game days for timed missives."
+            );
+            timedMissiveMaxDays = config.getInt(
+                    "timedMissiveMaxDays",
+                    CATEGORY_MISSIVES,
+                    timedMissiveMaxDays,
+                    1,
+                    30,
+                    "Maximum accepted-quest deadline length in in-game days for timed missives."
+            );
+            clampMissiveOptions();
+
             if (!HUD_PRESET_CUSTOM.equals(hudPlacementPreset)) {
                 applyHudPresetValues(hudPlacementPreset);
             }
@@ -602,6 +708,7 @@ public final class LostTalesConfig {
         }
         config.getCategory(CATEGORY_CLIENT).setLanguageKey("losttales.config.category.client");
         config.getCategory(CATEGORY_QUESTS).setLanguageKey("losttales.config.category.quests");
+        config.getCategory(CATEGORY_MISSIVES).setLanguageKey("losttales.config.category.missives");
     }
 
     private static void writeCurrentValues(Configuration config) {
@@ -652,5 +759,56 @@ public final class LostTalesConfig {
         config.get(CATEGORY_QUESTS, "autoPinQuestOnStart", autoPinQuestOnStart).set(autoPinQuestOnStart);
         config.get(CATEGORY_QUESTS, "autoDiscoverNearbyMapMarkers", autoDiscoverNearbyMapMarkers).set(autoDiscoverNearbyMapMarkers);
         config.get(CATEGORY_QUESTS, "mapMarkerDiscoveryScanIntervalTicks", mapMarkerDiscoveryScanIntervalTicks).set(mapMarkerDiscoveryScanIntervalTicks);
+        config.get(CATEGORY_MISSIVES, "enableDynamicMissiveBoards", enableDynamicMissiveBoards).set(enableDynamicMissiveBoards);
+        config.get(CATEGORY_MISSIVES, "missiveBoardMinAvailable", missiveBoardMinAvailable).set(missiveBoardMinAvailable);
+        config.get(CATEGORY_MISSIVES, "missiveBoardMaxAvailable", missiveBoardMaxAvailable).set(missiveBoardMaxAvailable);
+        config.get(CATEGORY_MISSIVES, "missiveBoardGenerationIntervalTicks", missiveBoardGenerationIntervalTicks).set(missiveBoardGenerationIntervalTicks);
+        config.get(CATEGORY_MISSIVES, "missiveBoardMinGeneratedPerCycle", missiveBoardMinGeneratedPerCycle).set(missiveBoardMinGeneratedPerCycle);
+        config.get(CATEGORY_MISSIVES, "missiveBoardMaxGeneratedPerCycle", missiveBoardMaxGeneratedPerCycle).set(missiveBoardMaxGeneratedPerCycle);
+        config.get(CATEGORY_MISSIVES, "expireMissiveBoardNotices", expireMissiveBoardNotices).set(expireMissiveBoardNotices);
+        config.get(CATEGORY_MISSIVES, "missiveBoardNoticeExpirationDays", missiveBoardNoticeExpirationDays).set(missiveBoardNoticeExpirationDays);
+        config.get(CATEGORY_MISSIVES, "enableTimedMissives", enableTimedMissives).set(enableTimedMissives);
+        config.get(CATEGORY_MISSIVES, "timedMissiveChancePercent", timedMissiveChancePercent).set(timedMissiveChancePercent);
+        config.get(CATEGORY_MISSIVES, "timedMissiveMinDays", timedMissiveMinDays).set(timedMissiveMinDays);
+        config.get(CATEGORY_MISSIVES, "timedMissiveMaxDays", timedMissiveMaxDays).set(timedMissiveMaxDays);
+    }
+
+    public static void clampMissiveOptions() {
+        missiveBoardMinAvailable = clampInt(missiveBoardMinAvailable, 0, 9);
+        missiveBoardMaxAvailable = clampInt(missiveBoardMaxAvailable, 1, 9);
+        if (missiveBoardMaxAvailable < missiveBoardMinAvailable) {
+            missiveBoardMaxAvailable = missiveBoardMinAvailable;
+        }
+        missiveBoardGenerationIntervalTicks = clampInt(missiveBoardGenerationIntervalTicks, 1200, 240000);
+        missiveBoardMinGeneratedPerCycle = clampInt(missiveBoardMinGeneratedPerCycle, 1, 9);
+        missiveBoardMaxGeneratedPerCycle = clampInt(missiveBoardMaxGeneratedPerCycle, 1, 9);
+        if (missiveBoardMaxGeneratedPerCycle < missiveBoardMinGeneratedPerCycle) {
+            missiveBoardMaxGeneratedPerCycle = missiveBoardMinGeneratedPerCycle;
+        }
+        missiveBoardNoticeExpirationDays = clampInt(missiveBoardNoticeExpirationDays, 1, 30);
+        timedMissiveChancePercent = clampInt(timedMissiveChancePercent, 0, 100);
+        timedMissiveMinDays = clampInt(timedMissiveMinDays, 1, 30);
+        timedMissiveMaxDays = clampInt(timedMissiveMaxDays, 1, 30);
+        if (timedMissiveMaxDays < timedMissiveMinDays) {
+            timedMissiveMaxDays = timedMissiveMinDays;
+        }
+    }
+
+    public static long getMissiveBoardNoticeExpirationTicks() {
+        if (!expireMissiveBoardNotices || missiveBoardNoticeExpirationDays <= 0) {
+            return 0L;
+        }
+        return (long) missiveBoardNoticeExpirationDays * 24000L;
+    }
+
+    private static int clampInt(int value, int min, int max) {
+        if (value < min) {
+            return min;
+        }
+        if (value > max) {
+            return max;
+        }
+        return value;
     }
 }
+

@@ -175,6 +175,12 @@ public final class LostTalesQuestHudRenderer {
                 int target = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
                 int current = progress == null ? 0 : progress.getObjectiveProgress(objective.getId());
                 String objectiveText = LostTalesQuestObjectiveTextHelper.buildObjectiveLine(progress, objective, true, false, false, false);
+                if (progress != null && progress.hasTimeLimit() && minecraft.theWorld != null) {
+                    String remaining = formatRemainingTime(progress.getRemainingTicks(minecraft.theWorld.getTotalWorldTime()));
+                    if (remaining.length() > 0) {
+                        objectiveText = objectiveText + " | " + remaining + " left";
+                    }
+                }
                 boolean complete = current >= target;
                 entries.add(new TrackedQuestHudEntry(quest.getTitle(), objectiveText, current, target, complete, minecraft.fontRenderer));
             }
@@ -294,6 +300,23 @@ public final class LostTalesQuestHudRenderer {
             result.add(stage.getObjectives().get(0));
         }
         return result;
+    }
+
+    private static String formatRemainingTime(long ticks) {
+        if (ticks <= 0L) {
+            return "expired";
+        }
+        long days = ticks / 24000L;
+        long remainder = ticks % 24000L;
+        long hours = remainder / 1000L;
+        long minutes = (remainder % 1000L) * 60L / 1000L;
+        if (days > 0L) {
+            return days + "d " + hours + "h";
+        }
+        if (hours > 0L) {
+            return hours + "h " + minutes + "m";
+        }
+        return Math.max(1L, minutes) + "m";
     }
 
     private static boolean isGotoObjective(LostTalesQuestObjectiveDefinition objective) {

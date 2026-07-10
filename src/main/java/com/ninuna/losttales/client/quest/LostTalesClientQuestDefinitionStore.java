@@ -6,48 +6,101 @@ import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import cpw.mods.fml.common.FMLLog;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.resources.IResourceManager;
 /**
- * Client cache for bundled quest definitions.
+ * Client cache for bundled and server-synced quest definitions.
  *
- * This is the 1.7.10 replacement for the modern datapack quest definition loader.
- * It is definition-only for now; player quest progress and server sync are separate
- * follow-up work.
+ * Bundled quests still come from client resources. Dynamic definitions are synced
+ * from the logical server so generated missives can appear in the journal and HUD
+ * after acceptance.
  */
 public final class LostTalesClientQuestDefinitionStore {
+    private static final Map<String, LostTalesQuestDefinition> STATIC_QUESTS = new LinkedHashMap<String, LostTalesQuestDefinition>();
+    private static final Map<String, LostTalesQuestDefinition> DYNAMIC_QUESTS = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static volatile List<LostTalesQuestDefinition> quests = Collections.emptyList();
     private static volatile boolean loaded;
 
     private LostTalesClientQuestDefinitionStore() {}
 
-    public static List<LostTalesQuestDefinition> getQuests() {
+    public static synchronized List<LostTalesQuestDefinition> getQuests() {
         return quests;
     }
 
-    public static LostTalesQuestDefinition getQuest(String id) {
+    public static synchronized LostTalesQuestDefinition getQuest(String id) {
         if (id == null) return null;
-        for (LostTalesQuestDefinition quest : quests) {
-            if (id.equals(quest.getId())) {
-                return quest;
-            }
+        LostTalesQuestDefinition dynamicQuest = DYNAMIC_QUESTS.get(id);
+        if (dynamicQuest != null) {
+            return dynamicQuest;
         }
-        return null;
+        return STATIC_QUESTS.get(id);
     }
 
-    public static void ensureLoaded(IResourceManager resourceManager) {
+    public static synchronized void ensureLoaded(IResourceManager resourceManager) {
         if (!loaded) {
             reloadFromResources(resourceManager);
         }
     }
 
-    public static void reloadFromResources(IResourceManager resourceManager) {
+    public static synchronized void reloadFromResources(IResourceManager resourceManager) {
         List<LostTalesQuestDefinition> loadedQuests = LostTalesQuestDefinitionResourceLoader.loadQuests(resourceManager);
-        quests = Collections.unmodifiableList(new ArrayList<LostTalesQuestDefinition>(loadedQuests));
+        STATIC_QUESTS.clear();
+        for (LostTalesQuestDefinition quest : loadedQuests) {
+            if (quest != null && quest.getId() != null && quest.getId().length() > 0) {
+                STATIC_QUESTS.put(quest.getId(), quest);
+            }
+        }
+        rebuildQuestList();
         loaded = true;
         logMissingMarkerWarnings(quests);
+    }
+
+    public static synchronized void setDynamicQuestDefinitions(Collection<LostTalesQuestDefinition> dynamicQuests) {
+        DYNAMIC_QUESTS.clear();
+        if (dynamicQuests != null) {
+            for (LostTalesQuestDefinition quest : dynamicQuests) {
+                if (quest != null && quest.getId() != null && quest.getId().length() > 0) {
+                    DYNAMIC_QUESTS.put(quest.getId(), quest);
+                }
+            }
+        }
+        rebuildQuestList();
+    }
+
+    public static synchronized void clearDynamicQuestDefinitions() {
+        if (!DYNAMIC_QUESTS.isEmpty()) {
+            DYNAMIC_QUESTS.clear();
+            rebuildQuestList();
+        }
+    }
+
+    private static void rebuildQuestList() {
+        LinkedHashMap<String, LostTalesQuestDefinition> merged = new LinkedHashMap<String, LostTalesQuestDefinition>();
+        merged.putAll(STATIC_QUESTS);
+        merged.putAll(DYNAMIC_QUESTS);
+
+        ArrayList<LostTalesQuestDefinition> rebuilt = new ArrayList<LostTalesQuestDefinition>(merged.values());
+        Collections.sort(rebuilt, new Comparator<LostTalesQuestDefinition>() {
+            @Override
+            public int compare(LostTalesQuestDefinition left, LostTalesQuestDefinition right) {
+                String leftTitle = left == null || left.getTitle() == null ? "" : left.getTitle();
+                String rightTitle = right == null || right.getTitle() == null ? "" : right.getTitle();
+                int titleCompare = leftTitle.compareToIgnoreCase(rightTitle);
+                if (titleCompare != 0) {
+                    return titleCompare;
+                }
+                String leftId = left == null || left.getId() == null ? "" : left.getId();
+                String rightId = right == null || right.getId() == null ? "" : right.getId();
+                return leftId.compareToIgnoreCase(rightId);
+            }
+        });
+        quests = Collections.unmodifiableList(rebuilt);
     }
 
     private static void logMissingMarkerWarnings(List<LostTalesQuestDefinition> loadedQuests) {

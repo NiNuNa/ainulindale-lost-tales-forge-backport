@@ -243,6 +243,10 @@ public enum ELostTalesItem {
             ELostTalesItemMaterial.NEUTRAL, Type.INSTRUMENT
     ).setUnlocalizedName("horn_test").setCreativeTab(ELostTalesCreativeTabs.MISC.getCreativeTab())),
 
+    // Quest - Items.
+    MISSIVE_LETTER(new LostTalesItemMissiveLetter()
+            .setUnlocalizedName("missive_letter").setCreativeTab(ELostTalesCreativeTabs.MISC.getCreativeTab())),
+
     // Consumables - Food and drinks.
     PLUM(new LostTalesItemFood(
             ELostTalesItemMaterial.NEUTRAL, Type.CONSUMABLE_FOOD, 1, 0.1F, false

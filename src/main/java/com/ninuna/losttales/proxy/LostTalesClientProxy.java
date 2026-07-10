@@ -1,6 +1,7 @@
 package com.ninuna.losttales.proxy;
 
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
+import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityPlushie;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityStatue;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
@@ -10,6 +11,7 @@ import com.ninuna.losttales.client.event.LostTalesClientEventHandler;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
+import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.client.render.renderer.item.LostTalesItemRendererArmor3D;
@@ -21,6 +23,9 @@ import com.ninuna.losttales.config.client.LostTalesConfigGuiEventHandler;
 import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneGuard;
 import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneMan;
 import com.ninuna.losttales.gui.ELostTalesMapLabels;
+import com.ninuna.losttales.gui.LostTalesGuiIds;
+import com.ninuna.losttales.gui.screen.LostTalesMissiveBoardGui;
+import com.ninuna.losttales.gui.screen.LostTalesMissiveLetterReaderGui;
 import com.ninuna.losttales.item.armor.LostTalesItemArmor3D;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
@@ -33,6 +38,10 @@ import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import net.minecraft.client.Minecraft;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.world.World;
 import net.minecraft.client.resources.IReloadableResourceManager;
 import lotr.client.render.entity.LOTRRenderBreeMan;
 import net.minecraftforge.common.MinecraftForge;
@@ -74,6 +83,26 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         super.init(event);
     }
 
+
+    @Override
+    public Object getClientGuiElement(int id, EntityPlayer player, World world, int x, int y, int z) {
+        if (id == LostTalesGuiIds.MISSIVE_BOARD) {
+            TileEntity tileEntity = world.getTileEntity(x, y, z);
+            if (tileEntity instanceof LostTalesTileEntityMissiveBoard) {
+                return new LostTalesMissiveBoardGui(player.inventory, (LostTalesTileEntityMissiveBoard) tileEntity);
+            }
+        }
+        return null;
+    }
+
+
+    @Override
+    public void openMissiveLetterGui(EntityPlayer player, ItemStack stack, int inventorySlot) {
+        if (stack != null) {
+            Minecraft.getMinecraft().displayGuiScreen(new LostTalesMissiveLetterReaderGui(stack, inventorySlot));
+        }
+    }
+
     @Override
     public void handleQuickLootContainerSync(LostTalesQuickLootContainerSyncPacket packet) {
         if (packet != null) {
@@ -85,8 +114,9 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     public void handleQuestSync(LostTalesQuestSyncPacket packet) {
         if (packet != null) {
             LostTalesClientMapMarkerStore.setDynamicMarkers(packet.getDynamicMapMarkers());
+            LostTalesClientQuestDefinitionStore.setDynamicQuestDefinitions(packet.getDynamicQuestDefinitions());
             LostTalesClientQuestNotificationStore.notifyForIncomingSync(packet.getActiveQuests(), packet.getCompletedQuestIds());
-            LostTalesClientQuestProgressStore.update(packet.getActiveQuests(), packet.getCompletedQuestIds(), packet.getPinnedQuestIds(), packet.getDiscoveredMarkerIds(), packet.getPinnedMapMarkerId());
+            LostTalesClientQuestProgressStore.update(packet.getActiveQuests(), packet.getCompletedQuestIds(), packet.getFailedQuestIds(), packet.getPinnedQuestIds(), packet.getDiscoveredMarkerIds(), packet.getPinnedMapMarkerId());
         }
     }
 

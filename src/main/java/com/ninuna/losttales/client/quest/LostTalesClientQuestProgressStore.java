@@ -12,6 +12,7 @@ import java.util.Set;
 public final class LostTalesClientQuestProgressStore {
     private static final Map<String, LostTalesQuestProgress> ACTIVE_QUESTS = new LinkedHashMap<String, LostTalesQuestProgress>();
     private static final Set<String> COMPLETED_QUESTS = new LinkedHashSet<String>();
+    private static final Set<String> FAILED_QUESTS = new LinkedHashSet<String>();
     private static final Set<String> DISCOVERED_MARKERS = new LinkedHashSet<String>();
     private static final Set<String> PINNED_QUESTS = new LinkedHashSet<String>();
     private static String pinnedMapMarkerId = "";
@@ -20,7 +21,7 @@ public final class LostTalesClientQuestProgressStore {
     private LostTalesClientQuestProgressStore() {}
 
     public static synchronized void update(Collection<LostTalesQuestProgress> activeQuests, Collection<String> completedQuestIds) {
-        update(activeQuests, completedQuestIds, Collections.<String>emptySet(), Collections.<String>emptySet(), "");
+        update(activeQuests, completedQuestIds, Collections.<String>emptySet(), Collections.<String>emptySet(), Collections.<String>emptySet(), "");
     }
 
     public static synchronized void update(Collection<LostTalesQuestProgress> activeQuests, Collection<String> completedQuestIds, String pinnedQuestIdIn) {
@@ -28,7 +29,7 @@ public final class LostTalesClientQuestProgressStore {
         if (pinnedQuestIdIn != null && pinnedQuestIdIn.length() > 0) {
             pinned.add(pinnedQuestIdIn);
         }
-        update(activeQuests, completedQuestIds, pinned, Collections.<String>emptySet(), "");
+        update(activeQuests, completedQuestIds, Collections.<String>emptySet(), pinned, Collections.<String>emptySet(), "");
     }
 
     public static synchronized void update(Collection<LostTalesQuestProgress> activeQuests, Collection<String> completedQuestIds, String pinnedQuestIdIn, Collection<String> discoveredMarkerIds, String pinnedMapMarkerIdIn) {
@@ -36,12 +37,13 @@ public final class LostTalesClientQuestProgressStore {
         if (pinnedQuestIdIn != null && pinnedQuestIdIn.length() > 0) {
             pinned.add(pinnedQuestIdIn);
         }
-        update(activeQuests, completedQuestIds, pinned, discoveredMarkerIds, pinnedMapMarkerIdIn);
+        update(activeQuests, completedQuestIds, Collections.<String>emptySet(), pinned, discoveredMarkerIds, pinnedMapMarkerIdIn);
     }
 
-    public static synchronized void update(Collection<LostTalesQuestProgress> activeQuests, Collection<String> completedQuestIds, Collection<String> pinnedQuestIdsIn, Collection<String> discoveredMarkerIds, String pinnedMapMarkerIdIn) {
+    public static synchronized void update(Collection<LostTalesQuestProgress> activeQuests, Collection<String> completedQuestIds, Collection<String> failedQuestIds, Collection<String> pinnedQuestIdsIn, Collection<String> discoveredMarkerIds, String pinnedMapMarkerIdIn) {
         ACTIVE_QUESTS.clear();
         COMPLETED_QUESTS.clear();
+        FAILED_QUESTS.clear();
         DISCOVERED_MARKERS.clear();
         PINNED_QUESTS.clear();
         receivedSync = true;
@@ -58,6 +60,14 @@ public final class LostTalesClientQuestProgressStore {
             for (String questId : completedQuestIds) {
                 if (questId != null && questId.length() > 0) {
                     COMPLETED_QUESTS.add(questId);
+                }
+            }
+        }
+
+        if (failedQuestIds != null) {
+            for (String questId : failedQuestIds) {
+                if (questId != null && questId.length() > 0) {
+                    FAILED_QUESTS.add(questId);
                 }
             }
         }
@@ -83,6 +93,7 @@ public final class LostTalesClientQuestProgressStore {
     public static synchronized void clear() {
         ACTIVE_QUESTS.clear();
         COMPLETED_QUESTS.clear();
+        FAILED_QUESTS.clear();
         DISCOVERED_MARKERS.clear();
         PINNED_QUESTS.clear();
         pinnedMapMarkerId = "";
@@ -101,6 +112,10 @@ public final class LostTalesClientQuestProgressStore {
         return Collections.unmodifiableSet(new LinkedHashSet<String>(COMPLETED_QUESTS));
     }
 
+    public static synchronized Set<String> getFailedQuestIds() {
+        return Collections.unmodifiableSet(new LinkedHashSet<String>(FAILED_QUESTS));
+    }
+
     public static synchronized Set<String> getDiscoveredMarkerIds() {
         return Collections.unmodifiableSet(new LinkedHashSet<String>(DISCOVERED_MARKERS));
     }
@@ -116,6 +131,10 @@ public final class LostTalesClientQuestProgressStore {
 
     public static synchronized boolean isQuestCompleted(String questId) {
         return COMPLETED_QUESTS.contains(questId);
+    }
+
+    public static synchronized boolean isQuestFailed(String questId) {
+        return questId != null && FAILED_QUESTS.contains(questId);
     }
 
     public static synchronized boolean isMarkerDiscovered(String markerId) {
@@ -178,7 +197,7 @@ public final class LostTalesClientQuestProgressStore {
     }
 
     public static synchronized boolean hasAnyState() {
-        return !ACTIVE_QUESTS.isEmpty() || !COMPLETED_QUESTS.isEmpty();
+        return !ACTIVE_QUESTS.isEmpty() || !COMPLETED_QUESTS.isEmpty() || !FAILED_QUESTS.isEmpty();
     }
 
     public static synchronized boolean hasReceivedSync() {

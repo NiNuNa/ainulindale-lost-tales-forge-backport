@@ -62,6 +62,7 @@ public class LostTalesConfigGui extends GuiConfig {
 
         List<IConfigElement> client = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_CLIENT)).getChildElements();
         List<IConfigElement> quests = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_QUESTS)).getChildElements();
+        List<IConfigElement> missives = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_MISSIVES)).getChildElements();
 
         elements.add(group("hud", "losttales.config.category.client.hud", pick(client,
                 "showLostTalesHud", "hudPlacementPreset",
@@ -79,6 +80,7 @@ public class LostTalesConfigGui extends GuiConfig {
                 "showQuestHudNotifications", "showWorldQuestMarkers", "showDiscoveredWorldMapMarkers",
                 "worldQuestMarkerMaxDistance", "showQuestChatFeedback", "playQuestSounds")));
         elements.add(group("questRules", "losttales.config.category.quests.rules", quests));
+        elements.add(group("missives", "losttales.config.category.missives", missives));
 
         List<IConfigElement> leftovers = leftovers(client, elements);
         if (!leftovers.isEmpty()) {

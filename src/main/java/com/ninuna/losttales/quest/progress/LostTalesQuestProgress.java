@@ -6,21 +6,33 @@ import java.util.Map;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
+
 /** Runtime state for one active player quest. */
 public final class LostTalesQuestProgress {
     private final String questId;
     private int stageIndex;
     private String stageId;
+    private long acceptedWorldTime;
+    private long deadlineWorldTime;
     private final Map<String, Integer> objectiveProgress = new LinkedHashMap<String, Integer>();
 
     public LostTalesQuestProgress(String questId, int stageIndex, String stageId) {
-        this(questId, stageIndex, stageId, null);
+        this(questId, stageIndex, stageId, null, 0L, 0L);
     }
 
     public LostTalesQuestProgress(String questId, int stageIndex, String stageId, Map<String, Integer> objectiveProgress) {
+        this(questId, stageIndex, stageId, objectiveProgress, 0L, 0L);
+    }
+
+    public LostTalesQuestProgress(String questId, int stageIndex, String stageId, Map<String, Integer> objectiveProgress, long acceptedWorldTime, long deadlineWorldTime) {
         this.questId = questId;
         this.stageIndex = Math.max(0, stageIndex);
         this.stageId = stageId == null ? "" : stageId;
+        this.acceptedWorldTime = Math.max(0L, acceptedWorldTime);
+        this.deadlineWorldTime = Math.max(0L, deadlineWorldTime);
+        if (this.deadlineWorldTime > 0L && this.acceptedWorldTime > 0L && this.deadlineWorldTime < this.acceptedWorldTime) {
+            this.deadlineWorldTime = this.acceptedWorldTime;
+        }
         if (objectiveProgress != null) {
             for (Map.Entry<String, Integer> entry : objectiveProgress.entrySet()) {
                 if (entry.getKey() != null && entry.getKey().length() > 0 && entry.getValue() != null) {
@@ -31,7 +43,7 @@ public final class LostTalesQuestProgress {
     }
 
     public LostTalesQuestProgress copy() {
-        return new LostTalesQuestProgress(this.questId, this.stageIndex, this.stageId, this.objectiveProgress);
+        return new LostTalesQuestProgress(this.questId, this.stageIndex, this.stageId, this.objectiveProgress, this.acceptedWorldTime, this.deadlineWorldTime);
     }
 
     public String getQuestId() {
@@ -49,6 +61,37 @@ public final class LostTalesQuestProgress {
     public void setStage(int stageIndex, String stageId) {
         this.stageIndex = Math.max(0, stageIndex);
         this.stageId = stageId == null ? "" : stageId;
+    }
+
+    public long getAcceptedWorldTime() {
+        return this.acceptedWorldTime;
+    }
+
+    public long getDeadlineWorldTime() {
+        return this.deadlineWorldTime;
+    }
+
+    public boolean hasTimeLimit() {
+        return this.deadlineWorldTime > 0L;
+    }
+
+    public long getRemainingTicks(long worldTime) {
+        if (!this.hasTimeLimit()) {
+            return 0L;
+        }
+        return Math.max(0L, this.deadlineWorldTime - Math.max(0L, worldTime));
+    }
+
+    public boolean isExpired(long worldTime) {
+        return this.hasTimeLimit() && Math.max(0L, worldTime) >= this.deadlineWorldTime;
+    }
+
+    public void setTiming(long acceptedWorldTime, long deadlineWorldTime) {
+        this.acceptedWorldTime = Math.max(0L, acceptedWorldTime);
+        this.deadlineWorldTime = Math.max(0L, deadlineWorldTime);
+        if (this.deadlineWorldTime > 0L && this.acceptedWorldTime > 0L && this.deadlineWorldTime < this.acceptedWorldTime) {
+            this.deadlineWorldTime = this.acceptedWorldTime;
+        }
     }
 
     public Map<String, Integer> getObjectiveProgress() {
@@ -90,6 +133,8 @@ public final class LostTalesQuestProgress {
         tag.setString("QuestId", this.questId);
         tag.setInteger("StageIndex", this.stageIndex);
         tag.setString("StageId", this.stageId);
+        tag.setLong("AcceptedWorldTime", this.acceptedWorldTime);
+        tag.setLong("DeadlineWorldTime", this.deadlineWorldTime);
 
         NBTTagList objectiveList = new NBTTagList();
         for (Map.Entry<String, Integer> entry : this.objectiveProgress.entrySet()) {
@@ -124,6 +169,13 @@ public final class LostTalesQuestProgress {
             }
         }
 
-        return new LostTalesQuestProgress(questId, tag.getInteger("StageIndex"), tag.getString("StageId"), objectiveProgress);
+        return new LostTalesQuestProgress(
+                questId,
+                tag.getInteger("StageIndex"),
+                tag.getString("StageId"),
+                objectiveProgress,
+                tag.getLong("AcceptedWorldTime"),
+                tag.getLong("DeadlineWorldTime")
+        );
     }
 }

@@ -37,7 +37,36 @@ public final class LostTalesQuestManager {
         return startQuest(player, questId, LostTalesQuestStartSource.COMMAND);
     }
 
+    /**
+     * Registers, persists, and starts a server-authored runtime quest.
+     *
+     * Generated missives use locked start mode so clients cannot start them directly
+     * from the journal or from forged item NBT. This method is intended for trusted
+     * server-side acceptance paths, such as a validated missive board slot.
+     */
+    public static StartResult startGeneratedQuest(EntityPlayer player, LostTalesQuestDefinition quest) {
+        return startGeneratedQuest(player, quest, 0L);
+    }
+
+    public static StartResult startGeneratedQuest(EntityPlayer player, LostTalesQuestDefinition quest, long timeLimitTicks) {
+        if (quest == null || quest.getId() == null || quest.getId().length() == 0) {
+            return StartResult.UNKNOWN_QUEST;
+        }
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null) {
+            sendQuestChat(player, EnumChatFormatting.RED + "Quest data is not available.");
+            return StartResult.NO_PLAYER_DATA;
+        }
+        data.rememberDynamicQuestDefinition(quest);
+        LostTalesQuestRegistry.registerRuntimeQuest(quest);
+        return startQuestInternal(player, quest.getId(), LostTalesQuestStartSource.COMMAND, Math.max(0L, timeLimitTicks));
+    }
+
     public static StartResult startQuest(EntityPlayer player, String questId, LostTalesQuestStartSource source) {
+        return startQuestInternal(player, questId, source, 0L);
+    }
+
+    private static StartResult startQuestInternal(EntityPlayer player, String questId, LostTalesQuestStartSource source, long timeLimitTicks) {
         LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
         if (quest == null) {
             sendQuestChat(player, EnumChatFormatting.RED + "Unknown quest: " + questId);
@@ -70,7 +99,9 @@ public final class LostTalesQuestManager {
         }
 
         LostTalesQuestStageDefinition firstStage = quest.getFirstStage();
-        data.startQuest(questId, firstStage == null ? "" : firstStage.getId());
+        long acceptedWorldTime = player != null && player.worldObj != null ? player.worldObj.getTotalWorldTime() : 0L;
+        long deadlineWorldTime = timeLimitTicks > 0L ? acceptedWorldTime + timeLimitTicks : 0L;
+        data.startQuest(questId, firstStage == null ? "" : firstStage.getId(), acceptedWorldTime, deadlineWorldTime);
         if (LostTalesConfig.autoPinQuestOnStart && !data.isQuestPinned(questId)) {
             data.pinQuestId(questId);
         }
@@ -78,6 +109,9 @@ public final class LostTalesQuestManager {
             revealQuestMarkers(player, quest, false);
         }
         sendQuestChat(player, EnumChatFormatting.GOLD + "Quest started: " + EnumChatFormatting.YELLOW + quest.getTitle());
+        if (timeLimitTicks > 0L) {
+            sendQuestChat(player, EnumChatFormatting.RED + "Time limit: " + formatTicks(timeLimitTicks) + ".");
+        }
         playQuestSound(player, "random.orb", 0.35F, 1.0F);
 
         if (player instanceof EntityPlayerMP) {
@@ -516,7 +550,7 @@ public final class LostTalesQuestManager {
             return;
         }
 
-        boolean changed = false;
+        boolean changed = failExpiredQuests(player);
         if (shouldScanMarkerDiscovery(player)) {
             changed |= discoverNearbyMapMarkers(player, false);
         }
@@ -541,6 +575,31 @@ public final class LostTalesQuestManager {
         }
     }
 
+    public static boolean failExpiredQuests(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null || player.worldObj.isRemote) {
+            return false;
+        }
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        if (data == null) {
+            return false;
+        }
+
+        long worldTime = player.worldObj.getTotalWorldTime();
+        boolean changed = false;
+        for (LostTalesQuestProgress progress : getActiveQuests(player)) {
+            if (progress == null || !progress.isExpired(worldTime)) {
+                continue;
+            }
+            String questId = progress.getQuestId();
+            if (data.failQuest(questId)) {
+                changed = true;
+                sendQuestChat(player, EnumChatFormatting.RED + "Quest failed: " + questTitle(questId));
+                playQuestSound(player, "random.break", 0.3F, 0.8F);
+            }
+        }
+        return changed;
+    }
+
     /**
      * Revalidates state after login, respawn, or dimension travel and sends one
      * clean snapshot. Keeping this in the manager avoids packet timing differences
@@ -552,6 +611,7 @@ public final class LostTalesQuestManager {
         }
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         boolean changed = data != null && data.pruneInvalidReferences();
+        changed |= failExpiredQuests(player);
         for (LostTalesQuestProgress progress : getActiveQuests(player)) {
             LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
             if (quest != null) {
@@ -1010,6 +1070,19 @@ public final class LostTalesQuestManager {
         }
         String description = objective.getDescription();
         return description == null || description.length() == 0 ? objective.getId() : description;
+    }
+
+    private static String formatTicks(long ticks) {
+        if (ticks >= 24000L && ticks % 24000L == 0L) {
+            long days = ticks / 24000L;
+            return days + " in-game day" + (days == 1L ? "" : "s");
+        }
+        if (ticks >= 1200L) {
+            long minutes = ticks / 1200L;
+            return minutes + " in-game minute" + (minutes == 1L ? "" : "s");
+        }
+        long seconds = Math.max(1L, ticks / 20L);
+        return seconds + " second" + (seconds == 1L ? "" : "s");
     }
 
     private static String questTitle(String questId) {

@@ -1,8 +1,10 @@
 package com.ninuna.losttales.proxy;
 
+import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.achievement.ELostTalesAchievement;
 import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
+import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityPlushie;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityStatue;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
@@ -14,6 +16,7 @@ import com.ninuna.losttales.event.LostTalesMobAggroEventHandler;
 import com.ninuna.losttales.event.LostTalesQuestObjectiveEventHandler;
 import com.ninuna.losttales.event.LostTalesQuestPlayerEventHandler;
 import com.ninuna.losttales.faction.ELostTalesFaction;
+import com.ninuna.losttales.gui.LostTalesGuiHandler;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
@@ -32,7 +35,11 @@ import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
+import cpw.mods.fml.common.network.NetworkRegistry;
 import cpw.mods.fml.common.registry.GameRegistry;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
+import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
 import software.bernie.geckolib3.GeckoLib;
 
@@ -61,6 +68,8 @@ public class LostTalesCommonProxy {
     }
 
     public void init(FMLInitializationEvent event) {
+        NetworkRegistry.INSTANCE.registerGuiHandler(LostTalesMod.instance, new LostTalesGuiHandler());
+
         ELostTalesStructure.initAndRegisterStructures();
         ELostTalesCrafting.initAndRegisterCrafting();
         ELostTalesFaction.initAndRegisterFactions();
@@ -80,7 +89,22 @@ public class LostTalesCommonProxy {
         GameRegistry.registerTileEntity(LostTalesTileEntityStatue.class, "statue");
         GameRegistry.registerTileEntity(LostTalesTileEntityLamp.class, "lamp");
         GameRegistry.registerTileEntity(LostTalesTileEntityPlushie.class, "plushie");
+        GameRegistry.registerTileEntity(LostTalesTileEntityMissiveBoard.class, "missive_board");
     }
+
+    /**
+     * Client-only GUI construction hook. The common/server proxy returns null so
+     * dedicated servers never load client GUI classes.
+     */
+    public Object getClientGuiElement(int id, EntityPlayer player, World world, int x, int y, int z) {
+        return null;
+    }
+
+    /**
+     * Client-only missive reader hook. The common/server proxy is a no-op so
+     * dedicated servers never load client GUI classes.
+     */
+    public void openMissiveLetterGui(EntityPlayer player, ItemStack stack, int inventorySlot) {}
 
     /**
      * Client-bound packet hooks. The common/server proxy deliberately does
