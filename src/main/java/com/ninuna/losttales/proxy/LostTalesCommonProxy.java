@@ -3,6 +3,8 @@ package com.ninuna.losttales.proxy;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.achievement.ELostTalesAchievement;
 import com.ninuna.losttales.block.ELostTalesBlock;
+import com.ninuna.losttales.character.server.CharacterPlayerEventHandler;
+import com.ninuna.losttales.character.server.CharacterServerTaskQueue;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityPlushie;
@@ -10,6 +12,7 @@ import com.ninuna.losttales.block.tileentity.LostTalesTileEntityStatue;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.command.ELostTalesCommand;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.crafting.ELostTalesCrafting;
 import com.ninuna.losttales.entity.ELostTalesEntity;
 import com.ninuna.losttales.event.LostTalesMobAggroEventHandler;
@@ -23,6 +26,8 @@ import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
+import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
+import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
 import com.ninuna.losttales.world.biome.ELostTalesBiome;
 import com.ninuna.losttales.world.map.LostTalesMapOverlay;
@@ -53,11 +58,15 @@ public class LostTalesCommonProxy {
         LostTalesQuestPlayerEventHandler questPlayerEventHandler = new LostTalesQuestPlayerEventHandler();
         LostTalesQuestObjectiveEventHandler questObjectiveEventHandler = new LostTalesQuestObjectiveEventHandler();
         LostTalesMobAggroEventHandler mobAggroEventHandler = new LostTalesMobAggroEventHandler();
+        CharacterPlayerEventHandler characterPlayerEventHandler = new CharacterPlayerEventHandler();
+        CharacterServerTaskQueue characterServerTaskQueue = new CharacterServerTaskQueue();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
         MinecraftForge.EVENT_BUS.register(questObjectiveEventHandler);
         FMLCommonHandler.instance().bus().register(questPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(questObjectiveEventHandler);
         FMLCommonHandler.instance().bus().register(mobAggroEventHandler);
+        FMLCommonHandler.instance().bus().register(characterPlayerEventHandler);
+        FMLCommonHandler.instance().bus().register(characterServerTaskQueue);
 
         ELostTalesItem.initAndRegisterItems();
         ELostTalesBlock.initAndRegisterBlocks();
@@ -80,7 +89,11 @@ public class LostTalesCommonProxy {
         ELostTalesRoad.initAndRegisterRoads();
     }
 
-    public void postInit(FMLPostInitializationEvent event) {}
+    public void postInit(FMLPostInitializationEvent event) {
+        // Run after Lost Tales has registered its additional LOTR factions so
+        // the immutable character-creation catalogue includes them as well.
+        LotrCharacterAdapter.getInstance().initialize();
+    }
 
     protected void registerTileEntities() {
         // Keep the original short IDs for world-save compatibility. Registering from the
@@ -120,6 +133,13 @@ public class LostTalesCommonProxy {
     public void handleMobAggroSync(LostTalesMobAggroSyncPacket packet) {}
 
     public void handleMapMarkerDiscovery(LostTalesMapMarkerDiscoveryPacket packet) {}
+
+    /** Queues client-only packet work. The dedicated-server proxy is a no-op. */
+    public void scheduleClientTask(Runnable task) {}
+
+    public void handleCharacterRosterSync(CharacterRosterSyncPacket packet) {}
+
+    public void handleCharacterOperationResult(CharacterOperationResultPacket packet) {}
 
     public void onServerStarting(FMLServerStartingEvent event) {
         ELostTalesCommand.initAndRegisterCommands(event);

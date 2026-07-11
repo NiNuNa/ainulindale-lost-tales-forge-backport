@@ -2,7 +2,9 @@ package com.ninuna.losttales.item.consumable;
 
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.material.ELostTalesItemMaterial;
-import com.ninuna.losttales.util.LostTalesUtil;
+import com.ninuna.losttales.util.LostTalesClientUtil;
+import cpw.mods.fml.relauncher.Side;
+import cpw.mods.fml.relauncher.SideOnly;
 import java.util.List;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemFood;
@@ -28,8 +30,9 @@ public class LostTalesItemFood extends ItemFood {
     }
 
     @Override
+    @SideOnly(Side.CLIENT)
     public void addInformation(ItemStack itemStack, EntityPlayer player, List list, boolean advancedTooltips) {
-        LostTalesUtil.addItemInformation(list, itemStack, this.material, this.credits, player, this.itemType);
+        LostTalesClientUtil.addItemInformation(list, itemStack, this.material, this.credits, player, this.itemType);
     }
 
     public ELostTalesItem.Type getItemType() {

@@ -3,6 +3,7 @@ package com.ninuna.losttales.gui.screen;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileRouterGui;
 import lotr.client.gui.LOTRGuiMap;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiScreen;
@@ -179,7 +180,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
         }
         switch (option) {
             case OPTION_PROFILE:
-                this.mc.displayGuiScreen(new LostTalesCharacterInfoGui(this));
+                this.mc.displayGuiScreen(new LostTalesCharacterProfileRouterGui(this));
                 break;
             case OPTION_QUESTS:
                 this.mc.displayGuiScreen(new LostTalesQuestJournalGui(this.parent));
@@ -193,7 +194,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
                 try {
                     this.mc.displayGuiScreen(new LOTRGuiMap());
                 } catch (Throwable ignored) {
-                    this.mc.displayGuiScreen(new LostTalesCharacterInfoGui(this));
+                    this.mc.displayGuiScreen(new LostTalesCharacterProfileRouterGui(this));
                 }
                 break;
             default:

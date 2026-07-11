@@ -1,0 +1,82 @@
+package com.ninuna.losttales.character.server;
+
+import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.character.sync.CharacterOperationType;
+import com.ninuna.losttales.character.validation.CharacterErrorId;
+import cpw.mods.fml.common.FMLLog;
+import net.minecraft.entity.player.EntityPlayerMP;
+
+import java.util.UUID;
+
+/** Executes queued character requests on the logical server thread. */
+public final class CharacterNetworkRequestHandler {
+
+    private CharacterNetworkRequestHandler() {}
+
+    public static void handleRosterRequest(final EntityPlayerMP player, final int requestId) {
+        execute(player, requestId, CharacterOperationType.REQUEST_ROSTER, new Operation() {
+            @Override
+            public CharacterOperationResult run() {
+                return CharacterService.getInstance().getRoster(player);
+            }
+        });
+    }
+
+    public static void handleCreateRequest(final EntityPlayerMP player, final int requestId,
+                                           final CharacterCreationRequest request) {
+        execute(player, requestId, CharacterOperationType.CREATE, new Operation() {
+            @Override
+            public CharacterOperationResult run() {
+                return CharacterService.getInstance().createCharacter(player, request);
+            }
+        });
+    }
+
+    public static void handleSelectRequest(final EntityPlayerMP player, final int requestId,
+                                           final long expectedRosterRevision,
+                                           final UUID characterId) {
+        execute(player, requestId, CharacterOperationType.SELECT, new Operation() {
+            @Override
+            public CharacterOperationResult run() {
+                return CharacterService.getInstance().selectCharacter(
+                        player, expectedRosterRevision, characterId);
+            }
+        });
+    }
+
+    public static void handleDeleteRequest(final EntityPlayerMP player, final int requestId,
+                                           final long expectedRosterRevision,
+                                           final UUID characterId) {
+        execute(player, requestId, CharacterOperationType.DELETE, new Operation() {
+            @Override
+            public CharacterOperationResult run() {
+                return CharacterService.getInstance().deleteCharacter(
+                        player, expectedRosterRevision, characterId);
+            }
+        });
+    }
+
+    private static void execute(EntityPlayerMP player,
+                                int requestId,
+                                CharacterOperationType operationType,
+                                Operation operation) {
+        try {
+            CharacterOperationResult result = operation.run();
+            CharacterSyncManager.sendResultAndRoster(
+                    player, requestId, operationType, result);
+        } catch (Throwable throwable) {
+            FMLLog.warning("[%s] Character %s request failed for player %s: %s",
+                    LostTalesMetaData.MOD_ID,
+                    operationType.getId(),
+                    player == null ? "unknown" : player.getUniqueID(),
+                    throwable.toString());
+            CharacterSyncManager.sendFailure(
+                    player, requestId, operationType,
+                    CharacterErrorId.INTERNAL_ERROR, -1L);
+        }
+    }
+
+    private interface Operation {
+        CharacterOperationResult run();
+    }
+}

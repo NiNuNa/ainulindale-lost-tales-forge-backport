@@ -1,6 +1,13 @@
 package com.ninuna.losttales.gui.screen;
 
+import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
+import com.ninuna.losttales.client.character.ClientCharacterNetwork;
+import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
+import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
+import com.ninuna.losttales.character.sync.CharacterSummary;
+import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileRouterGui;
+import com.ninuna.losttales.gui.screen.character.LostTalesCharacterRosterGui;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -13,7 +20,9 @@ import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.resources.I18n;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.entity.EntityLivingBase;
@@ -27,6 +36,8 @@ import org.lwjgl.opengl.GL12;
 /** Client-only character overview/details screen reached from the radial character menu. */
 public class LostTalesCharacterInfoGui extends GuiScreen {
     private static final int PANEL_PADDING = 10;
+    private static final int BUTTON_MANAGE = 1;
+    private static final int BUTTON_BACK = 2;
 
     private final GuiScreen parent;
     private int modelPanelX;
@@ -39,6 +50,7 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
     private float modelYaw = 25.0F;
     private float modelPitch = 0.0F;
     private int modelScale = 48;
+    private int rosterRequestId;
 
     public LostTalesCharacterInfoGui(GuiScreen parent) {
         this.parent = parent;
@@ -46,15 +58,40 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
 
     @Override
     public void initGui() {
+        this.buttonList.clear();
         if (this.mc != null) {
             LostTalesClientQuestDefinitionStore.ensureLoaded(this.mc.getResourceManager());
+        }
+        this.buttonList.add(new GuiButton(BUTTON_MANAGE, this.width - 126,
+                this.height - 28, 118, 20,
+                I18n.format("gui.losttales.character.manage")));
+        this.buttonList.add(new GuiButton(BUTTON_BACK, 8,
+                this.height - 28, 72, 20, I18n.format("gui.back")));
+        if (ClientCharacterRosterCache.getState() == ClientCharacterRosterCache.SyncState.UNKNOWN
+                || ClientCharacterRosterCache.getState() == ClientCharacterRosterCache.SyncState.ERROR) {
+            this.rosterRequestId = ClientCharacterNetwork.requestRoster();
+        }
+    }
+
+    @Override
+    public void updateScreen() {
+        ClientCharacterRosterCache.SyncState state = ClientCharacterRosterCache.getState();
+        if (state == ClientCharacterRosterCache.SyncState.READY) {
+            CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
+            if (snapshot == null || snapshot.getActiveCharacter() == null) {
+                this.mc.displayGuiScreen(new LostTalesCharacterProfileRouterGui(this.parent));
+            }
+        } else if (state == ClientCharacterRosterCache.SyncState.ERROR
+                && (this.rosterRequestId == 0
+                || !ClientCharacterRosterCache.isRequestPending(this.rosterRequestId))) {
+            this.mc.displayGuiScreen(new LostTalesCharacterProfileRouterGui(this.parent));
         }
     }
 
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         LostTalesSkyrimUiStyle.drawScreenShade(this.width, this.height);
-        LostTalesSkyrimUiStyle.drawCenteredHeader(this.fontRendererObj, "Character Info", getPlayerName(), this.width, 12);
+        LostTalesSkyrimUiStyle.drawCenteredHeader(this.fontRendererObj, I18n.format("gui.losttales.character.profile"), getCharacterName(), this.width, 12);
 
         int gap = 14;
         int panelTop = 48;
@@ -85,30 +122,50 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
     }
 
     private void drawCharacterPanel(int x, int y, int width, int height) {
-        LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj, "Profile", x, y, width);
+        CharacterSummary character = getActiveCharacter();
+        LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj,
+                I18n.format("gui.losttales.character.profile"), x, y, width);
         int lineY = y + 16;
-        lineY = drawLabelValue("Name", getPlayerName(), x, lineY, width);
-        lineY = drawLabelValue("Location", getDimensionName(), x, lineY, width);
-        lineY = drawLabelValue("World Time", getWorldTimeText(), x, lineY, width);
+        if (character == null) {
+            drawWrapped(I18n.format("gui.losttales.character.loading_detail"),
+                    x, lineY, width, LostTalesSkyrimUiStyle.TEXT_MUTED, height);
+            return;
+        }
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.name"),
+                character.getName(), x, lineY, width);
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.level"),
+                String.valueOf(character.getRoleplayLevel()), x, lineY, width);
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.race"),
+                ClientCharacterDisplayNames.race(character.getRaceId()), x, lineY, width);
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.gender"),
+                ClientCharacterDisplayNames.gender(character.getGenderId()), x, lineY, width);
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.age"),
+                String.valueOf(character.getAge()), x, lineY, width);
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.starting_faction"),
+                ClientCharacterDisplayNames.faction(character.getStartingFactionId()), x, lineY, width);
         lineY += 8;
 
-        LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj, "HUD", x, lineY, width);
+        LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj,
+                I18n.format("gui.losttales.character.account_state"), x, lineY, width);
         lineY += 16;
-        lineY = drawLabelValue("Master", LostTalesConfig.showLostTalesHud ? "Shown" : "Hidden", x, lineY, width);
-        lineY = drawLabelValue("Compass", LostTalesConfig.showCompassHud ? "Shown" : "Hidden", x, lineY, width);
-        lineY = drawLabelValue("Quick Loot", LostTalesConfig.showQuickLootHud ? "Shown" : "Hidden", x, lineY, width);
-        lineY = drawLabelValue("Quest Tracker", LostTalesConfig.showQuestHud ? "Shown" : "Hidden", x, lineY, width);
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.minecraft_account"),
+                getAccountName(), x, lineY, width);
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.location"),
+                getDimensionName(), x, lineY, width);
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.world_time"),
+                getWorldTimeText(), x, lineY, width);
         lineY += 8;
 
-        LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj, "Controls", x, lineY, width);
+        LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj,
+                I18n.format("gui.losttales.character.shared_state"), x, lineY, width);
         lineY += 16;
-        lineY = drawLabelValue("Quest Journal", LostTalesKeyBindings.getQuestJournalKeyDisplayName(), x, lineY, width);
-        lineY = drawLabelValue("Character Menu", LostTalesKeyBindings.getCharacterMenuKeyDisplayName(), x, lineY, width);
-        drawLabelValue("HUD Modifier", LostTalesKeyBindings.getModifierKeyDisplayName(), x, lineY, width);
+        drawWrapped(I18n.format("gui.losttales.character.shared_state_detail"),
+                x, lineY, width, LostTalesSkyrimUiStyle.TEXT_MUTED,
+                Math.max(18, height - (lineY - y)));
     }
 
     private void drawPlayerModelPanel(int x, int y, int width, int height, int mouseX, int mouseY) {
-        LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj, "Character", x, y, width);
+        LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj, I18n.format("gui.losttales.character.character"), x, y, width);
         EntityPlayer player = this.mc == null ? null : this.mc.thePlayer;
         int modelX = x + width / 2;
         int modelY = y + Math.max(78, height - 28);
@@ -157,8 +214,14 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
 
     private int drawLabelValue(String label, String value, int x, int y, int width) {
         String safeValue = value == null ? "" : value;
-        this.fontRendererObj.drawStringWithShadow(label + ":", x, y, LostTalesSkyrimUiStyle.TEXT_MUTED);
-        this.fontRendererObj.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, safeValue, width - 82), x + 82, y, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
+        String labelText = label + ":";
+        int labelWidth = Math.min(Math.max(74, this.fontRendererObj.getStringWidth(labelText) + 8),
+                Math.max(74, width / 2));
+        this.fontRendererObj.drawStringWithShadow(labelText, x, y, LostTalesSkyrimUiStyle.TEXT_MUTED);
+        this.fontRendererObj.drawStringWithShadow(
+                LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, safeValue,
+                        Math.max(20, width - labelWidth)),
+                x + labelWidth, y, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
         return y + 11;
     }
 
@@ -247,15 +310,27 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
     }
 
     private void drawFooterHelp() {
-        String help = "Drag model: rotate   Mouse wheel: scale   "
-                + LostTalesKeyBindings.getQuestJournalKeyDisplayName() + ": quest journal   "
-                + LostTalesKeyBindings.getCharacterMenuKeyDisplayName() + "/Esc: back";
-        this.fontRendererObj.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, help, this.width - 24), 12, this.height - 20, LostTalesSkyrimUiStyle.TEXT_MUTED);
+        String help = I18n.format("gui.losttales.character.profile_help",
+                LostTalesKeyBindings.getQuestJournalKeyDisplayName(),
+                LostTalesKeyBindings.getCharacterMenuKeyDisplayName());
+        this.fontRendererObj.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, help, this.width - 180), 92, this.height - 22, LostTalesSkyrimUiStyle.TEXT_MUTED);
     }
 
-    private String getPlayerName() {
+    private CharacterSummary getActiveCharacter() {
+        CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
+        return snapshot == null ? null : snapshot.getActiveCharacter();
+    }
+
+    private String getCharacterName() {
+        CharacterSummary character = getActiveCharacter();
+        return character == null ? I18n.format("gui.losttales.character.loading")
+                : character.getName();
+    }
+
+    private String getAccountName() {
         EntityPlayer player = this.mc == null ? null : this.mc.thePlayer;
-        return player == null ? "Unknown Adventurer" : player.getCommandSenderName();
+        return player == null ? I18n.format("gui.losttales.character.unknown")
+                : player.getCommandSenderName();
     }
 
     private String getDimensionName() {
@@ -281,6 +356,17 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
         int hour = (int)(timeOfDay / 1000L);
         int minute = (int)((timeOfDay % 1000L) * 60L / 1000L);
         return "Day " + day + ", " + (hour < 10 ? "0" : "") + hour + ":" + (minute < 10 ? "0" : "") + minute;
+    }
+
+    @Override
+    protected void actionPerformed(GuiButton button) {
+        if (button.id == BUTTON_MANAGE) {
+            this.mc.displayGuiScreen(new LostTalesCharacterRosterGui(this, false));
+            return;
+        }
+        if (button.id == BUTTON_BACK) {
+            this.mc.displayGuiScreen(this.parent);
+        }
     }
 
     @Override

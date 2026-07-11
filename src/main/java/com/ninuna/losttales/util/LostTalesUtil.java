@@ -1,17 +1,9 @@
 package com.ninuna.losttales.util;
 
-import com.ninuna.losttales.block.custom.LostTalesBlockPlushie;
-import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
-import com.ninuna.losttales.entity.ELostTalesUser;
-import com.ninuna.losttales.item.ELostTalesItem;
-import com.ninuna.losttales.item.armor.LostTalesItemArmorBase;
-import com.ninuna.losttales.item.material.ELostTalesItemMaterial;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.ModContainer;
 import cpw.mods.fml.relauncher.ReflectionHelper;
-import cpw.mods.fml.relauncher.Side;
-import cpw.mods.fml.relauncher.SideOnly;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,12 +11,8 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.EnumSet;
-import java.util.List;
 import javax.imageio.ImageIO;
-import lotr.client.LOTRTextures;
-import lotr.client.gui.LOTRMapLabels;
 import lotr.common.LOTRAchievement;
 import lotr.common.LOTRDimension;
 import lotr.common.fac.LOTRControlZone;
@@ -37,163 +25,10 @@ import lotr.common.world.map.LOTRRoads;
 import lotr.common.world.map.LOTRWaypoint;
 import lotr.common.world.spawning.LOTRSpawnEntry;
 import lotr.common.world.spawning.LOTRSpawnList;
-import net.minecraft.block.Block;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.client.resources.I18n;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.util.EnumHelper;
-import org.lwjgl.input.Keyboard;
 
 public abstract class LostTalesUtil {
-
-    public static void addItemInformation(List list, ItemStack itemStack, ELostTalesItemMaterial material, String credits, EntityPlayer player, ELostTalesItem.Type itemType) {
-        addItemLore(list, getItemLore(itemStack));
-        addItemDetails(list, itemStack, credits, material, itemType);
-        if (itemStack.getItem() instanceof LostTalesItemArmorBase) {
-            addArmorSetInformation(itemStack, player, list, "Test Bonus!");
-        }
-    }
-
-    public static void addItemBlockInformation(List list, ItemStack itemStack, Block block, ELostTalesUser credits) {
-        addItemLore(list, getItemLore(itemStack));
-        addItemBlockDetails(list, itemStack, block, credits);
-
-    }
-
-    public static String[] getItemLore(ItemStack itemStack) {
-        return new String[]{I18n.format(itemStack.getUnlocalizedName() + ".lore.line1"), I18n.format(itemStack.getUnlocalizedName() + ".lore.line2")};
-    }
-
-    public static void addItemLore(List list, String[] itemLore) {
-        if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)) {
-            for (String lore : itemLore) {
-                list.add("§7§o" + lore);
-            }
-        } else {
-            list.add("Hold §f[SHIFT] §r§7to view item lore.");
-        }
-    }
-
-    public static void addItemDetails(List list, ItemStack itemStack, String credits, ELostTalesItemMaterial material, ELostTalesItem.Type itemType) {
-        if (Keyboard.isKeyDown(Keyboard.KEY_LCONTROL)) {
-            list.add("");
-            list.add("Faction: §f§o" +  I18n.format("lotr.faction." + material.getFaction().getFaction().codeName() + ".name"));
-
-            if (material.getMaterial() != null) {
-                list.add("Repair Item: §f§o" + material.getMaterial().getRepairItem().getDisplayName());
-            }
-
-            list.add("Type: §f§o" + itemType.getName());
-
-            if (credits != null){
-                list.add("§8Created by: §o" + credits);
-            }
-        } else {
-            list.add("");
-            list.add("Hold §f[CTRL] §r§7to view item details.");
-        }
-    }
-
-    public static void addItemBlockDetails(List list, ItemStack itemStack, Block block, ELostTalesUser credits) {
-        if (Keyboard.isKeyDown(Keyboard.KEY_LCONTROL)) {
-            list.add("");
-
-            if (block instanceof LostTalesBlockPlushie) {
-                list.add("Rarity: " + ((LostTalesBlockPlushie)block).getRarity().rarityColor + "§o" + ((LostTalesBlockPlushie)block).getRarity().rarityName);
-            }
-
-            list.add("Type: §f§o" + ELostTalesItem.Type.BLOCK_BUILDING.getName());
-
-            if (credits != ELostTalesUser.NULL){
-                list.add("§8Created by: §o" + credits.getName());
-            }
-        } else {
-            list.add("");
-            list.add("Hold §f[CTRL] §r§7to view item details.");
-        }
-    }
-
-    public static void addArmorSetInformation(ItemStack itemStack, EntityPlayer player, List list, String setBonusDescription) {
-        ItemStack helmet = player.getCurrentArmor(3);
-        ItemStack armor = player.getCurrentArmor(2);
-        ItemStack leggings = player.getCurrentArmor(1);
-        ItemStack boots = player.getCurrentArmor(0);
-
-        String infoTextBase = "§8>§o ";
-        String[] names = new String[]{infoTextBase, infoTextBase, infoTextBase, infoTextBase};
-
-        int setCounter = 0;
-
-        //Display armor set progress when armor is equipped.
-        if (itemStack == helmet || itemStack == armor || itemStack == leggings || itemStack == boots) {
-            list.add("");
-            if (LostTalesKeyBindings.isModifierKeyDown()) {
-                if (itemStack.getItem() instanceof LostTalesItemArmorBase) {
-                    if (((LostTalesItemArmorBase)itemStack.getItem()).getItemType() == ELostTalesItem.Type.ARMOR_HEAVY) {
-                        setCounter = displayArmorSetDetails(true, names, helmet, armor, leggings, boots);
-                        list.add("§e[" + setCounter + "/4] §r§7Heavy Armor Set:");
-                    } else {
-                        setCounter = displayArmorSetDetails(false, names, helmet, armor, leggings, boots);
-                        list.add("§e[" + setCounter + "/4] §r§7Light Armor Set:");
-                    }
-                }
-                Collections.addAll(list, names);
-
-                //Display the armor set bonus.
-                if (setCounter == 4) {
-                    list.add("");
-                    if (itemStack.getItem() instanceof LostTalesItemArmorBase) {
-                        if (((LostTalesItemArmorBase)itemStack.getItem()).getItemType() == ELostTalesItem.Type.ARMOR_HEAVY) {
-                            list.add("§e[4/4] §r§7Heavy Armor Set Bonus:");
-                        } else {
-                            list.add("§e[4/4] §r§7Light Armor Set Bonus:");
-                        }
-                    }
-                    if (!setBonusDescription.isEmpty()) {
-                        list.add("§e§o" + setBonusDescription);
-                    } else {
-                        list.add("§e§oNo set bonus!");
-                    }
-                }
-            } else {
-                list.add("Hold §e[" + LostTalesKeyBindings.getModifierKeyDisplayName() + "] §r§7to view armor set information.");
-            }
-        }
-    }
-
-    private static int displayArmorSetDetails(Boolean isHeavyArmor, String[] names, ItemStack helmet, ItemStack armor, ItemStack leggings, ItemStack boots) {
-        int setCounter = 0;
-
-        setCounter = getArmorSetDetails(helmet, isHeavyArmor, names, setCounter, 0);
-        setCounter = getArmorSetDetails(armor, isHeavyArmor, names, setCounter, 1);
-        setCounter = getArmorSetDetails(leggings, isHeavyArmor, names, setCounter, 2);
-        setCounter = getArmorSetDetails(boots, isHeavyArmor, names, setCounter, 3);
-
-        return setCounter;
-    }
-
-    private static int getArmorSetDetails(ItemStack itemStack, Boolean isHeavyArmor, String[] names, int setCounter, int armorSlot) {
-        String partOfSetBase = "§e>§o ";
-        String emptySlot = "Empty";
-
-        if (itemStack != null) {
-            if (itemStack.getItem() instanceof LostTalesItemArmorBase) {
-                if (isHeavyArmor == (((LostTalesItemArmorBase)itemStack.getItem()).getItemType() == ELostTalesItem.Type.ARMOR_HEAVY)) {
-                    names[armorSlot] = partOfSetBase;
-                    setCounter++;
-                    
-                }
-            }
-            names[armorSlot] += itemStack.getDisplayName();
-        } else {
-            names[armorSlot] += emptySlot;
-        }
-        return setCounter;
-    }
-
 
     //  LOTR Reflections
     public static LOTRFaction addFaction(String enumName, int color, LOTRDimension.DimensionRegion region, EnumSet<LOTRFaction.FactionType> types) {
@@ -310,85 +145,6 @@ public abstract class LostTalesUtil {
         ReflectionHelper.setPrivateValue(LOTRGenLayerWorld.class, null, biomeImageData, "biomeImageData");
     }
 
-    @SideOnly(Side.CLIENT)
-    public static void setClientMapImage (ResourceLocation mapTexture) {
-        ReflectionHelper.setPrivateValue(LOTRTextures.class, null, mapTexture, "mapTexture");
-
-        ResourceLocation sepiaMapTexture;
-        try {
-            BufferedImage mapImage = getImage(Minecraft.getMinecraft ().getResourceManager ().getResource (mapTexture).getInputStream ());
-            sepiaMapTexture = findAndInvokeMethod (new Object[]{mapImage, new ResourceLocation ("lotr:map_sepia")}, LOTRTextures.class, null, "convertToSepia", BufferedImage.class, ResourceLocation.class);
-        }
-        catch (IOException e) {
-            FMLLog.severe("Failed to generate LOTR sepia map", new Object[0]);
-            e.printStackTrace();
-            sepiaMapTexture = mapTexture;
-        }
-        ReflectionHelper.setPrivateValue(LOTRTextures.class, null, sepiaMapTexture, "sepiaMapTexture");
-    }
-
-    @SideOnly(Side.CLIENT)
-    public static void setClientMapImageWithOverlay(ResourceLocation baseMap, ResourceLocation overlayMap) {
-        BufferedImage mergedMapImage = getMergedClientMapImage(baseMap, overlayMap);
-        if (mergedMapImage == null) {
-            setClientMapImage(baseMap);
-            return;
-        }
-
-        ResourceLocation mergedMapTexture = Minecraft.getMinecraft().getTextureManager().getDynamicTextureLocation("losttales_lotr_map", new DynamicTexture(mergedMapImage));
-        ReflectionHelper.setPrivateValue(LOTRTextures.class, null, mergedMapTexture, "mapTexture");
-
-        ResourceLocation sepiaMapTexture;
-        try {
-            sepiaMapTexture = findAndInvokeMethod(new Object[]{mergedMapImage, new ResourceLocation("losttales:map_sepia")}, LOTRTextures.class, null, "convertToSepia", BufferedImage.class, ResourceLocation.class);
-        } catch (RuntimeException e) {
-            FMLLog.severe("Failed to generate Lost Tales LOTR sepia map", new Object[0]);
-            e.printStackTrace();
-            sepiaMapTexture = mergedMapTexture;
-        }
-        ReflectionHelper.setPrivateValue(LOTRTextures.class, null, sepiaMapTexture, "sepiaMapTexture");
-    }
-
-    @SideOnly(Side.CLIENT)
-    private static BufferedImage getMergedClientMapImage(ResourceLocation baseMap, ResourceLocation overlayMap) {
-        try {
-            BufferedImage baseImage = getImage(Minecraft.getMinecraft().getResourceManager().getResource(baseMap).getInputStream());
-            BufferedImage overlayImage = getImage(Minecraft.getMinecraft().getResourceManager().getResource(overlayMap).getInputStream());
-            return mergeMapImages(baseImage, overlayImage);
-        } catch (IOException e) {
-            FMLLog.severe("Failed to load Lost Tales map overlay", new Object[0]);
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    private static BufferedImage mergeMapImages(BufferedImage baseImage, BufferedImage overlayImage) {
-        if (baseImage == null) {
-            return null;
-        }
-        if (overlayImage == null) {
-            return baseImage;
-        }
-
-        int width = baseImage.getWidth();
-        int height = baseImage.getHeight();
-        int[] baseColors = baseImage.getRGB(0, 0, width, height, null, 0, width);
-        int[] overlayColors = getOverlayColors(overlayImage, width, height);
-
-        if (overlayColors == null) {
-            return baseImage;
-        }
-
-        int[] mergedColors = new int[baseColors.length];
-        for (int i = 0; i < baseColors.length; i++) {
-            mergedColors[i] = blendOver(baseColors[i], overlayColors[i]);
-        }
-
-        BufferedImage mergedImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-        mergedImage.setRGB(0, 0, width, height, mergedColors, 0, width);
-        return mergedImage;
-    }
-
     private static int[] getOverlayColors(BufferedImage overlayImage, int width, int height) {
         if (overlayImage == null) {
             return null;
@@ -419,30 +175,6 @@ public abstract class LostTalesUtil {
         return fallbackOverlayBiome;
     }
 
-    private static int blendOver(int baseColor, int overlayColor) {
-        int overlayAlpha = (overlayColor >> 24) & 255;
-        if (overlayAlpha <= 0) {
-            return baseColor;
-        }
-        if (overlayAlpha >= 255) {
-            return 0xFF000000 | (overlayColor & 0x00FFFFFF);
-        }
-
-        int baseRed = (baseColor >> 16) & 255;
-        int baseGreen = (baseColor >> 8) & 255;
-        int baseBlue = baseColor & 255;
-        int overlayRed = (overlayColor >> 16) & 255;
-        int overlayGreen = (overlayColor >> 8) & 255;
-        int overlayBlue = overlayColor & 255;
-        int inverseAlpha = 255 - overlayAlpha;
-
-        int red = (overlayRed * overlayAlpha + baseRed * inverseAlpha) / 255;
-        int green = (overlayGreen * overlayAlpha + baseGreen * inverseAlpha) / 255;
-        int blue = (overlayBlue * overlayAlpha + baseBlue * inverseAlpha) / 255;
-        return 0xFF000000 | red << 16 | green << 8 | blue;
-    }
-
-
     public static BufferedImage getImage(InputStream in) {
         if (in == null) {
             return null;
@@ -458,15 +190,6 @@ public abstract class LostTalesUtil {
                 in.close();
             }
             catch(IOException e) {}
-        }
-        return null;
-    }
-
-    @SideOnly(Side.CLIENT)
-    public static ResourceLocation getTextureResourceLocation(InputStream in, String textureName) {
-        BufferedImage img = getImage(in);
-        if(img != null) {
-            return Minecraft.getMinecraft().getTextureManager().getDynamicTextureLocation(textureName, new DynamicTexture(img));
         }
         return null;
     }
@@ -504,28 +227,17 @@ public abstract class LostTalesUtil {
         findAndInvokeMethod (zone, LOTRFaction.class, faction, "addControlZone", LOTRControlZone.class);
     }
 
-    public static LOTRMapLabels addMapLabel(String enumName, LOTRBiome biomeLabel, int x, int y, float scale, int angle, float zoomMin, float zoomMan) {
-        return addMapLabel(enumName, (Object) biomeLabel, x, y, scale, angle, zoomMin, zoomMan);
-    }
-
-    public static LOTRMapLabels addMapLabel(String enumName, String stringLabel, int x, int y, float scale, int angle, float zoomMin, float zoomMan) {
-        return addMapLabel(enumName, (Object) stringLabel, x, y, scale, angle, zoomMin, zoomMan);
-    }
-
-    private static LOTRMapLabels addMapLabel(String enumName, Object label, int x, int y, float scale, int angle, float zoomMin, float zoomMan) {
-        Class<?>[] classArr = {Object.class, int.class, int.class, float.class, int.class, float.class, float.class};
-        Object[] args = {label, x, y, scale, angle, zoomMin, zoomMan};
-
-        return EnumHelper.addEnum(LOTRMapLabels.class, enumName, classArr, args);
-    }
-
-    private static <E> Constructor<E> findConstructor (Class<E> clazz, Class<?>... parameterTypes) {
+    private static <E> Constructor<E> findConstructor(Class<E> clazz,
+                                                        Class<?>... parameterTypes) {
         try {
-            return clazz.getDeclaredConstructor (parameterTypes);
-        }
-        catch (NoSuchMethodException | SecurityException e) {
-            System.out.println("Error when getting constructor from class " + clazz.getSimpleName () + " with parameters " + parameterTypes);
-            e.printStackTrace ();
+            return clazz.getDeclaredConstructor(parameterTypes);
+        } catch (NoSuchMethodException exception) {
+            FMLLog.severe("Lost Tales compatibility constructor not found: %s%s",
+                    clazz.getName(), java.util.Arrays.toString(parameterTypes));
+        } catch (SecurityException exception) {
+            FMLLog.severe("Lost Tales cannot access compatibility constructor %s%s: %s",
+                    clazz.getName(), java.util.Arrays.toString(parameterTypes),
+                    exception.toString());
         }
         return null;
     }
@@ -543,13 +255,25 @@ public abstract class LostTalesUtil {
     }
 
     @SuppressWarnings("unchecked")
-    private static <T, E> T findAndInvokeMethod (Object[] args, Class<? super E> clazz, E instance, String[] methodNames, Class<?>... methodTypes) {
-        Method addControlZoneMethod = ReflectionHelper.findMethod (clazz, instance, methodNames, methodTypes);
+    private static <T, E> T findAndInvokeMethod(Object[] args,
+                                                 Class<? super E> clazz,
+                                                 E instance,
+                                                 String[] methodNames,
+                                                 Class<?>... methodTypes) {
         try {
-            return (T) addControlZoneMethod.invoke (instance, args);
-        }
-        catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-            System.out.println("Error when getting method " + methodNames[0] + " from class " + clazz.getSimpleName ());e.printStackTrace ();
+            Method method = ReflectionHelper.findMethod(clazz, instance,
+                    methodNames, methodTypes);
+            return (T)method.invoke(instance, args);
+        } catch (RuntimeException exception) {
+            FMLLog.severe("Lost Tales compatibility method not found: %s.%s%s (%s)",
+                    clazz.getName(), methodNames[0],
+                    java.util.Arrays.toString(methodTypes), exception.toString());
+        } catch (IllegalAccessException exception) {
+            FMLLog.severe("Lost Tales cannot access compatibility method %s.%s: %s",
+                    clazz.getName(), methodNames[0], exception.toString());
+        } catch (InvocationTargetException exception) {
+            FMLLog.severe("Lost Tales compatibility method %s.%s failed: %s",
+                    clazz.getName(), methodNames[0], exception.getCause());
         }
         return null;
     }
@@ -577,14 +301,30 @@ public abstract class LostTalesUtil {
         return findAndInvokeConstructor (args, clazz, paramaterTypes);
     }
 
-    private static <E> E findAndInvokeConstructor (Object[] args, Class<E> clazz, Class<?>... parameterTypes) {
+    private static <E> E findAndInvokeConstructor(Object[] args, Class<E> clazz,
+                                                   Class<?>... parameterTypes) {
         Constructor<E> constructor = findConstructor(clazz, parameterTypes);
-        constructor.setAccessible(true);
-        try {
-            return constructor.newInstance (args);
+        if (constructor == null) {
+            return null;
         }
-        catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-            System.out.println("Error when initializing constructor from class " + clazz.getSimpleName () + " with parameters " + args);
+        try {
+            constructor.setAccessible(true);
+            return constructor.newInstance(args);
+        } catch (InstantiationException exception) {
+            FMLLog.severe("Lost Tales cannot instantiate compatibility class %s: %s",
+                    clazz.getName(), exception.toString());
+        } catch (IllegalAccessException exception) {
+            FMLLog.severe("Lost Tales cannot access compatibility constructor %s: %s",
+                    clazz.getName(), exception.toString());
+        } catch (IllegalArgumentException exception) {
+            FMLLog.severe("Lost Tales supplied invalid constructor arguments for %s: %s",
+                    clazz.getName(), exception.toString());
+        } catch (InvocationTargetException exception) {
+            FMLLog.severe("Lost Tales compatibility constructor %s failed: %s",
+                    clazz.getName(), exception.getCause());
+        } catch (SecurityException exception) {
+            FMLLog.severe("Lost Tales cannot make compatibility constructor accessible for %s: %s",
+                    clazz.getName(), exception.toString());
         }
         return null;
     }

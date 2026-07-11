@@ -1,0 +1,110 @@
+package com.ninuna.losttales.network.packet.character;
+
+import com.ninuna.losttales.character.server.CharacterCreationRequest;
+import com.ninuna.losttales.character.server.CharacterNetworkRequestHandler;
+import com.ninuna.losttales.character.server.CharacterServerPacketDispatcher;
+import com.ninuna.losttales.character.sync.CharacterOperationType;
+import cpw.mods.fml.common.network.simpleimpl.IMessage;
+import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
+import cpw.mods.fml.common.network.simpleimpl.MessageContext;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.entity.player.EntityPlayerMP;
+
+/** Narrow client request to create one character in one unlocked slot. */
+public final class CharacterCreateRequestPacket implements IMessage {
+
+    private int requestId;
+    private long expectedRosterRevision;
+    private int slotIndex;
+    private String name = "";
+    private String raceId = "";
+    private String genderId = "";
+    private int age;
+    private String startingFactionId = "";
+    private boolean malformed;
+
+    public CharacterCreateRequestPacket() {}
+
+    public CharacterCreateRequestPacket(int requestId, CharacterCreationRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("request must not be null");
+        }
+        this.requestId = requestId;
+        this.expectedRosterRevision = request.getExpectedRosterRevision();
+        this.slotIndex = request.getSlotIndex();
+        this.name = request.getName();
+        this.raceId = request.getRaceId();
+        this.genderId = request.getGenderId();
+        this.age = request.getAge();
+        this.startingFactionId = request.getStartingFactionId();
+    }
+
+    @Override
+    public void fromBytes(ByteBuf buffer) {
+        try {
+            this.requestId = buffer.readInt();
+            this.expectedRosterRevision = buffer.readLong();
+            this.slotIndex = buffer.readByte();
+            this.name = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_NAME_BYTES);
+            this.raceId = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            this.genderId = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            this.age = buffer.readInt();
+            this.startingFactionId = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            CharacterPacketCodec.requireFinished(buffer);
+            if (this.expectedRosterRevision < 0L) {
+                throw new CharacterPacketCodec.DecodeException("missing roster revision");
+            }
+        } catch (RuntimeException exception) {
+            this.malformed = true;
+        }
+    }
+
+    @Override
+    public void toBytes(ByteBuf buffer) {
+        buffer.writeInt(this.requestId);
+        buffer.writeLong(this.expectedRosterRevision);
+        buffer.writeByte(this.slotIndex);
+        CharacterPacketCodec.writeString(buffer, this.name, CharacterPacketCodec.MAX_NAME_BYTES);
+        CharacterPacketCodec.writeString(buffer, this.raceId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+        CharacterPacketCodec.writeString(buffer, this.genderId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+        buffer.writeInt(this.age);
+        CharacterPacketCodec.writeString(buffer, this.startingFactionId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+    }
+
+    private CharacterCreationRequest toRequest() {
+        return new CharacterCreationRequest(
+                this.expectedRosterRevision,
+                this.slotIndex,
+                this.name,
+                this.raceId,
+                this.genderId,
+                this.age,
+                this.startingFactionId
+        );
+    }
+
+    public static final class Handler implements IMessageHandler<CharacterCreateRequestPacket, IMessage> {
+        @Override
+        public IMessage onMessage(final CharacterCreateRequestPacket message, MessageContext context) {
+            final EntityPlayerMP player = CharacterServerPacketDispatcher.getPlayer(context);
+            if (player == null || message == null) {
+                return null;
+            }
+            CharacterServerPacketDispatcher.submit(
+                    player,
+                    message.requestId,
+                    CharacterOperationType.CREATE,
+                    message.malformed,
+                    "CharacterCreateRequestPacket",
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            CharacterNetworkRequestHandler.handleCreateRequest(
+                                    player, message.requestId, message.toRequest());
+                        }
+                    }
+            );
+            return null;
+        }
+    }
+}

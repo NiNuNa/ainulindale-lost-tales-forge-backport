@@ -1,6 +1,7 @@
 package com.ninuna.losttales.world.map;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.util.LostTalesClientUtil;
 import com.ninuna.losttales.util.LostTalesUtil;
 import com.ninuna.losttales.world.biome.ELostTalesBiome;
 import cpw.mods.fml.relauncher.Side;
@@ -31,6 +32,6 @@ public final class LostTalesMapOverlay {
 
     @SideOnly(Side.CLIENT)
     public static void applyClientMap() {
-        LostTalesUtil.setClientMapImageWithOverlay(LOTR_BASE_MAP, LOST_TALES_MAP_OVERLAY);
+        LostTalesClientUtil.setClientMapImageWithOverlay(LOTR_BASE_MAP, LOST_TALES_MAP_OVERLAY);
     }
 }

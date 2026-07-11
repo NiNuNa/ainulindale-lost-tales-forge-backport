@@ -7,6 +7,8 @@ import com.ninuna.losttales.block.tileentity.LostTalesTileEntityStatue;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
+import com.ninuna.losttales.client.character.CharacterClientTaskQueue;
+import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.event.LostTalesClientEventHandler;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
@@ -31,6 +33,8 @@ import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
+import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
+import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.client.registry.RenderingRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -50,15 +54,18 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
     private LostTalesClientEventHandler clientEventHandler;
     private LostTalesKeyBindings keyBindings;
+    private CharacterClientTaskQueue characterClientTaskQueue;
 
     @Override
     public void preInit(FMLPreInitializationEvent event) {
         clientEventHandler = new LostTalesClientEventHandler();
         keyBindings = new LostTalesKeyBindings();
+        characterClientTaskQueue = new CharacterClientTaskQueue();
         keyBindings.register();
         MinecraftForge.EVENT_BUS.register(keyBindings);
         FMLCommonHandler.instance().bus().register(keyBindings);
         FMLCommonHandler.instance().bus().register(clientEventHandler);
+        FMLCommonHandler.instance().bus().register(characterClientTaskQueue);
         FMLCommonHandler.instance().bus().register(new LostTalesConfigGuiEventHandler());
         ELostTalesMapLabels.initAndRegisterMapLabels();
 
@@ -132,6 +139,34 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         if (packet != null) {
             LostTalesClientMobAggroCache.accept(packet.getEntityIds());
         }
+    }
+
+    @Override
+    public void scheduleClientTask(Runnable task) {
+        CharacterClientTaskQueue.enqueue(task);
+    }
+
+    @Override
+    public void handleCharacterRosterSync(CharacterRosterSyncPacket packet) {
+        if (packet == null || packet.isMalformed() || packet.getSnapshot() == null) {
+            ClientCharacterRosterCache.markProtocolError(packet == null ? 0 : packet.getRequestId());
+            return;
+        }
+        EntityPlayer player = Minecraft.getMinecraft().thePlayer;
+        if (player == null || !player.getUniqueID().equals(packet.getSnapshot().getOwnerId())) {
+            ClientCharacterRosterCache.markProtocolError(packet.getRequestId());
+            return;
+        }
+        ClientCharacterRosterCache.acceptRoster(packet.getRequestId(), packet.getSnapshot());
+    }
+
+    @Override
+    public void handleCharacterOperationResult(CharacterOperationResultPacket packet) {
+        if (packet == null || packet.isMalformed()) {
+            ClientCharacterRosterCache.markProtocolError(packet == null ? 0 : packet.getRequestId());
+            return;
+        }
+        ClientCharacterRosterCache.acceptOperation(packet.toFeedback());
     }
 
 }
