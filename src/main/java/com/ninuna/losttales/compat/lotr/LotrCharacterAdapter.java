@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.registry.CharacterFactionCategory;
 import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
 import com.ninuna.losttales.character.registry.CharacterFactionResolver;
+import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.common.FMLLog;
 import lotr.common.fac.LOTRFaction;
 
@@ -23,7 +24,7 @@ import java.util.Set;
  * This is the only character-system class that talks to LOTR faction classes.
  * It deliberately does not read or mutate LOTRPlayerData: alignment, pledges,
  * miniquests, titles, waypoints, fellowships and other LOTR progression remain
- * owned by the Minecraft account in the initial character-system release.
+ * owned by the Minecraft account.
  */
 public final class LotrCharacterAdapter implements CharacterFactionResolver {
 
@@ -33,6 +34,8 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
 
     private final Map<String, CharacterFactionDefinition> resolved =
             new HashMap<String, CharacterFactionDefinition>();
+    private final Map<String, LOTRFaction> factionsById =
+            new HashMap<String, LOTRFaction>();
     private final Set<String> unresolved = new HashSet<String>();
     private List<String> playableFactionIds = Collections.emptyList();
     private boolean initialized;
@@ -44,8 +47,10 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
     }
 
     /**
-     * Verifies the exact public faction API used by the character system and
-     * builds an immutable starting-faction catalogue. Safe to call repeatedly.
+     * Builds a canonical faction catalogue directly from LOTRFaction.values().
+     * No enum-name round trip is required, so factions registered by compatible
+     * add-ons are not discarded merely because LOTRFaction.forName does not know
+     * about the extension's code-name convention.
      */
     public synchronized void initialize() {
         if (this.initialized) {
@@ -53,6 +58,7 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         }
         this.initialized = true;
         this.resolved.clear();
+        this.factionsById.clear();
         this.unresolved.clear();
 
         try {
@@ -67,28 +73,29 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
                 if (faction == null) {
                     continue;
                 }
-                String codeName = faction.codeName();
-                if (codeName == null || codeName.trim().length() == 0) {
-                    markUnavailable("blank_faction_code_name", null);
-                    return;
+                String canonicalId = canonicalId(faction);
+                if (canonicalId.length() == 0) {
+                    FMLLog.warning("[%s] Skipping LOTR faction with blank code name: %s",
+                            LostTalesMetaData.MOD_ID, String.valueOf(faction));
+                    continue;
+                }
+                if (this.factionsById.containsKey(canonicalId)) {
+                    FMLLog.warning("[%s] Skipping duplicate LOTR faction ID %s",
+                            LostTalesMetaData.MOD_ID, canonicalId);
+                    continue;
                 }
 
-                String canonicalId = ID_PREFIX + codeName.toLowerCase(Locale.ROOT);
-                LOTRFaction roundTrip = LOTRFaction.forName(codeName.toUpperCase(Locale.ROOT));
-                if (roundTrip == null) {
-                    markUnavailable("faction_lookup_failed:" + canonicalId, null);
-                    return;
-                }
-
-                CharacterFactionDefinition definition = createDefinition(faction, canonicalId);
+                CharacterFactionDefinition definition = createDefinition(
+                        faction, canonicalId);
+                this.factionsById.put(canonicalId, faction);
                 this.resolved.put(canonicalId, definition);
                 if (definition.isPlayable()) {
                     playable.add(canonicalId);
                 }
             }
 
-            if (playable.isEmpty()) {
-                markUnavailable("no_playable_lotr_factions", null);
+            if (this.resolved.isEmpty()) {
+                markUnavailable("no_resolvable_lotr_factions", null);
                 return;
             }
 
@@ -96,8 +103,9 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
             this.playableFactionIds = Collections.unmodifiableList(playable);
             this.available = true;
             this.unavailableReason = "";
-            FMLLog.info("[%s] LOTR character integration ready: %d factions, %d playable starting factions",
-                    LostTalesMetaData.MOD_ID, factions.length, playable.size());
+            FMLLog.info("[%s] LOTR character integration ready: %d factions, %d configured playable starting factions",
+                    LostTalesMetaData.MOD_ID, this.resolved.size(), playable.size());
+            logExpectedElfFaction("lotr:lothlorien");
         } catch (LinkageError error) {
             markUnavailable("incompatible_lotr_api", error);
         } catch (RuntimeException exception) {
@@ -142,8 +150,9 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
             return null;
         }
 
-        String canonicalId = ID_PREFIX + faction.codeName().toLowerCase(Locale.ROOT);
+        String canonicalId = canonicalId(faction);
         CharacterFactionDefinition definition = createDefinition(faction, canonicalId);
+        this.factionsById.put(canonicalId, faction);
         this.resolved.put(normalizedId, definition);
         this.resolved.put(canonicalId, definition);
         return definition;
@@ -186,7 +195,8 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
             return "";
         }
         String normalized = factionId.trim().toLowerCase(Locale.ROOT);
-        if (!normalized.startsWith(ID_PREFIX) || normalized.length() == ID_PREFIX.length()) {
+        if (!normalized.startsWith(ID_PREFIX)
+                || normalized.length() == ID_PREFIX.length()) {
             return "";
         }
         return normalized;
@@ -199,9 +209,20 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
     }
 
     private LOTRFaction findFaction(String normalizedId) {
-        String codeName = normalizedId.substring(ID_PREFIX.length()).toUpperCase(Locale.ROOT);
+        LOTRFaction cached = this.factionsById.get(normalizedId);
+        if (cached != null) {
+            return cached;
+        }
+
+        // Re-scan values first. This supports factions appended after the first
+        // catalogue build and avoids assuming enum-name == code-name.
         try {
-            return LOTRFaction.forName(codeName);
+            for (LOTRFaction faction : LOTRFaction.values()) {
+                if (faction != null && normalizedId.equals(canonicalId(faction))) {
+                    this.factionsById.put(normalizedId, faction);
+                    return faction;
+                }
+            }
         } catch (LinkageError error) {
             markUnavailable("incompatible_lotr_api", error);
             return null;
@@ -211,15 +232,67 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
                     LostTalesMetaData.MOD_ID, normalizedId, exception.toString());
             return null;
         }
+        return null;
     }
 
-    private static CharacterFactionDefinition createDefinition(LOTRFaction faction,
-                                                                 String canonicalId) {
+    private static String canonicalId(LOTRFaction faction) {
+        if (faction == null) {
+            return "";
+        }
+        String codeName = faction.codeName();
+        if (codeName == null || codeName.trim().length() == 0) {
+            return "";
+        }
+        return ID_PREFIX + codeName.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static CharacterFactionDefinition createDefinition(
+            LOTRFaction faction, String canonicalId) {
+        boolean playable = faction.isPlayableAlignmentFaction()
+                && isAllowedByConfiguration(canonicalId);
         return new CharacterFactionDefinition(
                 canonicalId,
-                faction.allowPlayer && faction.isPlayableAlignmentFaction(),
-                mapCategories(faction)
-        );
+                playable,
+                mapCategories(faction));
+    }
+
+    private static boolean isAllowedByConfiguration(String canonicalId) {
+        Set<String> denied = normalizeConfiguredIds(
+                LostTalesConfig.deniedStartingFactionIds);
+        if (denied.contains(canonicalId)) {
+            return false;
+        }
+        Set<String> allowed = normalizeConfiguredIds(
+                LostTalesConfig.allowedStartingFactionIds);
+        return allowed.isEmpty() || allowed.contains(canonicalId);
+    }
+
+    private static Set<String> normalizeConfiguredIds(String[] ids) {
+        if (ids == null || ids.length == 0) {
+            return Collections.emptySet();
+        }
+        HashSet<String> normalized = new HashSet<String>();
+        for (String id : ids) {
+            String value = normalizeFactionId(id);
+            if (value.length() > 0) {
+                normalized.add(value);
+            }
+        }
+        return normalized;
+    }
+
+    private void logExpectedElfFaction(String id) {
+        CharacterFactionDefinition definition = this.resolved.get(id);
+        if (definition == null) {
+            FMLLog.warning("[%s] Expected LOTR faction %s was not present in LOTRFaction.values()",
+                    LostTalesMetaData.MOD_ID, id);
+        } else if (!definition.hasCategory(CharacterFactionCategory.ELF)) {
+            FMLLog.warning("[%s] LOTR faction %s is present but is not categorized as ELF",
+                    LostTalesMetaData.MOD_ID, id);
+        } else if (!definition.isPlayable()) {
+            FMLLog.info("[%s] LOTR faction %s is an ELF faction but is excluded by LOTR playability or Lost Tales configuration",
+                    LostTalesMetaData.MOD_ID, id);
+        }
     }
 
     private void markUnavailable(String reason, Throwable cause) {
@@ -227,6 +300,7 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         this.unavailableReason = reason == null ? "unknown" : reason;
         this.playableFactionIds = Collections.emptyList();
         this.resolved.clear();
+        this.factionsById.clear();
         this.unresolved.clear();
         String causeText = cause == null ? "no additional cause" : cause.toString();
         FMLLog.severe("[%s] LOTR character integration is unavailable (%s; %s). "

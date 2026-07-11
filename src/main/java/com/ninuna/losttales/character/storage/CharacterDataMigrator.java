@@ -41,6 +41,21 @@ public final class CharacterDataMigrator {
                     migrated.setInteger(DATA_VERSION_TAG, version);
                     changed = true;
                     break;
+                case 1:
+                    // Character data version 2 adds SkinId. The NBT codec
+                    // assigns its deterministic race/gender-compatible default.
+                    version = 2;
+                    migrated.setInteger(DATA_VERSION_TAG, version);
+                    changed = true;
+                    break;
+                case 2:
+                    // Character data version 3 removes the unspecified option
+                    // and makes allowed gender values race-specific. The codec
+                    // repairs the value and selected skin together.
+                    version = 3;
+                    migrated.setInteger(DATA_VERSION_TAG, version);
+                    changed = true;
+                    break;
                 default:
                     return MigrationResult.unsupported(version);
             }

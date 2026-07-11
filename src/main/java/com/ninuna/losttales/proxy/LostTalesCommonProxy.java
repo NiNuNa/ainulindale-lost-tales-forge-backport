@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.achievement.ELostTalesAchievement;
 import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.character.server.CharacterPlayerEventHandler;
+import com.ninuna.losttales.character.server.CharacterRaceGameplayHandler;
 import com.ninuna.losttales.character.server.CharacterServerTaskQueue;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
@@ -26,6 +27,8 @@ import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
+import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPacket;
+import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
@@ -59,13 +62,17 @@ public class LostTalesCommonProxy {
         LostTalesQuestObjectiveEventHandler questObjectiveEventHandler = new LostTalesQuestObjectiveEventHandler();
         LostTalesMobAggroEventHandler mobAggroEventHandler = new LostTalesMobAggroEventHandler();
         CharacterPlayerEventHandler characterPlayerEventHandler = new CharacterPlayerEventHandler();
+        CharacterRaceGameplayHandler characterRaceGameplayHandler = new CharacterRaceGameplayHandler();
         CharacterServerTaskQueue characterServerTaskQueue = new CharacterServerTaskQueue();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
+        MinecraftForge.EVENT_BUS.register(characterPlayerEventHandler);
+        MinecraftForge.EVENT_BUS.register(characterRaceGameplayHandler);
         MinecraftForge.EVENT_BUS.register(questObjectiveEventHandler);
         FMLCommonHandler.instance().bus().register(questPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(questObjectiveEventHandler);
         FMLCommonHandler.instance().bus().register(mobAggroEventHandler);
         FMLCommonHandler.instance().bus().register(characterPlayerEventHandler);
+        FMLCommonHandler.instance().bus().register(characterRaceGameplayHandler);
         FMLCommonHandler.instance().bus().register(characterServerTaskQueue);
 
         ELostTalesItem.initAndRegisterItems();
@@ -140,6 +147,10 @@ public class LostTalesCommonProxy {
     public void handleCharacterRosterSync(CharacterRosterSyncPacket packet) {}
 
     public void handleCharacterOperationResult(CharacterOperationResultPacket packet) {}
+
+    public void handleCharacterAppearanceSync(CharacterAppearanceSyncPacket packet) {}
+
+    public void handleCharacterCreationCatalogSync(CharacterCreationCatalogSyncPacket packet) {}
 
     public void onServerStarting(FMLServerStartingEvent event) {
         ELostTalesCommand.initAndRegisterCommands(event);

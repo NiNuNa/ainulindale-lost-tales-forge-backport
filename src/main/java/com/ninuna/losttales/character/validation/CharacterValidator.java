@@ -7,6 +7,7 @@ import com.ninuna.losttales.character.registry.CharacterFactionResolver;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
+import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.character.server.CharacterCreationRequest;
 import net.minecraft.entity.player.EntityPlayerMP;
 
@@ -98,7 +99,7 @@ public final class CharacterValidator {
             }
         }
 
-        String raceId = CharacterRaceRegistry.normalizeIdentifier(request.getRaceId());
+        String raceId = CharacterRaceRegistry.canonicalizeIdentifier(request.getRaceId());
         if (!isValidIdentifierLength(raceId)) {
             return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_RACE);
         }
@@ -108,8 +109,16 @@ public final class CharacterValidator {
         }
 
         String genderId = CharacterGenderRegistry.normalizeIdentifier(request.getGenderId());
-        if (!isValidIdentifierLength(genderId) || !CharacterGenderRegistry.contains(genderId)) {
+        if (!isValidIdentifierLength(genderId)
+                || !CharacterGenderRegistry.contains(genderId)
+                || !race.isGenderAllowed(genderId)) {
             return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_GENDER);
+        }
+
+        String skinId = CharacterSkinRegistry.normalizeIdentifier(request.getSkinId());
+        if (!isValidIdentifierLength(skinId)
+                || !CharacterSkinRegistry.isCompatible(skinId, race.getId(), genderId)) {
+            return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_SKIN);
         }
 
         int age = request.getAge();
@@ -142,6 +151,7 @@ public final class CharacterValidator {
                 normalizedNameKey,
                 race.getId(),
                 genderId,
+                skinId,
                 age,
                 faction.getId()
         ));

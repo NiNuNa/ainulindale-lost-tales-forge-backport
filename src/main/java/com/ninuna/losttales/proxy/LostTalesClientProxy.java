@@ -8,7 +8,10 @@ import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.character.CharacterClientTaskQueue;
+import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
+import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.event.LostTalesClientEventHandler;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
@@ -16,6 +19,7 @@ import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
+import com.ninuna.losttales.client.render.player.LostTalesRaceAwarePlayerRenderer;
 import com.ninuna.losttales.client.render.renderer.item.LostTalesItemRendererArmor3D;
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererLamp;
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererPlushie;
@@ -33,11 +37,14 @@ import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
+import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPacket;
+import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.client.registry.RenderingRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
+import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import net.minecraft.client.Minecraft;
@@ -76,6 +83,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
     @Override
     public void init(FMLInitializationEvent event) {
+        verifyRaceTransformers();
         ((IReloadableResourceManager) Minecraft.getMinecraft().getResourceManager()).registerReloadListener(clientEventHandler);
 
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityUrn.class, new LostTalesTileEntityRendererUrn());
@@ -83,12 +91,22 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityLamp.class, new LostTalesTileEntityRendererLamp());
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityPlushie.class, new LostTalesTileEntityRendererPlushie());
 
+        RenderingRegistry.registerEntityRenderingHandler(EntityPlayer.class, new LostTalesRaceAwarePlayerRenderer());
         RenderingRegistry.registerEntityRenderingHandler(LostTalesEntityOdaneMan.class, new LOTRRenderBreeMan());
         RenderingRegistry.registerEntityRenderingHandler(LostTalesEntityOdaneGuard.class, new LOTRRenderBreeMan());
 
         super.init(event);
     }
 
+
+    private static void verifyRaceTransformers() {
+        if (!Boolean.getBoolean("losttales.cameraTransformer.active")) {
+            FMLLog.warning("[losttales] Camera transformer is not active; short-race first/third-person camera height will remain vanilla");
+        }
+        if (!Boolean.getBoolean("losttales.debugHitboxTransformer.active")) {
+            FMLLog.warning("[losttales] Debug-hitbox transformer is not active; F3+B may be drawn above roleplay player models");
+        }
+    }
 
     @Override
     public Object getClientGuiElement(int id, EntityPlayer player, World world, int x, int y, int z) {
@@ -158,6 +176,30 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             return;
         }
         ClientCharacterRosterCache.acceptRoster(packet.getRequestId(), packet.getSnapshot());
+    }
+
+    @Override
+    public void handleCharacterAppearanceSync(CharacterAppearanceSyncPacket packet) {
+        if (packet == null || packet.isMalformed()) {
+            return;
+        }
+        if (packet.isReplaceAll()) {
+            ClientCharacterAppearanceCache.replaceAll(packet.getAppearances());
+        } else {
+            ClientCharacterAppearanceCache.apply(packet.getAppearances());
+        }
+        // Apply dimensions and eye data immediately after the authoritative
+        // snapshot rather than waiting for a periodic client tick.
+        ClientCharacterRacePhysics.applyAll(Minecraft.getMinecraft());
+    }
+
+    @Override
+    public void handleCharacterCreationCatalogSync(CharacterCreationCatalogSyncPacket packet) {
+        if (packet == null || packet.isMalformed() || packet.getCatalog() == null) {
+            ClientCharacterCreationCatalogCache.clear();
+            return;
+        }
+        ClientCharacterCreationCatalogCache.accept(packet.getCatalog());
     }
 
     @Override

@@ -64,6 +64,16 @@ public final class CharacterNetworkRequestHandler {
             CharacterOperationResult result = operation.run();
             CharacterSyncManager.sendResultAndRoster(
                     player, requestId, operationType, result);
+            if (result.isSuccessful() && result.wasChanged()
+                    && result.getRoster() != null
+                    && operationType != CharacterOperationType.REQUEST_ROSTER) {
+                // Apply the authoritative selection before broadcasting it so
+                // the selecting player cannot spend up to ten ticks with stale
+                // dimensions, eye height, or attributes.
+                CharacterRaceGameplayHandler.apply(player);
+                CharacterAppearanceSyncManager.broadcastPlayer(
+                        player, result.getRoster());
+            }
         } catch (Throwable throwable) {
             FMLLog.warning("[%s] Character %s request failed for player %s: %s",
                     LostTalesMetaData.MOD_ID,

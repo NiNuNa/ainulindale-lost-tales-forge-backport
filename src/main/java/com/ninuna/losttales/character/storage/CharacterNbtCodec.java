@@ -4,6 +4,9 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.model.CharacterProgression;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
+import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -41,6 +44,7 @@ public final class CharacterNbtCodec {
     private static final String TAG_NAME = "Name";
     private static final String TAG_RACE_ID = "RaceId";
     private static final String TAG_GENDER_ID = "GenderId";
+    private static final String TAG_SKIN_ID = "SkinId";
     private static final String TAG_AGE = "Age";
     private static final String TAG_STARTING_FACTION_ID = "StartingFactionId";
     private static final String TAG_ROLEPLAY_LEVEL = "RoleplayLevel";
@@ -148,6 +152,7 @@ public final class CharacterNbtCodec {
         tag.setString(TAG_NAME, character.getName());
         tag.setString(TAG_RACE_ID, character.getRaceId());
         tag.setString(TAG_GENDER_ID, character.getGenderId());
+        tag.setString(TAG_SKIN_ID, character.getSkinId());
         tag.setInteger(TAG_AGE, character.getAge());
         tag.setString(TAG_STARTING_FACTION_ID, character.getStartingFactionId());
         tag.setInteger(TAG_ROLEPLAY_LEVEL, character.getRoleplayLevel());
@@ -312,13 +317,42 @@ public final class CharacterNbtCodec {
         }
 
         String name = tag.getString(TAG_NAME);
-        String raceId = tag.getString(TAG_RACE_ID);
-        String genderId = tag.getString(TAG_GENDER_ID);
+        String storedRaceId = tag.getString(TAG_RACE_ID);
+        String raceId = CharacterRaceRegistry.canonicalizeIdentifier(storedRaceId);
+        if (CharacterRaceRegistry.get(raceId) == null) {
+            raceId = CharacterRaceRegistry.HUMAN;
+            repaired = true;
+            warn("Repairing unknown race %s to safe fallback %s for character %s owned by %s",
+                    storedRaceId, raceId, characterId, rosterOwnerId);
+        }
+        String storedGenderId = CharacterGenderRegistry.normalizeIdentifier(
+                tag.getString(TAG_GENDER_ID));
+        String genderId = CharacterRaceRegistry.normalizeGenderForRace(
+                raceId, storedGenderId);
         String startingFactionId = tag.getString(TAG_STARTING_FACTION_ID);
         if (isBlank(name) || isBlank(raceId) || isBlank(genderId) || isBlank(startingFactionId)) {
-            warn("Skipping character %s for owner %s because a required text field is empty",
+            warn("Skipping character %s for owner %s because a required text field is empty or unsupported",
                     characterId, rosterOwnerId);
             return CharacterReadResult.failed(true);
+        }
+        if (!raceId.equals(storedRaceId)) {
+            repaired = true;
+            warn("Migrating legacy race %s to %s for character %s owned by %s",
+                    storedRaceId, raceId, characterId, rosterOwnerId);
+        }
+        if (!genderId.equals(storedGenderId)) {
+            repaired = true;
+            warn("Repairing gender %s to %s for race %s on character %s owned by %s",
+                    storedGenderId, genderId, raceId, characterId, rosterOwnerId);
+        }
+
+        String skinId = CharacterSkinRegistry.normalizeIdentifier(
+                tag.getString(TAG_SKIN_ID));
+        if (!CharacterSkinRegistry.isCompatible(skinId, raceId, genderId)) {
+            skinId = CharacterSkinRegistry.getDefaultSkinId(raceId, genderId, characterId);
+            repaired = true;
+            warn("Assigning a compatible LOTR skin to character %s owned by %s",
+                    characterId, rosterOwnerId);
         }
 
         boolean hasAge = tag.hasKey(TAG_AGE, Constants.NBT.TAG_INT);
@@ -380,6 +414,7 @@ public final class CharacterNbtCodec {
                 name,
                 raceId,
                 genderId,
+                skinId,
                 age,
                 startingFactionId,
                 roleplayLevel,

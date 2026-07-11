@@ -21,6 +21,7 @@ public enum CharacterErrorId {
     DUPLICATE_NAME("duplicate_name"),
     INVALID_RACE("invalid_race"),
     INVALID_GENDER("invalid_gender"),
+    INVALID_SKIN("invalid_skin"),
     INVALID_AGE("invalid_age"),
     INVALID_STARTING_FACTION("invalid_starting_faction"),
     LOTR_INTEGRATION_UNAVAILABLE("lotr_integration_unavailable"),

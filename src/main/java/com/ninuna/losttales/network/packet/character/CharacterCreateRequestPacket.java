@@ -19,6 +19,7 @@ public final class CharacterCreateRequestPacket implements IMessage {
     private String name = "";
     private String raceId = "";
     private String genderId = "";
+    private String skinId = "";
     private int age;
     private String startingFactionId = "";
     private boolean malformed;
@@ -35,6 +36,7 @@ public final class CharacterCreateRequestPacket implements IMessage {
         this.name = request.getName();
         this.raceId = request.getRaceId();
         this.genderId = request.getGenderId();
+        this.skinId = request.getSkinId();
         this.age = request.getAge();
         this.startingFactionId = request.getStartingFactionId();
     }
@@ -47,7 +49,10 @@ public final class CharacterCreateRequestPacket implements IMessage {
             this.slotIndex = buffer.readByte();
             this.name = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_NAME_BYTES);
             this.raceId = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            this.genderId = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            this.genderId = CharacterPacketCodec.readString(
+                    buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            this.skinId = CharacterPacketCodec.readString(
+                    buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             this.age = buffer.readInt();
             this.startingFactionId = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             CharacterPacketCodec.requireFinished(buffer);
@@ -66,7 +71,10 @@ public final class CharacterCreateRequestPacket implements IMessage {
         buffer.writeByte(this.slotIndex);
         CharacterPacketCodec.writeString(buffer, this.name, CharacterPacketCodec.MAX_NAME_BYTES);
         CharacterPacketCodec.writeString(buffer, this.raceId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-        CharacterPacketCodec.writeString(buffer, this.genderId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+        CharacterPacketCodec.writeString(
+                buffer, this.genderId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+        CharacterPacketCodec.writeString(
+                buffer, this.skinId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         buffer.writeInt(this.age);
         CharacterPacketCodec.writeString(buffer, this.startingFactionId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
     }
@@ -78,6 +86,7 @@ public final class CharacterCreateRequestPacket implements IMessage {
                 this.name,
                 this.raceId,
                 this.genderId,
+                this.skinId,
                 this.age,
                 this.startingFactionId
         );

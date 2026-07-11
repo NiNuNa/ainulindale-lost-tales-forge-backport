@@ -244,6 +244,7 @@ public final class CharacterService {
                     creation.getName(),
                     creation.getRaceId(),
                     creation.getGenderId(),
+                    creation.getSkinId(),
                     creation.getAge(),
                     creation.getStartingFactionId(),
                     RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL,

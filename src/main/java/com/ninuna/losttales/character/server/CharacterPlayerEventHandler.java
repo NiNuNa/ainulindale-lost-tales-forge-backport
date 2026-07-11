@@ -9,6 +9,7 @@ import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedOutEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerRespawnEvent;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 
 /** Ensures a UUID-owned roster exists at normal server player lifecycle points. */
 public final class CharacterPlayerEventHandler {
@@ -22,6 +23,7 @@ public final class CharacterPlayerEventHandler {
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerLoggedOutEvent event) {
         if (event != null && event.player != null) {
+            CharacterAppearanceSyncManager.broadcastRemoval(event.player.getUniqueID());
             CharacterServerTaskQueue.cancelPlayer(event.player.getUniqueID());
             CharacterNetworkSecurity.clearPlayer(event.player.getUniqueID());
         }
@@ -35,6 +37,31 @@ public final class CharacterPlayerEventHandler {
     @SubscribeEvent
     public void onPlayerRespawn(PlayerRespawnEvent event) {
         ensureRoster(event.player);
+    }
+
+
+    /**
+     * WorldSavedData is UUID-owned, so a cloned EntityPlayer does not need an
+     * NBT copy. Re-resolving here applies that same authoritative record to the
+     * replacement entity before normal respawn synchronization completes.
+     */
+    @SubscribeEvent
+    public void onPlayerClone(PlayerEvent.Clone event) {
+        if (event != null) {
+            ensureRoster(event.entityPlayer);
+        }
+    }
+
+    /** Send the target's current public appearance when tracking begins. */
+    @SubscribeEvent
+    public void onStartTracking(PlayerEvent.StartTracking event) {
+        if (event == null || !(event.entityPlayer instanceof EntityPlayerMP)
+                || !(event.target instanceof EntityPlayerMP)) {
+            return;
+        }
+        CharacterAppearanceSyncManager.sendPlayer(
+                (EntityPlayerMP) event.entityPlayer,
+                (EntityPlayerMP) event.target);
     }
 
     private void ensureRoster(EntityPlayer player) {
@@ -51,9 +78,13 @@ public final class CharacterPlayerEventHandler {
                     result.getErrorId().getId());
             return;
         }
+        EntityPlayerMP serverPlayer = (EntityPlayerMP) player;
         CharacterSyncManager.sendRoster(
-                (EntityPlayerMP) player,
+                serverPlayer,
                 CharacterSyncManager.UNSOLICITED_REQUEST_ID,
                 result.getRoster());
+        CharacterAppearanceSyncManager.sendFullSnapshot(serverPlayer);
+        CharacterRaceGameplayHandler.apply(serverPlayer);
+        CharacterAppearanceSyncManager.broadcastPlayer(serverPlayer, result.getRoster());
     }
 }

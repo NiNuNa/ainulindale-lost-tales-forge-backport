@@ -4,7 +4,10 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.character.CharacterClientTaskQueue;
+import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
+import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
@@ -25,9 +28,11 @@ import com.ninuna.losttales.item.weapon.LostTalesItemDagger;
 import com.ninuna.losttales.item.weapon.LostTalesItemSpear;
 import com.ninuna.losttales.item.weapon.LostTalesItemSword;
 import com.ninuna.losttales.world.map.LostTalesMapOverlay;
+import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.network.FMLNetworkEvent.ClientDisconnectionFromServerEvent;
+import cpw.mods.fml.common.gameevent.TickEvent;
 import java.util.Arrays;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureMap;
@@ -65,8 +70,21 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientMobAggroCache.clear();
         LostTalesClientQuickLootCache.clear();
         ClientCharacterRosterCache.clear();
+        ClientCharacterAppearanceCache.clear();
+        ClientCharacterCreationCatalogCache.clear();
         CharacterClientTaskQueue.clear();
         LostTalesQuickLootHudRenderer.resetHud();
+        LotrRaceProfileAdapter.getInstance().clear();
+    }
+
+    @SubscribeEvent
+    public void onClientPlayerTick(TickEvent.PlayerTickEvent event) {
+        if (event == null || event.phase != TickEvent.Phase.END
+                || event.player == null || event.player.worldObj == null
+                || !event.player.worldObj.isRemote) {
+            return;
+        }
+        ClientCharacterRacePhysics.apply(event.player);
     }
 
     @SubscribeEvent

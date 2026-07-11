@@ -13,6 +13,7 @@ public final class LostTalesConfig {
     public static final String CATEGORY_CLIENT = "client";
     public static final String CATEGORY_QUESTS = "quests";
     public static final String CATEGORY_MISSIVES = "missives";
+    public static final String CATEGORY_CHARACTERS = "characters";
 
     public static final String HUD_PRESET_CUSTOM = "custom";
     public static final String HUD_PRESET_DEFAULT = "default";
@@ -89,6 +90,11 @@ public final class LostTalesConfig {
     public static int timedMissiveMinDays = 1;
     public static int timedMissiveMaxDays = 3;
 
+    /** Empty allow-list means all LOTR-playable factions are eligible. */
+    public static String[] allowedStartingFactionIds = new String[0];
+    /** Deny-list always wins over the allow-list and race category matching. */
+    public static String[] deniedStartingFactionIds = new String[0];
+
     private LostTalesConfig() {}
 
     public static void load(File configFile) {
@@ -97,6 +103,19 @@ public final class LostTalesConfig {
         try {
             config.load();
             applyGuiMetadata(config);
+
+            allowedStartingFactionIds = config.get(
+                    CATEGORY_CHARACTERS,
+                    "allowedStartingFactionIds",
+                    allowedStartingFactionIds,
+                    "Optional canonical LOTR faction IDs (for example lotr:lothlorien). Empty means all LOTR-playable factions may be offered before race filtering."
+            ).getStringList();
+            deniedStartingFactionIds = config.get(
+                    CATEGORY_CHARACTERS,
+                    "deniedStartingFactionIds",
+                    deniedStartingFactionIds,
+                    "Canonical LOTR faction IDs excluded from character creation. Deny entries override allow entries."
+            ).getStringList();
 
             showLostTalesHud = config.getBoolean(
                     "showLostTalesHud",
@@ -709,6 +728,7 @@ public final class LostTalesConfig {
         config.getCategory(CATEGORY_CLIENT).setLanguageKey("losttales.config.category.client");
         config.getCategory(CATEGORY_QUESTS).setLanguageKey("losttales.config.category.quests");
         config.getCategory(CATEGORY_MISSIVES).setLanguageKey("losttales.config.category.missives");
+        config.getCategory(CATEGORY_CHARACTERS).setLanguageKey("losttales.config.category.characters");
     }
 
     private static void writeCurrentValues(Configuration config) {
@@ -716,6 +736,10 @@ public final class LostTalesConfig {
             return;
         }
 
+        config.get(CATEGORY_CHARACTERS, "allowedStartingFactionIds",
+                allowedStartingFactionIds).set(allowedStartingFactionIds);
+        config.get(CATEGORY_CHARACTERS, "deniedStartingFactionIds",
+                deniedStartingFactionIds).set(deniedStartingFactionIds);
         config.get(CATEGORY_CLIENT, "showLostTalesHud", showLostTalesHud).set(showLostTalesHud);
         Property hudPresetProperty = config.get(CATEGORY_CLIENT, "hudPlacementPreset", hudPlacementPreset);
         hudPresetProperty.set(hudPlacementPreset);

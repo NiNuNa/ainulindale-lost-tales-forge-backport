@@ -2,10 +2,12 @@ package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.model.CharacterRoster;
+import com.ninuna.losttales.character.sync.CharacterCreationCatalog;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
+import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
 import cpw.mods.fml.common.FMLLog;
@@ -61,6 +63,16 @@ public final class CharacterSyncManager {
         CharacterRosterSnapshot snapshot = CharacterRosterSnapshot.fromRoster(roster);
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new CharacterRosterSyncPacket(requestId, snapshot), player);
+        sendCreationCatalog(player);
         return true;
+    }
+
+    public static void sendCreationCatalog(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null || player.worldObj.isRemote) {
+            return;
+        }
+        LostTalesNetworkHandler.CHANNEL.sendTo(
+                new CharacterCreationCatalogSyncPacket(
+                        CharacterCreationCatalog.fromServer()), player);
     }
 }

@@ -4,6 +4,9 @@ import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
+import com.ninuna.losttales.character.registry.CharacterSkinDefinition;
+import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
+import com.ninuna.losttales.character.sync.CharacterCreationCatalog;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import net.minecraft.client.resources.I18n;
@@ -32,16 +35,40 @@ public final class ClientCharacterDisplayNames {
         return Collections.unmodifiableList(new ArrayList<String>(CharacterGenderRegistry.getAll()));
     }
 
-    public static List<String> getCompatibleFactionIds(String raceId) {
+    public static List<String> getCompatibleGenderIds(String raceId) {
         CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);
-        if (race == null || !LOTR_ADAPTER.isAvailable()) {
+        if (race == null) {
             return Collections.emptyList();
         }
+        return Collections.unmodifiableList(
+                new ArrayList<String>(race.getAllowedGenderIds()));
+    }
+
+    public static List<String> getCompatibleSkinIds(String raceId, String genderId) {
         ArrayList<String> ids = new ArrayList<String>();
-        for (String id : LOTR_ADAPTER.getPlayableFactionIds()) {
-            CharacterFactionDefinition definition = LOTR_ADAPTER.resolve(id);
-            if (definition != null && race.isCompatibleWith(definition)) {
-                ids.add(definition.getId());
+        for (CharacterSkinDefinition definition
+                : CharacterSkinRegistry.getCompatibleSkins(raceId, genderId)) {
+            ids.add(definition.getId());
+        }
+        return Collections.unmodifiableList(ids);
+    }
+
+    public static List<String> getCompatibleFactionIds(String raceId) {
+        CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);
+        if (race == null) {
+            return Collections.emptyList();
+        }
+        CharacterCreationCatalog catalog = ClientCharacterCreationCatalogCache.get();
+        ArrayList<String> ids = new ArrayList<String>();
+        if (catalog != null) {
+            ids.addAll(catalog.getFactionIds(raceId));
+        } else if (LOTR_ADAPTER.isAvailable()) {
+            // Local fallback is used only before the first server snapshot.
+            for (String id : LOTR_ADAPTER.getPlayableFactionIds()) {
+                CharacterFactionDefinition definition = LOTR_ADAPTER.resolve(id);
+                if (definition != null && race.isCompatibleWith(definition)) {
+                    ids.add(definition.getId());
+                }
             }
         }
         Collections.sort(ids, new Comparator<String>() {
@@ -54,7 +81,8 @@ public final class ClientCharacterDisplayNames {
     }
 
     public static boolean isLotrIntegrationAvailable() {
-        return LOTR_ADAPTER.isAvailable();
+        CharacterCreationCatalog catalog = ClientCharacterCreationCatalogCache.get();
+        return catalog == null ? LOTR_ADAPTER.isAvailable() : catalog.isLotrAvailable();
     }
 
     public static String race(String id) {
@@ -63,6 +91,21 @@ public final class ClientCharacterDisplayNames {
 
     public static String gender(String id) {
         return translatedIdentifier("gui.losttales.character.gender.", id, "losttales:");
+    }
+
+    public static String skin(String id) {
+        CharacterSkinDefinition definition = CharacterSkinRegistry.get(id);
+        if (definition == null) {
+            return prettifyIdentifier(id);
+        }
+        String groupKey = "gui.losttales.character.skin_group."
+                + definition.getDisplayGroupId();
+        String group = I18n.format(groupKey);
+        if (groupKey.equals(group)) {
+            group = prettifyIdentifier(definition.getDisplayGroupId());
+        }
+        return I18n.format("gui.losttales.character.skin_value",
+                group, Integer.valueOf(definition.getVariantIndex() + 1));
     }
 
     public static String faction(String id) {

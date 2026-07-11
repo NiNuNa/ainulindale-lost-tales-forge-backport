@@ -58,7 +58,10 @@ public final class CharacterRosterSyncPacket implements IMessage {
                 int slotIndex = buffer.readUnsignedByte();
                 String name = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_NAME_BYTES);
                 String raceId = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-                String genderId = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                String genderId = CharacterPacketCodec.readString(
+                        buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                String skinId = CharacterPacketCodec.readString(
+                        buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 int age = buffer.readInt();
                 String factionId = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 int roleplayLevel = buffer.readInt();
@@ -81,6 +84,7 @@ public final class CharacterRosterSyncPacket implements IMessage {
                         name,
                         raceId,
                         genderId,
+                        skinId,
                         age,
                         factionId,
                         roleplayLevel,
@@ -124,7 +128,10 @@ public final class CharacterRosterSyncPacket implements IMessage {
             buffer.writeByte(character.getSlotIndex());
             CharacterPacketCodec.writeString(buffer, character.getName(), CharacterPacketCodec.MAX_NAME_BYTES);
             CharacterPacketCodec.writeString(buffer, character.getRaceId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            CharacterPacketCodec.writeString(buffer, character.getGenderId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            CharacterPacketCodec.writeString(
+                    buffer, character.getGenderId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            CharacterPacketCodec.writeString(
+                    buffer, character.getSkinId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeInt(character.getAge());
             CharacterPacketCodec.writeString(buffer, character.getStartingFactionId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeInt(character.getRoleplayLevel());

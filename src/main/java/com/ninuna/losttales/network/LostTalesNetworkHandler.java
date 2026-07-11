@@ -9,7 +9,9 @@ import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootDropItemPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootRequestPacket;
+import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterCreateRequestPacket;
+import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterDeleteRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterRequestPacket;
@@ -46,5 +48,7 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesMapMarkerDiscoveryPacket.Handler.class, LostTalesMapMarkerDiscoveryPacket.class, 6, Side.CLIENT);
         CHANNEL.registerMessage(CharacterRosterSyncPacket.Handler.class, CharacterRosterSyncPacket.class, 12, Side.CLIENT);
         CHANNEL.registerMessage(CharacterOperationResultPacket.Handler.class, CharacterOperationResultPacket.class, 13, Side.CLIENT);
+        CHANNEL.registerMessage(CharacterAppearanceSyncPacket.Handler.class, CharacterAppearanceSyncPacket.class, 14, Side.CLIENT);
+        CHANNEL.registerMessage(CharacterCreationCatalogSyncPacket.Handler.class, CharacterCreationCatalogSyncPacket.class, 15, Side.CLIENT);
     }
 }

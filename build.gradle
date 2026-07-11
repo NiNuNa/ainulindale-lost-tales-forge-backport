@@ -51,6 +51,29 @@ dependencies {
 
 }
 
+
+
+def lostTalesCorePlugin = 'com.ninuna.losttales.core.LostTalesCorePlugin'
+
+jar {
+    manifest {
+        attributes(
+                'FMLCorePlugin': lostTalesCorePlugin,
+                'FMLCorePluginContainsFMLMod': 'true'
+        )
+    }
+}
+
+// The release jar loads the core plugin from its manifest. ForgeGradle run
+// tasks need the explicit development property because the classes directory
+// does not have a jar manifest.
+tasks.matching { task ->
+    task.name == 'runClient' || task.name == 'runServer'
+}.all { task ->
+    task.jvmArgs "-Dfml.coreMods.load=${lostTalesCorePlugin}"
+}
+
+
 processResources
 {
     // this will ensure that this task is redone when the versions change.

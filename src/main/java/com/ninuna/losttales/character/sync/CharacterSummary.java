@@ -12,6 +12,7 @@ public final class CharacterSummary {
     private final String name;
     private final String raceId;
     private final String genderId;
+    private final String skinId;
     private final int age;
     private final String startingFactionId;
     private final int roleplayLevel;
@@ -20,7 +21,7 @@ public final class CharacterSummary {
     private final int dataVersion;
 
     public CharacterSummary(UUID characterId, int slotIndex, String name,
-                            String raceId, String genderId, int age,
+                            String raceId, String genderId, String skinId, int age,
                             String startingFactionId, int roleplayLevel,
                             long experiencePoints, long creationTimestamp,
                             int dataVersion) {
@@ -32,6 +33,7 @@ public final class CharacterSummary {
         this.name = name == null ? "" : name;
         this.raceId = raceId == null ? "" : raceId;
         this.genderId = genderId == null ? "" : genderId;
+        this.skinId = skinId == null ? "" : skinId;
         this.age = age;
         this.startingFactionId = startingFactionId == null ? "" : startingFactionId;
         this.roleplayLevel = Math.max(RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL, roleplayLevel);
@@ -50,6 +52,7 @@ public final class CharacterSummary {
                 character.getName(),
                 character.getRaceId(),
                 character.getGenderId(),
+                character.getSkinId(),
                 character.getAge(),
                 character.getStartingFactionId(),
                 character.getRoleplayLevel(),
@@ -77,6 +80,10 @@ public final class CharacterSummary {
 
     public String getGenderId() {
         return this.genderId;
+    }
+
+    public String getSkinId() {
+        return this.skinId;
     }
 
     public int getAge() {

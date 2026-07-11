@@ -1,9 +1,12 @@
 package com.ninuna.losttales.gui.screen;
 
+import com.ninuna.losttales.client.character.CharacterGuiPreviewLayout;
 import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
+import com.ninuna.losttales.client.character.ClientCharacterRaceAttributes;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
+import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileRouterGui;
@@ -139,10 +142,29 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
                 ClientCharacterDisplayNames.race(character.getRaceId()), x, lineY, width);
         lineY = drawLabelValue(I18n.format("gui.losttales.character.gender"),
                 ClientCharacterDisplayNames.gender(character.getGenderId()), x, lineY, width);
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.skin"),
+                ClientCharacterDisplayNames.skin(character.getSkinId()), x, lineY, width);
         lineY = drawLabelValue(I18n.format("gui.losttales.character.age"),
                 String.valueOf(character.getAge()), x, lineY, width);
         lineY = drawLabelValue(I18n.format("gui.losttales.character.starting_faction"),
                 ClientCharacterDisplayNames.faction(character.getStartingFactionId()), x, lineY, width);
+        lineY += 8;
+
+        CharacterRaceGameplayProfile raceProfile = ClientCharacterRaceAttributes.resolve(
+                this.mc == null ? null : this.mc.theWorld, character.getRaceId());
+        LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj,
+                I18n.format("gui.losttales.character.race_attributes"), x, lineY, width);
+        lineY += 16;
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.attribute.health"),
+                ClientCharacterRaceAttributes.formatHealth(raceProfile), x, lineY, width);
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.attribute.movement_speed"),
+                ClientCharacterRaceAttributes.formatMovementSpeed(raceProfile), x, lineY, width);
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.attribute.attack_damage"),
+                ClientCharacterRaceAttributes.formatAttackDamage(raceProfile), x, lineY, width);
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.attribute.hitbox"),
+                ClientCharacterRaceAttributes.formatHitbox(raceProfile), x, lineY, width);
+        lineY = drawLabelValue(I18n.format("gui.losttales.character.attribute.eye_height"),
+                ClientCharacterRaceAttributes.formatEyeHeight(raceProfile), x, lineY, width);
         lineY += 8;
 
         LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj,
@@ -168,9 +190,14 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
         LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj, I18n.format("gui.losttales.character.character"), x, y, width);
         EntityPlayer player = this.mc == null ? null : this.mc.thePlayer;
         int modelX = x + width / 2;
-        int modelY = y + Math.max(78, height - 28);
+        int baseModelY = y + Math.max(78, height - 28);
+        CharacterSummary activeCharacter = getActiveCharacter();
+        String raceId = activeCharacter == null ? "" : activeCharacter.getRaceId();
+        int modelY = CharacterGuiPreviewLayout.baselineY(raceId, baseModelY);
+        int effectiveScale = CharacterGuiPreviewLayout.scale(raceId, this.modelScale);
         if (player != null) {
-            drawEntityModel(modelX, modelY, this.modelScale, this.modelYaw, this.modelPitch, player);
+            drawEntityModel(modelX, modelY, effectiveScale,
+                    this.modelYaw, this.modelPitch, player);
         }
 
         int helpY = y + height - 28;
@@ -272,9 +299,6 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         GL11.glEnable(GL11.GL_COLOR_MATERIAL);
         GL11.glPushMatrix();
-        GL11.glTranslatef((float)x, (float)y, 50.0F);
-        GL11.glScalef((float)(-scale), (float)scale, (float)scale);
-        GL11.glRotatef(180.0F, 0.0F, 0.0F, 1.0F);
 
         float previousRenderYawOffset = entity.renderYawOffset;
         float previousRotationYaw = entity.rotationYaw;
@@ -282,31 +306,45 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
         float previousPrevRotationYawHead = entity.prevRotationYawHead;
         float previousRotationYawHead = entity.rotationYawHead;
         float previousPlayerViewY = RenderManager.instance.playerViewY;
+        boolean previousDebugBoundingBox = RenderManager.debugBoundingBox;
 
-        GL11.glEnable(GL12.GL_RESCALE_NORMAL);
-        GL11.glRotatef(135.0F, 0.0F, 1.0F, 0.0F);
-        RenderHelper.enableStandardItemLighting();
-        GL11.glRotatef(-135.0F, 0.0F, 1.0F, 0.0F);
-        GL11.glRotatef(-pitch, 1.0F, 0.0F, 0.0F);
-        entity.renderYawOffset = yaw;
-        entity.rotationYaw = yaw;
-        entity.rotationYawHead = yaw;
-        entity.prevRotationYawHead = yaw;
-        entity.rotationPitch = pitch * 0.25F;
-        GL11.glTranslatef(0.0F, entity.yOffset, 0.0F);
-        RenderManager.instance.playerViewY = 180.0F;
-        RenderManager.instance.renderEntityWithPosYaw(entity, 0.0D, 0.0D, 0.0D, 0.0F, 1.0F);
+        try {
+            GL11.glTranslatef((float)x, (float)y, 50.0F);
+            GL11.glScalef((float)(-scale), (float)scale, (float)scale);
+            GL11.glRotatef(180.0F, 0.0F, 0.0F, 1.0F);
+            // GuiInventory applies this compensation before RenderPlayer, which
+            // subtracts yOffset from its render Y. Without it, a player model is
+            // displaced downward by roughly 1.62 * preview scale pixels.
+            GL11.glTranslatef(0.0F, entity.yOffset, 0.0F);
 
-        entity.renderYawOffset = previousRenderYawOffset;
-        entity.rotationYaw = previousRotationYaw;
-        entity.rotationPitch = previousRotationPitch;
-        entity.prevRotationYawHead = previousPrevRotationYawHead;
-        entity.rotationYawHead = previousRotationYawHead;
-        RenderManager.instance.playerViewY = previousPlayerViewY;
-        GL11.glPopMatrix();
-        RenderHelper.disableStandardItemLighting();
-        GL11.glDisable(GL12.GL_RESCALE_NORMAL);
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glEnable(GL12.GL_RESCALE_NORMAL);
+            GL11.glRotatef(135.0F, 0.0F, 1.0F, 0.0F);
+            RenderHelper.enableStandardItemLighting();
+            GL11.glRotatef(-135.0F, 0.0F, 1.0F, 0.0F);
+            GL11.glRotatef(-pitch, 1.0F, 0.0F, 0.0F);
+            entity.renderYawOffset = yaw;
+            entity.rotationYaw = yaw;
+            entity.rotationYawHead = yaw;
+            entity.prevRotationYawHead = yaw;
+            entity.rotationPitch = pitch * 0.25F;
+            RenderManager.instance.playerViewY = 180.0F;
+            // F3+B is useful in-world but should not be rendered inside a GUI.
+            RenderManager.debugBoundingBox = false;
+            RenderManager.instance.renderEntityWithPosYaw(
+                    entity, 0.0D, 0.0D, 0.0D, 0.0F, 1.0F);
+        } finally {
+            entity.renderYawOffset = previousRenderYawOffset;
+            entity.rotationYaw = previousRotationYaw;
+            entity.rotationPitch = previousRotationPitch;
+            entity.prevRotationYawHead = previousPrevRotationYawHead;
+            entity.rotationYawHead = previousRotationYawHead;
+            RenderManager.instance.playerViewY = previousPlayerViewY;
+            RenderManager.debugBoundingBox = previousDebugBoundingBox;
+            GL11.glPopMatrix();
+            RenderHelper.disableStandardItemLighting();
+            GL11.glDisable(GL12.GL_RESCALE_NORMAL);
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        }
     }
 
     private void drawFooterHelp() {

@@ -2,12 +2,10 @@ package com.ninuna.losttales.character.model;
 
 import java.util.UUID;
 
-/**
- * Persistent server-authoritative record for one roleplaying character.
- */
+/** Persistent server-authoritative record for one roleplaying character. */
 public class RoleplayCharacter {
 
-    public static final int CURRENT_DATA_VERSION = 1;
+    public static final int CURRENT_DATA_VERSION = 3;
     public static final int INITIAL_ROLEPLAY_LEVEL = 1;
 
     private final UUID characterId;
@@ -16,6 +14,7 @@ public class RoleplayCharacter {
     private final String name;
     private final String raceId;
     private final String genderId;
+    private final String skinId;
     private final int age;
     private final String startingFactionId;
     private final long creationTimestamp;
@@ -25,26 +24,20 @@ public class RoleplayCharacter {
     private CharacterProgression progression;
 
     public static RoleplayCharacter createNew(UUID ownerId, int slotIndex, String name,
-                                               String raceId, String genderId, int age,
-                                               String startingFactionId, long creationTimestamp) {
+                                               String raceId, String genderId,
+                                               String skinId, int age,
+                                               String startingFactionId,
+                                               long creationTimestamp) {
         return new RoleplayCharacter(
-                UUID.randomUUID(),
-                ownerId,
-                slotIndex,
-                name,
-                raceId,
-                genderId,
-                age,
-                startingFactionId,
-                INITIAL_ROLEPLAY_LEVEL,
-                new CharacterProgression(),
-                creationTimestamp,
+                UUID.randomUUID(), ownerId, slotIndex, name, raceId, genderId,
+                skinId, age, startingFactionId, INITIAL_ROLEPLAY_LEVEL,
+                new CharacterProgression(), creationTimestamp,
                 CURRENT_DATA_VERSION
         );
     }
 
     public RoleplayCharacter(UUID characterId, UUID ownerId, int slotIndex, String name,
-                             String raceId, String genderId, int age,
+                             String raceId, String genderId, String skinId, int age,
                              String startingFactionId, int roleplayLevel,
                              CharacterProgression progression, long creationTimestamp,
                              int dataVersion) {
@@ -61,6 +54,7 @@ public class RoleplayCharacter {
         this.name = name == null ? "" : name;
         this.raceId = raceId == null ? "" : raceId;
         this.genderId = genderId == null ? "" : genderId;
+        this.skinId = skinId == null ? "" : skinId;
         this.age = age;
         this.startingFactionId = startingFactionId == null ? "" : startingFactionId;
         this.roleplayLevel = Math.max(INITIAL_ROLEPLAY_LEVEL, roleplayLevel);
@@ -93,6 +87,10 @@ public class RoleplayCharacter {
         return this.genderId;
     }
 
+    public String getSkinId() {
+        return this.skinId;
+    }
+
     public int getAge() {
         return this.age;
     }
@@ -105,10 +103,7 @@ public class RoleplayCharacter {
         return this.roleplayLevel;
     }
 
-    /**
-     * Intended for future authoritative progression code. Clients must never
-     * be allowed to call this through a mutation packet.
-     */
+    /** Intended for future authoritative progression code only. */
     public void setRoleplayLevel(int roleplayLevel) {
         this.roleplayLevel = Math.max(INITIAL_ROLEPLAY_LEVEL, roleplayLevel);
     }
