@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.character;
 
+import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
+import com.ninuna.losttales.character.cape.CharacterCapeDefinition;
 import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
@@ -112,6 +114,21 @@ public final class ClientCharacterDisplayNames {
         String displayName = LOTR_ADAPTER.getFactionDisplayName(id);
         return displayName == null || displayName.length() == 0
                 ? prettifyIdentifier(id) : displayName;
+    }
+
+    public static String cape(int cosmeticCapeId) {
+        if (cosmeticCapeId == CharacterCapeCatalog.NONE_ID) {
+            return I18n.format("gui.losttales.character.cape.none");
+        }
+        CharacterCapeDefinition definition = CharacterCapeCatalog.get(cosmeticCapeId);
+        if (definition == null) {
+            return I18n.format("gui.losttales.character.unknown");
+        }
+        String key = definition.getTranslationKey();
+        String translated = I18n.format(key);
+        return key.equals(translated)
+                ? prettifyIdentifier(definition.getId())
+                : translated;
     }
 
     public static String error(CharacterErrorId errorId) {

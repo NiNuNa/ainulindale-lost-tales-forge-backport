@@ -14,26 +14,35 @@ public final class CharacterPlayerEyeHeightHelper {
      * Applies the current standing or sneaking eye position.
      *
      * Forge 1.7.10 deliberately exposes EntityPlayer#eyeHeight. Its value is
-     * an offset consumed by Forge's player getPosition patch. The default value
-     * must remain part of the conversion: default + desired height above feet
-     * - yOffset.
+     * relative to the player's unusual posY/yOffset anchor, not an absolute
+     * height above the feet. The default value must therefore remain part of
+     * this conversion.
      */
     public static void apply(
             EntityPlayer player,
-            CharacterRaceGameplayProfile profile,
+            CharacterRaceDimensions dimensions,
             boolean hasRace) {
         if (player == null) {
             return;
         }
-        if (!hasRace || profile == null || player.isPlayerSleeping()) {
+        if (!hasRace || dimensions == null || player.isPlayerSleeping()) {
             restoreVanilla(player);
             return;
         }
 
-        float absoluteEyeHeight = player.isSneaking()
-                ? profile.getSneakingEyeHeight()
-                : profile.getStandingEyeHeight();
+        float absoluteEyeHeight = dimensions.getEyeHeight(player.isSneaking());
         player.eyeHeight = toPlayerEyeHeightField(player, absoluteEyeHeight);
+    }
+
+    /** Backwards-compatible entry point for callers not yet using the snapshot. */
+    public static void apply(
+            EntityPlayer player,
+            CharacterRaceGameplayProfile profile,
+            boolean hasRace) {
+        CharacterRaceDimensions dimensions = profile == null
+                ? null
+                : CharacterRaceDimensions.fromProfile(profile.getRaceId(), profile);
+        apply(player, dimensions, hasRace);
     }
 
     public static void restoreVanilla(EntityPlayer player) {

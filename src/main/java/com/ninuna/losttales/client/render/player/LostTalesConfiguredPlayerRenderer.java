@@ -52,6 +52,20 @@ final class LostTalesConfiguredPlayerRenderer extends RenderPlayer {
         return this.configured;
     }
 
+    String getRaceId() {
+        return this.raceId;
+    }
+
+    ModelBiped getConfiguredModel() {
+        return this.modelBipedMain;
+    }
+
+    void bindCapeTexture(ResourceLocation texture) {
+        if (texture != null) {
+            this.bindTexture(texture);
+        }
+    }
+
     /*
      * Keep RenderPlayer's normal Y handling. EntityPlayer uses a player-only
      * yOffset and RenderPlayer compensates for it before rendering. Cancelling

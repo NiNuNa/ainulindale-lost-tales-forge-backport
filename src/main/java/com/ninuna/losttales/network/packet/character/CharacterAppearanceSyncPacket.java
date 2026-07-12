@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet.character;
 
 import com.ninuna.losttales.LostTalesMod;
+import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -64,12 +65,19 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String skinId = CharacterPacketCodec.readString(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                boolean showMinecraftCape = buffer.readBoolean();
+                int cosmeticCapeId = buffer.readUnsignedShort();
                 if (!playerIds.add(playerId)) {
                     throw new CharacterPacketCodec.DecodeException(
                             "duplicate appearance player UUID");
                 }
+                if (!CharacterCapeCatalog.isValidSelection(cosmeticCapeId)) {
+                    throw new CharacterPacketCodec.DecodeException(
+                            "invalid cosmetic cape ID");
+                }
                 decoded.add(new CharacterAppearance(
-                        playerId, raceId, genderId, skinId));
+                        playerId, raceId, genderId, skinId,
+                        showMinecraftCape, cosmeticCapeId));
             }
             CharacterPacketCodec.requireFinished(buffer);
             this.appearances = Collections.unmodifiableList(decoded);
@@ -97,6 +105,8 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
             CharacterPacketCodec.writeString(
                     buffer, appearance.getSkinId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            buffer.writeBoolean(appearance.isMinecraftCapeVisible());
+            buffer.writeShort(appearance.getCosmeticCapeId());
         }
     }
 

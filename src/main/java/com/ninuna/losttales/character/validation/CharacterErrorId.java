@@ -22,6 +22,8 @@ public enum CharacterErrorId {
     INVALID_RACE("invalid_race"),
     INVALID_GENDER("invalid_gender"),
     INVALID_SKIN("invalid_skin"),
+    INVALID_CAPE("invalid_cape"),
+    CAPE_NOT_ELIGIBLE("cape_not_eligible"),
     INVALID_AGE("invalid_age"),
     INVALID_STARTING_FACTION("invalid_starting_faction"),
     LOTR_INTEGRATION_UNAVAILABLE("lotr_integration_unavailable"),
@@ -31,6 +33,7 @@ public enum CharacterErrorId {
     CHARACTER_NOT_FOUND("character_not_found"),
     SWITCH_NOT_ALLOWED("switch_not_allowed"),
     DELETE_NOT_ALLOWED("delete_not_allowed"),
+    CAPE_UPDATE_NOT_ALLOWED("cape_update_not_allowed"),
     INTERNAL_ERROR("internal_error");
 
     private final String id;

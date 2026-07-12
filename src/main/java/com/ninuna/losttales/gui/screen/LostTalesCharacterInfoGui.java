@@ -9,6 +9,7 @@ import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
+import com.ninuna.losttales.gui.screen.character.LostTalesCharacterCapeGui;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileRouterGui;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterRosterGui;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
@@ -41,6 +42,7 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
     private static final int PANEL_PADDING = 10;
     private static final int BUTTON_MANAGE = 1;
     private static final int BUTTON_BACK = 2;
+    private static final int BUTTON_CAPE = 3;
 
     private final GuiScreen parent;
     private int modelPanelX;
@@ -65,6 +67,9 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
         if (this.mc != null) {
             LostTalesClientQuestDefinitionStore.ensureLoaded(this.mc.getResourceManager());
         }
+        this.buttonList.add(new GuiButton(BUTTON_CAPE, this.width - 252,
+                this.height - 28, 118, 20,
+                I18n.format("gui.losttales.character.cape.button")));
         this.buttonList.add(new GuiButton(BUTTON_MANAGE, this.width - 126,
                 this.height - 28, 118, 20,
                 I18n.format("gui.losttales.character.manage")));
@@ -398,6 +403,10 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
 
     @Override
     protected void actionPerformed(GuiButton button) {
+        if (button.id == BUTTON_CAPE) {
+            this.mc.displayGuiScreen(new LostTalesCharacterCapeGui(this));
+            return;
+        }
         if (button.id == BUTTON_MANAGE) {
             this.mc.displayGuiScreen(new LostTalesCharacterRosterGui(this, false));
             return;

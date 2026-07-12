@@ -1,12 +1,16 @@
 package com.ninuna.losttales.character.model;
 
+import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
+
 import java.util.UUID;
 
 /** Persistent server-authoritative record for one roleplaying character. */
 public class RoleplayCharacter {
 
-    public static final int CURRENT_DATA_VERSION = 3;
+    public static final int CURRENT_DATA_VERSION = 4;
     public static final int INITIAL_ROLEPLAY_LEVEL = 1;
+    public static final boolean DEFAULT_SHOW_MINECRAFT_CAPE = true;
+    public static final int DEFAULT_COSMETIC_CAPE_ID = CharacterCapeCatalog.NONE_ID;
 
     private final UUID characterId;
     private final UUID ownerId;
@@ -22,6 +26,8 @@ public class RoleplayCharacter {
 
     private int roleplayLevel;
     private CharacterProgression progression;
+    private boolean showMinecraftCape;
+    private int cosmeticCapeId;
 
     public static RoleplayCharacter createNew(UUID ownerId, int slotIndex, String name,
                                                String raceId, String genderId,
@@ -32,15 +38,29 @@ public class RoleplayCharacter {
                 UUID.randomUUID(), ownerId, slotIndex, name, raceId, genderId,
                 skinId, age, startingFactionId, INITIAL_ROLEPLAY_LEVEL,
                 new CharacterProgression(), creationTimestamp,
-                CURRENT_DATA_VERSION
+                CURRENT_DATA_VERSION, DEFAULT_SHOW_MINECRAFT_CAPE,
+                DEFAULT_COSMETIC_CAPE_ID
         );
+    }
+
+    /** Compatibility constructor for pre-cape call sites and tests. */
+    public RoleplayCharacter(UUID characterId, UUID ownerId, int slotIndex, String name,
+                             String raceId, String genderId, String skinId, int age,
+                             String startingFactionId, int roleplayLevel,
+                             CharacterProgression progression, long creationTimestamp,
+                             int dataVersion) {
+        this(characterId, ownerId, slotIndex, name, raceId, genderId, skinId,
+                age, startingFactionId, roleplayLevel, progression,
+                creationTimestamp, dataVersion, DEFAULT_SHOW_MINECRAFT_CAPE,
+                DEFAULT_COSMETIC_CAPE_ID);
     }
 
     public RoleplayCharacter(UUID characterId, UUID ownerId, int slotIndex, String name,
                              String raceId, String genderId, String skinId, int age,
                              String startingFactionId, int roleplayLevel,
                              CharacterProgression progression, long creationTimestamp,
-                             int dataVersion) {
+                             int dataVersion, boolean showMinecraftCape,
+                             int cosmeticCapeId) {
         if (characterId == null) {
             throw new IllegalArgumentException("characterId must not be null");
         }
@@ -61,6 +81,8 @@ public class RoleplayCharacter {
         this.progression = progression == null ? new CharacterProgression() : progression;
         this.creationTimestamp = Math.max(0L, creationTimestamp);
         this.dataVersion = dataVersion <= 0 ? CURRENT_DATA_VERSION : dataVersion;
+        this.showMinecraftCape = showMinecraftCape;
+        this.cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(cosmeticCapeId);
     }
 
     public UUID getCharacterId() {
@@ -114,6 +136,24 @@ public class RoleplayCharacter {
 
     public void setProgression(CharacterProgression progression) {
         this.progression = progression == null ? new CharacterProgression() : progression;
+    }
+
+    public boolean isMinecraftCapeVisible() {
+        return this.showMinecraftCape;
+    }
+
+    public int getCosmeticCapeId() {
+        return this.cosmeticCapeId;
+    }
+
+    /** Called only after server-side catalog and eligibility validation. */
+    public boolean setCapeSettings(boolean showMinecraftCape, int cosmeticCapeId) {
+        int normalizedCapeId = CharacterCapeCatalog.normalizeSelection(cosmeticCapeId);
+        boolean changed = this.showMinecraftCape != showMinecraftCape
+                || this.cosmeticCapeId != normalizedCapeId;
+        this.showMinecraftCape = showMinecraftCape;
+        this.cosmeticCapeId = normalizedCapeId;
+        return changed;
     }
 
     public long getCreationTimestamp() {

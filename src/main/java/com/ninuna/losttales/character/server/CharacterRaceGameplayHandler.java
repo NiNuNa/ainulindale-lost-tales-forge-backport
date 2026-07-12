@@ -2,6 +2,7 @@ package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.physics.CharacterEntitySizeHelper;
+import com.ninuna.losttales.character.physics.CharacterRaceDimensions;
 import com.ninuna.losttales.character.physics.CharacterRaceEntityData;
 import com.ninuna.losttales.character.physics.CharacterPlayerEyeHeightHelper;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
@@ -98,6 +99,9 @@ public final class CharacterRaceGameplayHandler {
         CharacterRaceGameplayProfile profile =
                 LotrRaceProfileAdapter.getInstance().resolve(
                         player.worldObj, character.getRaceId());
+        CharacterRaceDimensions dimensions =
+                CharacterRaceDimensions.fromProfile(
+                        character.getRaceId(), profile);
 
         applyTargetAttribute(
                 player.getEntityAttribute(SharedMonsterAttributes.maxHealth),
@@ -119,11 +123,10 @@ public final class CharacterRaceGameplayHandler {
 
         capHealthToMaximum(player);
         if (!player.isPlayerSleeping()) {
-            CharacterEntitySizeHelper.apply(
-                    player, profile.getWidth(), profile.getHeight());
+            CharacterEntitySizeHelper.apply(player, dimensions);
         }
-        CharacterRaceEntityData.write(player, character.getRaceId(), profile);
-        CharacterPlayerEyeHeightHelper.apply(player, profile, true);
+        CharacterRaceEntityData.write(player, dimensions);
+        CharacterPlayerEyeHeightHelper.apply(player, dimensions, true);
     }
 
     private static void enforceRaceArmor(
@@ -186,11 +189,12 @@ public final class CharacterRaceGameplayHandler {
 
         capHealthToMaximum(player);
         CharacterRaceGameplayProfile fallback = CharacterRaceGameplayRegistry.DEFAULT;
+        CharacterRaceDimensions dimensions =
+                CharacterRaceDimensions.fromProfile("", fallback);
         if (!player.isPlayerSleeping()) {
-            CharacterEntitySizeHelper.apply(
-                    player, fallback.getWidth(), fallback.getHeight());
+            CharacterEntitySizeHelper.apply(player, dimensions);
         }
-        CharacterRaceEntityData.write(player, "", fallback);
+        CharacterRaceEntityData.write(player, dimensions);
         CharacterPlayerEyeHeightHelper.restoreVanilla(player);
     }
 

@@ -70,7 +70,9 @@ public final class ClientCharacterAppearanceCache {
                         playerId,
                         active.getRaceId(),
                         active.getGenderId(),
-                        active.getSkinId());
+                        active.getSkinId(),
+                        active.isMinecraftCapeVisible(),
+                        active.getCosmeticCapeId());
             }
         }
         return null;

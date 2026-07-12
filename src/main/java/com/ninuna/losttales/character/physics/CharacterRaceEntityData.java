@@ -23,19 +23,51 @@ public final class CharacterRaceEntityData {
     private CharacterRaceEntityData() {}
 
     public static void write(
-            Entity entity,
-            String raceId,
-            CharacterRaceGameplayProfile profile) {
-        if (entity == null || profile == null) {
+            Entity entity, CharacterRaceDimensions dimensions) {
+        if (entity == null || dimensions == null) {
             return;
         }
         NBTTagCompound data = entity.getEntityData();
-        data.setString(TAG_RACE, raceId == null ? "" : raceId);
-        data.setFloat(TAG_STANDING_EYE_HEIGHT, profile.getStandingEyeHeight());
-        data.setFloat(TAG_SNEAKING_EYE_HEIGHT, profile.getSneakingEyeHeight());
-        data.setFloat(TAG_WIDTH, profile.getWidth());
-        data.setFloat(TAG_HEIGHT, profile.getHeight());
-        data.setBoolean(TAG_LOTR_DERIVED, profile.isLotrDerived());
+        data.setString(TAG_RACE, dimensions.getRaceId());
+        data.setFloat(TAG_STANDING_EYE_HEIGHT,
+                dimensions.getStandingEyeHeight());
+        data.setFloat(TAG_SNEAKING_EYE_HEIGHT,
+                dimensions.getSneakingEyeHeight());
+        data.setFloat(TAG_WIDTH, dimensions.getWidth());
+        data.setFloat(TAG_HEIGHT, dimensions.getHeight());
+        data.setBoolean(TAG_LOTR_DERIVED, dimensions.isLotrDerived());
+    }
+
+    /** Backwards-compatible entry point for existing integrations. */
+    public static void write(
+            Entity entity,
+            String raceId,
+            CharacterRaceGameplayProfile profile) {
+        if (profile == null) {
+            return;
+        }
+        write(entity, CharacterRaceDimensions.fromProfile(raceId, profile));
+    }
+
+    public static CharacterRaceDimensions read(
+            Entity entity, CharacterRaceDimensions fallback) {
+        if (entity == null || fallback == null) {
+            return fallback;
+        }
+        String raceId = getRaceId(entity);
+        if (raceId.length() == 0) {
+            return fallback;
+        }
+
+        NBTTagCompound data = entity.getEntityData();
+        return CharacterRaceDimensions.fromEntityData(
+                raceId,
+                data.getFloat(TAG_WIDTH),
+                data.getFloat(TAG_HEIGHT),
+                data.getFloat(TAG_STANDING_EYE_HEIGHT),
+                data.getFloat(TAG_SNEAKING_EYE_HEIGHT),
+                data.getBoolean(TAG_LOTR_DERIVED),
+                fallback);
     }
 
     public static String getRaceId(Entity entity) {

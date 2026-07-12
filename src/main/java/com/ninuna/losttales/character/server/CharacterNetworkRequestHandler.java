@@ -56,6 +56,25 @@ public final class CharacterNetworkRequestHandler {
         });
     }
 
+    public static void handleCapeUpdateRequest(final EntityPlayerMP player,
+                                               final int requestId,
+                                               final long expectedRosterRevision,
+                                               final UUID characterId,
+                                               final boolean showMinecraftCape,
+                                               final int cosmeticCapeId) {
+        execute(player, requestId, CharacterOperationType.CAPE_UPDATE, new Operation() {
+            @Override
+            public CharacterOperationResult run() {
+                return CharacterService.getInstance().updateCapeSettings(
+                        player,
+                        expectedRosterRevision,
+                        characterId,
+                        showMinecraftCape,
+                        cosmeticCapeId);
+            }
+        });
+    }
+
     private static void execute(EntityPlayerMP player,
                                 int requestId,
                                 CharacterOperationType operationType,
@@ -70,7 +89,9 @@ public final class CharacterNetworkRequestHandler {
                 // Apply the authoritative selection before broadcasting it so
                 // the selecting player cannot spend up to ten ticks with stale
                 // dimensions, eye height, or attributes.
-                CharacterRaceGameplayHandler.apply(player);
+                if (operationType != CharacterOperationType.CAPE_UPDATE) {
+                    CharacterRaceGameplayHandler.apply(player);
+                }
                 CharacterAppearanceSyncManager.broadcastPlayer(
                         player, result.getRoster());
             }

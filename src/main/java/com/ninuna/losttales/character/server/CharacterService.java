@@ -1,6 +1,7 @@
 package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterProgression;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
@@ -30,12 +31,22 @@ public final class CharacterService {
     private static final int UUID_GENERATION_ATTEMPTS = 8;
 
     private final CharacterFactionResolver factionResolver;
+    private final CharacterCapeEligibilityPolicy capeEligibilityPolicy;
 
     public CharacterService(CharacterFactionResolver factionResolver) {
+        this(factionResolver, new AllowlistedCharacterCapeEligibilityPolicy());
+    }
+
+    public CharacterService(CharacterFactionResolver factionResolver,
+                            CharacterCapeEligibilityPolicy capeEligibilityPolicy) {
         if (factionResolver == null) {
             throw new IllegalArgumentException("factionResolver must not be null");
         }
+        if (capeEligibilityPolicy == null) {
+            throw new IllegalArgumentException("capeEligibilityPolicy must not be null");
+        }
         this.factionResolver = factionResolver;
+        this.capeEligibilityPolicy = capeEligibilityPolicy;
     }
 
     public static CharacterService getInstance() {
@@ -170,6 +181,63 @@ public final class CharacterService {
         return CharacterOperationResult.success(true, roster, character);
     }
 
+    public synchronized CharacterOperationResult updateCapeSettings(
+            EntityPlayerMP player, long expectedRosterRevision, UUID characterId,
+            boolean showMinecraftCape, int cosmeticCapeId) {
+        CharacterValidationResult playerValidation = validateServerPlayer(player);
+        if (!playerValidation.isValid()) {
+            return CharacterOperationResult.failure(playerValidation.getErrorId(), null);
+        }
+        CharacterValidationResult managementValidation =
+                CharacterValidator.validatePlayerCanManage(player);
+        if (!managementValidation.isValid()) {
+            CharacterErrorId error = managementValidation.getErrorId();
+            if (error == CharacterErrorId.PLAYER_DEAD
+                    || error == CharacterErrorId.PLAYER_SLEEPING) {
+                error = CharacterErrorId.CAPE_UPDATE_NOT_ALLOWED;
+            }
+            return CharacterOperationResult.failure(error, null);
+        }
+
+        CharacterWorldData data = getData(player);
+        if (data == null) {
+            return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, null);
+        }
+        if (data.isReadOnlyForNewerVersion()) {
+            return CharacterOperationResult.failure(CharacterErrorId.STORAGE_READ_ONLY, null);
+        }
+        CharacterRoster roster = data.getOrCreateRoster(player.getUniqueID());
+        CharacterValidationResult referenceValidation =
+                CharacterValidator.validateCharacterReference(
+                        roster, characterId, expectedRosterRevision);
+        if (!referenceValidation.isValid()) {
+            return CharacterOperationResult.failure(
+                    referenceValidation.getErrorId(), roster);
+        }
+        if (!CharacterCapeCatalog.isValidSelection(cosmeticCapeId)) {
+            return CharacterOperationResult.failure(CharacterErrorId.INVALID_CAPE, roster);
+        }
+
+        RoleplayCharacter character = roster.getCharacter(characterId);
+        CharacterValidationResult eligibility = this.capeEligibilityPolicy.validate(
+                player, character, cosmeticCapeId);
+        if (!eligibility.isValid()) {
+            CharacterErrorId error = eligibility.getErrorId();
+            if (error == CharacterErrorId.NONE) {
+                error = CharacterErrorId.CAPE_NOT_ELIGIBLE;
+            }
+            return CharacterOperationResult.failure(error, roster);
+        }
+
+        boolean changed = character.setCapeSettings(
+                showMinecraftCape, cosmeticCapeId);
+        if (changed) {
+            roster.incrementRevision();
+            data.saveRoster(roster);
+        }
+        return CharacterOperationResult.success(changed, roster, character);
+    }
+
     public synchronized CharacterOperationResult deleteCharacter(
             EntityPlayerMP player, long expectedRosterRevision, UUID characterId) {
         CharacterValidationResult playerValidation = validateServerPlayer(player);
@@ -258,6 +326,8 @@ public final class CharacterService {
 
     private static final class Holder {
         private static final CharacterService INSTANCE =
-                new CharacterService(LotrCharacterAdapter.getInstance());
+                new CharacterService(
+                        LotrCharacterAdapter.getInstance(),
+                        new AllowlistedCharacterCapeEligibilityPolicy());
     }
 }

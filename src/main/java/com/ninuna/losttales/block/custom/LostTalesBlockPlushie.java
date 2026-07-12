@@ -2,9 +2,11 @@ package com.ninuna.losttales.block.custom;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.block.base.LostTalesBlockStatueBase;
+import com.ninuna.losttales.block.collision.LostTalesBlockBounds;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityPlushie;
 import com.ninuna.losttales.entity.ELostTalesUser;
 import com.ninuna.losttales.util.LostTalesBlockRotationHelper;
+import java.util.List;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.entity.Entity;
@@ -13,10 +15,13 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.EnumRarity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 
 public class LostTalesBlockPlushie extends LostTalesBlockStatueBase {
+    private static final LostTalesBlockBounds SELECTION_BOUNDS = new LostTalesBlockBounds(0.13F, 0.0F, 0.13F, 0.87F, 0.9F, 0.87F);
+    private static final LostTalesBlockBounds COLLISION_BOUNDS = new LostTalesBlockBounds(0.1875F, 0.0F, 0.1875F, 0.8125F, 0.5F, 0.8125F);
     private static final float SQUEAK_MIN_FALL_DISTANCE = 0.4F;
     private static final double LIVING_BOUNCE_MULTIPLIER = 0.6D;
     private static final double NON_LIVING_BOUNCE_MULTIPLIER = 0.48D;
@@ -32,7 +37,26 @@ public class LostTalesBlockPlushie extends LostTalesBlockStatueBase {
 
     @Override
     public void setBlockBoundsBasedOnState(IBlockAccess world, int x, int y, int z) {
-        this.setBlockBounds(0.13F, 0.0F, 0.13F, 0.87F, 0.9F, 0.87F);
+        this.applyBounds(SELECTION_BOUNDS);
+    }
+
+    @Override
+    public AxisAlignedBB getCollisionBoundingBoxFromPool(World world, int x, int y, int z) {
+        return COLLISION_BOUNDS.toWorldBox(x, y, z);
+    }
+
+    @Override
+    public void addCollisionBoxesToList(World world, int x, int y, int z, AxisAlignedBB queryBox, List collisionBoxes, Entity entity) {
+        COLLISION_BOUNDS.addToCollisionList(x, y, z, queryBox, collisionBoxes);
+    }
+
+    @Override
+    public AxisAlignedBB getSelectedBoundingBoxFromPool(World world, int x, int y, int z) {
+        return SELECTION_BOUNDS.toWorldBox(x, y, z);
+    }
+
+    private void applyBounds(LostTalesBlockBounds bounds) {
+        this.setBlockBounds(bounds.getMinX(), bounds.getMinY(), bounds.getMinZ(), bounds.getMaxX(), bounds.getMaxY(), bounds.getMaxZ());
     }
 
     @Override

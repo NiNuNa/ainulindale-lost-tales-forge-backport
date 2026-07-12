@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.sync;
 
+import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 
 import java.util.UUID;
@@ -13,6 +14,8 @@ public final class CharacterSummary {
     private final String raceId;
     private final String genderId;
     private final String skinId;
+    private final boolean showMinecraftCape;
+    private final int cosmeticCapeId;
     private final int age;
     private final String startingFactionId;
     private final int roleplayLevel;
@@ -20,9 +23,23 @@ public final class CharacterSummary {
     private final long creationTimestamp;
     private final int dataVersion;
 
+    /** Compatibility constructor for pre-cape packet tests and callers. */
     public CharacterSummary(UUID characterId, int slotIndex, String name,
                             String raceId, String genderId, String skinId, int age,
                             String startingFactionId, int roleplayLevel,
+                            long experiencePoints, long creationTimestamp,
+                            int dataVersion) {
+        this(characterId, slotIndex, name, raceId, genderId, skinId,
+                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
+                age, startingFactionId, roleplayLevel, experiencePoints,
+                creationTimestamp, dataVersion);
+    }
+
+    public CharacterSummary(UUID characterId, int slotIndex, String name,
+                            String raceId, String genderId, String skinId,
+                            boolean showMinecraftCape, int cosmeticCapeId,
+                            int age, String startingFactionId, int roleplayLevel,
                             long experiencePoints, long creationTimestamp,
                             int dataVersion) {
         if (characterId == null) {
@@ -34,6 +51,8 @@ public final class CharacterSummary {
         this.raceId = raceId == null ? "" : raceId;
         this.genderId = genderId == null ? "" : genderId;
         this.skinId = skinId == null ? "" : skinId;
+        this.showMinecraftCape = showMinecraftCape;
+        this.cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(cosmeticCapeId);
         this.age = age;
         this.startingFactionId = startingFactionId == null ? "" : startingFactionId;
         this.roleplayLevel = Math.max(RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL, roleplayLevel);
@@ -53,6 +72,8 @@ public final class CharacterSummary {
                 character.getRaceId(),
                 character.getGenderId(),
                 character.getSkinId(),
+                character.isMinecraftCapeVisible(),
+                character.getCosmeticCapeId(),
                 character.getAge(),
                 character.getStartingFactionId(),
                 character.getRoleplayLevel(),
@@ -84,6 +105,14 @@ public final class CharacterSummary {
 
     public String getSkinId() {
         return this.skinId;
+    }
+
+    public boolean isMinecraftCapeVisible() {
+        return this.showMinecraftCape;
+    }
+
+    public int getCosmeticCapeId() {
+        return this.cosmeticCapeId;
     }
 
     public int getAge() {

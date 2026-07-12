@@ -10,6 +10,7 @@ import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket
 import com.ninuna.losttales.network.packet.LostTalesQuickLootDropItemPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPacket;
+import com.ninuna.losttales.network.packet.character.CharacterCapeUpdateRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterCreateRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterDeleteRequestPacket;
@@ -37,6 +38,7 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(CharacterCreateRequestPacket.Handler.class, CharacterCreateRequestPacket.class, 9, Side.SERVER);
         CHANNEL.registerMessage(CharacterSelectRequestPacket.Handler.class, CharacterSelectRequestPacket.class, 10, Side.SERVER);
         CHANNEL.registerMessage(CharacterDeleteRequestPacket.Handler.class, CharacterDeleteRequestPacket.class, 11, Side.SERVER);
+        CHANNEL.registerMessage(CharacterCapeUpdateRequestPacket.Handler.class, CharacterCapeUpdateRequestPacket.class, 16, Side.SERVER);
 
         // Server -> client snapshots. These are registered from the common proxy so a
         // dedicated server also knows the packet discriminators when it sends them.

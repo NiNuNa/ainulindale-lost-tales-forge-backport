@@ -95,6 +95,12 @@ public final class CharacterDataMigrator {
                     // the selected gender and skin together.
                     return 3;
                 }
+                if (version == 3) {
+                    // Character v4 adds normal-cape visibility and a stable
+                    // numeric LOTR cosmetic-cape selection. Missing values are
+                    // filled by the codec with backward-compatible defaults.
+                    return 4;
+                }
                 break;
             case PROGRESSION:
                 if (version == 0) {

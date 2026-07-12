@@ -6,6 +6,7 @@ public enum CharacterOperationType {
     CREATE(1, "create"),
     SELECT(2, "select"),
     DELETE(3, "delete"),
+    CAPE_UPDATE(4, "cape_update"),
     UNKNOWN(255, "unknown");
 
     private final int networkId;

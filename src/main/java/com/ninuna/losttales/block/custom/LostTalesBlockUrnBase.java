@@ -1,13 +1,16 @@
 package com.ninuna.losttales.block.custom;
 
 import com.ninuna.losttales.block.base.LostTalesBlockDirectionalContainerBase;
+import com.ninuna.losttales.block.collision.LostTalesBlockBounds;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.entity.ELostTalesUser;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.sound.ELostTalesBlockSoundType;
 import com.ninuna.losttales.util.LostTalesBlockRotationHelper;
+import java.util.List;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
@@ -15,10 +18,12 @@ import net.minecraft.init.Items;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 
 public class LostTalesBlockUrnBase extends LostTalesBlockDirectionalContainerBase {
+    protected static final LostTalesBlockBounds STANDARD_URN_BOUNDS = new LostTalesBlockBounds(0.19F, 0.0F, 0.19F, 0.81F, 1.0F, 0.81F);
     /**
      * The modern branch seals urns with honeycomb. Minecraft 1.7.10 does not
      * have honeycomb, so this backport intentionally uses vanilla clay balls.
@@ -32,8 +37,35 @@ public class LostTalesBlockUrnBase extends LostTalesBlockDirectionalContainerBas
     }
 
     @Override
-    public void setBlockBoundsBasedOnState(IBlockAccess world, int i, int j, int k) {
-        this.setBlockBounds(0.19F, 0.0F, 0.19F, 0.81F, 1.0F, 0.81F);
+    public void setBlockBoundsBasedOnState(IBlockAccess world, int x, int y, int z) {
+        this.applyBounds(this.getSelectionBounds(world, x, y, z));
+    }
+
+    @Override
+    public AxisAlignedBB getCollisionBoundingBoxFromPool(World world, int x, int y, int z) {
+        return this.getCollisionBounds(world, x, y, z).toWorldBox(x, y, z);
+    }
+
+    @Override
+    public void addCollisionBoxesToList(World world, int x, int y, int z, AxisAlignedBB queryBox, List collisionBoxes, Entity entity) {
+        this.getCollisionBounds(world, x, y, z).addToCollisionList(x, y, z, queryBox, collisionBoxes);
+    }
+
+    @Override
+    public AxisAlignedBB getSelectedBoundingBoxFromPool(World world, int x, int y, int z) {
+        return this.getSelectionBounds(world, x, y, z).toWorldBox(x, y, z);
+    }
+
+    protected LostTalesBlockBounds getCollisionBounds(IBlockAccess world, int x, int y, int z) {
+        return STANDARD_URN_BOUNDS;
+    }
+
+    protected LostTalesBlockBounds getSelectionBounds(IBlockAccess world, int x, int y, int z) {
+        return STANDARD_URN_BOUNDS;
+    }
+
+    private void applyBounds(LostTalesBlockBounds bounds) {
+        this.setBlockBounds(bounds.getMinX(), bounds.getMinY(), bounds.getMinZ(), bounds.getMaxX(), bounds.getMaxY(), bounds.getMaxZ());
     }
 
     @Override

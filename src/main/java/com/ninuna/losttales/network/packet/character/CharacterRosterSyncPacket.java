@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet.character;
 
 import com.ninuna.losttales.LostTalesMod;
+import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
@@ -62,6 +63,8 @@ public final class CharacterRosterSyncPacket implements IMessage {
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String skinId = CharacterPacketCodec.readString(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                boolean showMinecraftCape = buffer.readBoolean();
+                int cosmeticCapeId = buffer.readUnsignedShort();
                 int age = buffer.readInt();
                 String factionId = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 int roleplayLevel = buffer.readInt();
@@ -72,6 +75,7 @@ public final class CharacterRosterSyncPacket implements IMessage {
                 if (!CharacterRoster.isValidSlotIndex(slotIndex)
                         || !ids.add(characterId)
                         || !slots.add(Integer.valueOf(slotIndex))
+                        || !CharacterCapeCatalog.isValidSelection(cosmeticCapeId)
                         || roleplayLevel < 1
                         || experiencePoints < 0L
                         || creationTimestamp < 0L
@@ -85,6 +89,8 @@ public final class CharacterRosterSyncPacket implements IMessage {
                         raceId,
                         genderId,
                         skinId,
+                        showMinecraftCape,
+                        cosmeticCapeId,
                         age,
                         factionId,
                         roleplayLevel,
@@ -132,6 +138,8 @@ public final class CharacterRosterSyncPacket implements IMessage {
                     buffer, character.getGenderId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             CharacterPacketCodec.writeString(
                     buffer, character.getSkinId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            buffer.writeBoolean(character.isMinecraftCapeVisible());
+            buffer.writeShort(character.getCosmeticCapeId());
             buffer.writeInt(character.getAge());
             CharacterPacketCodec.writeString(buffer, character.getStartingFactionId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeInt(character.getRoleplayLevel());

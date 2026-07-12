@@ -1,5 +1,6 @@
 package com.ninuna.losttales.block.custom;
 
+import com.ninuna.losttales.block.collision.LostTalesBlockBounds;
 import com.ninuna.losttales.entity.ELostTalesUser;
 import java.util.Random;
 import net.minecraft.entity.EntityLivingBase;
@@ -9,24 +10,31 @@ import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 
 public class LostTalesBlockUrnTall extends LostTalesBlockUrnBase {
+    private static final int UPPER_PART_METADATA = 4;
+    private static final LostTalesBlockBounds UPPER_URN_BOUNDS = new LostTalesBlockBounds(0.19F, 0.0F, 0.19F, 0.81F, 0.64F, 0.81F);
 
     public LostTalesBlockUrnTall(ELostTalesUser credits) {
         super(credits);
     }
 
     @Override
-    public void setBlockBoundsBasedOnState(IBlockAccess world, int i, int j, int k) {
-        if (world.getBlock(i, j - 1, k) == this) {
-            this.setBlockBounds(0.19F, 0.0F, 0.19F, 0.81F, 0.64F, 0.81F);
-        } else {
-            this.setBlockBounds(0.19F, 0.0F, 0.19F, 0.81F, 1.0F, 0.81F);
-        }
+    protected LostTalesBlockBounds getCollisionBounds(IBlockAccess world, int x, int y, int z) {
+        return this.isUpperPart(world, x, y, z) ? UPPER_URN_BOUNDS : STANDARD_URN_BOUNDS;
+    }
+
+    @Override
+    protected LostTalesBlockBounds getSelectionBounds(IBlockAccess world, int x, int y, int z) {
+        return this.isUpperPart(world, x, y, z) ? UPPER_URN_BOUNDS : STANDARD_URN_BOUNDS;
+    }
+
+    private boolean isUpperPart(IBlockAccess world, int x, int y, int z) {
+        return world.getBlockMetadata(x, y, z) == UPPER_PART_METADATA;
     }
 
     @Override
     public void onBlockPlacedBy(World world, int i, int j, int k, EntityLivingBase entity, ItemStack itemStack) {
         super.onBlockPlacedBy(world, i, j, k, entity, itemStack);
-        world.setBlock(i, j + 1, k, this, 4, 2);
+        world.setBlock(i, j + 1, k, this, UPPER_PART_METADATA, 2);
         this.configurePlacedTileEntity(world, i, j + 1, k, entity);
     }
 
@@ -40,7 +48,7 @@ public class LostTalesBlockUrnTall extends LostTalesBlockUrnBase {
 
     @Override
     public boolean canBlockStay(World world, int i, int j, int k) {
-        if (world.getBlockMetadata(i, j, k) == 4) {
+        if (world.getBlockMetadata(i, j, k) == UPPER_PART_METADATA) {
             return !world.isAirBlock(i, j - 1, k) && world.getBlock(i, j - 1, k) == this;
         } else {
             return !world.isAirBlock(i, j - 1, k) && world.getBlock(i, j + 1, k) == this;
@@ -49,7 +57,7 @@ public class LostTalesBlockUrnTall extends LostTalesBlockUrnBase {
 
     @Override
     public Item getItemDropped(int meta, Random random, int fortune) {
-        if (meta == 4){
+        if (meta == UPPER_PART_METADATA){
             return null;
         } else {
             return super.getItemDropped(meta, random, fortune);
@@ -68,7 +76,7 @@ public class LostTalesBlockUrnTall extends LostTalesBlockUrnBase {
 
     @Override
     protected int[] getBottomCoords(World world, int x, int y, int z) {
-        if (world.getBlockMetadata(x, y, z) == 4) {
+        if (world.getBlockMetadata(x, y, z) == UPPER_PART_METADATA) {
             return world.getBlock(x, y - 1, z) == this ? new int[]{x, y - 1, z} : null;
         }
         return new int[]{x, y, z};

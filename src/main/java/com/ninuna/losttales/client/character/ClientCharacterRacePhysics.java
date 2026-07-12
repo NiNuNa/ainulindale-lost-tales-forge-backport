@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.character;
 
 import com.ninuna.losttales.character.physics.CharacterEntitySizeHelper;
+import com.ninuna.losttales.character.physics.CharacterRaceDimensions;
 import com.ninuna.losttales.character.physics.CharacterRaceEntityData;
 import com.ninuna.losttales.character.physics.CharacterPlayerEyeHeightHelper;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
@@ -35,18 +36,18 @@ public final class ClientCharacterRacePhysics {
                         : LotrRaceProfileAdapter.getInstance().resolve(
                                 player.worldObj, appearance.getRaceId());
 
+        boolean hasRace = appearance != null && appearance.isPresent();
+        CharacterRaceDimensions dimensions =
+                CharacterRaceDimensions.fromProfile(
+                        hasRace ? appearance.getRaceId() : "", profile);
+
         // Vanilla uses a special sleeping body layout. Preserve it and reapply
         // the race dimensions on the first tick after waking.
         if (!player.isPlayerSleeping()) {
-            CharacterEntitySizeHelper.apply(
-                    player, profile.getWidth(), profile.getHeight());
+            CharacterEntitySizeHelper.apply(player, dimensions);
         }
-        boolean hasRace = appearance != null && appearance.isPresent();
-        CharacterRaceEntityData.write(
-                player,
-                hasRace ? appearance.getRaceId() : "",
-                profile);
-        CharacterPlayerEyeHeightHelper.apply(player, profile, hasRace);
+        CharacterRaceEntityData.write(player, dimensions);
+        CharacterPlayerEyeHeightHelper.apply(player, dimensions, hasRace);
     }
 
     public static void applyAll(Minecraft minecraft) {

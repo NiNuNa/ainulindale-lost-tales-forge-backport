@@ -26,6 +26,12 @@ public final class CharacterEntitySizeHelper {
      * setPosition anchors minY at posY - yOffset + ySize. All alignment and
      * collision checks therefore use that same vanilla formula.
      */
+    public static boolean apply(
+            Entity entity, CharacterRaceDimensions dimensions) {
+        return dimensions != null
+                && apply(entity, dimensions.getWidth(), dimensions.getHeight());
+    }
+
     public static boolean apply(Entity entity, float width, float height) {
         if (entity == null || width <= 0.0F || height <= 0.0F) {
             return false;

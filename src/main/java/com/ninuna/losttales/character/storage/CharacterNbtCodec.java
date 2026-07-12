@@ -1,6 +1,7 @@
 package com.ninuna.losttales.character.storage;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterProgression;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
@@ -53,6 +54,8 @@ public final class CharacterNbtCodec {
     private static final String TAG_RACE_ID = "RaceId";
     private static final String TAG_GENDER_ID = "GenderId";
     private static final String TAG_SKIN_ID = "SkinId";
+    private static final String TAG_SHOW_MINECRAFT_CAPE = "ShowMinecraftCape";
+    private static final String TAG_COSMETIC_CAPE_ID = "CosmeticCapeId";
     private static final String TAG_AGE = "Age";
     private static final String TAG_STARTING_FACTION_ID = "StartingFactionId";
     private static final String TAG_ROLEPLAY_LEVEL = "RoleplayLevel";
@@ -244,6 +247,8 @@ public final class CharacterNbtCodec {
         tag.setString(TAG_RACE_ID, character.getRaceId());
         tag.setString(TAG_GENDER_ID, character.getGenderId());
         tag.setString(TAG_SKIN_ID, character.getSkinId());
+        tag.setBoolean(TAG_SHOW_MINECRAFT_CAPE, character.isMinecraftCapeVisible());
+        tag.setInteger(TAG_COSMETIC_CAPE_ID, character.getCosmeticCapeId());
         tag.setInteger(TAG_AGE, character.getAge());
         tag.setString(TAG_STARTING_FACTION_ID, character.getStartingFactionId());
         tag.setInteger(TAG_ROLEPLAY_LEVEL, character.getRoleplayLevel());
@@ -456,6 +461,34 @@ public final class CharacterNbtCodec {
                     characterId, rosterOwnerId);
         }
 
+        boolean hasShowMinecraftCape = tag.hasKey(
+                TAG_SHOW_MINECRAFT_CAPE, Constants.NBT.TAG_BYTE);
+        boolean showMinecraftCape = hasShowMinecraftCape
+                ? tag.getBoolean(TAG_SHOW_MINECRAFT_CAPE)
+                : RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE;
+        if (!hasShowMinecraftCape) {
+            repaired = true;
+            warn("Assigning the default normal-cape visibility to character %s owned by %s",
+                    characterId, rosterOwnerId);
+        }
+
+        boolean hasCosmeticCapeId = tag.hasKey(
+                TAG_COSMETIC_CAPE_ID, Constants.NBT.TAG_INT);
+        int storedCosmeticCapeId = hasCosmeticCapeId
+                ? tag.getInteger(TAG_COSMETIC_CAPE_ID)
+                : RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID;
+        int cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(storedCosmeticCapeId);
+        if (!hasCosmeticCapeId || cosmeticCapeId != storedCosmeticCapeId) {
+            repaired = true;
+            if (hasCosmeticCapeId) {
+                warn("Clearing invalid cosmetic cape ID %d for character %s owned by %s",
+                        Integer.valueOf(storedCosmeticCapeId), characterId, rosterOwnerId);
+            } else {
+                warn("Assigning no cosmetic cape to character %s owned by %s",
+                        characterId, rosterOwnerId);
+            }
+        }
+
         boolean hasAge = tag.hasKey(TAG_AGE, Constants.NBT.TAG_INT);
         int age = hasAge ? tag.getInteger(TAG_AGE) : 1;
         if (!hasAge) {
@@ -529,7 +562,9 @@ public final class CharacterNbtCodec {
                 roleplayLevel,
                 progressionResult.progression,
                 creationTimestamp,
-                RoleplayCharacter.CURRENT_DATA_VERSION
+                RoleplayCharacter.CURRENT_DATA_VERSION,
+                showMinecraftCape,
+                cosmeticCapeId
         );
         return CharacterReadResult.success(character, repaired, quarantinedEntries);
     }

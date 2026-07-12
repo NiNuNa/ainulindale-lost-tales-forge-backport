@@ -15,6 +15,7 @@ import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
+import com.ninuna.losttales.client.render.player.LostTalesPlayerCapeRenderHook;
 import com.ninuna.losttales.client.render.renderer.item.LostTalesItemRendererHammer;
 import com.ninuna.losttales.client.render.renderer.item.LostTalesRendererLargeItems;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
@@ -42,6 +43,7 @@ import net.minecraftforge.client.MinecraftForgeClient;
 import lotr.client.gui.LOTRGuiMap;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
+import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.client.event.TextureStitchEvent;
 import net.minecraftforge.common.MinecraftForge;
@@ -115,6 +117,12 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         } catch (Throwable ignored) {
             // World-space marker rendering should never crash the client render tick.
         }
+    }
+
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void renderRaceAdjustedCape(RenderPlayerEvent.Specials.Pre event) {
+        LostTalesPlayerCapeRenderHook.onSpecialsPre(event);
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
