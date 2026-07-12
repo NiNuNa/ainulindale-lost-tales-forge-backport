@@ -5,7 +5,7 @@ import com.ninuna.losttales.achievement.ELostTalesAchievement;
 import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.character.server.CharacterPlayerEventHandler;
 import com.ninuna.losttales.character.server.CharacterRaceGameplayHandler;
-import com.ninuna.losttales.character.server.CharacterServerTaskQueue;
+import com.ninuna.losttales.character.server.CharacterServerPacketDispatcher;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityPlushie;
@@ -23,6 +23,9 @@ import com.ninuna.losttales.faction.ELostTalesFaction;
 import com.ninuna.losttales.gui.LostTalesGuiHandler;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
+import com.ninuna.losttales.network.server.LostTalesNetworkPlayerEventHandler;
+import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
+import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
@@ -43,6 +46,7 @@ import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
+import cpw.mods.fml.common.event.FMLServerStoppingEvent;
 import cpw.mods.fml.common.network.NetworkRegistry;
 import cpw.mods.fml.common.registry.GameRegistry;
 import net.minecraft.entity.player.EntityPlayer;
@@ -63,7 +67,8 @@ public class LostTalesCommonProxy {
         LostTalesMobAggroEventHandler mobAggroEventHandler = new LostTalesMobAggroEventHandler();
         CharacterPlayerEventHandler characterPlayerEventHandler = new CharacterPlayerEventHandler();
         CharacterRaceGameplayHandler characterRaceGameplayHandler = new CharacterRaceGameplayHandler();
-        CharacterServerTaskQueue characterServerTaskQueue = new CharacterServerTaskQueue();
+        LostTalesServerTaskQueue serverTaskQueue = new LostTalesServerTaskQueue();
+        LostTalesNetworkPlayerEventHandler networkPlayerEventHandler = new LostTalesNetworkPlayerEventHandler();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
         MinecraftForge.EVENT_BUS.register(characterPlayerEventHandler);
         MinecraftForge.EVENT_BUS.register(characterRaceGameplayHandler);
@@ -73,7 +78,8 @@ public class LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(mobAggroEventHandler);
         FMLCommonHandler.instance().bus().register(characterPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(characterRaceGameplayHandler);
-        FMLCommonHandler.instance().bus().register(characterServerTaskQueue);
+        FMLCommonHandler.instance().bus().register(serverTaskQueue);
+        FMLCommonHandler.instance().bus().register(networkPlayerEventHandler);
 
         ELostTalesItem.initAndRegisterItems();
         ELostTalesBlock.initAndRegisterBlocks();
@@ -153,6 +159,15 @@ public class LostTalesCommonProxy {
     public void handleCharacterCreationCatalogSync(CharacterCreationCatalogSyncPacket packet) {}
 
     public void onServerStarting(FMLServerStartingEvent event) {
+        LostTalesServerTaskQueue.startAccepting();
+        LostTalesRequestRateLimiter.clear();
+        CharacterServerPacketDispatcher.clearSecurityState();
         ELostTalesCommand.initAndRegisterCommands(event);
+    }
+
+    public void onServerStopping(FMLServerStoppingEvent event) {
+        LostTalesServerTaskQueue.stopAcceptingAndClear();
+        LostTalesRequestRateLimiter.clear();
+        CharacterServerPacketDispatcher.clearSecurityState();
     }
 }

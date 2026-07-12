@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet.character;
 import com.ninuna.losttales.character.server.CharacterNetworkRequestHandler;
 import com.ninuna.losttales.character.server.CharacterServerPacketDispatcher;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
+import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -60,18 +61,21 @@ public final class CharacterDeleteRequestPacket implements IMessage {
             if (player == null || message == null) {
                 return null;
             }
+            final int requestId = message.requestId;
+            final long expectedRosterRevision = message.expectedRosterRevision;
+            final UUID characterId = message.characterId;
             CharacterServerPacketDispatcher.submit(
                     player,
-                    message.requestId,
+                    requestId,
                     CharacterOperationType.DELETE,
                     message.malformed,
                     "CharacterDeleteRequestPacket",
-                    new Runnable() {
+                    new LostTalesServerTaskQueue.PlayerTask() {
                         @Override
-                        public void run() {
+                        public void run(EntityPlayerMP livePlayer) {
                             CharacterNetworkRequestHandler.handleDeleteRequest(
-                                    player, message.requestId,
-                                    message.expectedRosterRevision, message.characterId);
+                                    livePlayer, requestId,
+                                    expectedRosterRevision, characterId);
                         }
                     }
             );

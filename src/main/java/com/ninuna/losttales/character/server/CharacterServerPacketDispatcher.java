@@ -2,6 +2,7 @@ package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import net.minecraft.entity.player.EntityPlayerMP;
 
@@ -22,7 +23,7 @@ public final class CharacterServerPacketDispatcher {
                               CharacterOperationType operationType,
                               boolean malformed,
                               String packetName,
-                              Runnable task) {
+                              LostTalesServerTaskQueue.PlayerTask task) {
         if (player == null || operationType == null) {
             return;
         }
@@ -42,11 +43,15 @@ public final class CharacterServerPacketDispatcher {
                     CharacterErrorId.MALFORMED_REQUEST, -1L);
             return;
         }
-        if (!CharacterServerTaskQueue.enqueue(player.getUniqueID(), task)) {
+        if (!LostTalesServerTaskQueue.enqueue(player.getUniqueID(), packetName, task)) {
             CharacterNetworkSecurity.logQueueFull(player);
             CharacterSyncManager.sendFailure(
                     player, requestId, operationType,
                     CharacterErrorId.INTERNAL_ERROR, -1L);
         }
+    }
+
+    public static void clearSecurityState() {
+        CharacterNetworkSecurity.clear();
     }
 }

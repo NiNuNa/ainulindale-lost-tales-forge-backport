@@ -1,5 +1,6 @@
 package com.ninuna.losttales.quest.player;
 
+import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
@@ -14,8 +15,10 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.world.World;
@@ -29,6 +32,9 @@ import net.minecraftforge.common.util.Constants;
  */
 public final class LostTalesQuestPlayerData implements IExtendedEntityProperties {
     public static final String PROPERTY_ID = "LostTalesQuestData";
+    public static final int CURRENT_DATA_VERSION = 1;
+
+    private static final String TAG_DATA_VERSION = "DataVersion";
 
     private final Map<String, LostTalesQuestProgress> activeQuests = new LinkedHashMap<String, LostTalesQuestProgress>();
     private final Set<String> completedQuests = new LinkedHashSet<String>();
@@ -39,6 +45,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     private final Set<String> pinnedQuestIds = new LinkedHashSet<String>();
     private String pinnedMapMarkerId = "";
     private EntityPlayer player;
+    private boolean readOnlyForNewerVersion;
+    private int unsupportedDataVersion = -1;
+    private NBTBase preservedReadOnlyData;
 
     public static LostTalesQuestPlayerData get(EntityPlayer player) {
         if (player == null) {
@@ -58,7 +67,16 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
 
     @Override
     public void saveNBTData(NBTTagCompound compound) {
+        if (compound == null) {
+            return;
+        }
+        if (this.readOnlyForNewerVersion && this.preservedReadOnlyData != null) {
+            compound.setTag(PROPERTY_ID, this.preservedReadOnlyData.copy());
+            return;
+        }
+
         NBTTagCompound data = new NBTTagCompound();
+        data.setInteger(TAG_DATA_VERSION, CURRENT_DATA_VERSION);
 
         NBTTagList activeList = new NBTTagList();
         for (LostTalesQuestProgress progress : this.activeQuests.values()) {
@@ -154,12 +172,35 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.dynamicQuestDefinitions.clear();
         this.pinnedQuestIds.clear();
         this.pinnedMapMarkerId = "";
+        this.readOnlyForNewerVersion = false;
+        this.unsupportedDataVersion = -1;
+        this.preservedReadOnlyData = null;
 
         if (compound == null || !compound.hasKey(PROPERTY_ID)) {
             return;
         }
+        if (!compound.hasKey(PROPERTY_ID, Constants.NBT.TAG_COMPOUND)) {
+            enterReadOnlyMode(compound.getTag(PROPERTY_ID), -1,
+                    "Quest data property is malformed and will be preserved without modification");
+            return;
+        }
 
-        NBTTagCompound data = compound.getCompoundTag(PROPERTY_ID);
+        NBTTagCompound originalData = compound.getCompoundTag(PROPERTY_ID);
+        LostTalesQuestDataMigrator.MigrationResult migration =
+                LostTalesQuestDataMigrator.migrate(originalData, CURRENT_DATA_VERSION);
+        if (!migration.isValid()) {
+            enterReadOnlyMode(originalData, -1,
+                    "Quest data is malformed and will be preserved without modification");
+            return;
+        }
+        if (!migration.isSupported()) {
+            enterReadOnlyMode(originalData, migration.getVersion(),
+                    "Quest data uses unsupported version " + migration.getVersion()
+                            + " and will be preserved without modification");
+            return;
+        }
+
+        NBTTagCompound data = migration.getTag();
         NBTTagList activeList = data.getTagList("ActiveQuests", Constants.NBT.TAG_COMPOUND);
         for (int i = 0; i < activeList.tagCount(); i++) {
             LostTalesQuestProgress progress = LostTalesQuestProgress.readFromNBT(activeList.getCompoundTagAt(i));
@@ -246,6 +287,26 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return this.player;
     }
 
+    public boolean isReadOnlyForNewerVersion() {
+        return this.readOnlyForNewerVersion;
+    }
+
+    public int getUnsupportedDataVersion() {
+        return this.unsupportedDataVersion;
+    }
+
+    private boolean isWritable() {
+        return !this.readOnlyForNewerVersion;
+    }
+
+    private void enterReadOnlyMode(NBTBase preservedData, int unsupportedVersion,
+                                   String message) {
+        this.readOnlyForNewerVersion = true;
+        this.unsupportedDataVersion = unsupportedVersion;
+        this.preservedReadOnlyData = preservedData == null ? null : preservedData.copy();
+        FMLLog.warning("[%s] %s", LostTalesMetaData.MOD_ID, message);
+    }
+
     public Collection<LostTalesQuestProgress> getActiveQuests() {
         ArrayList<LostTalesQuestProgress> copy = new ArrayList<LostTalesQuestProgress>();
         for (LostTalesQuestProgress progress : this.activeQuests.values()) {
@@ -279,6 +340,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean rememberDynamicQuestDefinition(LostTalesQuestDefinition quest) {
+        if (!isWritable()) {
+            return false;
+        }
         if (quest == null || quest.getId() == null || quest.getId().length() == 0) {
             return false;
         }
@@ -313,6 +377,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public void startQuest(String questId, String firstStageId, long acceptedWorldTime, long deadlineWorldTime) {
+        if (!isWritable()) {
+            return;
+        }
         if (questId == null || questId.length() == 0 || this.activeQuests.containsKey(questId)) {
             return;
         }
@@ -348,6 +415,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean discoverMarker(String markerId) {
+        if (!isWritable()) {
+            return false;
+        }
         markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
         if (markerId.length() == 0) {
             return false;
@@ -356,6 +426,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean discoverDynamicMarker(LostTalesMapMarkerDefinition marker) {
+        if (!isWritable()) {
+            return false;
+        }
         if (marker == null || marker.getId() == null || marker.getId().length() == 0) {
             return false;
         }
@@ -387,6 +460,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean forgetMarker(String markerId) {
+        if (!isWritable()) {
+            return false;
+        }
         markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
         if (markerId.length() == 0) {
             return false;
@@ -403,6 +479,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean setPinnedMapMarkerId(String markerId) {
+        if (!isWritable()) {
+            return false;
+        }
         markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
         if (markerId.length() == 0) {
             return clearPinnedMapMarkerId();
@@ -418,6 +497,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean clearPinnedMapMarkerId() {
+        if (!isWritable()) {
+            return false;
+        }
         boolean changed = this.pinnedMapMarkerId != null && this.pinnedMapMarkerId.length() > 0;
         this.pinnedMapMarkerId = "";
         return changed;
@@ -428,6 +510,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean pinQuestId(String questId) {
+        if (!isWritable()) {
+            return false;
+        }
         if (questId == null || questId.length() == 0 || !this.activeQuests.containsKey(questId)) {
             return false;
         }
@@ -439,6 +524,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean unpinQuestId(String questId) {
+        if (!isWritable()) {
+            return false;
+        }
         if (questId == null || questId.length() == 0) {
             return false;
         }
@@ -446,12 +534,18 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean clearPinnedQuestId() {
+        if (!isWritable()) {
+            return false;
+        }
         boolean changed = !this.pinnedQuestIds.isEmpty();
         this.pinnedQuestIds.clear();
         return changed;
     }
 
     public boolean completeQuest(String questId) {
+        if (!isWritable()) {
+            return false;
+        }
         if (questId == null || questId.length() == 0) {
             return false;
         }
@@ -463,6 +557,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean failQuest(String questId) {
+        if (!isWritable()) {
+            return false;
+        }
         if (questId == null || questId.length() == 0) {
             return false;
         }
@@ -474,6 +571,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean setQuestStage(String questId, int stageIndex, String stageId) {
+        if (!isWritable()) {
+            return false;
+        }
         LostTalesQuestProgress progress = this.activeQuests.get(questId);
         if (progress == null) {
             return false;
@@ -489,11 +589,17 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public int addObjectiveProgress(String questId, String objectiveId, int amount, int maxValue) {
+        if (!isWritable()) {
+            return getObjectiveProgress(questId, objectiveId);
+        }
         LostTalesQuestProgress progress = this.activeQuests.get(questId);
         return progress == null ? 0 : progress.addObjectiveProgress(objectiveId, amount, maxValue);
     }
 
     public void setObjectiveProgress(String questId, String objectiveId, int value) {
+        if (!isWritable()) {
+            return;
+        }
         LostTalesQuestProgress progress = this.activeQuests.get(questId);
         if (progress != null) {
             progress.setObjectiveProgress(objectiveId, value);
@@ -501,6 +607,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean resetQuest(String questId) {
+        if (!isWritable()) {
+            return false;
+        }
         if (questId == null || questId.length() == 0) {
             return false;
         }
@@ -512,6 +621,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean abandonQuest(String questId) {
+        if (!isWritable()) {
+            return false;
+        }
         if (questId == null || questId.length() == 0) {
             return false;
         }
@@ -529,7 +641,18 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.dynamicQuestDefinitions.clear();
         this.pinnedQuestIds.clear();
         this.pinnedMapMarkerId = "";
+        this.readOnlyForNewerVersion = false;
+        this.unsupportedDataVersion = -1;
+        this.preservedReadOnlyData = null;
         if (oldData == null) {
+            return;
+        }
+        if (oldData.readOnlyForNewerVersion) {
+            this.readOnlyForNewerVersion = true;
+            this.unsupportedDataVersion = oldData.unsupportedDataVersion;
+            this.preservedReadOnlyData = oldData.preservedReadOnlyData == null
+                    ? null
+                    : oldData.preservedReadOnlyData.copy();
             return;
         }
 
@@ -556,6 +679,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
      * or older NBT is loaded. Returns true when anything was cleaned up.
      */
     public boolean pruneInvalidReferences() {
+        if (!isWritable()) {
+            return false;
+        }
         boolean changed = false;
         ArrayList<String> invalidPinnedQuests = new ArrayList<String>();
         for (String questId : this.pinnedQuestIds) {

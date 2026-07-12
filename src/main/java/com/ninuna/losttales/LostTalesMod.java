@@ -7,6 +7,7 @@ import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
+import cpw.mods.fml.common.event.FMLServerStoppingEvent;
 
 @Mod(
         modid = LostTalesMetaData.MOD_ID,
@@ -42,5 +43,10 @@ public class LostTalesMod {
     @Mod.EventHandler
     public void onServerStarting(FMLServerStartingEvent event) {
         proxy.onServerStarting(event);
+    }
+
+    @Mod.EventHandler
+    public void onServerStopping(FMLServerStoppingEvent event) {
+        proxy.onServerStopping(event);
     }
 }

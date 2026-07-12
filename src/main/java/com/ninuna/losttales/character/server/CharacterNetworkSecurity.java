@@ -81,6 +81,10 @@ final class CharacterNetworkSecurity {
         }
     }
 
+    static void clear() {
+        WINDOWS.clear();
+    }
+
     private static void logThrottled(EntityPlayerMP player, String message) {
         if (player == null || player.getUniqueID() == null) {
             return;

@@ -24,7 +24,6 @@ public final class CharacterPlayerEventHandler {
     public void onPlayerLoggedOut(PlayerLoggedOutEvent event) {
         if (event != null && event.player != null) {
             CharacterAppearanceSyncManager.broadcastRemoval(event.player.getUniqueID());
-            CharacterServerTaskQueue.cancelPlayer(event.player.getUniqueID());
             CharacterNetworkSecurity.clearPlayer(event.player.getUniqueID());
         }
     }

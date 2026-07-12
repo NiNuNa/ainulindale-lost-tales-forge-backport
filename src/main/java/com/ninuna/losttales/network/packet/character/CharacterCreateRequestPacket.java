@@ -4,6 +4,7 @@ import com.ninuna.losttales.character.server.CharacterCreationRequest;
 import com.ninuna.losttales.character.server.CharacterNetworkRequestHandler;
 import com.ninuna.losttales.character.server.CharacterServerPacketDispatcher;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
+import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -99,17 +100,19 @@ public final class CharacterCreateRequestPacket implements IMessage {
             if (player == null || message == null) {
                 return null;
             }
+            final int requestId = message.requestId;
+            final CharacterCreationRequest request = message.toRequest();
             CharacterServerPacketDispatcher.submit(
                     player,
-                    message.requestId,
+                    requestId,
                     CharacterOperationType.CREATE,
                     message.malformed,
                     "CharacterCreateRequestPacket",
-                    new Runnable() {
+                    new LostTalesServerTaskQueue.PlayerTask() {
                         @Override
-                        public void run() {
+                        public void run(EntityPlayerMP livePlayer) {
                             CharacterNetworkRequestHandler.handleCreateRequest(
-                                    player, message.requestId, message.toRequest());
+                                    livePlayer, requestId, request);
                         }
                     }
             );

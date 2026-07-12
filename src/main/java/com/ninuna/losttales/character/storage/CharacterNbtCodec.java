@@ -26,10 +26,18 @@ import java.util.UUID;
  */
 public final class CharacterNbtCodec {
 
-    public static final int CURRENT_ROOT_DATA_VERSION = 1;
+    public static final int CURRENT_ROOT_DATA_VERSION = 2;
+    public static final int CURRENT_QUARANTINE_DATA_VERSION = 1;
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_ROSTERS = "Rosters";
+    private static final String TAG_QUARANTINE = "Quarantine";
+    private static final String TAG_QUARANTINE_ENTRIES = "Entries";
+    private static final String TAG_ENTRY_TYPE = "EntryType";
+    private static final String TAG_REASON = "Reason";
+    private static final String TAG_ROSTER_INDEX = "RosterIndex";
+    private static final String TAG_CHARACTER_INDEX = "CharacterIndex";
+    private static final String TAG_ORIGINAL_DATA = "OriginalData";
     private static final String TAG_CHARACTERS = "Characters";
     private static final String TAG_PROGRESSION = "Progression";
     private static final String TAG_EXTENSION_DATA = "ExtensionData";
@@ -56,6 +64,11 @@ public final class CharacterNbtCodec {
     private CharacterNbtCodec() {}
 
     public static void write(NBTTagCompound output, Collection<CharacterRoster> rosters) {
+        write(output, rosters, Collections.<NBTTagCompound>emptyList());
+    }
+
+    public static void write(NBTTagCompound output, Collection<CharacterRoster> rosters,
+                             Collection<NBTTagCompound> quarantinedEntries) {
         output.setInteger(TAG_DATA_VERSION, CURRENT_ROOT_DATA_VERSION);
 
         NBTTagList rosterList = new NBTTagList();
@@ -76,11 +89,12 @@ public final class CharacterNbtCodec {
             }
         }
         output.setTag(TAG_ROSTERS, rosterList);
+        output.setTag(TAG_QUARANTINE, writeQuarantine(quarantinedEntries));
     }
 
     public static ReadResult read(NBTTagCompound source) {
         CharacterDataMigrator.MigrationResult rootMigration =
-                CharacterDataMigrator.migrate(source, CURRENT_ROOT_DATA_VERSION);
+                CharacterDataMigrator.migrateRoot(source, CURRENT_ROOT_DATA_VERSION);
 
         if (!rootMigration.isValid()) {
             warn("Character data root is malformed; data will remain read-only to avoid overwriting it");
@@ -93,7 +107,17 @@ public final class CharacterNbtCodec {
         }
 
         NBTTagCompound root = rootMigration.getTag();
-        boolean repaired = rootMigration.wasMigrated();
+        QuarantineReadResult quarantineResult = readQuarantine(root);
+        if (!quarantineResult.supported) {
+            warn("Character quarantine data is malformed or uses unsupported version %d; "
+                            + "the whole store will remain read-only",
+                    Integer.valueOf(quarantineResult.unsupportedVersion));
+            return ReadResult.unsupported(source, quarantineResult.unsupportedVersion);
+        }
+
+        boolean repaired = rootMigration.wasMigrated() || quarantineResult.repaired;
+        ArrayList<NBTTagCompound> quarantinedEntries =
+                new ArrayList<NBTTagCompound>(quarantineResult.entries);
         if (!root.hasKey(TAG_ROSTERS, Constants.NBT.TAG_LIST)) {
             repaired = true;
             warn("Character data root is missing the roster list; repairing it as empty");
@@ -102,27 +126,94 @@ public final class CharacterNbtCodec {
         NBTTagList rosterList = root.getTagList(TAG_ROSTERS, Constants.NBT.TAG_COMPOUND);
 
         for (int i = 0; i < rosterList.tagCount(); i++) {
-            RosterReadResult rosterResult = readRoster(rosterList.getCompoundTagAt(i), i);
+            NBTTagCompound rawRoster = rosterList.getCompoundTagAt(i);
+            RosterReadResult rosterResult = readRoster(rawRoster, i);
             if (rosterResult.unsupportedVersion >= 0) {
                 warn("Character data contains nested unsupported version %d; the whole store will remain read-only",
                         Integer.valueOf(rosterResult.unsupportedVersion));
                 return ReadResult.unsupported(source, rosterResult.unsupportedVersion);
             }
             repaired |= rosterResult.repaired;
+            quarantinedEntries.addAll(rosterResult.quarantinedEntries);
             CharacterRoster roster = rosterResult.roster;
             if (roster == null) {
+                quarantinedEntries.add(createQuarantineEntry(
+                        "roster", rosterResult.failureReason, i, -1, null, null, rawRoster));
+                repaired = true;
                 continue;
             }
             if (rosters.containsKey(roster.getOwnerId())) {
                 repaired = true;
-                warn("Skipping duplicate roster for owner %s at index %d",
+                quarantinedEntries.add(createQuarantineEntry(
+                        "roster", "duplicate_roster_owner", i, -1,
+                        roster.getOwnerId(), null, rawRoster));
+                warn("Quarantining duplicate roster for owner %s at index %d",
                         roster.getOwnerId(), Integer.valueOf(i));
                 continue;
             }
             rosters.put(roster.getOwnerId(), roster);
         }
 
-        return ReadResult.success(rosters, repaired);
+        if (quarantinedEntries.size() > quarantineResult.entries.size()) {
+            warn("Preserved %d newly rejected character record(s) in the character-data quarantine",
+                    Integer.valueOf(quarantinedEntries.size() - quarantineResult.entries.size()));
+        }
+        return ReadResult.success(rosters, repaired, quarantinedEntries);
+    }
+
+    private static NBTTagCompound writeQuarantine(Collection<NBTTagCompound> entries) {
+        NBTTagCompound quarantine = new NBTTagCompound();
+        quarantine.setInteger(TAG_DATA_VERSION, CURRENT_QUARANTINE_DATA_VERSION);
+        NBTTagList entryList = new NBTTagList();
+        if (entries != null) {
+            for (NBTTagCompound entry : entries) {
+                if (entry != null) {
+                    entryList.appendTag(entry.copy());
+                }
+            }
+        }
+        quarantine.setTag(TAG_QUARANTINE_ENTRIES, entryList);
+        return quarantine;
+    }
+
+    private static QuarantineReadResult readQuarantine(NBTTagCompound root) {
+        if (!root.hasKey(TAG_QUARANTINE)) {
+            return QuarantineReadResult.success(Collections.<NBTTagCompound>emptyList(), false);
+        }
+        if (!root.hasKey(TAG_QUARANTINE, Constants.NBT.TAG_COMPOUND)) {
+            return QuarantineReadResult.unsupported(-1);
+        }
+
+        NBTTagCompound source = root.getCompoundTag(TAG_QUARANTINE);
+        NBTTagCompound quarantine = (NBTTagCompound) source.copy();
+        int version = quarantine.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
+                ? quarantine.getInteger(TAG_DATA_VERSION)
+                : 0;
+        if (version < 0 || version > CURRENT_QUARANTINE_DATA_VERSION) {
+            return QuarantineReadResult.unsupported(version);
+        }
+
+        boolean repaired = false;
+        if (version == 0) {
+            version = 1;
+            quarantine.setInteger(TAG_DATA_VERSION, version);
+            repaired = true;
+        }
+        if (version != CURRENT_QUARANTINE_DATA_VERSION) {
+            return QuarantineReadResult.unsupported(version);
+        }
+        if (quarantine.hasKey(TAG_QUARANTINE_ENTRIES)
+                && !quarantine.hasKey(TAG_QUARANTINE_ENTRIES, Constants.NBT.TAG_LIST)) {
+            return QuarantineReadResult.unsupported(-1);
+        }
+
+        ArrayList<NBTTagCompound> entries = new ArrayList<NBTTagCompound>();
+        NBTTagList entryList = quarantine.getTagList(
+                TAG_QUARANTINE_ENTRIES, Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < entryList.tagCount(); i++) {
+            entries.add((NBTTagCompound) entryList.getCompoundTagAt(i).copy());
+        }
+        return QuarantineReadResult.success(entries, repaired);
     }
 
     private static NBTTagCompound writeRoster(CharacterRoster roster) {
@@ -174,10 +265,10 @@ public final class CharacterNbtCodec {
 
     private static RosterReadResult readRoster(NBTTagCompound source, int rosterIndex) {
         CharacterDataMigrator.MigrationResult migration =
-                CharacterDataMigrator.migrate(source, CharacterRoster.CURRENT_DATA_VERSION);
+                CharacterDataMigrator.migrateRoster(source, CharacterRoster.CURRENT_DATA_VERSION);
         if (!migration.isValid()) {
             warn("Skipping malformed roster at index %d", Integer.valueOf(rosterIndex));
-            return RosterReadResult.failed(true);
+            return RosterReadResult.failed(true, "malformed_roster");
         }
         if (!migration.isSupported()) {
             warn("Roster at index %d uses unsupported version %d",
@@ -191,7 +282,7 @@ public final class CharacterNbtCodec {
         if (ownerId == null) {
             warn("Skipping roster at index %d because its owner UUID is missing or invalid",
                     Integer.valueOf(rosterIndex));
-            return RosterReadResult.failed(true);
+            return RosterReadResult.failed(true, "missing_or_invalid_owner_uuid");
         }
 
         boolean hasUnlockedSlotCount = tag.hasKey(TAG_UNLOCKED_SLOT_COUNT, Constants.NBT.TAG_INT);
@@ -230,21 +321,30 @@ public final class CharacterNbtCodec {
                 CharacterRoster.CURRENT_DATA_VERSION
         );
 
+        ArrayList<NBTTagCompound> quarantinedEntries = new ArrayList<NBTTagCompound>();
         NBTTagList characterList = tag.getTagList(TAG_CHARACTERS, Constants.NBT.TAG_COMPOUND);
         for (int i = 0; i < characterList.tagCount(); i++) {
-            CharacterReadResult characterResult = readCharacter(
-                    characterList.getCompoundTagAt(i), ownerId, i);
+            NBTTagCompound rawCharacter = characterList.getCompoundTagAt(i);
+            CharacterReadResult characterResult = readCharacter(rawCharacter, ownerId, rosterIndex, i);
             if (characterResult.unsupportedVersion >= 0) {
                 return RosterReadResult.unsupported(characterResult.unsupportedVersion);
             }
             repaired |= characterResult.repaired;
+            quarantinedEntries.addAll(characterResult.quarantinedEntries);
             RoleplayCharacter character = characterResult.character;
             if (character == null) {
+                quarantinedEntries.add(createQuarantineEntry(
+                        "character", characterResult.failureReason, rosterIndex, i,
+                        ownerId, null, rawCharacter));
+                repaired = true;
                 continue;
             }
             if (!roster.addCharacter(character)) {
                 repaired = true;
-                warn("Skipping duplicate character UUID or occupied slot for owner %s, character %s, slot %d",
+                quarantinedEntries.add(createQuarantineEntry(
+                        "character", "duplicate_character_uuid_or_occupied_slot",
+                        rosterIndex, i, ownerId, character.getCharacterId(), rawCharacter));
+                warn("Quarantining duplicate character UUID or occupied slot for owner %s, character %s, slot %d",
                         ownerId, character.getCharacterId(), Integer.valueOf(character.getSlotIndex()));
             }
         }
@@ -264,17 +364,17 @@ public final class CharacterNbtCodec {
             roster.clearInvalidActiveCharacter();
         }
 
-        return RosterReadResult.success(roster, repaired);
+        return RosterReadResult.success(roster, repaired, quarantinedEntries);
     }
 
     private static CharacterReadResult readCharacter(NBTTagCompound source, UUID rosterOwnerId,
-                                                       int characterIndex) {
+                                                       int rosterIndex, int characterIndex) {
         CharacterDataMigrator.MigrationResult migration =
-                CharacterDataMigrator.migrate(source, RoleplayCharacter.CURRENT_DATA_VERSION);
+                CharacterDataMigrator.migrateCharacter(source, RoleplayCharacter.CURRENT_DATA_VERSION);
         if (!migration.isValid()) {
             warn("Skipping malformed character at index %d for owner %s",
                     Integer.valueOf(characterIndex), rosterOwnerId);
-            return CharacterReadResult.failed(true);
+            return CharacterReadResult.failed(true, "malformed_character");
         }
         if (!migration.isSupported()) {
             warn("Character at index %d for owner %s uses unsupported version %d",
@@ -285,11 +385,12 @@ public final class CharacterNbtCodec {
 
         NBTTagCompound tag = migration.getTag();
         boolean repaired = migration.wasMigrated();
+        ArrayList<NBTTagCompound> quarantinedEntries = new ArrayList<NBTTagCompound>();
         UUID characterId = readUuid(tag, TAG_CHARACTER_UUID);
         if (characterId == null) {
             warn("Skipping character at index %d for owner %s because its UUID is missing or invalid",
                     Integer.valueOf(characterIndex), rosterOwnerId);
-            return CharacterReadResult.failed(true);
+            return CharacterReadResult.failed(true, "missing_or_invalid_character_uuid");
         }
 
         UUID characterOwnerId = readUuid(tag, TAG_OWNER_UUID);
@@ -301,19 +402,19 @@ public final class CharacterNbtCodec {
         } else if (!rosterOwnerId.equals(characterOwnerId)) {
             warn("Skipping character %s because owner %s does not match roster owner %s",
                     characterId, characterOwnerId, rosterOwnerId);
-            return CharacterReadResult.failed(true);
+            return CharacterReadResult.failed(true, "owner_uuid_mismatch");
         }
 
         if (!tag.hasKey(TAG_SLOT_INDEX, Constants.NBT.TAG_INT)) {
             warn("Skipping character %s for owner %s because its slot index is missing",
                     characterId, rosterOwnerId);
-            return CharacterReadResult.failed(true);
+            return CharacterReadResult.failed(true, "missing_slot_index");
         }
         int slotIndex = tag.getInteger(TAG_SLOT_INDEX);
         if (!CharacterRoster.isValidSlotIndex(slotIndex)) {
             warn("Skipping character %s for owner %s because slot %d is invalid",
                     characterId, rosterOwnerId, Integer.valueOf(slotIndex));
-            return CharacterReadResult.failed(true);
+            return CharacterReadResult.failed(true, "invalid_slot_index");
         }
 
         String name = tag.getString(TAG_NAME);
@@ -333,7 +434,7 @@ public final class CharacterNbtCodec {
         if (isBlank(name) || isBlank(raceId) || isBlank(genderId) || isBlank(startingFactionId)) {
             warn("Skipping character %s for owner %s because a required text field is empty or unsupported",
                     characterId, rosterOwnerId);
-            return CharacterReadResult.failed(true);
+            return CharacterReadResult.failed(true, "missing_required_text_field");
         }
         if (!raceId.equals(storedRaceId)) {
             repaired = true;
@@ -399,13 +500,21 @@ public final class CharacterNbtCodec {
                     characterId, rosterOwnerId);
         }
 
+        boolean progressionTagPresent = tag.hasKey(TAG_PROGRESSION);
+        boolean progressionCompoundPresent = tag.hasKey(TAG_PROGRESSION, Constants.NBT.TAG_COMPOUND);
         ProgressionReadResult progressionResult = readProgression(
                 tag.getCompoundTag(TAG_PROGRESSION), characterId, rosterOwnerId,
-                tag.hasKey(TAG_PROGRESSION, Constants.NBT.TAG_COMPOUND));
+                progressionCompoundPresent);
         if (progressionResult.unsupportedVersion >= 0) {
             return CharacterReadResult.unsupported(progressionResult.unsupportedVersion);
         }
         repaired |= progressionResult.repaired;
+        if ((progressionTagPresent && !progressionCompoundPresent)
+                || progressionResult.replacedMalformedData) {
+            quarantinedEntries.add(createQuarantineEntry(
+                    "character", "malformed_progression_replaced", rosterIndex, characterIndex,
+                    rosterOwnerId, characterId, source));
+        }
 
         RoleplayCharacter character = new RoleplayCharacter(
                 characterId,
@@ -422,7 +531,7 @@ public final class CharacterNbtCodec {
                 creationTimestamp,
                 RoleplayCharacter.CURRENT_DATA_VERSION
         );
-        return CharacterReadResult.success(character, repaired);
+        return CharacterReadResult.success(character, repaired, quarantinedEntries);
     }
 
     private static ProgressionReadResult readProgression(NBTTagCompound source, UUID characterId,
@@ -430,15 +539,15 @@ public final class CharacterNbtCodec {
         if (!wasPresent) {
             warn("Creating missing progression container for character %s owned by %s",
                     characterId, ownerId);
-            return ProgressionReadResult.success(new CharacterProgression(), true);
+            return ProgressionReadResult.success(new CharacterProgression(), true, false);
         }
 
         CharacterDataMigrator.MigrationResult migration =
-                CharacterDataMigrator.migrate(source, CharacterProgression.CURRENT_DATA_VERSION);
+                CharacterDataMigrator.migrateProgression(source, CharacterProgression.CURRENT_DATA_VERSION);
         if (!migration.isValid()) {
             warn("Replacing malformed progression data for character %s owned by %s",
                     characterId, ownerId);
-            return ProgressionReadResult.success(new CharacterProgression(), true);
+            return ProgressionReadResult.success(new CharacterProgression(), true, true);
         }
         if (!migration.isSupported()) {
             warn("Progression data for character %s owned by %s uses unsupported version %d",
@@ -457,13 +566,15 @@ public final class CharacterNbtCodec {
             warn("Repairing negative experience for character %s owned by %s", characterId, ownerId);
         }
 
+        boolean extensionTagPresent = tag.hasKey(TAG_EXTENSION_DATA);
         boolean hasExtensionData = tag.hasKey(TAG_EXTENSION_DATA, Constants.NBT.TAG_COMPOUND);
+        boolean replacedMalformedData = extensionTagPresent && !hasExtensionData;
         NBTTagCompound extensionData = hasExtensionData
                 ? tag.getCompoundTag(TAG_EXTENSION_DATA)
                 : new NBTTagCompound();
         if (!hasExtensionData) {
             repaired = true;
-            warn("Repairing missing progression extension data for character %s owned by %s",
+            warn("Repairing missing or malformed progression extension data for character %s owned by %s",
                     characterId, ownerId);
         }
         CharacterProgression progression = new CharacterProgression(
@@ -471,7 +582,32 @@ public final class CharacterNbtCodec {
                 experiencePoints,
                 extensionData
         );
-        return ProgressionReadResult.success(progression, repaired);
+        return ProgressionReadResult.success(progression, repaired, replacedMalformedData);
+    }
+
+    private static NBTTagCompound createQuarantineEntry(String entryType, String reason,
+                                                         int rosterIndex, int characterIndex,
+                                                         UUID ownerId, UUID characterId,
+                                                         NBTTagCompound originalData) {
+        NBTTagCompound entry = new NBTTagCompound();
+        entry.setString(TAG_ENTRY_TYPE, isBlank(entryType) ? "unknown" : entryType);
+        entry.setString(TAG_REASON, isBlank(reason) ? "unspecified" : reason);
+        if (rosterIndex >= 0) {
+            entry.setInteger(TAG_ROSTER_INDEX, rosterIndex);
+        }
+        if (characterIndex >= 0) {
+            entry.setInteger(TAG_CHARACTER_INDEX, characterIndex);
+        }
+        if (ownerId != null) {
+            writeUuid(entry, TAG_OWNER_UUID, ownerId);
+        }
+        if (characterId != null) {
+            writeUuid(entry, TAG_CHARACTER_UUID, characterId);
+        }
+        entry.setTag(TAG_ORIGINAL_DATA, originalData == null
+                ? new NBTTagCompound()
+                : originalData.copy());
+        return entry;
     }
 
     private static void writeUuid(NBTTagCompound tag, String key, UUID uuid) {
@@ -500,6 +636,19 @@ public final class CharacterNbtCodec {
         return Math.min(CharacterRoster.MAX_SLOTS, count);
     }
 
+    private static List<NBTTagCompound> copyQuarantineEntries(
+            Collection<NBTTagCompound> entries) {
+        ArrayList<NBTTagCompound> copies = new ArrayList<NBTTagCompound>();
+        if (entries != null) {
+            for (NBTTagCompound entry : entries) {
+                if (entry != null) {
+                    copies.add((NBTTagCompound) entry.copy());
+                }
+            }
+        }
+        return copies;
+    }
+
     private static void warn(String message, Object... arguments) {
         Object[] allArguments = new Object[arguments.length + 1];
         allArguments[0] = LostTalesMetaData.MOD_ID;
@@ -513,19 +662,27 @@ public final class CharacterNbtCodec {
         private final boolean readOnly;
         private final int unsupportedVersion;
         private final NBTTagCompound originalData;
+        private final List<NBTTagCompound> quarantinedEntries;
 
         private ReadResult(Map<UUID, CharacterRoster> rosters, boolean repaired,
                            boolean readOnly, int unsupportedVersion,
-                           NBTTagCompound originalData) {
+                           NBTTagCompound originalData,
+                           Collection<NBTTagCompound> quarantinedEntries) {
             this.rosters = rosters;
             this.repaired = repaired;
             this.readOnly = readOnly;
             this.unsupportedVersion = unsupportedVersion;
             this.originalData = originalData;
+            this.quarantinedEntries = copyQuarantineEntries(quarantinedEntries);
+        }
+
+        public static ReadResult success(Map<UUID, CharacterRoster> rosters, boolean repaired,
+                                         Collection<NBTTagCompound> quarantinedEntries) {
+            return new ReadResult(rosters, repaired, false, -1, null, quarantinedEntries);
         }
 
         public static ReadResult success(Map<UUID, CharacterRoster> rosters, boolean repaired) {
-            return new ReadResult(rosters, repaired, false, -1, null);
+            return success(rosters, repaired, Collections.<NBTTagCompound>emptyList());
         }
 
         public static ReadResult empty(boolean repaired) {
@@ -537,7 +694,8 @@ public final class CharacterNbtCodec {
                     ? new NBTTagCompound()
                     : (NBTTagCompound) originalData.copy();
             return new ReadResult(new LinkedHashMap<UUID, CharacterRoster>(), false,
-                    true, unsupportedVersion, copy);
+                    true, unsupportedVersion, copy,
+                    Collections.<NBTTagCompound>emptyList());
         }
 
         public Map<UUID, CharacterRoster> getRosters() {
@@ -561,29 +719,67 @@ public final class CharacterNbtCodec {
                     ? null
                     : (NBTTagCompound) this.originalData.copy();
         }
+
+        public List<NBTTagCompound> getQuarantinedEntriesCopy() {
+            return copyQuarantineEntries(this.quarantinedEntries);
+        }
+    }
+
+    private static final class QuarantineReadResult {
+        private final List<NBTTagCompound> entries;
+        private final boolean repaired;
+        private final boolean supported;
+        private final int unsupportedVersion;
+
+        private QuarantineReadResult(Collection<NBTTagCompound> entries, boolean repaired,
+                                     boolean supported, int unsupportedVersion) {
+            this.entries = copyQuarantineEntries(entries);
+            this.repaired = repaired;
+            this.supported = supported;
+            this.unsupportedVersion = unsupportedVersion;
+        }
+
+        private static QuarantineReadResult success(Collection<NBTTagCompound> entries,
+                                                    boolean repaired) {
+            return new QuarantineReadResult(entries, repaired, true, -1);
+        }
+
+        private static QuarantineReadResult unsupported(int version) {
+            return new QuarantineReadResult(Collections.<NBTTagCompound>emptyList(),
+                    false, false, version);
+        }
     }
 
     private static final class RosterReadResult {
         private final CharacterRoster roster;
         private final boolean repaired;
         private final int unsupportedVersion;
+        private final String failureReason;
+        private final List<NBTTagCompound> quarantinedEntries;
 
-        private RosterReadResult(CharacterRoster roster, boolean repaired, int unsupportedVersion) {
+        private RosterReadResult(CharacterRoster roster, boolean repaired, int unsupportedVersion,
+                                 String failureReason,
+                                 Collection<NBTTagCompound> quarantinedEntries) {
             this.roster = roster;
             this.repaired = repaired;
             this.unsupportedVersion = unsupportedVersion;
+            this.failureReason = failureReason;
+            this.quarantinedEntries = copyQuarantineEntries(quarantinedEntries);
         }
 
-        private static RosterReadResult success(CharacterRoster roster, boolean repaired) {
-            return new RosterReadResult(roster, repaired, -1);
+        private static RosterReadResult success(CharacterRoster roster, boolean repaired,
+                                                Collection<NBTTagCompound> quarantinedEntries) {
+            return new RosterReadResult(roster, repaired, -1, null, quarantinedEntries);
         }
 
-        private static RosterReadResult failed(boolean repaired) {
-            return new RosterReadResult(null, repaired, -1);
+        private static RosterReadResult failed(boolean repaired, String reason) {
+            return new RosterReadResult(null, repaired, -1, reason,
+                    Collections.<NBTTagCompound>emptyList());
         }
 
         private static RosterReadResult unsupported(int version) {
-            return new RosterReadResult(null, false, version);
+            return new RosterReadResult(null, false, version, null,
+                    Collections.<NBTTagCompound>emptyList());
         }
     }
 
@@ -591,23 +787,32 @@ public final class CharacterNbtCodec {
         private final RoleplayCharacter character;
         private final boolean repaired;
         private final int unsupportedVersion;
+        private final String failureReason;
+        private final List<NBTTagCompound> quarantinedEntries;
 
-        private CharacterReadResult(RoleplayCharacter character, boolean repaired, int unsupportedVersion) {
+        private CharacterReadResult(RoleplayCharacter character, boolean repaired,
+                                    int unsupportedVersion, String failureReason,
+                                    Collection<NBTTagCompound> quarantinedEntries) {
             this.character = character;
             this.repaired = repaired;
             this.unsupportedVersion = unsupportedVersion;
+            this.failureReason = failureReason;
+            this.quarantinedEntries = copyQuarantineEntries(quarantinedEntries);
         }
 
-        private static CharacterReadResult success(RoleplayCharacter character, boolean repaired) {
-            return new CharacterReadResult(character, repaired, -1);
+        private static CharacterReadResult success(RoleplayCharacter character, boolean repaired,
+                                                   Collection<NBTTagCompound> quarantinedEntries) {
+            return new CharacterReadResult(character, repaired, -1, null, quarantinedEntries);
         }
 
-        private static CharacterReadResult failed(boolean repaired) {
-            return new CharacterReadResult(null, repaired, -1);
+        private static CharacterReadResult failed(boolean repaired, String reason) {
+            return new CharacterReadResult(null, repaired, -1, reason,
+                    Collections.<NBTTagCompound>emptyList());
         }
 
         private static CharacterReadResult unsupported(int version) {
-            return new CharacterReadResult(null, false, version);
+            return new CharacterReadResult(null, false, version, null,
+                    Collections.<NBTTagCompound>emptyList());
         }
     }
 
@@ -615,21 +820,25 @@ public final class CharacterNbtCodec {
         private final CharacterProgression progression;
         private final boolean repaired;
         private final int unsupportedVersion;
+        private final boolean replacedMalformedData;
 
         private ProgressionReadResult(CharacterProgression progression, boolean repaired,
-                                      int unsupportedVersion) {
+                                      int unsupportedVersion, boolean replacedMalformedData) {
             this.progression = progression;
             this.repaired = repaired;
             this.unsupportedVersion = unsupportedVersion;
+            this.replacedMalformedData = replacedMalformedData;
         }
 
         private static ProgressionReadResult success(CharacterProgression progression,
-                                                     boolean repaired) {
-            return new ProgressionReadResult(progression, repaired, -1);
+                                                     boolean repaired,
+                                                     boolean replacedMalformedData) {
+            return new ProgressionReadResult(progression, repaired, -1,
+                    replacedMalformedData);
         }
 
         private static ProgressionReadResult unsupported(int version) {
-            return new ProgressionReadResult(null, false, version);
+            return new ProgressionReadResult(null, false, version, false);
         }
     }
 }

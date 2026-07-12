@@ -4,11 +4,11 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraftforge.common.util.Constants;
 
 /**
- * Small, explicit migration pipeline for versioned character NBT records.
+ * Explicit migration entry points for each character persistence schema.
  *
- * Version zero represents an unversioned record using the current field names.
- * No released character format predates version one, but accepting version zero
- * provides a controlled path for development worlds and future migration tests.
+ * Keeping the schema type in the method name prevents a future root, roster,
+ * or progression version increase from accidentally executing character-only
+ * migration steps.
  */
 public final class CharacterDataMigrator {
 
@@ -16,8 +16,24 @@ public final class CharacterDataMigrator {
 
     private CharacterDataMigrator() {}
 
-    public static MigrationResult migrate(NBTTagCompound source, int currentVersion) {
-        if (source == null) {
+    public static MigrationResult migrateRoot(NBTTagCompound source, int currentVersion) {
+        return migrate(source, currentVersion, Schema.ROOT);
+    }
+
+    public static MigrationResult migrateRoster(NBTTagCompound source, int currentVersion) {
+        return migrate(source, currentVersion, Schema.ROSTER);
+    }
+
+    public static MigrationResult migrateCharacter(NBTTagCompound source, int currentVersion) {
+        return migrate(source, currentVersion, Schema.CHARACTER);
+    }
+
+    public static MigrationResult migrateProgression(NBTTagCompound source, int currentVersion) {
+        return migrate(source, currentVersion, Schema.PROGRESSION);
+    }
+
+    private static MigrationResult migrate(NBTTagCompound source, int currentVersion, Schema schema) {
+        if (source == null || currentVersion < 1) {
             return MigrationResult.invalid();
         }
 
@@ -35,33 +51,67 @@ public final class CharacterDataMigrator {
 
         boolean changed = false;
         while (version < currentVersion) {
-            switch (version) {
-                case 0:
-                    version = 1;
-                    migrated.setInteger(DATA_VERSION_TAG, version);
-                    changed = true;
-                    break;
-                case 1:
-                    // Character data version 2 adds SkinId. The NBT codec
-                    // assigns its deterministic race/gender-compatible default.
-                    version = 2;
-                    migrated.setInteger(DATA_VERSION_TAG, version);
-                    changed = true;
-                    break;
-                case 2:
-                    // Character data version 3 removes the unspecified option
-                    // and makes allowed gender values race-specific. The codec
-                    // repairs the value and selected skin together.
-                    version = 3;
-                    migrated.setInteger(DATA_VERSION_TAG, version);
-                    changed = true;
-                    break;
-                default:
-                    return MigrationResult.unsupported(version);
+            int nextVersion = nextVersion(schema, version);
+            if (nextVersion <= version || nextVersion > currentVersion) {
+                return MigrationResult.unsupported(version);
             }
+            version = nextVersion;
+            migrated.setInteger(DATA_VERSION_TAG, version);
+            changed = true;
         }
 
         return MigrationResult.success(migrated, version, changed);
+    }
+
+    private static int nextVersion(Schema schema, int version) {
+        switch (schema) {
+            case ROOT:
+                // Root v1 introduced the explicit root DataVersion.
+                // Root v2 adds the additive Quarantine container.
+                if (version == 0) {
+                    return 1;
+                }
+                if (version == 1) {
+                    return 2;
+                }
+                break;
+            case ROSTER:
+                if (version == 0) {
+                    return 1;
+                }
+                break;
+            case CHARACTER:
+                if (version == 0) {
+                    return 1;
+                }
+                if (version == 1) {
+                    // Character v2 adds SkinId. The codec assigns a
+                    // deterministic race/gender-compatible default.
+                    return 2;
+                }
+                if (version == 2) {
+                    // Character v3 removes the unspecified option and makes
+                    // allowed gender values race-specific. The codec repairs
+                    // the selected gender and skin together.
+                    return 3;
+                }
+                break;
+            case PROGRESSION:
+                if (version == 0) {
+                    return 1;
+                }
+                break;
+            default:
+                break;
+        }
+        return -1;
+    }
+
+    private enum Schema {
+        ROOT,
+        ROSTER,
+        CHARACTER,
+        PROGRESSION
     }
 
     public static final class MigrationResult {

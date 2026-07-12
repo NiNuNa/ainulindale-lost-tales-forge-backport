@@ -5,9 +5,11 @@ import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.WorldSavedData;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -23,6 +25,7 @@ public class CharacterWorldData extends WorldSavedData {
     public static final String DATA_NAME = "losttales_characters";
 
     private final Map<UUID, CharacterRoster> rosters = new LinkedHashMap<UUID, CharacterRoster>();
+    private final List<NBTTagCompound> quarantinedEntries = new ArrayList<NBTTagCompound>();
     private boolean readOnlyForNewerVersion;
     private int unsupportedDataVersion = -1;
     private NBTTagCompound preservedNewerData;
@@ -38,6 +41,7 @@ public class CharacterWorldData extends WorldSavedData {
     @Override
     public void readFromNBT(NBTTagCompound compound) {
         this.rosters.clear();
+        this.quarantinedEntries.clear();
         this.readOnlyForNewerVersion = false;
         this.unsupportedDataVersion = -1;
         this.preservedNewerData = null;
@@ -51,6 +55,7 @@ public class CharacterWorldData extends WorldSavedData {
         }
 
         this.rosters.putAll(result.getRosters());
+        this.quarantinedEntries.addAll(result.getQuarantinedEntriesCopy());
         if (result.wasRepaired()) {
             markDirty();
         }
@@ -62,7 +67,7 @@ public class CharacterWorldData extends WorldSavedData {
             copyTagContents(this.preservedNewerData, compound);
             return;
         }
-        CharacterNbtCodec.write(compound, this.rosters.values());
+        CharacterNbtCodec.write(compound, this.rosters.values(), this.quarantinedEntries);
     }
 
     public boolean isReadOnlyForNewerVersion() {
@@ -120,6 +125,20 @@ public class CharacterWorldData extends WorldSavedData {
 
     public Collection<CharacterRoster> getRosters() {
         return Collections.unmodifiableCollection(this.rosters.values());
+    }
+
+    public int getQuarantinedEntryCount() {
+        return this.quarantinedEntries.size();
+    }
+
+    public List<NBTTagCompound> getQuarantinedEntriesCopy() {
+        ArrayList<NBTTagCompound> copies = new ArrayList<NBTTagCompound>();
+        for (NBTTagCompound entry : this.quarantinedEntries) {
+            if (entry != null) {
+                copies.add((NBTTagCompound) entry.copy());
+            }
+        }
+        return Collections.unmodifiableList(copies);
     }
 
     private void ensureWritable() {
