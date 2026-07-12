@@ -154,8 +154,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
     @Override
     public void handleMobAggroSync(LostTalesMobAggroSyncPacket packet) {
-        if (packet != null) {
-            LostTalesClientMobAggroCache.accept(packet.getEntityIds());
+        if (packet != null && !packet.isMalformed()) {
+            LostTalesClientMobAggroCache.accept(packet);
         }
     }
 

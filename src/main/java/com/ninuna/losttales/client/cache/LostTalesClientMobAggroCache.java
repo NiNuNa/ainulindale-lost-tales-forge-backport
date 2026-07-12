@@ -1,69 +1,151 @@
 package com.ninuna.losttales.client.cache;
 
+import com.ninuna.losttales.entity.combat.LostTalesCombatEngagement;
+import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import net.minecraft.client.Minecraft;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.world.World;
+
 /**
- * Client-side cache of mobs that the server recently confirmed are attacking
- * the local player.
- *
- * Forge 1.7.10 does not reliably expose every server AI target on the client,
- * especially for modded NPCs. The server refreshes this small ID list
- * periodically and the client keeps it for a short TTL so compass rendering can
- * remain smooth between packets.
+ * Client-side replacement snapshot of entities the server approved for combat markers.
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesClientMobAggroCache {
-    private static final Map<Integer, Long> AGGRO_UNTIL_TICK = new HashMap<Integer, Long>();
-    private static final int TTL_TICKS = 20;
+    private static final int STALE_SNAPSHOT_TICKS = 240;
+    private static volatile List<TrackedEnemy> trackedEnemies = Collections.emptyList();
+    private static volatile int dimensionId = Integer.MIN_VALUE;
+    private static volatile int sequence = -1;
+    private static volatile int serverTrackingRadius;
+    private static long lastSnapshotWorldTick = Long.MIN_VALUE;
+    private static World contextWorld;
+    private static EntityPlayer contextPlayer;
+    private static int contextPlayerEntityId = Integer.MIN_VALUE;
 
     private LostTalesClientMobAggroCache() {}
 
-    public static synchronized void accept(Iterable<Integer> entityIds) {
-        long now = getClientTick();
-        long until = now + TTL_TICKS;
-        if (entityIds != null) {
-            for (Integer entityId : entityIds) {
-                if (entityId != null) {
-                    AGGRO_UNTIL_TICK.put(entityId, until);
-                }
+    public static synchronized void accept(LostTalesMobAggroSyncPacket packet) {
+        if (packet == null || packet.isMalformed()) {
+            return;
+        }
+
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.theWorld == null || minecraft.thePlayer == null) {
+            clearInternal();
+            return;
+        }
+
+        int currentDimension = minecraft.theWorld.provider.dimensionId;
+        if (packet.getDimensionId() != currentDimension) {
+            return;
+        }
+
+        int currentPlayerEntityId = minecraft.thePlayer.getEntityId();
+        if (contextWorld != null && (contextWorld != minecraft.theWorld
+                || contextPlayer != minecraft.thePlayer
+                || contextPlayerEntityId != currentPlayerEntityId
+                || dimensionId != Integer.MIN_VALUE && dimensionId != currentDimension)) {
+            clearInternal();
+        }
+        if (dimensionId == currentDimension && packet.getSequence() <= sequence) {
+            return;
+        }
+
+        contextWorld = minecraft.theWorld;
+        contextPlayer = minecraft.thePlayer;
+        contextPlayerEntityId = currentPlayerEntityId;
+        dimensionId = currentDimension;
+        sequence = packet.getSequence();
+        serverTrackingRadius = packet.getTrackingRadius();
+        lastSnapshotWorldTick = minecraft.theWorld.getTotalWorldTime();
+
+        List<LostTalesMobAggroSyncPacket.Entry> packetEntries = packet.getEntries();
+        List<TrackedEnemy> replacement = new ArrayList<TrackedEnemy>(packetEntries.size());
+        for (LostTalesMobAggroSyncPacket.Entry entry : packetEntries) {
+            if (entry != null && entry.getEntityId() >= 0
+                    && entry.getEngagement() != LostTalesCombatEngagement.NONE) {
+                replacement.add(new TrackedEnemy(entry.getEntityId(), entry.getEngagement()));
             }
         }
-        pruneExpired(now);
+        trackedEnemies = replacement.isEmpty()
+                ? Collections.<TrackedEnemy>emptyList()
+                : Collections.unmodifiableList(replacement);
     }
 
-    public static synchronized boolean isAggro(int entityId) {
-        long now = getClientTick();
-        Long until = AGGRO_UNTIL_TICK.get(entityId);
-        if (until == null) {
-            return false;
+    /** Clears stale state when the local world, dimension, or player entity changes. */
+    public static synchronized void validateContext(EntityPlayer player) {
+        if (player == null || player.worldObj == null) {
+            clearInternal();
+            return;
         }
-        if (until.longValue() <= now) {
-            AGGRO_UNTIL_TICK.remove(entityId);
-            return false;
+        if (contextWorld != null && (contextWorld != player.worldObj
+                || contextPlayer != player
+                || contextPlayerEntityId != player.getEntityId()
+                || dimensionId != Integer.MIN_VALUE && dimensionId != player.worldObj.provider.dimensionId)) {
+            clearInternal();
         }
-        return true;
+        if (!trackedEnemies.isEmpty() && lastSnapshotWorldTick != Long.MIN_VALUE) {
+            long elapsed = player.worldObj.getTotalWorldTime() - lastSnapshotWorldTick;
+            if (elapsed < 0L || elapsed > STALE_SNAPSHOT_TICKS) {
+                clearInternal();
+            }
+        }
+        contextWorld = player.worldObj;
+        contextPlayer = player;
+        contextPlayerEntityId = player.getEntityId();
+    }
+
+    public static List<TrackedEnemy> getTrackedEnemies() {
+        return trackedEnemies;
+    }
+
+    public static int getServerTrackingRadius() {
+        return serverTrackingRadius;
+    }
+
+    public static boolean isAggro(int entityId) {
+        for (TrackedEnemy trackedEnemy : trackedEnemies) {
+            if (trackedEnemy.getEntityId() == entityId) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static synchronized void clear() {
-        AGGRO_UNTIL_TICK.clear();
+        clearInternal();
     }
 
-    private static void pruneExpired(long now) {
-        Iterator<Map.Entry<Integer, Long>> iterator = AGGRO_UNTIL_TICK.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<Integer, Long> entry = iterator.next();
-            if (entry.getValue().longValue() <= now) {
-                iterator.remove();
-            }
+    private static void clearInternal() {
+        trackedEnemies = Collections.emptyList();
+        dimensionId = Integer.MIN_VALUE;
+        sequence = -1;
+        serverTrackingRadius = 0;
+        lastSnapshotWorldTick = Long.MIN_VALUE;
+        contextWorld = null;
+        contextPlayer = null;
+        contextPlayerEntityId = Integer.MIN_VALUE;
+    }
+
+    public static final class TrackedEnemy {
+        private final int entityId;
+        private final LostTalesCombatEngagement engagement;
+
+        private TrackedEnemy(int entityId, LostTalesCombatEngagement engagement) {
+            this.entityId = entityId;
+            this.engagement = engagement;
         }
-    }
 
-    private static long getClientTick() {
-        Minecraft minecraft = Minecraft.getMinecraft();
-        return minecraft != null && minecraft.theWorld != null ? minecraft.theWorld.getTotalWorldTime() : 0L;
+        public int getEntityId() {
+            return this.entityId;
+        }
+
+        public LostTalesCombatEngagement getEngagement() {
+            return this.engagement;
+        }
     }
 }

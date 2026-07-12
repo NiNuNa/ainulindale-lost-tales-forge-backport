@@ -1,7 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
-import lotr.common.LOTRDimension;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -11,7 +10,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lotr.common.LOTRDimension;
 import net.minecraft.client.resources.IResourceManager;
+
 /**
  * Client cache for shared/static and server-synced map markers.
  *
@@ -22,6 +23,7 @@ import net.minecraft.client.resources.IResourceManager;
 public final class LostTalesClientMapMarkerStore {
     private static volatile List<LostTalesMapMarkerData> sharedMarkers = createFallbackMarkers();
     private static volatile List<LostTalesMapMarkerData> dynamicMarkers = Collections.emptyList();
+    private static volatile MarkerSnapshot markerSnapshot = MarkerSnapshot.create(sharedMarkers, dynamicMarkers);
 
     private LostTalesClientMapMarkerStore() {}
 
@@ -30,53 +32,34 @@ public final class LostTalesClientMapMarkerStore {
     }
 
     public static List<LostTalesMapMarkerData> getAllMarkers() {
-        ArrayList<LostTalesMapMarkerData> markers = new ArrayList<LostTalesMapMarkerData>();
-        markers.addAll(sharedMarkers);
-        markers.addAll(dynamicMarkers);
-        return Collections.unmodifiableList(markers);
+        return markerSnapshot.allMarkers;
     }
 
     public static Set<String> getSharedMarkerIds() {
-        Set<String> ids = new LinkedHashSet<String>();
-        for (LostTalesMapMarkerData marker : getAllMarkers()) {
-            if (marker != null && marker.getId() != null && marker.getId().length() > 0) {
-                ids.add(marker.getId());
-            }
-        }
-        return Collections.unmodifiableSet(ids);
+        return markerSnapshot.markerIds;
     }
 
     public static LostTalesMapMarkerData getSharedMarker(String markerId) {
         if (markerId == null || markerId.length() == 0) {
             return null;
         }
-        // Player/server markers should win over bundled JSON if an ID overlaps.
-        for (LostTalesMapMarkerData marker : dynamicMarkers) {
-            if (marker != null && markerId.equals(marker.getId())) {
-                return marker;
-            }
-        }
-        for (LostTalesMapMarkerData marker : sharedMarkers) {
-            if (marker != null && markerId.equals(marker.getId())) {
-                return marker;
-            }
-        }
-        return null;
+        return markerSnapshot.markersById.get(markerId);
     }
 
     public static boolean hasSharedMarker(String markerId) {
         return getSharedMarker(markerId) != null;
     }
 
-    public static void reloadFromResources(IResourceManager resourceManager) {
+    public static synchronized void reloadFromResources(IResourceManager resourceManager) {
         List<LostTalesMapMarkerData> loaded = LostTalesMapMarkerResourceLoader.loadSharedMarkers(resourceManager);
         if (loaded.isEmpty()) {
             loaded = createFallbackMarkers();
         }
         sharedMarkers = Collections.unmodifiableList(new ArrayList<LostTalesMapMarkerData>(loaded));
+        rebuildSnapshot();
     }
 
-    public static void setDynamicMarkers(Collection<LostTalesMapMarkerDefinition> markers) {
+    public static synchronized void setDynamicMarkers(Collection<LostTalesMapMarkerDefinition> markers) {
         Map<String, LostTalesMapMarkerData> byId = new LinkedHashMap<String, LostTalesMapMarkerData>();
         if (markers != null) {
             for (LostTalesMapMarkerDefinition marker : markers) {
@@ -87,10 +70,16 @@ public final class LostTalesClientMapMarkerStore {
             }
         }
         dynamicMarkers = Collections.unmodifiableList(new ArrayList<LostTalesMapMarkerData>(byId.values()));
+        rebuildSnapshot();
     }
 
-    public static void clearDynamicMarkers() {
+    public static synchronized void clearDynamicMarkers() {
         dynamicMarkers = Collections.emptyList();
+        rebuildSnapshot();
+    }
+
+    private static void rebuildSnapshot() {
+        markerSnapshot = MarkerSnapshot.create(sharedMarkers, dynamicMarkers);
     }
 
     private static LostTalesMapMarkerData toClientMarker(LostTalesMapMarkerDefinition marker) {
@@ -118,6 +107,58 @@ public final class LostTalesClientMapMarkerStore {
                 marker.isHiddenUntilDiscovered(),
                 marker.isDiscoverable()
         );
+    }
+
+    private static final class MarkerSnapshot {
+        private final List<LostTalesMapMarkerData> allMarkers;
+        private final Set<String> markerIds;
+        private final Map<String, LostTalesMapMarkerData> markersById;
+
+        private MarkerSnapshot(List<LostTalesMapMarkerData> allMarkers, Set<String> markerIds,
+                               Map<String, LostTalesMapMarkerData> markersById) {
+            this.allMarkers = allMarkers;
+            this.markerIds = markerIds;
+            this.markersById = markersById;
+        }
+
+        private static MarkerSnapshot create(List<LostTalesMapMarkerData> shared,
+                                             List<LostTalesMapMarkerData> dynamic) {
+            int sharedSize = shared == null ? 0 : shared.size();
+            int dynamicSize = dynamic == null ? 0 : dynamic.size();
+            List<LostTalesMapMarkerData> combined = new ArrayList<LostTalesMapMarkerData>(sharedSize + dynamicSize);
+            Set<String> ids = new LinkedHashSet<String>();
+            Map<String, LostTalesMapMarkerData> byId = new LinkedHashMap<String, LostTalesMapMarkerData>();
+
+            addMarkers(shared, combined, ids, byId, false);
+            addMarkers(dynamic, combined, ids, byId, true);
+
+            return new MarkerSnapshot(
+                    Collections.unmodifiableList(combined),
+                    Collections.unmodifiableSet(ids),
+                    Collections.unmodifiableMap(byId)
+            );
+        }
+
+        private static void addMarkers(List<LostTalesMapMarkerData> source,
+                                       List<LostTalesMapMarkerData> combined,
+                                       Set<String> ids,
+                                       Map<String, LostTalesMapMarkerData> byId,
+                                       boolean replaceExisting) {
+            if (source == null || source.isEmpty()) {
+                return;
+            }
+            for (LostTalesMapMarkerData marker : source) {
+                combined.add(marker);
+                if (marker == null || marker.getId() == null || marker.getId().length() == 0) {
+                    continue;
+                }
+                String markerId = marker.getId();
+                ids.add(markerId);
+                if (replaceExisting || !byId.containsKey(markerId)) {
+                    byId.put(markerId, marker);
+                }
+            }
+        }
     }
 
     private static List<LostTalesMapMarkerData> createFallbackMarkers() {

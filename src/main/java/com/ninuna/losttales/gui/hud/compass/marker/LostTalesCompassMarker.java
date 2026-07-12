@@ -3,6 +3,7 @@ package com.ninuna.losttales.gui.hud.compass.marker;
 import java.util.Locale;
 
 public class LostTalesCompassMarker {
+    private final String stateKey;
     private final String name;
     private final LostTalesCompassMarkerIcon icon;
     private final boolean bearingMarker;
@@ -18,7 +19,8 @@ public class LostTalesCompassMarker {
     private final float green;
     private final float blue;
 
-    private LostTalesCompassMarker(String name, LostTalesCompassMarkerIcon icon, boolean bearingMarker, float bearingDegrees, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius, boolean activeQuestMarker, float red, float green, float blue) {
+    private LostTalesCompassMarker(String stateKey, String name, LostTalesCompassMarkerIcon icon, boolean bearingMarker, float bearingDegrees, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius, boolean activeQuestMarker, float red, float green, float blue) {
+        this.stateKey = stateKey;
         this.name = name;
         this.icon = icon;
         this.bearingMarker = bearingMarker;
@@ -36,7 +38,7 @@ public class LostTalesCompassMarker {
     }
 
     public static LostTalesCompassMarker bearing(String name, LostTalesCompassMarkerIcon icon, float bearingDegrees) {
-        return new LostTalesCompassMarker(name, icon, true, bearingDegrees, 0.0D, 0.0D, 0.0D, false, false, 0.0D, false, 1.0F, 1.0F, 1.0F);
+        return new LostTalesCompassMarker(null, name, icon, true, bearingDegrees, 0.0D, 0.0D, 0.0D, false, false, 0.0D, false, 1.0F, 1.0F, 1.0F);
     }
 
     public static LostTalesCompassMarker position(String name, LostTalesCompassMarkerIcon icon, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius) {
@@ -45,11 +47,19 @@ public class LostTalesCompassMarker {
 
     public static LostTalesCompassMarker position(String name, LostTalesCompassMarkerIcon icon, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius, String colorName) {
         float[] color = parseColor(colorName);
-        return new LostTalesCompassMarker(name, icon, false, 0.0F, x, y, z, scaleWithCenterFocus, showDistanceLabel, fadeInRadius, false, color[0], color[1], color[2]);
+        return new LostTalesCompassMarker(null, name, icon, false, 0.0F, x, y, z, scaleWithCenterFocus, showDistanceLabel, fadeInRadius, false, color[0], color[1], color[2]);
     }
 
     public static LostTalesCompassMarker questPosition(String name, double x, double y, double z, boolean showDistanceLabel, double fadeInRadius) {
-        return new LostTalesCompassMarker(name, LostTalesCompassMarkerIcon.QUEST, false, 0.0F, x, y, z, true, showDistanceLabel, fadeInRadius, true, 1.0F, 1.0F, 1.0F);
+        return new LostTalesCompassMarker(null, name, LostTalesCompassMarkerIcon.QUEST, false, 0.0F, x, y, z, true, showDistanceLabel, fadeInRadius, true, 1.0F, 1.0F, 1.0F);
+    }
+
+    public static LostTalesCompassMarker positionWithStateKey(String stateKey, String name, LostTalesCompassMarkerIcon icon, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius) {
+        return new LostTalesCompassMarker(stateKey, name, icon, false, 0.0F, x, y, z, scaleWithCenterFocus, showDistanceLabel, fadeInRadius, false, 1.0F, 1.0F, 1.0F);
+    }
+
+    public String getStateKey() {
+        return this.stateKey;
     }
 
     public String getName() {

@@ -605,6 +605,8 @@ gui.losttales.missive_board.accept=Accept
 gui.losttales.missive_board.select=Select a notice, then accept it.
 gui.losttales.missive_board.selected=Selected notice %s
 gui.losttales.missive_board.available=%s/%s notices
+losttales.config.category.combatMarkers=Combat Markers
+losttales.config.category.combatMarkers.tooltip=Server-authoritative range, update cadence, disengagement grace, and diagnostics for temporary enemy markers.
 losttales.config.category.missives=Dynamic Missives
 losttales.config.category.missives.tooltip=Missive board refill, notice expiration, and generated timed quest options.
 # Missive letter reader

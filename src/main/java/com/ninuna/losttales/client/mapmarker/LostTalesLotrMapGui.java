@@ -17,6 +17,7 @@ import lotr.common.world.map.LOTRAbstractWaypoint;
  */
 public class LostTalesLotrMapGui extends LOTRGuiMap {
     private LostTalesMapMarkerData selectedStandaloneMarker;
+    private boolean transientEnemyMarkersRendered;
 
     @Override
     public void renderWaypoints(List<LOTRAbstractWaypoint> waypoints, int pass, int mouseX, int mouseY, boolean drawLabels, boolean includeHidden) {
@@ -24,6 +25,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             super.renderWaypoints(waypoints, pass, mouseX, mouseY, drawLabels, includeHidden);
             if (pass == 1) {
                 LostTalesLotrMapMarkerIconOverlay.renderStandaloneMarkerHoverTooltip(this, this.selectedStandaloneMarker, mouseX, mouseY);
+                LostTalesLotrMapMarkerIconOverlay.renderTransientEnemyMarkerHoverTooltip(this, mouseX, mouseY);
             }
             return;
         }
@@ -31,6 +33,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         if (waypoints == null || waypoints.isEmpty()) {
             super.renderWaypoints(waypoints, pass, mouseX, mouseY, drawLabels, includeHidden);
             LostTalesLotrMapMarkerIconOverlay.renderStandaloneMarkers(this, mouseX, mouseY, drawLabels);
+            renderTransientEnemyMarkersOnce(mouseX, mouseY, drawLabels);
             return;
         }
 
@@ -38,10 +41,19 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         super.renderWaypoints(baseWaypoints, pass, mouseX, mouseY, drawLabels, includeHidden);
         LostTalesLotrMapMarkerIconOverlay.renderReplacementWaypoints(this, waypoints, mouseX, mouseY, drawLabels, includeHidden);
         LostTalesLotrMapMarkerIconOverlay.renderStandaloneMarkers(this, mouseX, mouseY, drawLabels);
+        renderTransientEnemyMarkersOnce(mouseX, mouseY, drawLabels);
+    }
+
+    private void renderTransientEnemyMarkersOnce(int mouseX, int mouseY, boolean drawLabels) {
+        if (!this.transientEnemyMarkersRendered) {
+            this.transientEnemyMarkersRendered = true;
+            LostTalesLotrMapMarkerIconOverlay.renderTransientEnemyMarkers(this, mouseX, mouseY, drawLabels);
+        }
     }
 
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        this.transientEnemyMarkersRendered = false;
         if (this.selectedStandaloneMarker != null) {
             LostTalesLotrMapMarkerIconOverlay.clearLotrSelectedWaypoint(this);
         }

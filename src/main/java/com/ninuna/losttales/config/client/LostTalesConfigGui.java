@@ -63,6 +63,7 @@ public class LostTalesConfigGui extends GuiConfig {
         List<IConfigElement> client = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_CLIENT)).getChildElements();
         List<IConfigElement> quests = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_QUESTS)).getChildElements();
         List<IConfigElement> missives = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_MISSIVES)).getChildElements();
+        List<IConfigElement> combatMarkers = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_COMBAT_MARKERS)).getChildElements();
 
         elements.add(group("hud", "losttales.config.category.client.hud", pick(client,
                 "showLostTalesHud", "hudPlacementPreset",
@@ -71,8 +72,8 @@ public class LostTalesConfigGui extends GuiConfig {
                 "showQuestHud", "linkShowQuestHud", "questHudOffsetX", "questHudOffsetY")));
         elements.add(group("compass", "losttales.config.category.client.compass", pick(client,
                 "compassHudDisplayRadius", "showStaticCompassMarkers", "showLotrWaypointCompassMarkers",
-                "onlyShowUnlockedLotrWaypoints", "showHostileCompassMarkers", "onlyShowAggroHostileCompassMarkers",
-                "hostileCompassMarkerScanRadius")));
+                "onlyShowUnlockedLotrWaypoints", "showHostileCompassMarkers",
+                "hostileCompassMarkerScanRadius", "showHostileMapMarkers", "hostileMapMarkerDisplayRadius")));
         elements.add(group("quickLoot", "losttales.config.category.client.quickLoot", pick(client,
                 "quickLootHudMaxRows")));
         elements.add(group("questHud", "losttales.config.category.client.questHud", pick(client,
@@ -81,6 +82,7 @@ public class LostTalesConfigGui extends GuiConfig {
                 "worldQuestMarkerMaxDistance", "showQuestChatFeedback", "playQuestSounds")));
         elements.add(group("questRules", "losttales.config.category.quests.rules", quests));
         elements.add(group("missives", "losttales.config.category.missives", missives));
+        elements.add(group("combatMarkers", "losttales.config.category.combatMarkers", combatMarkers));
 
         List<IConfigElement> leftovers = leftovers(client, elements);
         if (!leftovers.isEmpty()) {
@@ -125,6 +127,7 @@ public class LostTalesConfigGui extends GuiConfig {
             return result;
         }
         Set<String> used = new HashSet<String>();
+        used.add("onlyShowAggroHostileCompassMarkers");
         if (groups != null) {
             for (IConfigElement group : groups) {
                 if (group == null || group.getChildElements() == null) {

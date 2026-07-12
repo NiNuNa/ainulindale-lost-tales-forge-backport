@@ -144,6 +144,9 @@ public final class LostTalesCompassMarkerBatchBuilder {
     }
 
     public static String getFocusStateKey(LostTalesCompassMarker marker) {
+        if (marker.getStateKey() != null && marker.getStateKey().length() > 0) {
+            return marker.getStateKey();
+        }
         String name = marker.getName();
         StringBuilder key = new StringBuilder();
         key.append(marker.getIcon().name());

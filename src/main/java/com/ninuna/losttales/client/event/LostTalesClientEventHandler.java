@@ -47,6 +47,7 @@ import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.client.event.TextureStitchEvent;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.world.WorldEvent;
 
 public class LostTalesClientEventHandler implements IResourceManagerReloadListener {
 
@@ -80,11 +81,21 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     }
 
     @SubscribeEvent
+    public void onClientWorldUnload(WorldEvent.Unload event) {
+        if (event != null && event.world != null && event.world.isRemote) {
+            LostTalesClientMobAggroCache.clear();
+        }
+    }
+
+    @SubscribeEvent
     public void onClientPlayerTick(TickEvent.PlayerTickEvent event) {
         if (event == null || event.phase != TickEvent.Phase.END
                 || event.player == null || event.player.worldObj == null
                 || !event.player.worldObj.isRemote) {
             return;
+        }
+        if (event.player == Minecraft.getMinecraft().thePlayer) {
+            LostTalesClientMobAggroCache.validateContext(event.player);
         }
         ClientCharacterRacePhysics.apply(event.player);
     }

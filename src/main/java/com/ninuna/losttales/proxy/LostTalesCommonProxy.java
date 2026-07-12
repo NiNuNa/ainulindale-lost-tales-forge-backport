@@ -76,6 +76,7 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(characterRaceGameplayHandler);
         MinecraftForge.EVENT_BUS.register(characterSpawnOriginHandler);
         MinecraftForge.EVENT_BUS.register(questObjectiveEventHandler);
+        MinecraftForge.EVENT_BUS.register(mobAggroEventHandler);
         FMLCommonHandler.instance().bus().register(questPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(questObjectiveEventHandler);
         FMLCommonHandler.instance().bus().register(mobAggroEventHandler);
@@ -172,5 +173,6 @@ public class LostTalesCommonProxy {
         LostTalesServerTaskQueue.stopAcceptingAndClear();
         LostTalesRequestRateLimiter.clear();
         CharacterServerPacketDispatcher.clearSecurityState();
+        LostTalesMobAggroEventHandler.clearAll();
     }
 }

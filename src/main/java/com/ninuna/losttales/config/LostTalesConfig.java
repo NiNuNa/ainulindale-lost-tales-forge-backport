@@ -14,6 +14,7 @@ public final class LostTalesConfig {
     public static final String CATEGORY_QUESTS = "quests";
     public static final String CATEGORY_MISSIVES = "missives";
     public static final String CATEGORY_CHARACTERS = "characters";
+    public static final String CATEGORY_COMBAT_MARKERS = "combat_markers";
 
     public static final String HUD_PRESET_CUSTOM = "custom";
     public static final String HUD_PRESET_DEFAULT = "default";
@@ -42,8 +43,15 @@ public final class LostTalesConfig {
     public static boolean showLotrWaypointCompassMarkers = true;
     public static boolean onlyShowUnlockedLotrWaypoints = true;
     public static boolean showHostileCompassMarkers = true;
-    public static boolean onlyShowAggroHostileCompassMarkers = false;
+    public static boolean onlyShowAggroHostileCompassMarkers = true;
     public static int hostileCompassMarkerScanRadius = 48;
+    public static boolean showHostileMapMarkers = true;
+    public static int hostileMapMarkerDisplayRadius = 64;
+
+    public static int combatMarkerTrackingRadius = 64;
+    public static int combatMarkerUpdateIntervalTicks = 10;
+    public static int combatMarkerDisengagementGraceTicks = 20;
+    public static boolean combatMarkerDebugLogging = false;
 
     public static boolean showQuickLootHud = true;
     public static boolean linkShowQuickLootHud = false;
@@ -190,21 +198,68 @@ public final class LostTalesConfig {
                     "showHostileCompassMarkers",
                     CATEGORY_CLIENT,
                     showHostileCompassMarkers,
-                    "Render nearby hostile mobs on the Lost Tales compass. Enabled by default so the red hostile marker sprite is visible during normal testing."
+                    "Render server-approved enemies actively engaged with the local player on the Lost Tales compass."
             );
-            onlyShowAggroHostileCompassMarkers = config.getBoolean(
-                    "onlyShowAggroHostileCompassMarkers",
+            Property strictHostileMarkers = config.get(
                     CATEGORY_CLIENT,
-                    onlyShowAggroHostileCompassMarkers,
-                    "When true, hostile compass markers are shown only for mobs the server recently confirmed are targeting you. When false, the legacy 1.7.10 fallback also shows ordinary vanilla IMob hostiles and unfriendly LOTR NPCs."
+                    "onlyShowAggroHostileCompassMarkers",
+                    true,
+                    "Compatibility key retained from older builds. Active-combat filtering is now always required and this value is forced to true."
             );
+            strictHostileMarkers.set(true);
+            onlyShowAggroHostileCompassMarkers = true;
             hostileCompassMarkerScanRadius = config.getInt(
                     "hostileCompassMarkerScanRadius",
                     CATEGORY_CLIENT,
                     hostileCompassMarkerScanRadius,
                     8,
                     128,
-                    "Scan radius in blocks for hostile compass markers and server-side aggro sync."
+                    "Client display radius in blocks for enemy compass markers. The server tracking radius remains authoritative."
+            );
+            showHostileMapMarkers = config.getBoolean(
+                    "showHostileMapMarkers",
+                    CATEGORY_CLIENT,
+                    showHostileMapMarkers,
+                    "Render transient active-combat enemy markers on the LOTR main map. These markers are never saved."
+            );
+            hostileMapMarkerDisplayRadius = config.getInt(
+                    "hostileMapMarkerDisplayRadius",
+                    CATEGORY_CLIENT,
+                    hostileMapMarkerDisplayRadius,
+                    8,
+                    128,
+                    "Client display radius in blocks for transient enemy markers on the LOTR main map. The server tracking radius remains authoritative."
+            );
+
+            combatMarkerTrackingRadius = config.getInt(
+                    "trackingRadius",
+                    CATEGORY_COMBAT_MARKERS,
+                    combatMarkerTrackingRadius,
+                    8,
+                    128,
+                    "Server-authoritative maximum range in blocks for player-specific combat marker tracking."
+            );
+            combatMarkerUpdateIntervalTicks = config.getInt(
+                    "updateIntervalTicks",
+                    CATEGORY_COMBAT_MARKERS,
+                    combatMarkerUpdateIntervalTicks,
+                    1,
+                    40,
+                    "Server ticks between combat-state scans. Snapshots are sent only when their contents change."
+            );
+            combatMarkerDisengagementGraceTicks = config.getInt(
+                    "disengagementGraceTicks",
+                    CATEGORY_COMBAT_MARKERS,
+                    combatMarkerDisengagementGraceTicks,
+                    0,
+                    60,
+                    "Ticks that an exact player/entity combat relationship may remain visible after direct evidence disappears."
+            );
+            combatMarkerDebugLogging = config.getBoolean(
+                    "debugLogging",
+                    CATEGORY_COMBAT_MARKERS,
+                    combatMarkerDebugLogging,
+                    "Log changed combat marker snapshots. Disabled by default to avoid log spam."
             );
 
             showQuickLootHud = config.getBoolean(
@@ -729,6 +784,7 @@ public final class LostTalesConfig {
         config.getCategory(CATEGORY_QUESTS).setLanguageKey("losttales.config.category.quests");
         config.getCategory(CATEGORY_MISSIVES).setLanguageKey("losttales.config.category.missives");
         config.getCategory(CATEGORY_CHARACTERS).setLanguageKey("losttales.config.category.characters");
+        config.getCategory(CATEGORY_COMBAT_MARKERS).setLanguageKey("losttales.config.category.combatMarkers");
     }
 
     private static void writeCurrentValues(Configuration config) {
@@ -753,8 +809,14 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "showLotrWaypointCompassMarkers", showLotrWaypointCompassMarkers).set(showLotrWaypointCompassMarkers);
         config.get(CATEGORY_CLIENT, "onlyShowUnlockedLotrWaypoints", onlyShowUnlockedLotrWaypoints).set(onlyShowUnlockedLotrWaypoints);
         config.get(CATEGORY_CLIENT, "showHostileCompassMarkers", showHostileCompassMarkers).set(showHostileCompassMarkers);
-        config.get(CATEGORY_CLIENT, "onlyShowAggroHostileCompassMarkers", onlyShowAggroHostileCompassMarkers).set(onlyShowAggroHostileCompassMarkers);
+        config.get(CATEGORY_CLIENT, "onlyShowAggroHostileCompassMarkers", true).set(true);
         config.get(CATEGORY_CLIENT, "hostileCompassMarkerScanRadius", hostileCompassMarkerScanRadius).set(hostileCompassMarkerScanRadius);
+        config.get(CATEGORY_CLIENT, "showHostileMapMarkers", showHostileMapMarkers).set(showHostileMapMarkers);
+        config.get(CATEGORY_CLIENT, "hostileMapMarkerDisplayRadius", hostileMapMarkerDisplayRadius).set(hostileMapMarkerDisplayRadius);
+        config.get(CATEGORY_COMBAT_MARKERS, "trackingRadius", combatMarkerTrackingRadius).set(combatMarkerTrackingRadius);
+        config.get(CATEGORY_COMBAT_MARKERS, "updateIntervalTicks", combatMarkerUpdateIntervalTicks).set(combatMarkerUpdateIntervalTicks);
+        config.get(CATEGORY_COMBAT_MARKERS, "disengagementGraceTicks", combatMarkerDisengagementGraceTicks).set(combatMarkerDisengagementGraceTicks);
+        config.get(CATEGORY_COMBAT_MARKERS, "debugLogging", combatMarkerDebugLogging).set(combatMarkerDebugLogging);
         config.get(CATEGORY_CLIENT, "showQuickLootHud", showQuickLootHud).set(showQuickLootHud);
         config.get(CATEGORY_CLIENT, "linkShowQuickLootHud", linkShowQuickLootHud).set(linkShowQuickLootHud);
         config.get(CATEGORY_CLIENT, "quickLootHudOffsetX", quickLootHudOffsetX).set(quickLootHudOffsetX);
