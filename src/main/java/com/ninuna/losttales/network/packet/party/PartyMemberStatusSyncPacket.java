@@ -5,10 +5,12 @@ import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.sync.PartyMemberAvailability;
 import com.ninuna.losttales.party.sync.PartyMemberStatusSnapshot;
 import com.ninuna.losttales.party.sync.PartyStatusSnapshot;
+import cpw.mods.fml.common.network.ByteBufUtils;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
+import net.minecraft.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -74,14 +76,18 @@ public final class PartyMemberStatusSyncPacket implements IMessage {
                 int dimensionId = PartyMemberStatusSnapshot.NO_DIMENSION;
                 float health = 0.0F;
                 float maximumHealth = 0.0F;
+                ItemStack helmet = null;
+                ItemStack heldItem = null;
                 if (availability.hasLiveEntityData()) {
                     dimensionId = buffer.readInt();
                     health = buffer.readFloat();
                     maximumHealth = buffer.readFloat();
+                    helmet = ByteBufUtils.readItemStack(buffer);
+                    heldItem = ByteBufUtils.readItemStack(buffer);
                 }
                 statuses.add(PartyMemberStatusSnapshot.decoded(
                         characterId, availability, dimensionId,
-                        health, maximumHealth));
+                        health, maximumHealth, helmet, heldItem));
             }
             PartyPacketCodec.requireFinished(buffer);
             PartyStatusSnapshot decoded = new PartyStatusSnapshot(
@@ -123,6 +129,8 @@ public final class PartyMemberStatusSyncPacket implements IMessage {
                 buffer.writeInt(status.getDimensionId());
                 buffer.writeFloat(status.getHealth());
                 buffer.writeFloat(status.getMaximumHealth());
+                ByteBufUtils.writeItemStack(buffer, status.getHelmet());
+                ByteBufUtils.writeItemStack(buffer, status.getHeldItem());
             }
         }
     }

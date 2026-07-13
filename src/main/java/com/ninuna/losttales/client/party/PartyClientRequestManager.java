@@ -8,6 +8,7 @@ import com.ninuna.losttales.party.sync.PartyStateSnapshot;
 
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import net.minecraft.client.Minecraft;
 
 /** Client-only request builder used by future party interfaces. */
 public final class PartyClientRequestManager {
@@ -111,9 +112,25 @@ public final class PartyClientRequestManager {
     public static int setGoHereMarker(UUID expectedActiveCharacterId,
                                       UUID expectedPartyId,
                                       long expectedPartyRevision) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.thePlayer == null) {
+            return failWithoutSend(PartyOperationType.SET_GO_HERE_MARKER);
+        }
+        return setGoHereMarker(expectedActiveCharacterId, expectedPartyId,
+                expectedPartyRevision, minecraft.thePlayer.dimension,
+                minecraft.thePlayer.posX, minecraft.thePlayer.posZ);
+    }
+
+    public static int setGoHereMarker(UUID expectedActiveCharacterId,
+                                      UUID expectedPartyId,
+                                      long expectedPartyRevision,
+                                      int dimensionId,
+                                      double x,
+                                      double z) {
         return send(PartyOperationType.SET_GO_HERE_MARKER,
                 expectedActiveCharacterId, expectedPartyId,
-                expectedPartyRevision, null, null);
+                expectedPartyRevision, null, null,
+                true, dimensionId, x, z);
     }
 
     public static int removeGoHereMarker(long expectedPartyRevision) {
@@ -189,6 +206,21 @@ public final class PartyClientRequestManager {
                             long expectedPartyRevision,
                             UUID targetId,
                             PartyColor color) {
+        return send(operationType, expectedActiveCharacterId,
+                expectedPartyId, expectedPartyRevision, targetId, color,
+                false, 0, 0.0D, 0.0D);
+    }
+
+    private static int send(PartyOperationType operationType,
+                            UUID expectedActiveCharacterId,
+                            UUID expectedPartyId,
+                            long expectedPartyRevision,
+                            UUID targetId,
+                            PartyColor color,
+                            boolean hasMarkerPosition,
+                            int markerDimensionId,
+                            double markerX,
+                            double markerZ) {
         int requestId = nextRequestId();
         ClientPartyStateCache.beginRequest(requestId, operationType);
         try {
@@ -200,10 +232,21 @@ public final class PartyClientRequestManager {
                             expectedPartyId,
                             expectedPartyRevision,
                             targetId,
-                            color));
+                            color,
+                            hasMarkerPosition,
+                            markerDimensionId,
+                            markerX,
+                            markerZ));
         } catch (Throwable throwable) {
             ClientPartyStateCache.failLocalRequest(requestId, operationType);
         }
+        return requestId;
+    }
+
+    private static int failWithoutSend(PartyOperationType operationType) {
+        int requestId = nextRequestId();
+        ClientPartyStateCache.beginRequest(requestId, operationType);
+        ClientPartyStateCache.failLocalRequest(requestId, operationType);
         return requestId;
     }
 

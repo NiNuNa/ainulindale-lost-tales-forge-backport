@@ -378,7 +378,9 @@ public final class PartyService {
     }
 
     public synchronized PartyOperationResult setGoHereMarker(
-            EntityPlayerMP player, long expectedPartyRevision) {
+            EntityPlayerMP player, long expectedPartyRevision,
+            boolean hasMarkerPosition, int markerDimensionId,
+            double markerX, double markerZ) {
         PartyContext context = resolvePartyContext(player);
         if (!context.isValid()) {
             return PartyOperationResult.failure(context.errorId, context.party);
@@ -389,9 +391,11 @@ public final class PartyService {
             return PartyOperationResult.failure(revisionError, context.party);
         }
         if (player.isDead || !player.isEntityAlive()
+                || !hasMarkerPosition
+                || markerDimensionId != player.dimension
+                || !DimensionManager.isDimensionRegistered(markerDimensionId)
                 || !PartyGoHereMarker.isValidCoordinates(
-                player.posX, player.posY, player.posZ)
-                || !DimensionManager.isDimensionRegistered(player.dimension)) {
+                markerX, player.posY, markerZ)) {
             return PartyOperationResult.failure(
                     PartyErrorId.INVALID_MARKER_POSITION, context.party);
         }
@@ -403,13 +407,13 @@ public final class PartyService {
         }
 
         UUID characterId = context.character.getCharacterId();
-        double x = quantizeTrackingCoordinate(player.posX);
+        double x = quantizeTrackingCoordinate(markerX);
         double y = quantizeTrackingCoordinate(player.posY);
-        double z = quantizeTrackingCoordinate(player.posZ);
+        double z = quantizeTrackingCoordinate(markerZ);
         PartyGoHereMarker previous = markerData.getMarker(characterId);
         if (previous != null
                 && previous.getPartyId().equals(context.party.getPartyId())
-                && previous.getDimensionId() == player.dimension
+                && previous.getDimensionId() == markerDimensionId
                 && Double.doubleToLongBits(previous.getX())
                 == Double.doubleToLongBits(x)
                 && Double.doubleToLongBits(previous.getY())
@@ -423,7 +427,7 @@ public final class PartyService {
         PartyGoHereMarker marker = new PartyGoHereMarker(
                 context.party.getPartyId(),
                 characterId,
-                player.dimension,
+                markerDimensionId,
                 x, y, z,
                 System.currentTimeMillis());
         markerData.saveMarker(marker);

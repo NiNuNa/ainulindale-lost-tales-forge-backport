@@ -17,6 +17,7 @@ import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import cpw.mods.fml.relauncher.Side;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -35,7 +36,7 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 
 /**
  * Server-authoritative combat tracker used by compass and map enemy markers.
- * Direct evidence remains player-scoped; authorized nearby party members receive a filtered union.
+ * Direct evidence remains player-scoped; authorized online party members in the same world receive a filtered union.
  */
 public class LostTalesMobAggroEventHandler {
     public static final int DEFAULT_AGGRO_MOB_SCAN_RADIUS = 64;
@@ -193,38 +194,40 @@ public class LostTalesMobAggroEventHandler {
 
         state.currentSnapshot.clear();
         state.currentSnapshot.putAll(snapshot);
-        mergeAuthorizedPartySnapshots(player, snapshot, trackingRadiusSq);
+        mergeAuthorizedPartySnapshots(player, snapshot);
+        List<LostTalesMobAggroSyncPacket.Entry> packetEntries =
+                buildPacketEntries(player, snapshot, state.currentSnapshot);
 
-        boolean heartbeatDue = state.initialSnapshotSent && !snapshot.isEmpty()
+        boolean heartbeatDue = state.initialSnapshotSent
+                && !packetEntries.isEmpty()
                 && now - state.lastSentTick >= SNAPSHOT_HEARTBEAT_TICKS;
-        if (!state.initialSnapshotSent || trackingRadius != state.lastSentTrackingRadius
-                || !snapshot.equals(state.lastSentSnapshot) || heartbeatDue) {
+        if (!state.initialSnapshotSent
+                || trackingRadius != state.lastSentTrackingRadius
+                || !packetEntries.equals(state.lastSentEntries)
+                || heartbeatDue) {
             state.sequence++;
-            state.lastSentSnapshot.clear();
-            state.lastSentSnapshot.putAll(snapshot);
+            state.lastSentEntries.clear();
+            state.lastSentEntries.addAll(packetEntries);
             state.initialSnapshotSent = true;
             state.lastSentTrackingRadius = trackingRadius;
             state.lastSentTick = now;
 
-            List<LostTalesMobAggroSyncPacket.Entry> packetEntries = new ArrayList<LostTalesMobAggroSyncPacket.Entry>(snapshot.size());
-            for (Map.Entry<Integer, LostTalesCombatEngagement> entry : snapshot.entrySet()) {
-                packetEntries.add(new LostTalesMobAggroSyncPacket.Entry(entry.getKey().intValue(), entry.getValue()));
-            }
             LostTalesNetworkHandler.CHANNEL.sendTo(
-                    new LostTalesMobAggroSyncPacket(dimensionId, state.sequence, trackingRadius, packetEntries),
-                    player
-            );
+                    new LostTalesMobAggroSyncPacket(
+                            dimensionId, state.sequence,
+                            trackingRadius, packetEntries),
+                    player);
 
             if (LostTalesConfig.combatMarkerDebugLogging) {
                 FMLLog.info("[losttales] Combat marker snapshot for %s: dimension=%d sequence=%d entries=%d",
-                        player.getCommandSenderName(), Integer.valueOf(dimensionId), Integer.valueOf(state.sequence), Integer.valueOf(snapshot.size()));
+                        player.getCommandSenderName(), Integer.valueOf(dimensionId), Integer.valueOf(state.sequence), Integer.valueOf(packetEntries.size()));
             }
         }
     }
 
-    private static void mergeAuthorizedPartySnapshots(EntityPlayerMP recipient,
-                                                       TreeMap<Integer, LostTalesCombatEngagement> snapshot,
-                                                       double trackingRadiusSq) {
+    private static void mergeAuthorizedPartySnapshots(
+            EntityPlayerMP recipient,
+            TreeMap<Integer, LostTalesCombatEngagement> snapshot) {
         if (!LostTalesConfig.partySharedAggroTracking || recipient == null
                 || recipient.worldObj == null || snapshot == null
                 || snapshot.size() >= LostTalesMobAggroSyncPacket.MAX_ENTITY_IDS) {
@@ -275,9 +278,11 @@ public class LostTalesMobAggroEventHandler {
                 if (snapshot.size() >= LostTalesMobAggroSyncPacket.MAX_ENTITY_IDS) {
                     return;
                 }
-                Entity entity = recipient.worldObj.getEntityByID(entry.getKey().intValue());
+                Entity entity = recipient.worldObj.getEntityByID(
+                        entry.getKey().intValue());
                 if (!(entity instanceof EntityLivingBase)
-                        || !isValidTrackedEntity((EntityLivingBase) entity, recipient, trackingRadiusSq)) {
+                        || !isShareableTrackedEntity(
+                        (EntityLivingBase) entity, recipient)) {
                     continue;
                 }
                 LostTalesCombatEngagement current = snapshot.get(entry.getKey());
@@ -287,6 +292,61 @@ public class LostTalesMobAggroEventHandler {
                 }
             }
         }
+    }
+
+    private static List<LostTalesMobAggroSyncPacket.Entry> buildPacketEntries(
+            EntityPlayerMP recipient,
+            Map<Integer, LostTalesCombatEngagement> combined,
+            Map<Integer, LostTalesCombatEngagement> direct) {
+        ArrayList<LostTalesMobAggroSyncPacket.Entry> result =
+                new ArrayList<LostTalesMobAggroSyncPacket.Entry>(
+                        combined.size());
+        for (Map.Entry<Integer, LostTalesCombatEngagement> entry
+                : combined.entrySet()) {
+            Entity entity = recipient.worldObj.getEntityByID(
+                    entry.getKey().intValue());
+            if (!(entity instanceof EntityLivingBase)
+                    || !isShareableTrackedEntity(
+                    (EntityLivingBase) entity, recipient)) {
+                continue;
+            }
+            EntityLivingBase living = (EntityLivingBase) entity;
+            result.add(new LostTalesMobAggroSyncPacket.Entry(
+                    living.getEntityId(), entry.getValue(),
+                    !direct.containsKey(entry.getKey()),
+                    boundedEntityName(living.getCommandSenderName()),
+                    quantizePacketCoordinate(living.posX),
+                    quantizePacketCoordinate(living.posY),
+                    quantizePacketCoordinate(living.posZ)));
+        }
+        return result;
+    }
+
+    private static boolean isShareableTrackedEntity(
+            EntityLivingBase living, EntityPlayerMP recipient) {
+        return living != null && recipient != null
+                && living != recipient && !(living instanceof EntityPlayer)
+                && living.isEntityAlive() && !living.isDead
+                && living.worldObj != null && recipient.worldObj != null
+                && living.worldObj == recipient.worldObj
+                && living.dimension == recipient.dimension;
+    }
+
+    private static double quantizePacketCoordinate(double value) {
+        return Math.rint(value * 2.0D) / 2.0D;
+    }
+
+    private static String boundedEntityName(String value) {
+        String name = value == null ? "Enemy" : value.trim();
+        if (name.length() == 0) {
+            name = "Enemy";
+        }
+        while (name.getBytes(StandardCharsets.UTF_8).length
+                > LostTalesMobAggroSyncPacket.MAX_ENTITY_NAME_BYTES
+                && name.length() > 1) {
+            name = name.substring(0, name.length() - 1);
+        }
+        return name;
     }
 
     private static int engagementPriority(LostTalesCombatEngagement engagement) {
@@ -429,14 +489,15 @@ public class LostTalesMobAggroEventHandler {
 
         state.entries.clear();
         state.currentSnapshot.clear();
-        if (sendEmptySnapshot && player.worldObj != null && state.initialSnapshotSent
-                && !state.lastSentSnapshot.isEmpty()) {
+        if (sendEmptySnapshot && player.worldObj != null
+                && state.initialSnapshotSent
+                && !state.lastSentEntries.isEmpty()) {
             int dimensionId = player.worldObj.provider.dimensionId;
             int trackingRadius = getTrackingRadius();
             long now = player.worldObj.getTotalWorldTime();
             state.sequence++;
             state.dimensionId = dimensionId;
-            state.lastSentSnapshot.clear();
+            state.lastSentEntries.clear();
             state.lastSentTrackingRadius = trackingRadius;
             state.lastSentTick = now;
             LostTalesNetworkHandler.CHANNEL.sendTo(
@@ -476,7 +537,8 @@ public class LostTalesMobAggroEventHandler {
         private long lastSentTick;
         private final Map<Integer, TrackedEngagement> entries = new HashMap<Integer, TrackedEngagement>();
         private final Map<Integer, LostTalesCombatEngagement> currentSnapshot = new TreeMap<Integer, LostTalesCombatEngagement>();
-        private final Map<Integer, LostTalesCombatEngagement> lastSentSnapshot = new TreeMap<Integer, LostTalesCombatEngagement>();
+        private final List<LostTalesMobAggroSyncPacket.Entry> lastSentEntries =
+                new ArrayList<LostTalesMobAggroSyncPacket.Entry>();
 
         private PlayerCombatState(int dimensionId) {
             this.dimensionId = dimensionId;
@@ -486,7 +548,7 @@ public class LostTalesMobAggroEventHandler {
             this.dimensionId = dimensionId;
             this.entries.clear();
             this.currentSnapshot.clear();
-            this.lastSentSnapshot.clear();
+            this.lastSentEntries.clear();
             this.initialSnapshotSent = false;
             this.lastSentTrackingRadius = -1;
             this.lastSentTick = 0L;

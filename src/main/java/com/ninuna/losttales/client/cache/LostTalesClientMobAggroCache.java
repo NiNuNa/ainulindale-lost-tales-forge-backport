@@ -11,13 +11,12 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.world.World;
 
-/**
- * Client-side replacement snapshot of entities the server approved for combat markers.
- */
+/** Client replacement snapshot of server-approved combat marker entities. */
 @SideOnly(Side.CLIENT)
 public final class LostTalesClientMobAggroCache {
     private static final int STALE_SNAPSHOT_TICKS = 240;
-    private static volatile List<TrackedEnemy> trackedEnemies = Collections.emptyList();
+    private static volatile List<TrackedEnemy> trackedEnemies =
+            Collections.emptyList();
     private static volatile int dimensionId = Integer.MIN_VALUE;
     private static volatile int sequence = -1;
     private static volatile int serverTrackingRadius;
@@ -28,30 +27,31 @@ public final class LostTalesClientMobAggroCache {
 
     private LostTalesClientMobAggroCache() {}
 
-    public static synchronized void accept(LostTalesMobAggroSyncPacket packet) {
+    public static synchronized void accept(
+            LostTalesMobAggroSyncPacket packet) {
         if (packet == null || packet.isMalformed()) {
             return;
         }
-
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft == null || minecraft.theWorld == null || minecraft.thePlayer == null) {
+        if (minecraft == null || minecraft.theWorld == null
+                || minecraft.thePlayer == null) {
             clearInternal();
             return;
         }
-
         int currentDimension = minecraft.theWorld.provider.dimensionId;
         if (packet.getDimensionId() != currentDimension) {
             return;
         }
-
         int currentPlayerEntityId = minecraft.thePlayer.getEntityId();
         if (contextWorld != null && (contextWorld != minecraft.theWorld
                 || contextPlayer != minecraft.thePlayer
                 || contextPlayerEntityId != currentPlayerEntityId
-                || dimensionId != Integer.MIN_VALUE && dimensionId != currentDimension)) {
+                || dimensionId != Integer.MIN_VALUE
+                && dimensionId != currentDimension)) {
             clearInternal();
         }
-        if (dimensionId == currentDimension && packet.getSequence() <= sequence) {
+        if (dimensionId == currentDimension
+                && packet.getSequence() <= sequence) {
             return;
         }
 
@@ -63,12 +63,15 @@ public final class LostTalesClientMobAggroCache {
         serverTrackingRadius = packet.getTrackingRadius();
         lastSnapshotWorldTick = minecraft.theWorld.getTotalWorldTime();
 
-        List<LostTalesMobAggroSyncPacket.Entry> packetEntries = packet.getEntries();
-        List<TrackedEnemy> replacement = new ArrayList<TrackedEnemy>(packetEntries.size());
+        List<LostTalesMobAggroSyncPacket.Entry> packetEntries =
+                packet.getEntries();
+        List<TrackedEnemy> replacement =
+                new ArrayList<TrackedEnemy>(packetEntries.size());
         for (LostTalesMobAggroSyncPacket.Entry entry : packetEntries) {
             if (entry != null && entry.getEntityId() >= 0
-                    && entry.getEngagement() != LostTalesCombatEngagement.NONE) {
-                replacement.add(new TrackedEnemy(entry.getEntityId(), entry.getEngagement()));
+                    && entry.getEngagement()
+                    != LostTalesCombatEngagement.NONE) {
+                replacement.add(new TrackedEnemy(entry));
             }
         }
         trackedEnemies = replacement.isEmpty()
@@ -76,7 +79,6 @@ public final class LostTalesClientMobAggroCache {
                 : Collections.unmodifiableList(replacement);
     }
 
-    /** Clears stale state when the local world, dimension, or player entity changes. */
     public static synchronized void validateContext(EntityPlayer player) {
         if (player == null || player.worldObj == null) {
             clearInternal();
@@ -85,11 +87,14 @@ public final class LostTalesClientMobAggroCache {
         if (contextWorld != null && (contextWorld != player.worldObj
                 || contextPlayer != player
                 || contextPlayerEntityId != player.getEntityId()
-                || dimensionId != Integer.MIN_VALUE && dimensionId != player.worldObj.provider.dimensionId)) {
+                || dimensionId != Integer.MIN_VALUE
+                && dimensionId != player.worldObj.provider.dimensionId)) {
             clearInternal();
         }
-        if (!trackedEnemies.isEmpty() && lastSnapshotWorldTick != Long.MIN_VALUE) {
-            long elapsed = player.worldObj.getTotalWorldTime() - lastSnapshotWorldTick;
+        if (!trackedEnemies.isEmpty()
+                && lastSnapshotWorldTick != Long.MIN_VALUE) {
+            long elapsed = player.worldObj.getTotalWorldTime()
+                    - lastSnapshotWorldTick;
             if (elapsed < 0L || elapsed > STALE_SNAPSHOT_TICKS) {
                 clearInternal();
             }
@@ -134,10 +139,20 @@ public final class LostTalesClientMobAggroCache {
     public static final class TrackedEnemy {
         private final int entityId;
         private final LostTalesCombatEngagement engagement;
+        private final boolean sharedFromParty;
+        private final String name;
+        private final double x;
+        private final double y;
+        private final double z;
 
-        private TrackedEnemy(int entityId, LostTalesCombatEngagement engagement) {
-            this.entityId = entityId;
-            this.engagement = engagement;
+        private TrackedEnemy(LostTalesMobAggroSyncPacket.Entry entry) {
+            this.entityId = entry.getEntityId();
+            this.engagement = entry.getEngagement();
+            this.sharedFromParty = entry.isSharedFromParty();
+            this.name = entry.getName();
+            this.x = entry.getX();
+            this.y = entry.getY();
+            this.z = entry.getZ();
         }
 
         public int getEntityId() {
@@ -146,6 +161,26 @@ public final class LostTalesClientMobAggroCache {
 
         public LostTalesCombatEngagement getEngagement() {
             return this.engagement;
+        }
+
+        public boolean isSharedFromParty() {
+            return this.sharedFromParty;
+        }
+
+        public String getName() {
+            return this.name;
+        }
+
+        public double getX() {
+            return this.x;
+        }
+
+        public double getY() {
+            return this.y;
+        }
+
+        public double getZ() {
+            return this.z;
         }
     }
 }

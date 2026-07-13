@@ -5,7 +5,6 @@ import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
 import com.ninuna.losttales.party.model.PartyColor;
 import com.ninuna.losttales.party.sync.PartyGoHereMarkerSnapshot;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
-import com.ninuna.losttales.party.sync.PartyTrackedMemberSnapshot;
 import com.ninuna.losttales.party.sync.PartyTrackingSnapshot;
 
 import java.util.ArrayList;
@@ -105,33 +104,15 @@ public final class ClientPartyTrackingCache {
         }
         ArrayList<LostTalesMapMarkerData> markers =
                 new ArrayList<LostTalesMapMarkerData>();
-        for (PartyTrackedMemberSnapshot member
-                : tracking.getTrackedMembers()) {
-            markers.add(new LostTalesMapMarkerData(
-                    "party_member:" + member.getCharacterId(),
-                    member.getCharacterName(),
-                    partyIcon(member.getColor()).name(),
-                    "white",
-                    "Party Member",
-                    "Current server-authorized party member position.",
-                    false,
-                    "",
-                    member.getDimensionId(),
-                    member.getX(), member.getY(), member.getZ(),
-                    2048.0D,
-                    1.0D,
-                    false,
-                    false));
-        }
         for (PartyGoHereMarkerSnapshot marker
                 : tracking.getGoHereMarkers()) {
             markers.add(new LostTalesMapMarkerData(
                     "party_go_here:" + marker.getOwnerCharacterId(),
-                    "Go Here: " + marker.getOwnerCharacterName(),
+                    marker.getOwnerCharacterName(),
                     LostTalesCompassMarkerIcon.QUEST.name(),
                     marker.getOwnerColor().getId(),
                     "Party Marker",
-                    "A personal Go Here marker shared with this party.",
+                    "A personal map marker shared with this party.",
                     false,
                     "",
                     marker.getDimensionId(),

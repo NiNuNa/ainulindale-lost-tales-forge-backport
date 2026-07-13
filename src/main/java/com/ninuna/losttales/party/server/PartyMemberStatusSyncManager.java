@@ -188,7 +188,9 @@ public final class PartyMemberStatusSyncManager {
                 dead,
                 player.dimension,
                 health,
-                maximumHealth);
+                maximumHealth,
+                player.getEquipmentInSlot(4),
+                player.getHeldItem());
     }
 
     private static PartyStatusSnapshot copyWithSequence(

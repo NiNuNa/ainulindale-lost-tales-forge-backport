@@ -15,11 +15,12 @@ public class LostTalesCompassMarker {
     private final boolean showDistanceLabel;
     private final double fadeInRadius;
     private final boolean activeQuestMarker;
+    private final boolean retainBeyondFadeRadius;
     private final float red;
     private final float green;
     private final float blue;
 
-    private LostTalesCompassMarker(String stateKey, String name, LostTalesCompassMarkerIcon icon, boolean bearingMarker, float bearingDegrees, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius, boolean activeQuestMarker, float red, float green, float blue) {
+    private LostTalesCompassMarker(String stateKey, String name, LostTalesCompassMarkerIcon icon, boolean bearingMarker, float bearingDegrees, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius, boolean activeQuestMarker, boolean retainBeyondFadeRadius, float red, float green, float blue) {
         this.stateKey = stateKey;
         this.name = name;
         this.icon = icon;
@@ -32,13 +33,14 @@ public class LostTalesCompassMarker {
         this.showDistanceLabel = showDistanceLabel;
         this.fadeInRadius = fadeInRadius;
         this.activeQuestMarker = activeQuestMarker;
+        this.retainBeyondFadeRadius = retainBeyondFadeRadius;
         this.red = clampColor(red);
         this.green = clampColor(green);
         this.blue = clampColor(blue);
     }
 
     public static LostTalesCompassMarker bearing(String name, LostTalesCompassMarkerIcon icon, float bearingDegrees) {
-        return new LostTalesCompassMarker(null, name, icon, true, bearingDegrees, 0.0D, 0.0D, 0.0D, false, false, 0.0D, false, 1.0F, 1.0F, 1.0F);
+        return new LostTalesCompassMarker(null, name, icon, true, bearingDegrees, 0.0D, 0.0D, 0.0D, false, false, 0.0D, false, false, 1.0F, 1.0F, 1.0F);
     }
 
     public static LostTalesCompassMarker position(String name, LostTalesCompassMarkerIcon icon, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius) {
@@ -47,11 +49,11 @@ public class LostTalesCompassMarker {
 
     public static LostTalesCompassMarker position(String name, LostTalesCompassMarkerIcon icon, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius, String colorName) {
         float[] color = parseColor(colorName);
-        return new LostTalesCompassMarker(null, name, icon, false, 0.0F, x, y, z, scaleWithCenterFocus, showDistanceLabel, fadeInRadius, false, color[0], color[1], color[2]);
+        return new LostTalesCompassMarker(null, name, icon, false, 0.0F, x, y, z, scaleWithCenterFocus, showDistanceLabel, fadeInRadius, false, false, color[0], color[1], color[2]);
     }
 
     public static LostTalesCompassMarker questPosition(String name, double x, double y, double z, boolean showDistanceLabel, double fadeInRadius) {
-        return new LostTalesCompassMarker(null, name, LostTalesCompassMarkerIcon.QUEST, false, 0.0F, x, y, z, true, showDistanceLabel, fadeInRadius, true, 1.0F, 1.0F, 1.0F);
+        return new LostTalesCompassMarker(null, name, LostTalesCompassMarkerIcon.QUEST, false, 0.0F, x, y, z, true, showDistanceLabel, fadeInRadius, true, false, 1.0F, 1.0F, 1.0F);
     }
 
     public static LostTalesCompassMarker positionWithStateKey(String stateKey, String name, LostTalesCompassMarkerIcon icon, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius) {
@@ -63,7 +65,17 @@ public class LostTalesCompassMarker {
         float[] color = parseColor(colorName);
         return new LostTalesCompassMarker(stateKey, name, icon, false, 0.0F,
                 x, y, z, scaleWithCenterFocus, showDistanceLabel,
-                fadeInRadius, false, color[0], color[1], color[2]);
+                fadeInRadius, false, false, color[0], color[1], color[2]);
+    }
+
+    public static LostTalesCompassMarker persistentPositionWithStateKey(
+            String stateKey, String name, LostTalesCompassMarkerIcon icon,
+            double x, double y, double z, boolean scaleWithCenterFocus,
+            boolean showDistanceLabel, double fadeInRadius, String colorName) {
+        float[] color = parseColor(colorName);
+        return new LostTalesCompassMarker(stateKey, name, icon, false, 0.0F,
+                x, y, z, scaleWithCenterFocus, showDistanceLabel,
+                fadeInRadius, false, true, color[0], color[1], color[2]);
     }
 
     public String getStateKey() {
@@ -112,6 +124,10 @@ public class LostTalesCompassMarker {
 
     public boolean isActiveQuestMarker() {
         return activeQuestMarker;
+    }
+
+    public boolean isRetainedBeyondFadeRadius() {
+        return this.retainBeyondFadeRadius;
     }
 
     public float getRed() {

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.event;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.character.CharacterClientTaskQueue;
@@ -51,6 +52,7 @@ import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.client.event.TextureStitchEvent;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.world.WorldEvent;
 
 public class LostTalesClientEventHandler implements IResourceManagerReloadListener {
@@ -92,6 +94,32 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         if (event != null && event.world != null && event.world.isRemote) {
             LostTalesClientMobAggroCache.clear();
             ClientPartyTrackingCache.clear();
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void useCharacterName(PlayerEvent.NameFormat event) {
+        if (event == null || event.entityPlayer == null
+                || event.entityPlayer.getUniqueID() == null) {
+            return;
+        }
+        CharacterAppearance appearance =
+                ClientCharacterAppearanceCache.getAuthoritative(
+                        event.entityPlayer.getUniqueID());
+        if (appearance != null && appearance.isPresent()
+                && appearance.getCharacterName().length() > 0) {
+            String characterName = appearance.getCharacterName();
+            String displayName = event.displayname;
+            String accountName = event.username;
+            int accountNameIndex = displayName == null || accountName == null
+                    || accountName.length() == 0
+                    ? -1 : displayName.indexOf(accountName);
+            event.displayname = accountNameIndex < 0
+                    ? characterName
+                    : displayName.substring(0, accountNameIndex)
+                    + characterName
+                    + displayName.substring(
+                    accountNameIndex + accountName.length());
         }
     }
 

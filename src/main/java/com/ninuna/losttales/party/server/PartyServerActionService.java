@@ -61,9 +61,14 @@ public final class PartyServerActionService {
 
     public static PartyOperationResult setGoHereMarker(
             EntityPlayerMP player,
-            long expectedPartyRevision) {
+            long expectedPartyRevision,
+            boolean hasMarkerPosition,
+            int markerDimensionId,
+            double markerX,
+            double markerZ) {
         return PartyService.getInstance().setGoHereMarker(
-                player, expectedPartyRevision);
+                player, expectedPartyRevision, hasMarkerPosition,
+                markerDimensionId, markerX, markerZ);
     }
 
     public static PartyOperationResult removeGoHereMarker(

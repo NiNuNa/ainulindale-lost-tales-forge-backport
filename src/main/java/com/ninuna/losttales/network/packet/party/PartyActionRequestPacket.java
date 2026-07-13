@@ -25,6 +25,10 @@ public final class PartyActionRequestPacket implements IMessage {
     private long expectedPartyRevision = NO_PARTY_REVISION;
     private UUID targetId;
     private PartyColor color;
+    private boolean hasMarkerPosition;
+    private int markerDimensionId;
+    private double markerX;
+    private double markerZ;
     private boolean malformed;
 
     public PartyActionRequestPacket() {}
@@ -36,7 +40,8 @@ public final class PartyActionRequestPacket implements IMessage {
                                     UUID targetId,
                                     PartyColor color) {
         this(requestId, operationType, null, null,
-                expectedPartyRevision, targetId, color);
+                expectedPartyRevision, targetId, color,
+                false, 0, 0.0D, 0.0D);
     }
 
     public PartyActionRequestPacket(int requestId,
@@ -46,6 +51,22 @@ public final class PartyActionRequestPacket implements IMessage {
                                     long expectedPartyRevision,
                                     UUID targetId,
                                     PartyColor color) {
+        this(requestId, operationType, expectedActiveCharacterId,
+                expectedPartyId, expectedPartyRevision, targetId, color,
+                false, 0, 0.0D, 0.0D);
+    }
+
+    public PartyActionRequestPacket(int requestId,
+                                    PartyOperationType operationType,
+                                    UUID expectedActiveCharacterId,
+                                    UUID expectedPartyId,
+                                    long expectedPartyRevision,
+                                    UUID targetId,
+                                    PartyColor color,
+                                    boolean hasMarkerPosition,
+                                    int markerDimensionId,
+                                    double markerX,
+                                    double markerZ) {
         this.requestId = requestId;
         this.operationType = operationType == null
                 ? PartyOperationType.UNKNOWN : operationType;
@@ -54,6 +75,10 @@ public final class PartyActionRequestPacket implements IMessage {
         this.expectedPartyRevision = expectedPartyRevision;
         this.targetId = targetId;
         this.color = color;
+        this.hasMarkerPosition = hasMarkerPosition;
+        this.markerDimensionId = markerDimensionId;
+        this.markerX = markerX;
+        this.markerZ = markerZ;
         validateShape();
     }
 
@@ -78,6 +103,16 @@ public final class PartyActionRequestPacket implements IMessage {
                             "invalid party color identifier");
                 }
             }
+            this.hasMarkerPosition = buffer.readBoolean();
+            if (this.hasMarkerPosition) {
+                this.markerDimensionId = buffer.readInt();
+                this.markerX = buffer.readDouble();
+                this.markerZ = buffer.readDouble();
+            } else {
+                this.markerDimensionId = 0;
+                this.markerX = 0.0D;
+                this.markerZ = 0.0D;
+            }
             PartyPacketCodec.requireFinished(buffer);
             validateShape();
         } catch (RuntimeException exception) {
@@ -98,6 +133,12 @@ public final class PartyActionRequestPacket implements IMessage {
         buffer.writeLong(this.expectedPartyRevision);
         PartyPacketCodec.writeNullableUuid(buffer, this.targetId);
         buffer.writeByte(this.color == null ? -1 : this.color.getNetworkId());
+        buffer.writeBoolean(this.hasMarkerPosition);
+        if (this.hasMarkerPosition) {
+            buffer.writeInt(this.markerDimensionId);
+            buffer.writeDouble(this.markerX);
+            buffer.writeDouble(this.markerZ);
+        }
     }
 
     public int getRequestId() {
@@ -126,6 +167,22 @@ public final class PartyActionRequestPacket implements IMessage {
 
     public PartyColor getColor() {
         return this.color;
+    }
+
+    public boolean hasMarkerPosition() {
+        return this.hasMarkerPosition;
+    }
+
+    public int getMarkerDimensionId() {
+        return this.markerDimensionId;
+    }
+
+    public double getMarkerX() {
+        return this.markerX;
+    }
+
+    public double getMarkerZ() {
+        return this.markerZ;
     }
 
     public boolean isMalformed() {
@@ -165,6 +222,22 @@ public final class PartyActionRequestPacket implements IMessage {
         if (this.operationType.requiresColor() != (this.color != null)) {
             throw new PartyPacketCodec.DecodeException("invalid color payload");
         }
+        if ((this.operationType == PartyOperationType.SET_GO_HERE_MARKER)
+                != this.hasMarkerPosition) {
+            throw new PartyPacketCodec.DecodeException(
+                    "invalid map marker position payload");
+        }
+        if (this.hasMarkerPosition
+                && (!isFinite(this.markerX) || !isFinite(this.markerZ)
+                || Math.abs(this.markerX) > 30000000.0D
+                || Math.abs(this.markerZ) > 30000000.0D)) {
+            throw new PartyPacketCodec.DecodeException(
+                    "invalid map marker coordinates");
+        }
+    }
+
+    private static boolean isFinite(double value) {
+        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
     public static final class Handler implements IMessageHandler<PartyActionRequestPacket, IMessage> {
@@ -183,6 +256,10 @@ public final class PartyActionRequestPacket implements IMessage {
             final long expectedPartyRevision = message.expectedPartyRevision;
             final UUID targetId = message.targetId;
             final PartyColor color = message.color;
+            final boolean hasMarkerPosition = message.hasMarkerPosition;
+            final int markerDimensionId = message.markerDimensionId;
+            final double markerX = message.markerX;
+            final double markerZ = message.markerZ;
             PartyServerPacketDispatcher.submit(
                     player,
                     requestId,
@@ -200,7 +277,11 @@ public final class PartyActionRequestPacket implements IMessage {
                                     expectedPartyId,
                                     expectedPartyRevision,
                                     targetId,
-                                    color);
+                                    color,
+                                    hasMarkerPosition,
+                                    markerDimensionId,
+                                    markerX,
+                                    markerZ);
                         }
                     });
             return null;

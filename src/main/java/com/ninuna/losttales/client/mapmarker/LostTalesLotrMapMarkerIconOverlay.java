@@ -3,18 +3,25 @@ package com.ninuna.losttales.client.mapmarker;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache.TrackedEnemy;
+import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
+import com.ninuna.losttales.party.sync.PartyMemberSnapshot;
+import com.ninuna.losttales.party.sync.PartyStateSnapshot;
+import com.ninuna.losttales.party.sync.PartyTrackedMemberSnapshot;
+import com.ninuna.losttales.party.sync.PartyTrackingSnapshot;
+import com.mojang.authlib.GameProfile;
 import cpw.mods.fml.common.FMLLog;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import lotr.client.gui.LOTRGuiMap;
 import lotr.common.LOTRDimension;
 import lotr.common.world.map.LOTRAbstractWaypoint;
@@ -53,6 +60,16 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     private static Field mapYMaxField;
     private static Field zoomExpField;
     private static Field selectedWaypointField;
+    private static Field mouseXCoordField;
+    private static Field mouseZCoordField;
+    private static Field isMouseWithinMapField;
+    private static Field hasOverlayField;
+    private static Field loadingConquestGridField;
+    private static Field playerLocationsField;
+    private static Field playerLocationProfileField;
+    private static Field playerLocationXField;
+    private static Field playerLocationZField;
+    private static Method renderPlayerIconMethod;
     private static Method renderWaypointTooltipMethod;
     private static Method drawFancyRectMethod;
     private static boolean reflectionReady;
@@ -149,6 +166,103 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         }
     }
 
+    /**
+     * Re-renders only the hovered party member head at a slightly larger scale.
+     * The normal LOTR player head remains the marker, so no colored dot is
+     * drawn above it.
+     */
+    public static void renderHoveredPartyMemberHead(
+            LOTRGuiMap gui, int mouseX, int mouseY) {
+        RenderContext context = createRenderContext(gui);
+        if (context == null || context.alpha <= 0.0F) {
+            return;
+        }
+        PartyStateSnapshot state = ClientPartyStateCache.getSnapshot();
+        PartyTrackingSnapshot tracking =
+                ClientPartyTrackingCache.getMatching(state);
+        if (state == null || state.getParty() == null || tracking == null) {
+            return;
+        }
+        try {
+            Map<?, ?> locations = (Map<?, ?>)
+                    playerLocationsField.get(null);
+            if (locations == null || locations.isEmpty()) {
+                return;
+            }
+            for (PartyTrackedMemberSnapshot tracked
+                    : tracking.getTrackedMembers()) {
+                PartyMemberSnapshot member = state.getParty().getMember(
+                        tracked.getCharacterId());
+                if (member == null) {
+                    continue;
+                }
+                Object location = locations.get(member.getOwnerId());
+                if (location == null) {
+                    continue;
+                }
+                GameProfile profile = (GameProfile)
+                        playerLocationProfileField.get(location);
+                double worldX = playerLocationXField.getDouble(location);
+                double worldZ = playerLocationZField.getDouble(location);
+                ScreenPosition position = transformWorldCoords(
+                        context, worldX, worldZ);
+                if (profile == null || position == null
+                        || !isInsideMap(position.x, position.y, context)
+                        || !isMouseOverPlayerHead(
+                        position.x, position.y, mouseX, mouseY)) {
+                    continue;
+                }
+                GL11.glPushMatrix();
+                GL11.glTranslated(position.x, position.y, 0.0D);
+                GL11.glScalef(1.30F, 1.30F, 1.0F);
+                GL11.glTranslated(-position.x, -position.y, 0.0D);
+                try {
+                    renderPlayerIconMethod.invoke(gui, profile,
+                            tracked.getCharacterName(),
+                            Double.valueOf(position.x),
+                            Double.valueOf(position.y),
+                            Integer.valueOf(mouseX), Integer.valueOf(mouseY));
+                } finally {
+                    GL11.glPopMatrix();
+                }
+                return;
+            }
+        } catch (Throwable ignored) {
+            // LOTR internals are compatibility-only; the normal map stays usable.
+        }
+    }
+
+    /** Returns the world X/Z under a valid, unobstructed LOTR-map click. */
+    public static int[] getMapClickWorldPosition(LOTRGuiMap gui) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (gui == null || minecraft == null || minecraft.theWorld == null
+                || minecraft.theWorld.provider.dimensionId
+                != LOTRDimension.MIDDLE_EARTH.dimensionID
+                || !ensureReflection()) {
+            return null;
+        }
+        try {
+            if (!isMouseWithinMapField.getBoolean(gui)
+                    || hasOverlayField.getBoolean(gui)
+                    || loadingConquestGridField.getBoolean(gui)) {
+                return null;
+            }
+            return new int[] {
+                    mouseXCoordField.getInt(gui),
+                    mouseZCoordField.getInt(gui)
+            };
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static boolean isMouseOverPlayerHead(
+            float screenX, float screenY, int mouseX, int mouseY) {
+        double dx = screenX + 0.5D - mouseX;
+        double dy = screenY + 0.5D - mouseY;
+        return dx * dx + dy * dy <= 36.0D;
+    }
+
     /** Renders non-interactive, non-persistent enemies from the shared combat snapshot. */
     public static void renderTransientEnemyMarkers(LOTRGuiMap gui, int mouseX, int mouseY, boolean drawLabels) {
         if (!LostTalesConfig.showHostileMapMarkers) {
@@ -173,12 +287,14 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         beginIconRender();
         try {
             for (TrackedEnemy trackedEnemy : trackedEnemies) {
-                EntityLivingBase living = resolveVisibleTransientEnemy(context, trackedEnemy, displayRadiusSq);
-                if (living == null) {
+                EnemyMarkerPosition enemy = resolveVisibleTransientEnemy(
+                        context, trackedEnemy, displayRadiusSq);
+                if (enemy == null) {
                     continue;
                 }
 
-                ScreenPosition position = transformWorldCoords(context, living.posX, living.posZ);
+                ScreenPosition position = transformWorldCoords(
+                        context, enemy.x, enemy.z);
                 if (position == null || !isInsideMap(position.x, position.y, context)) {
                     continue;
                 }
@@ -206,15 +322,29 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             return;
         }
 
-        EntityLivingBase hoveredEnemy = getHoveredTransientEnemy(context, mouseX, mouseY);
+        EnemyMarkerPosition hoveredEnemy = getHoveredTransientEnemy(
+                context, mouseX, mouseY);
         if (hoveredEnemy == null) {
             return;
         }
 
-        renderLotrWaypointTooltip(context, new LostTalesEntityWaypoint(hoveredEnemy), false, mouseX, mouseY);
+        renderLotrWaypointTooltip(context,
+                new LostTalesEntityWaypoint(hoveredEnemy),
+                false, mouseX, mouseY);
     }
 
-    public static LostTalesMapMarkerData getHoveredStandaloneMarker(LOTRGuiMap gui, int mouseX, int mouseY) {
+    public static LostTalesMapMarkerData getHoveredStandaloneMarker(
+            LOTRGuiMap gui, int mouseX, int mouseY) {
+        return getHoveredStandaloneMarker(gui, mouseX, mouseY, null);
+    }
+
+    /**
+     * Returns the marker under the mouse, preferring a requested marker ID
+     * when several icons overlap at the same map location.
+     */
+    public static LostTalesMapMarkerData getHoveredStandaloneMarker(
+            LOTRGuiMap gui, int mouseX, int mouseY,
+            String preferredMarkerId) {
         RenderContext context = createRenderContext(gui);
         if (context == null || context.alpha <= 0.0F) {
             return null;
@@ -228,13 +358,21 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 continue;
             }
             ScreenPosition position = transformMarker(context, marker);
-            if (position == null || !isInsideMap(position.x, position.y, context)) {
+            if (position == null
+                    || !isInsideMap(position.x, position.y, context)) {
                 continue;
             }
             double dx = position.x - mouseX;
             double dy = position.y - mouseY;
             double distanceSq = dx * dx + dy * dy;
-            if (distanceSq <= (double) (HOVER_RADIUS * HOVER_RADIUS) && distanceSq < nearestDistanceSq) {
+            if (distanceSq > (double) (HOVER_RADIUS * HOVER_RADIUS)) {
+                continue;
+            }
+            if (preferredMarkerId != null
+                    && preferredMarkerId.equals(marker.getId())) {
+                return marker;
+            }
+            if (distanceSq < nearestDistanceSq) {
                 nearest = marker;
                 nearestDistanceSq = distanceSq;
             }
@@ -534,58 +672,83 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         return dx * dx + dy * dy <= (double) (HOVER_RADIUS * HOVER_RADIUS);
     }
 
-    private static EntityLivingBase getHoveredTransientEnemy(RenderContext context, int mouseX, int mouseY) {
-        List<TrackedEnemy> trackedEnemies = LostTalesClientMobAggroCache.getTrackedEnemies();
+    private static EnemyMarkerPosition getHoveredTransientEnemy(
+            RenderContext context, int mouseX, int mouseY) {
+        List<TrackedEnemy> trackedEnemies =
+                LostTalesClientMobAggroCache.getTrackedEnemies();
         if (trackedEnemies.isEmpty()) {
             return null;
         }
-
         double displayRadiusSq = getTransientEnemyDisplayRadiusSq();
         if (displayRadiusSq < 0.0D) {
             return null;
         }
 
-        EntityLivingBase nearest = null;
+        EnemyMarkerPosition nearest = null;
         double nearestDistanceSq = Double.MAX_VALUE;
         for (TrackedEnemy trackedEnemy : trackedEnemies) {
-            EntityLivingBase living = resolveVisibleTransientEnemy(context, trackedEnemy, displayRadiusSq);
-            if (living == null) {
+            EnemyMarkerPosition enemy = resolveVisibleTransientEnemy(
+                    context, trackedEnemy, displayRadiusSq);
+            if (enemy == null) {
                 continue;
             }
-
-            ScreenPosition position = transformWorldCoords(context, living.posX, living.posZ);
-            if (position == null || !isInsideMap(position.x, position.y, context)) {
+            ScreenPosition position = transformWorldCoords(
+                    context, enemy.x, enemy.z);
+            if (position == null
+                    || !isInsideMap(position.x, position.y, context)) {
                 continue;
             }
-
             double dx = position.x - mouseX;
             double dy = position.y - mouseY;
             double distanceSq = dx * dx + dy * dy;
-            if (distanceSq <= (double) (HOVER_RADIUS * HOVER_RADIUS) && distanceSq < nearestDistanceSq) {
-                nearest = living;
+            if (distanceSq <= (double) (HOVER_RADIUS * HOVER_RADIUS)
+                    && distanceSq < nearestDistanceSq) {
+                nearest = enemy;
                 nearestDistanceSq = distanceSq;
             }
         }
         return nearest;
     }
 
-    private static EntityLivingBase resolveVisibleTransientEnemy(RenderContext context, TrackedEnemy trackedEnemy, double displayRadiusSq) {
-        if (context == null || trackedEnemy == null || context.minecraft.theWorld == null || context.minecraft.thePlayer == null) {
+    private static EnemyMarkerPosition resolveVisibleTransientEnemy(
+            RenderContext context, TrackedEnemy trackedEnemy,
+            double displayRadiusSq) {
+        if (context == null || trackedEnemy == null
+                || context.minecraft.theWorld == null
+                || context.minecraft.thePlayer == null) {
             return null;
         }
 
-        Entity entity = context.minecraft.theWorld.getEntityByID(trackedEnemy.getEntityId());
-        if (!(entity instanceof EntityLivingBase) || entity == context.minecraft.thePlayer) {
-            return null;
+        double x = trackedEnemy.getX();
+        double y = trackedEnemy.getY();
+        double z = trackedEnemy.getZ();
+        String name = trackedEnemy.getName();
+        Entity entity = context.minecraft.theWorld.getEntityByID(
+                trackedEnemy.getEntityId());
+        if (entity instanceof EntityLivingBase
+                && entity != context.minecraft.thePlayer) {
+            EntityLivingBase living = (EntityLivingBase) entity;
+            if (!living.isEntityAlive() || living.isDead
+                    || living.dimension
+                    != context.minecraft.thePlayer.dimension) {
+                return null;
+            }
+            x = living.posX;
+            y = living.posY;
+            z = living.posZ;
+            name = living.getCommandSenderName();
         }
 
-        EntityLivingBase living = (EntityLivingBase) entity;
-        if (!living.isEntityAlive() || living.isDead
-                || living.dimension != context.minecraft.thePlayer.dimension
-                || living.getDistanceSqToEntity(context.minecraft.thePlayer) > displayRadiusSq) {
-            return null;
+        if (!trackedEnemy.isSharedFromParty()) {
+            double dx = x - context.minecraft.thePlayer.posX;
+            double dy = y - context.minecraft.thePlayer.posY;
+            double dz = z - context.minecraft.thePlayer.posZ;
+            if (dx * dx + dy * dy + dz * dz > displayRadiusSq) {
+                return null;
+            }
         }
-        return living;
+        return new EnemyMarkerPosition(
+                trackedEnemy.getEntityId(), name, x, y, z);
     }
 
     private static double getTransientEnemyDisplayRadiusSq() {
@@ -751,6 +914,23 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             mapYMaxField = LOTRGuiMap.class.getDeclaredField("mapYMax");
             zoomExpField = LOTRGuiMap.class.getDeclaredField("zoomExp");
             selectedWaypointField = LOTRGuiMap.class.getDeclaredField("selectedWaypoint");
+            mouseXCoordField = LOTRGuiMap.class.getDeclaredField("mouseXCoord");
+            mouseZCoordField = LOTRGuiMap.class.getDeclaredField("mouseZCoord");
+            isMouseWithinMapField = LOTRGuiMap.class.getDeclaredField("isMouseWithinMap");
+            hasOverlayField = LOTRGuiMap.class.getDeclaredField("hasOverlay");
+            loadingConquestGridField = LOTRGuiMap.class.getDeclaredField("loadingConquestGrid");
+            playerLocationsField = LOTRGuiMap.class.getDeclaredField("playerLocations");
+            Class<?> playerLocationClass = Class.forName(
+                    "lotr.client.gui.LOTRGuiMap$PlayerLocationInfo");
+            playerLocationProfileField = playerLocationClass
+                    .getDeclaredField("profile");
+            playerLocationXField = playerLocationClass
+                    .getDeclaredField("posX");
+            playerLocationZField = playerLocationClass
+                    .getDeclaredField("posZ");
+            renderPlayerIconMethod = LOTRGuiMap.class.getDeclaredMethod(
+                    "renderPlayerIcon", GameProfile.class, String.class,
+                    double.class, double.class, int.class, int.class);
             renderWaypointTooltipMethod = LOTRGuiMap.class.getDeclaredMethod("renderWaypointTooltip", LOTRAbstractWaypoint.class, boolean.class, int.class, int.class);
             drawFancyRectMethod = LOTRGuiMap.class.getDeclaredMethod("drawFancyRect", int.class, int.class, int.class, int.class);
             mapXMinField.setAccessible(true);
@@ -759,6 +939,16 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             mapYMaxField.setAccessible(true);
             zoomExpField.setAccessible(true);
             selectedWaypointField.setAccessible(true);
+            mouseXCoordField.setAccessible(true);
+            mouseZCoordField.setAccessible(true);
+            isMouseWithinMapField.setAccessible(true);
+            hasOverlayField.setAccessible(true);
+            loadingConquestGridField.setAccessible(true);
+            playerLocationsField.setAccessible(true);
+            playerLocationProfileField.setAccessible(true);
+            playerLocationXField.setAccessible(true);
+            playerLocationZField.setAccessible(true);
+            renderPlayerIconMethod.setAccessible(true);
             renderWaypointTooltipMethod.setAccessible(true);
             drawFancyRectMethod.setAccessible(true);
             reflectionReady = true;
@@ -919,14 +1109,14 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         private final int mapImageX;
         private final int mapImageY;
 
-        private LostTalesEntityWaypoint(EntityLivingBase entity) {
-            this.entityId = entity.getEntityId();
-            this.displayName = entity.getCommandSenderName();
-            this.worldX = Math.round((float) entity.posX);
-            this.worldY = Math.round((float) entity.posY);
-            this.worldZ = Math.round((float) entity.posZ);
-            this.mapImageX = LOTRWaypoint.worldToMapX(entity.posX);
-            this.mapImageY = LOTRWaypoint.worldToMapZ(entity.posZ);
+        private LostTalesEntityWaypoint(EnemyMarkerPosition enemy) {
+            this.entityId = enemy.entityId;
+            this.displayName = enemy.name;
+            this.worldX = Math.round((float) enemy.x);
+            this.worldY = Math.round((float) enemy.y);
+            this.worldZ = Math.round((float) enemy.z);
+            this.mapImageX = LOTRWaypoint.worldToMapX(enemy.x);
+            this.mapImageY = LOTRWaypoint.worldToMapZ(enemy.z);
         }
 
         @Override
@@ -992,6 +1182,24 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         @Override
         public int getID() {
             return -this.entityId - 1;
+        }
+    }
+
+    private static final class EnemyMarkerPosition {
+        private final int entityId;
+        private final String name;
+        private final double x;
+        private final double y;
+        private final double z;
+
+        private EnemyMarkerPosition(int entityId, String name,
+                                    double x, double y, double z) {
+            this.entityId = entityId;
+            this.name = name == null || name.length() == 0
+                    ? "Enemy" : name;
+            this.x = x;
+            this.y = y;
+            this.z = z;
         }
     }
 

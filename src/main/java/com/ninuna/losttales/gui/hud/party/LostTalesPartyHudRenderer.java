@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.hud.party;
 
+import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinDefinition;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
@@ -20,11 +21,16 @@ import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.client.resources.I18n;
+import net.minecraft.client.renderer.OpenGlHelper;
+import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.renderer.entity.RenderItem;
+import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +41,13 @@ public final class LostTalesPartyHudRenderer {
 
     private static final ResourceLocation DEFAULT_PLAYER_SKIN =
             new ResourceLocation("textures/entity/steve.png");
+    private static final ResourceLocation GUI_ICONS =
+            new ResourceLocation("textures/gui/icons.png");
+    private static final RenderItem ITEM_RENDERER = new RenderItem();
+
     private static final int HEAD_SIZE = 20;
+    private static final int HEART_SIZE = 9;
+    private static final int MAX_VISIBLE_HEARTS = 15;
 
     private LostTalesPartyHudRenderer() {}
 
@@ -115,28 +127,45 @@ public final class LostTalesPartyHudRenderer {
                                         int x,
                                         int y,
                                         int width) {
-        int color = color(member.getColor());
+        int partyColor = color(member.getColor());
         Gui.drawRect(x, y + 1, x + 2, y + PartyHudLayout.ROW_HEIGHT - 2,
-                color);
-        if (y > 0) {
-            Gui.drawRect(x + 3, y + PartyHudLayout.ROW_HEIGHT - 1,
-                    x + width, y + PartyHudLayout.ROW_HEIGHT,
-                    LostTalesSkyrimUiStyle.BORDER_DIM);
-        }
+                partyColor);
+        Gui.drawRect(x + 3, y + PartyHudLayout.ROW_HEIGHT - 1,
+                x + width, y + PartyHudLayout.ROW_HEIGHT,
+                LostTalesSkyrimUiStyle.BORDER_DIM);
 
-        boolean muted = stale || status == null
-                || status.getAvailability() != PartyMemberAvailability.ACTIVE;
+        boolean hasLiveStatus = !stale && status != null
+                && status.getAvailability().hasLiveEntityData();
+        boolean muted = !hasLiveStatus;
+        ItemStack helmet = hasLiveStatus ? status.getHelmet() : null;
+        ItemStack heldItem = hasLiveStatus ? status.getHeldItem() : null;
+
         drawMemberHead(
                 minecraft,
                 member.getOwnerId(),
-                !stale && status != null && status.isOnlineActive(),
                 x + 5,
                 y + 4,
                 muted ? 0.55F : 1.0F);
+        if (helmet != null) {
+            renderStack(minecraft, helmet,
+                    x + 5 + HEAD_SIZE - 8,
+                    y + 4 + HEAD_SIZE - 8,
+                    0.55F, false);
+        }
+
+        int heldItemX = x + width - 18;
+        if (heldItem != null) {
+            Gui.drawRect(heldItemX - 1, y + 8,
+                    heldItemX + 17, y + 26, 0x66302D28);
+            renderStack(minecraft, heldItem, heldItemX, y + 9, 1.0F, true);
+        }
 
         FontRenderer font = minecraft.fontRenderer;
         int textX = x + 30;
-        int nameRight = x + width - (leader ? 13 : 4);
+        int leaderX = heldItem == null
+                ? x + width - 7 : heldItemX - 7;
+        int nameRight = leader ? leaderX - 5
+                : (heldItem == null ? x + width - 4 : heldItemX - 3);
         String name = LostTalesSkyrimUiStyle.trimToWidth(
                 font, member.getCharacterName(),
                 Math.max(8, nameRight - textX));
@@ -145,38 +174,37 @@ public final class LostTalesPartyHudRenderer {
                         : LostTalesSkyrimUiStyle.TEXT_BRIGHT);
         if (leader) {
             LostTalesSkyrimUiStyle.drawDiamond(
-                    x + width - 7, y + 7,
+                    leaderX, y + 7,
                     LostTalesSkyrimUiStyle.GOLD);
         }
 
-        String statusText = describeStatus(
-                minecraft, status, stale);
-        font.drawStringWithShadow(
-                LostTalesSkyrimUiStyle.trimToWidth(
-                        font, statusText,
-                        Math.max(8, x + width - 4 - textX)),
-                textX, y + 14,
-                statusColor(status, stale));
-
-        if (!stale && status != null
-                && status.getAvailability().hasLiveEntityData()) {
-            int barWidth = Math.max(8, x + width - 4 - textX);
-            int fill = Math.round(barWidth
-                    * status.getHealth()
-                    / Math.max(0.001F, status.getMaximumHealth()));
-            fill = Math.max(0, Math.min(barWidth, fill));
-            Gui.drawRect(textX, y + 24,
-                    textX + barWidth, y + 26, 0x773D3A33);
-            if (fill > 0) {
-                Gui.drawRect(textX, y + 24,
-                        textX + fill, y + 26, color);
+        int contentRight = heldItem == null
+                ? x + width - 4 : heldItemX - 3;
+        if (hasLiveStatus) {
+            float brightness = status.getAvailability()
+                    == PartyMemberAvailability.DEAD ? 0.65F : 1.0F;
+            if (minecraft.thePlayer != null
+                    && minecraft.thePlayer.dimension
+                    != status.getDimensionId()) {
+                brightness *= 0.65F;
             }
+            drawHearts(minecraft, status,
+                    textX, y + 15,
+                    Math.max(HEART_SIZE, contentRight - textX),
+                    brightness);
+        } else {
+            String statusText = describeUnavailableStatus(status, stale);
+            font.drawStringWithShadow(
+                    LostTalesSkyrimUiStyle.trimToWidth(
+                            font, statusText,
+                            Math.max(8, contentRight - textX)),
+                    textX, y + 15,
+                    statusColor(status, stale));
         }
     }
 
-    private static String describeStatus(Minecraft minecraft,
-                                         PartyMemberStatusSnapshot status,
-                                         boolean stale) {
+    private static String describeUnavailableStatus(
+            PartyMemberStatusSnapshot status, boolean stale) {
         if (stale || status == null) {
             return I18n.format("gui.losttales.party.hud.status_unavailable");
         }
@@ -187,28 +215,7 @@ public final class LostTalesPartyHudRenderer {
         if (availability == PartyMemberAvailability.INACTIVE_CHARACTER) {
             return I18n.format("gui.losttales.party.hud.different_character");
         }
-        if (availability == PartyMemberAvailability.UNAVAILABLE) {
-            return I18n.format("gui.losttales.party.hud.unavailable");
-        }
-        if (availability == PartyMemberAvailability.DEAD) {
-            return I18n.format("gui.losttales.party.hud.dead");
-        }
-
-        String health = I18n.format(
-                "gui.losttales.party.hud.health",
-                formatHealth(status.getHealth()),
-                formatHealth(status.getMaximumHealth()));
-        if (minecraft.thePlayer != null
-                && minecraft.thePlayer.dimension != status.getDimensionId()) {
-            return I18n.format(
-                    "gui.losttales.party.hud.other_dimension", health);
-        }
-        if (status.getMaximumHealth() > 0.0F
-                && status.getHealth() / status.getMaximumHealth() <= 0.25F) {
-            return I18n.format(
-                    "gui.losttales.party.hud.low_health", health);
-        }
-        return health;
+        return I18n.format("gui.losttales.party.hud.unavailable");
     }
 
     private static int statusColor(PartyMemberStatusSnapshot status,
@@ -225,6 +232,53 @@ public final class LostTalesPartyHudRenderer {
         return LostTalesSkyrimUiStyle.TEXT_MUTED;
     }
 
+    private static void drawHearts(Minecraft minecraft,
+                                   PartyMemberStatusSnapshot status,
+                                   int x,
+                                   int y,
+                                   int availableWidth,
+                                   float brightness) {
+        int actualHearts = Math.max(1,
+                (int) Math.ceil(status.getMaximumHealth() / 2.0F));
+        int visibleHearts = Math.min(MAX_VISIBLE_HEARTS, actualHearts);
+        int spacing = visibleHearts <= 1 ? 0
+                : Math.max(1, Math.min(8,
+                (availableWidth - HEART_SIZE) / (visibleHearts - 1)));
+
+        int filledHalfHearts;
+        if (actualHearts <= MAX_VISIBLE_HEARTS) {
+            filledHalfHearts = Math.max(0,
+                    Math.min(visibleHearts * 2,
+                            (int) Math.ceil(status.getHealth())));
+        } else {
+            float fraction = status.getHealth()
+                    / Math.max(0.001F, status.getMaximumHealth());
+            filledHalfHearts = Math.max(0,
+                    Math.min(visibleHearts * 2,
+                            Math.round(fraction * visibleHearts * 2.0F)));
+        }
+
+        minecraft.getTextureManager().bindTexture(GUI_ICONS);
+        GL11.glColor4f(brightness, brightness, brightness, 1.0F);
+        for (int index = 0; index < visibleHearts; index++) {
+            int heartX = x + index * spacing;
+            drawTexturedQuad(heartX, y, HEART_SIZE, HEART_SIZE,
+                    16.0F, 0.0F, HEART_SIZE, HEART_SIZE,
+                    256.0F, 256.0F);
+            int halfThreshold = index * 2;
+            if (filledHalfHearts >= halfThreshold + 2) {
+                drawTexturedQuad(heartX, y, HEART_SIZE, HEART_SIZE,
+                        52.0F, 0.0F, HEART_SIZE, HEART_SIZE,
+                        256.0F, 256.0F);
+            } else if (filledHalfHearts == halfThreshold + 1) {
+                drawTexturedQuad(heartX, y, HEART_SIZE, HEART_SIZE,
+                        61.0F, 0.0F, HEART_SIZE, HEART_SIZE,
+                        256.0F, 256.0F);
+            }
+        }
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+    }
+
     private static List<PartyMemberSnapshot> collectOtherMembers(
             PartySnapshot party, UUID activeCharacterId) {
         ArrayList<PartyMemberSnapshot> result =
@@ -239,19 +293,22 @@ public final class LostTalesPartyHudRenderer {
 
     private static void drawMemberHead(Minecraft minecraft,
                                        UUID ownerId,
-                                       boolean allowConfiguredCharacterTexture,
                                        int x,
                                        int y,
                                        float brightness) {
-        ResourceLocation texture = resolveHeadTexture(
-                minecraft, ownerId, allowConfiguredCharacterTexture);
+        HeadTexture texture = resolveHeadTexture(minecraft, ownerId);
         try {
-            minecraft.getTextureManager().bindTexture(texture);
+            minecraft.getTextureManager().bindTexture(texture.location);
             GL11.glColor4f(brightness, brightness, brightness, 1.0F);
             drawTexturedQuad(x, y, HEAD_SIZE, HEAD_SIZE,
-                    8.0F, 8.0F, 8.0F, 8.0F, 64.0F, 32.0F);
+                    8.0F, 8.0F, 8.0F, 8.0F,
+                    64.0F, texture.imageHeight);
+            // Both classic 64x32 player skins and LOTR's 64x64 biped
+            // textures use the standard headwear UV region. Transparent
+            // pixels make this a no-op for skins without an overlay.
             drawTexturedQuad(x, y, HEAD_SIZE, HEAD_SIZE,
-                    40.0F, 8.0F, 8.0F, 8.0F, 64.0F, 32.0F);
+                    40.0F, 8.0F, 8.0F, 8.0F,
+                    64.0F, texture.imageHeight);
         } catch (Throwable ignored) {
             Gui.drawRect(x, y, x + HEAD_SIZE, y + HEAD_SIZE,
                     0xAA272727);
@@ -260,18 +317,16 @@ public final class LostTalesPartyHudRenderer {
         }
     }
 
-    private static ResourceLocation resolveHeadTexture(
-            Minecraft minecraft,
-            UUID ownerId,
-            boolean allowConfiguredCharacterTexture) {
-        if (allowConfiguredCharacterTexture) {
-            CharacterAppearance appearance =
-                    ClientCharacterAppearanceCache.getAuthoritative(ownerId);
-            CharacterSkinDefinition configured = appearance == null
-                    ? null : CharacterSkinRegistry.get(appearance.getSkinId());
-            if (configured != null) {
-                return new ResourceLocation(configured.getTextureLocation());
-            }
+    private static HeadTexture resolveHeadTexture(
+            Minecraft minecraft, UUID ownerId) {
+        CharacterAppearance appearance =
+                ClientCharacterAppearanceCache.getAuthoritative(ownerId);
+        CharacterSkinDefinition configured = appearance == null
+                ? null : CharacterSkinRegistry.get(appearance.getSkinId());
+        if (configured != null) {
+            return new HeadTexture(
+                    new ResourceLocation(configured.getTextureLocation()),
+                    configuredTextureHeight(appearance));
         }
 
         if (minecraft != null && minecraft.theWorld != null
@@ -280,7 +335,9 @@ public final class LostTalesPartyHudRenderer {
                 if (value instanceof AbstractClientPlayer) {
                     AbstractClientPlayer player = (AbstractClientPlayer) value;
                     if (ownerId.equals(player.getUniqueID())) {
-                        return player.getLocationSkin();
+                        // Legacy player skins use the classic 64x32 layout.
+                        return new HeadTexture(
+                                player.getLocationSkin(), 32.0F);
                     }
                 } else if (value instanceof EntityPlayer) {
                     EntityPlayer player = (EntityPlayer) value;
@@ -290,7 +347,78 @@ public final class LostTalesPartyHudRenderer {
                 }
             }
         }
-        return DEFAULT_PLAYER_SKIN;
+        return new HeadTexture(DEFAULT_PLAYER_SKIN, 32.0F);
+    }
+
+    /** LOTR orc and Uruk body textures retain the classic 64x32 layout. */
+    private static float configuredTextureHeight(
+            CharacterAppearance appearance) {
+        if (appearance != null
+                && (CharacterRaceRegistry.ORC.equals(appearance.getRaceId())
+                || CharacterRaceRegistry.URUK.equals(appearance.getRaceId()))) {
+            return 32.0F;
+        }
+        return 64.0F;
+    }
+
+    private static void renderStack(Minecraft minecraft,
+                                    ItemStack stack,
+                                    int x,
+                                    int y,
+                                    float scale,
+                                    boolean drawOverlay) {
+        if (minecraft == null || stack == null || scale <= 0.0F) {
+            return;
+        }
+
+        float previousZLevel = ITEM_RENDERER.zLevel;
+        float previousLightmapX = OpenGlHelper.lastBrightnessX;
+        float previousLightmapY = OpenGlHelper.lastBrightnessY;
+
+        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(x, y, 0.0F);
+            GL11.glScalef(scale, scale, 1.0F);
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
+            GL11.glEnable(GL11.GL_ALPHA_TEST);
+            GL11.glDisable(GL11.GL_BLEND);
+            GL11.glEnable(GL11.GL_DEPTH_TEST);
+            GL11.glDepthMask(true);
+            GL11.glDepthFunc(GL11.GL_LEQUAL);
+            GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
+            GL11.glEnable(GL12.GL_RESCALE_NORMAL);
+
+            OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
+            OpenGlHelper.setLightmapTextureCoords(
+                    OpenGlHelper.lightmapTexUnit, 240.0F, 240.0F);
+            OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
+
+            RenderHelper.enableGUIStandardItemLighting();
+            ITEM_RENDERER.zLevel = 200.0F;
+            ITEM_RENDERER.renderItemAndEffectIntoGUI(
+                    minecraft.fontRenderer,
+                    minecraft.getTextureManager(),
+                    stack, 0, 0);
+            if (drawOverlay) {
+                ITEM_RENDERER.renderItemOverlayIntoGUI(
+                        minecraft.fontRenderer,
+                        minecraft.getTextureManager(),
+                        stack, 0, 0);
+            }
+        } finally {
+            ITEM_RENDERER.zLevel = previousZLevel;
+            RenderHelper.disableStandardItemLighting();
+            OpenGlHelper.setLightmapTextureCoords(
+                    OpenGlHelper.lightmapTexUnit,
+                    previousLightmapX, previousLightmapY);
+            OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glPopMatrix();
+            GL11.glPopAttrib();
+        }
     }
 
     private static void drawTexturedQuad(float x,
@@ -329,11 +457,13 @@ public final class LostTalesPartyHudRenderer {
         return 0xFF62B56B;
     }
 
-    private static String formatHealth(float value) {
-        int rounded = Math.round(value);
-        if (Math.abs(value - rounded) < 0.05F) {
-            return Integer.toString(rounded);
+    private static final class HeadTexture {
+        private final ResourceLocation location;
+        private final float imageHeight;
+        private HeadTexture(ResourceLocation location,
+                            float imageHeight) {
+            this.location = location;
+            this.imageHeight = imageHeight;
         }
-        return String.format(java.util.Locale.ENGLISH, "%.1f", value);
     }
 }

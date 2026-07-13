@@ -59,6 +59,7 @@ public final class LostTalesConfig {
     public static boolean linkShowPartyHud = false;
     public static int partyHudOffsetX = 2;
     public static int partyHudOffsetY = 18;
+    public static int partyCompassMarkerFadeRadius = 100;
 
     public static int partyStatusUpdateIntervalTicks = 10;
     public static int partyStatusHeartbeatTicks = 100;
@@ -309,6 +310,14 @@ public final class LostTalesConfig {
                     0,
                     100,
                     "Vertical party HUD position as a percentage of the scaled screen height."
+            );
+            partyCompassMarkerFadeRadius = config.getInt(
+                    "partyCompassMarkerFadeRadius",
+                    CATEGORY_CLIENT,
+                    partyCompassMarkerFadeRadius,
+                    16,
+                    2048,
+                    "Distance in blocks over which party-member compass markers fade to their minimum opacity. Beyond this distance they remain visible at the opacity floor."
             );
             partyStatusUpdateIntervalTicks = config.getInt(
                     "statusUpdateIntervalTicks",

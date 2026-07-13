@@ -76,10 +76,10 @@ public final class LostTalesCompassMarkerBatchBuilder {
             if (!marker.isBearingMarker() && marker.getFadeInRadius() > 0.0D) {
                 double dist = Math.sqrt(distSq);
                 double radius = marker.getFadeInRadius();
-                if (dist > radius) continue;
+                if (dist > radius && !marker.isRetainedBeyondFadeRadius()) continue;
                 float t = MathHelper.clamp_float((float) (dist / radius), 0.0F, 1.0F);
-                // Distance fade is strongest when standing on the marker and eases out
-                // to the configured opacity floor at the distance threshold. Cardinal/bearing
+                // The marker is fully opaque nearby and eases down to the
+                // configured opacity floor at the distance threshold. Cardinal/bearing
                 // icons do not have a world distance, so they are intentionally skipped.
                 distT = 1.0F - (t * t * (3.0F - 2.0F * t));
             }

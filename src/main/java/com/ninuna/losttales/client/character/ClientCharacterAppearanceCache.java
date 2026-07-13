@@ -68,6 +68,7 @@ public final class ClientCharacterAppearanceCache {
             if (active != null) {
                 return new CharacterAppearance(
                         playerId,
+                        active.getName(),
                         active.getRaceId(),
                         active.getGenderId(),
                         active.getSkinId(),

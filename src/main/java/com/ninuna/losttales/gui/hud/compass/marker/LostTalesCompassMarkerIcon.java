@@ -23,7 +23,7 @@ public enum LostTalesCompassMarkerIcon {
     PARTY_BLUE(171, 0),
     PARTY_GREEN(190, 0);
 
-    public static final ResourceLocation TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/map_marker_icons.png");
+    public static final ResourceLocation TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/map_markers.png");
     public static final int TEXTURE_WIDTH = 207;
     public static final int TEXTURE_HEIGHT = 64;
     public static final int WIDTH = 17;

@@ -59,6 +59,8 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
             Set<UUID> playerIds = new HashSet<UUID>();
             for (int index = 0; index < count; index++) {
                 UUID playerId = CharacterPacketCodec.readUuid(buffer);
+                String characterName = CharacterPacketCodec.readString(
+                        buffer, CharacterPacketCodec.MAX_NAME_BYTES);
                 String raceId = CharacterPacketCodec.readString(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String genderId = CharacterPacketCodec.readString(
@@ -76,7 +78,7 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                             "invalid cosmetic cape ID");
                 }
                 decoded.add(new CharacterAppearance(
-                        playerId, raceId, genderId, skinId,
+                        playerId, characterName, raceId, genderId, skinId,
                         showMinecraftCape, cosmeticCapeId));
             }
             CharacterPacketCodec.requireFinished(buffer);
@@ -96,6 +98,9 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
         buffer.writeShort(this.appearances.size());
         for (CharacterAppearance appearance : this.appearances) {
             CharacterPacketCodec.writeUuid(buffer, appearance.getPlayerId());
+            CharacterPacketCodec.writeString(
+                    buffer, appearance.getCharacterName(),
+                    CharacterPacketCodec.MAX_NAME_BYTES);
             CharacterPacketCodec.writeString(
                     buffer, appearance.getRaceId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);

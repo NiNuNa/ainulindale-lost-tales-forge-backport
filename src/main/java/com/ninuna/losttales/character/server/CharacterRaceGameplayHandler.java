@@ -10,6 +10,7 @@ import com.ninuna.losttales.character.registry.CharacterRaceGameplayRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.compat.lotr.LotrHalfTrollArmorAdapter;
 import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
+import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import net.minecraft.entity.SharedMonsterAttributes;
@@ -19,8 +20,10 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.IChatComponent;
 import net.minecraftforge.event.ServerChatEvent;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -61,9 +64,9 @@ public final class CharacterRaceGameplayHandler {
         apply(player, character);
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onServerChat(ServerChatEvent event) {
-        if (event == null || event.player == null) {
+        if (event == null || event.player == null || event.component == null) {
             return;
         }
         RoleplayCharacter character = CharacterActiveResolver.get(event.player);
@@ -71,13 +74,80 @@ public final class CharacterRaceGameplayHandler {
             return;
         }
 
-        // Keep the vanilla translation component shape so chat mods can still
-        // inspect and style the two ordinary chat arguments.
-        event.component = new ChatComponentTranslation(
-                "chat.type.text",
-                new ChatComponentText(character.getName()),
-                new ChatComponentText(event.message)
-        );
+        // Run after LOTR's title handler and replace only the account-name
+        // component. This preserves LOTR titles, chat translations, styles,
+        // hover events, drunk-text processing, and any other compatible
+        // decoration already attached to the message.
+        ReplacementState replacementState = new ReplacementState();
+        IChatComponent replaced = replaceFirstExactText(
+                event.component,
+                event.username,
+                character.getName(),
+                replacementState);
+        if (replacementState.replaced
+                && replaced instanceof ChatComponentTranslation) {
+            event.component = (ChatComponentTranslation) replaced;
+        }
+    }
+
+    private static IChatComponent replaceFirstExactText(
+            IChatComponent component,
+            String expected,
+            String replacement,
+            ReplacementState state) {
+        if (component == null || expected == null || replacement == null
+                || state == null || state.replaced) {
+            return component;
+        }
+        if (component instanceof ChatComponentText
+                && expected.equals(component.getUnformattedTextForChat())) {
+            IChatComponent result = new ChatComponentText(replacement);
+            result.setChatStyle(component.getChatStyle().createShallowCopy());
+            // Minecraft 1.7.10 exposes getSiblings() as a raw List in the
+            // mapped API, so iterating it as IChatComponent does not compile.
+            for (Object sibling : component.getSiblings()) {
+                if (sibling instanceof IChatComponent) {
+                    result.appendSibling((IChatComponent) sibling);
+                }
+            }
+            state.replaced = true;
+            return result;
+        }
+
+        if (component instanceof ChatComponentTranslation) {
+            Object[] arguments = ((ChatComponentTranslation) component)
+                    .getFormatArgs();
+            for (int index = 0;
+                 index < arguments.length && !state.replaced;
+                 index++) {
+                Object argument = arguments[index];
+                if (argument instanceof IChatComponent) {
+                    arguments[index] = replaceFirstExactText(
+                            (IChatComponent) argument,
+                            expected, replacement, state);
+                } else if (expected.equals(argument)) {
+                    arguments[index] = replacement;
+                    state.replaced = true;
+                }
+            }
+        }
+
+        List siblings = component.getSiblings();
+        for (int index = 0;
+             index < siblings.size() && !state.replaced;
+             index++) {
+            Object sibling = siblings.get(index);
+            if (sibling instanceof IChatComponent) {
+                siblings.set(index, replaceFirstExactText(
+                        (IChatComponent) sibling,
+                        expected, replacement, state));
+            }
+        }
+        return component;
+    }
+
+    private static final class ReplacementState {
+        private boolean replaced;
     }
 
     public static void apply(EntityPlayerMP player) {

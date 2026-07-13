@@ -1,5 +1,7 @@
 package com.ninuna.losttales.party.sync;
 
+import net.minecraft.item.ItemStack;
+
 import java.util.UUID;
 
 /** Immutable, bounded runtime projection for one authorized party member. */
@@ -13,12 +15,16 @@ public final class PartyMemberStatusSnapshot {
     private final int dimensionId;
     private final float health;
     private final float maximumHealth;
+    private final ItemStack helmet;
+    private final ItemStack heldItem;
 
     private PartyMemberStatusSnapshot(UUID characterId,
                                       PartyMemberAvailability availability,
                                       int dimensionId,
                                       float health,
-                                      float maximumHealth) {
+                                      float maximumHealth,
+                                      ItemStack helmet,
+                                      ItemStack heldItem) {
         if (characterId == null || availability == null) {
             throw new IllegalArgumentException(
                     "party member status identity and availability are required");
@@ -27,13 +33,16 @@ public final class PartyMemberStatusSnapshot {
         this.availability = availability;
         if (!availability.hasLiveEntityData()) {
             if (dimensionId != NO_DIMENSION || health != 0.0F
-                    || maximumHealth != 0.0F) {
+                    || maximumHealth != 0.0F
+                    || helmet != null || heldItem != null) {
                 throw new IllegalArgumentException(
                         "unavailable party members must not expose entity state");
             }
             this.dimensionId = NO_DIMENSION;
             this.health = 0.0F;
             this.maximumHealth = 0.0F;
+            this.helmet = null;
+            this.heldItem = null;
             return;
         }
         if (!isFinite(health) || !isFinite(maximumHealth)
@@ -44,6 +53,8 @@ public final class PartyMemberStatusSnapshot {
         this.dimensionId = dimensionId;
         this.maximumHealth = maximumHealth;
         this.health = Math.max(0.0F, Math.min(health, maximumHealth));
+        this.helmet = copy(helmet);
+        this.heldItem = copy(heldItem);
     }
 
     public static PartyMemberStatusSnapshot offline(UUID characterId) {
@@ -64,13 +75,26 @@ public final class PartyMemberStatusSnapshot {
                                                     int dimensionId,
                                                     float health,
                                                     float maximumHealth) {
+        return online(characterId, dead, dimensionId, health,
+                maximumHealth, null, null);
+    }
+
+    public static PartyMemberStatusSnapshot online(UUID characterId,
+                                                    boolean dead,
+                                                    int dimensionId,
+                                                    float health,
+                                                    float maximumHealth,
+                                                    ItemStack helmet,
+                                                    ItemStack heldItem) {
         return new PartyMemberStatusSnapshot(
                 characterId,
                 dead ? PartyMemberAvailability.DEAD
                         : PartyMemberAvailability.ACTIVE,
                 dimensionId,
                 health,
-                maximumHealth);
+                maximumHealth,
+                helmet,
+                heldItem);
     }
 
     public static PartyMemberStatusSnapshot decoded(
@@ -79,6 +103,18 @@ public final class PartyMemberStatusSnapshot {
             int dimensionId,
             float health,
             float maximumHealth) {
+        return decoded(characterId, availability, dimensionId,
+                health, maximumHealth, null, null);
+    }
+
+    public static PartyMemberStatusSnapshot decoded(
+            UUID characterId,
+            PartyMemberAvailability availability,
+            int dimensionId,
+            float health,
+            float maximumHealth,
+            ItemStack helmet,
+            ItemStack heldItem) {
         if (availability == null) {
             throw new IllegalArgumentException("availability is required");
         }
@@ -87,13 +123,14 @@ public final class PartyMemberStatusSnapshot {
         }
         return new PartyMemberStatusSnapshot(
                 characterId, availability, dimensionId,
-                health, maximumHealth);
+                health, maximumHealth, helmet, heldItem);
     }
 
     private static PartyMemberStatusSnapshot unavailable(
             UUID characterId, PartyMemberAvailability availability) {
         return new PartyMemberStatusSnapshot(
-                characterId, availability, NO_DIMENSION, 0.0F, 0.0F);
+                characterId, availability, NO_DIMENSION, 0.0F, 0.0F,
+                null, null);
     }
 
     public UUID getCharacterId() {
@@ -114,6 +151,16 @@ public final class PartyMemberStatusSnapshot {
 
     public float getMaximumHealth() {
         return this.maximumHealth;
+    }
+
+    /** Returns a defensive copy suitable for client-side item rendering. */
+    public ItemStack getHelmet() {
+        return copy(this.helmet);
+    }
+
+    /** Returns a defensive copy suitable for client-side item rendering. */
+    public ItemStack getHeldItem() {
+        return copy(this.heldItem);
     }
 
     public boolean isOnlineActive() {
@@ -140,7 +187,9 @@ public final class PartyMemberStatusSnapshot {
                 && Float.floatToIntBits(this.health)
                 == Float.floatToIntBits(other.health)
                 && Float.floatToIntBits(this.maximumHealth)
-                == Float.floatToIntBits(other.maximumHealth);
+                == Float.floatToIntBits(other.maximumHealth)
+                && ItemStack.areItemStacksEqual(this.helmet, other.helmet)
+                && ItemStack.areItemStacksEqual(this.heldItem, other.heldItem);
     }
 
     @Override
@@ -150,6 +199,24 @@ public final class PartyMemberStatusSnapshot {
         result = 31 * result + this.dimensionId;
         result = 31 * result + Float.floatToIntBits(this.health);
         result = 31 * result + Float.floatToIntBits(this.maximumHealth);
+        result = 31 * result + itemStackHash(this.helmet);
+        result = 31 * result + itemStackHash(this.heldItem);
+        return result;
+    }
+
+    private static ItemStack copy(ItemStack stack) {
+        return stack == null ? null : stack.copy();
+    }
+
+    private static int itemStackHash(ItemStack stack) {
+        if (stack == null) {
+            return 0;
+        }
+        int result = stack.getItem() == null ? 0 : stack.getItem().hashCode();
+        result = 31 * result + stack.stackSize;
+        result = 31 * result + stack.getItemDamage();
+        result = 31 * result + (stack.hasTagCompound()
+                ? stack.getTagCompound().hashCode() : 0);
         return result;
     }
 

@@ -22,7 +22,11 @@ public final class PartyNetworkRequestHandler {
                                     UUID expectedPartyId,
                                     long expectedPartyRevision,
                                     UUID targetId,
-                                    PartyColor color) {
+                                    PartyColor color,
+                                    boolean hasMarkerPosition,
+                                    int markerDimensionId,
+                                    double markerX,
+                                    double markerZ) {
         if (player == null || operationType == null) {
             return;
         }
@@ -91,7 +95,9 @@ public final class PartyNetworkRequestHandler {
                 case SET_GO_HERE_MARKER:
                     finish(player, requestId, operationType, before,
                             PartyServerActionService.setGoHereMarker(
-                                    player, expectedPartyRevision));
+                                    player, expectedPartyRevision,
+                                    hasMarkerPosition, markerDimensionId,
+                                    markerX, markerZ));
                     return;
                 case REMOVE_GO_HERE_MARKER:
                     finish(player, requestId, operationType, before,
