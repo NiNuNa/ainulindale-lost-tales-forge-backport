@@ -64,10 +64,12 @@ public class LostTalesConfigGui extends GuiConfig {
         List<IConfigElement> quests = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_QUESTS)).getChildElements();
         List<IConfigElement> missives = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_MISSIVES)).getChildElements();
         List<IConfigElement> combatMarkers = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_COMBAT_MARKERS)).getChildElements();
+        List<IConfigElement> party = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_PARTY)).getChildElements();
 
         elements.add(group("hud", "losttales.config.category.client.hud", pick(client,
                 "showLostTalesHud", "hudPlacementPreset",
                 "showCompassHud", "linkShowCompassHud", "compassHudOffsetX", "compassHudOffsetY",
+                "showPartyHud", "linkShowPartyHud", "partyHudOffsetX", "partyHudOffsetY",
                 "showQuickLootHud", "linkShowQuickLootHud", "quickLootHudOffsetX", "quickLootHudOffsetY",
                 "showQuestHud", "linkShowQuestHud", "questHudOffsetX", "questHudOffsetY")));
         elements.add(group("compass", "losttales.config.category.client.compass", pick(client,
@@ -83,6 +85,7 @@ public class LostTalesConfigGui extends GuiConfig {
         elements.add(group("questRules", "losttales.config.category.quests.rules", quests));
         elements.add(group("missives", "losttales.config.category.missives", missives));
         elements.add(group("combatMarkers", "losttales.config.category.combatMarkers", combatMarkers));
+        elements.add(group("party", "losttales.config.category.party", party));
 
         List<IConfigElement> leftovers = leftovers(client, elements);
         if (!leftovers.isEmpty()) {

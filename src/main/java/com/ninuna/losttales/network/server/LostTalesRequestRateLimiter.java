@@ -22,7 +22,9 @@ public final class LostTalesRequestRateLimiter {
         QUICK_LOOT_SNAPSHOT(30, 5000L),
         QUICK_LOOT_MUTATION(20, 5000L),
         QUEST_ACTION(30, 5000L),
-        MISSIVE_ACCEPT(10, 5000L);
+        MISSIVE_ACCEPT(10, 5000L),
+        PARTY_SNAPSHOT(20, 5000L),
+        PARTY_MUTATION(12, 5000L);
 
         private final int maximumRequests;
         private final long windowMillis;

@@ -18,6 +18,11 @@ import com.ninuna.losttales.network.packet.character.CharacterOperationResultPac
 import com.ninuna.losttales.network.packet.character.CharacterRosterRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterSelectRequestPacket;
+import com.ninuna.losttales.network.packet.party.PartyActionRequestPacket;
+import com.ninuna.losttales.network.packet.party.PartyMemberStatusSyncPacket;
+import com.ninuna.losttales.network.packet.party.PartyOperationResultPacket;
+import com.ninuna.losttales.network.packet.party.PartyStateSyncPacket;
+import com.ninuna.losttales.network.packet.party.PartyTrackingSyncPacket;
 import cpw.mods.fml.common.network.NetworkRegistry;
 import cpw.mods.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import cpw.mods.fml.relauncher.Side;
@@ -39,6 +44,7 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(CharacterSelectRequestPacket.Handler.class, CharacterSelectRequestPacket.class, 10, Side.SERVER);
         CHANNEL.registerMessage(CharacterDeleteRequestPacket.Handler.class, CharacterDeleteRequestPacket.class, 11, Side.SERVER);
         CHANNEL.registerMessage(CharacterCapeUpdateRequestPacket.Handler.class, CharacterCapeUpdateRequestPacket.class, 16, Side.SERVER);
+        CHANNEL.registerMessage(PartyActionRequestPacket.Handler.class, PartyActionRequestPacket.class, 17, Side.SERVER);
 
         // Server -> client snapshots. These are registered from the common proxy so a
         // dedicated server also knows the packet discriminators when it sends them.
@@ -52,5 +58,9 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(CharacterOperationResultPacket.Handler.class, CharacterOperationResultPacket.class, 13, Side.CLIENT);
         CHANNEL.registerMessage(CharacterAppearanceSyncPacket.Handler.class, CharacterAppearanceSyncPacket.class, 14, Side.CLIENT);
         CHANNEL.registerMessage(CharacterCreationCatalogSyncPacket.Handler.class, CharacterCreationCatalogSyncPacket.class, 15, Side.CLIENT);
+        CHANNEL.registerMessage(PartyStateSyncPacket.Handler.class, PartyStateSyncPacket.class, 18, Side.CLIENT);
+        CHANNEL.registerMessage(PartyOperationResultPacket.Handler.class, PartyOperationResultPacket.class, 19, Side.CLIENT);
+        CHANNEL.registerMessage(PartyMemberStatusSyncPacket.Handler.class, PartyMemberStatusSyncPacket.class, 20, Side.CLIENT);
+        CHANNEL.registerMessage(PartyTrackingSyncPacket.Handler.class, PartyTrackingSyncPacket.class, 21, Side.CLIENT);
     }
 }

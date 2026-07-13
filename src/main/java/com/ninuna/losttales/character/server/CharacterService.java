@@ -14,6 +14,9 @@ import com.ninuna.losttales.character.validation.CharacterValidationResult;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.character.validation.ValidatedCharacterCreation;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
+import com.ninuna.losttales.party.server.PartyErrorId;
+import com.ninuna.losttales.party.server.PartyOperationResult;
+import com.ninuna.losttales.party.server.PartyService;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 
@@ -121,7 +124,8 @@ public final class CharacterService {
         }
 
         ValidatedCharacterCreation creation = validation.getCreation();
-        RoleplayCharacter character = createUniqueCharacter(roster, player.getUniqueID(), creation);
+        RoleplayCharacter character = createUniqueCharacter(
+                data, player.getUniqueID(), creation);
         if (character == null || !roster.addCharacter(character)) {
             return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, roster);
         }
@@ -269,6 +273,22 @@ public final class CharacterService {
             return CharacterOperationResult.failure(validation.getErrorId(), roster);
         }
 
+        RoleplayCharacter character = roster.getCharacter(characterId);
+        PartyOperationResult partyCleanup = PartyService.getInstance()
+                .removeCharacterForDeletion(player.worldObj, character);
+        if (!partyCleanup.isSuccessful()) {
+            CharacterErrorId error;
+            if (partyCleanup.getErrorId() == PartyErrorId.PARTY_STORAGE_READ_ONLY) {
+                error = CharacterErrorId.PARTY_STORAGE_READ_ONLY;
+            } else if (partyCleanup.getErrorId()
+                    == PartyErrorId.INVITATION_STORAGE_READ_ONLY) {
+                error = CharacterErrorId.PARTY_INVITATION_STORAGE_READ_ONLY;
+            } else {
+                error = CharacterErrorId.PARTY_CLEANUP_FAILED;
+            }
+            return CharacterOperationResult.failure(error, roster);
+        }
+
         RoleplayCharacter removed = roster.removeCharacter(characterId);
         if (removed == null) {
             return CharacterOperationResult.failure(CharacterErrorId.CHARACTER_NOT_FOUND, roster);
@@ -298,11 +318,11 @@ public final class CharacterService {
         }
     }
 
-    private RoleplayCharacter createUniqueCharacter(CharacterRoster roster, UUID ownerId,
+    private RoleplayCharacter createUniqueCharacter(CharacterWorldData data, UUID ownerId,
                                                      ValidatedCharacterCreation creation) {
         for (int attempt = 0; attempt < UUID_GENERATION_ATTEMPTS; attempt++) {
             UUID characterId = UUID.randomUUID();
-            if (roster.getCharacter(characterId) != null) {
+            if (containsCharacterId(data, characterId)) {
                 continue;
             }
             return new RoleplayCharacter(
@@ -322,6 +342,18 @@ public final class CharacterService {
             );
         }
         return null;
+    }
+
+    private boolean containsCharacterId(CharacterWorldData data, UUID characterId) {
+        if (data == null || characterId == null) {
+            return false;
+        }
+        for (CharacterRoster roster : data.getRosters()) {
+            if (roster != null && roster.getCharacter(characterId) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static final class Holder {

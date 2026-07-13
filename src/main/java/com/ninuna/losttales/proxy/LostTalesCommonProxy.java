@@ -35,6 +35,14 @@ import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPack
 import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
+import com.ninuna.losttales.network.packet.party.PartyMemberStatusSyncPacket;
+import com.ninuna.losttales.network.packet.party.PartyOperationResultPacket;
+import com.ninuna.losttales.network.packet.party.PartyStateSyncPacket;
+import com.ninuna.losttales.network.packet.party.PartyTrackingSyncPacket;
+import com.ninuna.losttales.party.server.PartyMemberStatusSyncManager;
+import com.ninuna.losttales.party.server.PartyTrackingSyncManager;
+import com.ninuna.losttales.party.server.PartyPlayerEventHandler;
+import com.ninuna.losttales.party.server.PartySyncManager;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
 import com.ninuna.losttales.world.biome.ELostTalesBiome;
 import com.ninuna.losttales.world.map.LostTalesMapOverlay;
@@ -69,6 +77,7 @@ public class LostTalesCommonProxy {
         CharacterPlayerEventHandler characterPlayerEventHandler = new CharacterPlayerEventHandler();
         CharacterRaceGameplayHandler characterRaceGameplayHandler = new CharacterRaceGameplayHandler();
         CharacterSpawnOriginHandler characterSpawnOriginHandler = new CharacterSpawnOriginHandler();
+        PartyPlayerEventHandler partyPlayerEventHandler = new PartyPlayerEventHandler();
         LostTalesServerTaskQueue serverTaskQueue = new LostTalesServerTaskQueue();
         LostTalesNetworkPlayerEventHandler networkPlayerEventHandler = new LostTalesNetworkPlayerEventHandler();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
@@ -82,6 +91,7 @@ public class LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(mobAggroEventHandler);
         FMLCommonHandler.instance().bus().register(characterPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(characterRaceGameplayHandler);
+        FMLCommonHandler.instance().bus().register(partyPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(serverTaskQueue);
         FMLCommonHandler.instance().bus().register(networkPlayerEventHandler);
 
@@ -162,10 +172,21 @@ public class LostTalesCommonProxy {
 
     public void handleCharacterCreationCatalogSync(CharacterCreationCatalogSyncPacket packet) {}
 
+    public void handlePartyStateSync(PartyStateSyncPacket packet) {}
+
+    public void handlePartyOperationResult(PartyOperationResultPacket packet) {}
+
+    public void handlePartyMemberStatusSync(PartyMemberStatusSyncPacket packet) {}
+
+    public void handlePartyTrackingSync(PartyTrackingSyncPacket packet) {}
+
     public void onServerStarting(FMLServerStartingEvent event) {
         LostTalesServerTaskQueue.startAccepting();
         LostTalesRequestRateLimiter.clear();
         CharacterServerPacketDispatcher.clearSecurityState();
+        PartySyncManager.clear();
+        PartyMemberStatusSyncManager.clear();
+        PartyTrackingSyncManager.clear();
         ELostTalesCommand.initAndRegisterCommands(event);
     }
 
@@ -173,6 +194,9 @@ public class LostTalesCommonProxy {
         LostTalesServerTaskQueue.stopAcceptingAndClear();
         LostTalesRequestRateLimiter.clear();
         CharacterServerPacketDispatcher.clearSecurityState();
+        PartySyncManager.clear();
+        PartyMemberStatusSyncManager.clear();
+        PartyTrackingSyncManager.clear();
         LostTalesMobAggroEventHandler.clearAll();
     }
 }

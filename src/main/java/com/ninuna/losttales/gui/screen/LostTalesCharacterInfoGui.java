@@ -12,6 +12,7 @@ import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterCapeGui;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileRouterGui;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterRosterGui;
+import com.ninuna.losttales.gui.screen.party.LostTalesPartyManagementGui;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -43,6 +44,7 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
     private static final int BUTTON_MANAGE = 1;
     private static final int BUTTON_BACK = 2;
     private static final int BUTTON_CAPE = 3;
+    private static final int BUTTON_PARTY = 4;
 
     private final GuiScreen parent;
     private int modelPanelX;
@@ -67,11 +69,21 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
         if (this.mc != null) {
             LostTalesClientQuestDefinitionStore.ensureLoaded(this.mc.getResourceManager());
         }
-        this.buttonList.add(new GuiButton(BUTTON_CAPE, this.width - 252,
-                this.height - 28, 118, 20,
+        int actionGap = 6;
+        int actionWidth = Math.max(64, Math.min(112,
+                (this.width - 104 - actionGap * 2) / 3));
+        int actionStart = this.width - 8
+                - actionWidth * 3 - actionGap * 2;
+        this.buttonList.add(new GuiButton(BUTTON_PARTY, actionStart,
+                this.height - 28, actionWidth, 20,
+                I18n.format("gui.losttales.party.button")));
+        this.buttonList.add(new GuiButton(BUTTON_CAPE,
+                actionStart + actionWidth + actionGap,
+                this.height - 28, actionWidth, 20,
                 I18n.format("gui.losttales.character.cape.button")));
-        this.buttonList.add(new GuiButton(BUTTON_MANAGE, this.width - 126,
-                this.height - 28, 118, 20,
+        this.buttonList.add(new GuiButton(BUTTON_MANAGE,
+                actionStart + (actionWidth + actionGap) * 2,
+                this.height - 28, actionWidth, 20,
                 I18n.format("gui.losttales.character.manage")));
         this.buttonList.add(new GuiButton(BUTTON_BACK, 8,
                 this.height - 28, 72, 20, I18n.format("gui.back")));
@@ -403,6 +415,10 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
 
     @Override
     protected void actionPerformed(GuiButton button) {
+        if (button.id == BUTTON_PARTY) {
+            this.mc.displayGuiScreen(new LostTalesPartyManagementGui(this));
+            return;
+        }
         if (button.id == BUTTON_CAPE) {
             this.mc.displayGuiScreen(new LostTalesCharacterCapeGui(this));
             return;

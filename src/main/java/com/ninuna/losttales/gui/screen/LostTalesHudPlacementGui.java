@@ -3,6 +3,7 @@ package com.ninuna.losttales.gui.screen;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
+import com.ninuna.losttales.gui.hud.party.PartyHudLayout;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
@@ -36,9 +37,10 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         addButton(0, centerX - 100, bottomY, 200, 20, "Done");
 
         int y = 36;
-        addButton(10, centerX - 155, y, 100, 20, elementLabel(HudElement.COMPASS));
-        addButton(11, centerX - 50, y, 100, 20, elementLabel(HudElement.QUICK_LOOT));
-        addButton(12, centerX + 55, y, 100, 20, elementLabel(HudElement.QUEST));
+        addButton(10, centerX - 154, y, 74, 20, elementLabel(HudElement.COMPASS));
+        addButton(11, centerX - 77, y, 74, 20, elementLabel(HudElement.PARTY));
+        addButton(12, centerX, y, 74, 20, elementLabel(HudElement.QUICK_LOOT));
+        addButton(13, centerX + 77, y, 74, 20, elementLabel(HudElement.QUEST));
 
         y += 28;
         addButton(20, centerX - 102, y, 50, 20, "Up");
@@ -46,11 +48,12 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         addButton(22, centerX - 158, y + 24, 50, 20, "Left");
         addButton(23, centerX - 46, y + 24, 50, 20, "Right");
 
-        addButton(30, centerX + 18, y, 66, 20, "Default");
-        addButton(31, centerX + 88, y, 76, 20, "LOTR-safe");
-        addButton(32, centerX + 18, y + 24, 66, 20, "Compact");
-        addButton(33, centerX + 88, y + 24, 76, 20, "Minimal");
-        addButton(34, centerX + 18, y + 48, 146, 20, "Reset Selected");
+        int presetX = Math.min(centerX + 18, this.width - 154);
+        addButton(30, presetX, y, 66, 20, "Default");
+        addButton(31, presetX + 70, y, 76, 20, "LOTR-safe");
+        addButton(32, presetX, y + 24, 66, 20, "Compact");
+        addButton(33, presetX + 70, y + 24, 76, 20, "Minimal");
+        addButton(34, presetX, y + 48, 146, 20, "Reset Selected");
     }
 
     private void addButton(int id, int x, int y, int width, int height, String text) {
@@ -73,11 +76,16 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             return;
         }
         if (button.id == 11) {
-            selected = HudElement.QUICK_LOOT;
+            selected = HudElement.PARTY;
             initGui();
             return;
         }
         if (button.id == 12) {
+            selected = HudElement.QUICK_LOOT;
+            initGui();
+            return;
+        }
+        if (button.id == 13) {
             selected = HudElement.QUEST;
             initGui();
             return;
@@ -112,6 +120,8 @@ public class LostTalesHudPlacementGui extends GuiScreen {
     private void resetSelectedElement() {
         if (selected == HudElement.COMPASS) {
             LostTalesConfig.setHudOffset(selected.configKey, 50, 2);
+        } else if (selected == HudElement.PARTY) {
+            LostTalesConfig.setHudOffset(selected.configKey, 2, 18);
         } else if (selected == HudElement.QUICK_LOOT) {
             LostTalesConfig.setHudOffset(selected.configKey, 24, 32);
         } else if (selected == HudElement.QUEST) {
@@ -176,6 +186,7 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         int screenHeight = resolution.getScaledHeight();
 
         drawCompassPreview(screenWidth, screenHeight);
+        drawPartyPreview(screenWidth, screenHeight);
         drawQuickLootPreview(screenWidth, screenHeight);
         drawQuestPreview(screenWidth, screenHeight);
     }
@@ -198,6 +209,11 @@ public class LostTalesHudPlacementGui extends GuiScreen {
     private void drawCompassPreview(int screenWidth, int screenHeight) {
         int[] bounds = getPreviewBounds(HudElement.COMPASS, screenWidth, screenHeight);
         drawPreviewBox(bounds[0], bounds[1], bounds[2], bounds[3], HudElement.COMPASS, "Compass / marker label");
+    }
+
+    private void drawPartyPreview(int screenWidth, int screenHeight) {
+        int[] bounds = getPreviewBounds(HudElement.PARTY, screenWidth, screenHeight);
+        drawPreviewBox(bounds[0], bounds[1], bounds[2], bounds[3], HudElement.PARTY, "Party members / health");
     }
 
     private void drawQuickLootPreview(int screenWidth, int screenHeight) {
@@ -232,6 +248,12 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             boxHeight = 32;
             x = (screenWidth - boxWidth) * LostTalesConfig.compassHudOffsetX / 100;
             y = screenHeight * LostTalesConfig.compassHudOffsetY / 100 + this.fontRendererObj.FONT_HEIGHT + 4;
+        } else if (element == HudElement.PARTY) {
+            boxWidth = PartyHudLayout.PANEL_WIDTH;
+            boxHeight = PartyHudLayout.PANEL_PADDING * 2
+                    + PartyHudLayout.ROW_HEIGHT * 3;
+            x = screenWidth * LostTalesConfig.partyHudOffsetX / 100;
+            y = screenHeight * LostTalesConfig.partyHudOffsetY / 100;
         } else if (element == HudElement.QUICK_LOOT) {
             boxWidth = 280;
             boxHeight = 25 + Math.max(1, Math.min(5, LostTalesConfig.quickLootHudMaxRows)) * 24 + 30;
@@ -278,6 +300,7 @@ public class LostTalesHudPlacementGui extends GuiScreen {
 
     private enum HudElement {
         COMPASS("Compass", "compass"),
+        PARTY("Party", "party"),
         QUICK_LOOT("Quick Loot", "quickloot"),
         QUEST("Quest", "quest");
 
@@ -297,6 +320,9 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         private String offsetText() {
             if (this == COMPASS) {
                 return LostTalesConfig.compassHudOffsetX + ", " + LostTalesConfig.compassHudOffsetY;
+            }
+            if (this == PARTY) {
+                return LostTalesConfig.partyHudOffsetX + ", " + LostTalesConfig.partyHudOffsetY;
             }
             if (this == QUICK_LOOT) {
                 return LostTalesConfig.quickLootHudOffsetX + ", " + LostTalesConfig.quickLootHudOffsetY;

@@ -3,6 +3,7 @@ package com.ninuna.losttales.character.server;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import com.ninuna.losttales.party.server.PartySyncManager;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 
@@ -47,13 +48,16 @@ public final class CharacterNetworkRequestHandler {
     public static void handleDeleteRequest(final EntityPlayerMP player, final int requestId,
                                            final long expectedRosterRevision,
                                            final UUID characterId) {
+        PartySyncManager.AudienceSnapshot affectedAudience =
+                PartySyncManager.captureCharacterRelationsAudience(
+                        player == null ? null : player.worldObj, characterId);
         execute(player, requestId, CharacterOperationType.DELETE, new Operation() {
             @Override
             public CharacterOperationResult run() {
                 return CharacterService.getInstance().deleteCharacter(
                         player, expectedRosterRevision, characterId);
             }
-        });
+        }, affectedAudience);
     }
 
     public static void handleCapeUpdateRequest(final EntityPlayerMP player,
@@ -79,6 +83,14 @@ public final class CharacterNetworkRequestHandler {
                                 int requestId,
                                 CharacterOperationType operationType,
                                 Operation operation) {
+        execute(player, requestId, operationType, operation, null);
+    }
+
+    private static void execute(EntityPlayerMP player,
+                                int requestId,
+                                CharacterOperationType operationType,
+                                Operation operation,
+                                PartySyncManager.AudienceSnapshot affectedAudience) {
         try {
             CharacterOperationResult result = operation.run();
             CharacterSyncManager.sendResultAndRoster(
@@ -94,6 +106,12 @@ public final class CharacterNetworkRequestHandler {
                 }
                 CharacterAppearanceSyncManager.broadcastPlayer(
                         player, result.getRoster());
+                if (operationType != CharacterOperationType.CAPE_UPDATE) {
+                    PartySyncManager.sendState(
+                            player, PartySyncManager.UNSOLICITED_REQUEST_ID);
+                    PartySyncManager.sendStateToAudience(
+                            affectedAudience, player.getUniqueID());
+                }
             }
         } catch (Throwable throwable) {
             FMLLog.warning("[%s] Character %s request failed for player %s: %s",

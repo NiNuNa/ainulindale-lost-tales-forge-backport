@@ -544,7 +544,7 @@ questJournal.title=Quest Journal
 
 #   Config GUI
 losttales.config.category.client=Client / HUD
-losttales.config.category.client.tooltip=HUD visibility, placement, compass, quick-loot, quest tracker, and client feedback options.
+losttales.config.category.client.tooltip=HUD visibility, placement, compass, party, quick-loot, quest tracker, and client feedback options.
 losttales.config.category.quests=Quests
 losttales.config.category.quests.tooltip=Quest start rules, prerequisites, rewards, and marker discovery behavior.
 losttales.config.category.client.hud=HUD Visibility & Placement
@@ -607,6 +607,19 @@ gui.losttales.missive_board.selected=Selected notice %s
 gui.losttales.missive_board.available=%s/%s notices
 losttales.config.category.combatMarkers=Combat Markers
 losttales.config.category.combatMarkers.tooltip=Server-authoritative range, update cadence, disengagement grace, and diagnostics for temporary enemy markers.
+
+losttales.config.category.party=Party Status
+losttales.config.category.party.tooltip=Server-authoritative party health and availability update cadence.
+
+# Party HUD
+gui.losttales.party.hud.status_unavailable=Status unavailable
+gui.losttales.party.hud.offline=Offline
+gui.losttales.party.hud.different_character=Different character
+gui.losttales.party.hud.unavailable=Unavailable
+gui.losttales.party.hud.dead=Dead
+gui.losttales.party.hud.health=%s / %s
+gui.losttales.party.hud.other_dimension=%s - Other dimension
+gui.losttales.party.hud.low_health=%s - Low health
 losttales.config.category.missives=Dynamic Missives
 losttales.config.category.missives.tooltip=Missive board refill, notice expiration, and generated timed quest options.
 # Missive letter reader
@@ -756,6 +769,9 @@ gui.losttales.character.error.invalid_character_id=The character identifier is i
 gui.losttales.character.error.character_not_found=That character no longer exists in your roster.
 gui.losttales.character.error.switch_not_allowed=Character switching is not permitted right now.
 gui.losttales.character.error.delete_not_allowed=Character deletion is not permitted right now.
+gui.losttales.character.error.party_storage_read_only=Party data was written by a newer version and is read-only. The character was not deleted.
+gui.losttales.character.error.party_invitation_storage_read_only=Party invitation data was written by a newer version and is read-only. The character was not deleted.
+gui.losttales.character.error.party_cleanup_failed=The server could not safely remove this character from its party. The character was not deleted.
 gui.losttales.character.error.internal_error=The server could not complete the character operation.
 
 gui.losttales.character.integration_unavailable=Unavailable
@@ -804,3 +820,134 @@ gui.losttales.character.cape.dorwinion_captain=Dorwinion Captain
 gui.losttales.character.cape.dorwinion_elf_captain=Dorwinion Elf Captain
 gui.losttales.character.cape.gandalf=Gandalf
 gui.losttales.character.cape.gandalf_santa=Gandalf's Winter Cape
+
+# Party management
+gui.losttales.party.button=Party
+gui.losttales.party.title=Party Management
+gui.losttales.party.server_authoritative=Server-authoritative character party
+gui.losttales.party.confirmation=Confirm Party Action
+gui.losttales.party.confirm=Confirm
+gui.losttales.party.refresh=Refresh
+gui.losttales.party.loading=Loading party state from the server...
+gui.losttales.party.working=Waiting for the server...
+gui.losttales.party.status=Party Status
+gui.losttales.party.unknown=Unknown
+
+gui.losttales.party.tab.members=Members
+gui.losttales.party.tab.invitations=Invitations
+gui.losttales.party.tab.invite=Invite
+gui.losttales.party.members=Party Members
+gui.losttales.party.member_details=Member Details
+gui.losttales.party.invitations=Invitations
+gui.losttales.party.invitation_details=Invitation Details
+gui.losttales.party.eligible_players=Eligible Online Players
+gui.losttales.party.invite_details=Invite Details
+
+gui.losttales.party.create=Create Party
+gui.losttales.party.leave=Leave Party
+gui.losttales.party.disband=Disband Party
+gui.losttales.party.remove=Remove
+gui.losttales.party.transfer=Transfer Leader
+gui.losttales.party.accept=Accept
+gui.losttales.party.decline=Decline
+gui.losttales.party.cancel_invite=Cancel Invite
+gui.losttales.party.invite=Invite Player
+gui.losttales.party.set_go_here=Set Go Here
+gui.losttales.party.remove_go_here=Remove Marker
+
+gui.losttales.party.no_party=This character is not currently in a party.
+gui.losttales.party.no_party_detail=Create a party to invite up to three other role-playing characters. Fellowship membership remains separate.
+gui.losttales.party.no_invitations=There are no incoming or outgoing party invitations.
+gui.losttales.party.create_before_invite=Create a party before inviting other players.
+gui.losttales.party.leader_invites_only=Only the party leader may send invitations.
+gui.losttales.party.full=The party already has four members.
+gui.losttales.party.no_eligible_players=No eligible online active characters are currently available. Refresh after another player joins or switches characters.
+gui.losttales.party.invitation_list_truncated=Only the first synchronized invitations are shown. Refresh after resolving some invitations.
+gui.losttales.party.player_list_truncated=Only the first 64 eligible online players are shown.
+
+gui.losttales.party.character=Character
+gui.losttales.party.player=Player
+gui.losttales.party.role=Role
+gui.losttales.party.color=Color
+gui.losttales.party.party_size=Party Size
+gui.losttales.party.direction=Direction
+gui.losttales.party.from=From
+gui.losttales.party.to=To
+gui.losttales.party.expires=Expires
+gui.losttales.party.incoming=Incoming
+gui.losttales.party.outgoing=Outgoing
+gui.losttales.party.leader=Leader
+gui.losttales.party.member=Member
+gui.losttales.party.leader_marker=[Leader]
+gui.losttales.party.you_marker=[You]
+gui.losttales.party.choose_color=Choose your party marker color:
+gui.losttales.party.expires_minutes=%sm %ss remaining
+gui.losttales.party.expires_seconds=%ss remaining
+
+gui.losttales.party.color.green=Green
+gui.losttales.party.color.yellow=Yellow
+gui.losttales.party.color.purple=Purple
+gui.losttales.party.color.blue=Blue
+
+gui.losttales.party.confirm.leave.title=Leave this party?
+gui.losttales.party.confirm.leave.detail=Your active character will be removed from this party. Leadership transfers only if the current leader leaves.
+gui.losttales.party.confirm.disband.title=Disband this party?
+gui.losttales.party.confirm.disband.detail=All membership and outstanding invitations will be removed.
+gui.losttales.party.confirm.remove.title=Remove %s from the party?
+gui.losttales.party.confirm.remove.detail=The selected character will lose party membership immediately.
+gui.losttales.party.confirm.transfer.title=Transfer leadership to %s?
+gui.losttales.party.confirm.transfer.detail=Existing outgoing invitations will be cancelled when leadership changes.
+
+gui.losttales.party.success.generic=Party operation completed.
+gui.losttales.party.success.request_state=Party state refreshed.
+gui.losttales.party.success.create=Party created.
+gui.losttales.party.success.leave=You left the party.
+gui.losttales.party.success.remove_member=Party member removed.
+gui.losttales.party.success.disband=Party disbanded.
+gui.losttales.party.success.transfer_leadership=Party leadership transferred.
+gui.losttales.party.success.set_color=Party color changed.
+gui.losttales.party.success.invite_player=Party invitation sent.
+gui.losttales.party.success.accept_invitation=Party invitation accepted.
+gui.losttales.party.success.decline_invitation=Party invitation declined.
+gui.losttales.party.success.cancel_invitation=Party invitation cancelled.
+gui.losttales.party.success.set_go_here_marker=Go Here marker placed at your current position.
+gui.losttales.party.success.remove_go_here_marker=Go Here marker removed.
+gui.losttales.party.success.unknown=Party operation completed.
+
+gui.losttales.party.error.none=No error.
+gui.losttales.party.error.invalid_player=The player session is not valid.
+gui.losttales.party.error.client_side_request=The request must be handled by the server.
+gui.losttales.party.error.character_storage_read_only=Character data is read-only because it was written by a newer version.
+gui.losttales.party.error.party_storage_read_only=Party data is read-only because it was written by a newer version.
+gui.losttales.party.error.invitation_storage_read_only=Party invitation data is read-only because it was written by a newer version.
+gui.losttales.party.error.marker_storage_read_only=Party marker data is read-only because it was written by a newer version.
+gui.losttales.party.error.no_active_character=Select an active role-playing character first.
+gui.losttales.party.error.character_not_found=The active role-playing character no longer exists.
+gui.losttales.party.error.character_id_ambiguous=The server found a duplicate character identifier and refused the operation.
+gui.losttales.party.error.active_character_changed=The active role-playing character changed. Review the refreshed party state and try again.
+gui.losttales.party.error.party_not_found=That party no longer exists.
+gui.losttales.party.error.already_in_party=This character is already in a party.
+gui.losttales.party.error.not_in_party=This character is not in a party.
+gui.losttales.party.error.not_leader=Only the party leader may perform that action.
+gui.losttales.party.error.party_full=The party already has four members.
+gui.losttales.party.error.target_not_member=The selected character is no longer a member of this party.
+gui.losttales.party.error.cannot_remove_leader=Transfer leadership or disband the party instead of removing the leader.
+gui.losttales.party.error.invalid_target=The selected target is invalid.
+gui.losttales.party.error.target_offline=The selected player is no longer online.
+gui.losttales.party.error.target_no_active_character=The selected player no longer has an active role-playing character.
+gui.losttales.party.error.target_already_in_party=The selected character already belongs to a party.
+gui.losttales.party.error.cannot_invite_self=You cannot invite your own active character.
+gui.losttales.party.error.invitation_not_found=That invitation no longer exists.
+gui.losttales.party.error.invitation_expired=That invitation has expired.
+gui.losttales.party.error.invitation_already_exists=This party has already invited that character.
+gui.losttales.party.error.invitation_target_mismatch=That invitation does not belong to the active character.
+gui.losttales.party.error.invitation_invalid=That invitation is no longer valid.
+gui.losttales.party.error.invalid_revision=The party request did not include a valid revision.
+gui.losttales.party.error.stale_party_revision=The party changed. Review the refreshed state and try again.
+gui.losttales.party.error.stale_party_context=This character now belongs to a different party. Review the refreshed state before trying again.
+gui.losttales.party.error.invalid_color=That party color is invalid.
+gui.losttales.party.error.color_in_use=Another party member already uses that color.
+gui.losttales.party.error.invalid_marker_position=Your current server position cannot be used for a party marker.
+gui.losttales.party.error.rate_limited=Too many party requests were sent. Try again shortly.
+gui.losttales.party.error.malformed_request=The party request was malformed.
+gui.losttales.party.error.internal_error=The server could not complete the party operation.

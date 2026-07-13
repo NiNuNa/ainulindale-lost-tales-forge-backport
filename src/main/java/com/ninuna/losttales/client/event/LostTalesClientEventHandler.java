@@ -12,6 +12,9 @@ import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
+import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
+import com.ninuna.losttales.client.party.ClientPartyStateCache;
+import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
@@ -21,6 +24,7 @@ import com.ninuna.losttales.client.render.renderer.item.LostTalesRendererLargeIt
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
 import com.ninuna.losttales.gui.hud.mapmarker.LostTalesMapMarkerHudRenderer;
+import com.ninuna.losttales.gui.hud.party.LostTalesPartyHudRenderer;
 import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
 import com.ninuna.losttales.gui.hud.quest.LostTalesWorldQuestMarkerRenderer;
 import com.ninuna.losttales.item.ELostTalesItem;
@@ -75,6 +79,9 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientCharacterRosterCache.clear();
         ClientCharacterAppearanceCache.clear();
         ClientCharacterCreationCatalogCache.clear();
+        ClientPartyStateCache.clear();
+        ClientPartyMemberStatusCache.clear();
+        ClientPartyTrackingCache.clear();
         CharacterClientTaskQueue.clear();
         LostTalesQuickLootHudRenderer.resetHud();
         LotrRaceProfileAdapter.getInstance().clear();
@@ -84,6 +91,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     public void onClientWorldUnload(WorldEvent.Unload event) {
         if (event != null && event.world != null && event.world.isRemote) {
             LostTalesClientMobAggroCache.clear();
+            ClientPartyTrackingCache.clear();
         }
     }
 
@@ -149,6 +157,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
             LostTalesQuickLootHudRenderer.render(Minecraft.getMinecraft());
             LostTalesCompassHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
             LostTalesMapMarkerHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
+            LostTalesPartyHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
             LostTalesQuestHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
         }
     }

@@ -2,6 +2,7 @@ package com.ninuna.losttales.event;
 
 import com.ninuna.losttales.quest.LostTalesQuestInteractionHelper;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
+import com.ninuna.losttales.party.quest.PartyQuestProgressCoordinator;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
@@ -33,7 +34,7 @@ public final class LostTalesQuestObjectiveEventHandler {
 
         EntityPlayerMP player = resolveQuestKillCredit(event.source);
         if (player != null) {
-            LostTalesQuestManager.handleEntityKilled(player, event.entityLiving);
+            PartyQuestProgressCoordinator.getInstance().handleAuthoritativeKill(player, event.entityLiving);
         }
     }
 

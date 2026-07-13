@@ -16,6 +16,7 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
     private final LostTalesCommandMapMarker mapMarkerCommand = new LostTalesCommandMapMarker("mapmarker", LostTalesMetaData.MOD_ID + " mapmarker");
     private final LostTalesCommandHud hudCommand = new LostTalesCommandHud("hud", LostTalesMetaData.MOD_ID + " hud");
     private final LostTalesCommandSummon summonCommand = new LostTalesCommandSummon("summon");
+    private final LostTalesCommandPartyAdmin partyCommand = new LostTalesCommandPartyAdmin();
 
     public LostTalesCommandRoot() {
         super(LostTalesMetaData.MOD_ID);
@@ -23,7 +24,7 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/" + getCommandName() + " <quest|mapmarker|hud|summon> ...";
+        return "/" + getCommandName() + " <quest|mapmarker|hud|summon|party> ...";
     }
 
     @Override
@@ -64,6 +65,9 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
         if ("summon".equalsIgnoreCase(name) || "entity".equalsIgnoreCase(name)) {
             return summonCommand;
         }
+        if ("party".equalsIgnoreCase(name) || "parties".equalsIgnoreCase(name)) {
+            return partyCommand;
+        }
         return null;
     }
 
@@ -80,6 +84,7 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " mapmarker <known|list|discover|forget|track|untrack>");
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " hud <status|preset|set|move|toggle>");
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " summon <entity> [x] [y] [z] [dataTag]");
+        send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " party <status|validate|repair|clearcombat>");
         send(sender, EnumChatFormatting.DARK_GRAY + "Use /losttales <subcommand>; legacy underscore commands are no longer registered.");
     }
 
@@ -90,7 +95,7 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
     @Override
     public List addTabCompletionOptions(ICommandSender sender, String[] args) {
         if (args.length == 1) {
-            return getListOfStringsMatchingLastWord(args, "quest", "mapmarker", "hud", "summon");
+            return getListOfStringsMatchingLastWord(args, "quest", "mapmarker", "hud", "summon", "party");
         }
 
         CommandBase command = getSubCommand(args[0]);

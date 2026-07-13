@@ -55,7 +55,15 @@ public class LostTalesCompassMarker {
     }
 
     public static LostTalesCompassMarker positionWithStateKey(String stateKey, String name, LostTalesCompassMarkerIcon icon, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius) {
-        return new LostTalesCompassMarker(stateKey, name, icon, false, 0.0F, x, y, z, scaleWithCenterFocus, showDistanceLabel, fadeInRadius, false, 1.0F, 1.0F, 1.0F);
+        return positionWithStateKey(stateKey, name, icon, x, y, z,
+                scaleWithCenterFocus, showDistanceLabel, fadeInRadius, "white");
+    }
+
+    public static LostTalesCompassMarker positionWithStateKey(String stateKey, String name, LostTalesCompassMarkerIcon icon, double x, double y, double z, boolean scaleWithCenterFocus, boolean showDistanceLabel, double fadeInRadius, String colorName) {
+        float[] color = parseColor(colorName);
+        return new LostTalesCompassMarker(stateKey, name, icon, false, 0.0F,
+                x, y, z, scaleWithCenterFocus, showDistanceLabel,
+                fadeInRadius, false, color[0], color[1], color[2]);
     }
 
     public String getStateKey() {

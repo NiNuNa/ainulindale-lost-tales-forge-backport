@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.mapmarker;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache.TrackedEnemy;
+import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
@@ -117,7 +118,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             return;
         }
 
-        List<LostTalesMapMarkerData> markers = LostTalesClientMapMarkerStore.getAllMarkers();
+        List<LostTalesMapMarkerData> markers = getVisibleStandaloneMarkers();
         if (markers.isEmpty()) {
             return;
         }
@@ -221,7 +222,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
 
         LostTalesMapMarkerData nearest = null;
         double nearestDistanceSq = Double.MAX_VALUE;
-        List<LostTalesMapMarkerData> markers = LostTalesClientMapMarkerStore.getAllMarkers();
+        List<LostTalesMapMarkerData> markers = getVisibleStandaloneMarkers();
         for (LostTalesMapMarkerData marker : markers) {
             if (!shouldRenderStandaloneMarker(marker)) {
                 continue;
@@ -257,7 +258,9 @@ public final class LostTalesLotrMapMarkerIconOverlay {
 
     public static boolean renderStandaloneMarkerSelection(LOTRGuiMap gui, LostTalesMapMarkerData marker, int mouseX, int mouseY) {
         RenderContext context = createRenderContext(gui);
-        if (context == null || marker == null || !shouldRenderStandaloneMarker(marker)) {
+        if (context == null || marker == null
+                || !shouldRenderStandaloneMarker(marker)
+                || !containsVisibleStandaloneMarker(marker)) {
             return false;
         }
 
@@ -281,6 +284,35 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         } catch (Throwable ignored) {
             // Selection clearing is best-effort only.
         }
+    }
+
+    private static List<LostTalesMapMarkerData> getVisibleStandaloneMarkers() {
+        List<LostTalesMapMarkerData> shared =
+                LostTalesClientMapMarkerStore.getAllMarkers();
+        List<LostTalesMapMarkerData> party =
+                ClientPartyTrackingCache.getMapMarkers();
+        if (party.isEmpty()) {
+            return shared;
+        }
+        ArrayList<LostTalesMapMarkerData> combined =
+                new ArrayList<LostTalesMapMarkerData>(
+                        shared.size() + party.size());
+        combined.addAll(shared);
+        combined.addAll(party);
+        return combined;
+    }
+
+    private static boolean containsVisibleStandaloneMarker(
+            LostTalesMapMarkerData target) {
+        if (target == null || target.getId() == null) {
+            return false;
+        }
+        for (LostTalesMapMarkerData marker : getVisibleStandaloneMarkers()) {
+            if (sameMarker(marker, target)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static LostTalesMapMarkerData getReplacementMarker(LOTRAbstractWaypoint waypoint) {

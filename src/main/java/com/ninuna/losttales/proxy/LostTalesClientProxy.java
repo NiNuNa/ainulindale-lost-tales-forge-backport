@@ -16,6 +16,9 @@ import com.ninuna.losttales.client.event.LostTalesClientEventHandler;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
+import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
+import com.ninuna.losttales.client.party.ClientPartyStateCache;
+import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
@@ -41,6 +44,10 @@ import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPack
 import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
+import com.ninuna.losttales.network.packet.party.PartyMemberStatusSyncPacket;
+import com.ninuna.losttales.network.packet.party.PartyOperationResultPacket;
+import com.ninuna.losttales.network.packet.party.PartyStateSyncPacket;
+import com.ninuna.losttales.network.packet.party.PartyTrackingSyncPacket;
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.client.registry.RenderingRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -209,6 +216,69 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             return;
         }
         ClientCharacterRosterCache.acceptOperation(packet.toFeedback());
+    }
+
+    @Override
+    public void handlePartyStateSync(PartyStateSyncPacket packet) {
+        if (packet == null || packet.isMalformed() || packet.getSnapshot() == null) {
+            ClientPartyStateCache.markProtocolError(
+                    packet == null ? 0 : packet.getRequestId());
+            return;
+        }
+        EntityPlayer player = Minecraft.getMinecraft().thePlayer;
+        if (player == null || !player.getUniqueID().equals(
+                packet.getSnapshot().getOwnerId())) {
+            ClientPartyStateCache.markProtocolError(packet.getRequestId());
+            return;
+        }
+        ClientPartyStateCache.acceptState(
+                packet.getRequestId(), packet.getSnapshot());
+        ClientPartyMemberStatusCache.validatePartyState(packet.getSnapshot());
+        ClientPartyTrackingCache.validatePartyState(packet.getSnapshot());
+    }
+
+    @Override
+    public void handlePartyMemberStatusSync(PartyMemberStatusSyncPacket packet) {
+        if (packet == null || packet.isMalformed() || packet.getSnapshot() == null) {
+            ClientPartyMemberStatusCache.clear();
+            return;
+        }
+        EntityPlayer player = Minecraft.getMinecraft().thePlayer;
+        if (player == null || !player.getUniqueID().equals(
+                packet.getSnapshot().getOwnerId())) {
+            ClientPartyMemberStatusCache.clear();
+            return;
+        }
+        ClientPartyMemberStatusCache.accept(packet.getSnapshot());
+        ClientPartyMemberStatusCache.validatePartyState(
+                ClientPartyStateCache.getSnapshot());
+    }
+
+    @Override
+    public void handlePartyTrackingSync(PartyTrackingSyncPacket packet) {
+        if (packet == null || packet.isMalformed() || packet.getSnapshot() == null) {
+            ClientPartyTrackingCache.clear();
+            return;
+        }
+        EntityPlayer player = Minecraft.getMinecraft().thePlayer;
+        if (player == null || !player.getUniqueID().equals(
+                packet.getSnapshot().getOwnerId())) {
+            ClientPartyTrackingCache.clear();
+            return;
+        }
+        ClientPartyTrackingCache.accept(packet.getSnapshot());
+        ClientPartyTrackingCache.validatePartyState(
+                ClientPartyStateCache.getSnapshot());
+    }
+
+    @Override
+    public void handlePartyOperationResult(PartyOperationResultPacket packet) {
+        if (packet == null || packet.isMalformed()) {
+            ClientPartyStateCache.markProtocolError(
+                    packet == null ? 0 : packet.getRequestId());
+            return;
+        }
+        ClientPartyStateCache.acceptOperation(packet.toFeedback());
     }
 
 }

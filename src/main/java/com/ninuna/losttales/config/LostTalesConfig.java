@@ -15,6 +15,7 @@ public final class LostTalesConfig {
     public static final String CATEGORY_MISSIVES = "missives";
     public static final String CATEGORY_CHARACTERS = "characters";
     public static final String CATEGORY_COMBAT_MARKERS = "combat_markers";
+    public static final String CATEGORY_PARTY = "party";
 
     public static final String HUD_PRESET_CUSTOM = "custom";
     public static final String HUD_PRESET_DEFAULT = "default";
@@ -52,6 +53,19 @@ public final class LostTalesConfig {
     public static int combatMarkerUpdateIntervalTicks = 10;
     public static int combatMarkerDisengagementGraceTicks = 20;
     public static boolean combatMarkerDebugLogging = false;
+    public static boolean partySharedAggroTracking = true;
+
+    public static boolean showPartyHud = true;
+    public static boolean linkShowPartyHud = false;
+    public static int partyHudOffsetX = 2;
+    public static int partyHudOffsetY = 18;
+
+    public static int partyStatusUpdateIntervalTicks = 10;
+    public static int partyStatusHeartbeatTicks = 100;
+    public static int partyTrackingUpdateIntervalTicks = 10;
+    public static int partyTrackingHeartbeatTicks = 100;
+    public static boolean enablePartySharedQuestKillProgress = true;
+    public static int partySharedQuestRadius = 32;
 
     public static boolean showQuickLootHud = true;
     public static boolean linkShowQuickLootHud = false;
@@ -260,6 +274,87 @@ public final class LostTalesConfig {
                     CATEGORY_COMBAT_MARKERS,
                     combatMarkerDebugLogging,
                     "Log changed combat marker snapshots. Disabled by default to avoid log spam."
+            );
+            partySharedAggroTracking = config.getBoolean(
+                    "shareWithParty",
+                    CATEGORY_COMBAT_MARKERS,
+                    partySharedAggroTracking,
+                    "Share server-approved active-combat enemy markers with authorized nearby members of the same role-playing party."
+            );
+
+            showPartyHud = config.getBoolean(
+                    "showPartyHud",
+                    CATEGORY_CLIENT,
+                    showPartyHud,
+                    "Render the compact party member HUD while the active role-playing character belongs to a party."
+            );
+            linkShowPartyHud = config.getBoolean(
+                    "linkShowPartyHud",
+                    CATEGORY_CLIENT,
+                    linkShowPartyHud,
+                    "When true, changing showLostTalesHud also changes showPartyHud."
+            );
+            partyHudOffsetX = config.getInt(
+                    "partyHudOffsetX",
+                    CATEGORY_CLIENT,
+                    partyHudOffsetX,
+                    0,
+                    100,
+                    "Horizontal party HUD position as a percentage of the scaled screen width."
+            );
+            partyHudOffsetY = config.getInt(
+                    "partyHudOffsetY",
+                    CATEGORY_CLIENT,
+                    partyHudOffsetY,
+                    0,
+                    100,
+                    "Vertical party HUD position as a percentage of the scaled screen height."
+            );
+            partyStatusUpdateIntervalTicks = config.getInt(
+                    "statusUpdateIntervalTicks",
+                    CATEGORY_PARTY,
+                    partyStatusUpdateIntervalTicks,
+                    2,
+                    40,
+                    "Server ticks between party health and availability checks. Packets are sent only when state changes or a heartbeat is due."
+            );
+            partyStatusHeartbeatTicks = config.getInt(
+                    "statusHeartbeatTicks",
+                    CATEGORY_PARTY,
+                    partyStatusHeartbeatTicks,
+                    20,
+                    400,
+                    "Maximum server ticks between unchanged party status snapshots for online party members."
+            );
+            partyTrackingUpdateIntervalTicks = config.getInt(
+                    "trackingUpdateIntervalTicks",
+                    CATEGORY_PARTY,
+                    partyTrackingUpdateIntervalTicks,
+                    2,
+                    40,
+                    "Server ticks between authorized party position checks. Coordinates are quantized and packets are sent only when state changes or a heartbeat is due."
+            );
+            partyTrackingHeartbeatTicks = config.getInt(
+                    "trackingHeartbeatTicks",
+                    CATEGORY_PARTY,
+                    partyTrackingHeartbeatTicks,
+                    20,
+                    400,
+                    "Maximum server ticks between unchanged party tracking snapshots for online party members."
+            );
+            enablePartySharedQuestKillProgress = config.getBoolean(
+                    "enableSharedQuestKillProgress",
+                    CATEGORY_PARTY,
+                    enablePartySharedQuestKillProgress,
+                    "Allow one authoritative kill event to advance matching Lost Tales kill objectives for eligible nearby party members. Completion and rewards remain individual."
+            );
+            partySharedQuestRadius = config.getInt(
+                    "sharedQuestRadius",
+                    CATEGORY_PARTY,
+                    partySharedQuestRadius,
+                    1,
+                    128,
+                    "Maximum block distance for conservative party-shared kill objective progress. Members must be online, alive, in the same dimension, using the party character, and independently possess the matching quest."
             );
 
             showQuickLootHud = config.getBoolean(
@@ -586,6 +681,9 @@ public final class LostTalesConfig {
         if (linkShowCompassHud) {
             showCompassHud = showLostTalesHud;
         }
+        if (linkShowPartyHud) {
+            showPartyHud = showLostTalesHud;
+        }
         if (linkShowQuickLootHud) {
             showQuickLootHud = showLostTalesHud;
         }
@@ -621,6 +719,8 @@ public final class LostTalesConfig {
         if (HUD_PRESET_DEFAULT.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 2;
+            partyHudOffsetX = 2;
+            partyHudOffsetY = 18;
             quickLootHudOffsetX = 24;
             quickLootHudOffsetY = 32;
             questHudOffsetX = 2;
@@ -628,6 +728,8 @@ public final class LostTalesConfig {
         } else if (HUD_PRESET_LOTR_SAFE.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 12;
+            partyHudOffsetX = 2;
+            partyHudOffsetY = 28;
             quickLootHudOffsetX = 22;
             quickLootHudOffsetY = 34;
             questHudOffsetX = 2;
@@ -635,6 +737,8 @@ public final class LostTalesConfig {
         } else if (HUD_PRESET_COMPACT.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 7;
+            partyHudOffsetX = 1;
+            partyHudOffsetY = 26;
             quickLootHudOffsetX = 34;
             quickLootHudOffsetY = 37;
             questHudOffsetX = 1;
@@ -642,6 +746,8 @@ public final class LostTalesConfig {
         } else if (HUD_PRESET_MINIMAL.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 4;
+            partyHudOffsetX = 1;
+            partyHudOffsetY = 18;
             quickLootHudOffsetX = 42;
             quickLootHudOffsetY = 42;
             questHudOffsetX = 1;
@@ -696,6 +802,9 @@ public final class LostTalesConfig {
         if ("compass".equals(key)) {
             compassHudOffsetX = x;
             compassHudOffsetY = y;
+        } else if ("party".equals(key)) {
+            partyHudOffsetX = x;
+            partyHudOffsetY = y;
         } else if ("quickloot".equals(key)) {
             quickLootHudOffsetX = x;
             quickLootHudOffsetY = y;
@@ -715,6 +824,9 @@ public final class LostTalesConfig {
         if ("compass".equals(key)) {
             return setHudOffset(key, compassHudOffsetX + dx, compassHudOffsetY + dy);
         }
+        if ("party".equals(key)) {
+            return setHudOffset(key, partyHudOffsetX + dx, partyHudOffsetY + dy);
+        }
         if ("quickloot".equals(key)) {
             return setHudOffset(key, quickLootHudOffsetX + dx, quickLootHudOffsetY + dy);
         }
@@ -732,6 +844,9 @@ public final class LostTalesConfig {
         if ("compass".equals(key)) {
             return "compass";
         }
+        if ("party".equals(key) || "partyhud".equals(key)) {
+            return "party";
+        }
         if ("quickloot".equals(key) || "loot".equals(key) || "quickloothud".equals(key)) {
             return "quickloot";
         }
@@ -744,6 +859,8 @@ public final class LostTalesConfig {
     public static void clampHudOffsets() {
         compassHudOffsetX = clampPercent(compassHudOffsetX);
         compassHudOffsetY = clampPercent(compassHudOffsetY);
+        partyHudOffsetX = clampPercent(partyHudOffsetX);
+        partyHudOffsetY = clampPercent(partyHudOffsetY);
         quickLootHudOffsetX = clampPercent(quickLootHudOffsetX);
         quickLootHudOffsetY = clampPercent(quickLootHudOffsetY);
         questHudOffsetX = clampPercent(questHudOffsetX);
@@ -785,6 +902,7 @@ public final class LostTalesConfig {
         config.getCategory(CATEGORY_MISSIVES).setLanguageKey("losttales.config.category.missives");
         config.getCategory(CATEGORY_CHARACTERS).setLanguageKey("losttales.config.category.characters");
         config.getCategory(CATEGORY_COMBAT_MARKERS).setLanguageKey("losttales.config.category.combatMarkers");
+        config.getCategory(CATEGORY_PARTY).setLanguageKey("losttales.config.category.party");
     }
 
     private static void writeCurrentValues(Configuration config) {
@@ -817,6 +935,17 @@ public final class LostTalesConfig {
         config.get(CATEGORY_COMBAT_MARKERS, "updateIntervalTicks", combatMarkerUpdateIntervalTicks).set(combatMarkerUpdateIntervalTicks);
         config.get(CATEGORY_COMBAT_MARKERS, "disengagementGraceTicks", combatMarkerDisengagementGraceTicks).set(combatMarkerDisengagementGraceTicks);
         config.get(CATEGORY_COMBAT_MARKERS, "debugLogging", combatMarkerDebugLogging).set(combatMarkerDebugLogging);
+        config.get(CATEGORY_COMBAT_MARKERS, "shareWithParty", partySharedAggroTracking).set(partySharedAggroTracking);
+        config.get(CATEGORY_CLIENT, "showPartyHud", showPartyHud).set(showPartyHud);
+        config.get(CATEGORY_CLIENT, "linkShowPartyHud", linkShowPartyHud).set(linkShowPartyHud);
+        config.get(CATEGORY_CLIENT, "partyHudOffsetX", partyHudOffsetX).set(partyHudOffsetX);
+        config.get(CATEGORY_CLIENT, "partyHudOffsetY", partyHudOffsetY).set(partyHudOffsetY);
+        config.get(CATEGORY_PARTY, "statusUpdateIntervalTicks", partyStatusUpdateIntervalTicks).set(partyStatusUpdateIntervalTicks);
+        config.get(CATEGORY_PARTY, "statusHeartbeatTicks", partyStatusHeartbeatTicks).set(partyStatusHeartbeatTicks);
+        config.get(CATEGORY_PARTY, "trackingUpdateIntervalTicks", partyTrackingUpdateIntervalTicks).set(partyTrackingUpdateIntervalTicks);
+        config.get(CATEGORY_PARTY, "trackingHeartbeatTicks", partyTrackingHeartbeatTicks).set(partyTrackingHeartbeatTicks);
+        config.get(CATEGORY_PARTY, "enableSharedQuestKillProgress", enablePartySharedQuestKillProgress).set(enablePartySharedQuestKillProgress);
+        config.get(CATEGORY_PARTY, "sharedQuestRadius", partySharedQuestRadius).set(partySharedQuestRadius);
         config.get(CATEGORY_CLIENT, "showQuickLootHud", showQuickLootHud).set(showQuickLootHud);
         config.get(CATEGORY_CLIENT, "linkShowQuickLootHud", linkShowQuickLootHud).set(linkShowQuickLootHud);
         config.get(CATEGORY_CLIENT, "quickLootHudOffsetX", quickLootHudOffsetX).set(quickLootHudOffsetX);

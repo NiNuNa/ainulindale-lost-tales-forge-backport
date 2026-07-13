@@ -33,6 +33,9 @@ public enum CharacterErrorId {
     CHARACTER_NOT_FOUND("character_not_found"),
     SWITCH_NOT_ALLOWED("switch_not_allowed"),
     DELETE_NOT_ALLOWED("delete_not_allowed"),
+    PARTY_STORAGE_READ_ONLY("party_storage_read_only"),
+    PARTY_INVITATION_STORAGE_READ_ONLY("party_invitation_storage_read_only"),
+    PARTY_CLEANUP_FAILED("party_cleanup_failed"),
     CAPE_UPDATE_NOT_ALLOWED("cape_update_not_allowed"),
     INTERNAL_ERROR("internal_error");
 

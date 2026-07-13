@@ -1,10 +1,16 @@
 package com.ninuna.losttales.event;
 
+import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.server.CharacterActiveResolver;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.entity.LostTalesHostilityHelper;
 import com.ninuna.losttales.entity.combat.LostTalesCombatEngagement;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
+import com.ninuna.losttales.party.model.Party;
+import com.ninuna.losttales.party.model.PartyMember;
+import com.ninuna.losttales.party.storage.PartyStorage;
+import com.ninuna.losttales.party.storage.PartyWorldData;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -23,11 +29,13 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.AxisAlignedBB;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.DamageSource;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 
 /**
- * Server-authoritative, per-player combat tracker used by compass and map enemy markers.
+ * Server-authoritative combat tracker used by compass and map enemy markers.
+ * Direct evidence remains player-scoped; authorized nearby party members receive a filtered union.
  */
 public class LostTalesMobAggroEventHandler {
     public static final int DEFAULT_AGGRO_MOB_SCAN_RADIUS = 64;
@@ -183,6 +191,10 @@ public class LostTalesMobAggroEventHandler {
             snapshot.put(entityId, visibleState);
         }
 
+        state.currentSnapshot.clear();
+        state.currentSnapshot.putAll(snapshot);
+        mergeAuthorizedPartySnapshots(player, snapshot, trackingRadiusSq);
+
         boolean heartbeatDue = state.initialSnapshotSent && !snapshot.isEmpty()
                 && now - state.lastSentTick >= SNAPSHOT_HEARTBEAT_TICKS;
         if (!state.initialSnapshotSent || trackingRadius != state.lastSentTrackingRadius
@@ -208,6 +220,101 @@ public class LostTalesMobAggroEventHandler {
                         player.getCommandSenderName(), Integer.valueOf(dimensionId), Integer.valueOf(state.sequence), Integer.valueOf(snapshot.size()));
             }
         }
+    }
+
+    private static void mergeAuthorizedPartySnapshots(EntityPlayerMP recipient,
+                                                       TreeMap<Integer, LostTalesCombatEngagement> snapshot,
+                                                       double trackingRadiusSq) {
+        if (!LostTalesConfig.partySharedAggroTracking || recipient == null
+                || recipient.worldObj == null || snapshot == null
+                || snapshot.size() >= LostTalesMobAggroSyncPacket.MAX_ENTITY_IDS) {
+            return;
+        }
+
+        RoleplayCharacter activeCharacter = CharacterActiveResolver.get(recipient);
+        if (activeCharacter == null) {
+            return;
+        }
+
+        Party party;
+        try {
+            PartyWorldData data = PartyStorage.get(recipient.worldObj);
+            party = data.getPartyForCharacter(activeCharacter.getCharacterId());
+        } catch (RuntimeException ignored) {
+            return;
+        }
+        if (party == null || party.getMemberCount() <= 1) {
+            return;
+        }
+
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null) {
+            return;
+        }
+        List<?> onlinePlayers = server.getConfigurationManager().playerEntityList;
+        for (PartyMember member : party.getMembers()) {
+            if (member == null || member.getOwnerId().equals(recipient.getUniqueID())) {
+                continue;
+            }
+            EntityPlayerMP sourcePlayer = findOnlinePlayer(onlinePlayers, member.getOwnerId());
+            if (sourcePlayer == null || sourcePlayer.worldObj != recipient.worldObj
+                    || sourcePlayer.isDead || !sourcePlayer.isEntityAlive()) {
+                continue;
+            }
+            RoleplayCharacter sourceCharacter = CharacterActiveResolver.get(sourcePlayer);
+            if (sourceCharacter == null
+                    || !member.getCharacterId().equals(sourceCharacter.getCharacterId())) {
+                continue;
+            }
+            PlayerCombatState sourceState = PLAYER_STATES.get(sourcePlayer.getUniqueID());
+            if (sourceState == null || sourceState.dimensionId != recipient.dimension) {
+                continue;
+            }
+            for (Map.Entry<Integer, LostTalesCombatEngagement> entry
+                    : sourceState.currentSnapshot.entrySet()) {
+                if (snapshot.size() >= LostTalesMobAggroSyncPacket.MAX_ENTITY_IDS) {
+                    return;
+                }
+                Entity entity = recipient.worldObj.getEntityByID(entry.getKey().intValue());
+                if (!(entity instanceof EntityLivingBase)
+                        || !isValidTrackedEntity((EntityLivingBase) entity, recipient, trackingRadiusSq)) {
+                    continue;
+                }
+                LostTalesCombatEngagement current = snapshot.get(entry.getKey());
+                LostTalesCombatEngagement shared = entry.getValue();
+                if (current == null || engagementPriority(shared) > engagementPriority(current)) {
+                    snapshot.put(entry.getKey(), shared);
+                }
+            }
+        }
+    }
+
+    private static int engagementPriority(LostTalesCombatEngagement engagement) {
+        if (engagement == LostTalesCombatEngagement.ATTACKING) {
+            return 3;
+        }
+        if (engagement == LostTalesCombatEngagement.TARGETING) {
+            return 2;
+        }
+        if (engagement == LostTalesCombatEngagement.RECENTLY_ENGAGED) {
+            return 1;
+        }
+        return 0;
+    }
+
+    private static EntityPlayerMP findOnlinePlayer(List<?> onlinePlayers, UUID accountId) {
+        if (onlinePlayers == null || accountId == null) {
+            return null;
+        }
+        for (Object object : onlinePlayers) {
+            if (object instanceof EntityPlayerMP) {
+                EntityPlayerMP player = (EntityPlayerMP) object;
+                if (accountId.equals(player.getUniqueID())) {
+                    return player;
+                }
+            }
+        }
+        return null;
     }
 
     private static EntityLivingBase resolveLivingAttacker(DamageSource source) {
@@ -321,6 +428,7 @@ public class LostTalesMobAggroEventHandler {
         }
 
         state.entries.clear();
+        state.currentSnapshot.clear();
         if (sendEmptySnapshot && player.worldObj != null && state.initialSnapshotSent
                 && !state.lastSentSnapshot.isEmpty()) {
             int dimensionId = player.worldObj.provider.dimensionId;
@@ -367,6 +475,7 @@ public class LostTalesMobAggroEventHandler {
         private int lastSentTrackingRadius = -1;
         private long lastSentTick;
         private final Map<Integer, TrackedEngagement> entries = new HashMap<Integer, TrackedEngagement>();
+        private final Map<Integer, LostTalesCombatEngagement> currentSnapshot = new TreeMap<Integer, LostTalesCombatEngagement>();
         private final Map<Integer, LostTalesCombatEngagement> lastSentSnapshot = new TreeMap<Integer, LostTalesCombatEngagement>();
 
         private PlayerCombatState(int dimensionId) {
@@ -376,6 +485,7 @@ public class LostTalesMobAggroEventHandler {
         private void resetForDimension(int dimensionId) {
             this.dimensionId = dimensionId;
             this.entries.clear();
+            this.currentSnapshot.clear();
             this.lastSentSnapshot.clear();
             this.initialSnapshotSent = false;
             this.lastSentTrackingRadius = -1;
