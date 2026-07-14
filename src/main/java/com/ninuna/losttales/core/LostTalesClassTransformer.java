@@ -26,11 +26,15 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.cameraTransformer.active";
     public static final String DEBUG_BOX_ACTIVE_PROPERTY =
             "losttales.debugHitboxTransformer.active";
+    public static final String FAST_TRAVEL_ACTIVE_PROPERTY =
+            "losttales.fastTravelTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
     private static final String RENDER_MANAGER =
             "net.minecraft.client.renderer.entity.RenderManager";
+    private static final String LOTR_FAST_TRAVEL_HANDLER =
+            "lotr.common.network.LOTRPacketFastTravel$Handler";
 
     private static final String CAMERA_MCP = "orientCamera";
     private static final String CAMERA_SRG = "func_78467_g";
@@ -45,6 +49,13 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "com/ninuna/losttales/character/physics/CharacterDebugHitboxHook";
     private static final String DEBUG_HOOK_DESC =
             "(Lnet/minecraft/entity/Entity;D)D";
+    private static final String FAST_TRAVEL_HOOK_OWNER =
+            "com/ninuna/losttales/world/map/waypoint/"
+                    + "LostTalesWaypointFastTravelPolicy";
+    private static final String FAST_TRAVEL_HOOK_DESC =
+            "(Llotr/common/LOTRPlayerData;"
+                    + "Llotr/common/world/map/LOTRAbstractWaypoint;"
+                    + "Lnet/minecraft/entity/player/EntityPlayerMP;)V";
 
     @Override
     public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -57,7 +68,56 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         if (RENDER_MANAGER.equals(transformedName)) {
             return transformDebugBox(basicClass);
         }
+        if (LOTR_FAST_TRAVEL_HANDLER.equals(transformedName)) {
+            return transformLotrFastTravelHandler(basicClass);
+        }
         return basicClass;
+    }
+
+    private static byte[] transformLotrFastTravelHandler(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"onMessage".equals(method.name)
+                        || !method.desc.startsWith(
+                        "(Llotr/common/network/LOTRPacketFastTravel;")) {
+                    continue;
+                }
+                MethodInsnNode targetCall = findLotrFastTravelTargetCall(method);
+                if (targetCall == null) {
+                    continue;
+                }
+                if (targetCall.getOpcode() == Opcodes.INVOKESTATIC
+                        && FAST_TRAVEL_HOOK_OWNER.equals(targetCall.owner)) {
+                    System.setProperty(FAST_TRAVEL_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                int playerLocal = findLotrHandlerPlayerLocal(method);
+                if (playerLocal < 0) {
+                    warn("Could not identify LOTR fast-travel handler player local; "
+                            + "the per-tick fallback will remain active");
+                    return basicClass;
+                }
+                method.instructions.insertBefore(
+                        targetCall,
+                        new VarInsnNode(Opcodes.ALOAD, playerLocal));
+                targetCall.setOpcode(Opcodes.INVOKESTATIC);
+                targetCall.owner = FAST_TRAVEL_HOOK_OWNER;
+                targetCall.name = "setTargetIfAllowed";
+                targetCall.desc = FAST_TRAVEL_HOOK_DESC;
+                System.setProperty(FAST_TRAVEL_ACTIVE_PROPERTY, "true");
+                FMLLog.info("[losttales] Patched LOTR fast travel for "
+                        + "character-specific marker discovery");
+                return write(owner);
+            }
+            warn("Could not locate LOTRPacketFastTravel$Handler#onMessage; "
+                    + "the per-tick fallback will remain active");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch LOTR fast travel: " + throwable);
+            return basicClass;
+        }
     }
 
     private static byte[] transformCamera(byte[] basicClass) {
@@ -267,6 +327,53 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             }
         }
         return false;
+    }
+
+    private static MethodInsnNode findLotrFastTravelTargetCall(
+            MethodNode method) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof MethodInsnNode)) {
+                continue;
+            }
+            MethodInsnNode call = (MethodInsnNode)instruction;
+            if (call.getOpcode() == Opcodes.INVOKEVIRTUAL
+                    && "lotr/common/LOTRPlayerData".equals(call.owner)
+                    && "setTargetFTWaypoint".equals(call.name)
+                    && "(Llotr/common/world/map/LOTRAbstractWaypoint;)V"
+                    .equals(call.desc)) {
+                return call;
+            }
+            if (call.getOpcode() == Opcodes.INVOKESTATIC
+                    && FAST_TRAVEL_HOOK_OWNER.equals(call.owner)
+                    && "setTargetIfAllowed".equals(call.name)) {
+                return call;
+            }
+        }
+        return null;
+    }
+
+    private static int findLotrHandlerPlayerLocal(MethodNode method) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof FieldInsnNode)
+                    || instruction.getOpcode() != Opcodes.GETFIELD) {
+                continue;
+            }
+            FieldInsnNode field = (FieldInsnNode)instruction;
+            if (!"net/minecraft/network/NetHandlerPlayServer"
+                    .equals(field.owner)
+                    || !("playerEntity".equals(field.name)
+                    || "field_147369_b".equals(field.name))) {
+                continue;
+            }
+            AbstractInsnNode store = nextCode(instruction);
+            if (store instanceof VarInsnNode
+                    && store.getOpcode() == Opcodes.ASTORE) {
+                return ((VarInsnNode)store).var;
+            }
+        }
+        return -1;
     }
 
     private static AbstractInsnNode nextCode(AbstractInsnNode instruction) {

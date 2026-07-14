@@ -117,6 +117,16 @@ public class LostTalesMobAggroEventHandler {
         PLAYER_STATES.clear();
     }
 
+    /** Conservative combat evidence used by character-switch policy. */
+    public static synchronized boolean hasTrackedCombat(EntityPlayerMP player) {
+        if (player == null || player.getUniqueID() == null) {
+            return false;
+        }
+        PlayerCombatState state = PLAYER_STATES.get(player.getUniqueID());
+        return state != null
+                && (!state.entries.isEmpty() || !state.currentSnapshot.isEmpty());
+    }
+
     private static synchronized void updatePlayerSnapshot(EntityPlayerMP player) {
         PlayerCombatState state = getOrCreateState(player);
         int dimensionId = player.worldObj.provider.dimensionId;

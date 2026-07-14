@@ -11,6 +11,7 @@ public final class CharacterOperationFeedback {
     private final boolean changed;
     private final CharacterErrorId errorId;
     private final long rosterRevision;
+    private final long retryAfterMillis;
     private final boolean rosterFollows;
 
     public CharacterOperationFeedback(int requestId,
@@ -19,6 +20,7 @@ public final class CharacterOperationFeedback {
                                       boolean changed,
                                       CharacterErrorId errorId,
                                       long rosterRevision,
+                                      long retryAfterMillis,
                                       boolean rosterFollows) {
         this.requestId = requestId;
         this.operationType = operationType == null
@@ -27,6 +29,7 @@ public final class CharacterOperationFeedback {
         this.changed = changed;
         this.errorId = errorId == null ? CharacterErrorId.INTERNAL_ERROR : errorId;
         this.rosterRevision = rosterRevision;
+        this.retryAfterMillis = retryAfterMillis;
         this.rosterFollows = rosterFollows;
     }
 
@@ -52,6 +55,10 @@ public final class CharacterOperationFeedback {
 
     public long getRosterRevision() {
         return this.rosterRevision;
+    }
+
+    public long getRetryAfterMillis() {
+        return this.retryAfterMillis;
     }
 
     public boolean isRosterFollows() {

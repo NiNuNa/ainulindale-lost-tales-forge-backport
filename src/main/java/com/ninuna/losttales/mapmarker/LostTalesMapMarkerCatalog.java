@@ -192,7 +192,7 @@ public final class LostTalesMapMarkerCatalog {
         double compassFadeInRadius = getDouble(object, "compassFadeInRadius", getDouble(object, "fadeInRadius", 128.0D));
         double discoveryRadius = Math.max(1.0D, getDouble(object, "discoveryRadius", getDouble(object, "unlockRadius", 8.0D)));
         boolean hidden = getBoolean(object, "hiddenUntilDiscovered", getBoolean(object, "requiresDiscovery", false));
-        boolean discoverable = getBoolean(object, "isDiscoverable", hidden);
+        boolean discoverable = getBoolean(object, "isDiscoverable", true);
         if (getBoolean(object, "discoveredByDefault", false)) {
             hidden = false;
             discoverable = false;

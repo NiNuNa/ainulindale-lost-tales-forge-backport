@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.render.player;
 
+import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinDefinition;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
@@ -11,6 +12,7 @@ import net.minecraft.client.model.ModelBiped;
 import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.client.renderer.entity.RenderPlayer;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
 
@@ -64,6 +66,41 @@ final class LostTalesConfiguredPlayerRenderer extends RenderPlayer {
         if (texture != null) {
             this.bindTexture(texture);
         }
+    }
+
+    /**
+     * Vanilla anchors the nameplate to the collision height, while several
+     * LOTR player models are visually taller than their gameplay hitbox. A
+     * temporary render-only height keeps the label above the actual head for
+     * both normal and sneaking nameplate paths.
+     */
+    @Override
+    protected void passSpecialRender(
+            EntityLivingBase entity, double x, double y, double z) {
+        float originalHeight = entity == null ? 0.0F : entity.height;
+        float offset = resolveNameplateHeightOffset(entity, originalHeight);
+        if (entity != null && offset > 0.0F) {
+            entity.height = originalHeight + offset;
+        }
+        try {
+            super.passSpecialRender(entity, x, y, z);
+        } finally {
+            if (entity != null) {
+                entity.height = originalHeight;
+            }
+        }
+    }
+
+    private float resolveNameplateHeightOffset(
+            EntityLivingBase entity, float physicalHeight) {
+        CharacterRaceDefinition definition =
+                CharacterRaceRegistry.get(this.raceId);
+        if (definition == null || physicalHeight <= 0.0F
+                || entity != null && entity.isPlayerSleeping()) {
+            return 0.0F;
+        }
+        float visualHeight = 1.8F * this.modelScale;
+        return Math.max(0.0F, visualHeight - physicalHeight);
     }
 
     /*

@@ -367,7 +367,9 @@ public final class LostTalesQuestManager {
         markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
         boolean changed = data.forgetMarker(markerId);
         if (changed) {
-            LostTalesMapMarkerWaypointUnlockHelper.lockWaypointForForgottenMarker(player, markerId);
+            if (player instanceof EntityPlayerMP) {
+                ensureLotrWaypointsForDiscoveredMapMarkers((EntityPlayerMP) player);
+            }
             sendQuestChat(player, EnumChatFormatting.YELLOW + "Map marker forgotten: " + EnumChatFormatting.WHITE + markerId);
             syncToClient(player);
         }
@@ -637,15 +639,13 @@ public final class LostTalesQuestManager {
             return false;
         }
 
-        boolean changed = false;
+        boolean changed =
+                LostTalesMapMarkerWaypointUnlockHelper.reconcileBundledWaypointRegions(
+                        player, data.getDiscoveredMarkerIds());
         for (String markerId : data.getDiscoveredMarkerIds()) {
-            if (LostTalesMapMarkerWaypointUnlockHelper.unlockWaypointForDiscoveredMarker(player, LostTalesMapMarkerCatalog.getMarker(markerId))) {
-                changed = true;
-            }
             LostTalesMapMarkerDefinition dynamicMarker = data.getDynamicMapMarker(markerId);
-            if (LostTalesMapMarkerWaypointUnlockHelper.unlockWaypointForDiscoveredMarker(player, dynamicMarker)) {
-                changed = true;
-            }
+            changed |= LostTalesMapMarkerWaypointUnlockHelper
+                    .unlockWaypointForDiscoveredMarker(player, dynamicMarker);
         }
         return changed;
     }

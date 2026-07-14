@@ -4,7 +4,8 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraftforge.common.util.Constants;
 
 /**
- * Additive migration pipeline for the account-owned quest property compound.
+ * Additive migration pipeline for the live quest property compound. Character
+ * snapshots reuse this codec after their one-time account-state import.
  */
 final class LostTalesQuestDataMigrator {
 

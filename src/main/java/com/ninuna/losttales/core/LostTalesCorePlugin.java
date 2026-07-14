@@ -4,7 +4,7 @@ import cpw.mods.fml.relauncher.IFMLLoadingPlugin;
 
 import java.util.Map;
 
-/** Loads the two client rendering/camera corrections before normal mods. */
+/** Loads client geometry corrections and the LOTR fast-travel policy hook. */
 @IFMLLoadingPlugin.Name("Lost Tales Core")
 @IFMLLoadingPlugin.MCVersion("1.7.10")
 @IFMLLoadingPlugin.SortingIndex(1002)

@@ -154,13 +154,32 @@ public final class CharacterRaceGameplayHandler {
         if (player == null || player.worldObj == null || player.worldObj.isRemote) {
             return;
         }
-        RoleplayCharacter character = CharacterActiveResolver.get(player);
-        enforceRaceArmor(player, character);
-        apply(player, character);
+        apply(player, CharacterActiveResolver.get(player));
     }
 
-    private static void apply(
+    public static void apply(
             EntityPlayerMP player, RoleplayCharacter character) {
+        applyInternal(player, character, true);
+    }
+
+    /**
+     * Applies attributes and dimensions before transaction commit without moving
+     * or dropping equipment. Equipment enforcement is allowed only post-commit.
+     */
+    public static void applyProvisional(
+            EntityPlayerMP player, RoleplayCharacter character) {
+        applyInternal(player, character, false);
+    }
+
+    private static void applyInternal(
+            EntityPlayerMP player, RoleplayCharacter character,
+            boolean enforceEquipment) {
+        if (player == null || player.worldObj == null || player.worldObj.isRemote) {
+            return;
+        }
+        if (enforceEquipment) {
+            enforceRaceArmor(player, character);
+        }
         if (character == null) {
             restoreVanillaPlayerState(player);
             return;
@@ -199,16 +218,42 @@ public final class CharacterRaceGameplayHandler {
         CharacterPlayerEyeHeightHelper.apply(player, dimensions, true);
     }
 
-    private static void enforceRaceArmor(
+
+    /**
+     * Transaction-safe armor normalization. Unlike ordinary enforcement this
+     * method never drops an item into the world: it either moves every rejected
+     * armor stack into empty main-inventory slots or leaves the player unchanged.
+     */
+    public static boolean prepareEquipmentForCharacterSwitch(
             EntityPlayerMP player, RoleplayCharacter character) {
         if (player == null || character == null
                 || !CharacterRaceRegistry.HALF_TROLL.equals(
                         CharacterRaceRegistry.canonicalizeIdentifier(
                                 character.getRaceId()))) {
-            return;
+            return true;
         }
-
-        boolean rejectedAny = false;
+        int rejected = 0;
+        for (int equipmentSlot = LotrHalfTrollArmorAdapter.SLOT_BOOTS;
+             equipmentSlot <= LotrHalfTrollArmorAdapter.SLOT_HELMET;
+             equipmentSlot++) {
+            ItemStack equipped = player.getEquipmentInSlot(equipmentSlot);
+            if (!LotrHalfTrollArmorAdapter.isAllowedInEquipmentSlot(
+                    equipped, equipmentSlot)) {
+                rejected++;
+            }
+        }
+        if (rejected == 0) {
+            return true;
+        }
+        int empty = 0;
+        for (ItemStack stack : player.inventory.mainInventory) {
+            if (stack == null) {
+                empty++;
+            }
+        }
+        if (empty < rejected) {
+            return false;
+        }
         for (int equipmentSlot = LotrHalfTrollArmorAdapter.SLOT_BOOTS;
              equipmentSlot <= LotrHalfTrollArmorAdapter.SLOT_HELMET;
              equipmentSlot++) {
@@ -217,24 +262,46 @@ public final class CharacterRaceGameplayHandler {
                     equipped, equipmentSlot)) {
                 continue;
             }
-
-            // Clear the armor slot before returning the same stack. This is
-            // authoritative on the server and the normal container sync then
-            // corrects the client's inventory view.
-            player.setCurrentItemOrArmor(equipmentSlot, null);
-            if (!player.inventory.addItemStackToInventory(equipped)
-                    && equipped.stackSize > 0) {
-                player.dropPlayerItemWithRandomChoice(equipped, false);
+            int emptySlot = player.inventory.getFirstEmptyStack();
+            if (emptySlot < 0) {
+                return false;
             }
-            rejectedAny = true;
+            player.setCurrentItemOrArmor(equipmentSlot, null);
+            player.inventory.mainInventory[emptySlot] = equipped;
         }
+        player.inventory.markDirty();
+        return true;
+    }
 
+    private static void enforceRaceArmor(
+            EntityPlayerMP player, RoleplayCharacter character) {
+        if (player == null || character == null
+                || !CharacterRaceRegistry.HALF_TROLL.equals(
+                        CharacterRaceRegistry.canonicalizeIdentifier(
+                                character.getRaceId()))) {
+            return;
+        }
+        boolean rejectedAny = false;
+        for (int equipmentSlot = LotrHalfTrollArmorAdapter.SLOT_BOOTS;
+             equipmentSlot <= LotrHalfTrollArmorAdapter.SLOT_HELMET;
+             equipmentSlot++) {
+            if (!LotrHalfTrollArmorAdapter.isAllowedInEquipmentSlot(
+                    player.getEquipmentInSlot(equipmentSlot), equipmentSlot)) {
+                rejectedAny = true;
+                break;
+            }
+        }
         if (!rejectedAny) {
             return;
         }
 
-        player.inventory.markDirty();
-        player.inventoryContainer.detectAndSendChanges();
+        // Never drop equipment as a side effect of login, recovery, or a race
+        // refresh. A world drop followed by a crash could be replayed from an
+        // older snapshot. Move all rejected pieces atomically or leave them in
+        // place until enough inventory space is available.
+        if (prepareEquipmentForCharacterSwitch(player, character)) {
+            player.inventoryContainer.detectAndSendChanges();
+        }
         sendHalfTrollArmorNotice(player);
     }
 

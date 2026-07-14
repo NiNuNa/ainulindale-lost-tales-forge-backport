@@ -118,6 +118,20 @@ public final class LostTalesConfig {
     /** Deny-list always wins over the allow-list and race category matching. */
     public static String[] deniedStartingFactionIds = new String[0];
 
+    /** Cooldown applied at each escalation stage, in seconds. */
+    public static int[] characterSwitchCooldownSeconds =
+            new int[] {60, 180, 300, 900, 1800, 3600};
+    /** Inactivity needed to decay each current stage, in seconds. */
+    public static int[] characterSwitchDecaySeconds =
+            new int[] {0, 3600, 10800, 21600, 43200, 86400};
+    public static int characterSwitchCombatGraceSeconds = 20;
+    public static int characterSwitchTeleportGraceSeconds = 5;
+    public static int characterSwitchStableGroundTicks = 20;
+    public static double characterSwitchTeleportDistancePerTick = 16.0D;
+    public static int characterStateMaxSnapshotBytes = 2 * 1024 * 1024;
+    public static long characterSwitchCombatGraceMillis = 20000L;
+    public static long characterSwitchTeleportGraceMillis = 5000L;
+
     private LostTalesConfig() {}
 
     public static void load(File configFile) {
@@ -139,6 +153,57 @@ public final class LostTalesConfig {
                     deniedStartingFactionIds,
                     "Canonical LOTR faction IDs excluded from character creation. Deny entries override allow entries."
             ).getStringList();
+            characterSwitchCooldownSeconds = config.get(
+                    CATEGORY_CHARACTERS,
+                    "switchCooldownSeconds",
+                    characterSwitchCooldownSeconds,
+                    "Escalating server-authoritative cooldown stages in seconds. The default is 1m, 3m, 5m, 15m, 30m, 60m."
+            ).getIntList();
+            characterSwitchDecaySeconds = config.get(
+                    CATEGORY_CHARACTERS,
+                    "switchCooldownDecaySeconds",
+                    characterSwitchDecaySeconds,
+                    "Inactivity required to decay each current cooldown stage. Higher stages should use longer values."
+            ).getIntList();
+            characterSwitchCombatGraceSeconds = config.getInt(
+                    "switchCombatGraceSeconds",
+                    CATEGORY_CHARACTERS,
+                    characterSwitchCombatGraceSeconds,
+                    0,
+                    3600,
+                    "Reject switching for this many seconds after incoming or outgoing combat evidence."
+            );
+            characterSwitchTeleportGraceSeconds = config.getInt(
+                    "switchTeleportGraceSeconds",
+                    CATEGORY_CHARACTERS,
+                    characterSwitchTeleportGraceSeconds,
+                    0,
+                    300,
+                    "Reject switching for this many seconds after teleport, respawn, or dimension-transition evidence."
+            );
+            characterSwitchStableGroundTicks = config.getInt(
+                    "switchStableGroundTicks",
+                    CATEGORY_CHARACTERS,
+                    characterSwitchStableGroundTicks,
+                    0,
+                    200,
+                    "Number of consecutive safe grounded ticks required before switching."
+            );
+            characterSwitchTeleportDistancePerTick = config.get(
+                    CATEGORY_CHARACTERS,
+                    "switchTeleportDistancePerTick",
+                    characterSwitchTeleportDistancePerTick,
+                    "Movement farther than this many blocks in one tick is treated as teleportation."
+            ).getDouble(characterSwitchTeleportDistancePerTick);
+            characterStateMaxSnapshotBytes = config.getInt(
+                    "characterStateMaxSnapshotBytes",
+                    CATEGORY_CHARACTERS,
+                    characterStateMaxSnapshotBytes,
+                    64 * 1024,
+                    16 * 1024 * 1024,
+                    "Maximum compressed size of one character-owned player-state snapshot. Oversized snapshots are rejected before switching."
+            );
+            sanitizeCharacterSwitchOptions();
 
             showLostTalesHud = config.getBoolean(
                     "showLostTalesHud",
@@ -923,6 +988,18 @@ public final class LostTalesConfig {
                 allowedStartingFactionIds).set(allowedStartingFactionIds);
         config.get(CATEGORY_CHARACTERS, "deniedStartingFactionIds",
                 deniedStartingFactionIds).set(deniedStartingFactionIds);
+        config.get(CATEGORY_CHARACTERS, "switchCooldownSeconds",
+                characterSwitchCooldownSeconds).set(characterSwitchCooldownSeconds);
+        config.get(CATEGORY_CHARACTERS, "switchCooldownDecaySeconds",
+                characterSwitchDecaySeconds).set(characterSwitchDecaySeconds);
+        config.get(CATEGORY_CHARACTERS, "switchCombatGraceSeconds",
+                characterSwitchCombatGraceSeconds).set(characterSwitchCombatGraceSeconds);
+        config.get(CATEGORY_CHARACTERS, "switchTeleportGraceSeconds",
+                characterSwitchTeleportGraceSeconds).set(characterSwitchTeleportGraceSeconds);
+        config.get(CATEGORY_CHARACTERS, "switchStableGroundTicks",
+                characterSwitchStableGroundTicks).set(characterSwitchStableGroundTicks);
+        config.get(CATEGORY_CHARACTERS, "switchTeleportDistancePerTick",
+                characterSwitchTeleportDistancePerTick).set(characterSwitchTeleportDistancePerTick);
         config.get(CATEGORY_CLIENT, "showLostTalesHud", showLostTalesHud).set(showLostTalesHud);
         Property hudPresetProperty = config.get(CATEGORY_CLIENT, "hudPlacementPreset", hudPlacementPreset);
         hudPresetProperty.set(hudPlacementPreset);
@@ -1023,6 +1100,52 @@ public final class LostTalesConfig {
             return 0L;
         }
         return (long) missiveBoardNoticeExpirationDays * 24000L;
+    }
+
+
+    private static void sanitizeCharacterSwitchOptions() {
+        characterSwitchCooldownSeconds = sanitizePositiveIntArray(
+                characterSwitchCooldownSeconds,
+                new int[] {60, 180, 300, 900, 1800, 3600},
+                1,
+                86400 * 30);
+        characterSwitchDecaySeconds = sanitizePositiveIntArray(
+                characterSwitchDecaySeconds,
+                new int[] {0, 3600, 10800, 21600, 43200, 86400},
+                0,
+                86400 * 365);
+        characterSwitchCombatGraceSeconds = clampInt(
+                characterSwitchCombatGraceSeconds, 0, 3600);
+        characterSwitchTeleportGraceSeconds = clampInt(
+                characterSwitchTeleportGraceSeconds, 0, 300);
+        characterSwitchStableGroundTicks = clampInt(
+                characterSwitchStableGroundTicks, 0, 200);
+        if (Double.isNaN(characterSwitchTeleportDistancePerTick)
+                || Double.isInfinite(characterSwitchTeleportDistancePerTick)) {
+            characterSwitchTeleportDistancePerTick = 16.0D;
+        }
+        characterSwitchTeleportDistancePerTick = Math.max(1.0D,
+                Math.min(1024.0D, characterSwitchTeleportDistancePerTick));
+        characterStateMaxSnapshotBytes = clampInt(
+                characterStateMaxSnapshotBytes, 64 * 1024, 16 * 1024 * 1024);
+        characterSwitchCombatGraceMillis =
+                (long) characterSwitchCombatGraceSeconds * 1000L;
+        characterSwitchTeleportGraceMillis =
+                (long) characterSwitchTeleportGraceSeconds * 1000L;
+    }
+
+    private static int[] sanitizePositiveIntArray(int[] values, int[] fallback,
+                                                   int minimum, int maximum) {
+        int[] source = values == null || values.length == 0 ? fallback : values;
+        int length = Math.max(1, Math.min(16, source.length));
+        int[] result = new int[length];
+        for (int index = 0; index < length; index++) {
+            result[index] = clampInt(source[index], minimum, maximum);
+            if (index > 0 && result[index] < result[index - 1]) {
+                result[index] = result[index - 1];
+            }
+        }
+        return result;
     }
 
     private static int clampInt(int value, int min, int max) {

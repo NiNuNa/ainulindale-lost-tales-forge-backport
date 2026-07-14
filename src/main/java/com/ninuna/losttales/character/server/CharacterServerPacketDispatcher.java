@@ -1,6 +1,7 @@
 package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.character.sync.CharacterOperationType;
+import com.ninuna.losttales.character.switching.CharacterLifecycleStateTracker;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -24,7 +25,7 @@ public final class CharacterServerPacketDispatcher {
                               boolean malformed,
                               String packetName,
                               LostTalesServerTaskQueue.PlayerTask task) {
-        if (player == null || operationType == null) {
+        if (player == null || operationType == null || task == null) {
             return;
         }
         if (!CharacterNetworkSecurity.allowRequest(player)) {
@@ -43,7 +44,35 @@ public final class CharacterServerPacketDispatcher {
                     CharacterErrorId.MALFORMED_REQUEST, -1L);
             return;
         }
-        if (!LostTalesServerTaskQueue.enqueue(player.getUniqueID(), packetName, task)) {
+        final long requestEpoch = CharacterLifecycleStateTracker.captureRequestEpoch(player);
+        if (requestEpoch <= 0L) {
+            CharacterSyncManager.sendFailure(
+                    player, requestId, operationType,
+                    CharacterErrorId.INVALID_PLAYER, -1L);
+            return;
+        }
+        final LostTalesServerTaskQueue.PlayerTask guardedTask = task;
+        final int guardedRequestId = requestId;
+        final CharacterOperationType guardedOperationType = operationType;
+        if (!LostTalesServerTaskQueue.enqueue(player.getUniqueID(), packetName,
+                new LostTalesServerTaskQueue.PlayerTask() {
+                    @Override
+                    public void run(EntityPlayerMP livePlayer) {
+                        if (!CharacterLifecycleStateTracker.isRequestEpochCurrent(
+                                livePlayer, requestEpoch)) {
+                            CharacterSyncManager.sendFailure(
+                                    livePlayer,
+                                    guardedRequestId,
+                                    guardedOperationType,
+                                    guardedOperationType == CharacterOperationType.SELECT
+                                            ? CharacterErrorId.SWITCH_SESSION_CHANGED
+                                            : CharacterErrorId.INVALID_PLAYER,
+                                    -1L);
+                            return;
+                        }
+                        guardedTask.run(livePlayer);
+                    }
+                })) {
             CharacterNetworkSecurity.logQueueFull(player);
             CharacterSyncManager.sendFailure(
                     player, requestId, operationType,

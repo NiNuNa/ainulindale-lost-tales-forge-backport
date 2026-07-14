@@ -89,7 +89,7 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
         }
         ClientCharacterRosterCache.clearOperation(completedRequest);
         if (!feedback.isSuccessful()) {
-            this.statusMessage = ClientCharacterDisplayNames.error(feedback.getErrorId());
+            this.statusMessage = ClientCharacterDisplayNames.error(feedback);
             this.statusError = true;
             return;
         }

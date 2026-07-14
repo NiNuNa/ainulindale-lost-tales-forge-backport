@@ -13,12 +13,15 @@ import io.netty.buffer.ByteBuf;
 /** Structured result for one character-management request. */
 public final class CharacterOperationResultPacket implements IMessage {
 
+    private static final long MAX_RETRY_AFTER_MILLIS = 365L * 24L * 60L * 60L * 1000L;
+
     private int requestId;
     private CharacterOperationType operationType = CharacterOperationType.UNKNOWN;
     private boolean successful;
     private boolean changed;
     private CharacterErrorId errorId = CharacterErrorId.INTERNAL_ERROR;
     private long rosterRevision = -1L;
+    private long retryAfterMillis = -1L;
     private boolean rosterFollows;
     private boolean malformed;
 
@@ -36,6 +39,10 @@ public final class CharacterOperationResultPacket implements IMessage {
         this.changed = result.wasChanged();
         this.errorId = result.getErrorId();
         this.rosterRevision = result.getRosterRevision();
+        long retryAt = result.getRetryAtEpochMillis();
+        this.retryAfterMillis = retryAt < 0L
+                ? -1L : Math.min(MAX_RETRY_AFTER_MILLIS,
+                        Math.max(0L, retryAt - System.currentTimeMillis()));
         this.rosterFollows = result.getRoster() != null;
     }
 
@@ -49,6 +56,7 @@ public final class CharacterOperationResultPacket implements IMessage {
         this.changed = false;
         this.errorId = errorId == null ? CharacterErrorId.INTERNAL_ERROR : errorId;
         this.rosterRevision = rosterRevision;
+        this.retryAfterMillis = -1L;
         this.rosterFollows = false;
     }
 
@@ -62,6 +70,7 @@ public final class CharacterOperationResultPacket implements IMessage {
             this.errorId = CharacterErrorId.fromId(CharacterPacketCodec.readString(
                     buffer, CharacterPacketCodec.MAX_ERROR_ID_BYTES));
             this.rosterRevision = buffer.readLong();
+            this.retryAfterMillis = buffer.readLong();
             this.rosterFollows = buffer.readBoolean();
             CharacterPacketCodec.requireFinished(buffer);
 
@@ -70,6 +79,9 @@ public final class CharacterOperationResultPacket implements IMessage {
                     || (!this.successful && this.errorId == CharacterErrorId.NONE)
                     || (!this.successful && this.changed)
                     || (this.successful && !this.rosterFollows)
+                    || (this.successful && this.retryAfterMillis >= 0L)
+                    || this.retryAfterMillis < -1L
+                    || this.retryAfterMillis > MAX_RETRY_AFTER_MILLIS
                     || (this.rosterFollows && this.rosterRevision < 0L)) {
                 throw new CharacterPacketCodec.DecodeException("invalid operation result");
             }
@@ -90,6 +102,7 @@ public final class CharacterOperationResultPacket implements IMessage {
         buffer.writeBoolean(this.changed);
         CharacterPacketCodec.writeString(buffer, this.errorId.getId(), CharacterPacketCodec.MAX_ERROR_ID_BYTES);
         buffer.writeLong(this.rosterRevision);
+        buffer.writeLong(this.retryAfterMillis);
         buffer.writeBoolean(this.rosterFollows);
     }
 
@@ -101,6 +114,7 @@ public final class CharacterOperationResultPacket implements IMessage {
                 this.changed,
                 this.errorId,
                 this.rosterRevision,
+                this.retryAfterMillis,
                 this.rosterFollows
         );
     }
@@ -127,6 +141,10 @@ public final class CharacterOperationResultPacket implements IMessage {
 
     public long getRosterRevision() {
         return this.rosterRevision;
+    }
+
+    public long getRetryAfterMillis() {
+        return this.retryAfterMillis;
     }
 
     public boolean isRosterFollows() {

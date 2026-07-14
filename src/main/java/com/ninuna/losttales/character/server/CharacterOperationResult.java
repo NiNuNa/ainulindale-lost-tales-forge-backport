@@ -12,23 +12,26 @@ public final class CharacterOperationResult {
     private final CharacterErrorId errorId;
     private final CharacterRoster roster;
     private final RoleplayCharacter character;
+    private final long retryAtEpochMillis;
 
     private CharacterOperationResult(boolean successful, boolean changed,
                                      CharacterErrorId errorId,
                                      CharacterRoster roster,
-                                     RoleplayCharacter character) {
+                                     RoleplayCharacter character,
+                                     long retryAtEpochMillis) {
         this.successful = successful;
         this.changed = changed;
         this.errorId = errorId == null ? CharacterErrorId.INTERNAL_ERROR : errorId;
         this.roster = roster;
         this.character = character;
+        this.retryAtEpochMillis = retryAtEpochMillis;
     }
 
     public static CharacterOperationResult success(boolean changed,
                                                    CharacterRoster roster,
                                                    RoleplayCharacter character) {
         return new CharacterOperationResult(true, changed, CharacterErrorId.NONE,
-                roster, character);
+                roster, character, -1L);
     }
 
     public static CharacterOperationResult failure(CharacterErrorId errorId,
@@ -36,7 +39,17 @@ public final class CharacterOperationResult {
         if (errorId == null || errorId == CharacterErrorId.NONE) {
             throw new IllegalArgumentException("failure requires a non-success error id");
         }
-        return new CharacterOperationResult(false, false, errorId, roster, null);
+        return new CharacterOperationResult(false, false, errorId, roster, null, -1L);
+    }
+
+    public static CharacterOperationResult failure(CharacterErrorId errorId,
+                                                   CharacterRoster roster,
+                                                   long retryAtEpochMillis) {
+        if (errorId == null || errorId == CharacterErrorId.NONE) {
+            throw new IllegalArgumentException("failure requires a non-success error id");
+        }
+        return new CharacterOperationResult(false, false, errorId, roster, null,
+                retryAtEpochMillis);
     }
 
     public boolean isSuccessful() {
@@ -61,5 +74,9 @@ public final class CharacterOperationResult {
 
     public long getRosterRevision() {
         return this.roster == null ? -1L : this.roster.getRevision();
+    }
+
+    public long getRetryAtEpochMillis() {
+        return this.retryAtEpochMillis;
     }
 }

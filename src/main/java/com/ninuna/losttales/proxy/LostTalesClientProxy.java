@@ -195,9 +195,25 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         } else {
             ClientCharacterAppearanceCache.apply(packet.getAppearances());
         }
+        refreshSynchronizedPlayerNames();
         // Apply dimensions and eye data immediately after the authoritative
         // snapshot rather than waiting for a periodic client tick.
         ClientCharacterRacePhysics.applyAll(Minecraft.getMinecraft());
+    }
+
+    private static void refreshSynchronizedPlayerNames() {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.theWorld == null
+                || minecraft.theWorld.playerEntities == null) {
+            return;
+        }
+        for (Object value : minecraft.theWorld.playerEntities) {
+            if (value instanceof EntityPlayer) {
+                // EntityPlayer caches Forge's NameFormat result. Appearance
+                // packets can arrive after that cache was first populated.
+                ((EntityPlayer)value).refreshDisplayName();
+            }
+        }
     }
 
     @Override

@@ -6,7 +6,10 @@ import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
 import com.ninuna.losttales.character.registry.CharacterFactionResolver;
 import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.common.FMLLog;
+import lotr.common.LOTRLevelData;
+import lotr.common.LOTRPlayerData;
 import lotr.common.fac.LOTRFaction;
+import net.minecraft.entity.player.EntityPlayerMP;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,10 +24,10 @@ import java.util.Set;
 /**
  * Public-API-only LOTR Legacy adapter for roleplaying-character metadata.
  *
- * This is the only character-system class that talks to LOTR faction classes.
- * It deliberately does not read or mutate LOTRPlayerData: alignment, pledges,
- * miniquests, titles, waypoints, fellowships and other LOTR progression remain
- * owned by the Minecraft account.
+ * This is the isolated character-system boundary for LOTR Legacy APIs.
+ * Transient fast-travel state remains here for switch safety. Character-owned
+ * progression capture and application are isolated in
+ * {@link LotrProgressionStateAdapter}; metadata resolution stays in this class.
  */
 public final class LotrCharacterAdapter implements CharacterFactionResolver {
 
@@ -187,6 +190,26 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
             FMLLog.warning("[%s] Failed to obtain LOTR faction display name for %s: %s",
                     LostTalesMetaData.MOD_ID, normalizedId, exception.toString());
             return null;
+        }
+    }
+
+    /** Public-API-only transient fast-travel guard for character switching. */
+    public boolean isFastTravelActive(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null || player.worldObj.isRemote) {
+            return false;
+        }
+        try {
+            LOTRPlayerData data = LOTRLevelData.getData(player);
+            return data != null
+                    && (data.getTargetFTWaypoint() != null || data.getTicksUntilFT() > 0);
+        } catch (LinkageError error) {
+            FMLLog.warning("[%s] Unable to inspect LOTR fast-travel state: %s",
+                    LostTalesMetaData.MOD_ID, error.toString());
+            return true;
+        } catch (RuntimeException exception) {
+            FMLLog.warning("[%s] Unable to inspect LOTR fast-travel state for %s: %s",
+                    LostTalesMetaData.MOD_ID, player.getUniqueID(), exception.toString());
+            return true;
         }
     }
 

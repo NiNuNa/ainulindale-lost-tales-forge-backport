@@ -9,6 +9,7 @@ import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinDefinition;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.character.sync.CharacterCreationCatalog;
+import com.ninuna.losttales.character.sync.CharacterOperationFeedback;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import net.minecraft.client.resources.I18n;
@@ -136,6 +137,23 @@ public final class ClientCharacterDisplayNames {
         String key = "gui.losttales.character.error." + safe.getId();
         String translated = I18n.format(key);
         return key.equals(translated) ? prettifyIdentifier(safe.getId()) : translated;
+    }
+
+    public static String error(CharacterOperationFeedback feedback) {
+        if (feedback == null) {
+            return error(CharacterErrorId.INTERNAL_ERROR);
+        }
+        String base = error(feedback.getErrorId());
+        long remainingMillis = feedback.getRetryAfterMillis();
+        if (remainingMillis < 0L) {
+            return base;
+        }
+        long totalSeconds = (remainingMillis + 999L) / 1000L;
+        long minutes = totalSeconds / 60L;
+        long seconds = totalSeconds % 60L;
+        return base + " " + (minutes > 0L
+                ? minutes + "m " + seconds + "s"
+                : seconds + "s");
     }
 
     public static String operationSuccess(String operationId) {

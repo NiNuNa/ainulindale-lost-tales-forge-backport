@@ -3,6 +3,7 @@ package com.ninuna.losttales.event;
 import com.ninuna.losttales.quest.LostTalesQuestInteractionHelper;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.party.quest.PartyQuestProgressCoordinator;
+import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
@@ -92,6 +93,9 @@ public final class LostTalesQuestObjectiveEventHandler {
         if (event == null || event.phase != TickEvent.Phase.END || !(event.player instanceof EntityPlayerMP) || event.player.worldObj == null || event.player.worldObj.isRemote) {
             return;
         }
+
+        LostTalesWaypointFastTravelPolicy.cancelUnauthorizedTarget(
+                (EntityPlayerMP)event.player);
 
         if (event.player.ticksExisted % 20 != 0) {
             return;

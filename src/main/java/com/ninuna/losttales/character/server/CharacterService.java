@@ -7,6 +7,7 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterFactionResolver;
 import com.ninuna.losttales.character.storage.CharacterStorage;
+import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.character.validation.CharacterCreationValidationResult;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
@@ -143,46 +144,11 @@ public final class CharacterService {
         return CharacterOperationResult.success(true, roster, character);
     }
 
-    public synchronized CharacterOperationResult selectCharacter(
-            EntityPlayerMP player, long expectedRosterRevision, UUID characterId) {
-        CharacterValidationResult playerValidation = validateServerPlayer(player);
-        if (!playerValidation.isValid()) {
-            return CharacterOperationResult.failure(playerValidation.getErrorId(), null);
-        }
-        CharacterValidationResult managementValidation =
-                CharacterValidator.validatePlayerCanManage(player);
-        if (!managementValidation.isValid()) {
-            CharacterErrorId error = managementValidation.getErrorId();
-            if (error == CharacterErrorId.PLAYER_DEAD
-                    || error == CharacterErrorId.PLAYER_SLEEPING) {
-                error = CharacterErrorId.SWITCH_NOT_ALLOWED;
-            }
-            return CharacterOperationResult.failure(error, null);
-        }
-
-        CharacterWorldData data = getData(player);
-        if (data == null) {
-            return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, null);
-        }
-        if (data.isReadOnlyForNewerVersion()) {
-            return CharacterOperationResult.failure(CharacterErrorId.STORAGE_READ_ONLY, null);
-        }
-        CharacterRoster roster = data.getOrCreateRoster(player.getUniqueID());
-        CharacterValidationResult validation = CharacterValidator.validateCharacterReference(
-                roster, characterId, expectedRosterRevision);
-        if (!validation.isValid()) {
-            return CharacterOperationResult.failure(validation.getErrorId(), roster);
-        }
-
-        RoleplayCharacter character = roster.getCharacter(characterId);
-        if (characterId.equals(roster.getActiveCharacterId())) {
-            return CharacterOperationResult.success(false, roster, character);
-        }
-
-        roster.setActiveCharacterId(characterId);
-        roster.incrementRevision();
-        data.saveRoster(roster);
-        return CharacterOperationResult.success(true, roster, character);
+    public CharacterOperationResult selectCharacter(
+            EntityPlayerMP player, int requestId,
+            long expectedRosterRevision, UUID characterId) {
+        return CharacterSwitchCoordinator.getInstance().selectCharacter(
+                player, requestId, expectedRosterRevision, characterId);
     }
 
     public synchronized CharacterOperationResult updateCapeSettings(
@@ -271,6 +237,11 @@ public final class CharacterService {
                 roster, characterId, expectedRosterRevision);
         if (!validation.isValid()) {
             return CharacterOperationResult.failure(validation.getErrorId(), roster);
+        }
+
+        if (characterId.equals(roster.getActiveCharacterId())) {
+            return CharacterOperationResult.failure(
+                    CharacterErrorId.DELETE_ACTIVE_CHARACTER, roster);
         }
 
         RoleplayCharacter character = roster.getCharacter(characterId);

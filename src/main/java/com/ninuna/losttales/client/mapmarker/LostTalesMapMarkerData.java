@@ -139,9 +139,9 @@ public final class LostTalesMapMarkerData {
 
 
     /**
-     * If true, this marker has no Lost Tales map/compass presentation before
-     * discovery unless it is an existing LOTR waypoint, in which case LOTR's own
-     * vanilla dot remains visible until Lost Tales discovery replaces it.
+     * If true, discovery is required before any map presentation. If false, a
+     * discoverable marker becomes an anonymous question mark after its LOTR
+     * biome/waypoint region has been visited by the active character.
      */
     public boolean isHiddenUntilDiscovered() {
         return this.hiddenUntilDiscovered;

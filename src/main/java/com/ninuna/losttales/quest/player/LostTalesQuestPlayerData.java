@@ -164,6 +164,12 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
 
     @Override
     public void loadNBTData(NBTTagCompound compound) {
+        loadNBTData(compound, true, true);
+    }
+
+    private void loadNBTData(NBTTagCompound compound,
+                             boolean registerRuntimeDefinitions,
+                             boolean logWarnings) {
         this.activeQuests.clear();
         this.completedQuests.clear();
         this.failedQuests.clear();
@@ -181,7 +187,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         if (!compound.hasKey(PROPERTY_ID, Constants.NBT.TAG_COMPOUND)) {
             enterReadOnlyMode(compound.getTag(PROPERTY_ID), -1,
-                    "Quest data property is malformed and will be preserved without modification");
+                    "Quest data property is malformed and will be preserved without modification",
+                    logWarnings);
             return;
         }
 
@@ -190,13 +197,15 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 LostTalesQuestDataMigrator.migrate(originalData, CURRENT_DATA_VERSION);
         if (!migration.isValid()) {
             enterReadOnlyMode(originalData, -1,
-                    "Quest data is malformed and will be preserved without modification");
+                    "Quest data is malformed and will be preserved without modification",
+                    logWarnings);
             return;
         }
         if (!migration.isSupported()) {
             enterReadOnlyMode(originalData, migration.getVersion(),
                     "Quest data uses unsupported version " + migration.getVersion()
-                            + " and will be preserved without modification");
+                            + " and will be preserved without modification",
+                    logWarnings);
             return;
         }
 
@@ -256,7 +265,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             LostTalesQuestDefinition quest = LostTalesQuestDefinitionNbt.read(dynamicQuestList.getCompoundTagAt(i));
             if (quest != null && quest.getId() != null && quest.getId().length() > 0) {
                 this.dynamicQuestDefinitions.put(quest.getId(), quest);
-                LostTalesQuestRegistry.registerRuntimeQuest(quest);
+                if (registerRuntimeDefinitions) {
+                    LostTalesQuestRegistry.registerRuntimeQuest(quest);
+                }
             }
         }
 
@@ -300,11 +311,71 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     private void enterReadOnlyMode(NBTBase preservedData, int unsupportedVersion,
-                                   String message) {
+                                   String message, boolean logWarning) {
         this.readOnlyForNewerVersion = true;
         this.unsupportedDataVersion = unsupportedVersion;
         this.preservedReadOnlyData = preservedData == null ? null : preservedData.copy();
-        FMLLog.warning("[%s] %s", LostTalesMetaData.MOD_ID, message);
+        if (logWarning) {
+            FMLLog.warning("[%s] %s", LostTalesMetaData.MOD_ID, message);
+        }
+    }
+
+    /**
+     * Returns a detached, character-owned quest payload without the Forge
+     * extended-properties wrapper used in vanilla player.dat.
+     */
+    public NBTTagCompound writeCharacterState() {
+        NBTTagCompound wrapper = new NBTTagCompound();
+        saveNBTData(wrapper);
+        if (!wrapper.hasKey(PROPERTY_ID, Constants.NBT.TAG_COMPOUND)) {
+            throw new IllegalStateException(
+                    "Quest data cannot be represented as a character snapshot");
+        }
+        return (NBTTagCompound) wrapper.getCompoundTag(PROPERTY_ID).copy();
+    }
+
+    /**
+     * Strictly validates a detached quest payload without registering its
+     * server-global runtime definitions. The returned compound is independent
+     * from the caller's NBT tree.
+     */
+    public static NBTTagCompound validateCharacterState(
+            NBTTagCompound characterState) {
+        if (characterState == null) {
+            throw new IllegalArgumentException("Quest character state is missing");
+        }
+        LostTalesQuestPlayerData probe = new LostTalesQuestPlayerData();
+        probe.loadCharacterState(characterState, false, false);
+        if (probe.isReadOnlyForNewerVersion()) {
+            throw new IllegalArgumentException(
+                    "Quest character state is malformed or unsupported");
+        }
+        NBTTagCompound canonical = probe.writeCharacterState();
+        if (!canonical.equals(characterState)) {
+            throw new IllegalArgumentException(
+                    "Quest character state is not canonical");
+        }
+        return (NBTTagCompound) canonical.copy();
+    }
+
+    /** Replaces the live player's quest state from an already detached payload. */
+    public void replaceCharacterState(NBTTagCompound characterState) {
+        NBTTagCompound validated = validateCharacterState(characterState);
+        loadCharacterState(validated, true, true);
+        if (isReadOnlyForNewerVersion()) {
+            throw new IllegalArgumentException(
+                    "Quest character state became unavailable while applying");
+        }
+    }
+
+    private void loadCharacterState(NBTTagCompound characterState,
+                                    boolean registerRuntimeDefinitions,
+                                    boolean logWarnings) {
+        NBTTagCompound wrapper = new NBTTagCompound();
+        if (characterState != null) {
+            wrapper.setTag(PROPERTY_ID, characterState.copy());
+        }
+        loadNBTData(wrapper, registerRuntimeDefinitions, logWarnings);
     }
 
     public Collection<LostTalesQuestProgress> getActiveQuests() {

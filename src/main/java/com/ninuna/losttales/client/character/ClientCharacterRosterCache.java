@@ -80,6 +80,7 @@ public final class ClientCharacterRosterCache {
                 false,
                 CharacterErrorId.INTERNAL_ERROR,
                 snapshot == null ? -1L : snapshot.getRevision(),
+                -1L,
                 false
         );
         PENDING_REQUESTS.remove(Integer.valueOf(requestId));
@@ -96,6 +97,7 @@ public final class ClientCharacterRosterCache {
                 false,
                 CharacterErrorId.INTERNAL_ERROR,
                 snapshot == null ? -1L : snapshot.getRevision(),
+                -1L,
                 false
         );
         if (requestId != 0) {

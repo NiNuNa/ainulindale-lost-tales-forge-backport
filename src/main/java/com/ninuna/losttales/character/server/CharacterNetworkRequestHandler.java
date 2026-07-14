@@ -40,7 +40,7 @@ public final class CharacterNetworkRequestHandler {
             @Override
             public CharacterOperationResult run() {
                 return CharacterService.getInstance().selectCharacter(
-                        player, expectedRosterRevision, characterId);
+                        player, requestId, expectedRosterRevision, characterId);
             }
         });
     }
@@ -91,16 +91,28 @@ public final class CharacterNetworkRequestHandler {
                                 CharacterOperationType operationType,
                                 Operation operation,
                                 PartySyncManager.AudienceSnapshot affectedAudience) {
+        CharacterOperationResult result;
         try {
-            CharacterOperationResult result = operation.run();
-            CharacterSyncManager.sendResultAndRoster(
-                    player, requestId, operationType, result);
-            if (result.isSuccessful() && result.wasChanged()
-                    && result.getRoster() != null
-                    && operationType != CharacterOperationType.REQUEST_ROSTER) {
-                // Apply the authoritative selection before broadcasting it so
-                // the selecting player cannot spend up to ten ticks with stale
-                // dimensions, eye height, or attributes.
+            result = operation.run();
+        } catch (Throwable throwable) {
+            FMLLog.warning("[%s] Character %s request failed for player %s: %s",
+                    LostTalesMetaData.MOD_ID,
+                    operationType.getId(),
+                    player == null ? "unknown" : player.getUniqueID(),
+                    throwable.toString());
+            CharacterSyncManager.sendFailure(
+                    player, requestId, operationType,
+                    CharacterErrorId.INTERNAL_ERROR, -1L);
+            return;
+        }
+
+        if (result.isSuccessful() && result.wasChanged()
+                && result.getRoster() != null
+                && operationType != CharacterOperationType.REQUEST_ROSTER) {
+            try {
+                // Once the coordinator commits, synchronization is best-effort.
+                // Never report a contradictory failure for an already committed
+                // switch; a later roster request can safely repair stale clients.
                 if (operationType != CharacterOperationType.CAPE_UPDATE) {
                     CharacterRaceGameplayHandler.apply(player);
                 }
@@ -112,16 +124,24 @@ public final class CharacterNetworkRequestHandler {
                     PartySyncManager.sendStateToAudience(
                             affectedAudience, player.getUniqueID());
                 }
+            } catch (Throwable synchronizationFailure) {
+                FMLLog.warning("[%s] Character %s committed for player %s but post-commit synchronization failed: %s",
+                        LostTalesMetaData.MOD_ID,
+                        operationType.getId(),
+                        player == null ? "unknown" : player.getUniqueID(),
+                        synchronizationFailure.toString());
             }
-        } catch (Throwable throwable) {
-            FMLLog.warning("[%s] Character %s request failed for player %s: %s",
+        }
+
+        try {
+            CharacterSyncManager.sendResultAndRoster(
+                    player, requestId, operationType, result);
+        } catch (Throwable responseFailure) {
+            FMLLog.warning("[%s] Unable to send character %s result to player %s: %s",
                     LostTalesMetaData.MOD_ID,
                     operationType.getId(),
                     player == null ? "unknown" : player.getUniqueID(),
-                    throwable.toString());
-            CharacterSyncManager.sendFailure(
-                    player, requestId, operationType,
-                    CharacterErrorId.INTERNAL_ERROR, -1L);
+                    responseFailure.toString());
         }
     }
 

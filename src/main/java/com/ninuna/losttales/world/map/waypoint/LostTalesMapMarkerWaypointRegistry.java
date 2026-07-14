@@ -13,15 +13,16 @@ import java.util.Locale;
 import java.util.Map;
 import lotr.common.LOTRDimension;
 import lotr.common.fac.LOTRFaction;
+import lotr.common.world.map.LOTRAbstractWaypoint;
 import lotr.common.world.map.LOTRWaypoint;
 
 /**
  * Registers Lost Tales JSON map markers as public LOTR waypoints.
  *
  * <p>These are not LOTRCustomWaypoint instances. They are normal global/public
- * LOTRWaypoint enum entries with one private region per marker. The waypoint is
- * created hidden and becomes visible for a player only after that player
- * discovers the corresponding Lost Tales map marker and we unlock its region.</p>
+ * LOTRWaypoint enum entries with one private fast-travel region per marker.
+ * Map visibility uses the marker coordinate's native biome region, while the
+ * private region is unlocked only after marker discovery.</p>
  */
 public final class LostTalesMapMarkerWaypointRegistry {
     private static final String LOTR_WAYPOINT_MARKER_PREFIX = "lotr:waypoint:";
@@ -56,6 +57,40 @@ public final class LostTalesMapMarkerWaypointRegistry {
     public static synchronized Map<String, LOTRWaypoint> getRegisteredWaypoints() {
         initAndRegisterWaypoints();
         return Collections.unmodifiableMap(new LinkedHashMap<String, LOTRWaypoint>(WAYPOINTS_BY_MARKER_ID));
+    }
+
+    /** Resolves the bundled Lost Tales definition that owns a LOTR waypoint. */
+    public static synchronized LostTalesMapMarkerDefinition getMarkerForWaypoint(
+            LOTRAbstractWaypoint waypoint) {
+        if (waypoint == null) {
+            return null;
+        }
+        initAndRegisterWaypoints();
+        for (Map.Entry<String, LOTRWaypoint> entry
+                : WAYPOINTS_BY_MARKER_ID.entrySet()) {
+            if (entry.getValue() == waypoint) {
+                return LostTalesMapMarkerCatalog.getMarker(entry.getKey());
+            }
+        }
+
+        String code = normalizeWaypointKey(waypoint.getCodeName());
+        for (LostTalesMapMarkerDefinition marker
+                : LostTalesMapMarkerCatalog.getMarkers()) {
+            if (marker == null || !marker.hasFastTravel()) {
+                continue;
+            }
+            String markerCode = normalizeWaypointKey(
+                    marker.getFastTravelWaypointCode());
+            if (markerCode.length() > 0 && markerCode.equals(code)) {
+                return marker;
+            }
+            if (markerCode.length() == 0
+                    && Math.abs(marker.getX() - waypoint.getXCoord()) <= 0.5D
+                    && Math.abs(marker.getZ() - waypoint.getZCoord()) <= 0.5D) {
+                return marker;
+            }
+        }
+        return null;
     }
 
     public static boolean isExistingLotrWaypointMarker(LostTalesMapMarkerDefinition marker) {
@@ -140,5 +175,9 @@ public final class LostTalesMapMarkerWaypointRegistry {
             builder.append("MARKER");
         }
         return builder.toString();
+    }
+
+    private static String normalizeWaypointKey(String value) {
+        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 }

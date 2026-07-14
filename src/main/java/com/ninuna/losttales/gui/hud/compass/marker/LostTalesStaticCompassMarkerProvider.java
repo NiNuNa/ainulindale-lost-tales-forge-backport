@@ -1,6 +1,7 @@
 package com.ninuna.losttales.gui.hud.compass.marker;
 
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
+import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerVisibility;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestMarkerHelper;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
@@ -30,6 +31,12 @@ public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMar
             boolean discovered = LostTalesClientQuestProgressStore.isMarkerDiscovered(entry.getId());
             boolean pinned = entry.getId() != null && entry.getId().equals(pinnedMarkerId);
             boolean undiscovered = entry.isDiscoverable() && !discovered;
+
+            if (undiscovered
+                    && !LostTalesClientMapMarkerVisibility
+                    .isUndiscoveredRegionVisible(entry)) {
+                continue;
+            }
 
             String name = activeQuestMarker ? activeQuestMarkers.get(entry.getId()) : entry.getName();
             if (pinned) {

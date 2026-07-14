@@ -6,6 +6,8 @@ import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.character.server.CharacterPlayerEventHandler;
 import com.ninuna.losttales.character.server.CharacterRaceGameplayHandler;
 import com.ninuna.losttales.character.server.CharacterSpawnOriginHandler;
+import com.ninuna.losttales.character.switching.CharacterLifecycleStateTracker;
+import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
 import com.ninuna.losttales.character.server.CharacterServerPacketDispatcher;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
@@ -74,6 +76,8 @@ public class LostTalesCommonProxy {
         LostTalesQuestPlayerEventHandler questPlayerEventHandler = new LostTalesQuestPlayerEventHandler();
         LostTalesQuestObjectiveEventHandler questObjectiveEventHandler = new LostTalesQuestObjectiveEventHandler();
         LostTalesMobAggroEventHandler mobAggroEventHandler = new LostTalesMobAggroEventHandler();
+        CharacterLifecycleStateTracker characterLifecycleStateTracker =
+                new CharacterLifecycleStateTracker();
         CharacterPlayerEventHandler characterPlayerEventHandler = new CharacterPlayerEventHandler();
         CharacterRaceGameplayHandler characterRaceGameplayHandler = new CharacterRaceGameplayHandler();
         CharacterSpawnOriginHandler characterSpawnOriginHandler = new CharacterSpawnOriginHandler();
@@ -81,6 +85,7 @@ public class LostTalesCommonProxy {
         LostTalesServerTaskQueue serverTaskQueue = new LostTalesServerTaskQueue();
         LostTalesNetworkPlayerEventHandler networkPlayerEventHandler = new LostTalesNetworkPlayerEventHandler();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
+        MinecraftForge.EVENT_BUS.register(characterLifecycleStateTracker);
         MinecraftForge.EVENT_BUS.register(characterPlayerEventHandler);
         MinecraftForge.EVENT_BUS.register(characterRaceGameplayHandler);
         MinecraftForge.EVENT_BUS.register(characterSpawnOriginHandler);
@@ -89,6 +94,7 @@ public class LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(questPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(questObjectiveEventHandler);
         FMLCommonHandler.instance().bus().register(mobAggroEventHandler);
+        FMLCommonHandler.instance().bus().register(characterLifecycleStateTracker);
         FMLCommonHandler.instance().bus().register(characterPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(characterRaceGameplayHandler);
         FMLCommonHandler.instance().bus().register(partyPlayerEventHandler);
@@ -181,6 +187,8 @@ public class LostTalesCommonProxy {
     public void handlePartyTrackingSync(PartyTrackingSyncPacket packet) {}
 
     public void onServerStarting(FMLServerStartingEvent event) {
+        CharacterLifecycleStateTracker.markServerStarting();
+        CharacterSwitchCoordinator.getInstance().clearAllRuntimeState();
         LostTalesServerTaskQueue.startAccepting();
         LostTalesRequestRateLimiter.clear();
         CharacterServerPacketDispatcher.clearSecurityState();
@@ -191,6 +199,8 @@ public class LostTalesCommonProxy {
     }
 
     public void onServerStopping(FMLServerStoppingEvent event) {
+        CharacterLifecycleStateTracker.markServerStopping();
+        CharacterSwitchCoordinator.getInstance().clearAllRuntimeState();
         LostTalesServerTaskQueue.stopAcceptingAndClear();
         LostTalesRequestRateLimiter.clear();
         CharacterServerPacketDispatcher.clearSecurityState();
