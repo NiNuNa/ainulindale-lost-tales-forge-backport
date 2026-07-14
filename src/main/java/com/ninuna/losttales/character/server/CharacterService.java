@@ -2,6 +2,7 @@ package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
+import com.ninuna.losttales.character.deletion.CharacterDeletionService;
 import com.ninuna.losttales.character.model.CharacterProgression;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
@@ -15,9 +16,6 @@ import com.ninuna.losttales.character.validation.CharacterValidationResult;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.character.validation.ValidatedCharacterCreation;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
-import com.ninuna.losttales.party.server.PartyErrorId;
-import com.ninuna.losttales.party.server.PartyOperationResult;
-import com.ninuna.losttales.party.server.PartyService;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 
@@ -245,28 +243,8 @@ public final class CharacterService {
         }
 
         RoleplayCharacter character = roster.getCharacter(characterId);
-        PartyOperationResult partyCleanup = PartyService.getInstance()
-                .removeCharacterForDeletion(player.worldObj, character);
-        if (!partyCleanup.isSuccessful()) {
-            CharacterErrorId error;
-            if (partyCleanup.getErrorId() == PartyErrorId.PARTY_STORAGE_READ_ONLY) {
-                error = CharacterErrorId.PARTY_STORAGE_READ_ONLY;
-            } else if (partyCleanup.getErrorId()
-                    == PartyErrorId.INVITATION_STORAGE_READ_ONLY) {
-                error = CharacterErrorId.PARTY_INVITATION_STORAGE_READ_ONLY;
-            } else {
-                error = CharacterErrorId.PARTY_CLEANUP_FAILED;
-            }
-            return CharacterOperationResult.failure(error, roster);
-        }
-
-        RoleplayCharacter removed = roster.removeCharacter(characterId);
-        if (removed == null) {
-            return CharacterOperationResult.failure(CharacterErrorId.CHARACTER_NOT_FOUND, roster);
-        }
-        roster.incrementRevision();
-        data.saveRoster(roster);
-        return CharacterOperationResult.success(true, roster, removed);
+        return CharacterDeletionService.getInstance().delete(
+                player, data, roster, character);
     }
 
     private CharacterValidationResult validateServerPlayer(EntityPlayerMP player) {

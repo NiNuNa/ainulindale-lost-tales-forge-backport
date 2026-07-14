@@ -91,7 +91,7 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " hud <status|preset|set|move|toggle>");
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " summon <entity> [x] [y] [z] [dataTag]");
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " party <status|validate|repair|clearcombat>");
-        send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " character <status|recover|cooldown|freeze|unfreeze> [player]");
+        send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " character <status|recover|cooldown|freeze|unfreeze|deleted|restore|rollback|purge> ...");
         send(sender, EnumChatFormatting.DARK_GRAY + "Use /losttales <subcommand>; legacy underscore commands are no longer registered.");
     }
 

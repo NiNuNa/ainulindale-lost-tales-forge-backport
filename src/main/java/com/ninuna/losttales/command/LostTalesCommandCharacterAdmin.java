@@ -1,5 +1,10 @@
 package com.ninuna.losttales.command;
 
+import com.ninuna.losttales.character.deletion.CharacterDeletionMaintenanceResult;
+import com.ninuna.losttales.character.deletion.CharacterDeletionService;
+import com.ninuna.losttales.character.deletion.CharacterDeletionStorage;
+import com.ninuna.losttales.character.deletion.CharacterDeletionTombstone;
+import com.ninuna.losttales.character.deletion.CharacterDeletionWorldData;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.state.CharacterPlayerStateAccount;
 import com.ninuna.losttales.character.state.CharacterPlayerStateRecord;
@@ -32,7 +37,8 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/losttales character <status|recover|cooldown|freeze|unfreeze> [player]";
+        return "/losttales character <status|recover|cooldown|freeze|unfreeze|deleted> [player]"
+                + " or <restore|rollback|purge> <player> <character-uuid> [confirm]";
     }
 
     @Override
@@ -74,6 +80,46 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
                     ? EnumChatFormatting.GREEN + "Character switch state reconciled."
                     : EnumChatFormatting.RED + "Recovery did not complete: " + result.getId());
             reportStatus(sender, target);
+        } else if ("deleted".equalsIgnoreCase(action)
+                || "tombstones".equalsIgnoreCase(action)) {
+            reportDeleted(sender, target);
+        } else if ("restore".equalsIgnoreCase(action)) {
+            UUID characterId = parseCharacterId(sender, args);
+            if (characterId == null) {
+                return;
+            }
+            CharacterDeletionMaintenanceResult result =
+                    CharacterDeletionService.getInstance().restore(
+                            target, characterId);
+            reportMaintenanceResult(sender, target, characterId,
+                    "restore", result);
+        } else if ("rollback".equalsIgnoreCase(action)) {
+            UUID characterId = parseCharacterId(sender, args);
+            if (characterId == null) {
+                return;
+            }
+            CharacterDeletionMaintenanceResult result =
+                    CharacterDeletionService.getInstance().rollbackInactive(
+                            target, characterId);
+            reportMaintenanceResult(sender, target, characterId,
+                    "rollback", result);
+        } else if ("purge".equalsIgnoreCase(action)) {
+            UUID characterId = parseCharacterId(sender, args);
+            if (characterId == null) {
+                return;
+            }
+            if (args.length < 4 || !"confirm".equalsIgnoreCase(args[3])) {
+                send(sender, EnumChatFormatting.RED
+                        + "Permanent purge requires: /losttales character purge "
+                        + target.getCommandSenderName() + " " + characterId
+                        + " confirm");
+                return;
+            }
+            CharacterDeletionMaintenanceResult result =
+                    CharacterDeletionService.getInstance().purge(
+                            target, characterId);
+            reportMaintenanceResult(sender, target, characterId,
+                    "purge", result);
         } else if ("cooldown".equalsIgnoreCase(action)
                 || "resetcooldown".equalsIgnoreCase(action)) {
             boolean reset = CharacterSwitchCoordinator.getInstance().resetCooldown(
@@ -110,6 +156,8 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             CharacterSwitchWorldData switchData = CharacterSwitchStorage.get(world);
             CharacterPlayerStateWorldData playerStateData =
                     CharacterPlayerStateStorage.get(world, ownerId);
+            CharacterDeletionWorldData deletionData =
+                    CharacterDeletionStorage.get(world);
             CharacterRoster roster = characterData.getRoster(ownerId);
             CharacterSwitchAccountState state = switchData.getAccount(ownerId);
             CharacterPlayerStateAccount playerState =
@@ -125,12 +173,18 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
                     + ", switchReadOnly=" + switchData.isReadOnlyForNewerVersion()
                     + ", playerStateReadOnly="
                     + playerStateData.isReadOnlyForNewerVersion()
+                    + ", deletionReadOnly="
+                    + deletionData.isReadOnlyForNewerVersion()
                     + ", switchOwnerBlocked=" + switchData.isOwnerBlocked(ownerId)
                     + ", playerStateOwnerBlocked="
                     + playerStateData.isOwnerBlocked(ownerId)
                     + ", switchQuarantine=" + switchData.getQuarantinedEntryCount()
                     + ", playerStateQuarantine="
-                    + playerStateData.getQuarantinedEntryCount());
+                    + playerStateData.getQuarantinedEntryCount()
+                    + ", deletionQuarantine="
+                    + deletionData.getQuarantinedEntryCount()
+                    + ", recoverableDeletions="
+                    + deletionData.getTombstones(ownerId).size());
             if (playerState == null) {
                 send(sender, EnumChatFormatting.GRAY
                         + "playerState=not bootstrapped");
@@ -179,6 +233,119 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         }
     }
 
+    private void reportDeleted(ICommandSender sender, EntityPlayerMP target) {
+        try {
+            List<CharacterDeletionTombstone> tombstones =
+                    CharacterDeletionService.getInstance().getTombstones(
+                            target.worldObj, target.getUniqueID());
+            if (tombstones.isEmpty()) {
+                send(sender, EnumChatFormatting.GRAY
+                        + "No recoverable deletions exist for "
+                        + target.getCommandSenderName() + ".");
+                return;
+            }
+            send(sender, EnumChatFormatting.GOLD + "Recoverable deletions for "
+                    + target.getCommandSenderName() + ":");
+            long now = System.currentTimeMillis();
+            for (CharacterDeletionTombstone tombstone : tombstones) {
+                String retention = tombstone.isCommitted()
+                        ? (tombstone.isPurgeAllowed(now)
+                        ? "purge eligible"
+                        : "purge in " + formatDuration(
+                                tombstone.getPurgeAfter() - now))
+                        : "prepared; deletion not committed";
+                send(sender, EnumChatFormatting.GRAY
+                        + tombstone.getCharacterCopy().getName()
+                        + " id=" + tombstone.getCharacterId()
+                        + ", slot="
+                        + tombstone.getCharacterCopy().getSlotIndex()
+                        + ", stateGeneration="
+                        + tombstone.getStateGeneration()
+                        + ", " + retention);
+            }
+        } catch (RuntimeException exception) {
+            send(sender, EnumChatFormatting.RED
+                    + "Unable to inspect recoverable deletions: "
+                    + exception.getClass().getSimpleName());
+        }
+    }
+
+    private UUID parseCharacterId(ICommandSender sender, String[] args) {
+        if (args == null || args.length < 3) {
+            send(sender, EnumChatFormatting.RED
+                    + "Specify an online player and a character UUID.");
+            return null;
+        }
+        try {
+            return UUID.fromString(args[2]);
+        } catch (IllegalArgumentException exception) {
+            send(sender, EnumChatFormatting.RED
+                    + "The character UUID is invalid: " + args[2]);
+            return null;
+        }
+    }
+
+    private void reportMaintenanceResult(
+            ICommandSender sender,
+            EntityPlayerMP target,
+            UUID characterId,
+            String action,
+            CharacterDeletionMaintenanceResult result) {
+        if (result == CharacterDeletionMaintenanceResult.SUCCESS) {
+            send(sender, EnumChatFormatting.GREEN + "Character " + action
+                    + " completed for " + characterId + ".");
+            reportStatus(sender, target);
+            return;
+        }
+        if (result == CharacterDeletionMaintenanceResult.RECONCILED) {
+            send(sender, EnumChatFormatting.GREEN
+                    + "The character already existed; its stale tombstone was removed.");
+            return;
+        }
+        String detail;
+        switch (result) {
+            case NOT_FOUND:
+                detail = "No matching character or tombstone was found.";
+                break;
+            case STORAGE_READ_ONLY:
+                detail = "A required character store is read-only.";
+                break;
+            case PLAYER_STATE_UNAVAILABLE:
+                detail = "The required character player-state generation is unavailable or invalid.";
+                break;
+            case SLOT_OCCUPIED:
+                detail = "The character's original roster slot is occupied.";
+                break;
+            case CHARACTER_ID_CONFLICT:
+                detail = "The character UUID is already present in a roster.";
+                break;
+            case CHARACTER_ACTIVE:
+                detail = "Switch away from the character before rolling back its generation.";
+                break;
+            case PREVIOUS_GENERATION_UNAVAILABLE:
+                detail = "No retained previous generation is available.";
+                break;
+            case RETENTION_ACTIVE:
+                CharacterDeletionTombstone tombstone =
+                        CharacterDeletionService.getInstance().getTombstone(
+                                target.worldObj, characterId);
+                detail = tombstone == null
+                        ? "The recovery retention period is still active."
+                        : "The recovery retention period remains active for "
+                        + formatDuration(tombstone.getPurgeAfter()
+                                - System.currentTimeMillis()) + ".";
+                break;
+            case NOT_COMMITTED:
+                detail = "The prepared deletion never committed; restore or retry normal deletion instead.";
+                break;
+            default:
+                detail = "The operation failed internally; inspect the server log.";
+                break;
+        }
+        send(sender, EnumChatFormatting.RED + "Character " + action
+                + " failed: " + detail);
+    }
+
     private EntityPlayerMP resolveTarget(ICommandSender sender, String playerName) {
         if (playerName != null && playerName.length() > 0) {
             try {
@@ -218,11 +385,16 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
     public List addTabCompletionOptions(ICommandSender sender, String[] args) {
         if (args != null && args.length == 1) {
             return getListOfStringsMatchingLastWord(
-                    args, "status", "recover", "cooldown", "freeze", "unfreeze");
+                    args, "status", "recover", "cooldown", "freeze", "unfreeze",
+                    "deleted", "restore", "rollback", "purge");
         }
         if (args != null && args.length == 2) {
             return getListOfStringsMatchingLastWord(args,
                     MinecraftServer.getServer().getAllUsernames());
+        }
+        if (args != null && args.length == 4
+                && "purge".equalsIgnoreCase(args[0])) {
+            return getListOfStringsMatchingLastWord(args, "confirm");
         }
         return null;
     }

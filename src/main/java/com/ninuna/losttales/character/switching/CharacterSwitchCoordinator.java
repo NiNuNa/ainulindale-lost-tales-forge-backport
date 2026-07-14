@@ -703,47 +703,14 @@ public final class CharacterSwitchCoordinator {
                                              CharacterSwitchAccountState account,
                                              CharacterSwitchWorldData switchData,
                                              long now) {
-        CharacterSwitchTransaction transaction = account.getTransaction();
-        if (transaction == null) {
-            return CharacterErrorId.NONE;
-        }
-        UUID active = roster.getActiveCharacterId();
-        boolean targetActive = equalsUuid(active, transaction.getTargetCharacterId());
-        boolean sourceActive = equalsUuid(active, transaction.getSourceCharacterId());
-        boolean changed = false;
-
-        if (transaction.getStatus() == CharacterSwitchTransactionStatus.ABORTED) {
-            if (sourceActive) {
-                account.setTransaction(null);
-            } else {
-                transaction.markRecoveryRequired(now);
-                account.setFrozen(true);
-            }
-            changed = true;
-        } else if (targetActive) {
-            if (transaction.getStatus() == CharacterSwitchTransactionStatus.COMMITTED) {
-                account.setTransaction(null);
-            } else {
-                account.applyCommittedCooldown(transaction);
-                transaction.markCommitted(now);
-            }
-            changed = true;
-        } else if (sourceActive) {
-            account.restorePreviousCooldown(transaction);
-            transaction.markAborted(now);
-            changed = true;
-        } else {
-            transaction.markRecoveryRequired(now);
-            account.setFrozen(true);
-            changed = true;
-        }
-        if (changed) {
+        CharacterSwitchRecoveryReconciler.Result result =
+                CharacterSwitchRecoveryReconciler.reconcile(
+                        roster.getActiveCharacterId(), account, now);
+        if (result.isChanged()) {
             switchData.saveAccount(account);
             CharacterSwitchStorage.flush(world);
         }
-        return transaction.getStatus() == CharacterSwitchTransactionStatus.RECOVERY_REQUIRED
-                ? CharacterErrorId.SWITCH_RECOVERY_REQUIRED
-                : CharacterErrorId.NONE;
+        return result.getErrorId();
     }
 
     private static void disconnectForRecovery(EntityPlayerMP player) {

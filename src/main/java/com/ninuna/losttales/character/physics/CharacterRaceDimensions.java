@@ -146,7 +146,7 @@ public final class CharacterRaceDimensions {
     /**
      * Projectile constructors commonly begin from the shooter's eye reference,
      * then apply their own forward/downward offsets. This named accessor is kept
-     * separate so Stage 2 can specialize projectile origins without making
+     * separate so projectile origins can be specialized without making
      * unrelated camera or item-drop code depend on that policy.
      */
     public float getProjectileEyeReferenceHeight(boolean sneaking) {

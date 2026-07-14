@@ -13,11 +13,11 @@ import org.lwjgl.opengl.GL11;
 
 /** Skyrim-style radial character menu. */
 public class LostTalesCharacterMenuGui extends GuiScreen {
-    private static final int NONE = -1;
-    private static final int OPTION_PROFILE = 0;
-    private static final int OPTION_QUESTS = 1;
-    private static final int OPTION_ITEMS = 2;
-    private static final int OPTION_MAP = 3;
+    private static final int NONE = CharacterMenuSectorResolver.NONE;
+    private static final int OPTION_PROFILE = CharacterMenuSectorResolver.PROFILE;
+    private static final int OPTION_QUESTS = CharacterMenuSectorResolver.QUESTS;
+    private static final int OPTION_ITEMS = CharacterMenuSectorResolver.ITEMS;
+    private static final int OPTION_MAP = CharacterMenuSectorResolver.MAP;
 
     private final GuiScreen parent;
     private int hoveredOption = NONE;
@@ -38,12 +38,13 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
         int centerX = this.width / 2;
         int centerY = this.height / 2;
         int radius = Math.max(72, Math.min(this.width, this.height) / 4);
-        this.hoveredOption = getOptionAt(mouseX, mouseY, centerX, centerY, radius);
+        this.hoveredOption = getOptionAt(
+                mouseX, mouseY, centerX, centerY, this.width, this.height);
 
         LostTalesSkyrimUiStyle.drawScreenShade(this.width, this.height);
         LostTalesSkyrimUiStyle.drawCenteredHeader(this.fontRendererObj, "Character Menu", getHoveredSubtitle(), this.width, 12);
 
-        drawHoverQuarter(centerX, centerY, radius);
+        drawHoverSector(centerX, centerY);
         drawRadialFrame(centerX, centerY, radius);
         drawRadialOption("PROFILE", OPTION_PROFILE, centerX, centerY - radius, centerX, centerY - 18);
         drawRadialOption("QUESTS", OPTION_QUESTS, centerX - radius, centerY, centerX - 22, centerY);
@@ -55,23 +56,25 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
         super.drawScreen(mouseX, mouseY, partialTicks);
     }
 
-    private void drawHoverQuarter(int centerX, int centerY, int radius) {
+    private void drawHoverSector(int centerX, int centerY) {
         if (this.hoveredOption == NONE) {
             return;
         }
         int color = 0x22FFFFFF;
         switch (this.hoveredOption) {
             case OPTION_PROFILE:
-                Gui.drawRect(centerX - radius, centerY - radius, centerX + radius, centerY, color);
+                drawTriangle(centerX, centerY, 0, 0, this.width, 0, color);
                 break;
             case OPTION_QUESTS:
-                Gui.drawRect(centerX - radius, centerY - radius, centerX, centerY + radius, color);
+                drawTriangle(centerX, centerY, 0, this.height, 0, 0, color);
                 break;
             case OPTION_ITEMS:
-                Gui.drawRect(centerX, centerY - radius, centerX + radius, centerY + radius, color);
+                drawTriangle(centerX, centerY, this.width, 0,
+                        this.width, this.height, color);
                 break;
             case OPTION_MAP:
-                Gui.drawRect(centerX - radius, centerY, centerX + radius, centerY + radius, color);
+                drawTriangle(centerX, centerY, this.width, this.height,
+                        0, this.height, color);
                 break;
             default:
                 break;
@@ -127,20 +130,30 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
         GL11.glPopAttrib();
     }
 
-    private int getOptionAt(int mouseX, int mouseY, int centerX, int centerY, int radius) {
-        int dx = mouseX - centerX;
-        int dy = mouseY - centerY;
-        int deadZone = 18;
-        if (Math.abs(dx) < deadZone && Math.abs(dy) < deadZone) {
-            return NONE;
-        }
-        if (Math.abs(dx) > radius || Math.abs(dy) > radius) {
-            return NONE;
-        }
-        if (Math.abs(dx) > Math.abs(dy)) {
-            return dx < 0 ? OPTION_QUESTS : OPTION_ITEMS;
-        }
-        return dy < 0 ? OPTION_PROFILE : OPTION_MAP;
+    private void drawTriangle(int x1, int y1, int x2, int y2,
+                              int x3, int y3, int color) {
+        float a = (color >> 24 & 255) / 255.0F;
+        float r = (color >> 16 & 255) / 255.0F;
+        float g = (color >> 8 & 255) / 255.0F;
+        float b = (color & 255) / 255.0F;
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_CURRENT_BIT);
+        GL11.glDisable(GL11.GL_TEXTURE_2D);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GL11.glColor4f(r, g, b, a);
+        GL11.glBegin(GL11.GL_TRIANGLES);
+        GL11.glVertex2f(x1, y1);
+        GL11.glVertex2f(x2, y2);
+        GL11.glVertex2f(x3, y3);
+        GL11.glEnd();
+        GL11.glPopAttrib();
+    }
+
+    private int getOptionAt(int mouseX, int mouseY, int centerX, int centerY,
+                            int screenWidth, int screenHeight) {
+        return CharacterMenuSectorResolver.resolve(
+                mouseX, mouseY, centerX, centerY,
+                screenWidth, screenHeight);
     }
 
     private String getHoveredSubtitle() {
@@ -167,8 +180,11 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
-        if (button == 0 && this.hoveredOption != NONE) {
-            openOption(this.hoveredOption);
+        int option = getOptionAt(mouseX, mouseY,
+                this.width / 2, this.height / 2, this.width, this.height);
+        this.hoveredOption = option;
+        if (button == 0 && option != NONE) {
+            openOption(option);
             return;
         }
         super.mouseClicked(mouseX, mouseY, button);

@@ -107,7 +107,7 @@ final class LostTalesConfiguredPlayerRenderer extends RenderPlayer {
      * Keep RenderPlayer's normal Y handling. EntityPlayer uses a player-only
      * yOffset and RenderPlayer compensates for it before rendering. Cancelling
      * that compensation moves the entire body upward by roughly eye height,
-     * which is why the Stage 4 body appeared to stand on the camera.
+     * which is why the earlier body renderer appeared to stand on the camera.
      */
 
     /**

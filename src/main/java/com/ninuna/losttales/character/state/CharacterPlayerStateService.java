@@ -4,9 +4,12 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterRaceGameplayHandler;
 import com.ninuna.losttales.character.state.component.LostTalesQuestStateComponent;
+import com.ninuna.losttales.character.state.component.LotrCharacterDetailsStateComponent;
+import com.ninuna.losttales.character.state.component.LotrCustomWaypointStateComponent;
 import com.ninuna.losttales.character.state.component.LotrFastTravelRegionStateComponent;
 import com.ninuna.losttales.character.state.component.LotrProgressionStateComponent;
 import com.ninuna.losttales.character.state.component.LotrQuestStateComponent;
+import com.ninuna.losttales.character.state.component.LotrWaypointUseStateComponent;
 import com.ninuna.losttales.character.state.component.VanillaInventoryStateComponent;
 import com.ninuna.losttales.character.state.component.VanillaPotionStateComponent;
 import com.ninuna.losttales.character.state.component.VanillaStatisticsStateComponent;
@@ -33,7 +36,10 @@ public final class CharacterPlayerStateService {
     private final VanillaStatisticsStateComponent statisticsComponent;
     private final LostTalesQuestStateComponent questComponent;
     private final LotrFastTravelRegionStateComponent lotrRegionComponent;
+    private final LotrWaypointUseStateComponent lotrWaypointUseComponent;
+    private final LotrCustomWaypointStateComponent lotrCustomWaypointComponent;
     private final LotrProgressionStateComponent lotrProgressionComponent;
+    private final LotrCharacterDetailsStateComponent lotrDetailsComponent;
     private final LotrQuestStateComponent lotrQuestComponent;
 
     private CharacterPlayerStateService() {
@@ -47,8 +53,14 @@ public final class CharacterPlayerStateService {
         registered.add(this.questComponent);
         this.lotrRegionComponent = new LotrFastTravelRegionStateComponent();
         registered.add(this.lotrRegionComponent);
+        this.lotrWaypointUseComponent = new LotrWaypointUseStateComponent();
+        registered.add(this.lotrWaypointUseComponent);
+        this.lotrCustomWaypointComponent = new LotrCustomWaypointStateComponent();
+        registered.add(this.lotrCustomWaypointComponent);
         this.lotrProgressionComponent = new LotrProgressionStateComponent();
         registered.add(this.lotrProgressionComponent);
+        this.lotrDetailsComponent = new LotrCharacterDetailsStateComponent();
+        registered.add(this.lotrDetailsComponent);
         this.lotrQuestComponent = new LotrQuestStateComponent();
         registered.add(this.lotrQuestComponent);
         registered.add(new VanillaVitalsStateComponent());
@@ -250,10 +262,12 @@ public final class CharacterPlayerStateService {
 
     public void clearRuntimeState(UUID ownerId) {
         this.statisticsComponent.clearRuntimeState(ownerId);
+        this.lotrCustomWaypointComponent.clearRuntimeState(ownerId);
     }
 
     public void clearAllRuntimeState() {
         this.statisticsComponent.clearAllRuntimeState();
+        this.lotrCustomWaypointComponent.clearAllRuntimeState();
     }
 
     public void saveActiveLiveState(EntityPlayerMP player,
@@ -338,6 +352,9 @@ public final class CharacterPlayerStateService {
         boolean migrateLotrProgression = account.getBootstrapVersion() < 4;
         boolean migrateLotrQuests = account.getBootstrapVersion() < 5;
         boolean migrateLotrRegions = account.getBootstrapVersion() < 6;
+        boolean migrateLotrWaypointUses = account.getBootstrapVersion() < 7;
+        boolean migrateLotrCustomWaypoints = account.getBootstrapVersion() < 7;
+        boolean migrateLotrDetails = account.getBootstrapVersion() < 8;
 
         NBTTagCompound importedStatistics = !migrateStatistics || importTarget == null
                 ? null : this.statisticsComponent.capture(player);
@@ -382,6 +399,34 @@ public final class CharacterPlayerStateService {
             this.lotrRegionComponent.validate(defaultLotrRegions);
         }
 
+        NBTTagCompound importedLotrWaypointUses =
+                !migrateLotrWaypointUses || importTarget == null
+                        ? null : this.lotrWaypointUseComponent.capture(player);
+        NBTTagCompound defaultLotrWaypointUses = !migrateLotrWaypointUses
+                ? null : this.lotrWaypointUseComponent.createDefault();
+        if (defaultLotrWaypointUses != null) {
+            this.lotrWaypointUseComponent.validate(defaultLotrWaypointUses);
+        }
+
+        NBTTagCompound importedLotrCustomWaypoints =
+                !migrateLotrCustomWaypoints || importTarget == null
+                        ? null : this.lotrCustomWaypointComponent.capture(player);
+        NBTTagCompound defaultLotrCustomWaypoints = !migrateLotrCustomWaypoints
+                ? null : this.lotrCustomWaypointComponent.createDefault();
+        if (defaultLotrCustomWaypoints != null) {
+            this.lotrCustomWaypointComponent.validate(
+                    defaultLotrCustomWaypoints);
+        }
+
+        NBTTagCompound importedLotrDetails =
+                !migrateLotrDetails || importTarget == null
+                        ? null : this.lotrDetailsComponent.capture(player);
+        NBTTagCompound defaultLotrDetails = !migrateLotrDetails
+                ? null : this.lotrDetailsComponent.createDefault();
+        if (defaultLotrDetails != null) {
+            this.lotrDetailsComponent.validate(defaultLotrDetails);
+        }
+
         ArrayList<CharacterPlayerStateRecord> existing =
                 new ArrayList<CharacterPlayerStateRecord>(account.getRecords());
         ArrayList<CharacterPlayerStateRecord> migrated =
@@ -400,13 +445,27 @@ public final class CharacterPlayerStateService {
             NBTTagCompound lotrRegions =
                     record.getCharacterId().equals(importTarget)
                             ? importedLotrRegions : defaultLotrRegions;
+            NBTTagCompound lotrCustomWaypoints =
+                    record.getCharacterId().equals(importTarget)
+                            ? importedLotrCustomWaypoints
+                            : defaultLotrCustomWaypoints;
+            NBTTagCompound lotrWaypointUses =
+                    record.getCharacterId().equals(importTarget)
+                            ? importedLotrWaypointUses
+                            : defaultLotrWaypointUses;
+            NBTTagCompound lotrDetails =
+                    record.getCharacterId().equals(importTarget)
+                            ? importedLotrDetails : defaultLotrDetails;
             CharacterPlayerStateSnapshot current = migrateLegacySnapshot(
                     record.getCurrent(), statistics, quests, lotrProgression,
-                    lotrQuests, lotrRegions);
+                    lotrQuests, lotrRegions, lotrWaypointUses,
+                    lotrCustomWaypoints, lotrDetails);
             CharacterPlayerStateSnapshot previous = record.getPrevious() == null
                     ? null : migrateLegacySnapshot(
                             record.getPrevious(), statistics, quests,
-                            lotrProgression, lotrQuests, lotrRegions);
+                            lotrProgression, lotrQuests, lotrRegions,
+                            lotrWaypointUses, lotrCustomWaypoints,
+                            lotrDetails);
             migrated.add(new CharacterPlayerStateRecord(
                     record.getCharacterId(), current, previous));
         }
@@ -424,7 +483,10 @@ public final class CharacterPlayerStateService {
             NBTTagCompound quests,
             NBTTagCompound lotrProgression,
             NBTTagCompound lotrQuests,
-            NBTTagCompound lotrRegions)
+            NBTTagCompound lotrRegions,
+            NBTTagCompound lotrWaypointUses,
+            NBTTagCompound lotrCustomWaypoints,
+            NBTTagCompound lotrDetails)
             throws CharacterStateValidationException {
         if (snapshot == null || snapshot.getDataVersion() <= 0
                 || snapshot.getDataVersion()
@@ -492,6 +554,43 @@ public final class CharacterPlayerStateService {
                     (NBTTagCompound)lotrRegions.copy());
         } else {
             this.lotrRegionComponent.validate(existingLotrRegions);
+        }
+        NBTTagCompound existingLotrWaypointUses = migrated.get(
+                LotrWaypointUseStateComponent.ID);
+        if (existingLotrWaypointUses == null) {
+            if (lotrWaypointUses == null) {
+                throw new CharacterStateValidationException(
+                        "Legacy LOTR waypoint-use migration state is unavailable");
+            }
+            migrated.put(LotrWaypointUseStateComponent.ID,
+                    (NBTTagCompound)lotrWaypointUses.copy());
+        } else {
+            this.lotrWaypointUseComponent.validate(existingLotrWaypointUses);
+        }
+        NBTTagCompound existingLotrCustomWaypoints = migrated.get(
+                LotrCustomWaypointStateComponent.ID);
+        if (existingLotrCustomWaypoints == null) {
+            if (lotrCustomWaypoints == null) {
+                throw new CharacterStateValidationException(
+                        "Legacy LOTR custom-waypoint migration state is unavailable");
+            }
+            migrated.put(LotrCustomWaypointStateComponent.ID,
+                    (NBTTagCompound)lotrCustomWaypoints.copy());
+        } else {
+            this.lotrCustomWaypointComponent.validate(
+                    existingLotrCustomWaypoints);
+        }
+        NBTTagCompound existingLotrDetails = migrated.get(
+                LotrCharacterDetailsStateComponent.ID);
+        if (existingLotrDetails == null) {
+            if (lotrDetails == null) {
+                throw new CharacterStateValidationException(
+                        "Legacy LOTR character-details migration state is unavailable");
+            }
+            migrated.put(LotrCharacterDetailsStateComponent.ID,
+                    (NBTTagCompound)lotrDetails.copy());
+        } else {
+            this.lotrDetailsComponent.validate(existingLotrDetails);
         }
         CharacterPlayerStateSnapshot upgraded = new CharacterPlayerStateSnapshot(
                 snapshot.getCharacterId(),

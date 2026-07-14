@@ -70,6 +70,43 @@ public final class CharacterNbtCodec {
         write(output, rosters, Collections.<NBTTagCompound>emptyList());
     }
 
+    /**
+     * Encodes one detached character record for recovery-oriented stores.
+     * The returned tag is independent from the live roster object.
+     */
+    public static NBTTagCompound writeCharacterRecord(RoleplayCharacter character) {
+        if (character == null) {
+            throw new IllegalArgumentException("character must not be null");
+        }
+        return writeCharacter(character);
+    }
+
+    /**
+     * Decodes and validates a detached character record for the expected owner.
+     * Malformed or unsupported records fail closed instead of producing a
+     * partially repaired recovery entry.
+     */
+    public static RoleplayCharacter readCharacterRecord(
+            NBTTagCompound source, UUID expectedOwnerId) {
+        if (source == null || expectedOwnerId == null) {
+            throw new IllegalArgumentException(
+                    "character data and expected owner must not be null");
+        }
+        CharacterReadResult result = readCharacter(
+                source, expectedOwnerId, -1, -1);
+        if (result.unsupportedVersion >= 0) {
+            throw new IllegalArgumentException(
+                    "unsupported character data version "
+                            + result.unsupportedVersion);
+        }
+        if (result.character == null) {
+            throw new IllegalArgumentException(
+                    "malformed detached character record: "
+                            + result.failureReason);
+        }
+        return result.character;
+    }
+
     public static void write(NBTTagCompound output, Collection<CharacterRoster> rosters,
                              Collection<NBTTagCompound> quarantinedEntries) {
         output.setInteger(TAG_DATA_VERSION, CURRENT_ROOT_DATA_VERSION);
@@ -688,7 +725,13 @@ public final class CharacterNbtCodec {
         Object[] allArguments = new Object[arguments.length + 1];
         allArguments[0] = LostTalesMetaData.MOD_ID;
         System.arraycopy(arguments, 0, allArguments, 1, arguments.length);
-        FMLLog.warning("[%s] " + message, allArguments);
+        try {
+            FMLLog.warning("[%s] " + message, allArguments);
+        } catch (Throwable ignored) {
+            // Persistence validation must never fail merely because Forge's
+            // logger has not yet been bootstrapped (for example in standalone
+            // recovery tools and the dependency-free validation harness).
+        }
     }
 
     public static final class ReadResult {

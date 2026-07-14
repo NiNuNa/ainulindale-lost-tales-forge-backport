@@ -166,8 +166,8 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
                 }
                 quarantine(raw, "malformed_account", blockedOwner);
                 repaired = true;
-                FMLLog.warning("[%s] Quarantined malformed character switch account at index %d: %s",
-                        LostTalesMetaData.MOD_ID, Integer.valueOf(index), exception.toString());
+                warn("Quarantined malformed character switch account at index %d: %s",
+                        Integer.valueOf(index), exception.toString());
             }
         }
         if (repaired) {
@@ -410,6 +410,18 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
             throw new IllegalStateException(
                     "Character switch data is read-only because it uses unsupported version "
                             + this.unsupportedDataVersion);
+        }
+    }
+
+    private static void warn(String message, Object... arguments) {
+        Object[] allArguments = new Object[arguments.length + 1];
+        allArguments[0] = LostTalesMetaData.MOD_ID;
+        System.arraycopy(arguments, 0, allArguments, 1, arguments.length);
+        try {
+            FMLLog.warning("[%s] " + message, allArguments);
+        } catch (Throwable ignored) {
+            // Journal quarantine must remain available to standalone repair
+            // and validation tooling before the Forge logger is initialized.
         }
     }
 

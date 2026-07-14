@@ -129,6 +129,7 @@ public final class LostTalesConfig {
     public static int characterSwitchStableGroundTicks = 20;
     public static double characterSwitchTeleportDistancePerTick = 16.0D;
     public static int characterStateMaxSnapshotBytes = 2 * 1024 * 1024;
+    public static int characterDeletionRetentionDays = 30;
     public static long characterSwitchCombatGraceMillis = 20000L;
     public static long characterSwitchTeleportGraceMillis = 5000L;
 
@@ -202,6 +203,14 @@ public final class LostTalesConfig {
                     64 * 1024,
                     16 * 1024 * 1024,
                     "Maximum compressed size of one character-owned player-state snapshot. Oversized snapshots are rejected before switching."
+            );
+            characterDeletionRetentionDays = config.getInt(
+                    "characterDeletionRetentionDays",
+                    CATEGORY_CHARACTERS,
+                    characterDeletionRetentionDays,
+                    1,
+                    3650,
+                    "Minimum number of days a deleted character and its player-state generations remain recoverable before an administrator may permanently purge them."
             );
             sanitizeCharacterSwitchOptions();
 
@@ -1000,6 +1009,10 @@ public final class LostTalesConfig {
                 characterSwitchStableGroundTicks).set(characterSwitchStableGroundTicks);
         config.get(CATEGORY_CHARACTERS, "switchTeleportDistancePerTick",
                 characterSwitchTeleportDistancePerTick).set(characterSwitchTeleportDistancePerTick);
+        config.get(CATEGORY_CHARACTERS, "characterStateMaxSnapshotBytes",
+                characterStateMaxSnapshotBytes).set(characterStateMaxSnapshotBytes);
+        config.get(CATEGORY_CHARACTERS, "characterDeletionRetentionDays",
+                characterDeletionRetentionDays).set(characterDeletionRetentionDays);
         config.get(CATEGORY_CLIENT, "showLostTalesHud", showLostTalesHud).set(showLostTalesHud);
         Property hudPresetProperty = config.get(CATEGORY_CLIENT, "hudPlacementPreset", hudPlacementPreset);
         hudPresetProperty.set(hudPlacementPreset);
@@ -1128,6 +1141,8 @@ public final class LostTalesConfig {
                 Math.min(1024.0D, characterSwitchTeleportDistancePerTick));
         characterStateMaxSnapshotBytes = clampInt(
                 characterStateMaxSnapshotBytes, 64 * 1024, 16 * 1024 * 1024);
+        characterDeletionRetentionDays = clampInt(
+                characterDeletionRetentionDays, 1, 3650);
         characterSwitchCombatGraceMillis =
                 (long) characterSwitchCombatGraceSeconds * 1000L;
         characterSwitchTeleportGraceMillis =
@@ -1158,4 +1173,3 @@ public final class LostTalesConfig {
         return value;
     }
 }
-

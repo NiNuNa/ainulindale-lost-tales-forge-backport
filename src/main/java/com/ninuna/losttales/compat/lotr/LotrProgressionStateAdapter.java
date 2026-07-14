@@ -23,8 +23,9 @@ import java.util.UUID;
  *
  * <p>The allowlist is deliberately narrower than LOTRPlayerData.save(). Apply
  * starts with the live account blob and overlays only these keys, preserving
- * preferences, moderation state, fellowships, custom waypoints, miniquest records,
- * quest data, death points, and transient transport/travel state.</p>
+ * preferences, moderation state, fellowships, miniquest records,
+ * quest data and transient transport/travel state. Shield, alcohol, and
+ * last-death state are handled by a separate character-details component.</p>
  */
 public final class LotrProgressionStateAdapter {
 

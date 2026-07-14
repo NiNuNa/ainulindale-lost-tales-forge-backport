@@ -28,15 +28,15 @@ public final class CharacterSwitchTransaction {
     private final long committedDecayAnchorAt;
     private final long committedLastObservedWallClock;
 
-    /** -1 for legacy Stage-1 journals that predate player-state generations. */
+    /** -1 for version-1 journals that predate player-state generations. */
     private long sourceStateGeneration;
-    /** -1 for legacy Stage-1 journals that predate player-state generations. */
+    /** -1 for version-1 journals that predate player-state generations. */
     private long targetStateGeneration;
 
     private CharacterSwitchTransactionStatus status;
     private long completedAt;
 
-    /** Compatibility constructor for Stage-1 journals and focused tests. */
+    /** Compatibility constructor for version-1 journals and focused tests. */
     public CharacterSwitchTransaction(UUID transactionId,
                                       UUID sourceCharacterId,
                                       UUID targetCharacterId,
