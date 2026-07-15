@@ -9,6 +9,7 @@ import java.util.UUID;
 final class CharacterPacketCodec {
 
     static final int MAX_NAME_BYTES = 128;
+    static final int MAX_DESCRIPTION_BYTES = 1024;
     static final int MAX_IDENTIFIER_BYTES = 128;
     static final int MAX_ERROR_ID_BYTES = 64;
     static final int MAX_CHARACTERS = 9;

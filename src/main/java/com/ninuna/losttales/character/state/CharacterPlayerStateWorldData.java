@@ -24,7 +24,7 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
 
     public static final String DATA_NAME_PREFIX =
             "losttales_character_player_state_";
-    public static final int CURRENT_DATA_VERSION = 8;
+    public static final int CURRENT_DATA_VERSION = 11;
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_ACCOUNTS = "Accounts";
@@ -316,7 +316,7 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
         });
         NBTTagList recordList = new NBTTagList();
         for (CharacterPlayerStateRecord record : records) {
-            recordList.appendTag(writeRecord(record));
+            recordList.appendTag(writeRecordCopy(record));
         }
         tag.setTag(TAG_RECORDS, recordList);
         return tag;
@@ -339,7 +339,7 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
             NBTTagList recordList = tag.getTagList(
                     TAG_RECORDS, Constants.NBT.TAG_COMPOUND);
             for (int index = 0; index < recordList.tagCount(); index++) {
-                CharacterPlayerStateRecord record = readRecord(
+                CharacterPlayerStateRecord record = readRecordCopy(
                         recordList.getCompoundTagAt(index));
                 if (!seen.add(record.getCharacterId())) {
                     throw new IllegalArgumentException(
@@ -363,7 +363,12 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
                 records);
     }
 
-    private static NBTTagCompound writeRecord(CharacterPlayerStateRecord record) {
+    /** Encodes a detached deep copy for journals and ownership transfers. */
+    public static NBTTagCompound writeRecordCopy(
+            CharacterPlayerStateRecord record) {
+        if (record == null) {
+            throw new IllegalArgumentException("record must not be null");
+        }
         NBTTagCompound tag = new NBTTagCompound();
         tag.setInteger(TAG_DATA_VERSION, CharacterPlayerStateRecord.CURRENT_DATA_VERSION);
         writeUuid(tag, TAG_CHARACTER_UUID, record.getCharacterId());
@@ -374,7 +379,11 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
         return tag;
     }
 
-    private static CharacterPlayerStateRecord readRecord(NBTTagCompound tag) {
+    /** Decodes and validates a detached record from a journal or state vault. */
+    public static CharacterPlayerStateRecord readRecordCopy(NBTTagCompound tag) {
+        if (tag == null) {
+            throw new IllegalArgumentException("record data must not be null");
+        }
         int version = tag.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? tag.getInteger(TAG_DATA_VERSION) : 0;
         if (version < 0 || version > CharacterPlayerStateRecord.CURRENT_DATA_VERSION) {

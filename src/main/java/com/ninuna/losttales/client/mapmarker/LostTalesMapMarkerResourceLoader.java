@@ -110,12 +110,18 @@ final class LostTalesMapMarkerResourceLoader {
         double discoveryRadius = Math.max(1.0D, getDouble(object, "discoveryRadius", getDouble(object, "unlockRadius", 8.0D)));
         boolean hiddenUntilDiscovered = getBoolean(object, "hiddenUntilDiscovered", getBoolean(object, "requiresDiscovery", false));
         boolean discoverable = getBoolean(object, "isDiscoverable", true);
+        boolean requiresRegionUnlock = getBoolean(
+                object, "requiresRegionUnlock", true);
         if (getBoolean(object, "discoveredByDefault", false)) {
             hiddenUntilDiscovered = false;
             discoverable = false;
         }
 
-        return new LostTalesMapMarkerData(id, name, icon, color, category, description, hasFastTravel, fastTravelWaypointCode, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, discoverable);
+        return new LostTalesMapMarkerData(id, name, icon, color, category,
+                description, hasFastTravel, fastTravelWaypointCode,
+                dimensionId, x, y, z, compassFadeInRadius,
+                discoveryRadius, hiddenUntilDiscovered, discoverable,
+                requiresRegionUnlock);
     }
 
     private static boolean hasNumber(JsonObject object, String key) {

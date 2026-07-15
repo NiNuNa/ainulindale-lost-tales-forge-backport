@@ -161,6 +161,14 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
                 ClientCharacterDisplayNames.gender(character.getGenderId()), x, lineY, width);
         lineY = drawLabelValue(I18n.format("gui.losttales.character.skin"),
                 ClientCharacterDisplayNames.skin(character.getSkinId()), x, lineY, width);
+        if (character.getDescription().length() > 0) {
+            this.fontRendererObj.drawStringWithShadow(
+                    I18n.format("gui.losttales.character.description") + ":",
+                    x, lineY, LostTalesSkyrimUiStyle.TEXT_MUTED);
+            lineY = drawWrapped(character.getDescription(), x + 8,
+                    lineY + 11, width - 8,
+                    LostTalesSkyrimUiStyle.TEXT_BRIGHT, 30);
+        }
         lineY = drawLabelValue(I18n.format("gui.losttales.character.age"),
                 String.valueOf(character.getAge()), x, lineY, width);
         lineY = drawLabelValue(I18n.format("gui.losttales.character.starting_faction"),

@@ -3,6 +3,7 @@ package com.ninuna.losttales.character.server;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.switching.CharacterLifecycleStateTracker;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
+import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferCoordinator;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.EventPriority;
@@ -47,8 +48,13 @@ public final class CharacterPlayerEventHandler {
 
     @SubscribeEvent
     public void onPlayerChangedDimension(PlayerChangedDimensionEvent event) {
-        initializePlayer(event == null ? null : event.player,
-                LifecycleAction.DIMENSION_CHANGE);
+        EntityPlayer player = event == null ? null : event.player;
+        if (player instanceof EntityPlayerMP
+                && CharacterLifecycleStateTracker.isOwnedDimensionTransition(
+                        (EntityPlayerMP) player)) {
+            return;
+        }
+        initializePlayer(player, LifecycleAction.DIMENSION_CHANGE);
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -84,6 +90,10 @@ public final class CharacterPlayerEventHandler {
             return;
         }
         EntityPlayerMP serverPlayer = (EntityPlayerMP) player;
+        // Finish any ownership/roster/state transfer before exposing a roster
+        // snapshot or applying the active character to the live player.
+        LoreCharacterTransferCoordinator.getInstance()
+                .recoverForPlayer(serverPlayer);
         CharacterOperationResult result = CharacterService.getInstance()
                 .ensureRoster(serverPlayer);
         if (!result.isSuccessful()) {

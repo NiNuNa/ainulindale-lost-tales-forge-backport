@@ -35,6 +35,10 @@ tasks.withType(JavaCompile) {
 }
 
 dependencies {
+    // Test-only: pure persistence/recovery state-machine coverage. This is not
+    // packaged into the mod and adds no runtime dependency for servers.
+    testCompile 'junit:junit:4.13.2'
+
     // you may put jars on which you depend on in ./libs
     // or you may define them like so..
     //compile "some.group:artifact:version:classifier"

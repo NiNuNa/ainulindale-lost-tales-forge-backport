@@ -124,13 +124,28 @@ public final class LostTalesMapMarkerWaypointRegistry {
         String enumBase = toEnumName(markerId);
         try {
             registerWaypointLocalization(enumBase, marker);
-            LOTRWaypoint.Region region = LostTalesUtil.addWaypointRegion(enumBase + "_REGION");
+            // Discoverable markers need a private region that unlocks only
+            // after proximity discovery. Non-discoverable markers instead
+            // inherit their normal biome/faction region, so the standard LOTR
+            // visited-region rule controls visibility and fast travel.
+            LOTRWaypoint.Region region =
+                    resolveInheritedRegion(marker);
+            if (region == null) {
+                region = LostTalesUtil.addWaypointRegion(
+                        enumBase + "_REGION");
+                if (!marker.isDiscoverable()
+                        && marker.requiresRegionUnlock()) {
+                    FMLLog.warning("[%s] Non-discoverable marker %s has no LOTR biome/faction region; it will remain locked", LostTalesMetaData.MOD_ID, markerId);
+                }
+            }
             LOTRWaypoint waypoint = LostTalesUtil.addWaypoint(
                     enumBase,
                     region,
                     LOTRFaction.UNALIGNED,
-                    LOTRWaypoint.worldToMapX(marker.getX()),
-                    LOTRWaypoint.worldToMapZ(marker.getZ()),
+                    LostTalesMapCoordinateHelper
+                            .worldToMapImageX(marker.getX()),
+                    LostTalesMapCoordinateHelper
+                            .worldToMapImageZ(marker.getZ()),
                     true
             );
             REGIONS_BY_MARKER_ID.put(markerId, region);
@@ -138,6 +153,19 @@ public final class LostTalesMapMarkerWaypointRegistry {
         } catch (RuntimeException e) {
             FMLLog.warning("[%s] Failed to register public LOTR waypoint for map marker %s: %s", LostTalesMetaData.MOD_ID, markerId, e.getMessage());
         }
+    }
+
+    /** Package-visible for policy regression tests without mutating the enum. */
+    static LOTRWaypoint.Region resolveInheritedRegion(
+            LostTalesMapMarkerDefinition marker) {
+        return marker != null && !marker.isDiscoverable()
+                && marker.requiresRegionUnlock()
+                ? LostTalesMapMarkerRegionResolver.resolve(marker) : null;
+    }
+
+    static boolean usesPrivateRegion(LostTalesMapMarkerDefinition marker) {
+        return marker != null && (marker.isDiscoverable()
+                || !marker.requiresRegionUnlock());
     }
 
     private static void registerWaypointLocalization(String enumBase, LostTalesMapMarkerDefinition marker) {

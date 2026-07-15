@@ -1,0 +1,12 @@
+{
+  "dataVersion": 1,
+  "id": "losttales:eomer",
+  "name": "Éomer",
+  "description": "A renowned Rider and leader of Rohan.",
+  "appearance": {
+    "raceId": "losttales:human",
+    "genderId": "losttales:male",
+    "modelId": "lotr:human",
+    "skinId": "losttales:human_rohan_male_0"
+  }
+}

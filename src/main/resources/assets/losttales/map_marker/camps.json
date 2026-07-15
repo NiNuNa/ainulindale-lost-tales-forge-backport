@@ -12,7 +12,8 @@
       "compassFadeInRadius": 220.0,
       "discoveryRadius": 10.0,
       "isDiscoverable": true,
-      "hiddenUntilDiscovered": true,
+      "hiddenUntilDiscovered": false,
+      "requiresRegionUnlock": true,
       "hasFastTravel": false
     },
     {
@@ -27,7 +28,8 @@
       "compassFadeInRadius": 240.0,
       "discoveryRadius": 10.0,
       "isDiscoverable": true,
-      "hiddenUntilDiscovered": true,
+      "hiddenUntilDiscovered": false,
+      "requiresRegionUnlock": true,
       "hasFastTravel": false
     }
   ]

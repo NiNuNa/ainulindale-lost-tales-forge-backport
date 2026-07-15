@@ -154,6 +154,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             markerTag.setBoolean("HiddenUntilDiscovered", marker.isHiddenUntilDiscovered());
             markerTag.setBoolean("IsDiscoverable", marker.isDiscoverable());
             markerTag.setBoolean("Discoverable", marker.isDiscoverable());
+            markerTag.setBoolean("RequiresRegionUnlock",
+                    marker.requiresRegionUnlock());
             dynamicMarkerList.appendTag(markerTag);
         }
         data.setTag("DynamicMapMarkers", dynamicMarkerList);
@@ -518,7 +520,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 marker.getCompassFadeInRadius(),
                 marker.getDiscoveryRadius(),
                 marker.isHiddenUntilDiscovered(),
-                marker.isDiscoverable()
+                marker.isDiscoverable(),
+                marker.requiresRegionUnlock()
         );
         LostTalesMapMarkerDefinition old = this.dynamicMapMarkers.put(markerId, normalized);
         boolean discoveredChanged = this.discoveredMarkerIds.add(markerId);
@@ -793,7 +796,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 markerTag.hasKey("CompassFadeInRadius") ? markerTag.getDouble("CompassFadeInRadius") : (markerTag.hasKey("FadeInRadius") ? markerTag.getDouble("FadeInRadius") : 128.0D),
                 markerTag.hasKey("DiscoveryRadius") ? markerTag.getDouble("DiscoveryRadius") : (markerTag.hasKey("UnlockRadius") ? markerTag.getDouble("UnlockRadius") : 8.0D),
                 !markerTag.hasKey("HiddenUntilDiscovered") || markerTag.getBoolean("HiddenUntilDiscovered"),
-                markerTag.hasKey("IsDiscoverable") ? markerTag.getBoolean("IsDiscoverable") : (markerTag.hasKey("Discoverable") ? markerTag.getBoolean("Discoverable") : (!markerTag.hasKey("HiddenUntilDiscovered") || markerTag.getBoolean("HiddenUntilDiscovered")))
+                markerTag.hasKey("IsDiscoverable") ? markerTag.getBoolean("IsDiscoverable") : (markerTag.hasKey("Discoverable") ? markerTag.getBoolean("Discoverable") : (!markerTag.hasKey("HiddenUntilDiscovered") || markerTag.getBoolean("HiddenUntilDiscovered"))),
+                markerTag.hasKey("RequiresRegionUnlock")
+                        && markerTag.getBoolean("RequiresRegionUnlock")
         );
     }
 
@@ -817,7 +822,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 && Math.abs(left.getCompassFadeInRadius() - right.getCompassFadeInRadius()) < 0.01D
                 && Math.abs(left.getDiscoveryRadius() - right.getDiscoveryRadius()) < 0.01D
                 && left.isHiddenUntilDiscovered() == right.isHiddenUntilDiscovered()
-                && left.isDiscoverable() == right.isDiscoverable();
+                && left.isDiscoverable() == right.isDiscoverable()
+                && left.requiresRegionUnlock()
+                == right.requiresRegionUnlock();
     }
 
     private static String safe(String value, String fallback) {

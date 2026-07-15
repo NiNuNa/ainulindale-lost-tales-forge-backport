@@ -63,6 +63,8 @@ public final class CharacterRosterSyncPacket implements IMessage {
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String skinId = CharacterPacketCodec.readString(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                String description = CharacterPacketCodec.readString(
+                        buffer, CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
                 boolean showMinecraftCape = buffer.readBoolean();
                 int cosmeticCapeId = buffer.readUnsignedShort();
                 int age = buffer.readInt();
@@ -96,7 +98,8 @@ public final class CharacterRosterSyncPacket implements IMessage {
                         roleplayLevel,
                         experiencePoints,
                         creationTimestamp,
-                        characterDataVersion
+                        characterDataVersion,
+                        description
                 ));
             }
             CharacterPacketCodec.requireFinished(buffer);
@@ -138,6 +141,9 @@ public final class CharacterRosterSyncPacket implements IMessage {
                     buffer, character.getGenderId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             CharacterPacketCodec.writeString(
                     buffer, character.getSkinId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            CharacterPacketCodec.writeString(
+                    buffer, character.getDescription(),
+                    CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
             buffer.writeBoolean(character.isMinecraftCapeVisible());
             buffer.writeShort(character.getCosmeticCapeId());
             buffer.writeInt(character.getAge());

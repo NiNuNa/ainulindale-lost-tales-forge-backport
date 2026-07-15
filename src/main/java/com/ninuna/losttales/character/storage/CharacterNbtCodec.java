@@ -8,6 +8,8 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
+import com.ninuna.losttales.character.validation.CharacterValidator;
+import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -54,15 +56,19 @@ public final class CharacterNbtCodec {
     private static final String TAG_RACE_ID = "RaceId";
     private static final String TAG_GENDER_ID = "GenderId";
     private static final String TAG_SKIN_ID = "SkinId";
+    private static final String TAG_DESCRIPTION = "Description";
     private static final String TAG_SHOW_MINECRAFT_CAPE = "ShowMinecraftCape";
     private static final String TAG_COSMETIC_CAPE_ID = "CosmeticCapeId";
     private static final String TAG_AGE = "Age";
     private static final String TAG_STARTING_FACTION_ID = "StartingFactionId";
+    private static final String TAG_STARTING_WAYPOINT_ID = "StartingWaypointId";
+    private static final String TAG_UNCONVENTIONAL_SETTINGS = "UnconventionalSettings";
     private static final String TAG_ROLEPLAY_LEVEL = "RoleplayLevel";
     private static final String TAG_CREATION_TIMESTAMP = "CreationTimestamp";
     private static final String TAG_EXPERIENCE_POINTS = "ExperiencePoints";
 
     private static final int MAX_REASONABLE_AGE = 100000;
+    private static final int MAX_STABLE_IDENTIFIER_LENGTH = 64;
 
     private CharacterNbtCodec() {}
 
@@ -284,10 +290,14 @@ public final class CharacterNbtCodec {
         tag.setString(TAG_RACE_ID, character.getRaceId());
         tag.setString(TAG_GENDER_ID, character.getGenderId());
         tag.setString(TAG_SKIN_ID, character.getSkinId());
+        tag.setString(TAG_DESCRIPTION, character.getDescription());
         tag.setBoolean(TAG_SHOW_MINECRAFT_CAPE, character.isMinecraftCapeVisible());
         tag.setInteger(TAG_COSMETIC_CAPE_ID, character.getCosmeticCapeId());
         tag.setInteger(TAG_AGE, character.getAge());
         tag.setString(TAG_STARTING_FACTION_ID, character.getStartingFactionId());
+        tag.setString(TAG_STARTING_WAYPOINT_ID, character.getStartingWaypointId());
+        tag.setBoolean(TAG_UNCONVENTIONAL_SETTINGS,
+                character.hasUnconventionalSettings());
         tag.setInteger(TAG_ROLEPLAY_LEVEL, character.getRoleplayLevel());
         tag.setLong(TAG_CREATION_TIMESTAMP, character.getCreationTimestamp());
         tag.setTag(TAG_PROGRESSION, writeProgression(character.getProgression()));
@@ -489,12 +499,57 @@ public final class CharacterNbtCodec {
                     storedGenderId, genderId, raceId, characterId, rosterOwnerId);
         }
 
+        boolean hasStartingWaypoint = tag.hasKey(
+                TAG_STARTING_WAYPOINT_ID, Constants.NBT.TAG_STRING);
+        String startingWaypointId = hasStartingWaypoint
+                ? tag.getString(TAG_STARTING_WAYPOINT_ID) : "";
+        String normalizedStartingWaypointId =
+                LotrCharacterAdapter.normalizeWaypointId(startingWaypointId);
+        if (startingWaypointId.length() > 0
+                && (!startingWaypointId.equals(normalizedStartingWaypointId)
+                || normalizedStartingWaypointId.length()
+                > MAX_STABLE_IDENTIFIER_LENGTH)) {
+            startingWaypointId = "";
+            repaired = true;
+            warn("Clearing malformed starting waypoint for character %s owned by %s",
+                    characterId, rosterOwnerId);
+        } else {
+            startingWaypointId = normalizedStartingWaypointId;
+        }
+        if (!hasStartingWaypoint) {
+            repaired = true;
+        }
+        boolean hasUnconventionalSettings = tag.hasKey(
+                TAG_UNCONVENTIONAL_SETTINGS, Constants.NBT.TAG_BYTE);
+        boolean unconventionalSettings = hasUnconventionalSettings
+                && tag.getBoolean(TAG_UNCONVENTIONAL_SETTINGS);
+        if (!hasUnconventionalSettings) {
+            repaired = true;
+        }
+
         String skinId = CharacterSkinRegistry.normalizeIdentifier(
                 tag.getString(TAG_SKIN_ID));
         if (!CharacterSkinRegistry.isCompatible(skinId, raceId, genderId)) {
             skinId = CharacterSkinRegistry.getDefaultSkinId(raceId, genderId, characterId);
             repaired = true;
             warn("Assigning a compatible LOTR skin to character %s owned by %s",
+                    characterId, rosterOwnerId);
+        }
+
+        boolean hasDescription = tag.hasKey(
+                TAG_DESCRIPTION, Constants.NBT.TAG_STRING);
+        String storedDescription = hasDescription
+                ? tag.getString(TAG_DESCRIPTION) : "";
+        String description = storedDescription.length()
+                > CharacterValidator.MAX_DESCRIPTION_LENGTH * 2
+                ? "" : CharacterValidator.normalizeDescription(
+                        storedDescription);
+        if (!CharacterValidator.isValidDescription(description)) {
+            description = "";
+        }
+        if (!hasDescription || !description.equals(storedDescription)) {
+            repaired = true;
+            warn("Repairing character description for %s owned by %s",
                     characterId, rosterOwnerId);
         }
 
@@ -601,7 +656,10 @@ public final class CharacterNbtCodec {
                 creationTimestamp,
                 RoleplayCharacter.CURRENT_DATA_VERSION,
                 showMinecraftCape,
-                cosmeticCapeId
+                cosmeticCapeId,
+                startingWaypointId,
+                unconventionalSettings,
+                description
         );
         return CharacterReadResult.success(character, repaired, quarantinedEntries);
     }

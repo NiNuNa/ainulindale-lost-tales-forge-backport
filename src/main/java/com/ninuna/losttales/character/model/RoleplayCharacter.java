@@ -7,7 +7,7 @@ import java.util.UUID;
 /** Persistent server-authoritative record for one roleplaying character. */
 public class RoleplayCharacter {
 
-    public static final int CURRENT_DATA_VERSION = 4;
+    public static final int CURRENT_DATA_VERSION = 6;
     public static final int INITIAL_ROLEPLAY_LEVEL = 1;
     public static final boolean DEFAULT_SHOW_MINECRAFT_CAPE = true;
     public static final int DEFAULT_COSMETIC_CAPE_ID = CharacterCapeCatalog.NONE_ID;
@@ -19,8 +19,11 @@ public class RoleplayCharacter {
     private final String raceId;
     private final String genderId;
     private final String skinId;
+    private final String description;
     private final int age;
     private final String startingFactionId;
+    private final String startingWaypointId;
+    private final boolean unconventionalSettings;
     private final long creationTimestamp;
     private final int dataVersion;
 
@@ -39,7 +42,7 @@ public class RoleplayCharacter {
                 skinId, age, startingFactionId, INITIAL_ROLEPLAY_LEVEL,
                 new CharacterProgression(), creationTimestamp,
                 CURRENT_DATA_VERSION, DEFAULT_SHOW_MINECRAFT_CAPE,
-                DEFAULT_COSMETIC_CAPE_ID
+                DEFAULT_COSMETIC_CAPE_ID, "", false
         );
     }
 
@@ -52,7 +55,7 @@ public class RoleplayCharacter {
         this(characterId, ownerId, slotIndex, name, raceId, genderId, skinId,
                 age, startingFactionId, roleplayLevel, progression,
                 creationTimestamp, dataVersion, DEFAULT_SHOW_MINECRAFT_CAPE,
-                DEFAULT_COSMETIC_CAPE_ID);
+                DEFAULT_COSMETIC_CAPE_ID, "", false);
     }
 
     public RoleplayCharacter(UUID characterId, UUID ownerId, int slotIndex, String name,
@@ -61,6 +64,34 @@ public class RoleplayCharacter {
                              CharacterProgression progression, long creationTimestamp,
                              int dataVersion, boolean showMinecraftCape,
                              int cosmeticCapeId) {
+        this(characterId, ownerId, slotIndex, name, raceId, genderId, skinId,
+                age, startingFactionId, roleplayLevel, progression,
+                creationTimestamp, dataVersion, showMinecraftCape,
+                cosmeticCapeId, "", false);
+    }
+
+    public RoleplayCharacter(UUID characterId, UUID ownerId, int slotIndex, String name,
+                             String raceId, String genderId, String skinId, int age,
+                             String startingFactionId, int roleplayLevel,
+                             CharacterProgression progression, long creationTimestamp,
+                             int dataVersion, boolean showMinecraftCape,
+                             int cosmeticCapeId, String startingWaypointId,
+                             boolean unconventionalSettings) {
+        this(characterId, ownerId, slotIndex, name, raceId, genderId, skinId,
+                age, startingFactionId, roleplayLevel, progression,
+                creationTimestamp, dataVersion, showMinecraftCape,
+                cosmeticCapeId, startingWaypointId, unconventionalSettings,
+                "");
+    }
+
+    public RoleplayCharacter(UUID characterId, UUID ownerId, int slotIndex, String name,
+                             String raceId, String genderId, String skinId, int age,
+                             String startingFactionId, int roleplayLevel,
+                             CharacterProgression progression, long creationTimestamp,
+                             int dataVersion, boolean showMinecraftCape,
+                             int cosmeticCapeId, String startingWaypointId,
+                             boolean unconventionalSettings,
+                             String description) {
         if (characterId == null) {
             throw new IllegalArgumentException("characterId must not be null");
         }
@@ -75,8 +106,11 @@ public class RoleplayCharacter {
         this.raceId = raceId == null ? "" : raceId;
         this.genderId = genderId == null ? "" : genderId;
         this.skinId = skinId == null ? "" : skinId;
+        this.description = description == null ? "" : description;
         this.age = age;
         this.startingFactionId = startingFactionId == null ? "" : startingFactionId;
+        this.startingWaypointId = startingWaypointId == null ? "" : startingWaypointId;
+        this.unconventionalSettings = unconventionalSettings;
         this.roleplayLevel = Math.max(INITIAL_ROLEPLAY_LEVEL, roleplayLevel);
         this.progression = progression == null ? new CharacterProgression() : progression;
         this.creationTimestamp = Math.max(0L, creationTimestamp);
@@ -113,12 +147,24 @@ public class RoleplayCharacter {
         return this.skinId;
     }
 
+    public String getDescription() {
+        return this.description;
+    }
+
     public int getAge() {
         return this.age;
     }
 
     public String getStartingFactionId() {
         return this.startingFactionId;
+    }
+
+    public String getStartingWaypointId() {
+        return this.startingWaypointId;
+    }
+
+    public boolean hasUnconventionalSettings() {
+        return this.unconventionalSettings;
     }
 
     public int getRoleplayLevel() {

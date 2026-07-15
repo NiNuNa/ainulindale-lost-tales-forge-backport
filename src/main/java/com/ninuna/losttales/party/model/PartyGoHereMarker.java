@@ -2,10 +2,10 @@ package com.ninuna.losttales.party.model;
 
 import java.util.UUID;
 
-/** One persistent, server-owned personal marker for a party character. */
+/** One persistent, server-owned personal marker for a roleplaying character. */
 public final class PartyGoHereMarker {
 
-    public static final int CURRENT_DATA_VERSION = 1;
+    public static final int CURRENT_DATA_VERSION = 2;
     public static final double MAX_HORIZONTAL_COORDINATE = 30000000.0D;
     public static final double MAX_VERTICAL_COORDINATE = 4096.0D;
 
@@ -24,9 +24,6 @@ public final class PartyGoHereMarker {
                              double y,
                              double z,
                              long updatedAt) {
-        if (partyId == null) {
-            throw new IllegalArgumentException("partyId must not be null");
-        }
         if (ownerCharacterId == null) {
             throw new IllegalArgumentException("ownerCharacterId must not be null");
         }

@@ -1,11 +1,19 @@
 package com.ninuna.losttales.proxy;
 
 import com.ninuna.losttales.LostTalesMod;
+import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.achievement.ELostTalesAchievement;
 import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.character.server.CharacterPlayerEventHandler;
+import com.ninuna.losttales.character.lore.LoreCharacterRegistry;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorldData;
+import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferCoordinator;
+import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferStorage;
+import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferWorldData;
 import com.ninuna.losttales.character.server.CharacterRaceGameplayHandler;
 import com.ninuna.losttales.character.server.CharacterSpawnOriginHandler;
+import com.ninuna.losttales.character.server.CharacterStateCheckpointHandler;
 import com.ninuna.losttales.character.switching.CharacterLifecycleStateTracker;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
 import com.ninuna.losttales.character.server.CharacterServerPacketDispatcher;
@@ -37,6 +45,7 @@ import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPack
 import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
+import com.ninuna.losttales.network.packet.character.LoreCharacterSyncPacket;
 import com.ninuna.losttales.network.packet.party.PartyMemberStatusSyncPacket;
 import com.ninuna.losttales.network.packet.party.PartyOperationResultPacket;
 import com.ninuna.losttales.network.packet.party.PartyStateSyncPacket;
@@ -53,6 +62,7 @@ import com.ninuna.losttales.world.map.waypoint.LostTalesMapMarkerWaypointRegistr
 import com.ninuna.losttales.world.spawning.ELostTalesSpawnList;
 import com.ninuna.losttales.world.structure.ELostTalesStructure;
 import cpw.mods.fml.common.FMLCommonHandler;
+import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
@@ -62,6 +72,7 @@ import cpw.mods.fml.common.network.NetworkRegistry;
 import cpw.mods.fml.common.registry.GameRegistry;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
 import software.bernie.geckolib3.GeckoLib;
@@ -70,6 +81,7 @@ public class LostTalesCommonProxy {
 
     public void preInit(FMLPreInitializationEvent event) {
         LostTalesConfig.load(event.getSuggestedConfigurationFile());
+        LoreCharacterRegistry.load(event.getModConfigurationDirectory());
         GeckoLib.initialize();
         LostTalesNetworkHandler.registerCommonPackets();
         LostTalesQuestRegistry.loadFromClasspath();
@@ -81,6 +93,8 @@ public class LostTalesCommonProxy {
         CharacterPlayerEventHandler characterPlayerEventHandler = new CharacterPlayerEventHandler();
         CharacterRaceGameplayHandler characterRaceGameplayHandler = new CharacterRaceGameplayHandler();
         CharacterSpawnOriginHandler characterSpawnOriginHandler = new CharacterSpawnOriginHandler();
+        CharacterStateCheckpointHandler characterStateCheckpointHandler =
+                new CharacterStateCheckpointHandler();
         PartyPlayerEventHandler partyPlayerEventHandler = new PartyPlayerEventHandler();
         LostTalesServerTaskQueue serverTaskQueue = new LostTalesServerTaskQueue();
         LostTalesNetworkPlayerEventHandler networkPlayerEventHandler = new LostTalesNetworkPlayerEventHandler();
@@ -97,6 +111,7 @@ public class LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(characterLifecycleStateTracker);
         FMLCommonHandler.instance().bus().register(characterPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(characterRaceGameplayHandler);
+        FMLCommonHandler.instance().bus().register(characterStateCheckpointHandler);
         FMLCommonHandler.instance().bus().register(partyPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(serverTaskQueue);
         FMLCommonHandler.instance().bus().register(networkPlayerEventHandler);
@@ -178,6 +193,8 @@ public class LostTalesCommonProxy {
 
     public void handleCharacterCreationCatalogSync(CharacterCreationCatalogSyncPacket packet) {}
 
+    public void handleLoreCharacterSync(LoreCharacterSyncPacket packet) {}
+
     public void handlePartyStateSync(PartyStateSyncPacket packet) {}
 
     public void handlePartyOperationResult(PartyOperationResultPacket packet) {}
@@ -188,6 +205,8 @@ public class LostTalesCommonProxy {
 
     public void onServerStarting(FMLServerStartingEvent event) {
         CharacterLifecycleStateTracker.markServerStarting();
+        initializeLoreCharacterOwnership(event);
+        CharacterStateCheckpointHandler.reset();
         CharacterSwitchCoordinator.getInstance().clearAllRuntimeState();
         LostTalesServerTaskQueue.startAccepting();
         LostTalesRequestRateLimiter.clear();
@@ -198,10 +217,47 @@ public class LostTalesCommonProxy {
         ELostTalesCommand.initAndRegisterCommands(event);
     }
 
+    private static void initializeLoreCharacterOwnership(
+            FMLServerStartingEvent event) {
+        if (event == null || event.getServer() == null
+                || event.getServer().worldServerForDimension(0) == null) {
+            return;
+        }
+        try {
+            LoreCharacterOwnershipWorldData data =
+                    LoreCharacterOwnershipStorage.get(
+                            event.getServer().worldServerForDimension(0));
+            if (data.isReadOnly()) {
+                FMLLog.severe("[%s] Lore-character ownership is read-only (%s); claims and releases are disabled",
+                        LostTalesMetaData.MOD_ID, data.getReadOnlyReason());
+            }
+            LoreCharacterTransferWorldData transfers =
+                    LoreCharacterTransferStorage.get(
+                            event.getServer().worldServerForDimension(0));
+            if (transfers.isReadOnly()) {
+                FMLLog.severe("[%s] Lore-character transfer journal is "
+                                + "read-only (%s); claims and releases are disabled",
+                        LostTalesMetaData.MOD_ID,
+                        transfers.getReadOnlyReason());
+            } else {
+                LoreCharacterTransferCoordinator.getInstance().recoverAll(
+                        event.getServer().worldServerForDimension(0));
+            }
+        } catch (RuntimeException exception) {
+            FMLLog.severe("[%s] Failed to initialize lore-character ownership storage: %s",
+                    LostTalesMetaData.MOD_ID, exception.toString());
+        }
+    }
+
     public void onServerStopping(FMLServerStoppingEvent event) {
-        CharacterLifecycleStateTracker.markServerStopping();
-        CharacterSwitchCoordinator.getInstance().clearAllRuntimeState();
         LostTalesServerTaskQueue.stopAcceptingAndClear();
+        CharacterLifecycleStateTracker.markServerStopping();
+        int checkpointed = CharacterSwitchCoordinator.getInstance()
+                .checkpointAllOnlinePlayers(MinecraftServer.getServer());
+        FMLLog.info("[%s] Shutdown character checkpoint completed for %d online accounts",
+                LostTalesMetaData.MOD_ID, Integer.valueOf(checkpointed));
+        CharacterStateCheckpointHandler.reset();
+        CharacterSwitchCoordinator.getInstance().clearAllRuntimeState();
         LostTalesRequestRateLimiter.clear();
         CharacterServerPacketDispatcher.clearSecurityState();
         PartySyncManager.clear();

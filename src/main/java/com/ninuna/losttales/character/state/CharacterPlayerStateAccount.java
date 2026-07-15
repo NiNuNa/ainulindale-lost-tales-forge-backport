@@ -9,8 +9,8 @@ import java.util.UUID;
 /** Persistent snapshot manifest for all characters owned by one account. */
 public final class CharacterPlayerStateAccount {
 
-    public static final int CURRENT_DATA_VERSION = 8;
-    public static final int CURRENT_BOOTSTRAP_VERSION = 8;
+    public static final int CURRENT_DATA_VERSION = 11;
+    public static final int CURRENT_BOOTSTRAP_VERSION = 11;
 
     private final UUID ownerId;
     private int bootstrapVersion;

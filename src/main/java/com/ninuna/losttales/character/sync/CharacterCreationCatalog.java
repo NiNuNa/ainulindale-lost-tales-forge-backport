@@ -20,10 +20,30 @@ public final class CharacterCreationCatalog {
     private final boolean lotrAvailable;
     private final String unavailableReason;
     private final Map<String, List<String>> factionIdsByRace;
+    private final Map<String, List<String>> waypointIdsByFaction;
+    private final List<String> allWaypointIds;
 
     public CharacterCreationCatalog(boolean lotrAvailable,
                                     String unavailableReason,
                                     Map<String, List<String>> factionIdsByRace) {
+        this(lotrAvailable, unavailableReason, factionIdsByRace,
+                Collections.<String, List<String>>emptyMap(),
+                Collections.<String>emptyList());
+    }
+
+    public CharacterCreationCatalog(boolean lotrAvailable,
+                                    String unavailableReason,
+                                    Map<String, List<String>> factionIdsByRace,
+                                    Map<String, List<String>> waypointIdsByFaction) {
+        this(lotrAvailable, unavailableReason, factionIdsByRace,
+                waypointIdsByFaction, null);
+    }
+
+    public CharacterCreationCatalog(boolean lotrAvailable,
+                                    String unavailableReason,
+                                    Map<String, List<String>> factionIdsByRace,
+                                    Map<String, List<String>> waypointIdsByFaction,
+                                    List<String> allWaypointIds) {
         this.lotrAvailable = lotrAvailable;
         this.unavailableReason = unavailableReason == null ? "" : unavailableReason;
         LinkedHashMap<String, List<String>> copy =
@@ -47,6 +67,51 @@ public final class CharacterCreationCatalog {
             }
         }
         this.factionIdsByRace = Collections.unmodifiableMap(copy);
+
+        LinkedHashMap<String, List<String>> waypointCopy =
+                new LinkedHashMap<String, List<String>>();
+        if (waypointIdsByFaction != null) {
+            for (Map.Entry<String, List<String>> entry
+                    : waypointIdsByFaction.entrySet()) {
+                String factionId = LotrCharacterAdapter.normalizeFactionId(entry.getKey());
+                if (factionId.length() == 0 || waypointCopy.containsKey(factionId)) {
+                    continue;
+                }
+                ArrayList<String> waypoints = new ArrayList<String>();
+                if (entry.getValue() != null) {
+                    for (String waypointId : entry.getValue()) {
+                        String normalized = LotrCharacterAdapter.normalizeWaypointId(
+                                waypointId);
+                        if (normalized.length() > 0 && !waypoints.contains(normalized)) {
+                            waypoints.add(normalized);
+                        }
+                    }
+                }
+                waypointCopy.put(factionId,
+                        Collections.unmodifiableList(waypoints));
+            }
+        }
+        this.waypointIdsByFaction = Collections.unmodifiableMap(waypointCopy);
+
+        ArrayList<String> allWaypoints = new ArrayList<String>();
+        if (allWaypointIds != null) {
+            for (String waypointId : allWaypointIds) {
+                String normalized = LotrCharacterAdapter.normalizeWaypointId(waypointId);
+                if (normalized.length() > 0 && !allWaypoints.contains(normalized)) {
+                    allWaypoints.add(normalized);
+                }
+            }
+        } else {
+            for (List<String> factionWaypoints : waypointCopy.values()) {
+                for (String waypointId : factionWaypoints) {
+                    if (!allWaypoints.contains(waypointId)) {
+                        allWaypoints.add(waypointId);
+                    }
+                }
+            }
+        }
+        Collections.sort(allWaypoints);
+        this.allWaypointIds = Collections.unmodifiableList(allWaypoints);
     }
 
     public static CharacterCreationCatalog fromServer() {
@@ -54,12 +119,23 @@ public final class CharacterCreationCatalog {
         boolean available = adapter.isAvailable();
         LinkedHashMap<String, List<String>> compatible =
                 new LinkedHashMap<String, List<String>>();
+        LinkedHashMap<String, List<String>> waypointsByFaction =
+                new LinkedHashMap<String, List<String>>();
+        if (available) {
+            for (String factionId : adapter.getPlayableFactionIds()) {
+                List<String> waypointIds = adapter.getStartingWaypointIds(factionId);
+                // Keep empty entries: unconventional mode may pair this
+                // faction with a waypoint belonging to another region.
+                waypointsByFaction.put(factionId, waypointIds);
+            }
+        }
         for (CharacterRaceDefinition race : CharacterRaceRegistry.getAll()) {
             ArrayList<String> factionIds = new ArrayList<String>();
             if (available) {
                 for (String factionId : adapter.getPlayableFactionIds()) {
                     CharacterFactionDefinition faction = adapter.resolve(factionId);
-                    if (faction != null && race.isCompatibleWith(faction)) {
+                    if (faction != null && race.isCompatibleWith(faction)
+                            && waypointsByFaction.containsKey(faction.getId())) {
                         factionIds.add(faction.getId());
                     }
                 }
@@ -69,7 +145,10 @@ public final class CharacterCreationCatalog {
         return new CharacterCreationCatalog(
                 available,
                 available ? "" : adapter.getUnavailableReason(),
-                compatible);
+                compatible,
+                waypointsByFaction,
+                available ? adapter.getAllStartingWaypointIds()
+                        : Collections.<String>emptyList());
     }
 
     public boolean isLotrAvailable() {
@@ -88,5 +167,24 @@ public final class CharacterCreationCatalog {
         List<String> ids = this.factionIdsByRace.get(
                 CharacterRaceRegistry.normalizeIdentifier(raceId));
         return ids == null ? Collections.<String>emptyList() : ids;
+    }
+
+    public Map<String, List<String>> getWaypointIdsByFaction() {
+        return this.waypointIdsByFaction;
+    }
+
+    public List<String> getWaypointIds(String factionId) {
+        List<String> ids = this.waypointIdsByFaction.get(
+                LotrCharacterAdapter.normalizeFactionId(factionId));
+        return ids == null ? Collections.<String>emptyList() : ids;
+    }
+
+    public List<String> getAllPlayableFactionIds() {
+        return Collections.unmodifiableList(
+                new ArrayList<String>(this.waypointIdsByFaction.keySet()));
+    }
+
+    public List<String> getAllWaypointIds() {
+        return this.allWaypointIds;
     }
 }

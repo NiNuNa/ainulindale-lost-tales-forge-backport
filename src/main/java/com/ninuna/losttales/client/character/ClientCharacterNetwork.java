@@ -8,6 +8,8 @@ import com.ninuna.losttales.network.packet.character.CharacterCreateRequestPacke
 import com.ninuna.losttales.network.packet.character.CharacterDeleteRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterSelectRequestPacket;
+import com.ninuna.losttales.network.packet.character.LoreCharacterClaimRequestPacket;
+import com.ninuna.losttales.network.packet.character.LoreCharacterReleaseRequestPacket;
 
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -96,6 +98,49 @@ public final class ClientCharacterNetwork {
                                 cosmeticCapeId));
             }
         });
+    }
+
+    public static int claimLoreCharacter(
+            final long expectedRosterRevision,
+            final long expectedOwnershipRevision,
+            final int slotIndex,
+            final String loreCharacterId) {
+        if (expectedRosterRevision < 0L || expectedOwnershipRevision < 0L
+                || loreCharacterId == null || loreCharacterId.length() == 0) {
+            throw new IllegalArgumentException("Lore claim fields are invalid");
+        }
+        final int requestId = nextRequestId();
+        return send(requestId, CharacterOperationType.LORE_CLAIM,
+                new Runnable() {
+                    @Override public void run() {
+                        LostTalesNetworkHandler.CHANNEL.sendToServer(
+                                new LoreCharacterClaimRequestPacket(
+                                        requestId, expectedRosterRevision,
+                                        expectedOwnershipRevision, slotIndex,
+                                        loreCharacterId));
+                    }
+                });
+    }
+
+    public static int releaseLoreCharacter(
+            final long expectedRosterRevision,
+            final long expectedOwnershipRevision,
+            final String loreCharacterId) {
+        if (expectedRosterRevision < 0L || expectedOwnershipRevision < 0L
+                || loreCharacterId == null || loreCharacterId.length() == 0) {
+            throw new IllegalArgumentException("Lore release fields are invalid");
+        }
+        final int requestId = nextRequestId();
+        return send(requestId, CharacterOperationType.LORE_RELEASE,
+                new Runnable() {
+                    @Override public void run() {
+                        LostTalesNetworkHandler.CHANNEL.sendToServer(
+                                new LoreCharacterReleaseRequestPacket(
+                                        requestId, expectedRosterRevision,
+                                        expectedOwnershipRevision,
+                                        loreCharacterId));
+                    }
+                });
     }
 
     private static int send(int requestId,

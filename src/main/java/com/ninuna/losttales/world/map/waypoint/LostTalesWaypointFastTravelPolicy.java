@@ -5,6 +5,7 @@ import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import lotr.common.LOTRLevelData;
 import lotr.common.LOTRPlayerData;
 import lotr.common.world.map.LOTRAbstractWaypoint;
+import lotr.common.world.map.LOTRWaypoint;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.ChatComponentTranslation;
 
@@ -55,7 +56,19 @@ public final class LostTalesWaypointFastTravelPolicy {
         LostTalesMapMarkerDefinition marker =
                 LostTalesMapMarkerWaypointRegistry
                         .getMarkerForWaypoint(waypoint);
-        if (marker == null || !marker.isDiscoverable()) {
+        if (marker == null) {
+            return true;
+        }
+        if (marker.requiresRegionUnlock()) {
+            LOTRWaypoint.Region locationRegion =
+                    LostTalesMapMarkerRegionResolver.resolve(marker);
+            LOTRPlayerData lotrData = LOTRLevelData.getData(player);
+            if (locationRegion == null || lotrData == null
+                    || !lotrData.isFTRegionUnlocked(locationRegion)) {
+                return false;
+            }
+        }
+        if (!marker.isDiscoverable()) {
             return true;
         }
         LostTalesQuestPlayerData data =

@@ -12,7 +12,7 @@ import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 
-/** Client-only compass projection of server-authorized party tracking data. */
+/** Client-only compass projection of character and party tracking data. */
 public final class LostTalesPartyCompassMarkerProvider
         implements LostTalesCompassMarkerProvider {
 
@@ -26,7 +26,7 @@ public final class LostTalesPartyCompassMarkerProvider
         PartyStateSnapshot state = ClientPartyStateCache.getSnapshot();
         PartyTrackingSnapshot tracking =
                 ClientPartyTrackingCache.getMatching(state);
-        if (tracking == null || !tracking.hasParty()) {
+        if (tracking == null) {
             return Collections.emptyList();
         }
 
@@ -50,12 +50,12 @@ public final class LostTalesPartyCompassMarkerProvider
             if (marker.getDimensionId() != dimensionId) {
                 continue;
             }
-            result.add(LostTalesCompassMarker.positionWithStateKey(
+            result.add(LostTalesCompassMarker.alwaysVisiblePositionWithStateKey(
                     "party_go_here:" + marker.getOwnerCharacterId(),
                     marker.getOwnerCharacterName(),
                     LostTalesCompassMarkerIcon.QUEST,
                     marker.getX(), marker.getY(), marker.getZ(),
-                    true, true, 2048.0D,
+                    true, true,
                     marker.getOwnerColor().getId()));
         }
         return result;

@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import cpw.mods.fml.common.FMLLog;
 import lotr.common.LOTRLevelData;
 import lotr.common.LOTRPlayerData;
+import lotr.common.fac.LOTRFaction;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -28,6 +29,8 @@ import java.util.UUID;
  * last-death state are handled by a separate character-details component.</p>
  */
 public final class LotrProgressionStateAdapter {
+
+    public static final float STARTING_FACTION_ALIGNMENT = 100.0F;
 
     private static final UUID DETACHED_PLAYER_ID =
             UUID.fromString("42685bb9-b4e8-47b9-8991-9b4ed0e3a3d1");
@@ -138,6 +141,58 @@ public final class LotrProgressionStateAdapter {
         } catch (RuntimeException exception) {
             throw incompatible("Unable to create default LOTR progression", exception);
         }
+    }
+
+    /**
+     * Creates clean progression with exactly 100 alignment for the selected
+     * starting faction. This intentionally does not pledge the character or
+     * unlock any alignment rewards, regions, or fast-travel waypoints.
+     */
+    public NBTTagCompound createDefault(String startingFactionId) {
+        try {
+            LOTRFaction faction = LotrCharacterAdapter.getInstance()
+                    .resolveFactionForState(startingFactionId);
+            if (faction == null) {
+                throw new IllegalArgumentException(
+                        "Starting faction cannot be resolved: " + startingFactionId);
+            }
+            return createDefault(faction);
+        } catch (IllegalArgumentException exception) {
+            throw exception;
+        } catch (LinkageError error) {
+            throw incompatible("Unable to create starting-faction progression", error);
+        } catch (RuntimeException exception) {
+            throw incompatible("Unable to create starting-faction progression", exception);
+        }
+    }
+
+    /** Package-visible seam for testing the LOTR public API without FML bootstrap. */
+    NBTTagCompound createDefault(LOTRFaction faction) {
+        if (faction == null) {
+            throw new IllegalArgumentException("Starting faction is missing");
+        }
+        LOTRPlayerData detached = new LOTRPlayerData(DETACHED_PLAYER_ID);
+        NBTTagCompound full = save(detached);
+        NBTTagList alignments = full.getTagList(
+                TAG_ALIGNMENT_MAP, Constants.NBT.TAG_COMPOUND);
+        NBTTagList seeded = new NBTTagList();
+        String factionCodeName = faction.codeName();
+        for (int index = 0; index < alignments.tagCount(); index++) {
+            NBTTagCompound entry = alignments.getCompoundTagAt(index);
+            if (!factionCodeName.equals(entry.getString(TAG_FACTION))) {
+                seeded.appendTag(entry.copy());
+            }
+        }
+        NBTTagCompound alignment = new NBTTagCompound();
+        alignment.setString(TAG_FACTION, factionCodeName);
+        alignment.setFloat(TAG_ALIGNMENT_FLOAT, STARTING_FACTION_ALIGNMENT);
+        seeded.appendTag(alignment);
+        full.setTag(TAG_ALIGNMENT_MAP, seeded);
+        // LOTR's public setAlignment method requires an online player. Loading
+        // the minimal map and saving it back lets LOTR canonicalize detached
+        // creation state without firing live-player side effects.
+        detached.load(full);
+        return normalizeListOrder(extractCharacterState(save(detached)));
     }
 
     /** Validates both the explicit v36.15 shape and LOTR's public load/save round trip. */

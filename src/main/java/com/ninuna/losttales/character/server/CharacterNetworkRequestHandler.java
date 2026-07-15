@@ -4,6 +4,8 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.party.server.PartySyncManager;
+import com.ninuna.losttales.character.lore.sync.LoreCharacterSyncManager;
+import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferCoordinator;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 
@@ -79,6 +81,41 @@ public final class CharacterNetworkRequestHandler {
         });
     }
 
+    public static void handleLoreClaimRequest(
+            final EntityPlayerMP player,
+            final int requestId,
+            final String loreCharacterId,
+            final long expectedOwnershipRevision,
+            final long expectedRosterRevision,
+            final int slotIndex) {
+        execute(player, requestId, CharacterOperationType.LORE_CLAIM,
+                new Operation() {
+                    @Override public CharacterOperationResult run() {
+                        return LoreCharacterTransferCoordinator.getInstance()
+                                .claim(player, loreCharacterId,
+                                        expectedOwnershipRevision,
+                                        expectedRosterRevision, slotIndex);
+                    }
+                });
+    }
+
+    public static void handleLoreReleaseRequest(
+            final EntityPlayerMP player,
+            final int requestId,
+            final String loreCharacterId,
+            final long expectedOwnershipRevision,
+            final long expectedRosterRevision) {
+        execute(player, requestId, CharacterOperationType.LORE_RELEASE,
+                new Operation() {
+                    @Override public CharacterOperationResult run() {
+                        return LoreCharacterTransferCoordinator.getInstance()
+                                .release(player, loreCharacterId,
+                                        expectedOwnershipRevision,
+                                        expectedRosterRevision);
+                    }
+                });
+    }
+
     private static void execute(EntityPlayerMP player,
                                 int requestId,
                                 CharacterOperationType operationType,
@@ -118,6 +155,10 @@ public final class CharacterNetworkRequestHandler {
                 }
                 CharacterAppearanceSyncManager.broadcastPlayer(
                         player, result.getRoster());
+                if (operationType == CharacterOperationType.LORE_CLAIM
+                        || operationType == CharacterOperationType.LORE_RELEASE) {
+                    LoreCharacterSyncManager.broadcast(player);
+                }
                 if (operationType != CharacterOperationType.CAPE_UPDATE) {
                     PartySyncManager.sendState(
                             player, PartySyncManager.UNSOLICITED_REQUEST_ID);

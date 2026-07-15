@@ -18,6 +18,9 @@ import com.ninuna.losttales.network.packet.character.CharacterOperationResultPac
 import com.ninuna.losttales.network.packet.character.CharacterRosterRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterSelectRequestPacket;
+import com.ninuna.losttales.network.packet.character.LoreCharacterClaimRequestPacket;
+import com.ninuna.losttales.network.packet.character.LoreCharacterReleaseRequestPacket;
+import com.ninuna.losttales.network.packet.character.LoreCharacterSyncPacket;
 import com.ninuna.losttales.network.packet.party.PartyActionRequestPacket;
 import com.ninuna.losttales.network.packet.party.PartyMemberStatusSyncPacket;
 import com.ninuna.losttales.network.packet.party.PartyOperationResultPacket;
@@ -45,6 +48,8 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(CharacterDeleteRequestPacket.Handler.class, CharacterDeleteRequestPacket.class, 11, Side.SERVER);
         CHANNEL.registerMessage(CharacterCapeUpdateRequestPacket.Handler.class, CharacterCapeUpdateRequestPacket.class, 16, Side.SERVER);
         CHANNEL.registerMessage(PartyActionRequestPacket.Handler.class, PartyActionRequestPacket.class, 17, Side.SERVER);
+        CHANNEL.registerMessage(LoreCharacterClaimRequestPacket.Handler.class, LoreCharacterClaimRequestPacket.class, 22, Side.SERVER);
+        CHANNEL.registerMessage(LoreCharacterReleaseRequestPacket.Handler.class, LoreCharacterReleaseRequestPacket.class, 23, Side.SERVER);
 
         // Server -> client snapshots. These are registered from the common proxy so a
         // dedicated server also knows the packet discriminators when it sends them.
@@ -62,5 +67,6 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(PartyOperationResultPacket.Handler.class, PartyOperationResultPacket.class, 19, Side.CLIENT);
         CHANNEL.registerMessage(PartyMemberStatusSyncPacket.Handler.class, PartyMemberStatusSyncPacket.class, 20, Side.CLIENT);
         CHANNEL.registerMessage(PartyTrackingSyncPacket.Handler.class, PartyTrackingSyncPacket.class, 21, Side.CLIENT);
+        CHANNEL.registerMessage(LoreCharacterSyncPacket.Handler.class, LoreCharacterSyncPacket.class, 24, Side.CLIENT);
     }
 }

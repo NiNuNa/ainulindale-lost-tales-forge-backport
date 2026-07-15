@@ -122,6 +122,9 @@ public final class CharacterDeletionTombstone {
                 source.getCreationTimestamp(),
                 source.getDataVersion(),
                 source.isMinecraftCapeVisible(),
-                source.getCosmeticCapeId());
+                source.getCosmeticCapeId(),
+                source.getStartingWaypointId(),
+                source.hasUnconventionalSettings(),
+                source.getDescription());
     }
 }

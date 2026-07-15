@@ -11,6 +11,7 @@ import com.ninuna.losttales.client.character.CharacterClientTaskQueue;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.event.LostTalesClientEventHandler;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
@@ -44,6 +45,7 @@ import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPack
 import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
+import com.ninuna.losttales.network.packet.character.LoreCharacterSyncPacket;
 import com.ninuna.losttales.network.packet.party.PartyMemberStatusSyncPacket;
 import com.ninuna.losttales.network.packet.party.PartyOperationResultPacket;
 import com.ninuna.losttales.network.packet.party.PartyStateSyncPacket;
@@ -223,6 +225,15 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             return;
         }
         ClientCharacterCreationCatalogCache.accept(packet.getCatalog());
+    }
+
+    @Override
+    public void handleLoreCharacterSync(LoreCharacterSyncPacket packet) {
+        if (packet == null || packet.isMalformed() || packet.getSnapshot() == null) {
+            ClientLoreCharacterCache.clear();
+            return;
+        }
+        ClientLoreCharacterCache.accept(packet.getSnapshot());
     }
 
     @Override

@@ -129,6 +129,8 @@ public final class LostTalesConfig {
     public static int characterSwitchStableGroundTicks = 20;
     public static double characterSwitchTeleportDistancePerTick = 16.0D;
     public static int characterStateMaxSnapshotBytes = 2 * 1024 * 1024;
+    public static int characterStateCheckpointIntervalSeconds = 300;
+    public static int characterStateCheckpointPlayersPerTick = 1;
     public static int characterDeletionRetentionDays = 30;
     public static long characterSwitchCombatGraceMillis = 20000L;
     public static long characterSwitchTeleportGraceMillis = 5000L;
@@ -203,6 +205,22 @@ public final class LostTalesConfig {
                     64 * 1024,
                     16 * 1024 * 1024,
                     "Maximum compressed size of one character-owned player-state snapshot. Oversized snapshots are rejected before switching."
+            );
+            characterStateCheckpointIntervalSeconds = config.getInt(
+                    "characterStateCheckpointIntervalSeconds",
+                    CATEGORY_CHARACTERS,
+                    characterStateCheckpointIntervalSeconds,
+                    30,
+                    3600,
+                    "Seconds between durable checkpoints of every online active character. Work is spread across server ticks."
+            );
+            characterStateCheckpointPlayersPerTick = config.getInt(
+                    "characterStateCheckpointPlayersPerTick",
+                    CATEGORY_CHARACTERS,
+                    characterStateCheckpointPlayersPerTick,
+                    1,
+                    4,
+                    "Maximum online characters durably checkpointed in one server tick."
             );
             characterDeletionRetentionDays = config.getInt(
                     "characterDeletionRetentionDays",
@@ -1011,6 +1029,12 @@ public final class LostTalesConfig {
                 characterSwitchTeleportDistancePerTick).set(characterSwitchTeleportDistancePerTick);
         config.get(CATEGORY_CHARACTERS, "characterStateMaxSnapshotBytes",
                 characterStateMaxSnapshotBytes).set(characterStateMaxSnapshotBytes);
+        config.get(CATEGORY_CHARACTERS, "characterStateCheckpointIntervalSeconds",
+                characterStateCheckpointIntervalSeconds).set(
+                characterStateCheckpointIntervalSeconds);
+        config.get(CATEGORY_CHARACTERS, "characterStateCheckpointPlayersPerTick",
+                characterStateCheckpointPlayersPerTick).set(
+                characterStateCheckpointPlayersPerTick);
         config.get(CATEGORY_CHARACTERS, "characterDeletionRetentionDays",
                 characterDeletionRetentionDays).set(characterDeletionRetentionDays);
         config.get(CATEGORY_CLIENT, "showLostTalesHud", showLostTalesHud).set(showLostTalesHud);
@@ -1141,6 +1165,10 @@ public final class LostTalesConfig {
                 Math.min(1024.0D, characterSwitchTeleportDistancePerTick));
         characterStateMaxSnapshotBytes = clampInt(
                 characterStateMaxSnapshotBytes, 64 * 1024, 16 * 1024 * 1024);
+        characterStateCheckpointIntervalSeconds = clampInt(
+                characterStateCheckpointIntervalSeconds, 30, 3600);
+        characterStateCheckpointPlayersPerTick = clampInt(
+                characterStateCheckpointPlayersPerTick, 1, 4);
         characterDeletionRetentionDays = clampInt(
                 characterDeletionRetentionDays, 1, 3650);
         characterSwitchCombatGraceMillis =

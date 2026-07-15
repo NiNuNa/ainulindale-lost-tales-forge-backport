@@ -105,7 +105,8 @@ public final class LostTalesClientMapMarkerStore {
                 marker.getCompassFadeInRadius(),
                 marker.getDiscoveryRadius(),
                 marker.isHiddenUntilDiscovered(),
-                marker.isDiscoverable()
+                marker.isDiscoverable(),
+                marker.requiresRegionUnlock()
         );
     }
 

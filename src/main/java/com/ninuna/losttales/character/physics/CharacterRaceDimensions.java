@@ -43,8 +43,9 @@ public final class CharacterRaceDimensions {
     }
 
     /**
-     * Creates a sanitized measurement snapshot from the resolved gameplay
-     * profile. Valid profiles retain their values exactly.
+     * Creates a sanitized measurement snapshot. Registered physical dimensions
+     * always win over adapter-provided values so runtime combat integration can
+     * never silently change collision boxes or first-person camera height.
      */
     public static CharacterRaceDimensions fromProfile(
             String raceId, CharacterRaceGameplayProfile profile) {
@@ -53,16 +54,24 @@ public final class CharacterRaceDimensions {
         }
 
         String canonicalRaceId = CharacterRaceRegistry.canonicalizeIdentifier(raceId);
-        float width = positiveOr(profile.getWidth(), MINIMUM_PHYSICAL_SIZE);
-        float height = positiveOr(profile.getHeight(), MINIMUM_PHYSICAL_SIZE);
-        float standingEyeHeight = clampEyeHeight(
-                profile.getStandingEyeHeight(), height, height);
-        float sneakingEyeHeight = clampEyeHeight(
-                profile.getSneakingEyeHeight(), standingEyeHeight,
-                standingEyeHeight);
-
         CharacterRaceDefinition definition =
                 CharacterRaceRegistry.get(canonicalRaceId);
+        float width = positiveOr(definition == null
+                ? profile.getWidth() : definition.getWidth(),
+                MINIMUM_PHYSICAL_SIZE);
+        float height = positiveOr(definition == null
+                ? profile.getHeight() : definition.getHeight(),
+                MINIMUM_PHYSICAL_SIZE);
+        float standingEyeHeight = clampEyeHeight(
+                definition == null ? profile.getStandingEyeHeight()
+                        : definition.getStandingEyeHeight(),
+                height, height);
+        float sneakingEyeHeight = clampEyeHeight(
+                definition == null ? profile.getSneakingEyeHeight()
+                        : definition.getSneakingEyeHeight(),
+                standingEyeHeight,
+                standingEyeHeight);
+
         float modelScale = definition == null
                 ? DEFAULT_MODEL_SCALE
                 : positiveOr(definition.getRendererScale(), DEFAULT_MODEL_SCALE);

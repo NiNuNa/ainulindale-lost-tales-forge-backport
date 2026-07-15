@@ -21,7 +21,8 @@ public final class LostTalesMapMarkerWaypointUnlockHelper {
     }
 
     public static boolean unlockWaypointForDiscoveredMarker(EntityPlayer player, LostTalesMapMarkerDefinition marker) {
-        if (!(player instanceof EntityPlayerMP) || marker == null || !marker.hasFastTravel()) {
+        if (!(player instanceof EntityPlayerMP) || marker == null
+                || !marker.hasFastTravel() || !marker.isDiscoverable()) {
             return false;
         }
         LOTRWaypoint.Region region =
@@ -41,6 +42,11 @@ public final class LostTalesMapMarkerWaypointUnlockHelper {
 
     public static boolean lockWaypointForForgottenMarker(EntityPlayer player, String markerId) {
         if (!(player instanceof EntityPlayerMP)) {
+            return false;
+        }
+        LostTalesMapMarkerDefinition marker =
+                LostTalesMapMarkerCatalog.getMarker(markerId);
+        if (marker == null || !marker.isDiscoverable()) {
             return false;
         }
         LOTRWaypoint.Region region =
@@ -72,14 +78,20 @@ public final class LostTalesMapMarkerWaypointUnlockHelper {
                 new LinkedHashMap<LOTRWaypoint.Region, Boolean>();
         for (LostTalesMapMarkerDefinition marker :
                 LostTalesMapMarkerCatalog.getMarkers()) {
-            LOTRWaypoint.Region region = marker == null ? null
-                    : LostTalesMapMarkerWaypointRegistry.getRegionForMarker(
+            // Never mutate native biome/faction regions. They belong to LOTR
+            // and are used by non-discoverable markers exactly as-is.
+            if (!LostTalesMapMarkerWaypointRegistry
+                    .usesPrivateRegion(marker)) {
+                continue;
+            }
+            LOTRWaypoint.Region region =
+                    LostTalesMapMarkerWaypointRegistry.getRegionForMarker(
                             marker.getId());
             if (region == null) {
                 continue;
             }
             String markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(marker.getId());
-            boolean discovered = marker != null && !marker.isDiscoverable()
+            boolean discovered = !marker.isDiscoverable()
                     || discoveredMarkerIds != null
                     && discoveredMarkerIds.contains(markerId);
             Boolean existing = desiredRegions.get(region);

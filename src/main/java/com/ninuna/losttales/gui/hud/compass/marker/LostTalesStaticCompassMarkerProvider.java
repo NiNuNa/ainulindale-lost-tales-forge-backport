@@ -32,9 +32,13 @@ public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMar
             boolean pinned = entry.getId() != null && entry.getId().equals(pinnedMarkerId);
             boolean undiscovered = entry.isDiscoverable() && !discovered;
 
+            if (!LostTalesClientMapMarkerVisibility
+                    .isRegionRequirementMet(entry)) {
+                continue;
+            }
             if (undiscovered
                     && !LostTalesClientMapMarkerVisibility
-                    .isUndiscoveredRegionVisible(entry)) {
+                    .isUndiscoveredCompassVisible(entry)) {
                 continue;
             }
 

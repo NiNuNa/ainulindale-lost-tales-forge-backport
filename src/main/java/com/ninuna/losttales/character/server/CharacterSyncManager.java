@@ -6,6 +6,7 @@ import com.ninuna.losttales.character.sync.CharacterCreationCatalog;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import com.ninuna.losttales.character.lore.sync.LoreCharacterSyncManager;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
@@ -64,6 +65,7 @@ public final class CharacterSyncManager {
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new CharacterRosterSyncPacket(requestId, snapshot), player);
         sendCreationCatalog(player);
+        LoreCharacterSyncManager.send(player);
         return true;
     }
 

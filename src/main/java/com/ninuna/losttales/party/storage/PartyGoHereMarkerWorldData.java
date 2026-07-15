@@ -184,7 +184,7 @@ public final class PartyGoHereMarkerWorldData extends WorldSavedData {
         if (left == null || right == null) {
             return false;
         }
-        return left.getPartyId().equals(right.getPartyId())
+        return equalNullable(left.getPartyId(), right.getPartyId())
                 && left.getOwnerCharacterId().equals(
                 right.getOwnerCharacterId())
                 && left.getDimensionId() == right.getDimensionId()
@@ -195,6 +195,10 @@ public final class PartyGoHereMarkerWorldData extends WorldSavedData {
                 && Double.doubleToLongBits(left.getZ())
                 == Double.doubleToLongBits(right.getZ())
                 && left.getUpdatedAt() == right.getUpdatedAt();
+    }
+
+    private static boolean equalNullable(Object left, Object right) {
+        return left == null ? right == null : left.equals(right);
     }
 
     private static void copyTagContents(NBTTagCompound source,

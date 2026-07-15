@@ -101,6 +101,16 @@ public final class CharacterDataMigrator {
                     // filled by the codec with backward-compatible defaults.
                     return 4;
                 }
+                if (version == 4) {
+                    // Character v5 records the validated initial waypoint and
+                    // whether cross-lore creation options were enabled.
+                    return 5;
+                }
+                if (version == 5) {
+                    // Character v6 adds an optional bounded roleplay
+                    // description.
+                    return 6;
+                }
                 break;
             case PROGRESSION:
                 if (version == 0) {

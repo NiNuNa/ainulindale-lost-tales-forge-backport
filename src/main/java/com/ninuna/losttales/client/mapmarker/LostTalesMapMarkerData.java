@@ -27,6 +27,7 @@ public final class LostTalesMapMarkerData {
     private final double discoveryRadius;
     private final boolean hiddenUntilDiscovered;
     private final boolean discoverable;
+    private final boolean requiresRegionUnlock;
 
     public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius) {
         this(id, name, iconName, colorName, CATEGORY_DEFAULT, false, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, false, false);
@@ -44,11 +45,26 @@ public final class LostTalesMapMarkerData {
         this(id, name, iconName, colorName, categoryName, hasFastTravel, "", dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, discoverable);
     }
 
+    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, boolean hasFastTravel, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable, boolean requiresRegionUnlock) {
+        this(id, name, iconName, colorName, categoryName, "",
+                hasFastTravel, "", dimensionId, x, y, z,
+                compassFadeInRadius, discoveryRadius,
+                hiddenUntilDiscovered, discoverable,
+                requiresRegionUnlock);
+    }
+
     public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, boolean hasFastTravel, String fastTravelWaypointCode, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
         this(id, name, iconName, colorName, categoryName, "", hasFastTravel, fastTravelWaypointCode, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, discoverable);
     }
 
     public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, String description, boolean hasFastTravel, String fastTravelWaypointCode, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
+        this(id, name, iconName, colorName, categoryName, description,
+                hasFastTravel, fastTravelWaypointCode, dimensionId,
+                x, y, z, compassFadeInRadius, discoveryRadius,
+                hiddenUntilDiscovered, discoverable, false);
+    }
+
+    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, String description, boolean hasFastTravel, String fastTravelWaypointCode, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable, boolean requiresRegionUnlock) {
         this.id = id;
         this.name = name;
         this.iconName = iconName;
@@ -65,6 +81,7 @@ public final class LostTalesMapMarkerData {
         this.discoveryRadius = discoveryRadius;
         this.hiddenUntilDiscovered = hiddenUntilDiscovered;
         this.discoverable = discoverable;
+        this.requiresRegionUnlock = requiresRegionUnlock;
     }
 
 
@@ -139,9 +156,9 @@ public final class LostTalesMapMarkerData {
 
 
     /**
-     * If true, discovery is required before any map presentation. If false, a
-     * discoverable marker becomes an anonymous question mark after its LOTR
-     * biome/waypoint region has been visited by the active character.
+     * If true, proximity discovery is required before full-map presentation.
+     * This is independent of {@link #requiresRegionUnlock()} and is ignored
+     * when {@link #isDiscoverable()} is false.
      */
     public boolean isHiddenUntilDiscovered() {
         return this.hiddenUntilDiscovered;
@@ -149,6 +166,10 @@ public final class LostTalesMapMarkerData {
 
     public boolean isDiscoverable() {
         return this.discoverable;
+    }
+
+    public boolean requiresRegionUnlock() {
+        return this.requiresRegionUnlock;
     }
 
 }

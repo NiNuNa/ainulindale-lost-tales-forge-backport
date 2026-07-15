@@ -55,6 +55,11 @@ public final class LotrProgressionStateComponent implements CharacterStateCompon
         return wrap(this.adapter.createDefault());
     }
 
+    /** Creates a clean character state seeded with the selected faction. */
+    public NBTTagCompound createDefault(String startingFactionId) {
+        return wrap(this.adapter.createDefault(startingFactionId));
+    }
+
     @Override
     public void validate(NBTTagCompound state)
             throws CharacterStateValidationException {

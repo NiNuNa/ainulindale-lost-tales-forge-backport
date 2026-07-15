@@ -52,17 +52,19 @@ public final class LostTalesCompassMarkerBatchBuilder {
             double dz = marker.getZ() - playerPos.z;
 
             boolean activeQuestMarker = marker.isActiveQuestMarker();
+            boolean forceFullOpacity = marker.isForceFullOpacity();
             float targetDeg = marker.isBearingMarker()
                     ? LostTalesCompassHudRenderHelper.normalizeViewYaw(marker.getBearingDegrees())
                     : LostTalesCompassHudRenderHelper.angleDegToTarget(dx, dz);
             float delta = LostTalesCompassHudRenderHelper.shortestDeltaDegrees(targetDeg, yawDeg);
 
-            if (!activeQuestMarker && Math.abs(delta) > visibleDeg / 2.0F) continue;
+            if (!activeQuestMarker && !forceFullOpacity
+                    && Math.abs(delta) > visibleDeg / 2.0F) continue;
 
             float rawPx = centerX + delta * pxPerDeg;
             float px = MathHelper.clamp_float(rawPx, minX, maxX);
 
-            float iconEdgeAlpha = activeQuestMarker
+            float iconEdgeAlpha = activeQuestMarker || forceFullOpacity
                     ? 1.0F
                     : LostTalesCompassHudRenderHelper.edgeCenterFactor(rawPx, centerX, halfWidth, LostTalesCompassHudRenderer.MAP_MARKER_BEGIN_EDGE_FADE_OUT_OFFSET);
             if (iconEdgeAlpha <= 0.0F) continue;
@@ -73,7 +75,8 @@ public final class LostTalesCompassMarkerBatchBuilder {
 
             double distSq = dx * dx + dy * dy + dz * dz;
             float distT = 1.0F;
-            if (!marker.isBearingMarker() && marker.getFadeInRadius() > 0.0D) {
+            if (!forceFullOpacity && !marker.isBearingMarker()
+                    && marker.getFadeInRadius() > 0.0D) {
                 double dist = Math.sqrt(distSq);
                 double radius = marker.getFadeInRadius();
                 if (dist > radius && !marker.isRetainedBeyondFadeRadius()) continue;

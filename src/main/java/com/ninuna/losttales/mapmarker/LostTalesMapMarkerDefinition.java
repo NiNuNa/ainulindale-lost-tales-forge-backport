@@ -24,6 +24,8 @@ public final class LostTalesMapMarkerDefinition {
     private final boolean hiddenUntilDiscovered;
     /** True when walking into discoveryRadius should unlock this marker. */
     private final boolean discoverable;
+    /** True when visibility also requires the marker's LOTR region to be visited. */
+    private final boolean requiresRegionUnlock;
 
     public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, int dimensionId, double x, double y, double z, boolean hiddenUntilDiscovered) {
         this(id, name, iconName, colorName, CATEGORY_DEFAULT, false, dimensionId, x, y, z, 128.0D, 8.0D, hiddenUntilDiscovered, hiddenUntilDiscovered);
@@ -37,11 +39,26 @@ public final class LostTalesMapMarkerDefinition {
         this(id, name, iconName, colorName, categoryName, hasFastTravel, "", dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, discoverable);
     }
 
+    public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, String categoryName, boolean hasFastTravel, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable, boolean requiresRegionUnlock) {
+        this(id, name, iconName, colorName, categoryName, "",
+                hasFastTravel, "", dimensionId, x, y, z,
+                compassFadeInRadius, discoveryRadius,
+                hiddenUntilDiscovered, discoverable,
+                requiresRegionUnlock);
+    }
+
     public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, String categoryName, boolean hasFastTravel, String fastTravelWaypointCode, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
         this(id, name, iconName, colorName, categoryName, "", hasFastTravel, fastTravelWaypointCode, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, discoverable);
     }
 
     public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, String categoryName, String description, boolean hasFastTravel, String fastTravelWaypointCode, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
+        this(id, name, iconName, colorName, categoryName, description,
+                hasFastTravel, fastTravelWaypointCode, dimensionId,
+                x, y, z, compassFadeInRadius, discoveryRadius,
+                hiddenUntilDiscovered, discoverable, false);
+    }
+
+    public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, String categoryName, String description, boolean hasFastTravel, String fastTravelWaypointCode, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable, boolean requiresRegionUnlock) {
         this.id = id;
         this.name = name;
         this.iconName = iconName;
@@ -58,6 +75,7 @@ public final class LostTalesMapMarkerDefinition {
         this.discoveryRadius = discoveryRadius;
         this.hiddenUntilDiscovered = hiddenUntilDiscovered;
         this.discoverable = discoverable;
+        this.requiresRegionUnlock = requiresRegionUnlock;
     }
 
 
@@ -137,6 +155,10 @@ public final class LostTalesMapMarkerDefinition {
 
     public boolean isDiscoverable() {
         return discoverable;
+    }
+
+    public boolean requiresRegionUnlock() {
+        return requiresRegionUnlock;
     }
 
 

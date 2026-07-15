@@ -3,6 +3,8 @@ package com.ninuna.losttales.character.server;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.deletion.CharacterDeletionService;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorldData;
 import com.ninuna.losttales.character.model.CharacterProgression;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
@@ -134,11 +136,26 @@ public final class CharacterService {
         if (createdInHighestUnlockedSlot) {
             roster.unlockNextSlot();
         }
-        if (roster.getActiveCharacterId() == null && roster.getCharacterCount() == 1) {
+        boolean becameFirstActive = roster.getActiveCharacterId() == null
+                && roster.getCharacterCount() == 1;
+        if (becameFirstActive) {
             roster.setActiveCharacterId(character.getCharacterId());
         }
         roster.incrementRevision();
         data.saveRoster(roster);
+        if (becameFirstActive) {
+            CharacterErrorId initialization = CharacterSwitchCoordinator.getInstance()
+                    .initializeNewActiveCharacter(
+                            player, character.getCharacterId());
+            if (initialization != CharacterErrorId.NONE) {
+                // The roster mutation is already authoritative. The coordinator
+                // leaves a pending waypoint generation and disconnects fail-closed;
+                // login recovery completes it idempotently.
+                FMLLog.warning("[%s] First character %s for owner %s remains pending initialization: %s",
+                        LostTalesMetaData.MOD_ID, character.getCharacterId(),
+                        player.getUniqueID(), initialization.getId());
+            }
+        }
         return CharacterOperationResult.success(true, roster, character);
     }
 
@@ -243,6 +260,25 @@ public final class CharacterService {
         }
 
         RoleplayCharacter character = roster.getCharacter(characterId);
+        try {
+            LoreCharacterOwnershipWorldData loreOwnership =
+                    LoreCharacterOwnershipStorage.get(player.worldObj);
+            if (loreOwnership.isReadOnly()) {
+                // A corrupt ownership index cannot prove that this identity is
+                // deletable, so fail closed until an administrator repairs it.
+                return CharacterOperationResult.failure(
+                        CharacterErrorId.LORE_CHARACTER_OWNERSHIP_STORAGE_READ_ONLY,
+                        roster);
+            }
+            if (loreOwnership.getRecordByCharacterId(characterId) != null) {
+                return CharacterOperationResult.failure(
+                        CharacterErrorId.LORE_CHARACTER_CANNOT_DELETE, roster);
+            }
+        } catch (RuntimeException exception) {
+            return CharacterOperationResult.failure(
+                    CharacterErrorId.LORE_CHARACTER_OWNERSHIP_STORAGE_READ_ONLY,
+                    roster);
+        }
         return CharacterDeletionService.getInstance().delete(
                 player, data, roster, character);
     }
@@ -287,7 +323,12 @@ public final class CharacterService {
                     RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL,
                     new CharacterProgression(),
                     System.currentTimeMillis(),
-                    RoleplayCharacter.CURRENT_DATA_VERSION
+                    RoleplayCharacter.CURRENT_DATA_VERSION,
+                    RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                    RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
+                    creation.getStartingWaypointId(),
+                    creation.hasUnconventionalSettings(),
+                    creation.getDescription()
             );
         }
         return null;

@@ -21,6 +21,7 @@ public final class CharacterValidator {
     public static final int MIN_NAME_LENGTH = 2;
     public static final int MAX_NAME_LENGTH = 32;
     public static final int MAX_IDENTIFIER_LENGTH = 64;
+    public static final int MAX_DESCRIPTION_LENGTH = 256;
     public static final int MIN_AGE = 1;
     public static final int MAX_AGE = 100000;
 
@@ -121,6 +122,12 @@ public final class CharacterValidator {
             return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_SKIN);
         }
 
+        String description = normalizeDescription(request.getDescription());
+        if (!isValidDescription(description)) {
+            return CharacterCreationValidationResult.failure(
+                    CharacterErrorId.INVALID_DESCRIPTION);
+        }
+
         int age = request.getAge();
         if (age < MIN_AGE || age > MAX_AGE) {
             return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_AGE);
@@ -141,8 +148,22 @@ public final class CharacterValidator {
         if (!faction.isPlayable()) {
             return CharacterCreationValidationResult.failure(CharacterErrorId.STARTING_FACTION_UNAVAILABLE);
         }
-        if (!race.isCompatibleWith(faction)) {
+        boolean unconventional = request.hasUnconventionalSettings();
+        if (!unconventional && !race.isCompatibleWith(faction)) {
             return CharacterCreationValidationResult.failure(CharacterErrorId.INCOMPATIBLE_RACE_FACTION);
+        }
+
+        String requestedWaypointId = normalizeStableIdentifier(
+                request.getStartingWaypointId());
+        if (requestedWaypointId.length() > MAX_IDENTIFIER_LENGTH) {
+            return CharacterCreationValidationResult.failure(
+                    CharacterErrorId.INVALID_STARTING_WAYPOINT);
+        }
+        String waypointId = factionResolver.resolveStartingWaypointId(
+                faction.getId(), requestedWaypointId, unconventional);
+        if (waypointId == null || !isValidIdentifierLength(waypointId)) {
+            return CharacterCreationValidationResult.failure(
+                    CharacterErrorId.STARTING_WAYPOINT_UNAVAILABLE);
         }
 
         return CharacterCreationValidationResult.success(new ValidatedCharacterCreation(
@@ -153,7 +174,10 @@ public final class CharacterValidator {
                 genderId,
                 skinId,
                 age,
-                faction.getId()
+                faction.getId(),
+                waypointId,
+                unconventional,
+                description
         ));
     }
 
@@ -200,6 +224,48 @@ public final class CharacterValidator {
 
     public static String normalizeNameKey(String input) {
         return normalizeName(input).toLowerCase(Locale.ROOT);
+    }
+
+    /** Normalizes user biography whitespace without permitting formatting codes. */
+    public static String normalizeDescription(String input) {
+        if (input == null) {
+            return "";
+        }
+        String normalized = Normalizer.normalize(input, Normalizer.Form.NFC);
+        StringBuilder output = new StringBuilder(normalized.length());
+        boolean pendingSpace = false;
+        for (int offset = 0; offset < normalized.length();) {
+            int codePoint = normalized.codePointAt(offset);
+            offset += Character.charCount(codePoint);
+            if (Character.isWhitespace(codePoint)) {
+                if (output.length() > 0) {
+                    pendingSpace = true;
+                }
+                continue;
+            }
+            if (pendingSpace) {
+                output.append(' ');
+                pendingSpace = false;
+            }
+            output.appendCodePoint(codePoint);
+        }
+        return output.toString();
+    }
+
+    public static boolean isValidDescription(String value) {
+        if (value == null || value.codePointCount(0, value.length())
+                > MAX_DESCRIPTION_LENGTH) {
+            return false;
+        }
+        for (int offset = 0; offset < value.length();) {
+            int codePoint = value.codePointAt(offset);
+            offset += Character.charCount(codePoint);
+            if (codePoint == 0x00A7 || Character.isISOControl(codePoint)
+                    || !Character.isDefined(codePoint)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public static String normalizeStableIdentifier(String input) {

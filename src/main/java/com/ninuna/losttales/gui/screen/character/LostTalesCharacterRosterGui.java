@@ -8,6 +8,7 @@ import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.gui.screen.LostTalesCharacterInfoGui;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.gui.Gui;
@@ -23,6 +24,7 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
     private static final int BUTTON_DELETE = 2;
     private static final int BUTTON_BACK = 3;
     private static final int BUTTON_REFRESH = 4;
+    private static final int BUTTON_LORE_CHARACTERS = 5;
 
     private final GuiScreen parent;
     private final boolean selectionRequired;
@@ -50,10 +52,13 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
     public void initGui() {
         this.buttonList.clear();
         int y = this.height - 34;
-        this.primaryButton = new GuiButton(BUTTON_PRIMARY, this.width / 2 - 158, y, 104, 20, "");
-        this.deleteButton = new GuiButton(BUTTON_DELETE, this.width / 2 - 50, y, 100, 20,
+        this.primaryButton = new GuiButton(BUTTON_PRIMARY, this.width / 2 - 186, y, 90, 20, "");
+        this.deleteButton = new GuiButton(BUTTON_DELETE, this.width / 2 - 92, y, 90, 20,
                 I18n.format("gui.losttales.character.delete"));
-        this.refreshButton = new GuiButton(BUTTON_REFRESH, this.width / 2 + 54, y, 104, 20,
+        this.buttonList.add(new GuiButton(BUTTON_LORE_CHARACTERS,
+                this.width / 2 + 2, y, 90, 20,
+                I18n.format("gui.losttales.lore.open")));
+        this.refreshButton = new GuiButton(BUTTON_REFRESH, this.width / 2 + 96, y, 90, 20,
                 I18n.format("gui.losttales.character.refresh"));
         this.buttonList.add(this.primaryButton);
         this.buttonList.add(this.deleteButton);
@@ -141,7 +146,9 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
             this.primaryButton.displayString = I18n.format("gui.losttales.character.unavailable");
             this.primaryButton.enabled = false;
         }
-        this.deleteButton.enabled = selected != null && !pending;
+        this.deleteButton.enabled = selected != null && !pending
+                && ClientLoreCharacterCache.findOwnedCharacter(
+                selected.getCharacterId()) == null;
         this.refreshButton.enabled = !pending;
     }
 
@@ -155,6 +162,10 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
         if (button.id == BUTTON_REFRESH) {
             this.statusMessage = "";
             this.pendingRequestId = ClientCharacterNetwork.requestRoster();
+            return;
+        }
+        if (button.id == BUTTON_LORE_CHARACTERS) {
+            this.mc.displayGuiScreen(new LostTalesLoreCharactersGui(this));
             return;
         }
         if (snapshot == null || this.pendingRequestId != 0) {

@@ -99,7 +99,7 @@ public final class ClientPartyTrackingCache {
 
     private static List<LostTalesMapMarkerData> buildMapMarkers(
             PartyTrackingSnapshot tracking) {
-        if (tracking == null || !tracking.hasParty()) {
+        if (tracking == null) {
             return Collections.emptyList();
         }
         ArrayList<LostTalesMapMarkerData> markers =
@@ -111,13 +111,13 @@ public final class ClientPartyTrackingCache {
                     marker.getOwnerCharacterName(),
                     LostTalesCompassMarkerIcon.QUEST.name(),
                     marker.getOwnerColor().getId(),
-                    "Party Marker",
-                    "A personal map marker shared with this party.",
+                    "Go Here",
+                    "A personal marker for this roleplaying character. It is shared while in a party.",
                     false,
                     "",
                     marker.getDimensionId(),
                     marker.getX(), marker.getY(), marker.getZ(),
-                    2048.0D,
+                    0.0D,
                     1.0D,
                     false,
                     false));

@@ -37,8 +37,16 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
     private static final int BUTTON_SKIN_NEXT = 6;
     private static final int BUTTON_FACTION_PREVIOUS = 7;
     private static final int BUTTON_FACTION_NEXT = 8;
-    private static final int BUTTON_CREATE = 9;
-    private static final int BUTTON_CANCEL = 10;
+    private static final int BUTTON_WAYPOINT_PREVIOUS = 9;
+    private static final int BUTTON_WAYPOINT_NEXT = 10;
+    private static final int BUTTON_UNCONVENTIONAL = 11;
+    private static final int BUTTON_CONTINUE = 12;
+    private static final int BUTTON_CREATE = 13;
+    private static final int BUTTON_BACK = 14;
+    private static final int BUTTON_CANCEL = 15;
+
+    private static final int STEP_APPEARANCE = 0;
+    private static final int STEP_IDENTITY = 1;
 
     private final GuiScreen parent;
     private final int slotIndex;
@@ -46,18 +54,28 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
 
     private GuiTextField nameField;
     private GuiTextField ageField;
+    private GuiTextField descriptionField;
     private List<String> raceIds = Collections.emptyList();
     private List<String> genderIds = Collections.emptyList();
     private List<String> skinIds = Collections.emptyList();
     private List<String> factionIds = Collections.emptyList();
+    private List<String> waypointIds = Collections.emptyList();
     private int raceIndex;
     private int genderIndex;
     private int skinIndex;
     private int factionIndex;
+    private int waypointIndex;
+    private int step = STEP_APPEARANCE;
+    private String draftName = "";
+    private String draftAge = "";
+    private String draftDescription = "";
+    private boolean unconventionalSettings;
     private int pendingRequestId;
     private String statusMessage = "";
     private boolean statusError;
     private GuiButton createButton;
+    private GuiButton continueButton;
+    private GuiButton unconventionalButton;
 
     public LostTalesCharacterCreationGui(GuiScreen parent, int slotIndex,
                                          boolean firstCharacterFlow) {
@@ -69,6 +87,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
     @Override
     public void initGui() {
         Keyboard.enableRepeatEvents(true);
+        captureTextDraft();
         this.buttonList.clear();
         this.raceIds = ClientCharacterDisplayNames.getRaceIds();
         this.raceIndex = clampIndex(this.raceIndex, this.raceIds.size());
@@ -81,36 +100,69 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
         int left = (this.width - panelWidth) / 2;
         int fieldX = left + 142;
         int previewWidth = panelWidth >= 420 ? 110 : 0;
+        if (this.step == STEP_IDENTITY) {
+            previewWidth = 0;
+        }
         int fieldWidth = panelWidth - 160 - previewWidth;
         int top = panelTop + 16;
-
-        String existingName = this.nameField == null ? "" : this.nameField.getText();
-        String existingAge = this.ageField == null ? "" : this.ageField.getText();
-        this.nameField = new GuiTextField(this.fontRendererObj,
-                fieldX, top, fieldWidth, 20);
-        this.nameField.setMaxStringLength(CharacterValidator.MAX_NAME_LENGTH + 8);
-        this.nameField.setText(existingName);
-        this.nameField.setFocused(true);
-        this.ageField = new GuiTextField(this.fontRendererObj,
-                fieldX, top + 30, Math.min(90, fieldWidth), 20);
-        this.ageField.setMaxStringLength(6);
-        this.ageField.setText(existingAge);
-
-        addCyclerButtons(BUTTON_RACE_PREVIOUS, BUTTON_RACE_NEXT,
-                fieldX, top + 60, fieldWidth);
-        addCyclerButtons(BUTTON_GENDER_PREVIOUS, BUTTON_GENDER_NEXT,
-                fieldX, top + 90, fieldWidth);
-        addCyclerButtons(BUTTON_SKIN_PREVIOUS, BUTTON_SKIN_NEXT,
-                fieldX, top + 120, fieldWidth);
-        addCyclerButtons(BUTTON_FACTION_PREVIOUS, BUTTON_FACTION_NEXT,
-                fieldX, top + 150, fieldWidth);
-
+        this.nameField = null;
+        this.ageField = null;
+        this.descriptionField = null;
+        this.createButton = null;
+        this.continueButton = null;
+        this.unconventionalButton = null;
         int bottom = panelTop + panelHeight - 30;
-        this.createButton = new GuiButton(BUTTON_CREATE, this.width / 2 - 104,
-                bottom, 100, 20, I18n.format("gui.losttales.character.create"));
-        this.buttonList.add(this.createButton);
-        this.buttonList.add(new GuiButton(BUTTON_CANCEL, this.width / 2 + 4,
-                bottom, 100, 20, I18n.format("gui.cancel")));
+        if (this.step == STEP_APPEARANCE) {
+            addCyclerButtons(BUTTON_RACE_PREVIOUS, BUTTON_RACE_NEXT,
+                    fieldX, top, fieldWidth);
+            addCyclerButtons(BUTTON_GENDER_PREVIOUS, BUTTON_GENDER_NEXT,
+                    fieldX, top + 30, fieldWidth);
+            addCyclerButtons(BUTTON_SKIN_PREVIOUS, BUTTON_SKIN_NEXT,
+                    fieldX, top + 60, fieldWidth);
+            this.continueButton = new GuiButton(
+                    BUTTON_CONTINUE, this.width / 2 - 104, bottom, 100, 20,
+                    I18n.format("gui.losttales.character.continue"));
+            this.buttonList.add(this.continueButton);
+            this.buttonList.add(new GuiButton(BUTTON_CANCEL,
+                    this.width / 2 + 4, bottom, 100, 20,
+                    I18n.format("gui.cancel")));
+        } else {
+            this.nameField = new GuiTextField(this.fontRendererObj,
+                    fieldX, top, fieldWidth, 20);
+            this.nameField.setMaxStringLength(
+                    CharacterValidator.MAX_NAME_LENGTH + 8);
+            this.nameField.setText(this.draftName);
+            this.nameField.setFocused(true);
+            this.ageField = new GuiTextField(this.fontRendererObj,
+                    fieldX, top + 30, Math.min(90, fieldWidth), 20);
+            this.ageField.setMaxStringLength(6);
+            this.ageField.setText(this.draftAge);
+            this.descriptionField = new GuiTextField(this.fontRendererObj,
+                    fieldX, top + 60, fieldWidth, 20);
+            this.descriptionField.setMaxStringLength(
+                    CharacterValidator.MAX_DESCRIPTION_LENGTH);
+            this.descriptionField.setText(this.draftDescription);
+            addCyclerButtons(BUTTON_FACTION_PREVIOUS, BUTTON_FACTION_NEXT,
+                    fieldX, top + 90, fieldWidth);
+            addCyclerButtons(BUTTON_WAYPOINT_PREVIOUS, BUTTON_WAYPOINT_NEXT,
+                    fieldX, top + 120, fieldWidth);
+            this.unconventionalButton = new GuiButton(
+                    BUTTON_UNCONVENTIONAL, fieldX, top + 150,
+                    fieldWidth, 20, "");
+            this.buttonList.add(this.unconventionalButton);
+            updateUnconventionalButtonLabel();
+
+            this.buttonList.add(new GuiButton(BUTTON_BACK,
+                    this.width / 2 - 155, bottom, 98, 20,
+                    I18n.format("gui.losttales.character.back")));
+            this.createButton = new GuiButton(BUTTON_CREATE,
+                    this.width / 2 - 49, bottom, 98, 20,
+                    I18n.format("gui.losttales.character.create"));
+            this.buttonList.add(this.createButton);
+            this.buttonList.add(new GuiButton(BUTTON_CANCEL,
+                    this.width / 2 + 57, bottom, 98, 20,
+                    I18n.format("gui.cancel")));
+        }
         updateButtonState();
     }
 
@@ -122,8 +174,15 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
 
     @Override
     public void updateScreen() {
-        this.nameField.updateCursorCounter();
-        this.ageField.updateCursorCounter();
+        if (this.nameField != null) {
+            this.nameField.updateCursorCounter();
+        }
+        if (this.ageField != null) {
+            this.ageField.updateCursorCounter();
+        }
+        if (this.descriptionField != null) {
+            this.descriptionField.updateCursorCounter();
+        }
         handlePendingOperation();
         updateButtonState();
     }
@@ -158,9 +217,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
     }
 
     private void updateButtonState() {
-        if (this.createButton == null) {
-            return;
-        }
         boolean pending = this.pendingRequestId != 0
                 && ClientCharacterRosterCache.isRequestPending(this.pendingRequestId);
         for (Object object : this.buttonList) {
@@ -171,12 +227,28 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
                     && this.genderIds.size() < 2) {
                 button.enabled = false;
             }
+            if ((button.id == BUTTON_FACTION_PREVIOUS
+                    || button.id == BUTTON_FACTION_NEXT)
+                    && this.factionIds.size() < 2) {
+                button.enabled = false;
+            }
+            if ((button.id == BUTTON_WAYPOINT_PREVIOUS
+                    || button.id == BUTTON_WAYPOINT_NEXT)
+                    && this.waypointIds.size() < 2) {
+                button.enabled = false;
+            }
         }
-        this.createButton.enabled = !pending
-                && this.raceIds.size() > 0
+        boolean appearanceReady = this.raceIds.size() > 0
                 && this.genderIds.size() > 0
-                && this.skinIds.size() > 0
-                && this.factionIds.size() > 0;
+                && this.skinIds.size() > 0;
+        if (this.continueButton != null) {
+            this.continueButton.enabled = !pending && appearanceReady;
+        }
+        if (this.createButton != null) {
+            this.createButton.enabled = !pending && appearanceReady
+                && this.factionIds.size() > 0
+                && this.waypointIds.size() > 0;
+        }
     }
 
     @Override
@@ -209,9 +281,36 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
                 return;
             case BUTTON_FACTION_PREVIOUS:
                 this.factionIndex = cycleIndex(this.factionIndex, -1, this.factionIds.size());
+                rebuildWaypoints();
                 return;
             case BUTTON_FACTION_NEXT:
                 this.factionIndex = cycleIndex(this.factionIndex, 1, this.factionIds.size());
+                rebuildWaypoints();
+                return;
+            case BUTTON_WAYPOINT_PREVIOUS:
+                this.waypointIndex = cycleIndex(
+                        this.waypointIndex, -1, this.waypointIds.size());
+                return;
+            case BUTTON_WAYPOINT_NEXT:
+                this.waypointIndex = cycleIndex(
+                        this.waypointIndex, 1, this.waypointIds.size());
+                return;
+            case BUTTON_UNCONVENTIONAL:
+                this.unconventionalSettings = !this.unconventionalSettings;
+                rebuildFactions();
+                updateUnconventionalButtonLabel();
+                return;
+            case BUTTON_CONTINUE:
+                if (this.continueButton != null
+                        && this.continueButton.enabled) {
+                    this.step = STEP_IDENTITY;
+                    initGui();
+                }
+                return;
+            case BUTTON_BACK:
+                captureTextDraft();
+                this.step = STEP_APPEARANCE;
+                initGui();
                 return;
             case BUTTON_CREATE:
                 submitCreation();
@@ -254,12 +353,36 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
 
     private void rebuildFactions() {
         String raceId = selected(this.raceIds, this.raceIndex);
-        this.factionIds = ClientCharacterDisplayNames.getCompatibleFactionIds(raceId);
-        this.factionIndex = clampIndex(this.factionIndex, this.factionIds.size());
+        String previousFaction = selected(this.factionIds, this.factionIndex);
+        this.factionIds = ClientCharacterDisplayNames.getFactionIds(
+                raceId, this.unconventionalSettings);
+        int previousIndex = this.factionIds.indexOf(previousFaction);
+        this.factionIndex = previousIndex >= 0
+                ? previousIndex : clampIndex(this.factionIndex, this.factionIds.size());
+        rebuildWaypoints();
         if (!ClientCharacterDisplayNames.isLotrIntegrationAvailable()) {
             this.statusMessage = ClientCharacterDisplayNames.error(
                     com.ninuna.losttales.character.validation.CharacterErrorId.LOTR_INTEGRATION_UNAVAILABLE);
             this.statusError = true;
+        }
+    }
+
+    private void rebuildWaypoints() {
+        String previousWaypoint = selected(this.waypointIds, this.waypointIndex);
+        String factionId = selected(this.factionIds, this.factionIndex);
+        this.waypointIds = ClientCharacterDisplayNames.getStartingWaypointIds(
+                factionId, this.unconventionalSettings);
+        int previousIndex = this.waypointIds.indexOf(previousWaypoint);
+        this.waypointIndex = previousIndex >= 0
+                ? previousIndex : clampIndex(this.waypointIndex, this.waypointIds.size());
+    }
+
+    private void updateUnconventionalButtonLabel() {
+        if (this.unconventionalButton != null) {
+            this.unconventionalButton.displayString = I18n.format(
+                    this.unconventionalSettings
+                            ? "gui.losttales.character.unconventional.on"
+                            : "gui.losttales.character.unconventional.off");
         }
     }
 
@@ -290,8 +413,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
         String genderId = selected(this.genderIds, this.genderIndex);
         String skinId = selected(this.skinIds, this.skinIndex);
         String factionId = selected(this.factionIds, this.factionIndex);
+        String waypointId = selected(this.waypointIds, this.waypointIndex);
         if (raceId.length() == 0 || genderId.length() == 0
-                || skinId.length() == 0 || factionId.length() == 0) {
+                || skinId.length() == 0 || factionId.length() == 0
+                || waypointId.length() == 0) {
             this.statusMessage = I18n.format("gui.losttales.character.no_options");
             this.statusError = true;
             return;
@@ -299,7 +424,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
 
         CharacterCreationRequest request = new CharacterCreationRequest(
                 snapshot.getRevision(), this.slotIndex, normalizedName,
-                raceId, genderId, skinId, age, factionId);
+                raceId, genderId, skinId, age, factionId,
+                waypointId, this.unconventionalSettings,
+                CharacterValidator.normalizeDescription(
+                        this.descriptionField.getText()));
         this.statusMessage = I18n.format("gui.losttales.character.creating");
         this.statusError = false;
         this.pendingRequestId = ClientCharacterNetwork.createCharacter(request);
@@ -308,9 +436,14 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         LostTalesSkyrimUiStyle.drawScreenShade(this.width, this.height);
+        String stepLabel = I18n.format(this.step == STEP_APPEARANCE
+                ? "gui.losttales.character.creation.step.appearance"
+                : "gui.losttales.character.creation.step.identity");
         LostTalesSkyrimUiStyle.drawCenteredHeader(this.fontRendererObj,
                 I18n.format("gui.losttales.character.creation"),
-                I18n.format("gui.losttales.character.slot", Integer.valueOf(this.slotIndex + 1)),
+                stepLabel + " - " + I18n.format(
+                        "gui.losttales.character.slot",
+                        Integer.valueOf(this.slotIndex + 1)),
                 this.width, 12);
 
         int panelWidth = getPanelWidth();
@@ -320,42 +453,99 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
         LostTalesSkyrimUiStyle.drawPanel(left, top, panelWidth, panelHeight);
         int labelX = left + 18;
         int valueX = left + 142;
-        int previewWidth = panelWidth >= 420 ? 110 : 0;
+        int previewWidth = this.step == STEP_APPEARANCE && panelWidth >= 420
+                ? 110 : 0;
         int valueWidth = panelWidth - 160 - previewWidth;
         int rowY = top + 20;
 
-        drawLabel(I18n.format("gui.losttales.character.name"), labelX, rowY + 6);
-        drawLabel(I18n.format("gui.losttales.character.age"), labelX, rowY + 36);
-        drawLabel(I18n.format("gui.losttales.character.race"), labelX, rowY + 66);
-        drawLabel(I18n.format("gui.losttales.character.gender"), labelX, rowY + 96);
-        drawLabel(I18n.format("gui.losttales.character.skin"), labelX, rowY + 126);
-        drawLabel(I18n.format("gui.losttales.character.starting_faction"), labelX, rowY + 156);
+        if (this.step == STEP_APPEARANCE) {
+            drawLabel(I18n.format("gui.losttales.character.race"),
+                    labelX, rowY + 6);
+            drawLabel(I18n.format("gui.losttales.character.gender"),
+                    labelX, rowY + 36);
+            drawLabel(I18n.format("gui.losttales.character.skin"),
+                    labelX, rowY + 66);
+            drawCenteredValue(ClientCharacterDisplayNames.race(
+                            selected(this.raceIds, this.raceIndex)),
+                    valueX + 22, rowY, valueWidth - 44);
+            drawCenteredValue(ClientCharacterDisplayNames.gender(
+                            selected(this.genderIds, this.genderIndex)),
+                    valueX + 22, rowY + 30, valueWidth - 44);
+            drawCenteredValue(this.skinIds.isEmpty()
+                            ? I18n.format("gui.losttales.character.no_options")
+                            : ClientCharacterDisplayNames.skin(
+                                    selected(this.skinIds, this.skinIndex)),
+                    valueX + 22, rowY + 60, valueWidth - 44);
 
-        this.nameField.drawTextBox();
-        this.ageField.drawTextBox();
-        drawCenteredValue(ClientCharacterDisplayNames.race(selected(this.raceIds, this.raceIndex)),
-                valueX + 22, rowY + 66, valueWidth - 44);
-        drawCenteredValue(ClientCharacterDisplayNames.gender(selected(this.genderIds, this.genderIndex)),
-                valueX + 22, rowY + 96, valueWidth - 44);
-        drawCenteredValue(this.skinIds.isEmpty()
-                        ? I18n.format("gui.losttales.character.no_options")
-                        : ClientCharacterDisplayNames.skin(selected(this.skinIds, this.skinIndex)),
-                valueX + 22, rowY + 126, valueWidth - 44);
-        drawCenteredValue(this.factionIds.isEmpty()
-                        ? I18n.format(ClientCharacterDisplayNames.isLotrIntegrationAvailable()
-                                ? "gui.losttales.character.no_compatible_faction"
-                                : "gui.losttales.character.integration_unavailable")
-                        : ClientCharacterDisplayNames.faction(selected(this.factionIds, this.factionIndex)),
-                valueX + 22, rowY + 156, valueWidth - 44);
+            if (panelHeight >= 314) {
+                drawRaceAttributes(left + 18, rowY + 112,
+                        panelWidth - previewWidth - 36);
+            }
+            if (previewWidth > 0) {
+                drawAppearancePreview(
+                        left + panelWidth - previewWidth / 2 - 8,
+                        top + panelHeight - 48, mouseX, mouseY);
+            }
+        } else {
+            drawLabel(I18n.format("gui.losttales.character.name"),
+                    labelX, rowY + 6);
+            drawLabel(I18n.format("gui.losttales.character.age"),
+                    labelX, rowY + 36);
+            drawLabel(I18n.format("gui.losttales.character.description"),
+                    labelX, rowY + 66);
+            drawLabel(I18n.format("gui.losttales.character.starting_faction"),
+                    labelX, rowY + 96);
+            drawLabel(I18n.format("gui.losttales.character.starting_waypoint"),
+                    labelX, rowY + 126);
 
-        if (panelHeight >= 318) {
-            drawRaceAttributes(left + 18, rowY + 184,
-                    panelWidth - previewWidth - 36);
-        }
+            if (this.nameField != null) {
+                this.nameField.drawTextBox();
+                this.ageField.drawTextBox();
+                this.descriptionField.drawTextBox();
+            }
+            drawCenteredValue(this.factionIds.isEmpty()
+                            ? I18n.format(ClientCharacterDisplayNames
+                                    .isLotrIntegrationAvailable()
+                                    ? "gui.losttales.character.no_compatible_faction"
+                                    : "gui.losttales.character.integration_unavailable")
+                            : ClientCharacterDisplayNames.faction(
+                                    selected(this.factionIds, this.factionIndex)),
+                    valueX + 22, rowY + 90, valueWidth - 44);
+            drawCenteredValue(this.waypointIds.isEmpty()
+                            ? I18n.format("gui.losttales.character.no_options")
+                            : ClientCharacterDisplayNames.waypoint(
+                                    selected(this.waypointIds,
+                                            this.waypointIndex)),
+                    valueX + 22, rowY + 120, valueWidth - 44);
 
-        if (previewWidth > 0) {
-            drawAppearancePreview(left + panelWidth - previewWidth / 2 - 8,
-                    top + panelHeight - 48, mouseX, mouseY);
+            this.fontRendererObj.drawStringWithShadow(
+                    LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj,
+                            I18n.format("gui.losttales.character.description.hint"),
+                            panelWidth - 36),
+                    left + 18, rowY + 177,
+                    LostTalesSkyrimUiStyle.TEXT_MUTED);
+            if (this.unconventionalSettings) {
+                this.fontRendererObj.drawStringWithShadow(
+                        LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj,
+                                I18n.format(
+                                        "gui.losttales.character.unconventional.hint"),
+                                panelWidth - 36),
+                        left + 18, rowY + 191,
+                        LostTalesSkyrimUiStyle.TEXT_MUTED);
+            }
+
+            LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj,
+                    I18n.format("gui.losttales.character.appearance_summary"),
+                    left + 18, rowY + 218, panelWidth - 36);
+            drawCompactAttribute(I18n.format("gui.losttales.character.race"),
+                    ClientCharacterDisplayNames.race(
+                            selected(this.raceIds, this.raceIndex)),
+                    left + 18, rowY + 235, (panelWidth - 48) / 2);
+            drawCompactAttribute(I18n.format("gui.losttales.character.skin"),
+                    ClientCharacterDisplayNames.skin(
+                            selected(this.skinIds, this.skinIndex)),
+                    left + panelWidth / 2, rowY + 235,
+                    panelWidth / 2 - 18);
         }
 
         if (this.statusMessage.length() > 0) {
@@ -418,7 +608,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
     }
 
     private int getPanelHeight() {
-        return Math.min(360, Math.max(254, this.height - 74));
+        return Math.min(420, Math.max(314, this.height - 74));
     }
 
     private int getPanelTop() {
@@ -469,23 +659,39 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
     @Override
     protected void keyTyped(char typedChar, int keyCode) {
         if (keyCode == Keyboard.KEY_ESCAPE) {
-            this.mc.displayGuiScreen(this.parent);
+            if (this.step == STEP_IDENTITY && this.pendingRequestId == 0) {
+                captureTextDraft();
+                this.step = STEP_APPEARANCE;
+                initGui();
+            } else {
+                this.mc.displayGuiScreen(this.parent);
+            }
             return;
         }
-        if (keyCode == Keyboard.KEY_TAB) {
-            boolean focusName = !this.nameField.isFocused();
-            this.nameField.setFocused(focusName);
-            this.ageField.setFocused(!focusName);
+        if (keyCode == Keyboard.KEY_TAB && this.nameField != null) {
+            boolean nameFocused = this.nameField.isFocused();
+            boolean ageFocused = this.ageField.isFocused();
+            this.nameField.setFocused(!nameFocused && !ageFocused);
+            this.ageField.setFocused(nameFocused);
+            this.descriptionField.setFocused(ageFocused);
             return;
         }
         if (keyCode == Keyboard.KEY_RETURN || keyCode == Keyboard.KEY_NUMPADENTER) {
-            if (this.createButton.enabled) {
+            if (this.step == STEP_APPEARANCE
+                    && this.continueButton != null
+                    && this.continueButton.enabled) {
+                this.step = STEP_IDENTITY;
+                initGui();
+            } else if (this.createButton != null && this.createButton.enabled) {
                 submitCreation();
             }
             return;
         }
-        if (this.nameField.textboxKeyTyped(typedChar, keyCode)
-                || this.ageField.textboxKeyTyped(typedChar, keyCode)) {
+        if (this.nameField != null
+                && (this.nameField.textboxKeyTyped(typedChar, keyCode)
+                || this.ageField.textboxKeyTyped(typedChar, keyCode)
+                || this.descriptionField.textboxKeyTyped(
+                        typedChar, keyCode))) {
             this.statusMessage = "";
             return;
         }
@@ -495,14 +701,30 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
         super.mouseClicked(mouseX, mouseY, button);
-        this.nameField.mouseClicked(mouseX, mouseY, button);
-        this.ageField.mouseClicked(mouseX, mouseY, button);
+        if (this.nameField != null) {
+            this.nameField.mouseClicked(mouseX, mouseY, button);
+            this.ageField.mouseClicked(mouseX, mouseY, button);
+            this.descriptionField.mouseClicked(mouseX, mouseY, button);
+        }
     }
 
     @Override
     public void onGuiClosed() {
+        captureTextDraft();
         Keyboard.enableRepeatEvents(false);
         super.onGuiClosed();
+    }
+
+    private void captureTextDraft() {
+        if (this.nameField != null) {
+            this.draftName = this.nameField.getText();
+        }
+        if (this.ageField != null) {
+            this.draftAge = this.ageField.getText();
+        }
+        if (this.descriptionField != null) {
+            this.draftDescription = this.descriptionField.getText();
+        }
     }
 
     private static int cycleIndex(int current, int direction, int size) {

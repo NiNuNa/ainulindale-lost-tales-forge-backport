@@ -3,9 +3,9 @@ package com.ninuna.losttales.character.registry;
 /**
  * Immutable resolved gameplay values for one race.
  *
- * Values normally come from representative LOTR Legacy NPCs. Each race also
- * has deterministic common-side fallback values so a failed compatibility
- * probe never silently turns a Hobbit or Half-troll into a vanilla-sized player.
+ * Combat values normally come from representative LOTR Legacy NPCs. Physical
+ * dimensions are copied from the deterministic race registry, so a failed or
+ * unusual NPC compatibility probe cannot resize a player.
  */
 public final class CharacterRaceGameplayProfile {
 

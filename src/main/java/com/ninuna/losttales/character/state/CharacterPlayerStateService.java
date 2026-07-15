@@ -11,10 +11,15 @@ import com.ninuna.losttales.character.state.component.LotrProgressionStateCompon
 import com.ninuna.losttales.character.state.component.LotrQuestStateComponent;
 import com.ninuna.losttales.character.state.component.LotrWaypointUseStateComponent;
 import com.ninuna.losttales.character.state.component.VanillaInventoryStateComponent;
+import com.ninuna.losttales.character.state.component.VanillaEnderChestStateComponent;
 import com.ninuna.losttales.character.state.component.VanillaPotionStateComponent;
+import com.ninuna.losttales.character.state.component.VanillaSpawnStateComponent;
 import com.ninuna.losttales.character.state.component.VanillaStatisticsStateComponent;
 import com.ninuna.losttales.character.state.component.VanillaVitalsStateComponent;
+import com.ninuna.losttales.character.state.component.VanillaLocationStateComponent;
+import com.ninuna.losttales.character.switching.CharacterLocationTransitionService;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
 
@@ -34,6 +39,10 @@ public final class CharacterPlayerStateService {
     private final List<CharacterStateComponent> components;
     private final Map<String, CharacterStateComponent> componentsById;
     private final VanillaStatisticsStateComponent statisticsComponent;
+    private final VanillaEnderChestStateComponent enderChestComponent;
+    private final VanillaLocationStateComponent locationComponent;
+    private final VanillaSpawnStateComponent spawnComponent;
+    private final CharacterLocationTransitionService locationTransitionService;
     private final LostTalesQuestStateComponent questComponent;
     private final LotrFastTravelRegionStateComponent lotrRegionComponent;
     private final LotrWaypointUseStateComponent lotrWaypointUseComponent;
@@ -46,6 +55,14 @@ public final class CharacterPlayerStateService {
         ArrayList<CharacterStateComponent> registered =
                 new ArrayList<CharacterStateComponent>();
         registered.add(new VanillaInventoryStateComponent());
+        this.enderChestComponent = new VanillaEnderChestStateComponent();
+        registered.add(this.enderChestComponent);
+        this.locationComponent = new VanillaLocationStateComponent();
+        registered.add(this.locationComponent);
+        this.locationTransitionService =
+                new CharacterLocationTransitionService(this.locationComponent);
+        this.spawnComponent = new VanillaSpawnStateComponent();
+        registered.add(this.spawnComponent);
         registered.add(new VanillaPotionStateComponent());
         this.statisticsComponent = new VanillaStatisticsStateComponent();
         registered.add(this.statisticsComponent);
@@ -119,13 +136,12 @@ public final class CharacterPlayerStateService {
         if (account.getBootstrapVersion() == 0) {
             Map<String, NBTTagCompound> liveState = importTarget == null
                     ? null : captureComponents(player);
-            Map<String, NBTTagCompound> defaultState = createDefaultComponents();
             ArrayList<CharacterPlayerStateRecord> initialized =
                     new ArrayList<CharacterPlayerStateRecord>();
             for (RoleplayCharacter character : roster.getCharacters()) {
                 Map<String, NBTTagCompound> initial =
                         character.getCharacterId().equals(importTarget)
-                                ? liveState : defaultState;
+                                ? liveState : createDefaultComponents(character);
                 CharacterPlayerStateSnapshot snapshot = createSnapshot(
                         character.getCharacterId(), 1L, now, initial);
                 initialized.add(new CharacterPlayerStateRecord(
@@ -141,7 +157,7 @@ public final class CharacterPlayerStateService {
             changed = true;
         } else if (account.getBootstrapVersion()
                 < CharacterPlayerStateAccount.CURRENT_BOOTSTRAP_VERSION) {
-            migrateLegacySnapshots(player, account, importTarget);
+            migrateLegacySnapshots(player, roster, account, importTarget);
             account.markBootstrapped(now);
             changed = true;
         }
@@ -155,10 +171,13 @@ public final class CharacterPlayerStateService {
             if (account.getRecord(character.getCharacterId()) != null) {
                 continue;
             }
-            Map<String, NBTTagCompound> initialState =
-                    character.getCharacterId().equals(activeId)
-                            ? captureComponents(player)
-                            : createDefaultComponents();
+            boolean active = character.getCharacterId().equals(activeId);
+            Map<String, NBTTagCompound> initialState = active
+                    ? captureComponents(player)
+                    : createDefaultComponents(character);
+            if (active && character.getStartingWaypointId().length() > 0) {
+                seedInitialCharacterState(initialState, character);
+            }
             CharacterPlayerStateSnapshot snapshot = createSnapshot(
                     character.getCharacterId(), 1L, now, initialState);
             account.putRecord(new CharacterPlayerStateRecord(
@@ -197,6 +216,27 @@ public final class CharacterPlayerStateService {
         record.commit(snapshot);
         data.saveAccount(account);
         return snapshot;
+    }
+
+    /**
+     * Builds a validated, detached first generation for a character that is
+     * not yet present in an account roster. Lore-character claims journal this
+     * record before publishing ownership or roster access.
+     */
+    public CharacterPlayerStateRecord createDefaultRecord(
+            RoleplayCharacter character)
+            throws CharacterStateValidationException {
+        if (character == null) {
+            throw new CharacterStateValidationException(
+                    "Character metadata is required for default state");
+        }
+        CharacterPlayerStateSnapshot snapshot = createSnapshot(
+                character.getCharacterId(),
+                1L,
+                Math.max(1L, System.currentTimeMillis()),
+                createDefaultComponents(character));
+        return new CharacterPlayerStateRecord(
+                character.getCharacterId(), snapshot, null);
     }
 
     public CharacterPlayerStateSnapshot getCurrent(
@@ -270,23 +310,26 @@ public final class CharacterPlayerStateService {
         this.lotrCustomWaypointComponent.clearAllRuntimeState();
     }
 
-    public void saveActiveLiveState(EntityPlayerMP player,
-                                    CharacterRoster roster,
-                                    CharacterPlayerStateWorldData data,
-                                    boolean flush)
+    public CharacterPlayerStateSnapshot saveActiveLiveState(
+            EntityPlayerMP player,
+            CharacterRoster roster,
+            CharacterPlayerStateWorldData data,
+            boolean flush)
             throws CharacterStateValidationException {
         requirePlayerRoster(player, roster);
         UUID activeId = roster.getActiveCharacterId();
         if (activeId == null || !player.isEntityAlive() || player.isDead
                 || player.getHealth() <= 0.0F) {
-            return;
+            return null;
         }
         CharacterPlayerStateAccount account = ensureBootstrapped(
                 player, roster, data, null);
-        captureAndAppend(player, account, data, activeId);
+        CharacterPlayerStateSnapshot snapshot = captureAndAppend(
+                player, account, data, activeId);
         if (flush) {
             CharacterPlayerStateStorage.flush(player.worldObj);
         }
+        return snapshot;
     }
 
     public void validateSnapshot(CharacterPlayerStateSnapshot snapshot)
@@ -344,6 +387,7 @@ public final class CharacterPlayerStateService {
 
     /** Upgrades retained generations without changing transaction references. */
     private void migrateLegacySnapshots(EntityPlayerMP player,
+                                        CharacterRoster roster,
                                         CharacterPlayerStateAccount account,
                                         UUID importTarget)
             throws CharacterStateValidationException {
@@ -355,6 +399,28 @@ public final class CharacterPlayerStateService {
         boolean migrateLotrWaypointUses = account.getBootstrapVersion() < 7;
         boolean migrateLotrCustomWaypoints = account.getBootstrapVersion() < 7;
         boolean migrateLotrDetails = account.getBootstrapVersion() < 8;
+        boolean migrateEnderChest = account.getBootstrapVersion() < 9;
+        boolean migrateLocation = account.getBootstrapVersion() < 10;
+        boolean migrateSpawns = account.getBootstrapVersion() < 11;
+
+        NBTTagCompound importedSpawns = !migrateSpawns || importTarget == null
+                ? null : this.spawnComponent.capture(player);
+        NBTTagCompound defaultSpawns = !migrateSpawns
+                ? null : this.spawnComponent.createDefault();
+        if (defaultSpawns != null) {
+            this.spawnComponent.validate(defaultSpawns);
+        }
+
+        NBTTagCompound importedLocation = !migrateLocation || importTarget == null
+                ? null : this.locationComponent.capture(player);
+
+        NBTTagCompound importedEnderChest = !migrateEnderChest || importTarget == null
+                ? null : this.enderChestComponent.capture(player);
+        NBTTagCompound defaultEnderChest = !migrateEnderChest
+                ? null : this.enderChestComponent.createDefault();
+        if (defaultEnderChest != null) {
+            this.enderChestComponent.validate(defaultEnderChest);
+        }
 
         NBTTagCompound importedStatistics = !migrateStatistics || importTarget == null
                 ? null : this.statisticsComponent.capture(player);
@@ -432,13 +498,26 @@ public final class CharacterPlayerStateService {
         ArrayList<CharacterPlayerStateRecord> migrated =
                 new ArrayList<CharacterPlayerStateRecord>(existing.size());
         for (CharacterPlayerStateRecord record : existing) {
+            RoleplayCharacter character = roster.getCharacter(record.getCharacterId());
+            NBTTagCompound defaultLocation = !migrateLocation
+                    ? null : createInitialLocation(character);
+            if (defaultLocation != null) {
+                this.locationComponent.validate(defaultLocation);
+            }
             NBTTagCompound statistics = record.getCharacterId().equals(importTarget)
                     ? importedStatistics : defaultStatistics;
             NBTTagCompound quests = record.getCharacterId().equals(importTarget)
                     ? importedQuests : defaultQuests;
             NBTTagCompound lotrProgression =
                     record.getCharacterId().equals(importTarget)
-                            ? importedLotrProgression : defaultLotrProgression;
+                            ? importedLotrProgression
+                            : migrateLotrProgression && character != null
+                            ? this.lotrProgressionComponent.createDefault(
+                                    character.getStartingFactionId())
+                            : defaultLotrProgression;
+            if (lotrProgression != null) {
+                this.lotrProgressionComponent.validate(lotrProgression);
+            }
             NBTTagCompound lotrQuests =
                     record.getCharacterId().equals(importTarget)
                             ? importedLotrQuests : defaultLotrQuests;
@@ -456,16 +535,24 @@ public final class CharacterPlayerStateService {
             NBTTagCompound lotrDetails =
                     record.getCharacterId().equals(importTarget)
                             ? importedLotrDetails : defaultLotrDetails;
+            NBTTagCompound enderChest =
+                    record.getCharacterId().equals(importTarget)
+                            ? importedEnderChest : defaultEnderChest;
+            NBTTagCompound location = record.getCharacterId().equals(importTarget)
+                    ? importedLocation : defaultLocation;
+            NBTTagCompound spawns = record.getCharacterId().equals(importTarget)
+                    ? importedSpawns : defaultSpawns;
             CharacterPlayerStateSnapshot current = migrateLegacySnapshot(
                     record.getCurrent(), statistics, quests, lotrProgression,
                     lotrQuests, lotrRegions, lotrWaypointUses,
-                    lotrCustomWaypoints, lotrDetails);
+                    lotrCustomWaypoints, lotrDetails, enderChest, location,
+                    spawns);
             CharacterPlayerStateSnapshot previous = record.getPrevious() == null
                     ? null : migrateLegacySnapshot(
                             record.getPrevious(), statistics, quests,
                             lotrProgression, lotrQuests, lotrRegions,
                             lotrWaypointUses, lotrCustomWaypoints,
-                            lotrDetails);
+                            lotrDetails, enderChest, location, spawns);
             migrated.add(new CharacterPlayerStateRecord(
                     record.getCharacterId(), current, previous));
         }
@@ -486,7 +573,10 @@ public final class CharacterPlayerStateService {
             NBTTagCompound lotrRegions,
             NBTTagCompound lotrWaypointUses,
             NBTTagCompound lotrCustomWaypoints,
-            NBTTagCompound lotrDetails)
+            NBTTagCompound lotrDetails,
+            NBTTagCompound enderChest,
+            NBTTagCompound location,
+            NBTTagCompound spawns)
             throws CharacterStateValidationException {
         if (snapshot == null || snapshot.getDataVersion() <= 0
                 || snapshot.getDataVersion()
@@ -592,6 +682,42 @@ public final class CharacterPlayerStateService {
         } else {
             this.lotrDetailsComponent.validate(existingLotrDetails);
         }
+        NBTTagCompound existingEnderChest = migrated.get(
+                VanillaEnderChestStateComponent.ID);
+        if (existingEnderChest == null) {
+            if (enderChest == null) {
+                throw new CharacterStateValidationException(
+                        "Legacy ender-chest migration state is unavailable");
+            }
+            migrated.put(VanillaEnderChestStateComponent.ID,
+                    (NBTTagCompound) enderChest.copy());
+        } else {
+            this.enderChestComponent.validate(existingEnderChest);
+        }
+        NBTTagCompound existingLocation = migrated.get(
+                VanillaLocationStateComponent.ID);
+        if (existingLocation == null) {
+            if (location == null) {
+                throw new CharacterStateValidationException(
+                        "Legacy location migration state is unavailable");
+            }
+            migrated.put(VanillaLocationStateComponent.ID,
+                    (NBTTagCompound) location.copy());
+        } else {
+            this.locationComponent.validate(existingLocation);
+        }
+        NBTTagCompound existingSpawns = migrated.get(
+                VanillaSpawnStateComponent.ID);
+        if (existingSpawns == null) {
+            if (spawns == null) {
+                throw new CharacterStateValidationException(
+                        "Legacy spawn migration state is unavailable");
+            }
+            migrated.put(VanillaSpawnStateComponent.ID,
+                    (NBTTagCompound) spawns.copy());
+        } else {
+            this.spawnComponent.validate(existingSpawns);
+        }
         CharacterPlayerStateSnapshot upgraded = new CharacterPlayerStateSnapshot(
                 snapshot.getCharacterId(),
                 snapshot.getGeneration(),
@@ -630,16 +756,76 @@ public final class CharacterPlayerStateService {
         return captured;
     }
 
-    private Map<String, NBTTagCompound> createDefaultComponents()
+    private Map<String, NBTTagCompound> createDefaultComponents(
+            RoleplayCharacter character)
             throws CharacterStateValidationException {
         LinkedHashMap<String, NBTTagCompound> defaults =
                 new LinkedHashMap<String, NBTTagCompound>();
         for (CharacterStateComponent component : this.components) {
-            NBTTagCompound state = component.createDefault();
+            NBTTagCompound state;
+            if (character != null && component == this.lotrProgressionComponent) {
+                state = this.lotrProgressionComponent.createDefault(
+                        character.getStartingFactionId());
+            } else if (component == this.locationComponent) {
+                state = createInitialLocation(character);
+            } else {
+                state = component.createDefault();
+            }
             component.validate(state);
             defaults.put(component.getId(), (NBTTagCompound) state.copy());
         }
         return defaults;
+    }
+
+    public void transitionLocation(EntityPlayerMP player,
+                                   CharacterPlayerStateSnapshot snapshot)
+            throws CharacterStateValidationException {
+        validateSnapshot(snapshot);
+        this.locationTransitionService.transition(
+                player, snapshot.getComponent(VanillaLocationStateComponent.ID));
+    }
+
+    public boolean hasPendingInitialLocation(
+            CharacterPlayerStateSnapshot snapshot)
+            throws CharacterStateValidationException {
+        validateSnapshot(snapshot);
+        return this.locationTransitionService.isPendingInitialLocation(
+                snapshot.getComponent(VanillaLocationStateComponent.ID));
+    }
+
+    private void seedInitialCharacterState(
+            Map<String, NBTTagCompound> components,
+            RoleplayCharacter character)
+            throws CharacterStateValidationException {
+        if (components == null || character == null) {
+            throw new CharacterStateValidationException(
+                    "Initial character state is incomplete");
+        }
+        NBTTagCompound progression = this.lotrProgressionComponent.createDefault(
+                character.getStartingFactionId());
+        NBTTagCompound location = createInitialLocation(character);
+        this.lotrProgressionComponent.validate(progression);
+        this.locationComponent.validate(location);
+        components.put(LotrProgressionStateComponent.ID,
+                (NBTTagCompound) progression.copy());
+        components.put(VanillaLocationStateComponent.ID,
+                (NBTTagCompound) location.copy());
+    }
+
+    private NBTTagCompound createInitialLocation(RoleplayCharacter character) {
+        if (character == null) {
+            return this.locationComponent.createDefault();
+        }
+        String waypointId = character.getStartingWaypointId();
+        if (waypointId.length() == 0) {
+            waypointId = LotrCharacterAdapter.getInstance()
+                    .resolveStartingWaypointId(
+                            character.getStartingFactionId(), "",
+                            character.hasUnconventionalSettings());
+        }
+        return waypointId == null || waypointId.length() == 0
+                ? this.locationComponent.createDefault()
+                : this.locationComponent.createStartingWaypoint(waypointId);
     }
 
     private CharacterPlayerStateSnapshot createSnapshot(

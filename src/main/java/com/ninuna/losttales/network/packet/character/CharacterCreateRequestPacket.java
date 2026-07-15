@@ -21,8 +21,11 @@ public final class CharacterCreateRequestPacket implements IMessage {
     private String raceId = "";
     private String genderId = "";
     private String skinId = "";
+    private String description = "";
     private int age;
     private String startingFactionId = "";
+    private String startingWaypointId = "";
+    private boolean unconventionalSettings;
     private boolean malformed;
 
     public CharacterCreateRequestPacket() {}
@@ -38,8 +41,11 @@ public final class CharacterCreateRequestPacket implements IMessage {
         this.raceId = request.getRaceId();
         this.genderId = request.getGenderId();
         this.skinId = request.getSkinId();
+        this.description = request.getDescription();
         this.age = request.getAge();
         this.startingFactionId = request.getStartingFactionId();
+        this.startingWaypointId = request.getStartingWaypointId();
+        this.unconventionalSettings = request.hasUnconventionalSettings();
     }
 
     @Override
@@ -54,8 +60,13 @@ public final class CharacterCreateRequestPacket implements IMessage {
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             this.skinId = CharacterPacketCodec.readString(
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            this.description = CharacterPacketCodec.readString(
+                    buffer, CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
             this.age = buffer.readInt();
             this.startingFactionId = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            this.startingWaypointId = CharacterPacketCodec.readString(
+                    buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            this.unconventionalSettings = buffer.readBoolean();
             CharacterPacketCodec.requireFinished(buffer);
             if (this.expectedRosterRevision < 0L) {
                 throw new CharacterPacketCodec.DecodeException("missing roster revision");
@@ -76,8 +87,13 @@ public final class CharacterCreateRequestPacket implements IMessage {
                 buffer, this.genderId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         CharacterPacketCodec.writeString(
                 buffer, this.skinId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+        CharacterPacketCodec.writeString(
+                buffer, this.description, CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
         buffer.writeInt(this.age);
         CharacterPacketCodec.writeString(buffer, this.startingFactionId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+        CharacterPacketCodec.writeString(buffer, this.startingWaypointId,
+                CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+        buffer.writeBoolean(this.unconventionalSettings);
     }
 
     private CharacterCreationRequest toRequest() {
@@ -89,7 +105,10 @@ public final class CharacterCreateRequestPacket implements IMessage {
                 this.genderId,
                 this.skinId,
                 this.age,
-                this.startingFactionId
+                this.startingFactionId,
+                this.startingWaypointId,
+                this.unconventionalSettings,
+                this.description
         );
     }
 

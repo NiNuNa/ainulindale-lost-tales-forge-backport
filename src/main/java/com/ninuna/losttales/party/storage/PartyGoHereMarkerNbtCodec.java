@@ -124,7 +124,9 @@ public final class PartyGoHereMarkerNbtCodec {
         NBTTagCompound entry = new NBTTagCompound();
         entry.setString(TAG_REASON, reason == null ? "unknown" : reason);
         if (marker != null) {
-            writeUuid(entry, TAG_PARTY_UUID, marker.getPartyId());
+            if (marker.getPartyId() != null) {
+                writeUuid(entry, TAG_PARTY_UUID, marker.getPartyId());
+            }
             writeUuid(entry, TAG_OWNER_CHARACTER_UUID,
                     marker.getOwnerCharacterId());
             entry.setInteger(TAG_DIMENSION_ID, marker.getDimensionId());
@@ -135,7 +137,9 @@ public final class PartyGoHereMarkerNbtCodec {
     private static NBTTagCompound writeMarker(PartyGoHereMarker marker) {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setInteger(TAG_DATA_VERSION, PartyGoHereMarker.CURRENT_DATA_VERSION);
-        writeUuid(tag, TAG_PARTY_UUID, marker.getPartyId());
+        if (marker.getPartyId() != null) {
+            writeUuid(tag, TAG_PARTY_UUID, marker.getPartyId());
+        }
         writeUuid(tag, TAG_OWNER_CHARACTER_UUID, marker.getOwnerCharacterId());
         tag.setInteger(TAG_DIMENSION_ID, marker.getDimensionId());
         tag.setDouble(TAG_X, marker.getX());
@@ -156,7 +160,8 @@ public final class PartyGoHereMarkerNbtCodec {
         }
         UUID partyId = readUuid(source, TAG_PARTY_UUID);
         UUID ownerCharacterId = readUuid(source, TAG_OWNER_CHARACTER_UUID);
-        if (partyId == null || ownerCharacterId == null) {
+        if (ownerCharacterId == null
+                || (version < 2 && partyId == null)) {
             return MarkerReadResult.failed("missing_required_identity");
         }
         if (!source.hasKey(TAG_DIMENSION_ID, Constants.NBT.TAG_INT)

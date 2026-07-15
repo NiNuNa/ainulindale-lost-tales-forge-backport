@@ -1,12 +1,8 @@
 package com.ninuna.losttales.gui.hud.party;
 
-import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
-import com.ninuna.losttales.character.registry.CharacterSkinDefinition;
-import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
-import com.ninuna.losttales.character.sync.CharacterAppearance;
-import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
+import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.party.model.PartyColor;
@@ -17,7 +13,6 @@ import com.ninuna.losttales.party.sync.PartySnapshot;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
 import com.ninuna.losttales.party.sync.PartyStatusSnapshot;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
@@ -26,7 +21,6 @@ import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderItem;
 import net.minecraft.client.resources.I18n;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
@@ -39,8 +33,6 @@ import java.util.UUID;
 /** Compact party HUD showing only the local character's other party members. */
 public final class LostTalesPartyHudRenderer {
 
-    private static final ResourceLocation DEFAULT_PLAYER_SKIN =
-            new ResourceLocation("textures/entity/steve.png");
     private static final ResourceLocation GUI_ICONS =
             new ResourceLocation("textures/gui/icons.png");
     private static final RenderItem ITEM_RENDERER = new RenderItem();
@@ -296,69 +288,12 @@ public final class LostTalesPartyHudRenderer {
                                        int x,
                                        int y,
                                        float brightness) {
-        HeadTexture texture = resolveHeadTexture(minecraft, ownerId);
-        try {
-            minecraft.getTextureManager().bindTexture(texture.location);
-            GL11.glColor4f(brightness, brightness, brightness, 1.0F);
-            drawTexturedQuad(x, y, HEAD_SIZE, HEAD_SIZE,
-                    8.0F, 8.0F, 8.0F, 8.0F,
-                    64.0F, texture.imageHeight);
-            // Both classic 64x32 player skins and LOTR's 64x64 biped
-            // textures use the standard headwear UV region. Transparent
-            // pixels make this a no-op for skins without an overlay.
-            drawTexturedQuad(x, y, HEAD_SIZE, HEAD_SIZE,
-                    40.0F, 8.0F, 8.0F, 8.0F,
-                    64.0F, texture.imageHeight);
-        } catch (Throwable ignored) {
+        if (!LostTalesCharacterHeadIconRenderer.drawHead(
+                minecraft, ownerId, x, y, HEAD_SIZE,
+                brightness, 1.0F)) {
             Gui.drawRect(x, y, x + HEAD_SIZE, y + HEAD_SIZE,
                     0xAA272727);
-        } finally {
-            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         }
-    }
-
-    private static HeadTexture resolveHeadTexture(
-            Minecraft minecraft, UUID ownerId) {
-        CharacterAppearance appearance =
-                ClientCharacterAppearanceCache.getAuthoritative(ownerId);
-        CharacterSkinDefinition configured = appearance == null
-                ? null : CharacterSkinRegistry.get(appearance.getSkinId());
-        if (configured != null) {
-            return new HeadTexture(
-                    new ResourceLocation(configured.getTextureLocation()),
-                    configuredTextureHeight(appearance));
-        }
-
-        if (minecraft != null && minecraft.theWorld != null
-                && minecraft.theWorld.playerEntities != null) {
-            for (Object value : minecraft.theWorld.playerEntities) {
-                if (value instanceof AbstractClientPlayer) {
-                    AbstractClientPlayer player = (AbstractClientPlayer) value;
-                    if (ownerId.equals(player.getUniqueID())) {
-                        // Legacy player skins use the classic 64x32 layout.
-                        return new HeadTexture(
-                                player.getLocationSkin(), 32.0F);
-                    }
-                } else if (value instanceof EntityPlayer) {
-                    EntityPlayer player = (EntityPlayer) value;
-                    if (ownerId.equals(player.getUniqueID())) {
-                        break;
-                    }
-                }
-            }
-        }
-        return new HeadTexture(DEFAULT_PLAYER_SKIN, 32.0F);
-    }
-
-    /** LOTR orc and Uruk body textures retain the classic 64x32 layout. */
-    private static float configuredTextureHeight(
-            CharacterAppearance appearance) {
-        if (appearance != null
-                && (CharacterRaceRegistry.ORC.equals(appearance.getRaceId())
-                || CharacterRaceRegistry.URUK.equals(appearance.getRaceId()))) {
-            return 32.0F;
-        }
-        return 64.0F;
     }
 
     private static void renderStack(Minecraft minecraft,
@@ -457,13 +392,4 @@ public final class LostTalesPartyHudRenderer {
         return 0xFF62B56B;
     }
 
-    private static final class HeadTexture {
-        private final ResourceLocation location;
-        private final float imageHeight;
-        private HeadTexture(ResourceLocation location,
-                            float imageHeight) {
-            this.location = location;
-            this.imageHeight = imageHeight;
-        }
-    }
 }

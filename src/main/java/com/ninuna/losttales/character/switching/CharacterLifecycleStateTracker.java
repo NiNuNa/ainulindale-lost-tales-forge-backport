@@ -73,7 +73,12 @@ public final class CharacterLifecycleStateTracker {
     @SubscribeEvent
     public void onPlayerChangedDimension(PlayerChangedDimensionEvent event) {
         if (event != null && event.player instanceof EntityPlayerMP) {
-            beginTransition((EntityPlayerMP) event.player, false);
+            EntityPlayerMP player = (EntityPlayerMP) event.player;
+            if (isOwnedDimensionTransition(player)) {
+                updateOwnedTransitionPosition(player);
+            } else {
+                beginTransition(player, false);
+            }
         }
     }
 
@@ -169,6 +174,7 @@ public final class CharacterLifecycleStateTracker {
                 state.loggingOut = true;
                 state.ready = false;
                 state.switching = false;
+                state.ownedDimensionTransition = false;
                 state.epoch = nextEpoch();
                 lastCombatAt = state.lastCombatAt;
             }
@@ -224,6 +230,43 @@ public final class CharacterLifecycleStateTracker {
             synchronized (state) {
                 state.switching = false;
             }
+        }
+    }
+
+    /** Marks a coordinator-owned transfer so normal portal lifecycle is skipped. */
+    public static boolean beginOwnedDimensionTransition(EntityPlayerMP player) {
+        SessionState state = getState(player);
+        if (state == null) {
+            return false;
+        }
+        synchronized (state) {
+            if (state.loggingOut || state.respawning || state.dimensionChanging
+                    || state.ownedDimensionTransition || serverStopping) {
+                return false;
+            }
+            state.ownedDimensionTransition = true;
+            return true;
+        }
+    }
+
+    public static boolean isOwnedDimensionTransition(EntityPlayerMP player) {
+        SessionState state = getState(player);
+        if (state == null) {
+            return false;
+        }
+        synchronized (state) {
+            return state.ownedDimensionTransition;
+        }
+    }
+
+    public static void endOwnedDimensionTransition(EntityPlayerMP player) {
+        SessionState state = getState(player);
+        if (state == null) {
+            return;
+        }
+        synchronized (state) {
+            state.ownedDimensionTransition = false;
+            updatePosition(state, player);
         }
     }
 
@@ -285,6 +328,7 @@ public final class CharacterLifecycleStateTracker {
             state.respawning = respawning;
             state.dimensionChanging = !respawning;
             state.switching = false;
+            state.ownedDimensionTransition = false;
             state.stableGroundTicks = 0;
             state.transitionUntil = safeAdd(now,
                     Math.max(0L, LostTalesConfig.characterSwitchTeleportGraceMillis));
@@ -340,6 +384,24 @@ public final class CharacterLifecycleStateTracker {
                 state.stableGroundTicks = 0;
             }
         }
+    }
+
+    private static void updateOwnedTransitionPosition(EntityPlayerMP player) {
+        SessionState state = getState(player);
+        if (state != null) {
+            synchronized (state) {
+                updatePosition(state, player);
+            }
+        }
+    }
+
+    private static void updatePosition(SessionState state,
+                                       EntityPlayerMP player) {
+        state.dimensionId = player.dimension;
+        state.lastX = player.posX;
+        state.lastY = player.posY;
+        state.lastZ = player.posZ;
+        state.hasPosition = true;
     }
 
     private static void recordCombat(EntityPlayerMP player, long now) {
@@ -407,6 +469,7 @@ public final class CharacterLifecycleStateTracker {
         private boolean respawning;
         private boolean dimensionChanging;
         private boolean switching;
+        private boolean ownedDimensionTransition;
         private long lastCombatAt;
         private long transitionUntil;
         private int stableGroundTicks;

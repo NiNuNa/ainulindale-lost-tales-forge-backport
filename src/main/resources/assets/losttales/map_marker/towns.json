@@ -11,8 +11,9 @@
       "z": 15.0,
       "compassFadeInRadius": 180.0,
       "discoveryRadius": 12.0,
-      "isDiscoverable": true,
+      "isDiscoverable": false,
       "hiddenUntilDiscovered": true,
+      "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "description": "A small test town marker used to verify Lost Tales discovery, compass labels, and public LOTR waypoint unlocking."
     },
@@ -28,7 +29,8 @@
       "compassFadeInRadius": 220.0,
       "discoveryRadius": 14.0,
       "isDiscoverable": true,
-      "hiddenUntilDiscovered": true,
+      "hiddenUntilDiscovered": false,
+      "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "description": "A modest market along the Greenway where travellers gather before continuing through the Shire borderlands."
     },
@@ -44,7 +46,8 @@
       "compassFadeInRadius": 240.0,
       "discoveryRadius": 14.0,
       "isDiscoverable": true,
-      "hiddenUntilDiscovered": true,
+      "hiddenUntilDiscovered": false,
+      "requiresRegionUnlock": true,
       "hasFastTravel": false
     }
   ]

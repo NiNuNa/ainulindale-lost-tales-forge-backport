@@ -28,6 +28,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.debugHitboxTransformer.active";
     public static final String FAST_TRAVEL_ACTIVE_PROPERTY =
             "losttales.fastTravelTransformer.active";
+    public static final String LOTR_BOUNTY_ACTIVE_PROPERTY =
+            "losttales.lotrBountyTransformer.active";
+    public static final String LOTR_SPEECH_ACTIVE_PROPERTY =
+            "losttales.lotrSpeechTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
@@ -35,6 +39,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "net.minecraft.client.renderer.entity.RenderManager";
     private static final String LOTR_FAST_TRAVEL_HANDLER =
             "lotr.common.network.LOTRPacketFastTravel$Handler";
+    private static final String LOTR_FACTION_BOUNTIES =
+            "lotr.common.fac.LOTRFactionBounties";
+    private static final String LOTR_FACTION_BOUNTY_PLAYER_DATA =
+            "lotr.common.fac.LOTRFactionBounties$PlayerData";
+    private static final String LOTR_SPEECH =
+            "lotr.common.entity.npc.LOTRSpeech";
 
     private static final String CAMERA_MCP = "orientCamera";
     private static final String CAMERA_SRG = "func_78467_g";
@@ -56,6 +66,15 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "(Llotr/common/LOTRPlayerData;"
                     + "Llotr/common/world/map/LOTRAbstractWaypoint;"
                     + "Lnet/minecraft/entity/player/EntityPlayerMP;)V";
+    private static final String ROLEPLAY_IDENTITY_HOOK_OWNER =
+            "com/ninuna/losttales/character/identity/"
+                    + "RoleplayCharacterIdentityHook";
+    private static final String GAMEPLAY_ID_HOOK_DESC =
+            "(Lnet/minecraft/entity/player/EntityPlayer;)Ljava/util/UUID;";
+    private static final String ROLEPLAY_NAME_HOOK_DESC =
+            "(Lnet/minecraft/entity/player/EntityPlayer;)Ljava/lang/String;";
+    private static final String GAMEPLAY_NAME_HOOK_DESC =
+            "(Ljava/util/UUID;)Ljava/lang/String;";
 
     @Override
     public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -71,7 +90,170 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         if (LOTR_FAST_TRAVEL_HANDLER.equals(transformedName)) {
             return transformLotrFastTravelHandler(basicClass);
         }
+        if (LOTR_FACTION_BOUNTIES.equals(transformedName)) {
+            return transformLotrFactionBounties(basicClass);
+        }
+        if (LOTR_FACTION_BOUNTY_PLAYER_DATA.equals(transformedName)) {
+            return transformLotrFactionBountyPlayerData(basicClass);
+        }
+        if (LOTR_SPEECH.equals(transformedName)) {
+            return transformLotrSpeech(basicClass);
+        }
         return basicClass;
+    }
+
+    /** Makes LOTR's faction-bounty map use the active character UUID. */
+    private static byte[] transformLotrFactionBounties(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"forPlayer".equals(method.name)
+                        || !"(Lnet/minecraft/entity/player/EntityPlayer;)"
+                        .concat("Llotr/common/fac/LOTRFactionBounties$PlayerData;")
+                        .equals(method.desc)) {
+                    continue;
+                }
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (!(instruction instanceof MethodInsnNode)) {
+                        continue;
+                    }
+                    MethodInsnNode call = (MethodInsnNode)instruction;
+                    if (call.getOpcode() == Opcodes.INVOKESTATIC
+                            && ROLEPLAY_IDENTITY_HOOK_OWNER.equals(call.owner)
+                            && "resolveGameplayId".equals(call.name)) {
+                        activateLotrBountyTransformer();
+                        return basicClass;
+                    }
+                    if (call.getOpcode() == Opcodes.INVOKEVIRTUAL
+                            && "net/minecraft/entity/player/EntityPlayer"
+                            .equals(call.owner)
+                            && "()Ljava/util/UUID;".equals(call.desc)) {
+                        call.setOpcode(Opcodes.INVOKESTATIC);
+                        call.owner = ROLEPLAY_IDENTITY_HOOK_OWNER;
+                        call.name = "resolveGameplayId";
+                        call.desc = GAMEPLAY_ID_HOOK_DESC;
+                        activateLotrBountyTransformer();
+                        info("Bound LOTR faction bounties "
+                                + "to active roleplay-character UUIDs");
+                        return write(owner);
+                    }
+                }
+            }
+            warn("Could not patch LOTRFactionBounties#forPlayer; faction "
+                    + "bounties will remain account-bound");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to bind LOTR faction bounties to characters: "
+                    + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Resolves bounty target labels from roleplay-character UUIDs. */
+    private static byte[] transformLotrFactionBountyPlayerData(
+            byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"findUsername".equals(method.name)
+                        || !"()Ljava/lang/String;".equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, ROLEPLAY_IDENTITY_HOOK_OWNER,
+                        "resolveGameplayName")) {
+                    activateLotrBountyTransformer();
+                    return basicClass;
+                }
+
+                method.instructions.clear();
+                method.tryCatchBlocks.clear();
+                if (method.localVariables != null) {
+                    method.localVariables.clear();
+                }
+                method.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                method.instructions.add(new FieldInsnNode(
+                        Opcodes.GETFIELD,
+                        "lotr/common/fac/LOTRFactionBounties$PlayerData",
+                        "playerID",
+                        "Ljava/util/UUID;"));
+                method.instructions.add(new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        ROLEPLAY_IDENTITY_HOOK_OWNER,
+                        "resolveGameplayName",
+                        GAMEPLAY_NAME_HOOK_DESC));
+                method.instructions.add(new org.objectweb.asm.tree.InsnNode(
+                        Opcodes.ARETURN));
+                activateLotrBountyTransformer();
+                info("Patched LOTR bounty target names "
+                        + "for roleplay-character UUIDs");
+                return write(owner);
+            }
+            warn("Could not patch LOTR faction bounty target names");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch LOTR faction bounty target names: "
+                    + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Changes only LOTR speech's # placeholder, not the player's account name. */
+    private static byte[] transformLotrSpeech(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"formatSpeech".equals(method.name)
+                        || !"(Ljava/lang/String;"
+                        .concat("Lnet/minecraft/entity/player/EntityPlayer;")
+                        .concat("Ljava/lang/String;Ljava/lang/String;)")
+                        .concat("Ljava/lang/String;")
+                        .equals(method.desc)) {
+                    continue;
+                }
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (!(instruction instanceof MethodInsnNode)) {
+                        continue;
+                    }
+                    MethodInsnNode call = (MethodInsnNode)instruction;
+                    if (call.getOpcode() == Opcodes.INVOKESTATIC
+                            && ROLEPLAY_IDENTITY_HOOK_OWNER.equals(call.owner)
+                            && "resolveRoleplayName".equals(call.name)) {
+                        System.setProperty(LOTR_SPEECH_ACTIVE_PROPERTY, "true");
+                        return basicClass;
+                    }
+                    if (call.getOpcode() == Opcodes.INVOKEVIRTUAL
+                            && "net/minecraft/entity/player/EntityPlayer"
+                            .equals(call.owner)
+                            && "()Ljava/lang/String;".equals(call.desc)
+                            && ("getCommandSenderName".equals(call.name)
+                            || "func_70005_c_".equals(call.name))) {
+                        call.setOpcode(Opcodes.INVOKESTATIC);
+                        call.owner = ROLEPLAY_IDENTITY_HOOK_OWNER;
+                        call.name = "resolveRoleplayName";
+                        call.desc = ROLEPLAY_NAME_HOOK_DESC;
+                        System.setProperty(LOTR_SPEECH_ACTIVE_PROPERTY, "true");
+                        info("Patched LOTR NPC speech to "
+                                + "use active roleplay-character names");
+                        return write(owner);
+                    }
+                }
+            }
+            warn("Could not patch LOTRSpeech#formatSpeech; NPC speech will "
+                    + "use account names");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch LOTR NPC speech names: " + throwable);
+            return basicClass;
+        }
+    }
+
+    private static void activateLotrBountyTransformer() {
+        System.setProperty(LOTR_BOUNTY_ACTIVE_PROPERTY, "true");
     }
 
     private static byte[] transformLotrFastTravelHandler(byte[] basicClass) {
@@ -107,7 +289,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 targetCall.name = "setTargetIfAllowed";
                 targetCall.desc = FAST_TRAVEL_HOOK_DESC;
                 System.setProperty(FAST_TRAVEL_ACTIVE_PROPERTY, "true");
-                FMLLog.info("[losttales] Patched LOTR fast travel for "
+                info("Patched LOTR fast travel for "
                         + "character-specific marker discovery");
                 return write(owner);
             }
@@ -156,7 +338,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             method.instructions.insert(offsetStore, hook);
 
             System.setProperty(CAMERA_ACTIVE_PROPERTY, "true");
-            FMLLog.info("[losttales] Patched EntityRenderer camera origin for roleplay races");
+            info("Patched EntityRenderer camera origin for roleplay races");
             return write(owner);
         } catch (Throwable throwable) {
             warn("Failed to patch EntityRenderer camera origin: " + throwable);
@@ -189,7 +371,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             method.instructions.insert(hook);
 
             System.setProperty(DEBUG_BOX_ACTIVE_PROPERTY, "true");
-            FMLLog.info("[losttales] Patched RenderManager F3+B origin for roleplay races");
+            info("Patched RenderManager F3+B origin for roleplay races");
             return write(owner);
         } catch (Throwable throwable) {
             warn("Failed to patch RenderManager F3+B origin: " + throwable);
@@ -393,6 +575,18 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     }
 
     private static void warn(String message) {
-        FMLLog.warning("[losttales] %s", message);
+        try {
+            FMLLog.warning("[losttales] %s", message);
+        } catch (Throwable ignored) {
+            // Unit tests and very early bootstrap may not have initialized FML's logger.
+        }
+    }
+
+    private static void info(String message) {
+        try {
+            FMLLog.info("[losttales] %s", message);
+        } catch (Throwable ignored) {
+            // Unit tests and very early bootstrap may not have initialized FML's logger.
+        }
     }
 }

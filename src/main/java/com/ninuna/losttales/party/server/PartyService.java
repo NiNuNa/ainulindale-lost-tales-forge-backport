@@ -58,8 +58,6 @@ public final class PartyService {
         PartyWorldData partyData = getPartyData(player.worldObj);
         PartyInvitationWorldData invitationData =
                 this.invitationCoordinator.getWritableData(player.worldObj);
-        PartyGoHereMarkerWorldData markerData =
-                getWritableGoHereMarkerData(player.worldObj);
         if (partyData == null) {
             return PartyOperationResult.failure(PartyErrorId.INTERNAL_ERROR, null);
         }
@@ -70,10 +68,6 @@ public final class PartyService {
         if (invitationData == null) {
             return PartyOperationResult.failure(
                     PartyErrorId.INVITATION_STORAGE_READ_ONLY, null);
-        }
-        if (markerData == null) {
-            return PartyOperationResult.failure(
-                    PartyErrorId.MARKER_STORAGE_READ_ONLY, null);
         }
         if (!ensurePartyIntegrity(player.worldObj, partyData,
                 context.characterData)) {
@@ -139,13 +133,6 @@ public final class PartyService {
             return PartyOperationResult.failure(
                     PartyErrorId.INVITATION_STORAGE_READ_ONLY, context.party);
         }
-        PartyGoHereMarkerWorldData markerData =
-                getWritableGoHereMarkerData(player.worldObj);
-        if (markerData == null) {
-            return PartyOperationResult.failure(
-                    PartyErrorId.MARKER_STORAGE_READ_ONLY, context.party);
-        }
-
         UUID leavingCharacterId = context.character.getCharacterId();
         PartyMember leaving = context.party.getMember(leavingCharacterId);
         boolean leaderLeaving = leavingCharacterId.equals(
@@ -156,11 +143,9 @@ public final class PartyService {
         }
         invitationData.removeInvitationsInvolvingCharacter(leavingCharacterId);
         if (context.party.getMemberCount() == 1) {
-            markerData.removeMarkersForParty(context.party.getPartyId());
             context.partyData.removeParty(context.party.getPartyId());
             return PartyOperationResult.disbanded(leaving);
         }
-        markerData.removeMarker(leavingCharacterId);
         context.party.removeMember(leavingCharacterId);
         context.partyData.saveParty(context.party);
         return PartyOperationResult.success(true, context.party, leaving);
@@ -212,15 +197,7 @@ public final class PartyService {
             return PartyOperationResult.failure(
                     PartyErrorId.INVITATION_STORAGE_READ_ONLY, context.party);
         }
-        PartyGoHereMarkerWorldData markerData =
-                getWritableGoHereMarkerData(player.worldObj);
-        if (markerData == null) {
-            return PartyOperationResult.failure(
-                    PartyErrorId.MARKER_STORAGE_READ_ONLY, context.party);
-        }
-
         invitationData.removeInvitationsInvolvingCharacter(targetCharacterId);
-        markerData.removeMarker(targetCharacterId);
         context.party.removeMember(targetCharacterId);
         context.partyData.saveParty(context.party);
         return PartyOperationResult.success(true, context.party, target);
@@ -258,20 +235,12 @@ public final class PartyService {
             return PartyOperationResult.failure(
                     PartyErrorId.INVITATION_STORAGE_READ_ONLY, context.party);
         }
-        PartyGoHereMarkerWorldData markerData =
-                getWritableGoHereMarkerData(player.worldObj);
-        if (markerData == null) {
-            return PartyOperationResult.failure(
-                    PartyErrorId.MARKER_STORAGE_READ_ONLY, context.party);
-        }
-
         PartyMember leader = context.party.getLeader();
         invitationData.removeInvitationsForParty(context.party.getPartyId());
         for (PartyMember member : context.party.getMembers()) {
             invitationData.removeInvitationsInvolvingCharacter(
                     member.getCharacterId());
         }
-        markerData.removeMarkersForParty(context.party.getPartyId());
         context.partyData.removeParty(context.party.getPartyId());
         return PartyOperationResult.disbanded(leader);
     }
@@ -381,15 +350,14 @@ public final class PartyService {
             EntityPlayerMP player, long expectedPartyRevision,
             boolean hasMarkerPosition, int markerDimensionId,
             double markerX, double markerZ) {
-        PartyContext context = resolvePartyContext(player);
-        if (!context.isValid()) {
-            return PartyOperationResult.failure(context.errorId, context.party);
+        ActiveCharacterContext active = resolveActiveCharacter(player);
+        if (!active.isValid()) {
+            return PartyOperationResult.failure(active.errorId, null);
         }
-        PartyErrorId revisionError = validateRevision(
-                context.party, expectedPartyRevision, true);
-        if (revisionError != PartyErrorId.NONE) {
-            return PartyOperationResult.failure(revisionError, context.party);
-        }
+        PartyWorldData partyData = getPartyData(player.worldObj);
+        Party party = partyData == null ? null
+                : partyData.getPartyForCharacter(
+                active.character.getCharacterId());
         if (player.isDead || !player.isEntityAlive()
                 || !hasMarkerPosition
                 || markerDimensionId != player.dimension
@@ -397,22 +365,21 @@ public final class PartyService {
                 || !PartyGoHereMarker.isValidCoordinates(
                 markerX, player.posY, markerZ)) {
             return PartyOperationResult.failure(
-                    PartyErrorId.INVALID_MARKER_POSITION, context.party);
+                    PartyErrorId.INVALID_MARKER_POSITION, party);
         }
         PartyGoHereMarkerWorldData markerData =
                 getWritableGoHereMarkerData(player.worldObj);
         if (markerData == null) {
             return PartyOperationResult.failure(
-                    PartyErrorId.MARKER_STORAGE_READ_ONLY, context.party);
+                    PartyErrorId.MARKER_STORAGE_READ_ONLY, party);
         }
 
-        UUID characterId = context.character.getCharacterId();
+        UUID characterId = active.character.getCharacterId();
         double x = quantizeTrackingCoordinate(markerX);
         double y = quantizeTrackingCoordinate(player.posY);
         double z = quantizeTrackingCoordinate(markerZ);
         PartyGoHereMarker previous = markerData.getMarker(characterId);
         if (previous != null
-                && previous.getPartyId().equals(context.party.getPartyId())
                 && previous.getDimensionId() == markerDimensionId
                 && Double.doubleToLongBits(previous.getX())
                 == Double.doubleToLongBits(x)
@@ -421,50 +388,48 @@ public final class PartyService {
                 && Double.doubleToLongBits(previous.getZ())
                 == Double.doubleToLongBits(z)) {
             return PartyOperationResult.success(
-                    false, context.party,
-                    context.party.getMember(characterId));
+                    false, party,
+                    party == null ? null : party.getMember(characterId));
         }
         PartyGoHereMarker marker = new PartyGoHereMarker(
-                context.party.getPartyId(),
+                party == null ? null : party.getPartyId(),
                 characterId,
                 markerDimensionId,
                 x, y, z,
                 System.currentTimeMillis());
         markerData.saveMarker(marker);
         return PartyOperationResult.success(
-                true, context.party,
-                context.party.getMember(characterId));
+                true, party,
+                party == null ? null : party.getMember(characterId));
     }
 
     public synchronized PartyOperationResult removeGoHereMarker(
             EntityPlayerMP player, long expectedPartyRevision) {
-        PartyContext context = resolvePartyContext(player);
-        if (!context.isValid()) {
-            return PartyOperationResult.failure(context.errorId, context.party);
+        ActiveCharacterContext active = resolveActiveCharacter(player);
+        if (!active.isValid()) {
+            return PartyOperationResult.failure(active.errorId, null);
         }
-        PartyErrorId revisionError = validateRevision(
-                context.party, expectedPartyRevision, true);
-        if (revisionError != PartyErrorId.NONE) {
-            return PartyOperationResult.failure(revisionError, context.party);
-        }
+        PartyWorldData partyData = getPartyData(player.worldObj);
+        Party party = partyData == null ? null
+                : partyData.getPartyForCharacter(
+                active.character.getCharacterId());
         PartyGoHereMarkerWorldData markerData =
                 getWritableGoHereMarkerData(player.worldObj);
         if (markerData == null) {
             return PartyOperationResult.failure(
-                    PartyErrorId.MARKER_STORAGE_READ_ONLY, context.party);
+                    PartyErrorId.MARKER_STORAGE_READ_ONLY, party);
         }
-        UUID characterId = context.character.getCharacterId();
+        UUID characterId = active.character.getCharacterId();
         PartyGoHereMarker existing = markerData.getMarker(characterId);
-        if (existing == null
-                || !context.party.getPartyId().equals(existing.getPartyId())) {
+        if (existing == null) {
             return PartyOperationResult.success(
-                    false, context.party,
-                    context.party.getMember(characterId));
+                    false, party,
+                    party == null ? null : party.getMember(characterId));
         }
         markerData.removeMarker(characterId);
         return PartyOperationResult.success(
-                true, context.party,
-                context.party.getMember(characterId));
+                true, party,
+                party == null ? null : party.getMember(characterId));
     }
 
     public synchronized PartyInvitationOperationResult invitePlayer(
@@ -511,18 +476,11 @@ public final class PartyService {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.PARTY_STORAGE_READ_ONLY, null, null);
         }
-        PartyGoHereMarkerWorldData markerData =
-                getWritableGoHereMarkerData(player.worldObj);
-        if (markerData == null) {
-            return PartyInvitationOperationResult.failure(
-                    PartyErrorId.MARKER_STORAGE_READ_ONLY, null, null);
-        }
         if (!ensurePartyIntegrity(
                 player.worldObj, partyData, active.characterData)) {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.CHARACTER_STORAGE_READ_ONLY, null, null);
         }
-        pruneInvalidGoHereMarkers(partyData, markerData);
         return this.invitationCoordinator.acceptInvitation(
                 player, active, partyData, invitationId);
     }
@@ -643,7 +601,6 @@ public final class PartyService {
             invitationData.removeInvitationsForParty(party.getPartyId());
         }
         if (party.getMemberCount() == 1) {
-            markerData.removeMarkersForParty(party.getPartyId());
             partyData.removeParty(party.getPartyId());
             return PartyOperationResult.disbanded(removed);
         }
@@ -672,7 +629,7 @@ public final class PartyService {
                 invitationData,
                 characterData,
                 System.currentTimeMillis());
-        pruneInvalidGoHereMarkers(partyData, markerData);
+        pruneInvalidGoHereMarkers(characterData, markerData);
         return true;
     }
 
@@ -696,7 +653,7 @@ public final class PartyService {
                         characterData,
                         System.currentTimeMillis());
         int removedMarkers = pruneInvalidGoHereMarkers(
-                partyData, markerData);
+                characterData, markerData);
         return removedInvitations + removedMarkers;
     }
 
@@ -913,18 +870,20 @@ public final class PartyService {
     }
 
     private int pruneInvalidGoHereMarkers(
-            PartyWorldData partyData,
+            CharacterWorldData characterData,
             PartyGoHereMarkerWorldData markerData) {
         int removed = 0;
+        CharacterIndex characters = buildCharacterIndex(characterData);
         List<PartyGoHereMarker> markers =
                 new ArrayList<PartyGoHereMarker>(markerData.getMarkers());
         for (PartyGoHereMarker marker : markers) {
-            Party party = partyData.getParty(marker.getPartyId());
             String reason = null;
-            if (party == null) {
-                reason = "missing_party";
-            } else if (!party.containsMember(marker.getOwnerCharacterId())) {
-                reason = "owner_not_party_member";
+            if (characters.ambiguousCharacterIds.contains(
+                    marker.getOwnerCharacterId())) {
+                reason = "ambiguous_owner_character";
+            } else if (!characters.characters.containsKey(
+                    marker.getOwnerCharacterId())) {
+                reason = "missing_owner_character";
             } else if (!DimensionManager.isDimensionRegistered(
                     marker.getDimensionId())) {
                 reason = "unregistered_dimension";

@@ -13,6 +13,14 @@ import java.util.Set;
 /** Stable built-in race identifiers and common metadata. */
 public final class CharacterRaceRegistry {
 
+    /**
+     * Eyes are measured from the feet and track the race's physical height.
+     * Keeping the ratio and crouch drop centralized prevents a future model
+     * size change from silently leaving the camera at another race's height.
+     */
+    private static final float STANDING_EYE_HEIGHT_RATIO = 0.85F;
+    private static final float SNEAKING_EYE_HEIGHT_DROP = 0.08F;
+
     public static final String HUMAN = "losttales:human";
     public static final String ELF = "losttales:elf";
     public static final String DWARF = "losttales:dwarf";
@@ -41,21 +49,21 @@ public final class CharacterRaceRegistry {
                 HUMAN, "lotr:bree_man",
                 EnumSet.of(CharacterFactionCategory.HUMAN),
                 NO_FACTIONS, NO_FACTIONS, MALE_AND_FEMALE,
-                0.60F, 1.80F, 1.53F, 1.45F,
+                0.60F, 1.80F, standingEyeHeight(1.80F), sneakingEyeHeight(1.80F),
                 20.0D, 1.0D, 2.0D,
                 1.0F, 1.0F, 0));
         register(definitions, definition(
                 ELF, "lotr:high_elf",
                 EnumSet.of(CharacterFactionCategory.ELF),
                 NO_FACTIONS, NO_FACTIONS, MALE_AND_FEMALE,
-                0.60F, 1.80F, 1.53F, 1.45F,
+                0.60F, 1.80F, standingEyeHeight(1.80F), sneakingEyeHeight(1.80F),
                 20.0D, 1.0D, 2.0D,
                 1.0F, 0.96F, 0));
         register(definitions, definition(
                 DWARF, "lotr:dwarf",
                 EnumSet.of(CharacterFactionCategory.DWARF),
                 NO_FACTIONS, NO_FACTIONS, MALE_AND_FEMALE,
-                0.50F, 1.50F, 1.28F, 1.20F,
+                0.50F, 1.50F, standingEyeHeight(1.50F), sneakingEyeHeight(1.50F),
                 20.0D, 0.9D, 3.0D,
                 0.8125F, 1.12F, -2));
         register(definitions, definition(
@@ -63,28 +71,28 @@ public final class CharacterRaceRegistry {
                 Collections.<CharacterFactionCategory>emptySet(),
                 identifiers("lotr:hobbit", "lotr:bree"),
                 NO_FACTIONS, MALE_AND_FEMALE,
-                0.45F, 1.20F, 1.02F, 0.94F,
+                0.45F, 1.20F, standingEyeHeight(1.20F), sneakingEyeHeight(1.20F),
                 16.0D, 1.0D, 2.0D,
                 0.75F, 1.34F, -5));
         register(definitions, definition(
                 ORC, "lotr:mordor_orc",
                 EnumSet.of(CharacterFactionCategory.ORC),
                 NO_FACTIONS, NO_FACTIONS, NON_BINARY_ONLY,
-                0.50F, 1.55F, 1.32F, 1.24F,
+                0.50F, 1.55F, standingEyeHeight(1.55F), sneakingEyeHeight(1.55F),
                 20.0D, 1.0D, 3.0D,
                 0.85F, 1.08F, -2));
         register(definitions, definition(
                 URUK, "lotr:uruk_hai",
                 EnumSet.of(CharacterFactionCategory.ORC),
                 NO_FACTIONS, NO_FACTIONS, NON_BINARY_ONLY,
-                0.50F, 1.55F, 1.32F, 1.24F,
+                0.60F, 1.80F, standingEyeHeight(1.80F), sneakingEyeHeight(1.80F),
                 24.0D, 1.05D, 4.0D,
                 1.0F, 1.05F, -2));
         register(definitions, definition(
                 HALF_TROLL, "lotr:half_troll",
                 EnumSet.of(CharacterFactionCategory.TROLL),
                 NO_FACTIONS, NO_FACTIONS, NON_BINARY_ONLY,
-                1.00F, 2.40F, 2.04F, 1.96F,
+                1.00F, 2.40F, standingEyeHeight(2.40F), sneakingEyeHeight(2.40F),
                 40.0D, 0.9D, 6.0D,
                 1.0F, 0.72F, 5));
 
@@ -172,6 +180,14 @@ public final class CharacterRaceRegistry {
     private static Set<String> identifiers(String... values) {
         return Collections.unmodifiableSet(
                 new LinkedHashSet<String>(Arrays.asList(values)));
+    }
+
+    private static float standingEyeHeight(float bodyHeight) {
+        return bodyHeight * STANDING_EYE_HEIGHT_RATIO;
+    }
+
+    private static float sneakingEyeHeight(float bodyHeight) {
+        return standingEyeHeight(bodyHeight) - SNEAKING_EYE_HEIGHT_DROP;
     }
 
     private static void register(Map<String, CharacterRaceDefinition> definitions,

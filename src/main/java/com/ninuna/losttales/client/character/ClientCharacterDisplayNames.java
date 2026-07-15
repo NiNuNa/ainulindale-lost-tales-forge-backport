@@ -57,6 +57,11 @@ public final class ClientCharacterDisplayNames {
     }
 
     public static List<String> getCompatibleFactionIds(String raceId) {
+        return getFactionIds(raceId, false);
+    }
+
+    public static List<String> getFactionIds(String raceId,
+                                             boolean unconventionalSettings) {
         CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);
         if (race == null) {
             return Collections.emptyList();
@@ -64,12 +69,15 @@ public final class ClientCharacterDisplayNames {
         CharacterCreationCatalog catalog = ClientCharacterCreationCatalogCache.get();
         ArrayList<String> ids = new ArrayList<String>();
         if (catalog != null) {
-            ids.addAll(catalog.getFactionIds(raceId));
+            ids.addAll(unconventionalSettings
+                    ? catalog.getAllPlayableFactionIds()
+                    : catalog.getFactionIds(raceId));
         } else if (LOTR_ADAPTER.isAvailable()) {
             // Local fallback is used only before the first server snapshot.
             for (String id : LOTR_ADAPTER.getPlayableFactionIds()) {
                 CharacterFactionDefinition definition = LOTR_ADAPTER.resolve(id);
-                if (definition != null && race.isCompatibleWith(definition)) {
+                if (definition != null && (unconventionalSettings
+                        || race.isCompatibleWith(definition))) {
                     ids.add(definition.getId());
                 }
             }
@@ -78,6 +86,28 @@ public final class ClientCharacterDisplayNames {
             @Override
             public int compare(String left, String right) {
                 return faction(left).compareToIgnoreCase(faction(right));
+            }
+        });
+        return Collections.unmodifiableList(ids);
+    }
+
+    public static List<String> getStartingWaypointIds(String factionId,
+                                                      boolean unconventionalSettings) {
+        CharacterCreationCatalog catalog = ClientCharacterCreationCatalogCache.get();
+        ArrayList<String> ids = new ArrayList<String>();
+        if (catalog != null) {
+            ids.addAll(unconventionalSettings
+                    ? catalog.getAllWaypointIds()
+                    : catalog.getWaypointIds(factionId));
+        } else if (LOTR_ADAPTER.isAvailable()) {
+            ids.addAll(unconventionalSettings
+                    ? LOTR_ADAPTER.getAllStartingWaypointIds()
+                    : LOTR_ADAPTER.getStartingWaypointIds(factionId));
+        }
+        Collections.sort(ids, new Comparator<String>() {
+            @Override
+            public int compare(String left, String right) {
+                return waypoint(left).compareToIgnoreCase(waypoint(right));
             }
         });
         return Collections.unmodifiableList(ids);
@@ -113,6 +143,12 @@ public final class ClientCharacterDisplayNames {
 
     public static String faction(String id) {
         String displayName = LOTR_ADAPTER.getFactionDisplayName(id);
+        return displayName == null || displayName.length() == 0
+                ? prettifyIdentifier(id) : displayName;
+    }
+
+    public static String waypoint(String id) {
+        String displayName = LOTR_ADAPTER.getStartingWaypointDisplayName(id);
         return displayName == null || displayName.length() == 0
                 ? prettifyIdentifier(id) : displayName;
     }

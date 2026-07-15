@@ -109,7 +109,10 @@ public final class LostTalesMapMarkerCatalog {
 
     public static boolean isVisibleByDefault(String markerId) {
         LostTalesMapMarkerDefinition marker = getMarker(markerId);
-        return marker != null && (!marker.isDiscoverable() || !marker.isHiddenUntilDiscovered());
+        // This method describes discovery secrecy only. Region visibility is
+        // character-specific and must not invalidate an otherwise valid pin.
+        return marker != null && (!marker.isDiscoverable()
+                || !marker.isHiddenUntilDiscovered());
     }
 
     public static void logQuestMarkerWarnings(Collection<LostTalesQuestDefinition> quests) {
@@ -193,11 +196,17 @@ public final class LostTalesMapMarkerCatalog {
         double discoveryRadius = Math.max(1.0D, getDouble(object, "discoveryRadius", getDouble(object, "unlockRadius", 8.0D)));
         boolean hidden = getBoolean(object, "hiddenUntilDiscovered", getBoolean(object, "requiresDiscovery", false));
         boolean discoverable = getBoolean(object, "isDiscoverable", true);
+        boolean requiresRegionUnlock = getBoolean(
+                object, "requiresRegionUnlock", true);
         if (getBoolean(object, "discoveredByDefault", false)) {
             hidden = false;
             discoverable = false;
         }
-        return new LostTalesMapMarkerDefinition(id, name, icon, color, category, description, hasFastTravel, fastTravelWaypointCode, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hidden, discoverable);
+        return new LostTalesMapMarkerDefinition(id, name, icon, color,
+                category, description, hasFastTravel,
+                fastTravelWaypointCode, dimensionId, x, y, z,
+                compassFadeInRadius, discoveryRadius, hidden,
+                discoverable, requiresRegionUnlock);
     }
 
     private static boolean hasNumber(JsonObject object, String key) {

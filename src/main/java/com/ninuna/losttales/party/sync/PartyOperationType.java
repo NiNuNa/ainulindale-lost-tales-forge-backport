@@ -40,9 +40,7 @@ public enum PartyOperationType {
                 || this == TRANSFER_LEADERSHIP
                 || this == SET_COLOR
                 || this == INVITE_PLAYER
-                || this == CANCEL_INVITATION
-                || this == SET_GO_HERE_MARKER
-                || this == REMOVE_GO_HERE_MARKER;
+                || this == CANCEL_INVITATION;
     }
 
     public boolean requiresTargetId() {

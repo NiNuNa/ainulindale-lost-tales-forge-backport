@@ -23,10 +23,17 @@ public final class PartyTrackingSnapshot {
     public static PartyTrackingSnapshot noParty(UUID ownerId,
                                                 long sequence,
                                                 UUID activeCharacterId) {
+        return noParty(ownerId, sequence, activeCharacterId,
+                Collections.<PartyGoHereMarkerSnapshot>emptyList());
+    }
+
+    public static PartyTrackingSnapshot noParty(
+            UUID ownerId, long sequence, UUID activeCharacterId,
+            List<PartyGoHereMarkerSnapshot> goHereMarkers) {
         return new PartyTrackingSnapshot(ownerId, sequence,
                 activeCharacterId, null, -1L,
                 Collections.<PartyTrackedMemberSnapshot>emptyList(),
-                Collections.<PartyGoHereMarkerSnapshot>emptyList());
+                goHereMarkers);
     }
 
     public PartyTrackingSnapshot(UUID ownerId,
@@ -52,9 +59,16 @@ public final class PartyTrackingSnapshot {
                 trackedMembers);
         List<PartyGoHereMarkerSnapshot> safeMarkers = copyMarkers(
                 goHereMarkers);
-        if (!hasParty && (!safeMembers.isEmpty() || !safeMarkers.isEmpty())) {
+        if (!hasParty && !safeMembers.isEmpty()) {
             throw new IllegalArgumentException(
-                    "partyless snapshot cannot contain tracking data");
+                    "partyless snapshot cannot contain tracked members");
+        }
+        if (!hasParty && (safeMarkers.size() > 1
+                || (!safeMarkers.isEmpty()
+                && !activeCharacterId.equals(
+                safeMarkers.get(0).getOwnerCharacterId())))) {
+            throw new IllegalArgumentException(
+                    "partyless snapshot may contain only its active character marker");
         }
         this.ownerId = ownerId;
         this.synchronizationSequence = synchronizationSequence;

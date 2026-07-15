@@ -43,50 +43,47 @@ public final class PartyTrackingSyncPacket implements IMessage {
                         "invalid party tracking sequence");
             }
             boolean hasParty = buffer.readBoolean();
-            if (!hasParty) {
-                PartyPacketCodec.requireFinished(buffer);
-                this.snapshot = PartyTrackingSnapshot.noParty(
-                        ownerId, sequence, activeCharacterId);
-                return;
-            }
-
-            UUID partyId = PartyPacketCodec.readUuid(buffer);
-            long partyRevision = buffer.readLong();
-            if (partyRevision < 0L) {
-                throw new PartyPacketCodec.DecodeException(
-                        "invalid party tracking revision");
-            }
-
-            int memberCount = buffer.readUnsignedByte();
-            if (memberCount > Party.MAX_MEMBERS) {
-                throw new PartyPacketCodec.DecodeException(
-                        "too many tracked party members");
-            }
+            UUID partyId = null;
+            long partyRevision = -1L;
             List<PartyTrackedMemberSnapshot> members =
-                    new ArrayList<PartyTrackedMemberSnapshot>(memberCount);
-            Set<UUID> memberIds = new HashSet<UUID>();
-            for (int index = 0; index < memberCount; index++) {
-                UUID characterId = PartyPacketCodec.readUuid(buffer);
-                if (!memberIds.add(characterId)) {
+                    new ArrayList<PartyTrackedMemberSnapshot>();
+            if (hasParty) {
+                partyId = PartyPacketCodec.readUuid(buffer);
+                partyRevision = buffer.readLong();
+                if (partyRevision < 0L) {
                     throw new PartyPacketCodec.DecodeException(
-                            "duplicate tracked member identity");
+                            "invalid party tracking revision");
                 }
-                String name = PartyPacketCodec.readString(
-                        buffer, PartyPacketCodec.MAX_NAME_BYTES);
-                PartyColor color = PartyColor.fromNetworkId(
-                        buffer.readUnsignedByte());
-                if (color == null) {
+
+                int memberCount = buffer.readUnsignedByte();
+                if (memberCount > Party.MAX_MEMBERS) {
                     throw new PartyPacketCodec.DecodeException(
-                            "invalid tracked member color");
+                            "too many tracked party members");
                 }
-                members.add(new PartyTrackedMemberSnapshot(
-                        characterId,
-                        name,
-                        color,
-                        buffer.readInt(),
-                        buffer.readDouble(),
-                        buffer.readDouble(),
-                        buffer.readDouble()));
+                Set<UUID> memberIds = new HashSet<UUID>();
+                for (int index = 0; index < memberCount; index++) {
+                    UUID characterId = PartyPacketCodec.readUuid(buffer);
+                    if (!memberIds.add(characterId)) {
+                        throw new PartyPacketCodec.DecodeException(
+                                "duplicate tracked member identity");
+                    }
+                    String name = PartyPacketCodec.readString(
+                            buffer, PartyPacketCodec.MAX_NAME_BYTES);
+                    PartyColor color = PartyColor.fromNetworkId(
+                            buffer.readUnsignedByte());
+                    if (color == null) {
+                        throw new PartyPacketCodec.DecodeException(
+                                "invalid tracked member color");
+                    }
+                    members.add(new PartyTrackedMemberSnapshot(
+                            characterId,
+                            name,
+                            color,
+                            buffer.readInt(),
+                            buffer.readDouble(),
+                            buffer.readDouble(),
+                            buffer.readDouble()));
+                }
             }
 
             int markerCount = buffer.readUnsignedByte();
@@ -122,14 +119,12 @@ public final class PartyTrackingSyncPacket implements IMessage {
                         buffer.readLong()));
             }
             PartyPacketCodec.requireFinished(buffer);
-            this.snapshot = new PartyTrackingSnapshot(
-                    ownerId,
-                    sequence,
-                    activeCharacterId,
-                    partyId,
-                    partyRevision,
-                    members,
-                    markers);
+            this.snapshot = hasParty
+                    ? new PartyTrackingSnapshot(
+                    ownerId, sequence, activeCharacterId,
+                    partyId, partyRevision, members, markers)
+                    : PartyTrackingSnapshot.noParty(
+                    ownerId, sequence, activeCharacterId, markers);
         } catch (RuntimeException exception) {
             this.snapshot = null;
             this.malformed = true;
@@ -146,23 +141,22 @@ public final class PartyTrackingSyncPacket implements IMessage {
         PartyPacketCodec.writeUuid(
                 buffer, this.snapshot.getActiveCharacterId());
         buffer.writeBoolean(this.snapshot.hasParty());
-        if (!this.snapshot.hasParty()) {
-            return;
-        }
-        PartyPacketCodec.writeUuid(buffer, this.snapshot.getPartyId());
-        buffer.writeLong(this.snapshot.getPartyRevision());
-        buffer.writeByte(this.snapshot.getTrackedMembers().size());
-        for (PartyTrackedMemberSnapshot member
-                : this.snapshot.getTrackedMembers()) {
-            PartyPacketCodec.writeUuid(buffer, member.getCharacterId());
-            PartyPacketCodec.writeString(buffer,
-                    member.getCharacterName(),
-                    PartyPacketCodec.MAX_NAME_BYTES);
-            buffer.writeByte(member.getColor().getNetworkId());
-            buffer.writeInt(member.getDimensionId());
-            buffer.writeDouble(member.getX());
-            buffer.writeDouble(member.getY());
-            buffer.writeDouble(member.getZ());
+        if (this.snapshot.hasParty()) {
+            PartyPacketCodec.writeUuid(buffer, this.snapshot.getPartyId());
+            buffer.writeLong(this.snapshot.getPartyRevision());
+            buffer.writeByte(this.snapshot.getTrackedMembers().size());
+            for (PartyTrackedMemberSnapshot member
+                    : this.snapshot.getTrackedMembers()) {
+                PartyPacketCodec.writeUuid(buffer, member.getCharacterId());
+                PartyPacketCodec.writeString(buffer,
+                        member.getCharacterName(),
+                        PartyPacketCodec.MAX_NAME_BYTES);
+                buffer.writeByte(member.getColor().getNetworkId());
+                buffer.writeInt(member.getDimensionId());
+                buffer.writeDouble(member.getX());
+                buffer.writeDouble(member.getY());
+                buffer.writeDouble(member.getZ());
+            }
         }
         buffer.writeByte(this.snapshot.getGoHereMarkers().size());
         for (PartyGoHereMarkerSnapshot marker

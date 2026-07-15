@@ -7,9 +7,12 @@ import com.ninuna.losttales.character.registry.CharacterFactionResolver;
 import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.common.FMLLog;
 import lotr.common.LOTRLevelData;
+import lotr.common.LOTRDimension;
 import lotr.common.LOTRPlayerData;
 import lotr.common.fac.LOTRFaction;
+import lotr.common.world.map.LOTRWaypoint;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.world.World;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,6 +35,7 @@ import java.util.Set;
 public final class LotrCharacterAdapter implements CharacterFactionResolver {
 
     public static final String ID_PREFIX = "lotr:";
+    private static final int MAX_STABLE_ID_LENGTH = 64;
 
     private static final LotrCharacterAdapter INSTANCE = new LotrCharacterAdapter();
 
@@ -167,6 +171,137 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         return this.available ? this.playableFactionIds : Collections.<String>emptyList();
     }
 
+    @Override
+    public synchronized List<String> getStartingWaypointIds(String factionId) {
+        LOTRFaction faction = resolveFactionForState(factionId);
+        if (faction == null) {
+            return Collections.emptyList();
+        }
+        ArrayList<String> ids = new ArrayList<String>();
+        try {
+            for (LOTRWaypoint waypoint : LOTRWaypoint.values()) {
+                if (waypoint == null || waypoint.faction != faction) {
+                    continue;
+                }
+                String id = canonicalWaypointId(waypoint);
+                if (id.length() > 0 && !ids.contains(id)) {
+                    ids.add(id);
+                }
+            }
+        } catch (LinkageError error) {
+            markUnavailable("incompatible_lotr_waypoint_api", error);
+            return Collections.emptyList();
+        } catch (RuntimeException exception) {
+            FMLLog.warning("[%s] Failed to enumerate starting waypoints for %s: %s",
+                    LostTalesMetaData.MOD_ID, factionId, exception.toString());
+            return Collections.emptyList();
+        }
+        Collections.sort(ids);
+        return Collections.unmodifiableList(ids);
+    }
+
+    @Override
+    public synchronized String resolveStartingWaypointId(String factionId,
+                                                         String waypointId) {
+        return resolveStartingWaypointId(factionId, waypointId, false);
+    }
+
+    @Override
+    public synchronized String resolveStartingWaypointId(String factionId,
+                                                         String waypointId,
+                                                         boolean allowAnyRegion) {
+        LOTRFaction faction = resolveFactionForState(factionId);
+        if (faction == null) {
+            return null;
+        }
+        List<String> eligible = allowAnyRegion
+                ? getAllStartingWaypointIds() : getStartingWaypointIds(factionId);
+        if (eligible.isEmpty()) {
+            return null;
+        }
+        String normalized = normalizeWaypointId(waypointId);
+        if (normalized.length() == 0) {
+            return eligible.get(0);
+        }
+        LOTRWaypoint waypoint = findWaypoint(normalized);
+        return waypoint != null
+                && (allowAnyRegion ? !waypoint.isHidden()
+                        : waypoint.faction == faction)
+                ? canonicalWaypointId(waypoint) : null;
+    }
+
+    /** All public static waypoints, for explicitly unconventional starts. */
+    public synchronized List<String> getAllStartingWaypointIds() {
+        ArrayList<String> ids = new ArrayList<String>();
+        try {
+            for (LOTRWaypoint waypoint : LOTRWaypoint.values()) {
+                if (waypoint == null || waypoint.isHidden()) {
+                    continue;
+                }
+                String id = canonicalWaypointId(waypoint);
+                if (id.length() > 0 && !ids.contains(id)) {
+                    ids.add(id);
+                }
+            }
+        } catch (LinkageError error) {
+            markUnavailable("incompatible_lotr_waypoint_api", error);
+            return Collections.emptyList();
+        } catch (RuntimeException exception) {
+            return Collections.emptyList();
+        }
+        Collections.sort(ids);
+        return Collections.unmodifiableList(ids);
+    }
+
+    /** Localized client presentation for a server-synchronized stable ID. */
+    public synchronized String getStartingWaypointDisplayName(String waypointId) {
+        LOTRWaypoint waypoint = findWaypoint(normalizeWaypointId(waypointId));
+        if (waypoint == null) {
+            return null;
+        }
+        try {
+            return waypoint.getDisplayName();
+        } catch (LinkageError error) {
+            markUnavailable("incompatible_lotr_waypoint_api", error);
+            return null;
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
+    public synchronized int getMiddleEarthDimensionId() {
+        try {
+            return LOTRDimension.MIDDLE_EARTH.dimensionID;
+        } catch (LinkageError error) {
+            markUnavailable("incompatible_lotr_dimension_api", error);
+            throw new IllegalStateException(
+                    "LOTR Middle-earth dimension is unavailable", error);
+        }
+    }
+
+    /** Resolves coordinates only after the caller has loaded the target chunk. */
+    public synchronized LotrStartingWaypointLocation resolveStartingWaypointLocation(
+            String waypointId, World targetWorld) {
+        LOTRWaypoint waypoint = findWaypoint(normalizeWaypointId(waypointId));
+        int dimensionId = getMiddleEarthDimensionId();
+        if (waypoint == null || targetWorld == null
+                || targetWorld.provider == null
+                || targetWorld.provider.dimensionId != dimensionId) {
+            return null;
+        }
+        try {
+            int x = waypoint.getXCoord();
+            int z = waypoint.getZCoord();
+            int y = waypoint.getYCoord(targetWorld, x, z);
+            return new LotrStartingWaypointLocation(
+                    dimensionId, x + 0.5D, y, z + 0.5D);
+        } catch (LinkageError error) {
+            markUnavailable("incompatible_lotr_waypoint_api", error);
+            throw new IllegalStateException(
+                    "LOTR waypoint location API is unavailable", error);
+        }
+    }
+
     /**
      * Returns LOTR's localized faction name, or null when the identifier cannot
      * be resolved. Presentation code must retain its stable-ID fallback.
@@ -193,6 +328,20 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         }
     }
 
+    /**
+     * Resolves a stable add-on faction ID to LOTR's live faction object.
+     * Package-private so character-state adapters can use the public LOTR API
+     * without exposing LOTR implementation types to the rest of the mod.
+     */
+    synchronized LOTRFaction resolveFactionForState(String factionId) {
+        ensureInitialized();
+        if (!this.available) {
+            return null;
+        }
+        String normalizedId = normalizeFactionId(factionId);
+        return normalizedId.length() == 0 ? null : findFaction(normalizedId);
+    }
+
     /** Public-API-only transient fast-travel guard for character switching. */
     public boolean isFastTravelActive(EntityPlayerMP player) {
         if (player == null || player.worldObj == null || player.worldObj.isRemote) {
@@ -213,11 +362,43 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         }
     }
 
+    /** Forces the public LOTR player-data cache to its per-player save file. */
+    public void savePlayerData(EntityPlayerMP player) {
+        if (player == null || player.getUniqueID() == null
+                || player.worldObj == null || player.worldObj.isRemote) {
+            throw new IllegalArgumentException(
+                    "LOTR player data can only be saved for a server player");
+        }
+        try {
+            LOTRPlayerData data = LOTRLevelData.getData(player);
+            if (data == null) {
+                throw new IllegalStateException("LOTR player data is unavailable");
+            }
+            data.markDirty();
+            LOTRLevelData.saveData(player.getUniqueID());
+        } catch (LinkageError error) {
+            throw new IllegalStateException(
+                    "Unable to save LOTR player data with the v36.15 API", error);
+        }
+    }
+
     public static String normalizeFactionId(String factionId) {
         if (factionId == null) {
             return "";
         }
         String normalized = factionId.trim().toLowerCase(Locale.ROOT);
+        if (!normalized.startsWith(ID_PREFIX)
+                || normalized.length() == ID_PREFIX.length()) {
+            return "";
+        }
+        return normalized;
+    }
+
+    public static String normalizeWaypointId(String waypointId) {
+        if (waypointId == null) {
+            return "";
+        }
+        String normalized = waypointId.trim().toLowerCase(Locale.ROOT);
         if (!normalized.startsWith(ID_PREFIX)
                 || normalized.length() == ID_PREFIX.length()) {
             return "";
@@ -256,6 +437,35 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
             return null;
         }
         return null;
+    }
+
+    private LOTRWaypoint findWaypoint(String normalizedId) {
+        if (normalizedId == null || normalizedId.length() == 0) {
+            return null;
+        }
+        try {
+            for (LOTRWaypoint waypoint : LOTRWaypoint.values()) {
+                if (waypoint != null
+                        && normalizedId.equals(canonicalWaypointId(waypoint))) {
+                    return waypoint;
+                }
+            }
+        } catch (LinkageError error) {
+            markUnavailable("incompatible_lotr_waypoint_api", error);
+        } catch (RuntimeException exception) {
+            FMLLog.warning("[%s] Failed to resolve LOTR waypoint %s: %s",
+                    LostTalesMetaData.MOD_ID, normalizedId, exception.toString());
+        }
+        return null;
+    }
+
+    private static String canonicalWaypointId(LOTRWaypoint waypoint) {
+        if (waypoint == null || waypoint.getCodeName() == null) {
+            return "";
+        }
+        String codeName = waypoint.getCodeName().trim().toLowerCase(Locale.ROOT);
+        String id = codeName.length() == 0 ? "" : ID_PREFIX + codeName;
+        return id.length() > MAX_STABLE_ID_LENGTH ? "" : id;
     }
 
     private static String canonicalId(LOTRFaction faction) {

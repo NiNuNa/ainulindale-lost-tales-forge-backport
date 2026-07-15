@@ -14,6 +14,7 @@ public final class CharacterSummary {
     private final String raceId;
     private final String genderId;
     private final String skinId;
+    private final String description;
     private final boolean showMinecraftCape;
     private final int cosmeticCapeId;
     private final int age;
@@ -33,7 +34,7 @@ public final class CharacterSummary {
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
                 RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
                 age, startingFactionId, roleplayLevel, experiencePoints,
-                creationTimestamp, dataVersion);
+                creationTimestamp, dataVersion, "");
     }
 
     public CharacterSummary(UUID characterId, int slotIndex, String name,
@@ -42,6 +43,18 @@ public final class CharacterSummary {
                             int age, String startingFactionId, int roleplayLevel,
                             long experiencePoints, long creationTimestamp,
                             int dataVersion) {
+        this(characterId, slotIndex, name, raceId, genderId, skinId,
+                showMinecraftCape, cosmeticCapeId, age, startingFactionId,
+                roleplayLevel, experiencePoints, creationTimestamp,
+                dataVersion, "");
+    }
+
+    public CharacterSummary(UUID characterId, int slotIndex, String name,
+                            String raceId, String genderId, String skinId,
+                            boolean showMinecraftCape, int cosmeticCapeId,
+                            int age, String startingFactionId, int roleplayLevel,
+                            long experiencePoints, long creationTimestamp,
+                            int dataVersion, String description) {
         if (characterId == null) {
             throw new IllegalArgumentException("characterId must not be null");
         }
@@ -51,6 +64,7 @@ public final class CharacterSummary {
         this.raceId = raceId == null ? "" : raceId;
         this.genderId = genderId == null ? "" : genderId;
         this.skinId = skinId == null ? "" : skinId;
+        this.description = description == null ? "" : description;
         this.showMinecraftCape = showMinecraftCape;
         this.cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(cosmeticCapeId);
         this.age = age;
@@ -79,7 +93,8 @@ public final class CharacterSummary {
                 character.getRoleplayLevel(),
                 character.getProgression().getExperiencePoints(),
                 character.getCreationTimestamp(),
-                character.getDataVersion()
+                character.getDataVersion(),
+                character.getDescription()
         );
     }
 
@@ -105,6 +120,10 @@ public final class CharacterSummary {
 
     public String getSkinId() {
         return this.skinId;
+    }
+
+    public String getDescription() {
+        return this.description;
     }
 
     public boolean isMinecraftCapeVisible() {

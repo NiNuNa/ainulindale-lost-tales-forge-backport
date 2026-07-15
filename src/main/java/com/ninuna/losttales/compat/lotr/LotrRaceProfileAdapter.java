@@ -24,8 +24,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Reads playable-race physics and base attributes from real LOTR NPC classes.
- * No LOTR source code, textures or model data are copied into Lost Tales.
+ * Reads playable-race combat attributes from real LOTR NPC classes. Physical
+ * player dimensions remain authoritative in {@link CharacterRaceRegistry};
+ * NPC collision boxes are mob implementation details and do not necessarily
+ * match their rendered model size.
  */
 public final class LotrRaceProfileAdapter {
 
@@ -151,13 +153,18 @@ public final class LotrRaceProfileAdapter {
         CharacterRaceDefinition definition = CharacterRaceRegistry.get(raceId);
         CharacterRaceGameplayProfile fallback =
                 CharacterRaceGameplayRegistry.getFallback(raceId);
-        float width = representative.width;
-        float height = representative.height;
-        float eyeHeight = representative.getEyeHeight();
-        float sneakingEyeDrop = definition == null
-                ? 0.08F
-                : definition.getStandingEyeHeight() - definition.getSneakingEyeHeight();
-        float sneakingEyeHeight = Math.max(0.1F, eyeHeight - sneakingEyeDrop);
+        if (definition == null) {
+            throw new IllegalStateException(
+                    "missing physical race definition for " + raceId);
+        }
+        // Do not copy EntityLivingBase dimensions from the representative.
+        // LOTR intentionally gives Mordor Orc and Uruk NPCs the same collision
+        // box even though their rendered models differ. Those values previously
+        // overwrote the player registry and placed both cameras at 1.32 blocks.
+        float width = definition.getWidth();
+        float height = definition.getHeight();
+        float eyeHeight = definition.getStandingEyeHeight();
+        float sneakingEyeHeight = definition.getSneakingEyeHeight();
         double maxHealth = readBaseAttribute(
                 representative, SharedMonsterAttributes.maxHealth, fallback.getMaxHealth());
         double movementSpeed = readBaseAttribute(
@@ -197,6 +204,12 @@ public final class LotrRaceProfileAdapter {
         }
         IAttributeInstance instance = entity.getEntityAttribute(attribute);
         return instance == null ? fallback : instance.getBaseValue();
+    }
+
+    private static void validatePhysicalValue(String name, float value) {
+        if (Float.isNaN(value) || Float.isInfinite(value) || value <= 0.0F) {
+            throw new IllegalStateException("invalid " + name + ": " + value);
+        }
     }
 
     private static LinkedHashMap<String, RepresentativeFactory> createFactories() {
@@ -252,12 +265,6 @@ public final class LotrRaceProfileAdapter {
                     }
                 });
         return factories;
-    }
-
-    private static void validatePhysicalValue(String name, float value) {
-        if (Float.isNaN(value) || Float.isInfinite(value) || value <= 0.0F) {
-            throw new IllegalStateException("invalid " + name + ": " + value);
-        }
     }
 
     private static void validatePositiveValue(String name, double value) {

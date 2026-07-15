@@ -1,6 +1,7 @@
 package com.ninuna.losttales.character.storage;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
+import com.ninuna.losttales.character.model.RoleplayCharacter;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.WorldSavedData;
@@ -125,6 +126,25 @@ public class CharacterWorldData extends WorldSavedData {
 
     public Collection<CharacterRoster> getRosters() {
         return Collections.unmodifiableCollection(this.rosters.values());
+    }
+
+    /**
+     * Resolves a globally unique roleplay-character identity without exposing
+     * mutable roster internals. This is used by integrations, such as LOTR
+     * faction bounties, whose persisted records contain the character UUID
+     * instead of the owning Minecraft account UUID.
+     */
+    public RoleplayCharacter findCharacter(UUID characterId) {
+        if (characterId == null) {
+            return null;
+        }
+        for (CharacterRoster roster : this.rosters.values()) {
+            RoleplayCharacter character = roster.getCharacter(characterId);
+            if (character != null) {
+                return character;
+            }
+        }
+        return null;
     }
 
     public int getQuarantinedEntryCount() {

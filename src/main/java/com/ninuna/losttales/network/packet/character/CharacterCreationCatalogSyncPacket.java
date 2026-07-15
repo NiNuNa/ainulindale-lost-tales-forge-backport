@@ -17,6 +17,9 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
 
     private static final int MAX_RACES = 32;
     private static final int MAX_FACTIONS_PER_RACE = 256;
+    private static final int MAX_FACTIONS_WITH_WAYPOINTS = 512;
+    private static final int MAX_WAYPOINTS_PER_FACTION = 256;
+    private static final int MAX_ALL_WAYPOINTS = 1024;
 
     private CharacterCreationCatalog catalog;
     private boolean malformed;
@@ -64,8 +67,60 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
                 }
                 factionsByRace.put(raceId, factions);
             }
+            int waypointFactionCount = buffer.readUnsignedShort();
+            if (waypointFactionCount > MAX_FACTIONS_WITH_WAYPOINTS) {
+                throw new CharacterPacketCodec.DecodeException(
+                        "too many waypoint faction entries");
+            }
+            LinkedHashMap<String, List<String>> waypointsByFaction =
+                    new LinkedHashMap<String, List<String>>();
+            for (int factionIndex = 0;
+                 factionIndex < waypointFactionCount; factionIndex++) {
+                String factionId = CharacterPacketCodec.readString(
+                        buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                if (waypointsByFaction.containsKey(factionId)) {
+                    throw new CharacterPacketCodec.DecodeException(
+                            "duplicate waypoint faction entry");
+                }
+                int waypointCount = buffer.readUnsignedShort();
+                if (waypointCount > MAX_WAYPOINTS_PER_FACTION) {
+                    throw new CharacterPacketCodec.DecodeException(
+                            "too many starting waypoints");
+                }
+                ArrayList<String> waypoints = new ArrayList<String>(waypointCount);
+                for (int waypointIndex = 0;
+                     waypointIndex < waypointCount; waypointIndex++) {
+                    String waypointId = CharacterPacketCodec.readString(
+                            buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                    if (waypoints.contains(waypointId)) {
+                        throw new CharacterPacketCodec.DecodeException(
+                                "duplicate starting waypoint");
+                    }
+                    waypoints.add(waypointId);
+                }
+                waypointsByFaction.put(factionId, waypoints);
+            }
+            int allWaypointCount = buffer.readUnsignedShort();
+            if (allWaypointCount > MAX_ALL_WAYPOINTS) {
+                throw new CharacterPacketCodec.DecodeException(
+                        "too many global starting waypoints");
+            }
+            ArrayList<String> allWaypoints =
+                    new ArrayList<String>(allWaypointCount);
+            for (int waypointIndex = 0;
+                 waypointIndex < allWaypointCount; waypointIndex++) {
+                String waypointId = CharacterPacketCodec.readString(
+                        buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                if (allWaypoints.contains(waypointId)) {
+                    throw new CharacterPacketCodec.DecodeException(
+                            "duplicate global starting waypoint");
+                }
+                allWaypoints.add(waypointId);
+            }
             CharacterPacketCodec.requireFinished(buffer);
-            this.catalog = new CharacterCreationCatalog(available, reason, factionsByRace);
+            this.catalog = new CharacterCreationCatalog(
+                    available, reason, factionsByRace,
+                    waypointsByFaction, allWaypoints);
         } catch (RuntimeException exception) {
             this.catalog = null;
             this.malformed = true;
@@ -97,6 +152,34 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
                 CharacterPacketCodec.writeString(buffer, factionId,
                         CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             }
+        }
+        Map<String, List<String>> waypointEntries =
+                this.catalog.getWaypointIdsByFaction();
+        if (waypointEntries.size() > MAX_FACTIONS_WITH_WAYPOINTS) {
+            throw new IllegalStateException("too many waypoint faction entries");
+        }
+        buffer.writeShort(waypointEntries.size());
+        for (Map.Entry<String, List<String>> entry : waypointEntries.entrySet()) {
+            CharacterPacketCodec.writeString(buffer, entry.getKey(),
+                    CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            List<String> waypoints = entry.getValue();
+            if (waypoints.size() > MAX_WAYPOINTS_PER_FACTION) {
+                throw new IllegalStateException("too many starting waypoints");
+            }
+            buffer.writeShort(waypoints.size());
+            for (String waypointId : waypoints) {
+                CharacterPacketCodec.writeString(buffer, waypointId,
+                        CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            }
+        }
+        List<String> allWaypoints = this.catalog.getAllWaypointIds();
+        if (allWaypoints.size() > MAX_ALL_WAYPOINTS) {
+            throw new IllegalStateException("too many global starting waypoints");
+        }
+        buffer.writeShort(allWaypoints.size());
+        for (String waypointId : allWaypoints) {
+            CharacterPacketCodec.writeString(buffer, waypointId,
+                    CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         }
     }
 

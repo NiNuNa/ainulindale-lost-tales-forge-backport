@@ -14,21 +14,50 @@ public final class CharacterCreationRequest {
     private final String raceId;
     private final String genderId;
     private final String skinId;
+    private final String description;
     private final int age;
     private final String startingFactionId;
+    private final String startingWaypointId;
+    private final boolean unconventionalSettings;
 
     public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
                                     String name, String raceId, String genderId,
                                     String skinId, int age,
                                     String startingFactionId) {
+        this(expectedRosterRevision, slotIndex, name, raceId, genderId,
+                skinId, age, startingFactionId, "", false,
+                "");
+    }
+
+    public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
+                                    String name, String raceId, String genderId,
+                                    String skinId, int age,
+                                    String startingFactionId,
+                                    String startingWaypointId,
+                                    boolean unconventionalSettings) {
+        this(expectedRosterRevision, slotIndex, name, raceId, genderId,
+                skinId, age, startingFactionId, startingWaypointId,
+                unconventionalSettings, "");
+    }
+
+    public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
+                                    String name, String raceId, String genderId,
+                                    String skinId, int age,
+                                    String startingFactionId,
+                                    String startingWaypointId,
+                                    boolean unconventionalSettings,
+                                    String description) {
         this.expectedRosterRevision = expectedRosterRevision;
         this.slotIndex = slotIndex;
         this.name = name;
         this.raceId = raceId;
         this.genderId = genderId;
         this.skinId = skinId;
+        this.description = description;
         this.age = age;
         this.startingFactionId = startingFactionId;
+        this.startingWaypointId = startingWaypointId;
+        this.unconventionalSettings = unconventionalSettings;
     }
 
     public long getExpectedRosterRevision() {
@@ -55,11 +84,23 @@ public final class CharacterCreationRequest {
         return this.skinId;
     }
 
+    public String getDescription() {
+        return this.description;
+    }
+
     public int getAge() {
         return this.age;
     }
 
     public String getStartingFactionId() {
         return this.startingFactionId;
+    }
+
+    public String getStartingWaypointId() {
+        return this.startingWaypointId;
+    }
+
+    public boolean hasUnconventionalSettings() {
+        return this.unconventionalSettings;
     }
 }

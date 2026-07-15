@@ -6,6 +6,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.party.PartyTrackingSyncPacket;
 import com.ninuna.losttales.party.model.Party;
+import com.ninuna.losttales.party.model.PartyColor;
 import com.ninuna.losttales.party.model.PartyGoHereMarker;
 import com.ninuna.losttales.party.model.PartyMember;
 import com.ninuna.losttales.party.storage.PartyGoHereMarkerWorldData;
@@ -92,17 +93,12 @@ public final class PartyTrackingSyncManager {
         UUID activeCharacterId = receiver.activeCharacter.getCharacterId();
         Party party = view.partyData.getPartyForCharacter(activeCharacterId);
         PartyTrackingSnapshot content = party == null
-                ? PartyTrackingSnapshot.noParty(
-                recipient.getUniqueID(), 1L, activeCharacterId)
+                ? buildSoloContent(recipient.getUniqueID(),
+                receiver.activeCharacter, view)
                 : buildPartyContent(recipient.getUniqueID(),
                 activeCharacterId, party, view);
 
         SentState sent = SENT_STATES.get(recipient.getUniqueID());
-        if (!content.hasParty() && !force
-                && (sent == null || sent.lastSnapshot == null
-                || !sent.lastSnapshot.hasParty())) {
-            return false;
-        }
         if (sent == null) {
             sent = new SentState();
             SENT_STATES.put(recipient.getUniqueID(), sent);
@@ -122,6 +118,22 @@ public final class PartyTrackingSyncManager {
         sent.lastSnapshot = outgoing;
         sent.lastSentTick = serverTicks;
         return true;
+    }
+
+    private static PartyTrackingSnapshot buildSoloContent(
+            UUID recipientOwnerId, RoleplayCharacter activeCharacter,
+            ServerView view) {
+        ArrayList<PartyGoHereMarkerSnapshot> markers =
+                new ArrayList<PartyGoHereMarkerSnapshot>(1);
+        PartyGoHereMarker marker = view.markerData.getMarker(
+                activeCharacter.getCharacterId());
+        if (marker != null) {
+            markers.add(toMarkerSnapshot(
+                    marker, activeCharacter.getName(), PartyColor.GREEN));
+        }
+        return PartyTrackingSnapshot.noParty(
+                recipientOwnerId, 1L,
+                activeCharacter.getCharacterId(), markers);
     }
 
     private static PartyTrackingSnapshot buildPartyContent(
@@ -146,19 +158,13 @@ public final class PartyTrackingSyncManager {
 
         ArrayList<PartyGoHereMarkerSnapshot> markers =
                 new ArrayList<PartyGoHereMarkerSnapshot>();
-        for (PartyGoHereMarker marker
-                : view.markerData.getMarkersForParty(party.getPartyId())) {
-            PartyMember owner = party.getMember(marker.getOwnerCharacterId());
-            if (owner == null) {
-                continue;
+        for (PartyMember owner : party.getMembers()) {
+            PartyGoHereMarker marker = view.markerData.getMarker(
+                    owner.getCharacterId());
+            if (marker != null) {
+                markers.add(toMarkerSnapshot(
+                        marker, owner.getCharacterName(), owner.getColor()));
             }
-            markers.add(new PartyGoHereMarkerSnapshot(
-                    owner.getCharacterId(),
-                    owner.getCharacterName(),
-                    owner.getColor(),
-                    marker.getDimensionId(),
-                    marker.getX(), marker.getY(), marker.getZ(),
-                    marker.getUpdatedAt()));
         }
         Collections.sort(markers,
                 new Comparator<PartyGoHereMarkerSnapshot>() {
@@ -177,6 +183,16 @@ public final class PartyTrackingSyncManager {
                 party.getRevision(),
                 tracked,
                 markers);
+    }
+
+    private static PartyGoHereMarkerSnapshot toMarkerSnapshot(
+            PartyGoHereMarker marker, String ownerName,
+            PartyColor ownerColor) {
+        return new PartyGoHereMarkerSnapshot(
+                marker.getOwnerCharacterId(), ownerName, ownerColor,
+                marker.getDimensionId(),
+                marker.getX(), marker.getY(), marker.getZ(),
+                marker.getUpdatedAt());
     }
 
     private static PartyTrackedMemberSnapshot buildTrackedMember(
@@ -215,7 +231,8 @@ public final class PartyTrackingSyncManager {
                 source.getGoHereMarkers())
                 : PartyTrackingSnapshot.noParty(
                 source.getOwnerId(), sequence,
-                source.getActiveCharacterId());
+                source.getActiveCharacterId(),
+                source.getGoHereMarkers());
     }
 
     private static ServerView collectServerView() {

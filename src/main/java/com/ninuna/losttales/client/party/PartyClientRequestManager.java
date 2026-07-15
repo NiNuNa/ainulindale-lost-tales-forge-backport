@@ -128,8 +128,8 @@ public final class PartyClientRequestManager {
                                       double x,
                                       double z) {
         return send(PartyOperationType.SET_GO_HERE_MARKER,
-                expectedActiveCharacterId, expectedPartyId,
-                expectedPartyRevision, null, null,
+                expectedActiveCharacterId, null,
+                PartyActionRequestPacket.NO_PARTY_REVISION, null, null,
                 true, dimensionId, x, z);
     }
 
@@ -142,8 +142,8 @@ public final class PartyClientRequestManager {
                                          UUID expectedPartyId,
                                          long expectedPartyRevision) {
         return send(PartyOperationType.REMOVE_GO_HERE_MARKER,
-                expectedActiveCharacterId, expectedPartyId,
-                expectedPartyRevision, null, null);
+                expectedActiveCharacterId, null,
+                PartyActionRequestPacket.NO_PARTY_REVISION, null, null);
     }
 
     public static int invitePlayer(long expectedPartyRevision,

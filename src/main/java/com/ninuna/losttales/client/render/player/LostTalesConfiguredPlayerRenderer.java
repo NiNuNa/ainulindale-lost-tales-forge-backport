@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.render.player;
 
+import com.ninuna.losttales.character.physics.CharacterNameplateHeightHelper;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinDefinition;
@@ -99,8 +100,8 @@ final class LostTalesConfiguredPlayerRenderer extends RenderPlayer {
                 || entity != null && entity.isPlayerSleeping()) {
             return 0.0F;
         }
-        float visualHeight = 1.8F * this.modelScale;
-        return Math.max(0.0F, visualHeight - physicalHeight);
+        return CharacterNameplateHeightHelper.resolveExtraHeight(
+                physicalHeight, this.modelScale);
     }
 
     /*

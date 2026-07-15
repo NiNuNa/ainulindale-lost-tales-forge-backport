@@ -213,8 +213,14 @@ public class LostTalesQuestSyncPacket implements IMessage {
             double discoveryRadius = buf.readDouble();
             boolean hidden = buf.readBoolean();
             boolean discoverable = buf.readBoolean();
+            boolean requiresRegionUnlock = buf.readBoolean();
             if (markerId != null && markerId.length() > 0) {
-                this.dynamicMapMarkers.add(new LostTalesMapMarkerDefinition(markerId, name, icon, color, category, hasFastTravel, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hidden, discoverable));
+                this.dynamicMapMarkers.add(
+                        new LostTalesMapMarkerDefinition(
+                                markerId, name, icon, color, category, "",
+                                hasFastTravel, "", dimensionId, x, y, z,
+                                compassFadeInRadius, discoveryRadius, hidden,
+                                discoverable, requiresRegionUnlock));
             }
         }
 
@@ -283,6 +289,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
             buf.writeDouble(marker.getDiscoveryRadius());
             buf.writeBoolean(marker.isHiddenUntilDiscovered());
             buf.writeBoolean(marker.isDiscoverable());
+            buf.writeBoolean(marker.requiresRegionUnlock());
         }
 
         buf.writeInt(this.dynamicQuestDefinitions.size());

@@ -5,6 +5,16 @@ import com.ninuna.losttales.character.deletion.CharacterDeletionService;
 import com.ninuna.losttales.character.deletion.CharacterDeletionStorage;
 import com.ninuna.losttales.character.deletion.CharacterDeletionTombstone;
 import com.ninuna.losttales.character.deletion.CharacterDeletionWorldData;
+import com.ninuna.losttales.character.lore.LoreCharacterDefinition;
+import com.ninuna.losttales.character.lore.LoreCharacterRegistry;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipRecord;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorldData;
+import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferCoordinator;
+import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferRecord;
+import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferStorage;
+import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferWorldData;
+import com.ninuna.losttales.character.lore.transfer.LoreCharacterVaultEntry;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.state.CharacterPlayerStateAccount;
 import com.ninuna.losttales.character.state.CharacterPlayerStateRecord;
@@ -38,7 +48,8 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
     @Override
     public String getCommandUsage(ICommandSender sender) {
         return "/losttales character <status|recover|cooldown|freeze|unfreeze|deleted> [player]"
-                + " or <restore|rollback|purge> <player> <character-uuid> [confirm]";
+                + " or <restore|rollback|purge> <player> <character-uuid> [confirm]"
+                + " or lore <status|recover|inspect> [lore-character-id]";
     }
 
     @Override
@@ -50,6 +61,10 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
     public void processCommand(ICommandSender sender, String[] args) {
         if (args == null || args.length == 0) {
             sendUsage(sender);
+            return;
+        }
+        if ("lore".equalsIgnoreCase(args[0])) {
+            processLoreCommand(sender, args);
             return;
         }
         EntityPlayerMP target = resolveTarget(sender, args.length > 1 ? args[1] : null);
@@ -136,6 +151,129 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         } else {
             sendUsage(sender);
         }
+    }
+
+    private void processLoreCommand(ICommandSender sender, String[] args) {
+        MinecraftServer server = MinecraftServer.getServer();
+        World world = server == null ? null : server.worldServerForDimension(0);
+        if (world == null) {
+            send(sender, EnumChatFormatting.RED
+                    + "The server overworld is not available.");
+            return;
+        }
+        String action = args.length > 1 ? args[1] : "status";
+        if ("status".equalsIgnoreCase(action)
+                || "list".equalsIgnoreCase(action)) {
+            reportLoreStatus(sender, world);
+            return;
+        }
+        if ("recover".equalsIgnoreCase(action)) {
+            LoreCharacterTransferCoordinator.getInstance().recoverAll(world);
+            send(sender, EnumChatFormatting.GREEN
+                    + "Lore-character transfer recovery pass completed.");
+            reportLoreStatus(sender, world);
+            return;
+        }
+        if ("inspect".equalsIgnoreCase(action) && args.length > 2) {
+            reportLoreCharacter(sender, world, args[2]);
+            return;
+        }
+        send(sender, EnumChatFormatting.GRAY
+                + "/losttales character lore <status|recover|inspect>"
+                + " [lore-character-id]");
+    }
+
+    private void reportLoreStatus(ICommandSender sender, World world) {
+        try {
+            LoreCharacterOwnershipWorldData ownership =
+                    LoreCharacterOwnershipStorage.get(world);
+            LoreCharacterTransferWorldData transfers =
+                    LoreCharacterTransferStorage.get(world);
+            int configured = 0;
+            for (LoreCharacterDefinition definition
+                    : LoreCharacterRegistry.getAll()) {
+                if (definition.hasAppearance()) configured++;
+            }
+            int claimed = 0;
+            for (LoreCharacterOwnershipRecord record : ownership.getRecords()) {
+                if (record.isClaimed()) claimed++;
+            }
+            send(sender, EnumChatFormatting.GOLD + "Lore-character status:");
+            send(sender, EnumChatFormatting.GRAY + "definitions="
+                    + LoreCharacterRegistry.getAll().size()
+                    + ", configured=" + configured
+                    + ", rejected=" + LoreCharacterRegistry.getLoadErrors().size()
+                    + ", ownershipRecords=" + ownership.getRecordCount()
+                    + ", claimed=" + claimed
+                    + ", retainedStates=" + transfers.getVaultEntryCount()
+                    + ", pendingTransfers="
+                    + transfers.getTransactions().size());
+            send(sender, EnumChatFormatting.GRAY + "stores: ownershipReadOnly="
+                    + ownership.isReadOnly() + reason(ownership.getReadOnlyReason())
+                    + ", transferReadOnly=" + transfers.isReadOnly()
+                    + reason(transfers.getReadOnlyReason()));
+            for (LoreCharacterTransferRecord transaction
+                    : transfers.getTransactions()) {
+                send(sender, EnumChatFormatting.YELLOW + "pending "
+                        + transaction.getLoreCharacterId()
+                        + " type=" + transaction.getType()
+                        + ", step=" + transaction.getStep()
+                        + ", character=" + transaction.getCharacterId());
+            }
+        } catch (RuntimeException exception) {
+            send(sender, EnumChatFormatting.RED
+                    + "Unable to inspect lore-character state: "
+                    + exception.getClass().getSimpleName());
+        }
+    }
+
+    private void reportLoreCharacter(
+            ICommandSender sender, World world, String loreId) {
+        try {
+            LoreCharacterDefinition definition = LoreCharacterRegistry.get(loreId);
+            LoreCharacterOwnershipWorldData ownership =
+                    LoreCharacterOwnershipStorage.get(world);
+            LoreCharacterTransferWorldData transfers =
+                    LoreCharacterTransferStorage.get(world);
+            if (definition == null) {
+                send(sender, EnumChatFormatting.RED
+                        + "Unknown lore-character identifier: " + loreId);
+                return;
+            }
+            LoreCharacterOwnershipRecord owner = ownership.getRecord(
+                    definition.getId());
+            LoreCharacterVaultEntry vault = transfers.getVaultEntry(
+                    definition.getId());
+            LoreCharacterTransferRecord transaction = transfers.getTransaction(
+                    definition.getId());
+            send(sender, EnumChatFormatting.GOLD + definition.getName()
+                    + " [" + definition.getId() + "]");
+            send(sender, EnumChatFormatting.GRAY + "configured="
+                    + definition.hasAppearance()
+                    + ", claimed=" + (owner != null && owner.isClaimed())
+                    + ", owner=" + (owner == null ? "none" : owner.getOwnerId())
+                    + ", character="
+                    + (owner == null ? "none" : owner.getCharacterId())
+                    + ", ownershipRevision="
+                    + (owner == null ? 0L : owner.getRevision()));
+            send(sender, EnumChatFormatting.GRAY + "retainedState="
+                    + (vault != null)
+                    + (vault == null ? "" : ", stateGeneration="
+                    + vault.getPlayerStateCopy().getCurrentGeneration()
+                    + ", updatedAt=" + vault.getUpdatedAt())
+                    + ", transfer=" + (transaction == null ? "none"
+                    : transaction.getType() + " step="
+                    + transaction.getStep() + " tx="
+                    + transaction.getTransactionId()));
+        } catch (RuntimeException exception) {
+            send(sender, EnumChatFormatting.RED
+                    + "Unable to inspect lore character: "
+                    + exception.getClass().getSimpleName());
+        }
+    }
+
+    private static String reason(String value) {
+        return value == null || value.length() == 0 ? "" : " (" + value + ")";
     }
 
     private void setFrozen(ICommandSender sender, EntityPlayerMP target, boolean frozen) {
@@ -386,7 +524,23 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         if (args != null && args.length == 1) {
             return getListOfStringsMatchingLastWord(
                     args, "status", "recover", "cooldown", "freeze", "unfreeze",
-                    "deleted", "restore", "rollback", "purge");
+                    "deleted", "restore", "rollback", "purge", "lore");
+        }
+        if (args != null && args.length == 2
+                && "lore".equalsIgnoreCase(args[0])) {
+            return getListOfStringsMatchingLastWord(
+                    args, "status", "recover", "inspect");
+        }
+        if (args != null && args.length == 3
+                && "lore".equalsIgnoreCase(args[0])
+                && "inspect".equalsIgnoreCase(args[1])) {
+            java.util.ArrayList<String> ids = new java.util.ArrayList<String>();
+            for (LoreCharacterDefinition definition
+                    : LoreCharacterRegistry.getAll()) {
+                ids.add(definition.getId());
+            }
+            return getListOfStringsMatchingLastWord(
+                    args, ids.toArray(new String[ids.size()]));
         }
         if (args != null && args.length == 2) {
             return getListOfStringsMatchingLastWord(args,

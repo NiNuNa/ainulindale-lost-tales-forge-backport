@@ -1,5 +1,7 @@
 package com.ninuna.losttales.character.physics;
 
+import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
+import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 
@@ -21,16 +23,26 @@ public final class CharacterCameraHook {
             return vanillaOffset;
         }
         EntityPlayer player = (EntityPlayer)viewEntity;
-        if (player.isPlayerSleeping()
-                || CharacterRaceEntityData.getRaceId(player).length() == 0) {
+        String raceId = CharacterRaceEntityData.getRaceId(player);
+        if (player.isPlayerSleeping() || raceId.length() == 0) {
             return vanillaOffset;
         }
 
         float fallback = Math.max(MINIMUM_EYE_HEIGHT,
                 player.yOffset - vanillaOffset);
-        float desiredEyeHeight = player.isSneaking()
-                ? CharacterRaceEntityData.getSneakingEyeHeight(player, fallback)
-                : CharacterRaceEntityData.getStandingEyeHeight(player, fallback);
+        CharacterRaceDefinition definition = CharacterRaceRegistry.get(raceId);
+        float desiredEyeHeight;
+        if (definition != null) {
+            desiredEyeHeight = player.isSneaking()
+                    ? definition.getSneakingEyeHeight()
+                    : definition.getStandingEyeHeight();
+        } else {
+            desiredEyeHeight = player.isSneaking()
+                    ? CharacterRaceEntityData.getSneakingEyeHeight(
+                    player, fallback)
+                    : CharacterRaceEntityData.getStandingEyeHeight(
+                    player, fallback);
+        }
         desiredEyeHeight = Math.max(MINIMUM_EYE_HEIGHT, desiredEyeHeight);
         return player.yOffset - desiredEyeHeight;
     }

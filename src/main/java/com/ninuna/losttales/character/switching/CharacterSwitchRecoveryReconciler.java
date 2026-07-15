@@ -52,6 +52,26 @@ public final class CharacterSwitchRecoveryReconciler {
                         : CharacterErrorId.NONE);
     }
 
+    /**
+     * Completes reconciliation after the caller has durably saved the live
+     * player represented by {@code activeCharacterId}. A prepared transaction
+     * first applies the correct cooldown outcome; the second reconciliation
+     * then removes the now-redundant journal. A mismatched roster remains
+     * frozen for manual recovery.
+     */
+    public static Result finalizeAfterDurablePlayerSave(
+            UUID activeCharacterId,
+            CharacterSwitchAccountState account,
+            long timestamp) {
+        Result first = reconcile(activeCharacterId, account, timestamp);
+        if (first.getErrorId() != CharacterErrorId.NONE
+                || account == null || account.getTransaction() == null) {
+            return first;
+        }
+        Result second = reconcile(activeCharacterId, account, timestamp);
+        return second.getErrorId() == CharacterErrorId.NONE ? second : first;
+    }
+
     public static Action decide(UUID activeCharacterId,
                                 CharacterSwitchTransaction transaction) {
         if (transaction == null) {

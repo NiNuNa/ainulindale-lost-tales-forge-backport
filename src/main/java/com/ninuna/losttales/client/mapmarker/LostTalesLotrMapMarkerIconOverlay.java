@@ -3,8 +3,9 @@ package com.ninuna.losttales.client.mapmarker;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache.TrackedEnemy;
-import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
+import com.ninuna.losttales.client.party.ClientPartyStateCache;
+import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
@@ -12,15 +13,18 @@ import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.party.sync.PartyMemberSnapshot;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
 import com.ninuna.losttales.party.sync.PartyTrackedMemberSnapshot;
+import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
 import com.ninuna.losttales.party.sync.PartyTrackingSnapshot;
-import com.mojang.authlib.GameProfile;
 import cpw.mods.fml.common.FMLLog;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import lotr.client.gui.LOTRGuiMap;
 import lotr.common.LOTRDimension;
 import lotr.common.world.map.LOTRAbstractWaypoint;
@@ -47,6 +51,11 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     private static final int ICON_HOVER_DRAW_SIZE = 16;
     private static final int HOVER_RADIUS = ICON_HOVER_DRAW_SIZE / 2;
     private static final int EDGE_PADDING = ICON_HOVER_DRAW_SIZE / 2 + 1;
+    private static final float MAP_MARKER_HOVER_SCALE =
+            (float) ICON_HOVER_DRAW_SIZE / (float) ICON_DRAW_SIZE;
+    private static final float PLAYER_HEAD_DRAW_SIZE = 9.0F;
+    private static final float PLAYER_HEAD_HOVER_DRAW_SIZE =
+            PLAYER_HEAD_DRAW_SIZE * MAP_MARKER_HOVER_SCALE;
     private static final double COORDINATE_MATCH_EPSILON = 0.5D;
 
     private static Method transformCoordsMethod;
@@ -62,10 +71,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     private static Field hasOverlayField;
     private static Field loadingConquestGridField;
     private static Field playerLocationsField;
-    private static Field playerLocationProfileField;
     private static Field playerLocationXField;
     private static Field playerLocationZField;
-    private static Method renderPlayerIconMethod;
     private static Method renderWaypointTooltipMethod;
     private static Method drawFancyRectMethod;
     private static boolean reflectionReady;
@@ -118,7 +125,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                     continue;
                 }
 
-                ScreenPosition position = transformWaypoint(context, waypoint);
+                // The JSON marker is also the compass source of truth. Using
+                // its exact world coordinates keeps both displays aligned,
+                // even for positions between LOTR's 128-block map pixels.
+                ScreenPosition position = transformMarker(context, marker);
                 if (position == null || !isInsideMap(position.x, position.y, context)) {
                     continue;
                 }
@@ -181,69 +191,127 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     }
 
     /**
-     * Re-renders only the hovered party member head at a slightly larger scale.
-     * The normal LOTR player head remains the marker, so no colored dot is
-     * drawn above it.
+     * Replaces native account heads with synchronized roleplaying-character
+     * portraits. Native markers remain the safe fallback when no appearance
+     * is available, and still own tracking and hover text.
      */
-    public static void renderHoveredPartyMemberHead(
+    public static void renderRoleplayPlayerHeads(
             LOTRGuiMap gui, int mouseX, int mouseY) {
         RenderContext context = createRenderContext(gui);
-        if (context == null || context.alpha <= 0.0F) {
+        if (context == null) {
             return;
         }
-        PartyStateSnapshot state = ClientPartyStateCache.getSnapshot();
-        PartyTrackingSnapshot tracking =
-                ClientPartyTrackingCache.getMatching(state);
-        if (state == null || state.getParty() == null || tracking == null) {
-            return;
-        }
+        beginIconRender();
         try {
+            Set<UUID> renderedOwners = new HashSet<UUID>();
+            // LOTR renders the local player outside playerLocations. Cover
+            // that separate path first so solo players receive the same
+            // roleplaying portrait as remote party members.
+            EntityPlayer localPlayer = context.minecraft.thePlayer;
+            UUID localOwnerId = localPlayer == null
+                    ? null : localPlayer.getUniqueID();
+            if (localPlayer != null && localOwnerId != null) {
+                renderRoleplayPlayerHead(
+                        context, localOwnerId,
+                        localPlayer.posX, localPlayer.posZ,
+                        mouseX, mouseY);
+                renderedOwners.add(localOwnerId);
+            }
+
+            // Lost Tales parties are independent of LOTR fellowships, so
+            // their synchronized members may not exist in LOTR's native
+            // playerLocations map. Render those authorized positions here.
+            PartyStateSnapshot partyState =
+                    ClientPartyStateCache.getSnapshot();
+            PartyTrackingSnapshot tracking =
+                    ClientPartyTrackingCache.getMatching(partyState);
+            if (tracking != null && partyState != null
+                    && partyState.getParty() != null) {
+                for (PartyTrackedMemberSnapshot tracked
+                        : tracking.getTrackedMembers()) {
+                    if (tracked.getDimensionId()
+                            != LOTRDimension.MIDDLE_EARTH.dimensionID) {
+                        continue;
+                    }
+                    PartyMemberSnapshot member = partyState.getParty()
+                            .getMember(tracked.getCharacterId());
+                    if (member == null
+                            || !renderedOwners.add(member.getOwnerId())) {
+                        continue;
+                    }
+                    renderRoleplayPlayerHead(
+                            context, member.getOwnerId(),
+                            tracked.getX(), tracked.getZ(),
+                            mouseX, mouseY);
+                }
+            }
+
             Map<?, ?> locations = (Map<?, ?>)
                     playerLocationsField.get(null);
-            if (locations == null || locations.isEmpty()) {
+            if (locations == null) {
                 return;
             }
-            for (PartyTrackedMemberSnapshot tracked
-                    : tracking.getTrackedMembers()) {
-                PartyMemberSnapshot member = state.getParty().getMember(
-                        tracked.getCharacterId());
-                if (member == null) {
+            for (Map.Entry<?, ?> entry : locations.entrySet()) {
+                if (!(entry.getKey() instanceof UUID)
+                        || entry.getValue() == null) {
                     continue;
                 }
-                Object location = locations.get(member.getOwnerId());
-                if (location == null) {
+                UUID ownerId = (UUID) entry.getKey();
+                if (!renderedOwners.add(ownerId)) {
                     continue;
                 }
-                GameProfile profile = (GameProfile)
-                        playerLocationProfileField.get(location);
+                Object location = entry.getValue();
                 double worldX = playerLocationXField.getDouble(location);
                 double worldZ = playerLocationZField.getDouble(location);
-                ScreenPosition position = transformWorldCoords(
-                        context, worldX, worldZ);
-                if (profile == null || position == null
-                        || !isInsideMap(position.x, position.y, context)
-                        || !isMouseOverPlayerHead(
-                        position.x, position.y, mouseX, mouseY)) {
-                    continue;
-                }
-                GL11.glPushMatrix();
-                GL11.glTranslated(position.x, position.y, 0.0D);
-                GL11.glScalef(1.30F, 1.30F, 1.0F);
-                GL11.glTranslated(-position.x, -position.y, 0.0D);
-                try {
-                    renderPlayerIconMethod.invoke(gui, profile,
-                            tracked.getCharacterName(),
-                            Double.valueOf(position.x),
-                            Double.valueOf(position.y),
-                            Integer.valueOf(mouseX), Integer.valueOf(mouseY));
-                } finally {
-                    GL11.glPopMatrix();
-                }
-                return;
+                renderRoleplayPlayerHead(
+                        context, ownerId, worldX, worldZ,
+                        mouseX, mouseY);
             }
         } catch (Throwable ignored) {
             // LOTR internals are compatibility-only; the normal map stays usable.
+        } finally {
+            endIconRender();
         }
+    }
+
+    private static void renderRoleplayPlayerHead(
+            RenderContext context, UUID ownerId,
+            double worldX, double worldZ, int mouseX, int mouseY) {
+        ScreenPosition position = transformWorldCoords(
+                context, worldX, worldZ);
+        if (position == null) {
+            return;
+        }
+        // Mirror LOTRGuiMap.renderPlayerIcon exactly: player coordinates are
+        // rounded, then clamped five pixels inside the map. This keeps the
+        // replacement directly over the native head even beyond map edges.
+        float centerX = clampPlayerIconCoordinate(
+                Math.round(position.x), context.mapXMin, context.mapXMax)
+                + 0.5F;
+        float centerY = clampPlayerIconCoordinate(
+                Math.round(position.y), context.mapYMin, context.mapYMax)
+                + 0.5F;
+        boolean hovered = isMouseOverPlayerHead(
+                centerX, centerY, mouseX, mouseY);
+        float size = hovered
+                ? PLAYER_HEAD_HOVER_DRAW_SIZE
+                : PLAYER_HEAD_DRAW_SIZE;
+        LostTalesCharacterHeadIconRenderer.drawRoleplayHead(
+                context.minecraft, ownerId,
+                centerX - size * 0.5F + 1.0F,
+                centerY - size * 0.5F + 1.0F,
+                size, 0.15F, 0.75F);
+        LostTalesCharacterHeadIconRenderer.drawRoleplayHead(
+                context.minecraft, ownerId,
+                centerX - size * 0.5F,
+                centerY - size * 0.5F,
+                size, 1.0F, 1.0F);
+    }
+
+    private static int clampPlayerIconCoordinate(
+            int coordinate, int minimum, int maximum) {
+        return Math.max(minimum + 5,
+                Math.min(maximum - 6, coordinate));
     }
 
     /** Returns the world X/Z under a valid, unobstructed LOTR-map click. */
@@ -272,9 +340,9 @@ public final class LostTalesLotrMapMarkerIconOverlay {
 
     private static boolean isMouseOverPlayerHead(
             float screenX, float screenY, int mouseX, int mouseY) {
-        double dx = screenX + 0.5D - mouseX;
-        double dy = screenY + 0.5D - mouseY;
-        return dx * dx + dy * dy <= 36.0D;
+        float hoverRadius = PLAYER_HEAD_HOVER_DRAW_SIZE * 0.5F;
+        return Math.abs(screenX - mouseX) <= hoverRadius
+                && Math.abs(screenY - mouseY) <= hoverRadius;
     }
 
     /** Renders non-interactive, non-persistent enemies from the shared combat snapshot. */
@@ -606,17 +674,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     }
 
     private static boolean shouldShowLostTalesIcon(LostTalesMapMarkerData marker) {
-        if (marker == null) {
-            return false;
-        }
-        if (!marker.isDiscoverable()) {
-            return true;
-        }
-        if (isDiscovered(marker)) {
-            return true;
-        }
-        return !marker.isHiddenUntilDiscovered()
-                && isVisibilityRegionUnlocked(marker);
+        return LostTalesClientMapMarkerVisibility.isMapVisible(marker);
     }
 
     private static boolean isDiscovered(LostTalesMapMarkerData marker) {
@@ -686,6 +744,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             return false;
         }
         return isUndiscoveredButVisible(marker)
+                || LostTalesClientMapMarkerVisibility
+                .isNonDiscoverableVisible(marker)
                 || shouldRenderWaypoint(minecraft, waypoint, includeHidden);
     }
 
@@ -906,13 +966,21 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     }
 
     private static void drawMarkerIcon(Minecraft minecraft, LostTalesMapMarkerData marker, float centerX, float centerY, float alpha, boolean hover) {
-        LostTalesCompassMarkerIcon icon = isUndiscoveredButVisible(marker)
+        boolean undiscovered = isUndiscoveredButVisible(marker);
+        LostTalesCompassMarkerIcon icon = undiscovered
                 ? LostTalesCompassMarkerIcon.UNDISCOVERED
                 : LostTalesCompassMarkerIcon.fromName(marker.getIconName());
-        float[] color = isUndiscoveredButVisible(marker) ? LostTalesCompassMarker.parseColor("gray") : LostTalesCompassMarker.parseColor(marker.getColorName());
-        float iconAlpha = isUndiscoveredButVisible(marker) ? alpha * 0.85F : alpha;
+        // White is a neutral texture tint. Undiscovered icons should retain
+        // their artwork instead of being recolored gray or washed out.
+        float[] color = LostTalesCompassMarker.parseColor(
+                undiscovered ? "white" : marker.getColorName());
         int size = hover ? ICON_HOVER_DRAW_SIZE : ICON_DRAW_SIZE;
-        drawFixedScreenIcon(minecraft, centerX, centerY, size, icon, color[0], color[1], color[2], iconAlpha);
+        // Match Minecraft's one-pixel text shadow without modifying the
+        // configured icon tint itself.
+        drawFixedScreenIcon(minecraft, centerX + 1.0F, centerY + 1.0F,
+                size, icon, 0.0F, 0.0F, 0.0F, alpha * 0.75F);
+        drawFixedScreenIcon(minecraft, centerX, centerY, size, icon,
+                color[0], color[1], color[2], alpha);
     }
 
     /**
@@ -1063,15 +1131,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             playerLocationsField = LOTRGuiMap.class.getDeclaredField("playerLocations");
             Class<?> playerLocationClass = Class.forName(
                     "lotr.client.gui.LOTRGuiMap$PlayerLocationInfo");
-            playerLocationProfileField = playerLocationClass
-                    .getDeclaredField("profile");
             playerLocationXField = playerLocationClass
                     .getDeclaredField("posX");
             playerLocationZField = playerLocationClass
                     .getDeclaredField("posZ");
-            renderPlayerIconMethod = LOTRGuiMap.class.getDeclaredMethod(
-                    "renderPlayerIcon", GameProfile.class, String.class,
-                    double.class, double.class, int.class, int.class);
             renderWaypointTooltipMethod = LOTRGuiMap.class.getDeclaredMethod("renderWaypointTooltip", LOTRAbstractWaypoint.class, boolean.class, int.class, int.class);
             drawFancyRectMethod = LOTRGuiMap.class.getDeclaredMethod("drawFancyRect", int.class, int.class, int.class, int.class);
             mapXMinField.setAccessible(true);
@@ -1086,10 +1149,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             hasOverlayField.setAccessible(true);
             loadingConquestGridField.setAccessible(true);
             playerLocationsField.setAccessible(true);
-            playerLocationProfileField.setAccessible(true);
             playerLocationXField.setAccessible(true);
             playerLocationZField.setAccessible(true);
-            renderPlayerIconMethod.setAccessible(true);
             renderWaypointTooltipMethod.setAccessible(true);
             drawFancyRectMethod.setAccessible(true);
             reflectionReady = true;
@@ -1161,16 +1222,18 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         private final LostTalesMapMarkerData marker;
         private final int worldX;
         private final int worldZ;
-        private final int mapImageX;
-        private final int mapImageY;
+        private final double mapImageX;
+        private final double mapImageY;
         private final int y;
 
         private LostTalesMarkerWaypoint(LostTalesMapMarkerData marker) {
             this.marker = marker;
             this.worldX = Math.round((float) marker.getX());
             this.worldZ = Math.round((float) marker.getZ());
-            this.mapImageX = LOTRWaypoint.worldToMapX(marker.getX());
-            this.mapImageY = LOTRWaypoint.worldToMapZ(marker.getZ());
+            this.mapImageX = LostTalesMapCoordinateHelper
+                    .worldToMapImageX(marker.getX());
+            this.mapImageY = LostTalesMapCoordinateHelper
+                    .worldToMapImageZ(marker.getZ());
             this.y = Math.round((float) marker.getY());
         }
 
@@ -1250,8 +1313,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         private final int worldX;
         private final int worldY;
         private final int worldZ;
-        private final int mapImageX;
-        private final int mapImageY;
+        private final double mapImageX;
+        private final double mapImageY;
 
         private LostTalesEntityWaypoint(EnemyMarkerPosition enemy) {
             this.entityId = enemy.entityId;
@@ -1259,8 +1322,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             this.worldX = Math.round((float) enemy.x);
             this.worldY = Math.round((float) enemy.y);
             this.worldZ = Math.round((float) enemy.z);
-            this.mapImageX = LOTRWaypoint.worldToMapX(enemy.x);
-            this.mapImageY = LOTRWaypoint.worldToMapZ(enemy.z);
+            this.mapImageX = LostTalesMapCoordinateHelper
+                    .worldToMapImageX(enemy.x);
+            this.mapImageY = LostTalesMapCoordinateHelper
+                    .worldToMapImageZ(enemy.z);
         }
 
         @Override

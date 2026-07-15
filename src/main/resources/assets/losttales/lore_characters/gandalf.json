@@ -1,0 +1,12 @@
+{
+  "dataVersion": 1,
+  "id": "losttales:gandalf",
+  "name": "Gandalf",
+  "description": "A wandering wizard who opposes the Shadow.",
+  "appearance": {
+    "raceId": "losttales:human",
+    "genderId": "losttales:male",
+    "modelId": "lotr:human",
+    "skinId": "losttales:human_bree_male_0"
+  }
+}
