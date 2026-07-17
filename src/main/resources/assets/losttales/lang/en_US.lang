@@ -528,12 +528,16 @@ item.horn_test.lore.line1=A simple horn for testing your call.
 item.horn_test.lore.line2=Plays a low note when used.
 
 key.categories.losttales.mappings=Ainulindalë: Lost Tales
+losttales.config.category.rangedCombat=Ranged Combat
 key.losttales.toggleHud=Toggle HUD
 key.losttales.use=Activate / Use
 key.losttales.modifier=Modifier Key
 key.losttales.characterMenu=Open Character Menu
 key.losttales.questJournal=Open Quest Journal
 key.losttales.swapShoulder=Switch Camera Shoulder
+key.losttales.targetLock=Toggle Target Lock
+key.losttales.cycleTargetLeft=Cycle Target Left
+key.losttales.cycleTargetRight=Cycle Target Right
 
 #   GUI
 quickLootHud.losttales.empty=Empty

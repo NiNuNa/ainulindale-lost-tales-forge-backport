@@ -1,6 +1,8 @@
 package com.ninuna.losttales.client.keybinding;
 
 import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
+import com.ninuna.losttales.client.camera.ThirdPersonTargetLockController;
+import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
 import com.ninuna.losttales.gui.hud.LostTalesHudHelper;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
 import com.ninuna.losttales.gui.screen.LostTalesCharacterMenuGui;
@@ -17,6 +19,7 @@ import org.lwjgl.input.Mouse;
 
 public class LostTalesKeyBindings {
     public static final String CATEGORY = "key.categories.losttales.mappings";
+    private static final int MIDDLE_MOUSE_KEY_CODE = -98;
 
     private static final KeyBinding CHARACTER_MENU = new KeyBinding("key.losttales.characterMenu", Keyboard.KEY_CAPITAL, CATEGORY);
     private static final KeyBinding QUEST_JOURNAL = new KeyBinding("key.losttales.questJournal", Keyboard.KEY_J, CATEGORY);
@@ -24,6 +27,9 @@ public class LostTalesKeyBindings {
     private static final KeyBinding USE = new KeyBinding("key.losttales.use", Keyboard.KEY_R, CATEGORY);
     private static final KeyBinding MODIFIER = new KeyBinding("key.losttales.modifier", Keyboard.KEY_LMENU, CATEGORY);
     private static final KeyBinding SWAP_SHOULDER = new KeyBinding("key.losttales.swapShoulder", Keyboard.KEY_C, CATEGORY);
+    private static final KeyBinding TARGET_LOCK = new KeyBinding("key.losttales.targetLock", MIDDLE_MOUSE_KEY_CODE, CATEGORY);
+    private static final KeyBinding CYCLE_TARGET_LEFT = new KeyBinding("key.losttales.cycleTargetLeft", Keyboard.KEY_NONE, CATEGORY);
+    private static final KeyBinding CYCLE_TARGET_RIGHT = new KeyBinding("key.losttales.cycleTargetRight", Keyboard.KEY_NONE, CATEGORY);
 
     public void register() {
         ClientRegistry.registerKeyBinding(CHARACTER_MENU);
@@ -32,6 +38,9 @@ public class LostTalesKeyBindings {
         ClientRegistry.registerKeyBinding(USE);
         ClientRegistry.registerKeyBinding(MODIFIER);
         ClientRegistry.registerKeyBinding(SWAP_SHOULDER);
+        ClientRegistry.registerKeyBinding(TARGET_LOCK);
+        ClientRegistry.registerKeyBinding(CYCLE_TARGET_LEFT);
+        ClientRegistry.registerKeyBinding(CYCLE_TARGET_RIGHT);
     }
 
     @SubscribeEvent
@@ -68,10 +77,30 @@ public class LostTalesKeyBindings {
         if (SWAP_SHOULDER.isPressed()) {
             ThirdPersonCameraRuntime.toggleShoulder(minecraft);
         }
+        if (TARGET_LOCK.isPressed()) {
+            ThirdPersonTargetLockController.toggle(minecraft);
+        }
+        if (CYCLE_TARGET_LEFT.isPressed()) {
+            ThirdPersonTargetLockController.cycle(minecraft, -1);
+        }
+        if (CYCLE_TARGET_RIGHT.isPressed()) {
+            ThirdPersonTargetLockController.cycle(minecraft, 1);
+        }
     }
 
     @SubscribeEvent
     public void onMouse(MouseEvent event) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (event.buttonstate && event.button >= 0
+                && isMouseButton(TARGET_LOCK, event.button)
+                && minecraft != null && minecraft.currentScreen == null
+                && LostTalesThirdPersonConfig.enableTargetLock
+                && ThirdPersonCameraRuntime.shouldUseCamera(
+                minecraft, minecraft.renderViewEntity)) {
+            ThirdPersonTargetLockController.toggle(minecraft);
+            event.setCanceled(true);
+            return;
+        }
         if (event.dwheel == 0 || !isModifierKeyDown()) {
             return;
         }
@@ -125,6 +154,13 @@ public class LostTalesKeyBindings {
 
     private static boolean isKeyboardKey(KeyBinding keyBinding, int keyCode) {
         return keyBinding != null && keyCode != Keyboard.KEY_NONE && keyBinding.getKeyCode() == keyCode;
+    }
+
+    private static boolean isMouseButton(
+            KeyBinding keyBinding, int mouseButton) {
+        return keyBinding != null && mouseButton >= 0
+                && keyBinding.getKeyCode() < Keyboard.KEY_NONE
+                && keyBinding.getKeyCode() + 100 == mouseButton;
     }
 
     private static boolean isKeyDown(KeyBinding keyBinding) {

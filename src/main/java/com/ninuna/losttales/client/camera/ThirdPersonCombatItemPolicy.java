@@ -21,7 +21,7 @@ final class ThirdPersonCombatItemPolicy {
         }
         Item item = stack.getItem();
         if (item instanceof ItemSword
-                || ThirdPersonProjectileItemPolicy.isSupported(stack)) {
+                || ThirdPersonProjectileItemPolicy.isRangedWeapon(stack)) {
             return true;
         }
         String simpleName = item.getClass().getSimpleName()

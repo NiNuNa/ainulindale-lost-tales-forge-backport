@@ -23,6 +23,8 @@ public final class ThirdPersonDirectionalMovementController {
     private static long activationSequence;
     private static boolean attackCommittedLastTick;
     private static float committedAttackYaw;
+    private static boolean reverseHeadTracking;
+    private static float reverseHeadTrackingBlend;
 
     private ThirdPersonDirectionalMovementController() {}
 
@@ -33,6 +35,8 @@ public final class ThirdPersonDirectionalMovementController {
             reset(player);
             return;
         }
+        ThirdPersonGameplayState gameplayState =
+                ThirdPersonGameplayStateTracker.get(player);
 
         String newContextKey = contextKey(player);
         if (!active || !newContextKey.equals(contextKey)) {
@@ -40,12 +44,18 @@ public final class ThirdPersonDirectionalMovementController {
             previousBodyYaw = bodyYaw;
             headYaw = finiteOr(player.rotationYawHead, player.rotationYaw);
             previousHeadYaw = headYaw;
-            boolean reverseTracking = DirectionalMovementMath
-                    .isReverseHeadTracking(
+            boolean allowReverseTracking = !gameplayState.shouldFaceAim()
+                    && !gameplayState.isAttacking();
+            reverseHeadTracking = allowReverseTracking
+                    && DirectionalMovementMath.updateReverseHeadTracking(
+                    false,
                     bodyYaw, player.rotationYaw,
-                    (float)LostTalesThirdPersonConfig.headTrackingAngle);
+                    (float)LostTalesThirdPersonConfig.headTrackingAngle,
+                    (float)LostTalesThirdPersonConfig
+                            .headTrackingHysteresisAngle);
+            reverseHeadTrackingBlend = reverseHeadTracking ? 1.0F : 0.0F;
             headPitch = DirectionalMovementMath.resolveHeadTrackingPitch(
-                    player.rotationPitch, reverseTracking);
+                    player.rotationPitch, reverseHeadTrackingBlend);
             previousHeadPitch = headPitch;
             contextKey = newContextKey;
             active = true;
@@ -58,8 +68,6 @@ public final class ThirdPersonDirectionalMovementController {
         float moveStrafe = player.movementInput.moveStrafe;
         boolean moving = Math.abs(moveForward) > MOVEMENT_EPSILON
                 || Math.abs(moveStrafe) > MOVEMENT_EPSILON;
-        ThirdPersonGameplayState gameplayState =
-                ThirdPersonGameplayStateTracker.get(player);
         previousBodyYaw = bodyYaw;
         float targetYaw = bodyYaw;
         double speed = LostTalesThirdPersonConfig.bodyRotationSpeed;
@@ -67,7 +75,8 @@ public final class ThirdPersonDirectionalMovementController {
 
         if (gameplayState.isAttackCommitted()) {
             if (!attackCommittedLastTick) {
-                committedAttackYaw = moving
+                committedAttackYaw = gameplayState.shouldFaceAim()
+                        ? player.rotationYaw : moving
                         ? DirectionalMovementMath.resolveMovementYaw(
                         player.rotationYaw, moveForward, moveStrafe)
                         : bodyYaw;
@@ -75,7 +84,7 @@ public final class ThirdPersonDirectionalMovementController {
             targetYaw = committedAttackYaw;
             speed = LostTalesThirdPersonConfig.attackBodyRotationSpeed;
             rotate = true;
-        } else if (gameplayState.isAiming()) {
+        } else if (gameplayState.shouldFaceAim()) {
             targetYaw = player.rotationYaw;
             speed = LostTalesThirdPersonConfig.aimingBodyRotationSpeed;
             rotate = true;
@@ -100,16 +109,28 @@ public final class ThirdPersonDirectionalMovementController {
         previousHeadPitch = headPitch;
         float trackingAngle = (float)LostTalesThirdPersonConfig
                 .headTrackingAngle;
-        boolean reverseTracking = DirectionalMovementMath
-                .isReverseHeadTracking(
-                bodyYaw, player.rotationYaw, trackingAngle);
+        boolean allowReverseTracking = !gameplayState.shouldFaceAim()
+                && !gameplayState.isAttacking();
+        reverseHeadTracking = allowReverseTracking
+                && DirectionalMovementMath.updateReverseHeadTracking(
+                reverseHeadTracking, bodyYaw, player.rotationYaw,
+                trackingAngle,
+                (float)LostTalesThirdPersonConfig
+                        .headTrackingHysteresisAngle);
+        float transitionSeconds = (float)LostTalesThirdPersonConfig
+                .headTrackingTransitionSeconds;
+        reverseHeadTrackingBlend = DirectionalMovementMath.approachValue(
+                reverseHeadTrackingBlend,
+                reverseHeadTracking ? 1.0F : 0.0F,
+                Math.min(1.0F, TICK_SECONDS
+                        / Math.max(0.0001F, transitionSeconds)));
         float targetHeadYaw = DirectionalMovementMath
                 .resolveHeadTrackingYaw(
                 bodyYaw, player.rotationYaw,
-                trackingAngle);
+                trackingAngle, reverseHeadTrackingBlend);
         float targetHeadPitch = DirectionalMovementMath
                 .resolveHeadTrackingPitch(
-                player.rotationPitch, reverseTracking);
+                player.rotationPitch, reverseHeadTrackingBlend);
         float maximumHeadStep = (float)(LostTalesThirdPersonConfig
                 .headTrackingSpeed * TICK_SECONDS);
         headYaw = DirectionalMovementMath.approachDegrees(
@@ -142,6 +163,8 @@ public final class ThirdPersonDirectionalMovementController {
         previousHeadPitch = 0.0F;
         attackCommittedLastTick = false;
         committedAttackYaw = 0.0F;
+        reverseHeadTracking = false;
+        reverseHeadTrackingBlend = 0.0F;
     }
 
     public static boolean isActive() {

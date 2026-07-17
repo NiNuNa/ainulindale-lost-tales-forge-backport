@@ -20,6 +20,8 @@ public final class LostTalesThirdPersonProjectileAimHandler {
         }
         EntityPlayerMP shooter = findShooter(event.entity);
         if (shooter != null) {
+            LostTalesChargeService.applyCharge(
+                    event.entity, shooter);
             LostTalesThirdPersonAimService.applyAim(
                     event.entity, shooter);
         }

@@ -19,7 +19,8 @@ public final class ThirdPersonCameraController {
     private static double lastDeltaSeconds;
     private static double renderedFov = 70.0D;
     private static CameraRenderFrame renderFrame;
-    private static double manualZoomDistance = Double.NaN;
+    private static double manualZoomOffset = Double.NaN;
+    private static double lastProfileDistance = Double.NaN;
 
     private ThirdPersonCameraController() {}
 
@@ -184,8 +185,9 @@ public final class ThirdPersonCameraController {
         validateZoomBounds(minimumDistance, maximumDistance);
         CameraMath.requireNonNegativeFinite(
                 "profileDistance", profileDistance);
-        double requested = Double.isNaN(manualZoomDistance)
-                ? profileDistance : manualZoomDistance;
+        lastProfileDistance = profileDistance;
+        double requested = profileDistance + (Double.isNaN(
+                manualZoomOffset) ? 0.0D : manualZoomOffset);
         return clamp(requested, minimumDistance, maximumDistance);
     }
 
@@ -198,17 +200,20 @@ public final class ThirdPersonCameraController {
         if (wheelDelta == 0 || pose == null || step == 0.0D) {
             return false;
         }
-        double current = Double.isNaN(manualZoomDistance)
-                ? pose.getDistance() : manualZoomDistance;
-        double direction = wheelDelta > 0 ? -1.0D : 1.0D;
-        manualZoomDistance = clamp(
-                current + direction * step,
+        double profileDistance = Double.isNaN(lastProfileDistance)
+                ? pose.getDistance() : lastProfileDistance;
+        double current = clamp(profileDistance + (Double.isNaN(
+                manualZoomOffset) ? 0.0D : manualZoomOffset),
                 minimumDistance, maximumDistance);
+        double direction = wheelDelta > 0 ? -1.0D : 1.0D;
+        double requested = clamp(current + direction * step,
+                minimumDistance, maximumDistance);
+        manualZoomOffset = requested - profileDistance;
         return true;
     }
 
-    static synchronized double getManualZoomDistance() {
-        return manualZoomDistance;
+    static synchronized double getManualZoomOffset() {
+        return manualZoomOffset;
     }
 
     public static synchronized boolean isActive() {
@@ -270,18 +275,19 @@ public final class ThirdPersonCameraController {
         lastDeltaSeconds = 0.0D;
         renderedFov = 70.0D;
         renderFrame = null;
+        lastProfileDistance = Double.NaN;
     }
 
     public static synchronized void reset() {
         deactivate();
         rightShoulder = true;
-        manualZoomDistance = Double.NaN;
+        manualZoomOffset = Double.NaN;
     }
 
     public static synchronized void reset(boolean useRightShoulder) {
         deactivate();
         rightShoulder = useRightShoulder;
-        manualZoomDistance = Double.NaN;
+        manualZoomOffset = Double.NaN;
     }
 
     private static void validateZoomBounds(

@@ -16,6 +16,7 @@ public final class LostTalesConfig {
     public static final String CATEGORY_CHARACTERS = "characters";
     public static final String CATEGORY_COMBAT_MARKERS = "combat_markers";
     public static final String CATEGORY_PARTY = "party";
+    public static final String CATEGORY_RANGED_COMBAT = "ranged_combat";
 
     public static final String HUD_PRESET_CUSTOM = "custom";
     public static final String HUD_PRESET_DEFAULT = "default";
@@ -136,6 +137,20 @@ public final class LostTalesConfig {
     public static long characterSwitchCombatGraceMillis = 20000L;
     public static long characterSwitchTeleportGraceMillis = 5000L;
 
+    public static boolean enableChargeTiers = true;
+    public static int chargeTierOneTicks = 10;
+    public static int chargeTierTwoTicks = 24;
+    public static int chargeTierThreeTicks = 42;
+    public static double chargeTierOneDamageMultiplier = 1.12D;
+    public static double chargeTierTwoDamageMultiplier = 1.30D;
+    public static double chargeTierThreeDamageMultiplier = 1.60D;
+    public static double chargeTierOneVelocityMultiplier = 1.04D;
+    public static double chargeTierTwoVelocityMultiplier = 1.09D;
+    public static double chargeTierThreeVelocityMultiplier = 1.16D;
+    public static double chargeTierOneKnockback = 0.0D;
+    public static double chargeTierTwoKnockback = 0.12D;
+    public static double chargeTierThreeKnockback = 0.24D;
+
     private LostTalesConfig() {}
 
     public static void load(File configFile) {
@@ -144,6 +159,69 @@ public final class LostTalesConfig {
         try {
             config.load();
             applyGuiMetadata(config);
+
+            enableChargeTiers = config.getBoolean(
+                    "enableChargeTiers", CATEGORY_RANGED_COMBAT,
+                    enableChargeTiers,
+                    "Enable server-authoritative post-full-draw charge tiers for bows, chargeable spears, and explicitly registered compatible weapons.");
+            chargeTierOneTicks = config.getInt(
+                    "chargeTierOneTicks", CATEGORY_RANGED_COMBAT,
+                    chargeTierOneTicks, 1, 200,
+                    "Ticks held after the weapon reaches its normal full draw before charge tier one activates.");
+            chargeTierTwoTicks = config.getInt(
+                    "chargeTierTwoTicks", CATEGORY_RANGED_COMBAT,
+                    chargeTierTwoTicks, 1, 400,
+                    "Ticks held after normal full draw before charge tier two activates.");
+            chargeTierThreeTicks = config.getInt(
+                    "chargeTierThreeTicks", CATEGORY_RANGED_COMBAT,
+                    chargeTierThreeTicks, 1, 600,
+                    "Ticks held after normal full draw before charge tier three activates.");
+            chargeTierTwoTicks = Math.max(
+                    chargeTierOneTicks + 1, chargeTierTwoTicks);
+            chargeTierThreeTicks = Math.max(
+                    chargeTierTwoTicks + 1, chargeTierThreeTicks);
+            config.get(CATEGORY_RANGED_COMBAT,
+                    "chargeTierTwoTicks", chargeTierTwoTicks)
+                    .set(chargeTierTwoTicks);
+            config.get(CATEGORY_RANGED_COMBAT,
+                    "chargeTierThreeTicks", chargeTierThreeTicks)
+                    .set(chargeTierThreeTicks);
+            chargeTierOneDamageMultiplier = getBoundedDouble(
+                    config, "chargeTierOneDamageMultiplier",
+                    chargeTierOneDamageMultiplier, 1.0D, 3.0D,
+                    "Damage multiplier applied by a tier-one projectile.");
+            chargeTierTwoDamageMultiplier = getBoundedDouble(
+                    config, "chargeTierTwoDamageMultiplier",
+                    chargeTierTwoDamageMultiplier, 1.0D, 4.0D,
+                    "Damage multiplier applied by a tier-two projectile.");
+            chargeTierThreeDamageMultiplier = getBoundedDouble(
+                    config, "chargeTierThreeDamageMultiplier",
+                    chargeTierThreeDamageMultiplier, 1.0D, 6.0D,
+                    "Damage multiplier applied by a tier-three projectile.");
+            chargeTierOneVelocityMultiplier = getBoundedDouble(
+                    config, "chargeTierOneVelocityMultiplier",
+                    chargeTierOneVelocityMultiplier, 1.0D, 2.0D,
+                    "Launch-speed multiplier applied to a tier-one projectile.");
+            chargeTierTwoVelocityMultiplier = getBoundedDouble(
+                    config, "chargeTierTwoVelocityMultiplier",
+                    chargeTierTwoVelocityMultiplier, 1.0D, 2.0D,
+                    "Launch-speed multiplier applied to a tier-two projectile.");
+            chargeTierThreeVelocityMultiplier = getBoundedDouble(
+                    config, "chargeTierThreeVelocityMultiplier",
+                    chargeTierThreeVelocityMultiplier, 1.0D, 2.0D,
+                    "Launch-speed multiplier applied to a tier-three projectile.");
+            chargeTierOneKnockback = getBoundedDouble(
+                    config, "chargeTierOneKnockback",
+                    chargeTierOneKnockback, 0.0D, 1.0D,
+                    "Additional horizontal knockback velocity from a tier-one projectile.");
+            chargeTierTwoKnockback = getBoundedDouble(
+                    config, "chargeTierTwoKnockback",
+                    chargeTierTwoKnockback, 0.0D, 1.0D,
+                    "Additional horizontal knockback velocity from a tier-two projectile.");
+            chargeTierThreeKnockback = getBoundedDouble(
+                    config, "chargeTierThreeKnockback",
+                    chargeTierThreeKnockback, 0.0D, 1.0D,
+                    "Additional horizontal knockback velocity from a tier-three projectile.");
 
             allowedStartingFactionIds = config.get(
                     CATEGORY_CHARACTERS,
@@ -768,7 +846,7 @@ public final class LostTalesConfig {
     /** Saves the exact Configuration whose properties the Forge GUI edited. */
     public static synchronized void savePendingGuiConfiguration() {
         Configuration pending = pendingGuiConfiguration;
-        if (pending != null && pending.hasChanged()) {
+        if (pending != null) {
             pending.save();
         }
     }
@@ -1015,12 +1093,53 @@ public final class LostTalesConfig {
         config.getCategory(CATEGORY_CHARACTERS).setLanguageKey("losttales.config.category.characters");
         config.getCategory(CATEGORY_COMBAT_MARKERS).setLanguageKey("losttales.config.category.combatMarkers");
         config.getCategory(CATEGORY_PARTY).setLanguageKey("losttales.config.category.party");
+        config.getCategory(CATEGORY_RANGED_COMBAT).setLanguageKey(
+                "losttales.config.category.rangedCombat");
     }
 
     private static void writeCurrentValues(Configuration config) {
         if (config == null) {
             return;
         }
+
+        config.get(CATEGORY_RANGED_COMBAT, "enableChargeTiers",
+                enableChargeTiers).set(enableChargeTiers);
+        config.get(CATEGORY_RANGED_COMBAT, "chargeTierOneTicks",
+                chargeTierOneTicks).set(chargeTierOneTicks);
+        config.get(CATEGORY_RANGED_COMBAT, "chargeTierTwoTicks",
+                chargeTierTwoTicks).set(chargeTierTwoTicks);
+        config.get(CATEGORY_RANGED_COMBAT, "chargeTierThreeTicks",
+                chargeTierThreeTicks).set(chargeTierThreeTicks);
+        config.get(CATEGORY_RANGED_COMBAT,
+                "chargeTierOneDamageMultiplier",
+                chargeTierOneDamageMultiplier).set(
+                chargeTierOneDamageMultiplier);
+        config.get(CATEGORY_RANGED_COMBAT,
+                "chargeTierTwoDamageMultiplier",
+                chargeTierTwoDamageMultiplier).set(
+                chargeTierTwoDamageMultiplier);
+        config.get(CATEGORY_RANGED_COMBAT,
+                "chargeTierThreeDamageMultiplier",
+                chargeTierThreeDamageMultiplier).set(
+                chargeTierThreeDamageMultiplier);
+        config.get(CATEGORY_RANGED_COMBAT,
+                "chargeTierOneVelocityMultiplier",
+                chargeTierOneVelocityMultiplier).set(
+                chargeTierOneVelocityMultiplier);
+        config.get(CATEGORY_RANGED_COMBAT,
+                "chargeTierTwoVelocityMultiplier",
+                chargeTierTwoVelocityMultiplier).set(
+                chargeTierTwoVelocityMultiplier);
+        config.get(CATEGORY_RANGED_COMBAT,
+                "chargeTierThreeVelocityMultiplier",
+                chargeTierThreeVelocityMultiplier).set(
+                chargeTierThreeVelocityMultiplier);
+        config.get(CATEGORY_RANGED_COMBAT, "chargeTierOneKnockback",
+                chargeTierOneKnockback).set(chargeTierOneKnockback);
+        config.get(CATEGORY_RANGED_COMBAT, "chargeTierTwoKnockback",
+                chargeTierTwoKnockback).set(chargeTierTwoKnockback);
+        config.get(CATEGORY_RANGED_COMBAT, "chargeTierThreeKnockback",
+                chargeTierThreeKnockback).set(chargeTierThreeKnockback);
 
         config.get(CATEGORY_CHARACTERS, "allowedStartingFactionIds",
                 allowedStartingFactionIds).set(allowedStartingFactionIds);
@@ -1210,5 +1329,19 @@ public final class LostTalesConfig {
             return max;
         }
         return value;
+    }
+
+    private static double getBoundedDouble(
+            Configuration config, String key, double defaultValue,
+            double minimum, double maximum, String comment) {
+        Property property = config.get(
+                CATEGORY_RANGED_COMBAT, key, defaultValue,
+                comment, minimum, maximum);
+        double value = property.getDouble(defaultValue);
+        double bounded = Math.max(minimum, Math.min(maximum, value));
+        if (bounded != value) {
+            property.set(bounded);
+        }
+        return bounded;
     }
 }

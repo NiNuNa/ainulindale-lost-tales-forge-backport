@@ -1,6 +1,8 @@
 package com.ninuna.losttales.client.camera;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -36,41 +38,61 @@ public final class DirectionalMovementMathTest {
     }
 
     @Test
-    public void headTrackingFlipsDirectionAtTheShoulderLimit() {
-        assertEquals(80.0F,
+    public void headTrackingBlendsAcrossTheShoulderLimit() {
+        assertEquals(85.0F,
                 DirectionalMovementMath.resolveHeadTrackingYaw(
-                        0.0F, 80.0F, 80.0F), 0.0F);
-        assertEquals(-80.0F,
+                        0.0F, 91.0F, 85.0F, 0.0F), 0.0F);
+        assertEquals(0.0F,
                 DirectionalMovementMath.resolveHeadTrackingYaw(
-                        0.0F, 81.0F, 80.0F), 0.0F);
-        assertEquals(-110.0F,
+                        0.0F, 91.0F, 85.0F, 0.5F), 0.0F);
+        assertEquals(-85.0F,
                 DirectionalMovementMath.resolveHeadTrackingYaw(
-                        170.0F, -110.0F, 80.0F), 0.0F);
-        assertEquals(90.0F,
-                DirectionalMovementMath.resolveHeadTrackingYaw(
-                        170.0F, -109.0F, 80.0F), 0.0F);
+                        0.0F, 91.0F, 85.0F, 1.0F), 0.0F);
     }
 
     @Test
-    public void reverseTrackingHasNoBodyForwardDeadZone() {
-        assertEquals(-80.0F,
+    public void headTrackingSupportsABeyondShoulderRange() {
+        assertEquals(100.0F,
                 DirectionalMovementMath.resolveHeadTrackingYaw(
-                        0.0F, 81.0F, 80.0F), 0.0F);
-        assertEquals(-80.0F,
+                        0.0F, 104.0F, 100.0F, 0.0F), 0.0F);
+        assertFalse(DirectionalMovementMath
+                .updateReverseHeadTracking(
+                        false, 0.0F, 104.0F, 100.0F, 6.0F));
+        assertTrue(DirectionalMovementMath
+                .updateReverseHeadTracking(
+                        false, 0.0F, 106.0F, 100.0F, 6.0F));
+    }
+
+    @Test
+    public void fullReverseTrackingFacesTheCameraWithoutExcessiveTwist() {
+        assertEquals(-85.0F,
                 DirectionalMovementMath.resolveHeadTrackingYaw(
-                        0.0F, 100.0F, 80.0F), 0.0F);
+                        0.0F, 91.0F, 85.0F, 1.0F), 0.0F);
         assertEquals(-45.0F,
                 DirectionalMovementMath.resolveHeadTrackingYaw(
-                        0.0F, 135.0F, 80.0F), 0.0001F);
-        assertEquals(80.0F,
-                DirectionalMovementMath.resolveHeadTrackingYaw(
-                        0.0F, -81.0F, 80.0F), 0.0F);
+                        0.0F, 135.0F, 85.0F, 1.0F), 0.0001F);
         assertEquals(45.0F,
                 DirectionalMovementMath.resolveHeadTrackingYaw(
-                        0.0F, -135.0F, 80.0F), 0.0001F);
+                        0.0F, -135.0F, 85.0F, 1.0F), 0.0001F);
         assertEquals(0.0F,
                 DirectionalMovementMath.resolveHeadTrackingYaw(
-                        0.0F, 180.0F, 80.0F), 0.0001F);
+                        0.0F, 180.0F, 85.0F, 1.0F), 0.0001F);
+    }
+
+    @Test
+    public void reverseTrackingUsesShoulderHysteresis() {
+        assertEquals(false,
+                DirectionalMovementMath.updateReverseHeadTracking(
+                        false, 0.0F, 90.0F, 85.0F, 6.0F));
+        assertEquals(true,
+                DirectionalMovementMath.updateReverseHeadTracking(
+                        false, 0.0F, 91.0F, 85.0F, 6.0F));
+        assertEquals(true,
+                DirectionalMovementMath.updateReverseHeadTracking(
+                        true, 0.0F, 80.0F, 85.0F, 6.0F));
+        assertEquals(false,
+                DirectionalMovementMath.updateReverseHeadTracking(
+                        true, 0.0F, 79.0F, 85.0F, 6.0F));
     }
 
     @Test
@@ -84,6 +106,9 @@ public final class DirectionalMovementMathTest {
         assertEquals(-30.0F,
                 DirectionalMovementMath.resolveHeadTrackingPitch(
                         -30.0F, false), 0.0F);
+        assertEquals(0.0F,
+                DirectionalMovementMath.resolveHeadTrackingPitch(
+                        30.0F, 0.5F), 0.0F);
     }
 
     @Test

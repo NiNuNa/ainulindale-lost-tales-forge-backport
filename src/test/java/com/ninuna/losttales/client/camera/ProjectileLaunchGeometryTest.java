@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.camera;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
 import java.util.List;
@@ -22,7 +23,7 @@ public final class ProjectileLaunchGeometryTest {
     }
 
     @Test
-    public void bowGuideStartsAtArrowTipWithoutMovingPhysicalArc() {
+    public void bowGuideStartsAtArrowTipAndSmoothlyJoinsPhysicalArc() {
         TargetingVector physical = vector(9.84D, 19.90D, 30.0D);
         TargetingVector visual = ProjectileLaunchGeometry
                 .resolveVisualOrigin(
@@ -37,12 +38,28 @@ public final class ProjectileLaunchGeometryTest {
                 9.84D, 19.85D, 35.97D);
         List<TargetingVector> rendered = ProjectileLaunchGeometry
                 .useVisualOrigin(Arrays.asList(
-                physical, firstPhysicalStep, secondPhysicalStep), visual);
+                physical, firstPhysicalStep, secondPhysicalStep),
+                visual, 4.0D);
 
         assertEquals(3, rendered.size());
         assertVector(rendered.get(0), 9.58D, 19.68D, 30.48D);
-        assertVector(rendered.get(1), 9.84D, 19.90D, 33.0D);
+        assertTrue(rendered.get(1).distanceSquared(firstPhysicalStep)
+                < visual.distanceSquared(physical));
         assertVector(rendered.get(2), 9.84D, 19.85D, 35.97D);
+    }
+
+    @Test
+    public void shortTrajectoryStillEndsAtPhysicalCollision() {
+        TargetingVector physical = vector(0.0D, 1.5D, 0.0D);
+        TargetingVector visual = vector(-0.3D, 1.2D, 0.4D);
+        TargetingVector collision = vector(0.0D, 1.4D, 1.0D);
+
+        List<TargetingVector> rendered = ProjectileLaunchGeometry
+                .useVisualOrigin(Arrays.asList(
+                physical, collision), visual, 3.0D);
+
+        assertVector(rendered.get(0), -0.3D, 1.2D, 0.4D);
+        assertVector(rendered.get(1), 0.0D, 1.4D, 1.0D);
     }
 
     @Test

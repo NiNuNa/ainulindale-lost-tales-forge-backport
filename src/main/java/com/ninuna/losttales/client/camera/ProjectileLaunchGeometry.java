@@ -65,28 +65,71 @@ public final class ProjectileLaunchGeometry {
                 .add(forward.scale(offsets.forward * modelScale));
     }
 
-    /**
-     * Replaces only the displayed first point. The remaining points retain the
-     * exact physical spawn origin, velocity, gravity, drag, and collisions.
-     */
+    /** Blends the held-item release point into the exact physical path. */
     public static List<TargetingVector> useVisualOrigin(
             List<TargetingVector> physicalTrajectory,
             TargetingVector visualOrigin) {
+        return useVisualOrigin(
+                physicalTrajectory, visualOrigin, 3.0D);
+    }
+
+    public static List<TargetingVector> useVisualOrigin(
+            List<TargetingVector> physicalTrajectory,
+            TargetingVector visualOrigin, double blendDistance) {
         if (physicalTrajectory == null) {
             throw new IllegalArgumentException(
                     "physical trajectory is required");
         }
         require(visualOrigin, "visual origin");
+        CameraMath.requireNonNegativeFinite(
+                "blendDistance", blendDistance);
+        if (blendDistance <= 0.0D) {
+            throw new IllegalArgumentException(
+                    "blendDistance must be positive");
+        }
         if (physicalTrajectory.isEmpty()) {
             return Collections.emptyList();
         }
+        TargetingVector physicalOrigin = physicalTrajectory.get(0);
+        require(physicalOrigin, "physical origin");
+        double totalDistance = pathLength(physicalTrajectory);
+        double transitionDistance = Math.min(
+                blendDistance, totalDistance);
+        TargetingVector offset = visualOrigin.subtract(physicalOrigin);
         List<TargetingVector> rendered =
                 new ArrayList<TargetingVector>(physicalTrajectory.size());
         rendered.add(visualOrigin);
+        double travelled = 0.0D;
         for (int index = 1; index < physicalTrajectory.size(); index++) {
-            rendered.add(physicalTrajectory.get(index));
+            TargetingVector previous = physicalTrajectory.get(index - 1);
+            TargetingVector point = physicalTrajectory.get(index);
+            require(previous, "physical trajectory point");
+            require(point, "physical trajectory point");
+            travelled += Math.sqrt(previous.distanceSquared(point));
+            double progress = transitionDistance <= 0.0000001D
+                    ? 1.0D : Math.min(
+                    1.0D, travelled / transitionDistance);
+            double offsetWeight = 1.0D - smoothStep(progress);
+            rendered.add(point.add(offset.scale(offsetWeight)));
         }
         return Collections.unmodifiableList(rendered);
+    }
+
+    private static double pathLength(List<TargetingVector> points) {
+        double length = 0.0D;
+        for (int index = 1; index < points.size(); index++) {
+            TargetingVector previous = points.get(index - 1);
+            TargetingVector point = points.get(index);
+            require(previous, "physical trajectory point");
+            require(point, "physical trajectory point");
+            length += Math.sqrt(previous.distanceSquared(point));
+        }
+        return length;
+    }
+
+    private static double smoothStep(double value) {
+        double clamped = Math.max(0.0D, Math.min(1.0D, value));
+        return clamped * clamped * (3.0D - 2.0D * clamped);
     }
 
     static double interpolateYaw(

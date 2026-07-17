@@ -48,6 +48,7 @@ public final class ThirdPersonEntityActionHooks {
                 && target != null && minecraft.currentScreen == null
                 && ThirdPersonCameraRuntime.shouldUseCamera(
                 minecraft, minecraft.renderViewEntity)
+                && mouseOver != null
                 && mouseOver.typeOfHit
                 == MovingObjectPosition.MovingObjectType.ENTITY
                 && mouseOver.entityHit == target

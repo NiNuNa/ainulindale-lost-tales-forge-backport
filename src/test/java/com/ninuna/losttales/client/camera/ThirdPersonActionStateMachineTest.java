@@ -68,6 +68,28 @@ public final class ThirdPersonActionStateMachineTest {
     }
 
     @Test
+    public void directionalItemCanFaceAimWithoutEnteringCombat() {
+        ThirdPersonGameplayState state =
+                new ThirdPersonActionStateMachine().update(
+                        false, false, true, false, false,
+                        false, 0, 0);
+        assertTrue(state.shouldFaceAim());
+        assertFalse(state.isAiming());
+        assertFalse(state.isCombat());
+    }
+
+    @Test
+    public void targetLockFacesAimAndSustainsCombatProfile() {
+        ThirdPersonGameplayState state =
+                new ThirdPersonActionStateMachine().update(
+                        false, false, true, true, false, false,
+                        false, 0, 2);
+        assertTrue(state.shouldFaceAim());
+        assertFalse(state.isAiming());
+        assertTrue(state.isCombat());
+    }
+
+    @Test
     public void userFacingSecondsRoundUpToWholeTicks() {
         assertTrue(ThirdPersonGameplayStateTracker.secondsToTicks(
                 0.01D) == 1);

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.camera;
 
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
+import com.ninuna.losttales.gameplay.item.ThirdPersonItemUsePolicy;
 import com.ninuna.losttales.gameplay.projectile.ThirdPersonProjectileItemPolicy;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.item.ItemStack;
@@ -31,9 +32,14 @@ public final class ThirdPersonGameplayStateTracker {
         ItemStack held = player.inventory.getCurrentItem();
         boolean aiming = ThirdPersonProjectileItemPolicy
                 .isActivelyAiming(held, player.isUsingItem());
+        boolean targetLocked = ThirdPersonTargetLockController
+                .hasTarget(player);
+        boolean faceAim = ThirdPersonItemUsePolicy.shouldFaceAim(
+                held, player.isUsingItem()) || targetLocked;
         state = MACHINE.update(
                 player.isSwingInProgress,
-                aiming, player.hurtTime > 0,
+                aiming, faceAim, targetLocked,
+                player.hurtTime > 0,
                 ThirdPersonCombatItemPolicy.isCombatItem(held),
                 LostTalesThirdPersonConfig
                         .combatProfileWithWeaponHeld,

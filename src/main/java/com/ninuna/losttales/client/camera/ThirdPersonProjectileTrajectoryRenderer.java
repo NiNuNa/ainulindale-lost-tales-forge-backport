@@ -34,6 +34,9 @@ public final class ThirdPersonProjectileTrajectoryRenderer {
         if (ballistics == null) {
             return;
         }
+        ballistics = ballistics.scaleLaunchSpeed(
+                ThirdPersonChargeFeedbackController
+                        .getVelocityMultiplier());
         MovingObjectPosition target = ThirdPersonProjectileAimController
                 .resolveTarget(minecraft, partialTicks);
         float partial = Math.max(0.0F, Math.min(1.0F, partialTicks));
@@ -73,10 +76,18 @@ public final class ThirdPersonProjectileTrajectoryRenderer {
                 player.inventory.getCurrentItem(), physicalOrigin,
                 direction, shooterYaw, modelScale);
         points = ProjectileLaunchGeometry.useVisualOrigin(
-                points, visualOrigin);
+                points, visualOrigin,
+                LostTalesThirdPersonConfig
+                        .projectileTrajectoryOriginBlendDistance);
         if (points.size() < 2) {
             return;
         }
+        points = ProjectileTrajectorySmoother.resample(
+                points,
+                LostTalesThirdPersonConfig
+                        .projectileTrajectorySamplesPerTick,
+                LostTalesThirdPersonConfig
+                        .projectileTrajectorySmoothing);
         draw(points);
     }
 
@@ -150,16 +161,22 @@ public final class ThirdPersonProjectileTrajectoryRenderer {
                 | GL11.GL_COLOR_BUFFER_BIT
                 | GL11.GL_DEPTH_BUFFER_BIT
                 | GL11.GL_LINE_BIT
+                | GL11.GL_HINT_BIT
                 | GL11.GL_CURRENT_BIT);
         GL11.glDisable(GL11.GL_TEXTURE_2D);
         GL11.glDisable(GL11.GL_LIGHTING);
         GL11.glDisable(GL11.GL_CULL_FACE);
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glEnable(GL11.GL_DEPTH_TEST);
+        GL11.glEnable(GL11.GL_LINE_SMOOTH);
+        GL11.glHint(GL11.GL_LINE_SMOOTH_HINT, GL11.GL_NICEST);
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
         GL11.glDepthMask(false);
-        GL11.glLineWidth(2.0F);
-        GL11.glColor4f(0.95F, 0.97F, 1.0F, 0.82F);
+        GL11.glLineWidth((float)LostTalesThirdPersonConfig
+                .projectileTrajectoryLineWidth);
+        GL11.glColor4f(0.95F, 0.97F, 1.0F,
+                (float)LostTalesThirdPersonConfig
+                        .projectileTrajectoryOpacity);
         try {
             Tessellator tessellator = Tessellator.instance;
             tessellator.startDrawing(GL11.GL_LINE_STRIP);

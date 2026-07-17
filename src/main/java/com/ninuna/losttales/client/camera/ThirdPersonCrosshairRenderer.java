@@ -23,27 +23,55 @@ public final class ThirdPersonCrosshairRenderer extends Gui {
             reset();
             return;
         }
-        if (!LostTalesThirdPersonConfig.enableTargetCrosshair) {
-            reset();
-            return;
-        }
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (!ThirdPersonCameraRuntime.shouldUseCamera(
+        boolean useThirdPersonCamera = ThirdPersonCameraRuntime
+                .shouldUseCamera(
                 minecraft, minecraft == null
-                ? null : minecraft.renderViewEntity)) {
+                ? null : minecraft.renderViewEntity);
+        boolean drawChargeIndicator = minecraft != null
+                && minecraft.thePlayer != null
+                && minecraft.gameSettings != null
+                && !minecraft.gameSettings.hideGUI
+                && LostTalesThirdPersonConfig.enableChargeTierFeedback
+                && ThirdPersonChargeFeedbackController
+                .getDisplayTier() > 0;
+        if (!useThirdPersonCamera && !drawChargeIndicator) {
             reset();
             return;
         }
-        CameraRenderFrame frame =
-                ThirdPersonCameraController.getRenderFrame();
-        if (frame == null) {
+        boolean drawCrosshair = useThirdPersonCamera
+                && LostTalesThirdPersonConfig
+                .enableTargetCrosshair;
+        boolean drawLockIndicator = useThirdPersonCamera
+                && LostTalesThirdPersonConfig
+                .enableTargetLockIndicator
+                && ThirdPersonTargetLockController.hasTarget(
+                minecraft.thePlayer);
+        if (!drawCrosshair && !drawLockIndicator
+                && !drawChargeIndicator) {
+            reset();
+            return;
+        }
+        if (useThirdPersonCamera
+                && ThirdPersonCameraController.getRenderFrame() == null) {
             return;
         }
 
         int width = event.resolution.getScaledWidth();
         int height = event.resolution.getScaledHeight();
-        event.setCanceled(true);
-        INSTANCE.draw(minecraft, width / 2, height / 2);
+        if (drawCrosshair) {
+            event.setCanceled(true);
+            INSTANCE.draw(minecraft, width / 2, height / 2);
+        }
+        if (drawLockIndicator) {
+            INSTANCE.drawLockIndicator(width / 2, height / 2);
+        }
+        if (drawChargeIndicator) {
+            INSTANCE.drawChargeIndicator(
+                    width / 2, height / 2,
+                    ThirdPersonChargeFeedbackController
+                            .getDisplayTier());
+        }
     }
 
     public static void reset() {}
@@ -61,5 +89,32 @@ public final class ThirdPersonCrosshairRenderer extends Gui {
         OpenGlHelper.glBlendFunc(
                 GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
         GL11.glDisable(GL11.GL_BLEND);
+    }
+
+    private void drawLockIndicator(int centerX, int centerY) {
+        int color = 0xD9E7C76A;
+        int inner = 9;
+        int outer = 13;
+        int length = 5;
+        drawRect(centerX - outer, centerY - outer,
+                centerX - outer + length, centerY - inner, color);
+        drawRect(centerX + inner, centerY - outer,
+                centerX + outer, centerY - inner, color);
+        drawRect(centerX - outer, centerY + inner,
+                centerX - outer + length, centerY + outer, color);
+        drawRect(centerX + inner, centerY + inner,
+                centerX + outer, centerY + outer, color);
+    }
+
+    private void drawChargeIndicator(
+            int centerX, int centerY, int chargeTier) {
+        int startX = centerX - 8;
+        int y = centerY + 17;
+        for (int index = 0; index < 3; index++) {
+            int color = index < chargeTier
+                    ? 0xE6E7C76A : 0x80403B31;
+            drawRect(startX + index * 6, y,
+                    startX + index * 6 + 4, y + 2, color);
+        }
     }
 }

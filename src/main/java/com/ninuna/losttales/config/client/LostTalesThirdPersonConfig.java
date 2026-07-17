@@ -13,7 +13,10 @@ public final class LostTalesThirdPersonConfig {
     private static final double ORIGINAL_HEAD_TRACKING_ANGLE = 35.0D;
     private static final double PREVIOUS_HEAD_TRACKING_ANGLE = 65.0D;
     private static final double RECENT_HEAD_TRACKING_ANGLE = 70.0D;
-    private static final double DEFAULT_HEAD_TRACKING_ANGLE = 80.0D;
+    private static final double LAST_HEAD_TRACKING_ANGLE = 80.0D;
+    private static final double FORMER_HEAD_TRACKING_ANGLE = 85.0D;
+    private static final double DEFAULT_HEAD_TRACKING_ANGLE = 100.0D;
+    private static final double MAXIMUM_HEAD_TRACKING_ANGLE = 120.0D;
 
     private static File loadedConfigFile;
     private static Configuration pendingGuiConfiguration;
@@ -24,9 +27,26 @@ public final class LostTalesThirdPersonConfig {
     public static boolean enableFovEffects = true;
     public static boolean enableTargetCrosshair = true;
     public static boolean enableCameraIntentTargeting = true;
+    public static boolean enableTargetLock = true;
+    public static boolean enableTargetLockIndicator = true;
+    public static double targetLockSelectionRange = 24.0D;
+    public static double targetLockReleaseRange = 28.0D;
+    public static double targetLockSelectionAngle = 65.0D;
+    public static double targetLockYawSpeed = 420.0D;
+    public static double targetLockPitchSpeed = 300.0D;
+    public static double targetLockHeightFactor = 0.65D;
+    public static double targetLockLineOfSightGraceSeconds = 0.75D;
     public static boolean enableProjectileAimCorrection = true;
     public static boolean enableProjectilePrediction = true;
     public static double projectileAimDistance = 96.0D;
+    public static int projectileTrajectorySamplesPerTick = 6;
+    public static double projectileTrajectorySmoothing = 0.40D;
+    public static double projectileTrajectoryOriginBlendDistance = 3.0D;
+    public static double projectileTrajectoryLineWidth = 1.5D;
+    public static double projectileTrajectoryOpacity = 0.78D;
+    public static boolean enableChargeTierFeedback = true;
+    public static boolean enableChargeTierParticles = true;
+    public static boolean enableChargeTierSounds = true;
     public static boolean enableCameraMotion = true;
     public static double cameraMotionMultiplier = 1.0D;
     public static double airborneMotionMultiplier = 1.0D;
@@ -52,6 +72,8 @@ public final class LostTalesThirdPersonConfig {
     public static double sprintBodyRotationSpeed = 720.0D;
     public static double headTrackingAngle = DEFAULT_HEAD_TRACKING_ANGLE;
     public static double headTrackingSpeed = 720.0D;
+    public static double headTrackingHysteresisAngle = 6.0D;
+    public static double headTrackingTransitionSeconds = 0.30D;
     public static boolean combatProfileWithWeaponHeld = true;
     public static double combatProfileHoldSeconds = 3.0D;
     public static double attackCommitmentSeconds = 0.25D;
@@ -84,7 +106,7 @@ public final class LostTalesThirdPersonConfig {
     /** Saves the exact Configuration whose properties the Forge GUI edited. */
     public static synchronized void savePendingGuiConfiguration() {
         Configuration pending = pendingGuiConfiguration;
-        if (pending != null && pending.hasChanged()) {
+        if (pending != null) {
             pending.save();
         }
     }
@@ -127,6 +149,48 @@ public final class LostTalesThirdPersonConfig {
                     "enableCameraIntentTargeting", CATEGORY_CAMERA,
                     enableCameraIntentTargeting,
                     "Aim from the camera center, then validate the result from the player's eye using vanilla reach and line of sight. Disable this compatibility fallback to retain vanilla eye-forward targeting.");
+            enableTargetLock = config.getBoolean(
+                    "enableTargetLock", CATEGORY_CAMERA,
+                    enableTargetLock,
+                    "Allow the third-person target-lock key to select a visible server-approved combat enemy from the hostile compass-marker snapshot and steer the local camera toward it. Server reach and line-of-sight validation remain unchanged.");
+            enableTargetLockIndicator = config.getBoolean(
+                    "enableTargetLockIndicator", CATEGORY_CAMERA,
+                    enableTargetLockIndicator,
+                    "Draw a restrained gold bracket around the screen center while a target is locked.");
+            targetLockSelectionRange = getClampedDouble(
+                    config, "targetLockSelectionRange",
+                    targetLockSelectionRange, 4.0D, 64.0D,
+                    "Maximum distance in blocks for acquiring and cycling target-lock candidates.");
+            targetLockReleaseRange = getClampedDouble(
+                    config, "targetLockReleaseRange",
+                    targetLockReleaseRange, 4.0D, 80.0D,
+                    "Distance in blocks at which an existing target lock is released. Values below the selection range are raised to match it.");
+            if (targetLockReleaseRange < targetLockSelectionRange) {
+                targetLockReleaseRange = targetLockSelectionRange;
+                config.get(CATEGORY_CAMERA, "targetLockReleaseRange",
+                        targetLockReleaseRange).set(
+                        targetLockReleaseRange);
+            }
+            targetLockSelectionAngle = getClampedDouble(
+                    config, "targetLockSelectionAngle",
+                    targetLockSelectionAngle, 10.0D, 120.0D,
+                    "Maximum angle in degrees from the camera direction for acquiring or cycling targets.");
+            targetLockYawSpeed = getClampedDouble(
+                    config, "targetLockYawSpeed",
+                    targetLockYawSpeed, 90.0D, 1080.0D,
+                    "Maximum horizontal target-lock camera turn speed in degrees per second.");
+            targetLockPitchSpeed = getClampedDouble(
+                    config, "targetLockPitchSpeed",
+                    targetLockPitchSpeed, 60.0D, 720.0D,
+                    "Maximum vertical target-lock camera turn speed in degrees per second.");
+            targetLockHeightFactor = getClampedDouble(
+                    config, "targetLockHeightFactor",
+                    targetLockHeightFactor, 0.25D, 0.90D,
+                    "Target height fraction used for camera framing and line of sight. 0.5 is body center; higher values favor the upper torso.");
+            targetLockLineOfSightGraceSeconds = getClampedDouble(
+                    config, "targetLockLineOfSightGraceSeconds",
+                    targetLockLineOfSightGraceSeconds, 0.0D, 3.0D,
+                    "How long target lock survives a blocked line of sight before releasing.");
             enableProjectileAimCorrection = config.getBoolean(
                     "enableProjectileAimCorrection", CATEGORY_CAMERA,
                     enableProjectileAimCorrection,
@@ -139,6 +203,40 @@ public final class LostTalesThirdPersonConfig {
                     config, "projectileAimDistance",
                     projectileAimDistance, 16.0D, 256.0D,
                     "Maximum raycast distance for the ranged third-person crosshair. This does not change projectile speed, damage, gravity, or entity tracking range.");
+            projectileTrajectorySamplesPerTick = config.getInt(
+                    "projectileTrajectorySamplesPerTick",
+                    CATEGORY_CAMERA,
+                    projectileTrajectorySamplesPerTick, 1, 12,
+                    "Number of visual curve samples generated between projectile physics ticks. Higher values make the guide smoother without changing prediction physics.");
+            projectileTrajectorySmoothing = getClampedDouble(
+                    config, "projectileTrajectorySmoothing",
+                    projectileTrajectorySmoothing, 0.0D, 0.5D,
+                    "Tangent strength used to round the visual trajectory between simulated physics points. Zero produces eased straight segments; 0.5 is full Catmull-Rom-style smoothing.");
+            projectileTrajectoryOriginBlendDistance = getClampedDouble(
+                    config, "projectileTrajectoryOriginBlendDistance",
+                    projectileTrajectoryOriginBlendDistance,
+                    0.5D, 8.0D,
+                    "Distance in blocks over which the guide blends smoothly from the held weapon release point into the exact physical projectile path.");
+            projectileTrajectoryLineWidth = getClampedDouble(
+                    config, "projectileTrajectoryLineWidth",
+                    projectileTrajectoryLineWidth, 1.0D, 4.0D,
+                    "Width of the depth-tested trajectory guide in screen pixels.");
+            projectileTrajectoryOpacity = getClampedDouble(
+                    config, "projectileTrajectoryOpacity",
+                    projectileTrajectoryOpacity, 0.10D, 1.0D,
+                    "Opacity of the client-only trajectory guide.");
+            enableChargeTierFeedback = config.getBoolean(
+                    "enableChargeTierFeedback", CATEGORY_CAMERA,
+                    enableChargeTierFeedback,
+                    "Show client feedback for charge tiers confirmed by the server.");
+            enableChargeTierParticles = config.getBoolean(
+                    "enableChargeTierParticles", CATEGORY_CAMERA,
+                    enableChargeTierParticles,
+                    "Show restrained vanilla particle effects when ranged charge tiers activate and release.");
+            enableChargeTierSounds = config.getBoolean(
+                    "enableChargeTierSounds", CATEGORY_CAMERA,
+                    enableChargeTierSounds,
+                    "Play short vanilla sound cues when ranged charge tiers activate and release.");
             enableCameraMotion = config.getBoolean(
                     "enableCameraMotion", CATEGORY_CAMERA,
                     enableCameraMotion,
@@ -240,7 +338,15 @@ public final class LostTalesThirdPersonConfig {
             headTrackingSpeed = getClampedDouble(
                     config, "headTrackingSpeed", headTrackingSpeed,
                     180.0D, 1440.0D,
-                    "Visual head turn speed in degrees per second, including the smooth transition between normal and reverse camera tracking.");
+                    "Maximum visual head turn speed in degrees per second.");
+            headTrackingHysteresisAngle = getClampedDouble(
+                    config, "headTrackingHysteresisAngle",
+                    headTrackingHysteresisAngle, 0.0D, 20.0D,
+                    "Extra camera angle required before entering reverse camera-facing head tracking, and before leaving it again. This prevents rapid shoulder-mode flicker.");
+            headTrackingTransitionSeconds = getClampedDouble(
+                    config, "headTrackingTransitionSeconds",
+                    headTrackingTransitionSeconds, 0.05D, 1.50D,
+                    "Time used to blend between over-shoulder head tracking and reverse camera-facing tracking. Lower values are more responsive; higher values are softer.");
             combatProfileWithWeaponHeld = config.getBoolean(
                     "combatProfileWithWeaponHeld", CATEGORY_CAMERA,
                     combatProfileWithWeaponHeld,
@@ -256,7 +362,7 @@ public final class LostTalesThirdPersonConfig {
             aimingBodyRotationSpeed = getClampedDouble(
                     config, "aimingBodyRotationSpeed",
                     aimingBodyRotationSpeed, 90.0D, 1440.0D,
-                    "Body turn speed in degrees per second while actively aiming a supported ranged weapon.");
+                    "Body turn speed in degrees per second while holding or using a direction-sensitive item.");
             attackBodyRotationSpeed = getClampedDouble(
                     config, "attackBodyRotationSpeed",
                     attackBodyRotationSpeed, 90.0D, 1440.0D,
@@ -292,14 +398,15 @@ public final class LostTalesThirdPersonConfig {
         Property property = config.get(
                 CATEGORY_CAMERA, "headTrackingAngle",
                 headTrackingAngle,
-                "Maximum side angle for normal camera-relative head tracking. Crossing this angle selects the opposite camera-facing direction; the visual head then turns smoothly across without a forward-only dead zone.",
-                0.0D, 85.0D);
+                "Maximum visible side angle for normal camera-relative head tracking. Reverse camera-facing tracking starts only after the configurable hysteresis and blends in over time.",
+                0.0D, MAXIMUM_HEAD_TRACKING_ANGLE);
         double value = property.getDouble(headTrackingAngle);
         if (isPreviousHeadTrackingDefault(value)) {
             value = DEFAULT_HEAD_TRACKING_ANGLE;
             property.set(value);
         }
-        double clamped = Math.max(0.0D, Math.min(85.0D, value));
+        double clamped = Math.max(0.0D, Math.min(
+                MAXIMUM_HEAD_TRACKING_ANGLE, value));
         if (clamped != value) {
             property.set(clamped);
         }
@@ -311,6 +418,10 @@ public final class LostTalesThirdPersonConfig {
                 || Math.abs(value - PREVIOUS_HEAD_TRACKING_ANGLE)
                 < 0.000001D
                 || Math.abs(value - RECENT_HEAD_TRACKING_ANGLE)
+                < 0.000001D
+                || Math.abs(value - LAST_HEAD_TRACKING_ANGLE)
+                < 0.000001D
+                || Math.abs(value - FORMER_HEAD_TRACKING_ANGLE)
                 < 0.000001D;
     }
 

@@ -12,22 +12,47 @@ final class ThirdPersonActionStateMachine {
             boolean combatProfileWithWeaponHeld,
             int configuredAttackCommitmentTicks,
             int configuredCombatHoldTicks) {
+        return update(swinging, aiming, aiming, hurt,
+                combatItemHeld, combatProfileWithWeaponHeld,
+                configuredAttackCommitmentTicks,
+                configuredCombatHoldTicks);
+    }
+
+    ThirdPersonGameplayState update(
+            boolean swinging, boolean aiming, boolean faceAim,
+            boolean hurt, boolean combatItemHeld,
+            boolean combatProfileWithWeaponHeld,
+            int configuredAttackCommitmentTicks,
+            int configuredCombatHoldTicks) {
+        return update(swinging, aiming, faceAim, false, hurt,
+                combatItemHeld, combatProfileWithWeaponHeld,
+                configuredAttackCommitmentTicks,
+                configuredCombatHoldTicks);
+    }
+
+    ThirdPersonGameplayState update(
+            boolean swinging, boolean aiming, boolean faceAim,
+            boolean forceCombat, boolean hurt, boolean combatItemHeld,
+            boolean combatProfileWithWeaponHeld,
+            int configuredAttackCommitmentTicks,
+            int configuredCombatHoldTicks) {
         int commitment = Math.max(0,
                 configuredAttackCommitmentTicks);
         int combatHold = Math.max(0, configuredCombatHoldTicks);
         if (swinging && !swingingLastTick) {
             attackCommitmentTicks = commitment;
         }
-        if (swinging || aiming || hurt) {
+        if (swinging || aiming || forceCombat || hurt) {
             combatHoldTicks = combatHold;
         }
 
         boolean committed = attackCommitmentTicks > 0;
         boolean attacking = swinging || committed;
-        boolean combat = aiming || attacking || combatHoldTicks > 0
+        boolean combat = aiming || forceCombat || attacking
+                || combatHoldTicks > 0
                 || combatProfileWithWeaponHeld && combatItemHeld;
         ThirdPersonGameplayState result = new ThirdPersonGameplayState(
-                aiming, attacking, committed, combat);
+                aiming, faceAim, attacking, committed, combat);
 
         if (attackCommitmentTicks > 0) {
             --attackCommitmentTicks;

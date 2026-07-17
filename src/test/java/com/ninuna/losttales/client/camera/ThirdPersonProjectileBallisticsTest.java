@@ -14,6 +14,18 @@ public final class ThirdPersonProjectileBallisticsTest {
     private static final double EPSILON = 0.0000001D;
 
     @Test
+    public void chargeVelocityScalesOnlyLaunchSpeed() {
+        ProjectileBallisticsProfile original =
+                new ProjectileBallisticsProfile(3.0D, 0.05D, 0.99D);
+        ProjectileBallisticsProfile scaled =
+                original.scaleLaunchSpeed(1.16D);
+
+        assertEquals(3.48D, scaled.getLaunchSpeed(), 0.0000001D);
+        assertEquals(0.05D, scaled.getGravity(), 0.0D);
+        assertEquals(0.99D, scaled.getDrag(), 0.0D);
+    }
+
+    @Test
     public void vanillaBowPredictionTracksActualDrawStrength() {
         ItemStack bow = new ItemStack(new ItemBow());
 

@@ -109,13 +109,34 @@ public final class ThirdPersonCameraControllerTest {
 
         assertTrue(ThirdPersonCameraController.adjustZoom(
                 120, 1.35D, 8.0D, 0.30D));
-        assertEquals(2.35D,
+        assertEquals(2.90D,
                 ThirdPersonCameraController.resolveZoomDistance(
                 3.20D, 1.35D, 8.0D), 0.0000001D);
 
         assertTrue(ThirdPersonCameraController.adjustZoom(
                 -120, 1.35D, 8.0D, 0.30D));
-        assertEquals(2.65D,
+        assertEquals(3.20D,
+                ThirdPersonCameraController.resolveZoomDistance(
+                3.20D, 1.35D, 8.0D), 0.0000001D);
+    }
+
+    @Test
+    public void manualZoomPreservesProfileRelativeFraming() {
+        ThirdPersonCameraController.activate(new CameraPose(
+                0.0D, 64.0D, 0.0D, 0.0D, 0.0D,
+                2.65D, 0.6D, 0.2D, 0.0D));
+        ThirdPersonCameraController.resolveZoomDistance(
+                2.65D, 1.35D, 8.0D);
+        ThirdPersonCameraController.adjustZoom(
+                120, 1.35D, 8.0D, 0.30D);
+
+        assertEquals(2.35D,
+                ThirdPersonCameraController.resolveZoomDistance(
+                2.65D, 1.35D, 8.0D), 0.0000001D);
+        assertEquals(1.80D,
+                ThirdPersonCameraController.resolveZoomDistance(
+                2.10D, 1.35D, 8.0D), 0.0000001D);
+        assertEquals(2.90D,
                 ThirdPersonCameraController.resolveZoomDistance(
                 3.20D, 1.35D, 8.0D), 0.0000001D);
     }
@@ -129,13 +150,13 @@ public final class ThirdPersonCameraControllerTest {
                 120, 1.35D, 8.0D, 0.30D);
 
         ThirdPersonCameraController.deactivate();
-        assertEquals(2.35D,
+        assertEquals(2.90D,
                 ThirdPersonCameraController.resolveZoomDistance(
                 3.20D, 1.35D, 8.0D), 0.0000001D);
 
         ThirdPersonCameraController.reset();
         assertTrue(Double.isNaN(
-                ThirdPersonCameraController.getManualZoomDistance()));
+                ThirdPersonCameraController.getManualZoomOffset()));
         assertEquals(3.20D,
                 ThirdPersonCameraController.resolveZoomDistance(
                 3.20D, 1.35D, 8.0D), 0.0000001D);

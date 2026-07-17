@@ -29,6 +29,12 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
         guiConfiguration.get(
                 LostTalesThirdPersonConfig.CATEGORY_CAMERA,
                 "enabled", false).set(true);
+        guiConfiguration.get(
+                LostTalesThirdPersonConfig.CATEGORY_CAMERA,
+                "distanceMultiplier", 1.0D).set(1.73D);
+        guiConfiguration.get(
+                LostTalesThirdPersonConfig.CATEGORY_CAMERA,
+                "projectileTrajectorySamplesPerTick", 6).set(9);
 
         LostTalesThirdPersonConfig.savePendingGuiConfiguration();
 
@@ -39,6 +45,18 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
                 "enabled",
                 LostTalesThirdPersonConfig.CATEGORY_CAMERA,
                 false, ""));
+        assertEquals(1.73D, persisted.get(
+                LostTalesThirdPersonConfig.CATEGORY_CAMERA,
+                "distanceMultiplier", 0.0D).getDouble(), 0.0D);
+        assertEquals(9, persisted.get(
+                LostTalesThirdPersonConfig.CATEGORY_CAMERA,
+                "projectileTrajectorySamplesPerTick", 0).getInt());
+
+        LostTalesThirdPersonConfig.reload();
+        assertEquals(1.73D,
+                LostTalesThirdPersonConfig.distanceMultiplier, 0.0D);
+        assertEquals(9, LostTalesThirdPersonConfig
+                .projectileTrajectorySamplesPerTick);
 
         guiConfiguration.get(
                 LostTalesThirdPersonConfig.CATEGORY_CAMERA,
@@ -69,17 +87,17 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
 
         LostTalesThirdPersonConfig.load(directory);
 
-        assertEquals(80.0D,
+        assertEquals(100.0D,
                 LostTalesThirdPersonConfig.headTrackingAngle, 0.0D);
         Configuration migrated = new Configuration(configFile);
         migrated.load();
-        assertEquals(80.0D, migrated.get(
+        assertEquals(100.0D, migrated.get(
                 LostTalesThirdPersonConfig.CATEGORY_CAMERA,
                 "headTrackingAngle", 0.0D).getDouble(0.0D), 0.0D);
     }
 
     @Test
-    public void previousCorrectedHeadDefaultMigratesToEightyDegrees()
+    public void previousCorrectedHeadDefaultMigratesToCurrentLimit()
             throws Exception {
         File directory = temporaryFolder.newFolder("previous-head-config");
         initializeForgeHome(directory.getParentFile());
@@ -93,17 +111,17 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
 
         LostTalesThirdPersonConfig.load(directory);
 
-        assertEquals(80.0D,
+        assertEquals(100.0D,
                 LostTalesThirdPersonConfig.headTrackingAngle, 0.0D);
         Configuration migrated = new Configuration(configFile);
         migrated.load();
-        assertEquals(80.0D, migrated.get(
+        assertEquals(100.0D, migrated.get(
                 LostTalesThirdPersonConfig.CATEGORY_CAMERA,
                 "headTrackingAngle", 0.0D).getDouble(0.0D), 0.0D);
     }
 
     @Test
-    public void recentSeventyDegreeDefaultMigratesToEightyDegrees()
+    public void recentSeventyDegreeDefaultMigratesToCurrentLimit()
             throws Exception {
         File directory = temporaryFolder.newFolder("recent-head-config");
         initializeForgeHome(directory.getParentFile());
@@ -117,11 +135,59 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
 
         LostTalesThirdPersonConfig.load(directory);
 
-        assertEquals(80.0D,
+        assertEquals(100.0D,
                 LostTalesThirdPersonConfig.headTrackingAngle, 0.0D);
         Configuration migrated = new Configuration(configFile);
         migrated.load();
-        assertEquals(80.0D, migrated.get(
+        assertEquals(100.0D, migrated.get(
+                LostTalesThirdPersonConfig.CATEGORY_CAMERA,
+                "headTrackingAngle", 0.0D).getDouble(0.0D), 0.0D);
+    }
+
+    @Test
+    public void formerEightyDegreeDefaultMigratesToCurrentLimit()
+            throws Exception {
+        File directory = temporaryFolder.newFolder("last-head-config");
+        initializeForgeHome(directory.getParentFile());
+        File configFile = new File(directory,
+                "losttales-third-person.cfg");
+        Configuration previous = new Configuration(configFile);
+        previous.load();
+        previous.get(LostTalesThirdPersonConfig.CATEGORY_CAMERA,
+                "headTrackingAngle", 80.0D).set(80.0D);
+        previous.save();
+
+        LostTalesThirdPersonConfig.load(directory);
+
+        assertEquals(100.0D,
+                LostTalesThirdPersonConfig.headTrackingAngle, 0.0D);
+        Configuration migrated = new Configuration(configFile);
+        migrated.load();
+        assertEquals(100.0D, migrated.get(
+                LostTalesThirdPersonConfig.CATEGORY_CAMERA,
+                "headTrackingAngle", 0.0D).getDouble(0.0D), 0.0D);
+    }
+
+    @Test
+    public void formerEightyFiveDegreeDefaultMigratesToCurrentLimit()
+            throws Exception {
+        File directory = temporaryFolder.newFolder("former-head-config");
+        initializeForgeHome(directory.getParentFile());
+        File configFile = new File(directory,
+                "losttales-third-person.cfg");
+        Configuration previous = new Configuration(configFile);
+        previous.load();
+        previous.get(LostTalesThirdPersonConfig.CATEGORY_CAMERA,
+                "headTrackingAngle", 85.0D).set(85.0D);
+        previous.save();
+
+        LostTalesThirdPersonConfig.load(directory);
+
+        assertEquals(100.0D,
+                LostTalesThirdPersonConfig.headTrackingAngle, 0.0D);
+        Configuration migrated = new Configuration(configFile);
+        migrated.load();
+        assertEquals(100.0D, migrated.get(
                 LostTalesThirdPersonConfig.CATEGORY_CAMERA,
                 "headTrackingAngle", 0.0D).getDouble(0.0D), 0.0D);
     }

@@ -18,6 +18,7 @@ import com.ninuna.losttales.client.camera.ThirdPersonBlockActionHooks;
 import com.ninuna.losttales.client.camera.ThirdPersonEntityActionHooks;
 import com.ninuna.losttales.client.camera.ThirdPersonTargetingHooks;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
+import com.ninuna.losttales.client.camera.ThirdPersonChargeFeedbackController;
 import com.ninuna.losttales.client.camera.CameraPresetFileStore;
 import com.ninuna.losttales.client.event.LostTalesClientEventHandler;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
@@ -45,6 +46,7 @@ import com.ninuna.losttales.gui.screen.LostTalesMissiveBoardGui;
 import com.ninuna.losttales.gui.screen.LostTalesMissiveLetterReaderGui;
 import com.ninuna.losttales.item.armor.LostTalesItemArmor3D;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
+import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
@@ -201,6 +203,11 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         if (packet != null && !packet.isMalformed()) {
             LostTalesClientMobAggroCache.accept(packet);
         }
+    }
+
+    @Override
+    public void handleChargeTierSync(LostTalesChargeTierSyncPacket packet) {
+        ThirdPersonChargeFeedbackController.handle(packet);
     }
 
     @Override

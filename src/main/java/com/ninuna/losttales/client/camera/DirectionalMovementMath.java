@@ -36,47 +36,82 @@ public final class DirectionalMovementMath {
 
     public static float resolveHeadTrackingYaw(
             float bodyYaw, float viewYaw, float trackingAngle) {
+        return resolveHeadTrackingYaw(
+                bodyYaw, viewYaw, trackingAngle,
+                isReverseHeadTracking(bodyYaw, viewYaw, trackingAngle)
+                        ? 1.0F : 0.0F);
+    }
+
+    public static float resolveHeadTrackingYaw(
+            float bodyYaw, float viewYaw, float trackingAngle,
+            float reverseBlend) {
         if (!Float.isFinite(bodyYaw) || !Float.isFinite(viewYaw)
                 || !Float.isFinite(trackingAngle)
-                || trackingAngle < 0.0F || trackingAngle > 90.0F) {
+                || !Float.isFinite(reverseBlend)
+                || trackingAngle < 0.0F || trackingAngle > 120.0F
+                || reverseBlend < 0.0F || reverseBlend > 1.0F) {
             throw new IllegalArgumentException(
-                    "head tracking angles must be finite and the limit must be between zero and ninety degrees");
+                    "head tracking angles and blend must be finite and within their limits");
         }
         float difference = wrapDegrees(viewYaw - bodyYaw);
-        float absoluteDifference = Math.abs(difference);
-        if (absoluteDifference <= trackingAngle) {
-            return wrapDegrees(viewYaw);
-        }
-
-        /*
-         * Crossing either shoulder immediately selects the opposite way of
-         * looking at the camera. Clamp that reverse target to the same neck
-         * limit so there is no body-forward dead zone and no excessive twist.
-         */
+        float normalDifference = clamp(
+                difference, -trackingAngle, trackingAngle);
         float reverseDifference = wrapDegrees(difference + 180.0F);
-        float limitedReverseDifference = Math.max(
-                -trackingAngle, Math.min(trackingAngle, reverseDifference));
-        return wrapDegrees(bodyYaw + limitedReverseDifference);
+        float limitedReverseDifference = clamp(
+                reverseDifference, -trackingAngle, trackingAngle);
+        float easedBlend = smoothStep(reverseBlend);
+        float blendedDifference = normalDifference + wrapDegrees(
+                limitedReverseDifference - normalDifference) * easedBlend;
+        return wrapDegrees(bodyYaw + blendedDifference);
     }
 
     public static boolean isReverseHeadTracking(
             float bodyYaw, float viewYaw, float trackingAngle) {
         if (!Float.isFinite(bodyYaw) || !Float.isFinite(viewYaw)
                 || !Float.isFinite(trackingAngle)
-                || trackingAngle < 0.0F || trackingAngle > 90.0F) {
+                || trackingAngle < 0.0F || trackingAngle > 120.0F) {
             throw new IllegalArgumentException(
-                    "head tracking angles must be finite and the limit must be between zero and ninety degrees");
+                    "head tracking angles must be finite and the limit must be between zero and one hundred twenty degrees");
         }
         return Math.abs(wrapDegrees(viewYaw - bodyYaw)) > trackingAngle;
     }
 
+    public static boolean updateReverseHeadTracking(
+            boolean reverseTracking, float bodyYaw, float viewYaw,
+            float trackingAngle, float hysteresisAngle) {
+        if (!Float.isFinite(bodyYaw) || !Float.isFinite(viewYaw)
+                || !Float.isFinite(trackingAngle)
+                || !Float.isFinite(hysteresisAngle)
+                || trackingAngle < 0.0F || trackingAngle > 120.0F
+                || hysteresisAngle < 0.0F
+                || hysteresisAngle > 45.0F) {
+            throw new IllegalArgumentException(
+                    "head tracking hysteresis must be finite and within its limits");
+        }
+        float difference = Math.abs(wrapDegrees(viewYaw - bodyYaw));
+        float enterAngle = Math.min(
+                180.0F, trackingAngle + hysteresisAngle);
+        float exitAngle = Math.max(
+                0.0F, trackingAngle - hysteresisAngle);
+        return reverseTracking
+                ? difference > exitAngle
+                : difference >= enterAngle;
+    }
+
     public static float resolveHeadTrackingPitch(
             float viewPitch, boolean reverseTracking) {
-        if (!Float.isFinite(viewPitch)) {
+        return resolveHeadTrackingPitch(
+                viewPitch, reverseTracking ? 1.0F : 0.0F);
+    }
+
+    public static float resolveHeadTrackingPitch(
+            float viewPitch, float reverseBlend) {
+        if (!Float.isFinite(viewPitch) || !Float.isFinite(reverseBlend)
+                || reverseBlend < 0.0F || reverseBlend > 1.0F) {
             throw new IllegalArgumentException(
-                    "head pitch must be finite");
+                    "head pitch and reverse blend must be finite and within their limits");
         }
-        return reverseTracking ? -viewPitch : viewPitch;
+        return viewPitch * (1.0F - 2.0F * smoothStep(reverseBlend));
     }
 
     public static float approachValue(
@@ -95,5 +130,13 @@ public final class DirectionalMovementMath {
 
     public static float wrapDegrees(float degrees) {
         return (float)CameraMath.wrapDegrees(degrees);
+    }
+
+    private static float clamp(float value, float minimum, float maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    private static float smoothStep(float value) {
+        return value * value * (3.0F - 2.0F * value);
     }
 }

@@ -31,4 +31,16 @@ public final class ProjectileBallisticsProfile {
     public double getDrag() {
         return drag;
     }
+
+    public ProjectileBallisticsProfile scaleLaunchSpeed(
+            double multiplier) {
+        CameraMath.requireNonNegativeFinite("multiplier", multiplier);
+        if (multiplier <= 0.0D) {
+            throw new IllegalArgumentException(
+                    "launch-speed multiplier must be positive");
+        }
+        return multiplier == 1.0D ? this
+                : new ProjectileBallisticsProfile(
+                launchSpeed * multiplier, gravity, drag);
+    }
 }

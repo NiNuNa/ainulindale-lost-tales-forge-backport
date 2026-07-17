@@ -35,11 +35,13 @@ import com.ninuna.losttales.gui.LostTalesGuiHandler;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.server.LostTalesNetworkPlayerEventHandler;
+import com.ninuna.losttales.network.server.LostTalesChargeService;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesThirdPersonAimService;
 import com.ninuna.losttales.network.server.LostTalesThirdPersonProjectileAimHandler;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
+import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
@@ -102,6 +104,8 @@ public class LostTalesCommonProxy {
         LostTalesNetworkPlayerEventHandler networkPlayerEventHandler = new LostTalesNetworkPlayerEventHandler();
         LostTalesThirdPersonProjectileAimHandler projectileAimHandler =
                 new LostTalesThirdPersonProjectileAimHandler();
+        LostTalesChargeService chargeService =
+                new LostTalesChargeService();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
         MinecraftForge.EVENT_BUS.register(characterLifecycleStateTracker);
         MinecraftForge.EVENT_BUS.register(characterPlayerEventHandler);
@@ -110,6 +114,7 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(questObjectiveEventHandler);
         MinecraftForge.EVENT_BUS.register(mobAggroEventHandler);
         MinecraftForge.EVENT_BUS.register(projectileAimHandler);
+        MinecraftForge.EVENT_BUS.register(chargeService);
         FMLCommonHandler.instance().bus().register(questPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(questObjectiveEventHandler);
         FMLCommonHandler.instance().bus().register(mobAggroEventHandler);
@@ -120,6 +125,7 @@ public class LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(partyPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(serverTaskQueue);
         FMLCommonHandler.instance().bus().register(networkPlayerEventHandler);
+        FMLCommonHandler.instance().bus().register(chargeService);
 
         ELostTalesItem.initAndRegisterItems();
         ELostTalesBlock.initAndRegisterBlocks();
@@ -187,6 +193,8 @@ public class LostTalesCommonProxy {
 
     public void handleMapMarkerDiscovery(LostTalesMapMarkerDiscoveryPacket packet) {}
 
+    public void handleChargeTierSync(LostTalesChargeTierSyncPacket packet) {}
+
     /** Queues client-only packet work. The dedicated-server proxy is a no-op. */
     public void scheduleClientTask(Runnable task) {}
 
@@ -216,6 +224,7 @@ public class LostTalesCommonProxy {
         LostTalesServerTaskQueue.startAccepting();
         LostTalesRequestRateLimiter.clear();
         LostTalesThirdPersonAimService.clear();
+        LostTalesChargeService.clear();
         CharacterServerPacketDispatcher.clearSecurityState();
         PartySyncManager.clear();
         PartyMemberStatusSyncManager.clear();
@@ -266,6 +275,7 @@ public class LostTalesCommonProxy {
         CharacterSwitchCoordinator.getInstance().clearAllRuntimeState();
         LostTalesRequestRateLimiter.clear();
         LostTalesThirdPersonAimService.clear();
+        LostTalesChargeService.clear();
         CharacterServerPacketDispatcher.clearSecurityState();
         PartySyncManager.clear();
         PartyMemberStatusSyncManager.clear();
