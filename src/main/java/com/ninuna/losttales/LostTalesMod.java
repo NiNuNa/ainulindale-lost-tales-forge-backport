@@ -20,7 +20,7 @@ import cpw.mods.fml.common.event.FMLServerStoppingEvent;
 public class LostTalesMod {
 
     @Mod.Instance(LostTalesMetaData.MOD_ID)
-    public static LostTalesMod instance = new LostTalesMod();
+    public static LostTalesMod instance;
 
     @SidedProxy(clientSide = LostTalesMetaData.CLIENT_PROXY_CLASS, serverSide = LostTalesMetaData.SERVER_PROXY_CLASS)
     public static LostTalesCommonProxy proxy;

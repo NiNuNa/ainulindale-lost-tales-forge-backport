@@ -24,7 +24,12 @@ public final class LostTalesRequestRateLimiter {
         QUEST_ACTION(30, 5000L),
         MISSIVE_ACCEPT(10, 5000L),
         PARTY_SNAPSHOT(20, 5000L),
-        PARTY_MUTATION(12, 5000L);
+        PARTY_MUTATION(12, 5000L),
+        // Allows ordinary high-rate clicking while bounding custom-packet floods.
+        THIRD_PERSON_ENTITY_ACTION(120, 5000L),
+        THIRD_PERSON_BLOCK_ACTION(120, 5000L),
+        // Ranged aim is synchronized every two client ticks while active.
+        THIRD_PERSON_AIM(70, 5000L);
 
         private final int maximumRequests;
         private final long windowMillis;

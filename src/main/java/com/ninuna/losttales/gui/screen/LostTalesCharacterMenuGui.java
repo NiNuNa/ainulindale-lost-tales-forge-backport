@@ -2,17 +2,21 @@ package com.ninuna.losttales.gui.screen;
 
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
+import com.ninuna.losttales.config.client.LostTalesConfigGui;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileRouterGui;
 import lotr.client.gui.LOTRGuiMap;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiInventory;
+import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
 /** Skyrim-style radial character menu. */
 public class LostTalesCharacterMenuGui extends GuiScreen {
+    private static final int BUTTON_SETTINGS = 42100;
     private static final int NONE = CharacterMenuSectorResolver.NONE;
     private static final int OPTION_PROFILE = CharacterMenuSectorResolver.PROFILE;
     private static final int OPTION_QUESTS = CharacterMenuSectorResolver.QUESTS;
@@ -28,6 +32,12 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
 
     @Override
     public void initGui() {
+        this.buttonList.clear();
+        this.buttonList.add(new GuiButton(
+                BUTTON_SETTINGS, Math.max(4, this.width - 104),
+                Math.max(8, this.height - 28),
+                96, 20,
+                I18n.format("gui.losttales.character.settings")));
         if (this.mc != null) {
             LostTalesClientQuestDefinitionStore.ensureLoaded(this.mc.getResourceManager());
         }
@@ -175,11 +185,19 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
         String help = "Hover a direction and click to select   "
                 + LostTalesKeyBindings.getQuestJournalKeyDisplayName() + ": quest journal   "
                 + LostTalesKeyBindings.getCharacterMenuKeyDisplayName() + "/Esc: close";
-        this.fontRendererObj.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, help, this.width - 24), 12, this.height - 20, LostTalesSkyrimUiStyle.TEXT_MUTED);
+        int availableWidth = Math.max(0, this.width - 140);
+        this.fontRendererObj.drawStringWithShadow(
+                LostTalesSkyrimUiStyle.trimToWidth(
+                this.fontRendererObj, help, availableWidth),
+                12, this.height - 20, LostTalesSkyrimUiStyle.TEXT_MUTED);
     }
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
+        if (isSettingsButtonAt(mouseX, mouseY)) {
+            super.mouseClicked(mouseX, mouseY, button);
+            return;
+        }
         int option = getOptionAt(mouseX, mouseY,
                 this.width / 2, this.height / 2, this.width, this.height);
         this.hoveredOption = option;
@@ -188,6 +206,30 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
             return;
         }
         super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private boolean isSettingsButtonAt(int mouseX, int mouseY) {
+        for (Object value : this.buttonList) {
+            if (!(value instanceof GuiButton)) {
+                continue;
+            }
+            GuiButton button = (GuiButton)value;
+            if (button.id == BUTTON_SETTINGS && button.visible
+                    && mouseX >= button.xPosition
+                    && mouseX < button.xPosition + button.width
+                    && mouseY >= button.yPosition
+                    && mouseY < button.yPosition + button.height) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    protected void actionPerformed(GuiButton button) {
+        if (button != null && button.id == BUTTON_SETTINGS && this.mc != null) {
+            this.mc.displayGuiScreen(new LostTalesConfigGui(this));
+        }
     }
 
     private void openOption(int option) {

@@ -36,6 +36,8 @@ import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.server.LostTalesNetworkPlayerEventHandler;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
+import com.ninuna.losttales.network.server.LostTalesThirdPersonAimService;
+import com.ninuna.losttales.network.server.LostTalesThirdPersonProjectileAimHandler;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
@@ -98,6 +100,8 @@ public class LostTalesCommonProxy {
         PartyPlayerEventHandler partyPlayerEventHandler = new PartyPlayerEventHandler();
         LostTalesServerTaskQueue serverTaskQueue = new LostTalesServerTaskQueue();
         LostTalesNetworkPlayerEventHandler networkPlayerEventHandler = new LostTalesNetworkPlayerEventHandler();
+        LostTalesThirdPersonProjectileAimHandler projectileAimHandler =
+                new LostTalesThirdPersonProjectileAimHandler();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
         MinecraftForge.EVENT_BUS.register(characterLifecycleStateTracker);
         MinecraftForge.EVENT_BUS.register(characterPlayerEventHandler);
@@ -105,6 +109,7 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(characterSpawnOriginHandler);
         MinecraftForge.EVENT_BUS.register(questObjectiveEventHandler);
         MinecraftForge.EVENT_BUS.register(mobAggroEventHandler);
+        MinecraftForge.EVENT_BUS.register(projectileAimHandler);
         FMLCommonHandler.instance().bus().register(questPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(questObjectiveEventHandler);
         FMLCommonHandler.instance().bus().register(mobAggroEventHandler);
@@ -210,6 +215,7 @@ public class LostTalesCommonProxy {
         CharacterSwitchCoordinator.getInstance().clearAllRuntimeState();
         LostTalesServerTaskQueue.startAccepting();
         LostTalesRequestRateLimiter.clear();
+        LostTalesThirdPersonAimService.clear();
         CharacterServerPacketDispatcher.clearSecurityState();
         PartySyncManager.clear();
         PartyMemberStatusSyncManager.clear();
@@ -259,6 +265,7 @@ public class LostTalesCommonProxy {
         CharacterStateCheckpointHandler.reset();
         CharacterSwitchCoordinator.getInstance().clearAllRuntimeState();
         LostTalesRequestRateLimiter.clear();
+        LostTalesThirdPersonAimService.clear();
         CharacterServerPacketDispatcher.clearSecurityState();
         PartySyncManager.clear();
         PartyMemberStatusSyncManager.clear();

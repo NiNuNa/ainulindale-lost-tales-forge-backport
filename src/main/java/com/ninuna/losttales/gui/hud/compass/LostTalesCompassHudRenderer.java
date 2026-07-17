@@ -1,6 +1,8 @@
 package com.ninuna.losttales.gui.hud.compass;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.client.camera.ThirdPersonCameraController;
+import com.ninuna.losttales.client.diagnostics.LostTalesClientDiagnostics;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerBatchBuilder;
@@ -84,7 +86,10 @@ public class LostTalesCompassHudRenderer {
         int centerX = compassX + COMPASS_WIDTH / 2;
 
         float pxPerDeg = (float) COMPASS_WIDTH / (float) displayRadiusDeg;
-        float viewYaw = minecraft.thePlayer.prevRotationYaw + (minecraft.thePlayer.rotationYaw - minecraft.thePlayer.prevRotationYaw) * partialTicks;
+        float viewYaw = ThirdPersonCameraController.resolveViewYaw(
+                minecraft.thePlayer.prevRotationYaw,
+                minecraft.thePlayer.rotationYaw,
+                partialTicks);
         float normalizedYaw = LostTalesCompassHudRenderHelper.normalizeViewYaw(viewYaw);
 
         GL11.glPushMatrix();
@@ -290,8 +295,11 @@ public class LostTalesCompassHudRenderer {
                 if (collected != null && !collected.isEmpty()) {
                     markers.addAll(collected);
                 }
-            } catch (Throwable ignored) {
-                // A HUD provider should never crash the whole render tick.
+            } catch (Throwable throwable) {
+                LostTalesClientDiagnostics.warnOnce(
+                        "compass-provider-" + provider.getClass().getName(),
+                        "Compass marker provider failed; its markers will be omitted",
+                        throwable);
             }
         }
         return markers;

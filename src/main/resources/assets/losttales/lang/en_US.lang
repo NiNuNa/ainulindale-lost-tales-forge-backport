@@ -533,6 +533,7 @@ key.losttales.use=Activate / Use
 key.losttales.modifier=Modifier Key
 key.losttales.characterMenu=Open Character Menu
 key.losttales.questJournal=Open Quest Journal
+key.losttales.swapShoulder=Switch Camera Shoulder
 
 #   GUI
 quickLootHud.losttales.empty=Empty
@@ -540,6 +541,7 @@ quickLootHud.losttales.drop=Drop
 quickLootHud.losttales.scroll=Scroll Up/Down
 quickLootHud.losttales.plus=+
 characterMenu.title=Character Menu
+gui.losttales.character.settings=Settings
 questJournal.title=Quest Journal
 
 #   Config GUI
@@ -557,6 +559,8 @@ losttales.config.category.client.questHud=Quest HUD & Notifications
 losttales.config.category.client.questHud.tooltip=Tracked quest HUD, wrapped objective text, world-space markers, and quest notification banners.
 losttales.config.category.client.other=Other Client Options
 losttales.config.category.client.other.tooltip=Additional client options not shown in the main groups.
+losttales.config.category.client.thirdPersonCamera=Third-Person Camera
+losttales.config.category.client.thirdPersonCamera.tooltip=Optional modern rear camera, profile transitions, shoulder framing, FOV response, collision safety, and editable presets from config/losttales/camera_presets.
 losttales.config.category.quests.rules=Quest Rules & Discovery
 losttales.config.category.quests.rules.tooltip=Quest starts, prerequisites, rewards, and marker discovery behavior.
 

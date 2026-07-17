@@ -1,6 +1,7 @@
 package com.ninuna.losttales.config.client;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.client.camera.CameraPresetFileStore;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.screen.LostTalesHudPlacementGui;
 import cpw.mods.fml.client.config.DummyConfigElement;
@@ -14,6 +15,7 @@ import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraftforge.common.config.ConfigElement;
 import net.minecraftforge.common.config.Configuration;
+import net.minecraftforge.common.config.Property;
 /**
  * Standard Forge 1.7.10 config screen opened from the Mods list.
  *
@@ -60,6 +62,26 @@ public class LostTalesConfigGui extends GuiConfig {
         config.load();
         LostTalesConfig.applyGuiMetadata(config);
 
+        Configuration cameraConfig =
+                LostTalesThirdPersonConfig.createConfiguration();
+        if (cameraConfig != null) {
+            cameraConfig.load();
+            LostTalesThirdPersonConfig.applyGuiMetadata(cameraConfig);
+            CameraPresetFileStore.reload();
+            Property presetProperty = cameraConfig.get(
+                    LostTalesThirdPersonConfig.CATEGORY_CAMERA,
+                    "cameraPreset",
+                    LostTalesThirdPersonConfig.cameraPreset);
+            presetProperty.setValidValues(
+                    CameraPresetFileStore.getConfigValues());
+            elements.add(group(
+                    "thirdPersonCamera",
+                    "losttales.config.category.client.thirdPersonCamera",
+                    new ConfigElement(cameraConfig.getCategory(
+                    LostTalesThirdPersonConfig.CATEGORY_CAMERA))
+                    .getChildElements()));
+        }
+
         List<IConfigElement> client = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_CLIENT)).getChildElements();
         List<IConfigElement> quests = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_QUESTS)).getChildElements();
         List<IConfigElement> missives = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_MISSIVES)).getChildElements();
@@ -95,7 +117,11 @@ public class LostTalesConfigGui extends GuiConfig {
     }
 
     private static IConfigElement group(String name, String langKey, List<IConfigElement> children) {
-        return new DummyConfigElement.DummyCategoryElement(name, langKey, children == null ? new ArrayList<IConfigElement>() : children);
+        return new DummyConfigElement.DummyCategoryElement(
+                name, langKey,
+                children == null
+                        ? new ArrayList<IConfigElement>() : children,
+                LostTalesSavingCategoryEntry.class);
     }
 
     private static List<IConfigElement> pick(List<IConfigElement> source, String... names) {

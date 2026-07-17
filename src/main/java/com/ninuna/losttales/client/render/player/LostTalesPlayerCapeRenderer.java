@@ -2,14 +2,19 @@ package com.ninuna.losttales.client.render.player;
 
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
+import com.ninuna.losttales.client.camera.ThirdPersonDirectionalMovementController;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import lotr.client.model.LOTRModelBiped;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.model.ModelBiped;
 import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
+
+import java.util.Map;
+import java.util.WeakHashMap;
 
 /**
  * Renders the normal or selected LOTR cape in the configured race model's torso space.
@@ -36,6 +41,13 @@ final class LostTalesPlayerCapeRenderer {
     private static final float HALF_TROLL_WIDTH_SCALE = 1.5F;
     private static final float HALF_TROLL_LENGTH_SCALE = 1.3333334F;
     private static final float HALF_TROLL_BACK_OFFSET = 4.0F * MODEL_UNIT;
+    private static final float MAXIMUM_FORWARD_LIFT = 80.0F;
+    private static final float MAXIMUM_SIDE_SWING = 65.0F;
+    private static final float WALKING_RESPONSE_SPEED = 12.0F;
+    private static final float SPRINTING_RESPONSE_SPEED = 9.0F;
+    private static final Map<AbstractClientPlayer, CapeMotionState>
+            MOTION_STATES =
+            new WeakHashMap<AbstractClientPlayer, CapeMotionState>();
 
     private LostTalesPlayerCapeRenderer() {}
 
@@ -150,7 +162,7 @@ final class LostTalesPlayerCapeRenderer {
         double deltaX = capeX - playerX;
         double deltaY = capeY - playerY;
         double deltaZ = capeZ - playerZ;
-        float bodyYaw = interpolate(
+        float bodyYaw = CapeMotionMath.interpolateDegrees(
                 player.prevRenderYawOffset,
                 player.renderYawOffset,
                 partialTicks);
@@ -174,7 +186,57 @@ final class LostTalesPlayerCapeRenderer {
         if (player.isSneaking()) {
             verticalLift += 25.0F;
         }
-        return new CapeMotion(verticalLift, forwardLift, sideSwing);
+        CapeMotion raw = new CapeMotion(
+                verticalLift, forwardLift, sideSwing);
+        return stabilizeDirectionalMotion(
+                player, raw, System.nanoTime());
+    }
+
+    private static CapeMotion stabilizeDirectionalMotion(
+            AbstractClientPlayer player, CapeMotion raw,
+            long updateNanos) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.thePlayer != player
+                || !ThirdPersonDirectionalMovementController.isActive()) {
+            MOTION_STATES.remove(player);
+            return raw;
+        }
+
+        float targetForward = CapeMotionMath.clamp(
+                raw.forwardLift, 0.0F, MAXIMUM_FORWARD_LIFT);
+        float targetSide = CapeMotionMath.clamp(
+                raw.sideSwing,
+                -MAXIMUM_SIDE_SWING, MAXIMUM_SIDE_SWING);
+        long activationSequence =
+                ThirdPersonDirectionalMovementController
+                        .getActivationSequence();
+        CapeMotionState state = MOTION_STATES.get(player);
+        if (state == null
+                || state.activationSequence != activationSequence
+                || updateNanos <= state.lastUpdateNanos) {
+            state = new CapeMotionState(
+                    activationSequence, updateNanos,
+                    targetForward, targetSide);
+            MOTION_STATES.put(player, state);
+        } else {
+            float deltaSeconds = (float)(
+                    (double)(updateNanos - state.lastUpdateNanos)
+                            / 1000000000.0D);
+            float response = player.isSprinting()
+                    ? SPRINTING_RESPONSE_SPEED
+                    : WALKING_RESPONSE_SPEED;
+            state.forwardLift = CapeMotionMath.damp(
+                    state.forwardLift, targetForward,
+                    response, deltaSeconds);
+            state.sideSwing = CapeMotionMath.damp(
+                    state.sideSwing, targetSide,
+                    response, deltaSeconds);
+            state.lastUpdateNanos = updateNanos;
+        }
+        return new CapeMotion(
+                raw.verticalLift,
+                state.forwardLift,
+                state.sideSwing);
     }
 
     private static double interpolate(double previous, double current,
@@ -199,6 +261,22 @@ final class LostTalesPlayerCapeRenderer {
         private CapeMotion(float verticalLift, float forwardLift,
                            float sideSwing) {
             this.verticalLift = verticalLift;
+            this.forwardLift = forwardLift;
+            this.sideSwing = sideSwing;
+        }
+    }
+
+    private static final class CapeMotionState {
+        private final long activationSequence;
+        private long lastUpdateNanos;
+        private float forwardLift;
+        private float sideSwing;
+
+        private CapeMotionState(
+                long activationSequence, long lastUpdateNanos,
+                float forwardLift, float sideSwing) {
+            this.activationSequence = activationSequence;
+            this.lastUpdateNanos = lastUpdateNanos;
             this.forwardLift = forwardLift;
             this.sideSwing = sideSwing;
         }

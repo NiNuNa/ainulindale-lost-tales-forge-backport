@@ -31,6 +31,7 @@ public final class LostTalesConfig {
     };
 
     private static File loadedConfigFile;
+    private static Configuration pendingGuiConfiguration;
 
     public static boolean showLostTalesHud = true;
     public static String hudPlacementPreset = HUD_PRESET_CUSTOM;
@@ -758,8 +759,18 @@ public final class LostTalesConfig {
         return loadedConfigFile;
     }
 
-    public static Configuration createConfiguration() {
-        return loadedConfigFile == null ? null : new Configuration(loadedConfigFile);
+    public static synchronized Configuration createConfiguration() {
+        pendingGuiConfiguration = loadedConfigFile == null
+                ? null : new Configuration(loadedConfigFile);
+        return pendingGuiConfiguration;
+    }
+
+    /** Saves the exact Configuration whose properties the Forge GUI edited. */
+    public static synchronized void savePendingGuiConfiguration() {
+        Configuration pending = pendingGuiConfiguration;
+        if (pending != null && pending.hasChanged()) {
+            pending.save();
+        }
     }
 
     public static void reload() {

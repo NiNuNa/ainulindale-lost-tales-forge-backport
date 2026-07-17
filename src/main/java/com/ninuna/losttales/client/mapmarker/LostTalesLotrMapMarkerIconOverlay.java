@@ -27,9 +27,10 @@ import java.util.Set;
 import java.util.UUID;
 import lotr.client.gui.LOTRGuiMap;
 import lotr.common.LOTRDimension;
+import lotr.common.LOTRLevelData;
+import lotr.common.LOTRPlayerData;
 import lotr.common.world.map.LOTRAbstractWaypoint;
 import lotr.common.world.map.LOTRCustomWaypoint;
-import lotr.common.world.map.LOTRWaypoint;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.Tessellator;
@@ -90,16 +91,12 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         for (LOTRAbstractWaypoint waypoint : waypoints) {
             LostTalesMapMarkerData marker = getMappedMarker(waypoint);
             if (marker != null) {
-                // Pass zero draws icons. Lost Tales owns that presentation for
-                // every mapped waypoint, including the unknown question mark.
-                if (pass == 0) {
-                    continue;
-                }
-                // Later LOTR passes render hover text and selection. Never let
-                // those paths expose a discoverable marker before discovery.
-                if (marker.isDiscoverable() && !isDiscovered(marker)) {
-                    continue;
-                }
+                // Lost Tales owns both the icon and hover hitbox for every
+                // mapped waypoint. Mixing JSON icon coordinates with LOTR's
+                // native pass caused visible markers that could not be hovered
+                // or selected. Native selected-waypoint and packet behavior is
+                // restored explicitly after our hit test.
+                continue;
             }
             filtered.add(waypoint);
         }
@@ -506,6 +503,77 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         renderLotrWaypointTooltip(context, new LostTalesMarkerWaypoint(hoveredMarker), false, mouseX, mouseY);
     }
 
+    /** Draws native LOTR hover text at the exact replacement-icon hitbox. */
+    public static void renderMappedWaypointHoverTooltip(
+            LOTRGuiMap gui, int mouseX, int mouseY) {
+        RenderContext context = createRenderContext(gui);
+        if (context == null || context.alpha <= 0.0F) {
+            return;
+        }
+        LOTRAbstractWaypoint waypoint = getHoveredMappedWaypoint(
+                gui, mouseX, mouseY);
+        if (waypoint == null || isSelectedWaypoint(gui, waypoint)) {
+            return;
+        }
+        renderLotrWaypointTooltip(
+                context, waypoint, false, mouseX, mouseY);
+    }
+
+    /** Finds a visible, non-private replacement using its rendered position. */
+    public static LOTRAbstractWaypoint getHoveredMappedWaypoint(
+            LOTRGuiMap gui, int mouseX, int mouseY) {
+        RenderContext context = createRenderContext(gui);
+        if (context == null || context.alpha <= 0.0F) {
+            return null;
+        }
+        LOTRPlayerData playerData = LOTRLevelData.getData(
+                context.minecraft.thePlayer);
+        if (playerData == null) {
+            return null;
+        }
+        List<LOTRAbstractWaypoint> waypoints =
+                playerData.getAllAvailableWaypoints();
+        LOTRAbstractWaypoint nearest = null;
+        double nearestDistanceSq = Double.MAX_VALUE;
+        for (LOTRAbstractWaypoint waypoint : waypoints) {
+            LostTalesMapMarkerData marker = getReplacementMarker(waypoint);
+            if (marker == null || isLockedMappedMarkerVisible(marker)
+                    || !shouldRenderReplacementWaypoint(
+                    context.minecraft, waypoint, marker, false)) {
+                continue;
+            }
+            ScreenPosition position = transformMarker(context, marker);
+            if (position == null
+                    || !isInsideMap(position.x, position.y, context)) {
+                continue;
+            }
+            double dx = position.x - mouseX;
+            double dy = position.y - mouseY;
+            double distanceSq = dx * dx + dy * dy;
+            if (distanceSq <= (double)(HOVER_RADIUS * HOVER_RADIUS)
+                    && distanceSq < nearestDistanceSq) {
+                nearest = waypoint;
+                nearestDistanceSq = distanceSq;
+            }
+        }
+        return nearest;
+    }
+
+    /** Hands our replacement hit back to LOTR's normal selection/FT flow. */
+    public static boolean selectLotrWaypoint(
+            LOTRGuiMap gui, LOTRAbstractWaypoint waypoint) {
+        if (gui == null || waypoint == null || !ensureReflection()
+                || selectedWaypointField == null) {
+            return false;
+        }
+        try {
+            selectedWaypointField.set(gui, waypoint);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     public static void renderLockedMappedMarkerHoverTooltip(
             LOTRGuiMap gui, LostTalesMapMarkerData selectedMarker,
             int mouseX, int mouseY) {
@@ -551,6 +619,19 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             selectedWaypointField.set(gui, null);
         } catch (Throwable ignored) {
             // Selection clearing is best-effort only.
+        }
+    }
+
+    private static boolean isSelectedWaypoint(
+            LOTRGuiMap gui, LOTRAbstractWaypoint waypoint) {
+        if (gui == null || waypoint == null || !ensureReflection()
+                || selectedWaypointField == null) {
+            return false;
+        }
+        try {
+            return selectedWaypointField.get(gui) == waypoint;
+        } catch (Throwable ignored) {
+            return false;
         }
     }
 
@@ -791,13 +872,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         } catch (Throwable ignored) {
             return null;
         }
-    }
-
-    private static ScreenPosition transformWaypoint(RenderContext context, LOTRAbstractWaypoint waypoint) {
-        if (context == null || waypoint == null) {
-            return null;
-        }
-        return transformMapCoords(context, waypoint.getXCoord(), waypoint.getZCoord());
     }
 
     private static ScreenPosition transformMarker(RenderContext context, LostTalesMapMarkerData marker) {

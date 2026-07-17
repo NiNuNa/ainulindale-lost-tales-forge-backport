@@ -3,7 +3,6 @@ package com.ninuna.losttales.gui.hud.quest;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestMarkerHelper;
-import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;

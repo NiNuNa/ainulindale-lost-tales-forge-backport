@@ -63,14 +63,17 @@ public final class LostTalesMapMarkerWaypointUnlockHelper {
     }
 
     /**
-     * Makes private Lost Tales fast-travel regions match marker discovery.
-     * Native LOTR biome regions are deliberately left intact: they record
-     * which areas the active character has visited and reveal anonymous map
-     * markers. Per-marker fast-travel authorization is enforced separately.
+     * Makes private fallback regions match both marker discovery and the
+     * marker location's real LOTR region. Native regions remain untouched.
      */
     public static boolean reconcileBundledWaypointRegions(
             EntityPlayerMP player, Set<String> discoveredMarkerIds) {
         if (player == null || player.worldObj == null || player.worldObj.isRemote) {
+            return false;
+        }
+
+        LOTRPlayerData lotrData = LOTRLevelData.getData(player);
+        if (lotrData == null) {
             return false;
         }
 
@@ -94,15 +97,19 @@ public final class LostTalesMapMarkerWaypointUnlockHelper {
             boolean discovered = !marker.isDiscoverable()
                     || discoveredMarkerIds != null
                     && discoveredMarkerIds.contains(markerId);
+            LOTRWaypoint.Region locationRegion =
+                    LostTalesMapMarkerRegionResolver.resolve(
+                            player.worldObj, marker);
+            boolean locationRegionUnlocked = locationRegion != null
+                    && lotrData.isFTRegionUnlocked(locationRegion);
+            boolean shouldBeUnlocked = shouldUnlockPrivateRegion(
+                    marker, discovered, locationRegionUnlocked);
             Boolean existing = desiredRegions.get(region);
             desiredRegions.put(region,
-                    Boolean.valueOf(discovered || Boolean.TRUE.equals(existing)));
+                    Boolean.valueOf(shouldBeUnlocked
+                            || Boolean.TRUE.equals(existing)));
         }
 
-        LOTRPlayerData lotrData = LOTRLevelData.getData(player);
-        if (lotrData == null) {
-            return false;
-        }
         boolean changed = false;
         for (Map.Entry<LOTRWaypoint.Region, Boolean> entry :
                 desiredRegions.entrySet()) {
@@ -121,6 +128,20 @@ public final class LostTalesMapMarkerWaypointUnlockHelper {
             LOTRLevelData.saveData(player.getUniqueID());
         }
         return changed;
+    }
+
+    /** Package-visible truth table used by catalog-wide regression tests. */
+    static boolean shouldUnlockPrivateRegion(
+            LostTalesMapMarkerDefinition marker, boolean discovered,
+            boolean locationRegionUnlocked) {
+        if (marker == null || !marker.hasFastTravel()) {
+            return false;
+        }
+        boolean discoveryRequirementMet = !marker.isDiscoverable()
+                || discovered;
+        boolean regionRequirementMet = !marker.requiresRegionUnlock()
+                || locationRegionUnlocked;
+        return discoveryRequirementMet && regionRequirementMet;
     }
 
 }

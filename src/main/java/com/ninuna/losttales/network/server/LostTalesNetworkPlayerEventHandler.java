@@ -17,6 +17,8 @@ public final class LostTalesNetworkPlayerEventHandler {
         }
         LostTalesServerTaskQueue.cancelPlayer(event.player.getUniqueID());
         LostTalesRequestRateLimiter.clearPlayer(event.player.getUniqueID());
+        LostTalesThirdPersonAimService.clearPlayer(
+                event.player.getUniqueID());
         PartySyncManager.clearPlayer(event.player.getUniqueID());
         PartyMemberStatusSyncManager.clearPlayer(event.player.getUniqueID());
         PartyTrackingSyncManager.clearPlayer(event.player.getUniqueID());

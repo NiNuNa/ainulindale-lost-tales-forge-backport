@@ -3,7 +3,7 @@
     "modid": "losttales",
     "name": "\u00A79Ainulindale: Lost Tales",
     "description": "Extending the Minecraft Lord of the Rings mod with new content and features!",
-    "version": "${version}",
+    "version": "${version} for Minecraft ${mcversion}",
     "mcversion": "${mcversion}",
     "url": "\u00A79https://discord.com/invite/usgvW2t6qY",
     "updateUrl": "",

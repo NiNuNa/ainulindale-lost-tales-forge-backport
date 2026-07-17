@@ -9,8 +9,10 @@ import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.registry.LanguageRegistry;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import lotr.common.LOTRDimension;
 import lotr.common.fac.LOTRFaction;
 import lotr.common.world.map.LOTRAbstractWaypoint;
@@ -28,6 +30,8 @@ public final class LostTalesMapMarkerWaypointRegistry {
     private static final String LOTR_WAYPOINT_MARKER_PREFIX = "lotr:waypoint:";
     private static final Map<String, LOTRWaypoint.Region> REGIONS_BY_MARKER_ID = new LinkedHashMap<String, LOTRWaypoint.Region>();
     private static final Map<String, LOTRWaypoint> WAYPOINTS_BY_MARKER_ID = new LinkedHashMap<String, LOTRWaypoint>();
+    private static final Set<String> PRIVATE_REGION_MARKER_IDS =
+            new LinkedHashSet<String>();
     private static boolean registered;
 
     private LostTalesMapMarkerWaypointRegistry() {}
@@ -133,6 +137,7 @@ public final class LostTalesMapMarkerWaypointRegistry {
             if (region == null) {
                 region = LostTalesUtil.addWaypointRegion(
                         enumBase + "_REGION");
+                PRIVATE_REGION_MARKER_IDS.add(markerId);
                 if (!marker.isDiscoverable()
                         && marker.requiresRegionUnlock()) {
                     FMLLog.warning("[%s] Non-discoverable marker %s has no LOTR biome/faction region; it will remain locked", LostTalesMetaData.MOD_ID, markerId);
@@ -146,7 +151,7 @@ public final class LostTalesMapMarkerWaypointRegistry {
                             .worldToMapImageX(marker.getX()),
                     LostTalesMapCoordinateHelper
                             .worldToMapImageZ(marker.getZ()),
-                    true
+                    shouldHideGeneratedWaypoint(marker)
             );
             REGIONS_BY_MARKER_ID.put(markerId, region);
             WAYPOINTS_BY_MARKER_ID.put(markerId, waypoint);
@@ -164,8 +169,28 @@ public final class LostTalesMapMarkerWaypointRegistry {
     }
 
     static boolean usesPrivateRegion(LostTalesMapMarkerDefinition marker) {
-        return marker != null && (marker.isDiscoverable()
-                || !marker.requiresRegionUnlock());
+        if (marker == null || !marker.hasFastTravel()) {
+            return false;
+        }
+        if (isExistingLotrWaypointMarker(marker)) {
+            return !marker.requiresRegionUnlock();
+        }
+        initAndRegisterWaypoints();
+        String markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(
+                marker.getId());
+        if (REGIONS_BY_MARKER_ID.containsKey(markerId)) {
+            return PRIVATE_REGION_MARKER_IDS.contains(markerId);
+        }
+        // Synthetic/dynamic markers are not present in the bundled registry.
+        // Preserve their private-region policy without touching ordinary
+        // native LOTR waypoints, which returned above.
+        return marker.isDiscoverable()
+                || !marker.requiresRegionUnlock();
+    }
+
+    static boolean shouldHideGeneratedWaypoint(
+            LostTalesMapMarkerDefinition marker) {
+        return marker != null && marker.isDiscoverable();
     }
 
     private static void registerWaypointLocalization(String enumBase, LostTalesMapMarkerDefinition marker) {

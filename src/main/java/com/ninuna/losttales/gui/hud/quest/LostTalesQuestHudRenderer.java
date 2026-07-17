@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.hud.quest;
 
+import com.ninuna.losttales.client.camera.ThirdPersonCameraController;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
@@ -196,7 +197,8 @@ public final class LostTalesQuestHudRenderer {
 
         EntityPlayer player = minecraft.thePlayer;
         LostTalesCompassHudRenderHelper.PlayerPos playerPos = LostTalesCompassHudRenderHelper.lerpPlayerPos(player, partialTicks);
-        float viewYaw = player.prevRotationYaw + (player.rotationYaw - player.prevRotationYaw) * partialTicks;
+        float viewYaw = ThirdPersonCameraController.resolveViewYaw(
+                player.prevRotationYaw, player.rotationYaw, partialTicks);
         float normalizedYaw = LostTalesCompassHudRenderHelper.normalizeViewYaw(viewYaw);
 
         for (HudQuestTarget target : targets) {

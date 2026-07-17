@@ -11,7 +11,6 @@ import com.ninuna.losttales.party.sync.PartyInvitationSnapshot;
 import com.ninuna.losttales.party.sync.PartyInviteTargetSnapshot;
 import com.ninuna.losttales.party.sync.PartyMemberSnapshot;
 import com.ninuna.losttales.party.sync.PartyOperationFeedback;
-import com.ninuna.losttales.party.sync.PartyOperationType;
 import com.ninuna.losttales.party.sync.PartySnapshot;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
 import java.util.ArrayList;
@@ -42,8 +41,6 @@ public final class LostTalesPartyManagementGui extends GuiScreen {
     private static final int BUTTON_ACTION_THREE = 22;
     private static final int BUTTON_ACTION_FOUR = 23;
     private static final int BUTTON_COLOR_GREEN = 30;
-    private static final int BUTTON_COLOR_YELLOW = 31;
-    private static final int BUTTON_COLOR_PURPLE = 32;
     private static final int BUTTON_COLOR_BLUE = 33;
 
     private static final int ROW_HEIGHT = 30;

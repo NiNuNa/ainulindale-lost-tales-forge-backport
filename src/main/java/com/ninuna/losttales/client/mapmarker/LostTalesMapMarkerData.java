@@ -79,7 +79,8 @@ public final class LostTalesMapMarkerData {
         this.z = z;
         this.compassFadeInRadius = compassFadeInRadius;
         this.discoveryRadius = discoveryRadius;
-        this.hiddenUntilDiscovered = hiddenUntilDiscovered;
+        this.hiddenUntilDiscovered = discoverable
+                && hiddenUntilDiscovered;
         this.discoverable = discoverable;
         this.requiresRegionUnlock = requiresRegionUnlock;
     }

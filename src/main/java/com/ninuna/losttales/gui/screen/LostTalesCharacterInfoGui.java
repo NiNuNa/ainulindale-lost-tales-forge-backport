@@ -15,7 +15,6 @@ import com.ninuna.losttales.gui.screen.character.LostTalesCharacterRosterGui;
 import com.ninuna.losttales.gui.screen.party.LostTalesPartyManagementGui;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;

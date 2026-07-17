@@ -75,6 +75,7 @@ public final class LostTalesClientMapMarkerVisibility {
         try {
             LOTRWaypoint.Region region =
                     LostTalesMapMarkerRegionResolver.resolve(
+                            minecraft.theWorld,
                             marker.getDimensionId(), marker.getX(),
                             marker.getZ(),
                             marker.getFastTravelWaypointCode());

@@ -26,6 +26,10 @@ public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMar
 
         for (LostTalesMapMarkerData entry : LostTalesClientMapMarkerStore.getSharedMarkers()) {
             if (entry.getDimensionId() != dimension) continue;
+            if (!LostTalesConfig.showLotrWaypointCompassMarkers
+                    && entry.getFastTravelWaypointCode().length() > 0) {
+                continue;
+            }
 
             boolean activeQuestMarker = activeQuestMarkers.containsKey(entry.getId());
             boolean discovered = LostTalesClientQuestProgressStore.isMarkerDiscovered(entry.getId());

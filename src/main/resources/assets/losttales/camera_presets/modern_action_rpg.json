@@ -1,0 +1,79 @@
+{
+  "dataVersion": 1,
+  "id": "modern_action_rpg",
+  "name": "Modern Action RPG",
+  "profiles": {
+    "standing": {
+      "distance": 2.65,
+      "shoulderOffset": 0.62,
+      "verticalOffset": 0.25,
+      "fovOffset": 0.0,
+      "smoothing": { "positionRate": 9.0, "verticalPositionRate": 6.5, "rotationRate": 15.0, "zoomRate": 9.0, "shoulderRate": 12.0, "verticalRate": 10.0, "fovRate": 6.0 },
+      "motion": { "horizontalFollowLimit": 0.35, "verticalFollowLimit": 0.18, "sideSway": 0.0, "verticalSway": 0.0, "forwardSway": 0.0, "turnSway": 0.085, "lookPitchSway": 0.045, "lookForwardSway": 0.055, "lookResponseRate": 8.0, "lookReferenceSpeed": 220.0, "swayCyclesPerBlock": 0.8, "responseRate": 7.0, "idleSideSway": 0.035, "idleVerticalSway": 0.022, "idleForwardSway": 0.014, "idleCyclesPerSecond": 0.11 }
+    },
+    "moving": {
+      "distance": 2.85,
+      "shoulderOffset": 0.62,
+      "verticalOffset": 0.22,
+      "fovOffset": 1.0,
+      "smoothing": { "positionRate": 9.0, "verticalPositionRate": 6.5, "rotationRate": 15.0, "zoomRate": 9.0, "shoulderRate": 12.0, "verticalRate": 10.0, "fovRate": 6.0 },
+      "motion": { "horizontalFollowLimit": 0.45, "verticalFollowLimit": 0.22, "sideSway": 0.035, "verticalSway": 0.018, "forwardSway": 0.012, "turnSway": 0.075, "lookPitchSway": 0.04, "lookForwardSway": 0.05, "lookResponseRate": 8.0, "lookReferenceSpeed": 240.0, "swayCyclesPerBlock": 0.8, "responseRate": 7.0, "idleSideSway": 0.03, "idleVerticalSway": 0.018, "idleForwardSway": 0.012, "idleCyclesPerSecond": 0.11 }
+    },
+    "sprinting": {
+      "distance": 3.2,
+      "shoulderOffset": 0.52,
+      "verticalOffset": 0.15,
+      "fovOffset": 3.0,
+      "smoothing": { "positionRate": 9.0, "verticalPositionRate": 6.5, "rotationRate": 15.0, "zoomRate": 9.0, "shoulderRate": 12.0, "verticalRate": 10.0, "fovRate": 6.0 },
+      "motion": { "horizontalFollowLimit": 0.58, "verticalFollowLimit": 0.26, "sideSway": 0.055, "verticalSway": 0.03, "forwardSway": 0.025, "turnSway": 0.065, "lookPitchSway": 0.035, "lookForwardSway": 0.045, "lookResponseRate": 9.0, "lookReferenceSpeed": 280.0, "swayCyclesPerBlock": 0.95, "responseRate": 8.0, "idleSideSway": 0.024, "idleVerticalSway": 0.015, "idleForwardSway": 0.01, "idleCyclesPerSecond": 0.12 }
+    },
+    "sneaking": {
+      "distance": 2.45,
+      "shoulderOffset": 0.68,
+      "verticalOffset": 0.05,
+      "fovOffset": -1.0,
+      "smoothing": { "positionRate": 9.0, "verticalPositionRate": 6.5, "rotationRate": 15.0, "zoomRate": 9.0, "shoulderRate": 12.0, "verticalRate": 10.0, "fovRate": 6.0 },
+      "motion": { "horizontalFollowLimit": 0.3, "verticalFollowLimit": 0.14, "sideSway": 0.018, "verticalSway": 0.01, "forwardSway": 0.008, "turnSway": 0.07, "lookPitchSway": 0.04, "lookForwardSway": 0.045, "lookResponseRate": 7.0, "lookReferenceSpeed": 220.0, "swayCyclesPerBlock": 0.65, "responseRate": 6.0, "idleSideSway": 0.028, "idleVerticalSway": 0.018, "idleForwardSway": 0.011, "idleCyclesPerSecond": 0.095 }
+    },
+    "swimming": {
+      "distance": 3.05,
+      "shoulderOffset": 0.45,
+      "verticalOffset": 0.2,
+      "fovOffset": 2.0,
+      "smoothing": { "positionRate": 9.0, "verticalPositionRate": 6.5, "rotationRate": 15.0, "zoomRate": 9.0, "shoulderRate": 12.0, "verticalRate": 10.0, "fovRate": 6.0 },
+      "motion": { "horizontalFollowLimit": 0.5, "verticalFollowLimit": 0.3, "sideSway": 0.035, "verticalSway": 0.025, "forwardSway": 0.02, "turnSway": 0.09, "lookPitchSway": 0.055, "lookForwardSway": 0.06, "lookResponseRate": 6.0, "lookReferenceSpeed": 200.0, "swayCyclesPerBlock": 0.6, "responseRate": 5.5, "idleSideSway": 0.028, "idleVerticalSway": 0.02, "idleForwardSway": 0.014, "idleCyclesPerSecond": 0.085 }
+    },
+    "riding": {
+      "distance": 4.2,
+      "shoulderOffset": 0.78,
+      "verticalOffset": 0.55,
+      "fovOffset": 3.0,
+      "smoothing": { "positionRate": 9.0, "verticalPositionRate": 6.5, "rotationRate": 15.0, "zoomRate": 9.0, "shoulderRate": 12.0, "verticalRate": 10.0, "fovRate": 6.0 },
+      "motion": { "horizontalFollowLimit": 0.65, "verticalFollowLimit": 0.35, "sideSway": 0.04, "verticalSway": 0.025, "forwardSway": 0.025, "turnSway": 0.1, "lookPitchSway": 0.055, "lookForwardSway": 0.07, "lookResponseRate": 6.0, "lookReferenceSpeed": 220.0, "swayCyclesPerBlock": 0.5, "responseRate": 5.5, "idleSideSway": 0.035, "idleVerticalSway": 0.022, "idleForwardSway": 0.014, "idleCyclesPerSecond": 0.08 }
+    },
+    "combat": {
+      "distance": 2.55,
+      "shoulderOffset": 0.74,
+      "verticalOffset": 0.2,
+      "fovOffset": 1.0,
+      "smoothing": { "positionRate": 12.0, "verticalPositionRate": 9.0, "rotationRate": 20.0, "zoomRate": 14.0, "shoulderRate": 18.0, "verticalRate": 14.0, "fovRate": 9.0 },
+      "motion": { "horizontalFollowLimit": 0.35, "verticalFollowLimit": 0.16, "sideSway": 0.022, "verticalSway": 0.01, "forwardSway": 0.008, "turnSway": 0.06, "lookPitchSway": 0.035, "lookForwardSway": 0.04, "lookResponseRate": 11.0, "lookReferenceSpeed": 260.0, "swayCyclesPerBlock": 0.8, "responseRate": 9.0, "idleSideSway": 0.03, "idleVerticalSway": 0.018, "idleForwardSway": 0.012, "idleCyclesPerSecond": 0.11 }
+    },
+    "aiming": {
+      "distance": 2.1,
+      "shoulderOffset": 0.84,
+      "verticalOffset": 0.2,
+      "fovOffset": -2.0,
+      "smoothing": { "positionRate": 12.0, "verticalPositionRate": 9.0, "rotationRate": 20.0, "zoomRate": 14.0, "shoulderRate": 18.0, "verticalRate": 14.0, "fovRate": 9.0 },
+      "motion": { "horizontalFollowLimit": 0.22, "verticalFollowLimit": 0.1, "sideSway": 0.005, "verticalSway": 0.003, "forwardSway": 0.0, "turnSway": 0.025, "lookPitchSway": 0.015, "lookForwardSway": 0.015, "lookResponseRate": 14.0, "lookReferenceSpeed": 300.0, "swayCyclesPerBlock": 0.7, "responseRate": 12.0, "idleSideSway": 0.012, "idleVerticalSway": 0.007, "idleForwardSway": 0.004, "idleCyclesPerSecond": 0.08 }
+    },
+    "attacking": {
+      "distance": 2.45,
+      "shoulderOffset": 0.76,
+      "verticalOffset": 0.18,
+      "fovOffset": 0.5,
+      "smoothing": { "positionRate": 12.0, "verticalPositionRate": 9.0, "rotationRate": 20.0, "zoomRate": 14.0, "shoulderRate": 18.0, "verticalRate": 14.0, "fovRate": 9.0 },
+      "motion": { "horizontalFollowLimit": 0.34, "verticalFollowLimit": 0.16, "sideSway": 0.025, "verticalSway": 0.012, "forwardSway": 0.01, "turnSway": 0.055, "lookPitchSway": 0.03, "lookForwardSway": 0.035, "lookResponseRate": 12.0, "lookReferenceSpeed": 260.0, "swayCyclesPerBlock": 0.85, "responseRate": 10.0, "idleSideSway": 0.024, "idleVerticalSway": 0.015, "idleForwardSway": 0.009, "idleCyclesPerSecond": 0.11 }
+    }
+  }
+}

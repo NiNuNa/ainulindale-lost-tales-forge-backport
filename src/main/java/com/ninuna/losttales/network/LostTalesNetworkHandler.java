@@ -9,6 +9,9 @@ import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootDropItemPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootRequestPacket;
+import com.ninuna.losttales.network.packet.LostTalesThirdPersonEntityActionPacket;
+import com.ninuna.losttales.network.packet.LostTalesThirdPersonBlockActionPacket;
+import com.ninuna.losttales.network.packet.LostTalesThirdPersonAimPacket;
 import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterCapeUpdateRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterCreateRequestPacket;
@@ -50,6 +53,9 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(PartyActionRequestPacket.Handler.class, PartyActionRequestPacket.class, 17, Side.SERVER);
         CHANNEL.registerMessage(LoreCharacterClaimRequestPacket.Handler.class, LoreCharacterClaimRequestPacket.class, 22, Side.SERVER);
         CHANNEL.registerMessage(LoreCharacterReleaseRequestPacket.Handler.class, LoreCharacterReleaseRequestPacket.class, 23, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesThirdPersonEntityActionPacket.Handler.class, LostTalesThirdPersonEntityActionPacket.class, 25, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesThirdPersonBlockActionPacket.Handler.class, LostTalesThirdPersonBlockActionPacket.class, 26, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesThirdPersonAimPacket.Handler.class, LostTalesThirdPersonAimPacket.class, 27, Side.SERVER);
 
         // Server -> client snapshots. These are registered from the common proxy so a
         // dedicated server also knows the packet discriminators when it sends them.

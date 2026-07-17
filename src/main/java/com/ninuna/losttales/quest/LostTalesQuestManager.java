@@ -556,6 +556,7 @@ public final class LostTalesQuestManager {
         if (shouldScanMarkerDiscovery(player)) {
             changed |= discoverNearbyMapMarkers(player, false);
         }
+        changed |= ensureLotrWaypointsForDiscoveredMapMarkers(player);
         for (LostTalesQuestProgress progress : getActiveQuests(player)) {
             LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
             LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
@@ -631,7 +632,7 @@ public final class LostTalesQuestManager {
     }
 
     public static boolean ensureLotrWaypointsForDiscoveredMapMarkers(EntityPlayerMP player) {
-        if (!LostTalesConfig.enableQuestMarkerDiscovery || player == null || player.worldObj == null || player.worldObj.isRemote) {
+        if (player == null || player.worldObj == null || player.worldObj.isRemote) {
             return false;
         }
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
@@ -642,6 +643,9 @@ public final class LostTalesQuestManager {
         boolean changed =
                 LostTalesMapMarkerWaypointUnlockHelper.reconcileBundledWaypointRegions(
                         player, data.getDiscoveredMarkerIds());
+        if (!LostTalesConfig.enableQuestMarkerDiscovery) {
+            return changed;
+        }
         for (String markerId : data.getDiscoveredMarkerIds()) {
             LostTalesMapMarkerDefinition dynamicMarker = data.getDynamicMapMarker(markerId);
             changed |= LostTalesMapMarkerWaypointUnlockHelper

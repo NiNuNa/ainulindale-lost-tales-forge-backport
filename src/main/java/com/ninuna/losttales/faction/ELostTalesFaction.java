@@ -1,14 +1,9 @@
 package com.ninuna.losttales.faction;
 
-import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.achievement.ELostTalesAchievement;
-import com.ninuna.losttales.block.ELostTalesBlock;
-import com.ninuna.losttales.item.block.LostTalesItemBlockBase;
-import com.ninuna.losttales.item.block.LostTalesItemBlockPlushie;
 import com.ninuna.losttales.util.LostTalesPair;
 import com.ninuna.losttales.util.LostTalesUtil;
 import com.ninuna.losttales.world.map.waypoint.ELostTalesWaypoint;
-import cpw.mods.fml.common.registry.GameRegistry;
 import java.util.EnumSet;
 import lotr.common.LOTRAchievement;
 import lotr.common.LOTRDimension;

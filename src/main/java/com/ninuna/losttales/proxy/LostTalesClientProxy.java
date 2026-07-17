@@ -13,6 +13,12 @@ import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
+import com.ninuna.losttales.client.camera.ThirdPersonCameraHooks;
+import com.ninuna.losttales.client.camera.ThirdPersonBlockActionHooks;
+import com.ninuna.losttales.client.camera.ThirdPersonEntityActionHooks;
+import com.ninuna.losttales.client.camera.ThirdPersonTargetingHooks;
+import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
+import com.ninuna.losttales.client.camera.CameraPresetFileStore;
 import com.ninuna.losttales.client.event.LostTalesClientEventHandler;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
@@ -30,6 +36,7 @@ import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntit
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererStatue;
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererUrn;
 import com.ninuna.losttales.config.client.LostTalesConfigGuiEventHandler;
+import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
 import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneGuard;
 import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneMan;
 import com.ninuna.losttales.gui.ELostTalesMapLabels;
@@ -74,6 +81,11 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
     @Override
     public void preInit(FMLPreInitializationEvent event) {
+        CameraPresetFileStore.initialize(
+                event.getModConfigurationDirectory());
+        LostTalesThirdPersonConfig.load(
+                event.getModConfigurationDirectory());
+        ThirdPersonCameraRuntime.resetSession();
         clientEventHandler = new LostTalesClientEventHandler();
         keyBindings = new LostTalesKeyBindings();
         characterClientTaskQueue = new CharacterClientTaskQueue();
@@ -114,6 +126,29 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         }
         if (!Boolean.getBoolean("losttales.debugHitboxTransformer.active")) {
             FMLLog.warning("[losttales] Debug-hitbox transformer is not active; F3+B may be drawn above roleplay player models");
+        }
+        if (LostTalesThirdPersonConfig.enabled
+                && !Boolean.getBoolean(
+                ThirdPersonCameraHooks.ACTIVE_PROPERTY)) {
+            FMLLog.warning("[losttales] Third-person camera transformer is not active; the optional overhaul will remain a vanilla pass-through, including the normal three-state F5 cycle");
+        }
+        if (LostTalesThirdPersonConfig.enabled
+                && LostTalesThirdPersonConfig.enableCameraIntentTargeting
+                && !Boolean.getBoolean(
+                ThirdPersonTargetingHooks.ACTIVE_PROPERTY)) {
+            FMLLog.warning("[losttales] Third-person targeting transformer is not active; vanilla targeting will remain active safely");
+        }
+        if (LostTalesThirdPersonConfig.enabled
+                && LostTalesThirdPersonConfig.enableCameraIntentTargeting
+                && !Boolean.getBoolean(
+                ThirdPersonEntityActionHooks.ACTIVE_PROPERTY)) {
+            FMLLog.warning("[losttales] Third-person entity-action transformer is not active; vanilla entity packets will remain active safely");
+        }
+        if (LostTalesThirdPersonConfig.enabled
+                && LostTalesThirdPersonConfig.enableCameraIntentTargeting
+                && !Boolean.getBoolean(
+                ThirdPersonBlockActionHooks.ACTIVE_PROPERTY)) {
+            FMLLog.warning("[losttales] Third-person block-action transformer is not active; vanilla block packets will remain active safely");
         }
     }
 

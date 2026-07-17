@@ -2,11 +2,17 @@ package com.ninuna.losttales.client.event;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
+import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
+import com.ninuna.losttales.client.camera.ThirdPersonCrosshairRenderer;
+import com.ninuna.losttales.client.camera.ThirdPersonExplosionMotionHandler;
+import com.ninuna.losttales.client.camera.ThirdPersonHeadRenderHook;
+import com.ninuna.losttales.client.camera.ThirdPersonProjectileTrajectoryRenderer;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.character.CharacterClientTaskQueue;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache;
+import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
@@ -51,6 +57,7 @@ import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.client.event.TextureStitchEvent;
+import net.minecraftforge.client.event.sound.PlaySoundEvent17;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.world.WorldEvent;
@@ -81,12 +88,14 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientCharacterRosterCache.clear();
         ClientCharacterAppearanceCache.clear();
         ClientCharacterCreationCatalogCache.clear();
+        ClientLoreCharacterCache.clear();
         ClientPartyStateCache.clear();
         ClientPartyMemberStatusCache.clear();
         ClientPartyTrackingCache.clear();
         CharacterClientTaskQueue.clear();
         LostTalesQuickLootHudRenderer.resetHud();
         LotrRaceProfileAdapter.getInstance().clear();
+        ThirdPersonCameraRuntime.resetSession();
     }
 
     @SubscribeEvent
@@ -94,7 +103,14 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         if (event != null && event.world != null && event.world.isRemote) {
             LostTalesClientMobAggroCache.clear();
             ClientPartyTrackingCache.clear();
+            ThirdPersonCameraRuntime.resetSession();
         }
+    }
+
+    @SubscribeEvent
+    public void applyExplosionCameraMotion(PlaySoundEvent17 event) {
+        ThirdPersonExplosionMotionHandler.onSound(
+                Minecraft.getMinecraft(), event);
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -132,6 +148,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         }
         if (event.player == Minecraft.getMinecraft().thePlayer) {
             LostTalesClientMobAggroCache.validateContext(event.player);
+            ThirdPersonCameraRuntime.onClientTick(
+                    Minecraft.getMinecraft());
         }
         ClientCharacterRacePhysics.apply(event.player);
     }
@@ -166,6 +184,12 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         }
     }
 
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void renderProjectilePrediction(RenderWorldLastEvent event) {
+        ThirdPersonProjectileTrajectoryRenderer.render(
+                Minecraft.getMinecraft(), event.partialTicks);
+    }
+
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void renderRaceAdjustedCape(RenderPlayerEvent.Specials.Pre event) {
@@ -173,10 +197,26 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void applyThirdPersonHeadPitch(RenderPlayerEvent.Pre event) {
+        ThirdPersonHeadRenderHook.onPre(event);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void restoreThirdPersonHeadPitch(RenderPlayerEvent.Post event) {
+        ThirdPersonHeadRenderHook.onPost(event);
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public void replaceLotrMapGui(GuiOpenEvent event) {
         if (event.gui != null && event.gui.getClass() == LOTRGuiMap.class) {
             event.gui = new LostTalesLotrMapGui();
         }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void renderThirdPersonCrosshair(
+            RenderGameOverlayEvent.Pre event) {
+        ThirdPersonCrosshairRenderer.render(event);
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)

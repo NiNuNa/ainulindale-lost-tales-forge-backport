@@ -61,7 +61,8 @@ public final class LostTalesWaypointFastTravelPolicy {
         }
         if (marker.requiresRegionUnlock()) {
             LOTRWaypoint.Region locationRegion =
-                    LostTalesMapMarkerRegionResolver.resolve(marker);
+                    LostTalesMapMarkerRegionResolver.resolve(
+                            player.worldObj, marker);
             LOTRPlayerData lotrData = LOTRLevelData.getData(player);
             if (locationRegion == null || lotrData == null
                     || !lotrData.isFTRegionUnlocked(locationRegion)) {

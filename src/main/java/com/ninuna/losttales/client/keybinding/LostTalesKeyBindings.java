@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.keybinding;
 
+import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
 import com.ninuna.losttales.gui.hud.LostTalesHudHelper;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
 import com.ninuna.losttales.gui.screen.LostTalesCharacterMenuGui;
@@ -22,6 +23,7 @@ public class LostTalesKeyBindings {
     private static final KeyBinding TOGGLE_HUD = new KeyBinding("key.losttales.toggleHud", Keyboard.KEY_H, CATEGORY);
     private static final KeyBinding USE = new KeyBinding("key.losttales.use", Keyboard.KEY_R, CATEGORY);
     private static final KeyBinding MODIFIER = new KeyBinding("key.losttales.modifier", Keyboard.KEY_LMENU, CATEGORY);
+    private static final KeyBinding SWAP_SHOULDER = new KeyBinding("key.losttales.swapShoulder", Keyboard.KEY_C, CATEGORY);
 
     public void register() {
         ClientRegistry.registerKeyBinding(CHARACTER_MENU);
@@ -29,11 +31,14 @@ public class LostTalesKeyBindings {
         ClientRegistry.registerKeyBinding(TOGGLE_HUD);
         ClientRegistry.registerKeyBinding(USE);
         ClientRegistry.registerKeyBinding(MODIFIER);
+        ClientRegistry.registerKeyBinding(SWAP_SHOULDER);
     }
 
     @SubscribeEvent
     public void onKeyInput(InputEvent.KeyInputEvent event) {
         handleBindingPresses();
+        ThirdPersonCameraRuntime.normalizePerspective(
+                Minecraft.getMinecraft());
     }
 
     @SubscribeEvent
@@ -60,12 +65,24 @@ public class LostTalesKeyBindings {
         if (USE.isPressed()) {
             LostTalesQuickLootHudRenderer.dropSelectedItem();
         }
+        if (SWAP_SHOULDER.isPressed()) {
+            ThirdPersonCameraRuntime.toggleShoulder(minecraft);
+        }
     }
 
     @SubscribeEvent
     public void onMouse(MouseEvent event) {
-        if (event.dwheel != 0 && isModifierKeyDown() && LostTalesQuickLootHudRenderer.isLookingAtContainer()) {
-            LostTalesQuickLootHudRenderer.moveSelection(event.dwheel > 0 ? -1 : 1);
+        if (event.dwheel == 0 || !isModifierKeyDown()) {
+            return;
+        }
+        if (LostTalesQuickLootHudRenderer.isLookingAtContainer()) {
+            LostTalesQuickLootHudRenderer.moveSelection(
+                    event.dwheel > 0 ? -1 : 1);
+            event.setCanceled(true);
+            return;
+        }
+        if (ThirdPersonCameraRuntime.adjustZoom(
+                Minecraft.getMinecraft(), event.dwheel)) {
             event.setCanceled(true);
         }
     }

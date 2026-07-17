@@ -29,6 +29,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                     pass, mouseX, mouseY, drawLabels, includeHidden);
             if (pass == 1) {
                 LostTalesLotrMapMarkerIconOverlay
+                        .renderMappedWaypointHoverTooltip(
+                                this, mouseX, mouseY);
+                LostTalesLotrMapMarkerIconOverlay
                         .renderLockedMappedMarkerHoverTooltip(
                                 this, this.selectedCustomMarker,
                                 mouseX, mouseY);
@@ -102,6 +105,16 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                     this.selectedCustomMarker = lockedMarker;
                     LostTalesLotrMapMarkerIconOverlay
                             .clearLotrSelectedWaypoint(this);
+                    return;
+                }
+                LOTRAbstractWaypoint mappedWaypoint =
+                        LostTalesLotrMapMarkerIconOverlay
+                                .getHoveredMappedWaypoint(
+                                        this, mouseX, mouseY);
+                if (mappedWaypoint != null
+                        && LostTalesLotrMapMarkerIconOverlay
+                        .selectLotrWaypoint(this, mappedWaypoint)) {
+                    this.selectedCustomMarker = null;
                     return;
                 }
                 String localMarkerId = getLocalGoHereMarkerId(state);

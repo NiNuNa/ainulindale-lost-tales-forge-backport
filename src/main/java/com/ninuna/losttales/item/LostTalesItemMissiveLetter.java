@@ -9,7 +9,6 @@ import java.util.Map;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
@@ -90,37 +89,6 @@ public class LostTalesItemMissiveLetter extends Item {
             LostTalesMod.proxy.openMissiveLetterGui(player, stack, player.inventory.currentItem);
         }
         return stack;
-    }
-
-    private void showMissiveText(ItemStack stack, EntityPlayer player) {
-        LostTalesMissiveData missive = LostTalesMissiveNbt.readFromItemStack(stack);
-        if (missive == null) {
-            player.addChatMessage(new ChatComponentText(EnumChatFormatting.GRAY + "This missive letter is blank."));
-            return;
-        }
-
-        player.addChatMessage(new ChatComponentText(EnumChatFormatting.GOLD + "=== " + missive.getTitle() + " ==="));
-        if (missive.getIssuer().length() > 0) {
-            player.addChatMessage(new ChatComponentText(EnumChatFormatting.GRAY + "Issued by: " + EnumChatFormatting.WHITE + missive.getIssuer()));
-        }
-        if (missive.getFlavorText().length() > 0) {
-            player.addChatMessage(new ChatComponentText(EnumChatFormatting.ITALIC + missive.getFlavorText()));
-        } else if (missive.getDescription().length() > 0) {
-            player.addChatMessage(new ChatComponentText(EnumChatFormatting.GRAY + missive.getDescription()));
-        }
-        for (LostTalesMissiveObjectiveData objective : missive.getObjectives()) {
-            if (objective != null && objective.isValid()) {
-                player.addChatMessage(new ChatComponentText(EnumChatFormatting.YELLOW + "- " + buildObjectiveSummary(objective)));
-            }
-        }
-        String rewardSummary = buildRewardSummary(missive);
-        if (rewardSummary.length() > 0) {
-            player.addChatMessage(new ChatComponentText(EnumChatFormatting.GREEN + "Reward: " + rewardSummary));
-        }
-        if (missive.hasTimeLimit()) {
-            player.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "Time limit after acceptance: " + formatTicks(missive.getTimeLimitTicks())));
-        }
-        player.addChatMessage(new ChatComponentText(EnumChatFormatting.DARK_GRAY + "Right-click the letter client-side to read and accept it."));
     }
 
     public static String buildObjectiveSummary(LostTalesMissiveObjectiveData objective) {

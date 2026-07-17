@@ -642,22 +642,6 @@ public class LostTalesQuestJournalGui extends GuiScreen {
         return lineY;
     }
 
-    private void drawDecorativeSerpent(int x, int y, int color) {
-        drawRect(x, y + 6, x + 22, y + 7, color);
-        drawRect(x + 3, y + 4, x + 12, y + 5, color);
-        drawRect(x + 12, y + 5, x + 27, y + 6, color);
-        drawRect(x + 24, y + 3, x + 34, y + 4, color);
-        LostTalesSkyrimUiStyle.drawDiamond(x + 35, y + 4, color);
-    }
-
-    private void drawLargeTextWithShadow(String text, int x, int y, int color, float scale) {
-        GL11.glPushMatrix();
-        GL11.glTranslatef(x, y, 0.0F);
-        GL11.glScalef(scale, scale, 1.0F);
-        this.fontRendererObj.drawStringWithShadow(text, 0, 0, color);
-        GL11.glPopMatrix();
-    }
-
     private void drawFooterHelp() {
         String sync = LostTalesClientQuestProgressStore.hasReceivedSync() ? "Server-synced" : "Waiting for server sync";
         String help = "Wheel: scroll   Click: select   Double-click/Space/Enter: track   F: filter   "
