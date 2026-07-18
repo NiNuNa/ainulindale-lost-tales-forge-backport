@@ -14,7 +14,7 @@ Both the client and dedicated server need the mod and its two dependencies. Lost
 ## Implemented systems
 
 - Server-owned roleplay character creation, appearance, race physics, switching, deletion, and recovery.
-- A world-wide catalogue for unique lore characters. Frodo, Gandalf, and Éomer currently have usable appearance definitions; the remaining catalogue entries are data placeholders and cannot be claimed yet.
+- A world-wide catalogue of 82 unique lore characters. Every bundled entry has a validated appearance and can be claimed once per world.
 - Persistent parties of up to four roleplay characters, with invitations, leadership, member colors, HUD status, tracking, go-here markers, and nearby shared quest-kill progress.
 - Bundled multi-stage quests with prerequisites, rewards, journal entries, objective tracking, map markers, and repeatable or one-time completion.
 - Dynamic missive boards and readable missive letters, including optional deadlines.
@@ -32,4 +32,3 @@ The long-term RPG direction does not mean every planned system exists. There is 
 These pages describe the current source and bundled resources. Experimental registry entries are marked as such. Registry names, packet identifiers, and saved-data formats are compatibility-sensitive and should not be renamed casually.
 
 See [Known Limitations](Known_Limitations.md) before using this build in a long-running world.
-

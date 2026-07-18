@@ -3,5 +3,10 @@
   "id": "losttales:angon",
   "name": "Angon, Lord of Lamedon",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:human",
+    "genderId": "losttales:male",
+    "modelId": "lotr:human",
+    "skinId": "losttales:human_gondor_male_1"
+  }
 }

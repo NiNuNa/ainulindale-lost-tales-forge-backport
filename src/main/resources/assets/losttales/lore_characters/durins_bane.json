@@ -3,5 +3,10 @@
   "id": "losttales:durins_bane",
   "name": "Durin\u0027s Bane",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:half_troll",
+    "genderId": "losttales:non_binary",
+    "modelId": "lotr:half_troll",
+    "skinId": "losttales:half_troll_0"
+  }
 }

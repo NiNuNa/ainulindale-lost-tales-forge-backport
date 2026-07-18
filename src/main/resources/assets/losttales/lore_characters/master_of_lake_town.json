@@ -3,5 +3,10 @@
   "id": "losttales:master_of_lake_town",
   "name": "Master of Lake-Town",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:human",
+    "genderId": "losttales:male",
+    "modelId": "lotr:human",
+    "skinId": "losttales:human_dale_male_0"
+  }
 }

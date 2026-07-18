@@ -3,5 +3,10 @@
   "id": "losttales:radagast",
   "name": "Radagast",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:human",
+    "genderId": "losttales:male",
+    "modelId": "lotr:human",
+    "skinId": "losttales:human_bree_male_6"
+  }
 }

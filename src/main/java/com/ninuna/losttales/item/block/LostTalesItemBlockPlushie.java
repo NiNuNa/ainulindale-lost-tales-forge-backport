@@ -25,6 +25,13 @@ public class LostTalesItemBlockPlushie extends LostTalesItemBlockBase {
 
     @Override
     @SideOnly(Side.CLIENT)
+    public int getSpriteNumber() {
+        return hasAuthoredItemIcon(getBlockTextureName())
+                ? 1 : super.getSpriteNumber();
+    }
+
+    @Override
+    @SideOnly(Side.CLIENT)
     public void registerIcons(IIconRegister iconRegister) {
         String blockName = getBlockTextureName();
         if (hasAuthoredItemIcon(blockName)) {

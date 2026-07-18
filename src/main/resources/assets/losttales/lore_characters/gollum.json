@@ -3,5 +3,10 @@
   "id": "losttales:gollum",
   "name": "Gollum",
   "description": "A secretive wanderer consumed by his history with the One Ring.",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:hobbit",
+    "genderId": "losttales:male",
+    "modelId": "lotr:hobbit",
+    "skinId": "losttales:hobbit_shire_male_3"
+  }
 }

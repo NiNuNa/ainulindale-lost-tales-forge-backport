@@ -3,5 +3,10 @@
   "id": "losttales:smaug",
   "name": "Smaug",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:half_troll",
+    "genderId": "losttales:non_binary",
+    "modelId": "lotr:half_troll",
+    "skinId": "losttales:half_troll_1"
+  }
 }

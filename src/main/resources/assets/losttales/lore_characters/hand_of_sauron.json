@@ -3,5 +3,10 @@
   "id": "losttales:hand_of_sauron",
   "name": "Hand of Sauron",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:uruk",
+    "genderId": "losttales:non_binary",
+    "modelId": "lotr:uruk",
+    "skinId": "losttales:black_uruk_0"
+  }
 }

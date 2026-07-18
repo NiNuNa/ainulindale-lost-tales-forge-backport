@@ -3,5 +3,10 @@
   "id": "losttales:herald_of_witch_king",
   "name": "Herald of the Witch-king",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:uruk",
+    "genderId": "losttales:non_binary",
+    "modelId": "lotr:uruk",
+    "skinId": "losttales:black_uruk_1"
+  }
 }

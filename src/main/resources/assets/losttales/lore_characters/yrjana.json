@@ -3,5 +3,10 @@
   "id": "losttales:yrjana",
   "name": "Yrjana",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:human",
+    "genderId": "losttales:female",
+    "modelId": "lotr:human",
+    "skinId": "losttales:human_easterling_female_0"
+  }
 }

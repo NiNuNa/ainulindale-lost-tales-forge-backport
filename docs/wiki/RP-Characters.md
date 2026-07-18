@@ -47,7 +47,9 @@ Deleted characters are retained as tombstones for 30 days by default. Purging or
 
 The bundled catalogue contains 82 named lore definitions. A lore character is unique across the world, not per account. Claim, release, deletion, and transfer operations use server-owned world data so two players cannot own the same identity.
 
-Only Frodo, Gandalf, and Éomer currently include complete appearance data and can be offered for use. The other definitions remain unavailable until appearance data is added. This is intentional validation, not a client-side display filter.
+All 82 bundled definitions include complete appearance data and can be offered for use. Each appearance is validated against the server's supported race, gender, model, and LOTR skin catalogue before the definition is registered. Characters without an equivalent playable body, such as Smaug and Durin's Bane, use the closest supported player-model approximation; they do not use the original creature model.
+
+Server-local definitions may still use `appearance: null` while they are being prepared. They remain visible to validation tools but cannot be claimed until a complete compatible appearance is supplied.
 
 ## Compatibility rules
 
@@ -55,4 +57,3 @@ Only Frodo, Gandalf, and Éomer currently include complete appearance data and c
 - Existing character, registry, and lore IDs must remain stable for world compatibility.
 - Half-troll equipment is restricted to compatible LOTR half-troll armor. Rejected equipment is returned safely rather than silently deleted.
 - Parties identify members by character UUID, while ownership and networking still use the Minecraft account UUID.
-

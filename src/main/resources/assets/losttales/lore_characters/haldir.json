@@ -3,5 +3,10 @@
   "id": "losttales:haldir",
   "name": "Haldir",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:elf",
+    "genderId": "losttales:male",
+    "modelId": "lotr:elf",
+    "skinId": "losttales:elf_galadhrim_male_0"
+  }
 }

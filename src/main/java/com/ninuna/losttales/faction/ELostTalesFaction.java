@@ -195,7 +195,7 @@ public enum ELostTalesFaction {
         });
 
         OROCARNI.setFactionControlZones( new LostTalesPair[]{
-                new LostTalesPair(ELostTalesWaypoint.SUN_ELVES.getWaypoint(), 175)
+                new LostTalesPair(ELostTalesWaypoint.OROCARNI.getWaypoint(), 175)
         });
 
         MORIA_GOBLINS.setFactionControlZones( new LostTalesPair[]{
@@ -207,7 +207,7 @@ public enum ELostTalesFaction {
         });
 
         LOSSOTH.setFactionControlZones( new LostTalesPair[]{
-                new LostTalesPair(ELostTalesWaypoint.SUN_ELVES.getWaypoint(), 175)
+                new LostTalesPair(ELostTalesWaypoint.LOSSOTH.getWaypoint(), 175)
         });
 
         ODANE.setFactionControlZones( new LostTalesPair[]{

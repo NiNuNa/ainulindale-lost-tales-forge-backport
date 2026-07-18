@@ -3,5 +3,10 @@
   "id": "losttales:olar",
   "name": "Olar",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:human",
+    "genderId": "losttales:male",
+    "modelId": "lotr:human",
+    "skinId": "losttales:human_bree_male_4"
+  }
 }

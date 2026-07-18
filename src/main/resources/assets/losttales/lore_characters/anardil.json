@@ -3,5 +3,10 @@
   "id": "losttales:anardil",
   "name": "Anardil, Lord of Morthond",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:human",
+    "genderId": "losttales:male",
+    "modelId": "lotr:human",
+    "skinId": "losttales:human_gondor_male_0"
+  }
 }

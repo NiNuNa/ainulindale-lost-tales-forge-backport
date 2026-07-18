@@ -3,5 +3,10 @@
   "id": "losttales:wulf_ii",
   "name": "Wulf II",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:human",
+    "genderId": "losttales:male",
+    "modelId": "lotr:human",
+    "skinId": "losttales:human_dunlending_male_1"
+  }
 }

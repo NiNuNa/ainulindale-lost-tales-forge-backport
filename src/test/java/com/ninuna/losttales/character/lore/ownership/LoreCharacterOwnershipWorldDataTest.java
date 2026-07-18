@@ -1,12 +1,20 @@
 package com.ninuna.losttales.character.lore.ownership;
 
+import com.ninuna.losttales.character.lore.LoreCharacterDefinition;
 import com.ninuna.losttales.character.lore.LoreCharacterRegistry;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -19,6 +27,9 @@ import static org.junit.Assert.assertTrue;
 public final class LoreCharacterOwnershipWorldDataTest {
 
     private static final String GANDALF = "losttales:gandalf";
+
+    @Rule
+    public final TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     @Before
     public void loadDefinitions() {
@@ -69,6 +80,23 @@ public final class LoreCharacterOwnershipWorldDataTest {
     }
 
     @Test
+    public void everyBundledDefinitionCanBeClaimed() {
+        LoreCharacterOwnershipWorldData data = createData();
+        UUID owner = uuid("61000000-0000-0000-0000-000000000006");
+
+        for (LoreCharacterDefinition definition : LoreCharacterRegistry.getAll()) {
+            LoreCharacterOwnershipResult result = data.tryClaim(
+                    definition.getId(), owner, UUID.randomUUID(), 0L, 100L);
+            assertEquals(definition.getId(),
+                    LoreCharacterOwnershipResult.Status.CLAIMED,
+                    result.getStatus());
+        }
+
+        assertEquals(LoreCharacterRegistry.getAll().size(),
+                data.getRecordCount());
+    }
+
+    @Test
     public void releaseRequiresCurrentOwnerAndRevision() {
         LoreCharacterOwnershipWorldData data = createData();
         UUID owner = uuid("70000000-0000-0000-0000-000000000007");
@@ -88,12 +116,13 @@ public final class LoreCharacterOwnershipWorldDataTest {
     }
 
     @Test
-    public void incompleteOrUnknownDefinitionsCannotBeClaimed() {
+    public void incompleteOrUnknownDefinitionsCannotBeClaimed() throws Exception {
+        LoreCharacterRegistry.load(createIncompleteDefinition());
         LoreCharacterOwnershipWorldData data = createData();
         UUID owner = uuid("90000000-0000-0000-0000-000000000009");
 
         LoreCharacterOwnershipResult incomplete = data.tryClaim(
-                "losttales:sauron", owner, UUID.randomUUID(), 0L, 100L);
+                "myserver:unfinished", owner, UUID.randomUUID(), 0L, 100L);
         LoreCharacterOwnershipResult unknown = data.tryClaim(
                 "losttales:not_registered", owner,
                 UUID.randomUUID(), 0L, 100L);
@@ -105,6 +134,28 @@ public final class LoreCharacterOwnershipWorldDataTest {
                 LoreCharacterOwnershipResult.Status.UNKNOWN_LORE_CHARACTER,
                 unknown.getStatus());
         assertEquals(0, data.getRecordCount());
+    }
+
+    private File createIncompleteDefinition() throws Exception {
+        File configRoot = this.temporaryFolder.newFolder("incomplete_config");
+        File directory = new File(
+                configRoot, LoreCharacterRegistry.EXTERNAL_DIRECTORY);
+        assertTrue(directory.mkdirs());
+        File definition = new File(directory, "unfinished.json");
+        Writer writer = new OutputStreamWriter(
+                new FileOutputStream(definition), StandardCharsets.UTF_8);
+        try {
+            writer.write("{\n"
+                    + "  \"dataVersion\": 1,\n"
+                    + "  \"id\": \"myserver:unfinished\",\n"
+                    + "  \"name\": \"Unfinished\",\n"
+                    + "  \"description\": \"\",\n"
+                    + "  \"appearance\": null\n"
+                    + "}\n");
+        } finally {
+            writer.close();
+        }
+        return configRoot;
     }
 
     @Test

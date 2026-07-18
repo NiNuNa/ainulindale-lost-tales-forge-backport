@@ -21,11 +21,10 @@ The active factions use the normal LOTR alignment and pledge model. Lost Tales d
 
 ## Relations and territory
 
-Selected default relations are registered between new factions and LOTR factions. Control zones use Lost Tales or public LOTR waypoints. The map regions, relations, ranks, and zones are startup integration data and should be tested whenever the LOTR dependency changes.
+Selected default relations are registered between new factions and LOTR factions. Control zones use Lost Tales or public LOTR waypoints. Lossoth and Orocarni each have a dedicated waypoint at the center of their own map region; both keep the existing 175-block zone radius. The new waypoints have matching discoverable map-marker metadata and were appended after the existing waypoint registrations so older Lost Tales waypoint identifiers keep their order.
 
-Two existing zone assignments require a gameplay decision before they can be changed safely: the Orocarni and Lossoth control zones currently point at the Sun Elves waypoint. Changing them could alter alignment and territory behavior in existing worlds, so the cleanup pass leaves them unchanged and records the issue in [Known Limitations](Known_Limitations.md).
+Orocarni progression uses Red Mountain Dwarf titles from Stonebearer through Lord or Lady of the Red Mountains. The map regions, relations, ranks, and zones are startup integration data and should be tested whenever the LOTR dependency changes.
 
 ## Content integration
 
 The mod also adds faction-themed equipment, NPC spawns, map waypoints, roads, and biomes. Four Moria Goblin equipment conversions are appended to the LOTR Gundabad crafting table. Lost Tales does not call LOTR's global recipe initializer a second time, which avoids duplicate legacy recipes.
-

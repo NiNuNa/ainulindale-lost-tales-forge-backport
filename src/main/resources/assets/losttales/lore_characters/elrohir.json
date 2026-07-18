@@ -3,5 +3,10 @@
   "id": "losttales:elrohir",
   "name": "Elrohir",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:elf",
+    "genderId": "losttales:male",
+    "modelId": "lotr:elf",
+    "skinId": "losttales:elf_high_male_3"
+  }
 }

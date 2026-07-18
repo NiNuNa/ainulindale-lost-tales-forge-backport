@@ -3,5 +3,10 @@
   "id": "losttales:galadriel",
   "name": "Galadriel",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:elf",
+    "genderId": "losttales:female",
+    "modelId": "lotr:elf",
+    "skinId": "losttales:elf_high_female_0"
+  }
 }

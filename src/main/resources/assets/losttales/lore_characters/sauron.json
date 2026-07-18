@@ -3,5 +3,10 @@
   "id": "losttales:sauron",
   "name": "Sauron",
   "description": "The Dark Lord and ruler of Mordor.",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:uruk",
+    "genderId": "losttales:non_binary",
+    "modelId": "lotr:uruk",
+    "skinId": "losttales:black_uruk_2"
+  }
 }

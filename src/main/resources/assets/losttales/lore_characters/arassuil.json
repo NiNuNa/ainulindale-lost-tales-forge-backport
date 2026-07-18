@@ -3,5 +3,10 @@
   "id": "losttales:arassuil",
   "name": "Arassuil",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:human",
+    "genderId": "losttales:male",
+    "modelId": "lotr:human",
+    "skinId": "losttales:human_ranger_male_0"
+  }
 }

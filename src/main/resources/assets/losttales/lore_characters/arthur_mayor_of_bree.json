@@ -3,5 +3,10 @@
   "id": "losttales:arthur_mayor_of_bree",
   "name": "Arthur, Mayor of Bree",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:human",
+    "genderId": "losttales:male",
+    "modelId": "lotr:human",
+    "skinId": "losttales:human_bree_male_2"
+  }
 }

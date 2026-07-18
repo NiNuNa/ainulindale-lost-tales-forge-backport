@@ -3,5 +3,10 @@
   "id": "losttales:thror",
   "name": "Thrór",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:dwarf",
+    "genderId": "losttales:male",
+    "modelId": "lotr:dwarf",
+    "skinId": "losttales:dwarf_erebor_male_2"
+  }
 }

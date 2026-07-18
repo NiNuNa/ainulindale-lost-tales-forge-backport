@@ -97,8 +97,9 @@ public final class LoreCharacterRegistryTest {
         assertNotNull(LoreCharacterRegistry.getByName("Éomer"));
         assertNotNull(LoreCharacterRegistry.getByName("Nazgûl I"));
         assertNotNull(LoreCharacterRegistry.getByName("Nazgûl II"));
-        assertTrue(LoreCharacterRegistry.get("losttales:gandalf").hasAppearance());
-        assertFalse(LoreCharacterRegistry.get("losttales:sauron").hasAppearance());
+        for (LoreCharacterDefinition definition : LoreCharacterRegistry.getAll()) {
+            assertTrue(definition.getId(), definition.hasAppearance());
+        }
     }
 
     @Test

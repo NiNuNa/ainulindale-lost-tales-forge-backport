@@ -3,5 +3,10 @@
   "id": "losttales:gothmog",
   "name": "Gothmog",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:orc",
+    "genderId": "losttales:non_binary",
+    "modelId": "lotr:orc",
+    "skinId": "losttales:orc_5"
+  }
 }

@@ -3,5 +3,10 @@
   "id": "losttales:fengel",
   "name": "Fengel",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:human",
+    "genderId": "losttales:male",
+    "modelId": "lotr:human",
+    "skinId": "losttales:human_rohan_male_1"
+  }
 }

@@ -3,5 +3,10 @@
   "id": "losttales:lome",
   "name": "Lóme",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:elf",
+    "genderId": "losttales:male",
+    "modelId": "lotr:elf",
+    "skinId": "losttales:elf_high_male_6"
+  }
 }

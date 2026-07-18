@@ -3,5 +3,10 @@
   "id": "losttales:ferumbras_took_ii",
   "name": "Ferumbras Took II",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:hobbit",
+    "genderId": "losttales:male",
+    "modelId": "lotr:hobbit",
+    "skinId": "losttales:hobbit_shire_male_2"
+  }
 }

@@ -3,5 +3,10 @@
   "id": "losttales:ungrax",
   "name": "Ungrax",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:uruk",
+    "genderId": "losttales:non_binary",
+    "modelId": "lotr:uruk",
+    "skinId": "losttales:uruk_hai_0"
+  }
 }

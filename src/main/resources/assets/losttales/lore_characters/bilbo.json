@@ -3,5 +3,10 @@
   "id": "losttales:bilbo",
   "name": "Bilbo",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:hobbit",
+    "genderId": "losttales:male",
+    "modelId": "lotr:hobbit",
+    "skinId": "losttales:hobbit_shire_male_1"
+  }
 }

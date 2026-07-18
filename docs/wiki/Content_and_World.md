@@ -20,7 +20,7 @@ Weapon subclasses register LOTR-compatible reach, swing speed, and knockback beh
 
 ## Blocks
 
-The block catalogue contains a ceramic connected-texture tile; amphora, urn, and loutrophoros containers; a watch stone; a test lamp; a cheese wheel; bear, fox, and Gandalf plushies; and a missive board.
+The block catalogue contains a ceramic connected-texture tile; amphora, urn, and loutrophoros containers; a watch stone; a test lamp; a cheese wheel; bear, fox, and Gandalf plushies; and a missive board. The bear and fox use their dedicated item textures in inventories while retaining their separate placed-block and animated model textures.
 
 Urn registry names remain compatible with older saves. Urns have inventory and seal behavior and are supported by quick loot. The missive board provides the dynamic quest interface.
 
@@ -37,4 +37,3 @@ The added biomes are Moon Elf Vale, Moon Elf Mountains, Odane Island, and Odane 
 An Odane glowstone house can generate in the Odane biomes and is registered with LOTR's structure-spawner catalogue as ID 7000. The structure reads its own bundled scan resource and does not copy LOTR source or assets.
 
 Moon Elf Vale includes custom cold terrain decoration and a very rare LOTR snow-troll spawn entry. Waypoints, roads, map regions, faction control zones, and spawn lists are registered during LOTR-compatible startup phases.
-

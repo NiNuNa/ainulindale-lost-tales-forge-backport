@@ -3,5 +3,10 @@
   "id": "losttales:ar_zimradur",
   "name": "Ar-Zimradur",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:human",
+    "genderId": "losttales:male",
+    "modelId": "lotr:human",
+    "skinId": "losttales:human_harnedor_male_0"
+  }
 }

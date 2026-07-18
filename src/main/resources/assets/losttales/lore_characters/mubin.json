@@ -3,5 +3,10 @@
   "id": "losttales:mubin",
   "name": "Mubin",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:human",
+    "genderId": "losttales:male",
+    "modelId": "lotr:human",
+    "skinId": "losttales:human_haradrim_male_2"
+  }
 }

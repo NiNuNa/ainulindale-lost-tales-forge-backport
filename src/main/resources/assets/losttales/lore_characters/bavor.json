@@ -3,5 +3,10 @@
   "id": "losttales:bavor",
   "name": "Bavór the Crimson King",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:dwarf",
+    "genderId": "losttales:male",
+    "modelId": "lotr:dwarf",
+    "skinId": "losttales:dwarf_blue_mountains_male_0"
+  }
 }

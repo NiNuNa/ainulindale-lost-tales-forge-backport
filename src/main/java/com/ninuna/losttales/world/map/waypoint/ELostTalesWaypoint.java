@@ -11,7 +11,9 @@ public enum ELostTalesWaypoint {
     ODANE(LostTalesUtil.addWaypoint("ODANE", Region.ODANE.getRegion(), ELostTalesFaction.ODANE.getFaction(), 3132, 790, false)),
     ODANE_MOUNTAINS(LostTalesUtil.addWaypoint("ODANE_MOUNTAINS", Region.ODANE.getRegion(), ELostTalesFaction.ODANE.getFaction(), 3142, 735, false)),
     ODANE_PORT(LostTalesUtil.addWaypoint("ODANE_PORT", Region.ODANE.getRegion(), ELostTalesFaction.ODANE.getFaction(), 3070, 850, false)),
-    ODANE_EASTWATCH(LostTalesUtil.addWaypoint("ODANE_EASTWATCH", Region.ODANE.getRegion(), ELostTalesFaction.ODANE.getFaction(), 3177, 832, false));
+    ODANE_EASTWATCH(LostTalesUtil.addWaypoint("ODANE_EASTWATCH", Region.ODANE.getRegion(), ELostTalesFaction.ODANE.getFaction(), 3177, 832, false)),
+    LOSSOTH(LostTalesUtil.addWaypoint("LOSSOTH", Region.LOSSOTH.getRegion(), ELostTalesFaction.LOSSOTH.getFaction(), 860, 350, true)),
+    OROCARNI(LostTalesUtil.addWaypoint("OROCARNI", Region.OROCARNI.getRegion(), ELostTalesFaction.OROCARNI.getFaction(), 2415, 915, true));
 
     private final LOTRWaypoint waypoint;
 
@@ -26,7 +28,9 @@ public enum ELostTalesWaypoint {
     public enum Region {
         MOON_ELVES(LostTalesUtil.addWaypointRegion("MOON_ELVES")),
         SUN_ELVES(LostTalesUtil.addWaypointRegion("SUN_ELVES")),
-        ODANE(LostTalesUtil.addWaypointRegion("ODANE"));
+        ODANE(LostTalesUtil.addWaypointRegion("ODANE")),
+        LOSSOTH(LostTalesUtil.addWaypointRegion("LOSSOTH")),
+        OROCARNI(LostTalesUtil.addWaypointRegion("OROCARNI"));
 
         final private LOTRWaypoint.Region region;
 

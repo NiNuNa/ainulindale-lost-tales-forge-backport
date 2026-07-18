@@ -3,5 +3,10 @@
   "id": "losttales:goblin_king",
   "name": "Goblin King",
   "description": "",
-  "appearance": null
+  "appearance": {
+    "raceId": "losttales:orc",
+    "genderId": "losttales:non_binary",
+    "modelId": "lotr:orc",
+    "skinId": "losttales:orc_4"
+  }
 }
