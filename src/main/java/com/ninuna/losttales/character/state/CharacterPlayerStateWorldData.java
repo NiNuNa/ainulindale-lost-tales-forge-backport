@@ -24,7 +24,7 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
 
     public static final String DATA_NAME_PREFIX =
             "losttales_character_player_state_";
-    public static final int CURRENT_DATA_VERSION = 11;
+    public static final int CURRENT_DATA_VERSION = 12;
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_ACCOUNTS = "Accounts";

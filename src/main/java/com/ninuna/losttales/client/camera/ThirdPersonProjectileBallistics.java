@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.camera;
 
+import com.ninuna.losttales.compat.minecraft.PlayerItemUseAccess;
 import lotr.common.item.LOTRItemBlowgun;
 import lotr.common.item.LOTRItemBow;
 import lotr.common.item.LOTRItemCrossbow;
@@ -27,10 +28,11 @@ public final class ThirdPersonProjectileBallistics {
         if (player == null) {
             return null;
         }
-        boolean usingItem = player.isUsingItem();
+        ItemStack activeStack = PlayerItemUseAccess.getItemInUse(player);
+        boolean usingItem = activeStack != null && activeStack == stack;
         int useTicks = usingItem && stack != null
                 ? Math.max(0, stack.getMaxItemUseDuration()
-                - player.getItemInUseCount()) : 0;
+                - PlayerItemUseAccess.getItemInUseCount(player)) : 0;
         return resolve(stack, usingItem, useTicks);
     }
 

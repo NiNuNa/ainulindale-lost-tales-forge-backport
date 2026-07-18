@@ -8,10 +8,12 @@ import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import lotr.client.model.LOTRArmorModels;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.model.ModelBiped;
 import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.client.renderer.entity.RenderPlayer;
+import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.util.ResourceLocation;
@@ -189,7 +191,16 @@ final class LostTalesConfiguredPlayerRenderer extends RenderPlayer {
         }
 
         AbstractClientPlayer clientPlayer = (AbstractClientPlayer)player;
-        this.bindTexture(getEntityTexture(clientPlayer));
+        ResourceLocation texture = getEntityTexture(clientPlayer);
+        Minecraft minecraft = Minecraft.getMinecraft();
+        TextureManager textureManager = minecraft == null
+                ? null : minecraft.getTextureManager();
+        if (texture == null || textureManager == null) {
+            // A disconnect can tear down RenderManager before the final hand
+            // frame. Skipping that frame is safer than dereferencing it.
+            return;
+        }
+        textureManager.bindTexture(texture);
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
 
         ModelBiped model = this.modelBipedMain;

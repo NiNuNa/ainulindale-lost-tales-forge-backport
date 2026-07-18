@@ -5,14 +5,17 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TypeInsnNode;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 /** Verifies the supported LOTR v36.15 integration points against the local jar. */
 public final class LostTalesClassTransformerTest {
@@ -38,6 +41,22 @@ public final class LostTalesClassTransformerTest {
     private static final String CLIENT_IDENTITY_HOOK_OWNER =
             "com/ninuna/losttales/client/character/"
                     + "ClientRoleplayCharacterIdentityHook";
+    private static final String ACCESSORY_CONTAINER_CLASS =
+            "com/ninuna/losttales/accessory/inventory/"
+                    + "LostTalesContainerPlayer";
+    private static final String ACCESSORY_CONTAINER_HOOK_OWNER =
+            "com/ninuna/losttales/accessory/inventory/"
+                    + "AccessoryContainerHooks";
+    private static final String ACCESSORY_CREATIVE_HOOK_OWNER =
+            "com/ninuna/losttales/accessory/inventory/"
+                    + "AccessoryCreativeInventoryHook";
+    private static final String ACCESSORY_DEATH_HOOK_OWNER =
+            "com/ninuna/losttales/accessory/player/AccessoryDeathHooks";
+    private static final String ACCESSORY_CONCEALMENT_HOOK_OWNER =
+            "com/ninuna/losttales/accessory/effect/"
+                    + "AccessoryConcealmentHooks";
+    private static final String ACCESSORY_LOTR_MAP_HOOK_OWNER =
+            "com/ninuna/losttales/compat/lotr/LotrAccessoryMapHooks";
 
     @Test
     public void factionBountiesUseRoleplayCharacterUuid() throws Exception {
@@ -168,6 +187,139 @@ public final class LostTalesClassTransformerTest {
                 "resolveMapPlayerName"));
     }
 
+    @Test
+    public void entityPlayerUsesAccessoryAwareContainer() throws Exception {
+        ClassNode transformed = transform(
+                "net.minecraft.entity.player.EntityPlayer");
+        assertTrue(containsConstructedType(
+                transformed, ACCESSORY_CONTAINER_CLASS));
+    }
+
+    @Test
+    public void entityPlayerCapturesAccessoryBeforePlayerDropsEvent()
+            throws Exception {
+        ClassNode transformed = transform(
+                "net.minecraft.entity.player.EntityPlayer");
+        assertTrue(containsStaticHook(
+                transformed, "onDeath", ACCESSORY_DEATH_HOOK_OWNER,
+                "captureAccessoryDrop"));
+        MethodNode death = findMethod(transformed, "onDeath");
+        int hookIndex = -1;
+        int captureCloseIndex = -1;
+        int dropsEventIndex = -1;
+        int index = 0;
+        for (AbstractInsnNode instruction = death.instructions.getFirst();
+             instruction != null;
+             instruction = instruction.getNext(), index++) {
+            if (instruction instanceof MethodInsnNode) {
+                MethodInsnNode call = (MethodInsnNode)instruction;
+                if (ACCESSORY_DEATH_HOOK_OWNER.equals(call.owner)
+                        && "captureAccessoryDrop".equals(call.name)) {
+                    hookIndex = index;
+                }
+            } else if (instruction instanceof FieldInsnNode) {
+                FieldInsnNode field = (FieldInsnNode)instruction;
+                if (field.getOpcode() == Opcodes.PUTFIELD
+                        && "captureDrops".equals(field.name)) {
+                    AbstractInsnNode previous = previousCode(field);
+                    if (previous != null
+                            && previous.getOpcode() == Opcodes.ICONST_0) {
+                        captureCloseIndex = index;
+                    }
+                }
+            } else if (instruction instanceof TypeInsnNode
+                    && instruction.getOpcode() == Opcodes.NEW
+                    && "net/minecraftforge/event/entity/player/PlayerDropsEvent"
+                    .equals(((TypeInsnNode)instruction).desc)) {
+                dropsEventIndex = index;
+            }
+        }
+        assertTrue(hookIndex >= 0 && hookIndex < captureCloseIndex);
+        assertTrue(captureCloseIndex < dropsEventIndex);
+    }
+
+    @Test
+    public void concealedPlayerIsNotRayCollidable() throws Exception {
+        ClassNode transformed = transform(
+                "net.minecraft.entity.EntityLivingBase");
+        assertTrue(containsStaticHook(
+                transformed, "canBeCollidedWith",
+                ACCESSORY_CONCEALMENT_HOOK_OWNER,
+                "isConcealed"));
+    }
+
+    @Test
+    public void concealedPlayerUsesVanillaInvisibilityPath()
+            throws Exception {
+        ClassNode transformed = transform("net.minecraft.entity.Entity");
+        assertTrue(containsStaticHook(
+                transformed, "isInvisible",
+                ACCESSORY_CONCEALMENT_HOOK_OWNER,
+                "isConcealed"));
+    }
+
+    @Test
+    public void vanillaAndLotrAiRejectConcealedTargets() throws Exception {
+        ClassNode transformed = transform(
+                "net.minecraft.entity.ai.EntityAITarget");
+        assertTrue(containsStaticHookAnywhere(
+                transformed, ACCESSORY_CONCEALMENT_HOOK_OWNER,
+                "isConcealed"));
+    }
+
+    @Test
+    public void livingSightRejectsConcealedPlayers() throws Exception {
+        ClassNode transformed = transform(
+                "net.minecraft.entity.EntityLivingBase");
+        assertTrue(containsStaticHook(
+                transformed, "canEntityBeSeen",
+                ACCESSORY_CONCEALMENT_HOOK_OWNER,
+                "isConcealed"));
+    }
+
+    @Test
+    public void lotrMapOmitsConcealedPlayerLocations() throws Exception {
+        ClassNode transformed = transform("lotr.common.LOTRLevelData");
+        assertTrue(containsStaticHook(
+                transformed, "sendPlayerLocationsToPlayer",
+                ACCESSORY_LOTR_MAP_HOOK_OWNER,
+                "addPlayerLocationIfVisible"));
+    }
+
+    @Test
+    public void minecraftPickBlockPreservesVanillaHotbarIds()
+            throws Exception {
+        ClassNode transformed = transform("net.minecraft.client.Minecraft");
+        assertTrue(containsStaticHookAnywhere(
+                transformed,
+                ACCESSORY_CONTAINER_HOOK_OWNER,
+                "resolveVanillaInventorySlotCount"));
+        MethodNode method = findMethod(transformed, "func_147112_ai");
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (instruction instanceof MethodInsnNode) {
+                MethodInsnNode call = (MethodInsnNode)instruction;
+                if (ACCESSORY_CONTAINER_HOOK_OWNER.equals(call.owner)
+                        && "resolveVanillaInventorySlotCount".equals(
+                        call.name)) {
+                    assertFalse(call.itf);
+                    return;
+                }
+            }
+        }
+        throw new AssertionError("Missing accessory pick-block hook");
+    }
+
+    @Test
+    public void creativeAccessoryWritesUseServerValidator()
+            throws Exception {
+        ClassNode transformed = transform(
+                "net.minecraft.network.NetHandlerPlayServer");
+        assertTrue(containsStaticHook(
+                transformed, "processCreativeInventoryAction",
+                ACCESSORY_CREATIVE_HOOK_OWNER, "handle"));
+    }
+
     private static ClassNode transform(String binaryName) throws IOException {
         byte[] original = readResource(binaryName.replace('.', '/') + ".class");
         byte[] bytes = new LostTalesClassTransformer().transform(
@@ -211,6 +363,43 @@ public final class LostTalesClassTransformerTest {
             }
         }
         return false;
+    }
+
+    private static boolean containsConstructedType(
+            ClassNode owner, String internalName) {
+        for (Object value : owner.methods) {
+            MethodNode method = (MethodNode)value;
+            for (AbstractInsnNode instruction = method.instructions.getFirst();
+                 instruction != null; instruction = instruction.getNext()) {
+                if (instruction instanceof TypeInsnNode
+                        && instruction.getOpcode() == Opcodes.NEW
+                        && internalName.equals(
+                        ((TypeInsnNode)instruction).desc)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static MethodNode findMethod(ClassNode owner, String name) {
+        for (Object value : owner.methods) {
+            MethodNode method = (MethodNode)value;
+            if (name.equals(method.name)) {
+                return method;
+            }
+        }
+        throw new AssertionError("Missing method " + name);
+    }
+
+    private static AbstractInsnNode previousCode(
+            AbstractInsnNode instruction) {
+        AbstractInsnNode cursor = instruction == null
+                ? null : instruction.getPrevious();
+        while (cursor != null && cursor.getOpcode() < 0) {
+            cursor = cursor.getPrevious();
+        }
+        return cursor;
     }
 
     private static byte[] readResource(String path) throws IOException {

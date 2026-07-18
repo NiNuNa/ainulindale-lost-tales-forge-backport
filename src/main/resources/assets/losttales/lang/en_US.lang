@@ -1038,3 +1038,9 @@ gui.losttales.party.error.malformed_request=The party request was malformed.
 gui.losttales.party.error.internal_error=The server could not complete the party operation.
 
 gui.losttales.character.error.delete_active_character=Switch to another character before deleting this one. Active character saves cannot be deleted.
+
+item.the_one_ring.name=The One Ring
+item.the_one_ring.lore.line1=A plain golden band carrying a terrible will.
+item.the_one_ring.lore.line2=Its power awakens only while properly equipped.
+item.the_one_ring.equip_hint=Right-click to equip or swap.
+container.losttales.accessory=Accessory

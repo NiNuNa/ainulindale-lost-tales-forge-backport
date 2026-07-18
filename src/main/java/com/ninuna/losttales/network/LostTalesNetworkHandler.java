@@ -13,6 +13,8 @@ import com.ninuna.losttales.network.packet.LostTalesQuickLootRequestPacket;
 import com.ninuna.losttales.network.packet.LostTalesThirdPersonEntityActionPacket;
 import com.ninuna.losttales.network.packet.LostTalesThirdPersonBlockActionPacket;
 import com.ninuna.losttales.network.packet.LostTalesThirdPersonAimPacket;
+import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
+import com.ninuna.losttales.network.packet.AccessoryEffectSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterCapeUpdateRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterCreateRequestPacket;
@@ -76,5 +78,7 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(PartyTrackingSyncPacket.Handler.class, PartyTrackingSyncPacket.class, 21, Side.CLIENT);
         CHANNEL.registerMessage(LoreCharacterSyncPacket.Handler.class, LoreCharacterSyncPacket.class, 24, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesChargeTierSyncPacket.Handler.class, LostTalesChargeTierSyncPacket.class, 28, Side.CLIENT);
+        CHANNEL.registerMessage(AccessoryInventorySyncPacket.Handler.class, AccessoryInventorySyncPacket.class, 29, Side.CLIENT);
+        CHANNEL.registerMessage(AccessoryEffectSyncPacket.Handler.class, AccessoryEffectSyncPacket.class, 30, Side.CLIENT);
     }
 }

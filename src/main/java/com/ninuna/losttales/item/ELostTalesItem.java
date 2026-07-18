@@ -234,6 +234,10 @@ public enum ELostTalesItem {
             ELostTalesItemMaterial.OROCARNI, Type.WEAPON_WARHAMMER
     ).setUnlocalizedName("dains_hammer").setCreativeTab(ELostTalesCreativeTabs.STORY.getCreativeTab())),
 
+    THE_ONE_RING(new LostTalesItemOneRing()
+            .setUnlocalizedName("the_one_ring")
+            .setCreativeTab(ELostTalesCreativeTabs.STORY.getCreativeTab())),
+
     // Backported utility/tools.
     CREATION_TOOL_LOOT_RESPAWNER(new LostTalesItemSimple(
             ELostTalesItemMaterial.NEUTRAL, Type.TOOL
@@ -352,6 +356,7 @@ public enum ELostTalesItem {
         CONSUMABLE_POTION("Potion"),
         CONSUMABLE_FOOD("Food"),
         CONSUMABLE_DRINK("Drink"),
+        ACCESSORY("Accessory"),
         TOOL("Tool"),
         INSTRUMENT("Instrument");
 

@@ -10,7 +10,7 @@ import java.util.UUID;
 /** Immutable generation of allowlisted character-owned player state. */
 public final class CharacterPlayerStateSnapshot {
 
-    public static final int CURRENT_DATA_VERSION = 11;
+    public static final int CURRENT_DATA_VERSION = 12;
 
     private final UUID characterId;
     private final long generation;

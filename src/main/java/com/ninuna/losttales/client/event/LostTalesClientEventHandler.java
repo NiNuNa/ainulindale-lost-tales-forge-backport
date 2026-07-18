@@ -1,6 +1,10 @@
 package com.ninuna.losttales.client.event;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.accessory.inventory.LostTalesContainerPlayer;
+import com.ninuna.losttales.accessory.player.AccessoryInventory;
+import com.ninuna.losttales.client.accessory.ClientAccessoryEffectCache;
+import com.ninuna.losttales.client.accessory.WraithWorldVisualEffect;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
 import com.ninuna.losttales.client.camera.ThirdPersonCrosshairRenderer;
@@ -16,6 +20,7 @@ import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
+import com.ninuna.losttales.client.gui.LostTalesGuiInventory;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
@@ -47,12 +52,18 @@ import cpw.mods.fml.common.network.FMLNetworkEvent.ClientDisconnectionFromServer
 import cpw.mods.fml.common.gameevent.TickEvent;
 import java.util.Arrays;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.inventory.GuiContainerCreative;
+import net.minecraft.client.gui.inventory.GuiInventory;
+import net.minecraft.inventory.Slot;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.client.resources.IResourceManagerReloadListener;
 import net.minecraftforge.client.MinecraftForgeClient;
 import lotr.client.gui.LOTRGuiMap;
 import net.minecraftforge.client.event.GuiOpenEvent;
+import net.minecraftforge.client.event.GuiScreenEvent;
+import net.minecraftforge.client.event.EntityViewRenderEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
@@ -70,6 +81,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
 
     @Override
     public void onResourceManagerReload(IResourceManager resManager) {
+        WraithWorldVisualEffect.onResourceManagerReload();
         LostTalesInputIconRenderer.onResourceManagerReload(resManager);
         LostTalesMapOverlay.applyClientMap();
         LostTalesClientMapMarkerStore.reloadFromResources(resManager);
@@ -92,6 +104,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientPartyStateCache.clear();
         ClientPartyMemberStatusCache.clear();
         ClientPartyTrackingCache.clear();
+        ClientAccessoryEffectCache.clear();
+        WraithWorldVisualEffect.reset();
         CharacterClientTaskQueue.clear();
         LostTalesQuickLootHudRenderer.resetHud();
         LotrRaceProfileAdapter.getInstance().clear();
@@ -104,7 +118,18 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
             LostTalesClientMobAggroCache.clear();
             ClientPartyTrackingCache.clear();
             ThirdPersonCameraRuntime.resetSession();
+            WraithWorldVisualEffect.reset();
         }
+    }
+
+    @SubscribeEvent
+    public void updateWraithWorldEffect(TickEvent.ClientTickEvent event) {
+        WraithWorldVisualEffect.onClientTick(event);
+    }
+
+    @SubscribeEvent
+    public void colorWraithWorldFog(EntityViewRenderEvent.FogColors event) {
+        WraithWorldVisualEffect.applyFogColors(event);
     }
 
     @SubscribeEvent
@@ -202,6 +227,15 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void hideConcealedPlayer(RenderPlayerEvent.Pre event) {
+        if (event != null && event.entityPlayer != null
+                && ClientAccessoryEffectCache.isConcealed(
+                event.entityPlayer)) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void restoreThirdPersonHeadPitch(RenderPlayerEvent.Post event) {
         ThirdPersonHeadRenderHook.onPost(event);
     }
@@ -210,6 +244,29 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     public void replaceLotrMapGui(GuiOpenEvent event) {
         if (event.gui != null && event.gui.getClass() == LOTRGuiMap.class) {
             event.gui = new LostTalesLotrMapGui();
+        } else if (event.gui != null
+                && event.gui.getClass() == GuiInventory.class
+                && Minecraft.getMinecraft().thePlayer != null
+                && Minecraft.getMinecraft().thePlayer.inventoryContainer
+                instanceof LostTalesContainerPlayer) {
+            event.gui = new LostTalesGuiInventory(
+                    Minecraft.getMinecraft().thePlayer);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void positionCreativeAccessorySlot(
+            GuiScreenEvent.DrawScreenEvent.Pre event) {
+        if (!(event.gui instanceof GuiContainerCreative)) {
+            return;
+        }
+        GuiContainerCreative gui = (GuiContainerCreative)event.gui;
+        for (Object value : gui.inventorySlots.inventorySlots) {
+            Slot slot = (Slot)value;
+            if (slot.inventory instanceof AccessoryInventory) {
+                slot.xDisplayPosition = 126;
+                slot.yDisplayPosition = 20;
+            }
         }
     }
 
@@ -217,6 +274,11 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     public void renderThirdPersonCrosshair(
             RenderGameOverlayEvent.Pre event) {
         ThirdPersonCrosshairRenderer.render(event);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void renderWraithWorldEffect(RenderGameOverlayEvent.Pre event) {
+        WraithWorldVisualEffect.render(event);
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)

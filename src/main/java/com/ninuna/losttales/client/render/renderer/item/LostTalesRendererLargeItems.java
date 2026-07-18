@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.render.renderer.item;
 
+import com.ninuna.losttales.compat.minecraft.PlayerItemUseAccess;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.weapon.LostTalesItemPike;
 import com.ninuna.losttales.item.weapon.LostTalesItemSpear;
@@ -47,7 +48,10 @@ public class LostTalesRendererLargeItems implements IItemRenderer {
         Tessellator tessellator = Tessellator.instance;
         Minecraft.getMinecraft().getTextureManager().bindTexture(TextureMap.locationItemsTexture);
 
-        if (item instanceof LostTalesItemSpear && holder instanceof EntityPlayer && ((EntityPlayer)holder).getItemInUse() == itemstack) {
+        if (item instanceof LostTalesItemSpear
+                && holder instanceof EntityPlayer
+                && PlayerItemUseAccess.getItemInUse(
+                (EntityPlayer)holder) == itemstack) {
             GL11.glRotatef(260.0F, 0.0F, 0.0F, 1.0F);
             GL11.glTranslatef(-1.0F, 0.0F, 0.0F);
         }

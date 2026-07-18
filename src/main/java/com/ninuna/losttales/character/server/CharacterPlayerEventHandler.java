@@ -1,6 +1,9 @@
 package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.accessory.player.AccessoryInventorySyncManager;
+import com.ninuna.losttales.accessory.player.AccessoryRecoveryService;
+import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
 import com.ninuna.losttales.character.switching.CharacterLifecycleStateTracker;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
 import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferCoordinator;
@@ -32,6 +35,7 @@ public final class CharacterPlayerEventHandler {
         }
         EntityPlayerMP player = (EntityPlayerMP) event.player;
         CharacterSwitchCoordinator.getInstance().saveActiveStateOnLogout(player);
+        AccessoryInventorySyncManager.clearPlayer(player.getUniqueID());
         CharacterAppearanceSyncManager.broadcastRemoval(player.getUniqueID());
         CharacterNetworkSecurity.clearPlayer(player.getUniqueID());
         CharacterSwitchCoordinator.getInstance().clearRuntimeState(player.getUniqueID());
@@ -101,6 +105,8 @@ public final class CharacterPlayerEventHandler {
                     LostTalesMetaData.MOD_ID,
                     player.getUniqueID(),
                     result.getErrorId().getId());
+            AccessoryRecoveryService.recover(serverPlayer);
+            AccessoryInventorySyncManager.send(serverPlayer);
             return;
         }
 
@@ -137,6 +143,9 @@ public final class CharacterPlayerEventHandler {
         CharacterAppearanceSyncManager.sendFullSnapshot(serverPlayer);
         CharacterRaceGameplayHandler.apply(serverPlayer);
         CharacterAppearanceSyncManager.broadcastPlayer(serverPlayer, result.getRoster());
+        AccessoryRecoveryService.recover(serverPlayer);
+        AccessoryInventorySyncManager.send(serverPlayer);
+        AccessoryEffectService.refresh(serverPlayer);
     }
 
     private enum LifecycleAction {

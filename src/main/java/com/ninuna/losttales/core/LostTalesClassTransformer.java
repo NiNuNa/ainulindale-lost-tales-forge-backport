@@ -15,6 +15,7 @@ import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 
 /**
@@ -41,13 +42,43 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.lotrBountyTransformer.active";
     public static final String LOTR_SPEECH_ACTIVE_PROPERTY =
             "losttales.lotrSpeechTransformer.active";
+    public static final String ACCESSORY_CONTAINER_ACTIVE_PROPERTY =
+            "losttales.accessoryContainerTransformer.active";
+    public static final String ACCESSORY_PICK_BLOCK_ACTIVE_PROPERTY =
+            "losttales.accessoryPickBlockTransformer.active";
+    public static final String ACCESSORY_CREATIVE_ACTIVE_PROPERTY =
+            "losttales.accessoryCreativeTransformer.active";
+    public static final String ACCESSORY_DEATH_ACTIVE_PROPERTY =
+            "losttales.accessoryDeathTransformer.active";
+    public static final String ACCESSORY_COLLISION_ACTIVE_PROPERTY =
+            "losttales.accessoryCollisionTransformer.active";
+    public static final String ACCESSORY_INVISIBILITY_ACTIVE_PROPERTY =
+            "losttales.accessoryInvisibilityTransformer.active";
+    public static final String ACCESSORY_AI_TARGET_ACTIVE_PROPERTY =
+            "losttales.accessoryAiTargetTransformer.active";
+    public static final String ACCESSORY_SIGHT_ACTIVE_PROPERTY =
+            "losttales.accessorySightTransformer.active";
+    public static final String ACCESSORY_LOTR_MAP_ACTIVE_PROPERTY =
+            "losttales.accessoryLotrMapTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
+    private static final String MINECRAFT =
+            "net.minecraft.client.Minecraft";
     private static final String PLAYER_CONTROLLER =
             "net.minecraft.client.multiplayer.PlayerControllerMP";
     private static final String ENTITY_PLAYER_MP =
             "net.minecraft.entity.player.EntityPlayerMP";
+    private static final String ENTITY_PLAYER =
+            "net.minecraft.entity.player.EntityPlayer";
+    private static final String ENTITY =
+            "net.minecraft.entity.Entity";
+    private static final String ENTITY_LIVING_BASE =
+            "net.minecraft.entity.EntityLivingBase";
+    private static final String ENTITY_AI_TARGET =
+            "net.minecraft.entity.ai.EntityAITarget";
+    private static final String NET_HANDLER_PLAY_SERVER =
+            "net.minecraft.network.NetHandlerPlayServer";
     private static final String RENDER_MANAGER =
             "net.minecraft.client.renderer.entity.RenderManager";
     private static final String LOTR_FAST_TRAVEL_HANDLER =
@@ -60,6 +91,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "lotr.common.entity.npc.LOTRSpeech";
     private static final String LOTR_GUI_MAP =
             "lotr.client.gui.LOTRGuiMap";
+    private static final String LOTR_LEVEL_DATA =
+            "lotr.common.LOTRLevelData";
 
     private static final String CAMERA_MCP = "orientCamera";
     private static final String CAMERA_SRG = "func_78467_g";
@@ -131,6 +164,22 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "ClientRoleplayCharacterIdentityHook";
     private static final String MAP_PLAYER_NAME_HOOK_DESC =
             "(Lcom/mojang/authlib/GameProfile;)Ljava/lang/String;";
+    private static final String ACCESSORY_CONTAINER_CLASS =
+            "com/ninuna/losttales/accessory/inventory/"
+                    + "LostTalesContainerPlayer";
+    private static final String ACCESSORY_CONTAINER_HOOK_OWNER =
+            "com/ninuna/losttales/accessory/inventory/"
+                    + "AccessoryContainerHooks";
+    private static final String ACCESSORY_CREATIVE_HOOK_OWNER =
+            "com/ninuna/losttales/accessory/inventory/"
+                    + "AccessoryCreativeInventoryHook";
+    private static final String ACCESSORY_DEATH_HOOK_OWNER =
+            "com/ninuna/losttales/accessory/player/AccessoryDeathHooks";
+    private static final String ACCESSORY_CONCEALMENT_HOOK_OWNER =
+            "com/ninuna/losttales/accessory/effect/"
+                    + "AccessoryConcealmentHooks";
+    private static final String ACCESSORY_LOTR_MAP_HOOK_OWNER =
+            "com/ninuna/losttales/compat/lotr/LotrAccessoryMapHooks";
 
     @Override
     public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -140,11 +189,29 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         if (ENTITY_RENDERER.equals(transformedName)) {
             return transformCamera(basicClass);
         }
+        if (MINECRAFT.equals(transformedName)) {
+            return transformMinecraftPickBlock(basicClass);
+        }
         if (PLAYER_CONTROLLER.equals(transformedName)) {
             return transformPlayerController(basicClass);
         }
         if (ENTITY_PLAYER_MP.equals(transformedName)) {
             return transformEntityPlayerMpDeathMessage(basicClass);
+        }
+        if (ENTITY_PLAYER.equals(transformedName)) {
+            return transformEntityPlayerContainer(basicClass);
+        }
+        if (ENTITY.equals(transformedName)) {
+            return transformEntityInvisibility(basicClass);
+        }
+        if (ENTITY_LIVING_BASE.equals(transformedName)) {
+            return transformEntityLivingBaseSight(basicClass);
+        }
+        if (ENTITY_AI_TARGET.equals(transformedName)) {
+            return transformEntityAiTarget(basicClass);
+        }
+        if (NET_HANDLER_PLAY_SERVER.equals(transformedName)) {
+            return transformCreativeInventoryAction(basicClass);
         }
         if (RENDER_MANAGER.equals(transformedName)) {
             return transformDebugBox(basicClass);
@@ -164,7 +231,426 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         if (LOTR_GUI_MAP.equals(transformedName)) {
             return transformLotrMapPlayerNames(basicClass);
         }
+        if (LOTR_LEVEL_DATA.equals(transformedName)) {
+            return transformLotrPlayerLocations(basicClass);
+        }
         return basicClass;
+    }
+
+    /** Installs the player container and the Forge drop-capture transaction hook. */
+    private static byte[] transformEntityPlayerContainer(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            boolean containerPatched = false;
+            boolean deathPatched = false;
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if ("<init>".equals(method.name)
+                        && "(Lnet/minecraft/world/World;"
+                        .concat("Lcom/mojang/authlib/GameProfile;)V")
+                        .equals(method.desc)) {
+                    boolean allocationPatched = false;
+                    boolean constructorPatched = false;
+                    for (AbstractInsnNode instruction =
+                         method.instructions.getFirst();
+                         instruction != null;
+                         instruction = instruction.getNext()) {
+                        if (instruction instanceof TypeInsnNode
+                                && instruction.getOpcode() == Opcodes.NEW) {
+                            TypeInsnNode allocation = (TypeInsnNode)instruction;
+                            if ("net/minecraft/inventory/ContainerPlayer"
+                                    .equals(allocation.desc)) {
+                                allocation.desc = ACCESSORY_CONTAINER_CLASS;
+                                allocationPatched = true;
+                            } else if (ACCESSORY_CONTAINER_CLASS.equals(
+                                    allocation.desc)) {
+                                allocationPatched = true;
+                            }
+                        } else if (instruction instanceof MethodInsnNode) {
+                            MethodInsnNode call = (MethodInsnNode)instruction;
+                            if (call.getOpcode() == Opcodes.INVOKESPECIAL
+                                    && "<init>".equals(call.name)
+                                    && "(Lnet/minecraft/entity/player/InventoryPlayer;"
+                                    .concat("ZLnet/minecraft/entity/player/EntityPlayer;)V")
+                                    .equals(call.desc)) {
+                                if ("net/minecraft/inventory/ContainerPlayer"
+                                        .equals(call.owner)) {
+                                    call.owner = ACCESSORY_CONTAINER_CLASS;
+                                    constructorPatched = true;
+                                } else if (ACCESSORY_CONTAINER_CLASS.equals(
+                                        call.owner)) {
+                                    constructorPatched = true;
+                                }
+                            }
+                        }
+                    }
+                    containerPatched = allocationPatched && constructorPatched;
+                }
+
+                if (("onDeath".equals(method.name)
+                        || "func_70645_a".equals(method.name))
+                        && "(Lnet/minecraft/util/DamageSource;)V".equals(
+                        method.desc)) {
+                    if (containsHook(method, ACCESSORY_DEATH_HOOK_OWNER,
+                            "captureAccessoryDrop")) {
+                        deathPatched = true;
+                        continue;
+                    }
+                    for (AbstractInsnNode instruction =
+                         method.instructions.getFirst();
+                         instruction != null;
+                         instruction = instruction.getNext()) {
+                        if (!(instruction instanceof FieldInsnNode)
+                                || instruction.getOpcode() != Opcodes.PUTFIELD) {
+                            continue;
+                        }
+                        FieldInsnNode field = (FieldInsnNode)instruction;
+                        AbstractInsnNode zero = previousCode(field);
+                        AbstractInsnNode playerLoad = previousCode(zero);
+                        if (!"captureDrops".equals(field.name)
+                                || !"Z".equals(field.desc)
+                                || zero == null
+                                || zero.getOpcode() != Opcodes.ICONST_0
+                                || !(playerLoad instanceof VarInsnNode)
+                                || playerLoad.getOpcode() != Opcodes.ALOAD
+                                || ((VarInsnNode)playerLoad).var != 0) {
+                            continue;
+                        }
+                        InsnList hook = new InsnList();
+                        hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                        hook.add(new MethodInsnNode(
+                                Opcodes.INVOKESTATIC,
+                                ACCESSORY_DEATH_HOOK_OWNER,
+                                "captureAccessoryDrop",
+                                "(Lnet/minecraft/entity/player/EntityPlayer;)V",
+                                false));
+                        method.instructions.insertBefore(playerLoad, hook);
+                        deathPatched = true;
+                        break;
+                    }
+                }
+
+            }
+            if (containerPatched) {
+                System.setProperty(
+                        ACCESSORY_CONTAINER_ACTIVE_PROPERTY, "true");
+                info("Installed accessory-aware player container");
+            } else {
+                warn("Could not patch EntityPlayer player-container construction; "
+                        + "accessory slots will remain unavailable");
+            }
+            if (deathPatched) {
+                System.setProperty(ACCESSORY_DEATH_ACTIVE_PROPERTY, "true");
+                info("Installed accessory death-drop capture hook");
+            } else {
+                warn("Could not patch EntityPlayer death-drop capture; "
+                        + "accessory insertion must remain disabled");
+            }
+            return containerPatched || deathPatched ? write(owner) : basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch EntityPlayer accessory integration: "
+                    + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Rejects concealed players before vanilla and LOTR target suitability. */
+    private static byte[] transformEntityAiTarget(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("isSuitableTarget".equals(method.name)
+                        || "func_75296_a".equals(method.name))
+                        || !"(Lnet/minecraft/entity/EntityLivingBase;Z)Z"
+                        .equals(method.desc)) {
+                    continue;
+                }
+                if (!containsHook(method,
+                        ACCESSORY_CONCEALMENT_HOOK_OWNER,
+                        "isConcealed")) {
+                    injectConcealmentGuard(method, 1);
+                }
+                if (containsHook(method,
+                        ACCESSORY_CONCEALMENT_HOOK_OWNER,
+                        "isConcealed")) {
+                    System.setProperty(
+                            ACCESSORY_AI_TARGET_ACTIVE_PROPERTY, "true");
+                    info("Installed accessory AI target-suitability hook");
+                    return write(owner);
+                }
+            }
+            warn("Could not patch EntityAITarget target suitability");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch EntityAITarget target suitability: "
+                    + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Makes vanilla rendering and visibility consumers treat the wearer as vanished. */
+    private static byte[] transformEntityInvisibility(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("isInvisible".equals(method.name)
+                        || "func_82150_aj".equals(method.name))
+                        || !"()Z".equals(method.desc)) {
+                    continue;
+                }
+                if (!containsHook(method,
+                        ACCESSORY_CONCEALMENT_HOOK_OWNER,
+                        "isConcealed")) {
+                    injectBooleanTrueGuard(method, 0);
+                }
+                if (containsHook(method,
+                        ACCESSORY_CONCEALMENT_HOOK_OWNER,
+                        "isConcealed")) {
+                    System.setProperty(
+                            ACCESSORY_INVISIBILITY_ACTIVE_PROPERTY, "true");
+                    info("Installed accessory vanilla-invisibility hook");
+                    return write(owner);
+                }
+            }
+            warn("Could not patch Entity invisibility predicate");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch Entity invisibility predicate: "
+                    + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Makes living sight and collision checks fail for concealed players. */
+    private static byte[] transformEntityLivingBaseSight(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            boolean sightPatched = false;
+            boolean collisionPatched = false;
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (("canEntityBeSeen".equals(method.name)
+                        || "func_70685_l".equals(method.name))
+                        && "(Lnet/minecraft/entity/Entity;)Z".equals(
+                        method.desc)) {
+                    if (!containsHook(method,
+                            ACCESSORY_CONCEALMENT_HOOK_OWNER,
+                            "isConcealed")) {
+                        injectConcealmentGuard(method, 1);
+                    }
+                    sightPatched = containsHook(method,
+                            ACCESSORY_CONCEALMENT_HOOK_OWNER,
+                            "isConcealed");
+                }
+                if (("canBeCollidedWith".equals(method.name)
+                        || "func_70067_L".equals(method.name))
+                        && "()Z".equals(method.desc)) {
+                    if (!containsHook(method,
+                            ACCESSORY_CONCEALMENT_HOOK_OWNER,
+                            "isConcealed")) {
+                        injectConcealmentGuard(method, 0);
+                    }
+                    collisionPatched = containsHook(method,
+                            ACCESSORY_CONCEALMENT_HOOK_OWNER,
+                            "isConcealed");
+                }
+            }
+            if (sightPatched) {
+                System.setProperty(
+                        ACCESSORY_SIGHT_ACTIVE_PROPERTY, "true");
+            } else {
+                warn("Could not patch EntityLivingBase sight checks");
+            }
+            if (collisionPatched) {
+                System.setProperty(
+                        ACCESSORY_COLLISION_ACTIVE_PROPERTY, "true");
+            } else {
+                warn("Could not patch EntityLivingBase collision targeting");
+            }
+            if (sightPatched || collisionPatched) {
+                info("Installed accessory living sight/collision hooks");
+                return write(owner);
+            }
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch EntityLivingBase sight checks: "
+                    + throwable);
+            return basicClass;
+        }
+    }
+
+    private static void injectConcealmentGuard(
+            MethodNode method, int entityLocal) {
+        LabelNode vanilla = new LabelNode();
+        InsnList guard = new InsnList();
+        guard.add(new VarInsnNode(Opcodes.ALOAD, entityLocal));
+        guard.add(new MethodInsnNode(
+                Opcodes.INVOKESTATIC,
+                ACCESSORY_CONCEALMENT_HOOK_OWNER,
+                "isConcealed",
+                "(Lnet/minecraft/entity/Entity;)Z",
+                false));
+        guard.add(new JumpInsnNode(Opcodes.IFEQ, vanilla));
+        guard.add(new org.objectweb.asm.tree.InsnNode(Opcodes.ICONST_0));
+        guard.add(new org.objectweb.asm.tree.InsnNode(Opcodes.IRETURN));
+        guard.add(vanilla);
+        method.instructions.insert(guard);
+    }
+
+    private static void injectBooleanTrueGuard(
+            MethodNode method, int entityLocal) {
+        LabelNode vanilla = new LabelNode();
+        InsnList guard = new InsnList();
+        guard.add(new VarInsnNode(Opcodes.ALOAD, entityLocal));
+        guard.add(new MethodInsnNode(
+                Opcodes.INVOKESTATIC,
+                ACCESSORY_CONCEALMENT_HOOK_OWNER,
+                "isConcealed",
+                "(Lnet/minecraft/entity/Entity;)Z",
+                false));
+        guard.add(new JumpInsnNode(Opcodes.IFEQ, vanilla));
+        guard.add(new org.objectweb.asm.tree.InsnNode(Opcodes.ICONST_1));
+        guard.add(new org.objectweb.asm.tree.InsnNode(Opcodes.IRETURN));
+        guard.add(vanilla);
+        method.instructions.insert(guard);
+    }
+
+    /** Preserves vanilla hotbar slot IDs after appending the accessory slot. */
+    private static byte[] transformMinecraftPickBlock(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("middleClickMouse".equals(method.name)
+                        || "func_147112_ai".equals(method.name))
+                        || !"()V".equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method,
+                        ACCESSORY_CONTAINER_HOOK_OWNER,
+                        "resolveVanillaInventorySlotCount")) {
+                    System.setProperty(
+                            ACCESSORY_PICK_BLOCK_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                for (AbstractInsnNode instruction =
+                     method.instructions.getFirst();
+                     instruction != null;
+                     instruction = instruction.getNext()) {
+                    if (!(instruction instanceof MethodInsnNode)) {
+                        continue;
+                    }
+                    MethodInsnNode call = (MethodInsnNode)instruction;
+                    if (call.getOpcode() == Opcodes.INVOKEINTERFACE
+                            && "java/util/List".equals(call.owner)
+                            && "size".equals(call.name)
+                            && "()I".equals(call.desc)) {
+                        call.setOpcode(Opcodes.INVOKESTATIC);
+                        call.owner = ACCESSORY_CONTAINER_HOOK_OWNER;
+                        call.name = "resolveVanillaInventorySlotCount";
+                        call.desc = "(Ljava/util/List;)I";
+                        // MethodInsnNode retains the original interface-owner
+                        // flag when only its opcode is changed. Leaving it set
+                        // writes an InterfaceMethodref for this class method,
+                        // which Java 8 rejects during Minecraft verification.
+                        call.itf = false;
+                        System.setProperty(
+                                ACCESSORY_PICK_BLOCK_ACTIVE_PROPERTY,
+                                "true");
+                        info("Patched creative pick-block hotbar indexing");
+                        return write(owner);
+                    }
+                }
+            }
+            warn("Could not patch Minecraft creative pick-block indexing");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch creative pick-block indexing: "
+                    + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Routes creative slot 45 through the accessory validator. */
+    private static byte[] transformCreativeInventoryAction(
+            byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("processCreativeInventoryAction".equals(method.name)
+                        || "func_147344_a".equals(method.name))
+                        || !"(Lnet/minecraft/network/play/client/"
+                        .concat("C10PacketCreativeInventoryAction;)V")
+                        .equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, ACCESSORY_CREATIVE_HOOK_OWNER,
+                        "handle")) {
+                    System.setProperty(
+                            ACCESSORY_CREATIVE_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                String playerField = findPlayerEntityField(method);
+                if (playerField == null) {
+                    warn("Could not locate NetHandlerPlayServer player field "
+                            + "for accessory creative validation");
+                    return basicClass;
+                }
+                LabelNode vanilla = new LabelNode();
+                InsnList hook = new InsnList();
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                hook.add(new FieldInsnNode(
+                        Opcodes.GETFIELD,
+                        "net/minecraft/network/NetHandlerPlayServer",
+                        playerField,
+                        "Lnet/minecraft/entity/player/EntityPlayerMP;"));
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                hook.add(new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        ACCESSORY_CREATIVE_HOOK_OWNER,
+                        "handle",
+                        "(Lnet/minecraft/entity/player/EntityPlayerMP;"
+                                + "Lnet/minecraft/network/play/client/"
+                                + "C10PacketCreativeInventoryAction;)Z"));
+                hook.add(new JumpInsnNode(Opcodes.IFEQ, vanilla));
+                hook.add(new org.objectweb.asm.tree.InsnNode(
+                        Opcodes.RETURN));
+                hook.add(vanilla);
+                method.instructions.insertBefore(
+                        method.instructions.getFirst(), hook);
+                System.setProperty(
+                        ACCESSORY_CREATIVE_ACTIVE_PROPERTY, "true");
+                info("Installed server accessory creative-slot validation");
+                return write(owner);
+            }
+            warn("Could not patch creative inventory action handling");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch creative inventory action handling: "
+                    + throwable);
+            return basicClass;
+        }
+    }
+
+    private static String findPlayerEntityField(MethodNode method) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof FieldInsnNode)
+                    || instruction.getOpcode() != Opcodes.GETFIELD) {
+                continue;
+            }
+            FieldInsnNode field = (FieldInsnNode)instruction;
+            if ("net/minecraft/network/NetHandlerPlayServer"
+                    .equals(field.owner)
+                    && "Lnet/minecraft/entity/player/EntityPlayerMP;"
+                    .equals(field.desc)) {
+                return field.name;
+            }
+        }
+        return null;
     }
 
     /** Rewrites only the already-generated player death chat component. */
@@ -266,6 +752,63 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return basicClass;
         } catch (Throwable throwable) {
             warn("Failed to patch LOTR map player tooltip names: "
+                    + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Filters concealed players before LOTR serializes map coordinates. */
+    private static byte[] transformLotrPlayerLocations(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"sendPlayerLocationsToPlayer".equals(method.name)
+                        || !"(Lnet/minecraft/entity/player/EntityPlayer;"
+                        .concat("Lnet/minecraft/world/World;)V")
+                        .equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method,
+                        ACCESSORY_LOTR_MAP_HOOK_OWNER,
+                        "addPlayerLocationIfVisible")) {
+                    System.setProperty(
+                            ACCESSORY_LOTR_MAP_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                for (AbstractInsnNode instruction =
+                     method.instructions.getFirst(); instruction != null;
+                     instruction = instruction.getNext()) {
+                    if (!(instruction instanceof MethodInsnNode)) {
+                        continue;
+                    }
+                    MethodInsnNode call = (MethodInsnNode)instruction;
+                    if (call.getOpcode() != Opcodes.INVOKEVIRTUAL
+                            || !"lotr/common/network/"
+                            .concat("LOTRPacketUpdatePlayerLocations")
+                            .equals(call.owner)
+                            || !"addPlayerLocation".equals(call.name)
+                            || !"(Lcom/mojang/authlib/GameProfile;DD)V"
+                            .equals(call.desc)) {
+                        continue;
+                    }
+                    call.setOpcode(Opcodes.INVOKESTATIC);
+                    call.owner = ACCESSORY_LOTR_MAP_HOOK_OWNER;
+                    call.name = "addPlayerLocationIfVisible";
+                    call.desc = "(Llotr/common/network/"
+                            + "LOTRPacketUpdatePlayerLocations;"
+                            + "Lcom/mojang/authlib/GameProfile;DD)V";
+                    call.itf = false;
+                    System.setProperty(
+                            ACCESSORY_LOTR_MAP_ACTIVE_PROPERTY, "true");
+                    info("Patched LOTR map locations for accessory concealment");
+                    return write(owner);
+                }
+            }
+            warn("Could not patch LOTR player-location packet construction");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch LOTR player-location packets: "
                     + throwable);
             return basicClass;
         }

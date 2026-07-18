@@ -3,6 +3,12 @@ package com.ninuna.losttales.proxy;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.achievement.ELostTalesAchievement;
+import com.ninuna.losttales.accessory.AccessoryBootstrap;
+import com.ninuna.losttales.accessory.player.AccessoryPlayerEventHandler;
+import com.ninuna.losttales.accessory.player.AccessoryInventorySyncManager;
+import com.ninuna.losttales.accessory.effect.AccessoryConcealmentEventHandler;
+import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
+import com.ninuna.losttales.core.LostTalesClassTransformer;
 import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.character.server.CharacterPlayerEventHandler;
 import com.ninuna.losttales.character.lore.LoreCharacterRegistry;
@@ -44,6 +50,8 @@ import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
+import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
+import com.ninuna.losttales.network.packet.AccessoryEffectSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyncPacket;
@@ -90,6 +98,10 @@ public class LostTalesCommonProxy {
         LostTalesNetworkHandler.registerCommonPackets();
         LostTalesQuestRegistry.loadFromClasspath();
         LostTalesQuestPlayerEventHandler questPlayerEventHandler = new LostTalesQuestPlayerEventHandler();
+        AccessoryPlayerEventHandler accessoryPlayerEventHandler =
+                new AccessoryPlayerEventHandler();
+        AccessoryConcealmentEventHandler accessoryConcealmentEventHandler =
+                new AccessoryConcealmentEventHandler();
         LostTalesQuestObjectiveEventHandler questObjectiveEventHandler = new LostTalesQuestObjectiveEventHandler();
         LostTalesMobAggroEventHandler mobAggroEventHandler = new LostTalesMobAggroEventHandler();
         CharacterLifecycleStateTracker characterLifecycleStateTracker =
@@ -107,6 +119,8 @@ public class LostTalesCommonProxy {
         LostTalesChargeService chargeService =
                 new LostTalesChargeService();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
+        MinecraftForge.EVENT_BUS.register(accessoryPlayerEventHandler);
+        MinecraftForge.EVENT_BUS.register(accessoryConcealmentEventHandler);
         MinecraftForge.EVENT_BUS.register(characterLifecycleStateTracker);
         MinecraftForge.EVENT_BUS.register(characterPlayerEventHandler);
         MinecraftForge.EVENT_BUS.register(characterRaceGameplayHandler);
@@ -116,6 +130,7 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(projectileAimHandler);
         MinecraftForge.EVENT_BUS.register(chargeService);
         FMLCommonHandler.instance().bus().register(questPlayerEventHandler);
+        FMLCommonHandler.instance().bus().register(accessoryPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(questObjectiveEventHandler);
         FMLCommonHandler.instance().bus().register(mobAggroEventHandler);
         FMLCommonHandler.instance().bus().register(characterLifecycleStateTracker);
@@ -128,6 +143,7 @@ public class LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(chargeService);
 
         ELostTalesItem.initAndRegisterItems();
+        AccessoryBootstrap.initialize();
         ELostTalesBlock.initAndRegisterBlocks();
         registerTileEntities();
         ELostTalesEntity.initAndRegisterEntities();
@@ -136,6 +152,14 @@ public class LostTalesCommonProxy {
     }
 
     public void init(FMLInitializationEvent event) {
+        if (!Boolean.getBoolean(
+                LostTalesClassTransformer.ACCESSORY_CONTAINER_ACTIVE_PROPERTY)
+                || !Boolean.getBoolean(
+                LostTalesClassTransformer.ACCESSORY_DEATH_ACTIVE_PROPERTY)) {
+            FMLLog.severe("[%s] Accessory lifecycle transformers are incomplete; "
+                            + "the ring slot will reject server-side insertion",
+                    LostTalesMetaData.MOD_ID);
+        }
         NetworkRegistry.INSTANCE.registerGuiHandler(LostTalesMod.instance, new LostTalesGuiHandler());
 
         ELostTalesStructure.initAndRegisterStructures();
@@ -149,6 +173,7 @@ public class LostTalesCommonProxy {
     }
 
     public void postInit(FMLPostInitializationEvent event) {
+        AccessoryBootstrap.freeze();
         // Run after Lost Tales has registered its additional LOTR factions so
         // the immutable character-creation catalogue includes them as well.
         LotrCharacterAdapter.getInstance().initialize();
@@ -195,6 +220,14 @@ public class LostTalesCommonProxy {
 
     public void handleChargeTierSync(LostTalesChargeTierSyncPacket packet) {}
 
+    public void handleAccessoryInventorySync(AccessoryInventorySyncPacket packet) {}
+
+    public void handleAccessoryEffectSync(AccessoryEffectSyncPacket packet) {}
+
+    public boolean isAccessoryConcealed(EntityPlayer player) {
+        return false;
+    }
+
     /** Queues client-only packet work. The dedicated-server proxy is a no-op. */
     public void scheduleClientTask(Runnable task) {}
 
@@ -221,6 +254,8 @@ public class LostTalesCommonProxy {
         initializeLoreCharacterOwnership(event);
         CharacterStateCheckpointHandler.reset();
         CharacterSwitchCoordinator.getInstance().clearAllRuntimeState();
+        AccessoryInventorySyncManager.clearAll();
+        AccessoryEffectService.clearAll();
         LostTalesServerTaskQueue.startAccepting();
         LostTalesRequestRateLimiter.clear();
         LostTalesThirdPersonAimService.clear();
@@ -273,6 +308,8 @@ public class LostTalesCommonProxy {
                 LostTalesMetaData.MOD_ID, Integer.valueOf(checkpointed));
         CharacterStateCheckpointHandler.reset();
         CharacterSwitchCoordinator.getInstance().clearAllRuntimeState();
+        AccessoryInventorySyncManager.clearAll();
+        AccessoryEffectService.clearAll();
         LostTalesRequestRateLimiter.clear();
         LostTalesThirdPersonAimService.clear();
         LostTalesChargeService.clear();

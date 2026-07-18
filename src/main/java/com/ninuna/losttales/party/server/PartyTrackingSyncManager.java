@@ -1,6 +1,7 @@
 package com.ninuna.losttales.party.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
@@ -68,6 +69,11 @@ public final class PartyTrackingSyncManager {
     public static synchronized void clear() {
         SENT_STATES.clear();
         serverTicks = 0L;
+    }
+
+    /** Immediately removes or restores live coordinates after concealment changes. */
+    public static synchronized void refreshAll() {
+        synchronizeOnlinePlayers(true);
     }
 
     private static void synchronizeOnlinePlayers(boolean force) {
@@ -206,6 +212,7 @@ public final class PartyTrackingSyncManager {
         }
         EntityPlayerMP player = online.player;
         if (player.isDead || !player.isEntityAlive()
+                || AccessoryEffectService.isConcealed(player)
                 || !PartyGoHereMarker.isValidCoordinates(
                 player.posX, player.posY, player.posZ)) {
             return null;

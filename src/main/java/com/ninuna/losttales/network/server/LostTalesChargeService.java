@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.server;
 
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.compat.minecraft.PlayerItemUseAccess;
 import com.ninuna.losttales.gameplay.projectile.ChargeTierCalculator;
 import com.ninuna.losttales.gameplay.projectile.ThirdPersonChargeItemPolicy;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
@@ -125,7 +126,7 @@ public final class LostTalesChargeService {
             return;
         }
         UUID playerId = player.getUniqueID();
-        ItemStack stack = player.getItemInUse();
+        ItemStack stack = PlayerItemUseAccess.getItemInUse(player);
         if (!LostTalesConfig.enableChargeTiers
                 || !ThirdPersonChargeItemPolicy
                 .supportsChargeTiers(stack)) {
@@ -152,7 +153,7 @@ public final class LostTalesChargeService {
     }
 
     private static int resolveCurrentTier(EntityPlayerMP player) {
-        ItemStack stack = player == null ? null : player.getItemInUse();
+        ItemStack stack = PlayerItemUseAccess.getItemInUse(player);
         return ThirdPersonChargeItemPolicy.supportsChargeTiers(stack)
                 ? resolveTier(player, stack) : 0;
     }
@@ -161,7 +162,7 @@ public final class LostTalesChargeService {
             EntityPlayerMP player, ItemStack stack) {
         int useTicks = Math.max(0,
                 stack.getMaxItemUseDuration()
-                        - player.getItemInUseCount());
+                        - PlayerItemUseAccess.getItemInUseCount(player));
         return ChargeTierCalculator.resolveTier(
                 useTicks,
                 ThirdPersonChargeItemPolicy.getFullDrawTicks(stack),

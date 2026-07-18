@@ -2,6 +2,7 @@ package com.ninuna.losttales.character.switching;
 
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
+import com.ninuna.losttales.compat.minecraft.PlayerItemUseAccess;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.event.LostTalesMobAggroEventHandler;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -87,7 +88,7 @@ public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy
             return CharacterSwitchPolicyResult.denied(
                     CharacterErrorId.SWITCH_ITEM_IN_CURSOR);
         }
-        if (player.isUsingItem()) {
+        if (PlayerItemUseAccess.isUsingItem(player)) {
             return CharacterSwitchPolicyResult.denied(
                     CharacterErrorId.SWITCH_USING_ITEM);
         }

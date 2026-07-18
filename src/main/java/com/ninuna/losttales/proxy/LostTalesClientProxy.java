@@ -50,6 +50,10 @@ import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
+import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
+import com.ninuna.losttales.accessory.player.AccessoryPlayerData;
+import com.ninuna.losttales.client.accessory.ClientAccessoryEffectCache;
+import com.ninuna.losttales.network.packet.AccessoryEffectSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
@@ -208,6 +212,29 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleChargeTierSync(LostTalesChargeTierSyncPacket packet) {
         ThirdPersonChargeFeedbackController.handle(packet);
+    }
+
+    @Override
+    public void handleAccessoryInventorySync(AccessoryInventorySyncPacket packet) {
+        EntityPlayer player = Minecraft.getMinecraft().thePlayer;
+        if (packet == null || packet.isMalformed() || player == null) {
+            return;
+        }
+        AccessoryPlayerData data = AccessoryPlayerData.getOrCreate(player);
+        if (data != null) {
+            data.applyServerSync(packet.getRevision(), packet.getEquipped(),
+                    packet.hasRejectedEntry());
+        }
+    }
+
+    @Override
+    public void handleAccessoryEffectSync(AccessoryEffectSyncPacket packet) {
+        ClientAccessoryEffectCache.accept(packet);
+    }
+
+    @Override
+    public boolean isAccessoryConcealed(EntityPlayer player) {
+        return ClientAccessoryEffectCache.isConcealed(player);
     }
 
     @Override
