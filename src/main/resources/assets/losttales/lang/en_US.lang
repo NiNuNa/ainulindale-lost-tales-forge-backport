@@ -217,6 +217,8 @@ item.dains_hammer.name=Dain's Hammer
 item.dains_hammer.lore.line1=A heavy testing relic of Dwarven make
 item.dains_hammer.lore.line2=kept for unfinished story content
 
+item.test.name=Test Spear
+
 #   Consumables - Food
 item.pear.name=Pear
 item.pear.lore.line1=A crisp fruit from well-kept orchards.
@@ -257,6 +259,8 @@ tile.loutrophoros.lore.line1=Stores several offerings.
 tile.loutrophoros.lore.line2=Use clay to seal it.
 
 #   Blocks - Decorative
+tile.tile_ceramic.name=Ceramic Tile
+tile.test_lamp.name=Test Lamp
 tile.watch_stone.name=Watch Stone
 tile.watch_stone.lore.line1=A weathered stone figure standing watch.
 tile.watch_stone.lore.line2=Its gaze follows the road ahead.
@@ -706,8 +710,8 @@ gui.losttales.character.account_state=Shared Account State
 gui.losttales.character.minecraft_account=Minecraft Account
 gui.losttales.character.location=Location
 gui.losttales.character.world_time=World Time
-gui.losttales.character.shared_state=Initial Switching Rules
-gui.losttales.character.shared_state_detail=Inventory, vanilla experience, Lost Tales quests, and LOTR progression are currently shared by the Minecraft account.
+gui.losttales.character.shared_state=Character-owned State
+gui.losttales.character.shared_state_detail=Inventory, ender chest, location, vitals, experience, statistics, accessories, Lost Tales quests, and LOTR progression are stored separately for each roleplay character.
 gui.losttales.character.profile_help=Drag model: rotate   Mouse wheel: scale   %s: quest journal   %s/Esc: back
 gui.losttales.character.no_options=No valid creation option is available.
 gui.losttales.character.no_compatible_faction=No compatible faction

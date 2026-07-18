@@ -6,6 +6,7 @@ import java.util.List;
 import lotr.common.LOTRMod;
 import lotr.common.recipe.LOTRRecipes;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.crafting.IRecipe;
 import net.minecraftforge.oredict.ShapelessOreRecipe;
 
 public enum ELostTalesCrafting {
@@ -16,10 +17,11 @@ public enum ELostTalesCrafting {
             new ShapelessOreRecipe(new ItemStack(ELostTalesItem.COMMUNITY_MORIA_GOBLIN_SCIMITAR.getItem()), LOTRMod.swordDwarven)
     });
 
-    private final List recipes;
+    private final List<IRecipe> recipes;
     private final ShapelessOreRecipe[] shapelessOreRecipe;
 
-    ELostTalesCrafting(List recipes, ShapelessOreRecipe[] shapelessOreRecipe) {
+    ELostTalesCrafting(List<IRecipe> recipes,
+                       ShapelessOreRecipe[] shapelessOreRecipe) {
         this.recipes = recipes;
         this.shapelessOreRecipe = shapelessOreRecipe;
     }
@@ -33,10 +35,11 @@ public enum ELostTalesCrafting {
             }
         }
 
-        LOTRRecipes.createAllRecipes();
+        // LOTR has already populated these lists before required-after mods run.
+        // Repeating its global initializer duplicates the base mod's recipes.
     }
 
-    public List getRecipes() {
+    public List<IRecipe> getRecipes() {
         return recipes;
     }
 

@@ -33,6 +33,12 @@ import net.minecraftforge.common.util.Constants;
 public final class LostTalesQuestPlayerData implements IExtendedEntityProperties {
     public static final String PROPERTY_ID = "LostTalesQuestData";
     public static final int CURRENT_DATA_VERSION = 1;
+    static final int MAX_ACTIVE_QUESTS = 1024;
+    static final int MAX_QUEST_ID_HISTORY = 8192;
+    static final int MAX_DYNAMIC_QUESTS = 512;
+    static final int MAX_DYNAMIC_MARKERS = 2048;
+    static final int MAX_IDENTIFIER_CHARACTERS = 256;
+    static final int MAX_NAME_CHARACTERS = 1024;
 
     private static final String TAG_DATA_VERSION = "DataVersion";
 
@@ -212,6 +218,13 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
 
         NBTTagCompound data = migration.getTag();
+        if (!isStructurallyReasonable(data)) {
+            enterReadOnlyMode(originalData, -1,
+                    "Quest data exceeds structural safety limits and will "
+                            + "be preserved without modification",
+                    logWarnings);
+            return;
+        }
         NBTTagList activeList = data.getTagList("ActiveQuests", Constants.NBT.TAG_COMPOUND);
         for (int i = 0; i < activeList.tagCount(); i++) {
             LostTalesQuestProgress progress = LostTalesQuestProgress.readFromNBT(activeList.getCompoundTagAt(i));
@@ -829,6 +842,143 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
 
     private static String safe(String value, String fallback) {
         return value == null || value.length() == 0 ? fallback : value;
+    }
+
+    private static boolean isStructurallyReasonable(NBTTagCompound data) {
+        if (!hasCompoundListWithinLimit(
+                data, "ActiveQuests", MAX_ACTIVE_QUESTS)
+                || !hasCompoundListWithinLimit(
+                data, "PinnedQuestIds", MAX_ACTIVE_QUESTS)
+                || !hasCompoundListWithinLimit(
+                data, "CompletedQuests", MAX_QUEST_ID_HISTORY)
+                || !hasCompoundListWithinLimit(
+                data, "FailedQuests", MAX_QUEST_ID_HISTORY)
+                || !hasCompoundListWithinLimit(
+                data, "DiscoveredMarkers", MAX_QUEST_ID_HISTORY)
+                || !hasCompoundListWithinLimit(
+                data, "DynamicQuestDefinitions", MAX_DYNAMIC_QUESTS)
+                || !hasCompoundListWithinLimit(
+                data, "DynamicMapMarkers", MAX_DYNAMIC_MARKERS)
+                || !hasReasonableOptionalString(
+                data, "PinnedQuestId", MAX_IDENTIFIER_CHARACTERS)
+                || !hasReasonableOptionalString(
+                data, "PinnedMapMarkerId", MAX_IDENTIFIER_CHARACTERS)) {
+            return false;
+        }
+
+        NBTTagList activeQuests = data.getTagList(
+                "ActiveQuests", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < activeQuests.tagCount(); i++) {
+            if (!LostTalesQuestProgress.isStructurallyReasonable(
+                    activeQuests.getCompoundTagAt(i))) {
+                return false;
+            }
+        }
+        if (!hasReasonableIdList(data, "PinnedQuestIds", "QuestId")
+                || !hasReasonableIdList(
+                data, "CompletedQuests", "QuestId")
+                || !hasReasonableIdList(data, "FailedQuests", "QuestId")
+                || !hasReasonableIdList(
+                data, "DiscoveredMarkers", "MarkerId")) {
+            return false;
+        }
+
+        NBTTagList dynamicQuests = data.getTagList(
+                "DynamicQuestDefinitions", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < dynamicQuests.tagCount(); i++) {
+            if (!LostTalesQuestDefinitionNbt.isStructurallyReasonable(
+                    dynamicQuests.getCompoundTagAt(i))) {
+                return false;
+            }
+        }
+
+        NBTTagList dynamicMarkers = data.getTagList(
+                "DynamicMapMarkers", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < dynamicMarkers.tagCount(); i++) {
+            if (!isReasonableDynamicMarker(
+                    dynamicMarkers.getCompoundTagAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean hasReasonableIdList(
+            NBTTagCompound owner, String listKey, String idKey) {
+        NBTTagList list = owner.getTagList(
+                listKey, Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < list.tagCount(); i++) {
+            String value = list.getCompoundTagAt(i).getString(idKey);
+            if (value.length() == 0
+                    || value.length() > MAX_IDENTIFIER_CHARACTERS) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isReasonableDynamicMarker(NBTTagCompound marker) {
+        if (!hasReasonableRequiredString(
+                marker, "MarkerId", MAX_IDENTIFIER_CHARACTERS)
+                || !hasReasonableOptionalString(
+                marker, "Name", MAX_NAME_CHARACTERS)
+                || !hasReasonableOptionalString(
+                marker, "Icon", MAX_IDENTIFIER_CHARACTERS)
+                || !hasReasonableOptionalString(
+                marker, "Color", MAX_IDENTIFIER_CHARACTERS)
+                || !hasReasonableOptionalString(
+                marker, "Category", MAX_NAME_CHARACTERS)) {
+            return false;
+        }
+        double x = marker.getDouble("X");
+        double y = marker.getDouble("Y");
+        double z = marker.getDouble("Z");
+        double fadeRadius = marker.hasKey("CompassFadeInRadius")
+                ? marker.getDouble("CompassFadeInRadius")
+                : marker.getDouble("FadeInRadius");
+        double discoveryRadius = marker.hasKey("DiscoveryRadius")
+                ? marker.getDouble("DiscoveryRadius")
+                : marker.getDouble("UnlockRadius");
+        return isFinite(x) && isFinite(y) && isFinite(z)
+                && isFinite(fadeRadius) && fadeRadius >= 0.0D
+                && isFinite(discoveryRadius) && discoveryRadius >= 0.0D;
+    }
+
+    private static boolean hasCompoundListWithinLimit(
+            NBTTagCompound owner, String key, int maximum) {
+        if (owner == null) {
+            return false;
+        }
+        if (!owner.hasKey(key)) {
+            return true;
+        }
+        NBTBase raw = owner.getTag(key);
+        if (!(raw instanceof NBTTagList)) {
+            return false;
+        }
+        NBTTagList list = (NBTTagList) raw;
+        return (list.tagCount() == 0
+                || list.func_150303_d() == Constants.NBT.TAG_COMPOUND)
+                && list.tagCount() <= maximum;
+    }
+
+    private static boolean hasReasonableRequiredString(
+            NBTTagCompound owner, String key, int maximum) {
+        return owner != null
+                && owner.hasKey(key, Constants.NBT.TAG_STRING)
+                && owner.getString(key).length() > 0
+                && owner.getString(key).length() <= maximum;
+    }
+
+    private static boolean hasReasonableOptionalString(
+            NBTTagCompound owner, String key, int maximum) {
+        return owner != null && (!owner.hasKey(key)
+                || owner.hasKey(key, Constants.NBT.TAG_STRING)
+                && owner.getString(key).length() <= maximum);
+    }
+
+    private static boolean isFinite(double value) {
+        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
 }

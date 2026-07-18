@@ -123,6 +123,10 @@ public abstract class LostTalesUtil {
         int[] baseColors = baseImage.getRGB(0, 0, LOTRGenLayerWorld.imageWidth, LOTRGenLayerWorld.imageHeight, null, 0, LOTRGenLayerWorld.imageWidth);
         int[] overlayColors = getOverlayColors(overlayImage, LOTRGenLayerWorld.imageWidth, LOTRGenLayerWorld.imageHeight);
         byte[] biomeImageData = new byte[LOTRGenLayerWorld.imageWidth * LOTRGenLayerWorld.imageHeight];
+        int unknownPixelCount = 0;
+        int firstUnknownColor = 0;
+        int firstUnknownX = -1;
+        int firstUnknownY = -1;
 
         for (int i = 0; i < baseColors.length; ++i) {
             if (overlayColors != null && isVisibleOverlayPixel(overlayColors[i])) {
@@ -139,8 +143,20 @@ public abstract class LostTalesUtil {
                 biomeImageData[i] = (byte) biomeID.intValue();
                 continue;
             }
-            System.out.println("Found unknown biome on map: " + Integer.toHexString(color) + " at location: " + (i % LOTRGenLayerWorld.imageWidth) + ", " + (i / LOTRGenLayerWorld.imageWidth));
+            if (unknownPixelCount == 0) {
+                firstUnknownColor = color;
+                firstUnknownX = i % LOTRGenLayerWorld.imageWidth;
+                firstUnknownY = i / LOTRGenLayerWorld.imageWidth;
+            }
+            unknownPixelCount++;
             biomeImageData[i] = (byte) LOTRBiome.ocean.biomeID;
+        }
+        if (unknownPixelCount > 0) {
+            FMLLog.warning(
+                    "Lost Tales world map contains %d unknown biome pixels; "
+                            + "using ocean as a fallback. First: %08x at %d, %d.",
+                    unknownPixelCount, firstUnknownColor,
+                    firstUnknownX, firstUnknownY);
         }
         ReflectionHelper.setPrivateValue(LOTRGenLayerWorld.class, null, biomeImageData, "biomeImageData");
     }
@@ -183,13 +199,19 @@ public abstract class LostTalesUtil {
             return ImageIO.read(in);
         }
         catch(IOException e) {
-            System.out.println("Failed to convert a input stream into a buffered image.");
+            FMLLog.warning(
+                    "Lost Tales could not decode an image resource: %s",
+                    e.toString());
         }
         finally {
             try {
                 in.close();
             }
-            catch(IOException e) {}
+            catch(IOException e) {
+                FMLLog.warning(
+                        "Lost Tales could not close an image resource: %s",
+                        e.toString());
+            }
         }
         return null;
     }
@@ -242,10 +264,6 @@ public abstract class LostTalesUtil {
         return null;
     }
 
-    private static <T, E> T findAndInvokeMethod (Class<? super E> clazz, E instance, String methodName) {
-        return findAndInvokeMethod (new Object[] {}, clazz, instance, methodName);
-    }
-
     private static <T, E> T findAndInvokeMethod (Object arg, Class<? super E> clazz, E instance, String methodName, Class<?>... methodTypes) {
         return findAndInvokeMethod (new Object[]{arg}, clazz, instance, new String[]{methodName}, methodTypes);
     }
@@ -276,29 +294,6 @@ public abstract class LostTalesUtil {
                     clazz.getName(), methodNames[0], exception.getCause());
         }
         return null;
-    }
-
-    private static <E> E findAndInvokeConstructor (String className, Class<?>... parameterTypes) {
-        return findAndInvokeConstructor (new Object[] {}, className, parameterTypes);
-    }
-
-    private static <E> E findAndInvokeConstructor (Object[] args, String className, Class<?>... parameterTypes) {
-        try {
-            return findAndInvokeConstructor (args, (Class<? extends E>) Class.forName (className), parameterTypes);
-        }
-        catch (ClassNotFoundException e) {
-            System.out.println("Error when finding class " + className + " for a constructor.");
-            e.printStackTrace ();
-        }
-        return null;
-    }
-
-    private static <E> E findAndInvokeConstructor (Class<E> clazz, Object... args) {
-        Class<?>[] paramaterTypes = new Class<?>[args.length];
-        for (int i = 0; i < args.length; i++) {
-            paramaterTypes[i] = args[i].getClass ();
-        }
-        return findAndInvokeConstructor (args, clazz, paramaterTypes);
     }
 
     private static <E> E findAndInvokeConstructor(Object[] args, Class<E> clazz,

@@ -2,6 +2,8 @@ package com.ninuna.losttales.command;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.config.LostTalesConfig;
+import cpw.mods.fml.common.FMLCommonHandler;
+import cpw.mods.fml.relauncher.Side;
 import java.util.List;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.util.ChatComponentText;
@@ -10,8 +12,8 @@ import net.minecraft.util.EnumChatFormatting;
  * Small config command for HUD placement presets and percent-based offsets.
  *
  * These values are the same legacy Forge config values used by the client HUD
- * renderers. In singleplayer/integrated-server testing this gives quick feedback;
- * dedicated-server admins should still treat the HUD values as client config.
+ * renderers. The command is useful in an integrated server, but cannot alter a
+ * remote client's configuration from a dedicated server.
  */
 public class LostTalesCommandHud extends LostTalesCommandBase {
     private final String commandPath;
@@ -37,6 +39,14 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
 
     @Override
     public void processCommand(ICommandSender sender, String[] args) {
+        if (FMLCommonHandler.instance().getSide() == Side.SERVER) {
+            send(sender, EnumChatFormatting.RED
+                    + "HUD settings are client-side and cannot be changed by a dedicated server command.");
+            send(sender, EnumChatFormatting.GRAY
+                    + "Use the Lost Tales config screen or hold the Modifier Key and press H on the client.");
+            return;
+        }
+
         if (args.length == 0 || "status".equalsIgnoreCase(args[0]) || "show".equalsIgnoreCase(args[0])) {
             sendStatus(sender);
             return;
@@ -71,7 +81,7 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
 
     private void setOffset(ICommandSender sender, String[] args) {
         if (args.length < 4) {
-            send(sender, EnumChatFormatting.RED + "Usage: " + commandPrefix() + " set <compass|quickloot|quest> <xPercent> <yPercent>");
+            send(sender, EnumChatFormatting.RED + "Usage: " + commandPrefix() + " set <compass|party|quickloot|quest> <xPercent> <yPercent>");
             return;
         }
         String element = LostTalesConfig.normalizeHudElement(args[1]);
@@ -90,7 +100,7 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
 
     private void moveOffset(ICommandSender sender, String[] args) {
         if (args.length < 4) {
-            send(sender, EnumChatFormatting.RED + "Usage: " + commandPrefix() + " move <compass|quickloot|quest> <dxPercent> <dyPercent>");
+            send(sender, EnumChatFormatting.RED + "Usage: " + commandPrefix() + " move <compass|party|quickloot|quest> <dxPercent> <dyPercent>");
             return;
         }
         String element = LostTalesConfig.normalizeHudElement(args[1]);
@@ -154,6 +164,7 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
                 + ", world markers: " + onOff(LostTalesConfig.showWorldQuestMarkers));
         send(sender, EnumChatFormatting.GRAY + "Preset: " + LostTalesConfig.hudPlacementPreset
                 + ", compass " + formatOffset("compass")
+                + ", party " + formatOffset("party")
                 + ", quick loot " + formatOffset("quickloot")
                 + ", quest " + formatOffset("quest"));
         send(sender, EnumChatFormatting.DARK_GRAY + "Tip: hold the Lost Tales Modifier Key and press H client-side to open the HUD placement preview.");
@@ -165,6 +176,9 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
         }
         if ("quickloot".equals(element)) {
             return LostTalesConfig.quickLootHudOffsetX + "," + LostTalesConfig.quickLootHudOffsetY;
+        }
+        if ("party".equals(element)) {
+            return LostTalesConfig.partyHudOffsetX + "," + LostTalesConfig.partyHudOffsetY;
         }
         if ("quest".equals(element)) {
             return LostTalesConfig.questHudOffsetX + "," + LostTalesConfig.questHudOffsetY;
@@ -202,7 +216,7 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
             return getListOfStringsMatchingLastWord(args, "custom", "default", "lotr-safe", "compact", "minimal");
         }
         if (args.length == 2 && ("set".equalsIgnoreCase(args[0]) || "move".equalsIgnoreCase(args[0]))) {
-            return getListOfStringsMatchingLastWord(args, "compass", "quickloot", "quest");
+            return getListOfStringsMatchingLastWord(args, "compass", "party", "quickloot", "quest");
         }
         if (args.length == 2 && "toggle".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args, "hud", "compass", "quickloot", "quest", "worldmarkers");

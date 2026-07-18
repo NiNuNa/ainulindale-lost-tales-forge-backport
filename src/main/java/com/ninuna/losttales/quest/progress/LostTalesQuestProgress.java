@@ -3,12 +3,16 @@ package com.ninuna.losttales.quest.progress;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 
 /** Runtime state for one active player quest. */
 public final class LostTalesQuestProgress {
+    public static final int MAX_OBJECTIVE_ENTRIES = 512;
+    public static final int MAX_IDENTIFIER_CHARACTERS = 256;
+
     private final String questId;
     private int stageIndex;
     private String stageId;
@@ -35,7 +39,11 @@ public final class LostTalesQuestProgress {
         }
         if (objectiveProgress != null) {
             for (Map.Entry<String, Integer> entry : objectiveProgress.entrySet()) {
-                if (entry.getKey() != null && entry.getKey().length() > 0 && entry.getValue() != null) {
+                if (this.objectiveProgress.size() >= MAX_OBJECTIVE_ENTRIES) {
+                    break;
+                }
+                if (isReasonableIdentifier(entry.getKey())
+                        && entry.getValue() != null) {
                     this.objectiveProgress.put(entry.getKey(), Math.max(0, entry.getValue()));
                 }
             }
@@ -104,21 +112,31 @@ public final class LostTalesQuestProgress {
     }
 
     public int addObjectiveProgress(String objectiveId, int amount, int maxValue) {
-        if (objectiveId == null || objectiveId.length() == 0 || amount <= 0) {
+        if (!isReasonableIdentifier(objectiveId) || amount <= 0) {
             return getObjectiveProgress(objectiveId);
         }
 
         int current = getObjectiveProgress(objectiveId);
-        int updated = current + amount;
+        if (!this.objectiveProgress.containsKey(objectiveId)
+                && this.objectiveProgress.size() >= MAX_OBJECTIVE_ENTRIES) {
+            return current;
+        }
+        long updated = (long) current + (long) amount;
         if (maxValue > 0) {
             updated = Math.min(updated, maxValue);
         }
-        this.objectiveProgress.put(objectiveId, Math.max(0, updated));
-        return updated;
+        int safeUpdated = (int)Math.min(Integer.MAX_VALUE,
+                Math.max(0L, updated));
+        this.objectiveProgress.put(objectiveId, safeUpdated);
+        return safeUpdated;
     }
 
     public void setObjectiveProgress(String objectiveId, int value) {
-        if (objectiveId == null || objectiveId.length() == 0) {
+        if (!isReasonableIdentifier(objectiveId)) {
+            return;
+        }
+        if (!this.objectiveProgress.containsKey(objectiveId)
+                && this.objectiveProgress.size() >= MAX_OBJECTIVE_ENTRIES) {
             return;
         }
         this.objectiveProgress.put(objectiveId, Math.max(0, value));
@@ -151,7 +169,7 @@ public final class LostTalesQuestProgress {
     }
 
     public static LostTalesQuestProgress readFromNBT(NBTTagCompound tag) {
-        if (tag == null || !tag.hasKey("QuestId")) {
+        if (!isStructurallyReasonable(tag)) {
             return null;
         }
         String questId = tag.getString("QuestId");
@@ -177,5 +195,43 @@ public final class LostTalesQuestProgress {
                 tag.getLong("AcceptedWorldTime"),
                 tag.getLong("DeadlineWorldTime")
         );
+    }
+
+    public static boolean isStructurallyReasonable(NBTTagCompound tag) {
+        if (tag == null || !tag.hasKey("QuestId", Constants.NBT.TAG_STRING)) {
+            return false;
+        }
+        String questId = tag.getString("QuestId");
+        String stageId = tag.getString("StageId");
+        if (!isReasonableIdentifier(questId)
+                || stageId.length() > MAX_IDENTIFIER_CHARACTERS
+                || tag.hasKey("ObjectiveProgress")
+                && !(tag.getTag("ObjectiveProgress") instanceof NBTTagList)) {
+            return false;
+        }
+        NBTBase rawObjectives = tag.getTag("ObjectiveProgress");
+        NBTTagList objectives = rawObjectives instanceof NBTTagList
+                ? (NBTTagList) rawObjectives : new NBTTagList();
+        if (objectives.tagCount() > 0
+                && objectives.func_150303_d()
+                != Constants.NBT.TAG_COMPOUND) {
+            return false;
+        }
+        if (objectives.tagCount() > MAX_OBJECTIVE_ENTRIES) {
+            return false;
+        }
+        for (int i = 0; i < objectives.tagCount(); i++) {
+            String objectiveId = objectives.getCompoundTagAt(i)
+                    .getString("ObjectiveId");
+            if (!isReasonableIdentifier(objectiveId)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isReasonableIdentifier(String value) {
+        return value != null && value.length() > 0
+                && value.length() <= MAX_IDENTIFIER_CHARACTERS;
     }
 }

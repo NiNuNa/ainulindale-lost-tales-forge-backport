@@ -58,6 +58,35 @@ final class LostTalesPacketCodec {
         }
     }
 
+    static int readCount(ByteBuf buffer, int maximum, String fieldName) {
+        requireReadable(buffer, 4);
+        int count = buffer.readInt();
+        if (count < 0 || count > maximum) {
+            throw new DecodeException("invalid " + fieldName + " count");
+        }
+        return count;
+    }
+
+    static void writeCount(ByteBuf buffer, int count, int maximum,
+                           String fieldName) {
+        if (buffer == null || count < 0 || count > maximum) {
+            throw new IllegalArgumentException(
+                    "invalid " + fieldName + " count");
+        }
+        buffer.writeInt(count);
+    }
+
+    static boolean isUtf8WithinLimit(String value, int maximumBytes) {
+        return value != null && maximumBytes >= 0
+                && value.getBytes(UTF_8).length <= maximumBytes;
+    }
+
+    static void discardRemaining(ByteBuf buffer) {
+        if (buffer != null && buffer.isReadable()) {
+            buffer.skipBytes(buffer.readableBytes());
+        }
+    }
+
     static boolean isValidBlockPosition(int x, int y, int z) {
         return y >= MIN_BLOCK_Y && y <= MAX_BLOCK_Y
                 && x >= -MAX_BLOCK_COORDINATE && x <= MAX_BLOCK_COORDINATE

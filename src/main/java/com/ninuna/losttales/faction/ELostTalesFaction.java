@@ -231,7 +231,8 @@ public enum ELostTalesFaction {
             if (f.isFactionActive) {
                 boolean categoryExists = false;
                 for (LOTRAchievement.Category category : LOTRAchievement.Category.values()) {
-                    if (category.codeName() == f.getFaction().codeName()) {
+                    if (category.codeName().equals(
+                            f.getFaction().codeName())) {
                         categoryExists = true;
                     }
                 }

@@ -7,7 +7,6 @@ import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
-import cpw.mods.fml.common.network.ByteBufUtils;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -28,6 +27,20 @@ import java.util.Set;
  * player's discovered/tracked map marker IDs.</p>
  */
 public class LostTalesQuestSyncPacket implements IMessage {
+    private static final int MAX_PACKET_BYTES = 2 * 1024 * 1024;
+    static final int MAX_ACTIVE_QUESTS = 1024;
+    static final int MAX_QUEST_ID_COLLECTION = 8192;
+    static final int MAX_OBJECTIVE_PROGRESS = 512;
+    static final int MAX_DYNAMIC_MARKERS = 2048;
+    static final int MAX_DYNAMIC_QUESTS = 512;
+    static final int MAX_QUEST_STAGES = 256;
+    static final int MAX_STAGE_OBJECTIVES = 512;
+    static final int MAX_STRING_MAP_ENTRIES = 256;
+    static final int MAX_IDENTIFIER_BYTES = 256;
+    static final int MAX_NAME_BYTES = 1024;
+    static final int MAX_TEXT_BYTES = 8192;
+    static final int MAX_MAP_VALUE_BYTES = 4096;
+
     private final List<LostTalesQuestProgress> activeQuests = new ArrayList<LostTalesQuestProgress>();
     private final Set<String> completedQuestIds = new LinkedHashSet<String>();
     private final Set<String> failedQuestIds = new LinkedHashSet<String>();
@@ -36,6 +49,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
     private final List<LostTalesMapMarkerDefinition> dynamicMapMarkers = new ArrayList<LostTalesMapMarkerDefinition>();
     private final List<LostTalesQuestDefinition> dynamicQuestDefinitions = new ArrayList<LostTalesQuestDefinition>();
     private String pinnedMapMarkerId = "";
+    private boolean malformed;
 
     public LostTalesQuestSyncPacket() {}
 
@@ -125,96 +139,97 @@ public class LostTalesQuestSyncPacket implements IMessage {
 
     @Override
     public void fromBytes(ByteBuf buf) {
-        this.activeQuests.clear();
-        this.completedQuestIds.clear();
-        this.failedQuestIds.clear();
-        this.discoveredMarkerIds.clear();
-        this.pinnedQuestIds.clear();
-        this.dynamicMapMarkers.clear();
-        this.dynamicQuestDefinitions.clear();
-        this.pinnedMapMarkerId = "";
+        clearState();
+        this.malformed = false;
+        try {
+            if (buf == null || buf.readableBytes() > MAX_PACKET_BYTES) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "invalid quest-sync packet size");
+            }
 
-        int activeCount = buf.readInt();
-        for (int i = 0; i < activeCount; i++) {
-            String questId = ByteBufUtils.readUTF8String(buf);
-            int stageIndex = buf.readInt();
-            String stageId = ByteBufUtils.readUTF8String(buf);
-            long acceptedWorldTime = buf.readLong();
-            long deadlineWorldTime = buf.readLong();
-
-            Map<String, Integer> objectiveProgress = new LinkedHashMap<String, Integer>();
-            int objectiveCount = buf.readInt();
-            for (int j = 0; j < objectiveCount; j++) {
-                String objectiveId = ByteBufUtils.readUTF8String(buf);
-                int progress = buf.readInt();
-                if (objectiveId != null && objectiveId.length() > 0) {
-                    objectiveProgress.put(objectiveId, Math.max(0, progress));
+            int activeCount = LostTalesPacketCodec.readCount(
+                    buf, MAX_ACTIVE_QUESTS, "active quest");
+            for (int i = 0; i < activeCount; i++) {
+                String questId = readIdentifier(buf);
+                int stageIndex = buf.readInt();
+                String stageId = readIdentifier(buf);
+                long acceptedWorldTime = buf.readLong();
+                long deadlineWorldTime = buf.readLong();
+                if (stageIndex < 0 || acceptedWorldTime < 0L
+                        || deadlineWorldTime < 0L
+                        || deadlineWorldTime > 0L
+                        && acceptedWorldTime > 0L
+                        && deadlineWorldTime < acceptedWorldTime) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid active quest timing");
                 }
+
+                Map<String, Integer> objectiveProgress =
+                        new LinkedHashMap<String, Integer>();
+                int objectiveCount = LostTalesPacketCodec.readCount(
+                        buf, MAX_OBJECTIVE_PROGRESS, "objective progress");
+                for (int j = 0; j < objectiveCount; j++) {
+                    String objectiveId = readIdentifier(buf);
+                    int progress = buf.readInt();
+                    if (objectiveId.length() == 0 || progress < 0) {
+                        throw new LostTalesPacketCodec.DecodeException(
+                                "invalid objective progress");
+                    }
+                    objectiveProgress.put(objectiveId, progress);
+                }
+
+                if (questId.length() == 0) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "active quest ID is empty");
+                }
+                this.activeQuests.add(new LostTalesQuestProgress(
+                        questId, stageIndex, stageId, objectiveProgress,
+                        acceptedWorldTime, deadlineWorldTime));
             }
 
-            if (questId != null && questId.length() > 0) {
-                this.activeQuests.add(new LostTalesQuestProgress(questId, stageIndex, stageId, objectiveProgress, acceptedWorldTime, deadlineWorldTime));
+            // Retained on the wire for compatibility with older clients.
+            addIfPresent(this.pinnedQuestIds, readIdentifier(buf));
+
+            int pinnedQuestCount = LostTalesPacketCodec.readCount(
+                    buf, MAX_QUEST_ID_COLLECTION, "pinned quest");
+            for (int i = 0; i < pinnedQuestCount; i++) {
+                addIfPresent(this.pinnedQuestIds, readIdentifier(buf));
             }
-        }
 
-        // Legacy first tracked quest, kept for old getter compatibility.
-        String legacyPinnedQuestId = ByteBufUtils.readUTF8String(buf);
-        if (legacyPinnedQuestId != null && legacyPinnedQuestId.length() > 0) {
-            this.pinnedQuestIds.add(legacyPinnedQuestId);
-        }
+            this.pinnedMapMarkerId = readIdentifier(buf);
+            readIdentifierSet(buf, this.discoveredMarkerIds,
+                    "discovered marker");
+            readIdentifierSet(buf, this.completedQuestIds,
+                    "completed quest");
+            readIdentifierSet(buf, this.failedQuestIds, "failed quest");
 
-        int pinnedQuestCount = buf.readInt();
-        for (int i = 0; i < pinnedQuestCount; i++) {
-            String questId = ByteBufUtils.readUTF8String(buf);
-            if (questId != null && questId.length() > 0) {
-                this.pinnedQuestIds.add(questId);
-            }
-        }
-
-        this.pinnedMapMarkerId = ByteBufUtils.readUTF8String(buf);
-
-        int markerCount = buf.readInt();
-        for (int i = 0; i < markerCount; i++) {
-            String markerId = ByteBufUtils.readUTF8String(buf);
-            if (markerId != null && markerId.length() > 0) {
-                this.discoveredMarkerIds.add(markerId);
-            }
-        }
-
-        int completedCount = buf.readInt();
-        for (int i = 0; i < completedCount; i++) {
-            String questId = ByteBufUtils.readUTF8String(buf);
-            if (questId != null && questId.length() > 0) {
-                this.completedQuestIds.add(questId);
-            }
-        }
-
-        int failedCount = buf.readInt();
-        for (int i = 0; i < failedCount; i++) {
-            String questId = ByteBufUtils.readUTF8String(buf);
-            if (questId != null && questId.length() > 0) {
-                this.failedQuestIds.add(questId);
-            }
-        }
-
-        int dynamicMarkerCount = buf.readInt();
-        for (int i = 0; i < dynamicMarkerCount; i++) {
-            String markerId = ByteBufUtils.readUTF8String(buf);
-            String name = ByteBufUtils.readUTF8String(buf);
-            String icon = ByteBufUtils.readUTF8String(buf);
-            String color = ByteBufUtils.readUTF8String(buf);
-            String category = ByteBufUtils.readUTF8String(buf);
-            boolean hasFastTravel = buf.readBoolean();
-            int dimensionId = buf.readInt();
-            double x = buf.readDouble();
-            double y = buf.readDouble();
-            double z = buf.readDouble();
-            double compassFadeInRadius = buf.readDouble();
-            double discoveryRadius = buf.readDouble();
-            boolean hidden = buf.readBoolean();
-            boolean discoverable = buf.readBoolean();
-            boolean requiresRegionUnlock = buf.readBoolean();
-            if (markerId != null && markerId.length() > 0) {
+            int dynamicMarkerCount = LostTalesPacketCodec.readCount(
+                    buf, MAX_DYNAMIC_MARKERS, "dynamic marker");
+            for (int i = 0; i < dynamicMarkerCount; i++) {
+                String markerId = readIdentifier(buf);
+                String name = readName(buf);
+                String icon = readIdentifier(buf);
+                String color = readIdentifier(buf);
+                String category = readName(buf);
+                boolean hasFastTravel = buf.readBoolean();
+                int dimensionId = buf.readInt();
+                double x = buf.readDouble();
+                double y = buf.readDouble();
+                double z = buf.readDouble();
+                double compassFadeInRadius = buf.readDouble();
+                double discoveryRadius = buf.readDouble();
+                boolean hidden = buf.readBoolean();
+                boolean discoverable = buf.readBoolean();
+                boolean requiresRegionUnlock = buf.readBoolean();
+                if (markerId.length() == 0
+                        || !isFinite(x) || !isFinite(y) || !isFinite(z)
+                        || !isFinite(compassFadeInRadius)
+                        || !isFinite(discoveryRadius)
+                        || compassFadeInRadius < 0.0D
+                        || discoveryRadius < 0.0D) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid dynamic marker");
+                }
                 this.dynamicMapMarkers.add(
                         new LostTalesMapMarkerDefinition(
                                 markerId, name, icon, color, category, "",
@@ -222,64 +237,81 @@ public class LostTalesQuestSyncPacket implements IMessage {
                                 compassFadeInRadius, discoveryRadius, hidden,
                                 discoverable, requiresRegionUnlock));
             }
-        }
 
-        int dynamicQuestCount = buf.readInt();
-        for (int i = 0; i < dynamicQuestCount; i++) {
-            LostTalesQuestDefinition quest = readQuestDefinition(buf);
-            if (quest != null && quest.getId() != null && quest.getId().length() > 0) {
+            int dynamicQuestCount = LostTalesPacketCodec.readCount(
+                    buf, MAX_DYNAMIC_QUESTS, "dynamic quest");
+            for (int i = 0; i < dynamicQuestCount; i++) {
+                LostTalesQuestDefinition quest = readQuestDefinition(buf);
+                if (quest == null || quest.getId() == null
+                        || quest.getId().length() == 0) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid dynamic quest");
+                }
                 this.dynamicQuestDefinitions.add(quest);
             }
+            LostTalesPacketCodec.requireFinished(buf);
+        } catch (RuntimeException exception) {
+            clearState();
+            this.malformed = true;
+            LostTalesPacketCodec.discardRemaining(buf);
         }
     }
 
     @Override
     public void toBytes(ByteBuf buf) {
-        buf.writeInt(this.activeQuests.size());
+        int startIndex = buf.writerIndex();
+        LostTalesPacketCodec.writeCount(buf, this.activeQuests.size(),
+                MAX_ACTIVE_QUESTS, "active quest");
         for (LostTalesQuestProgress progress : this.activeQuests) {
-            ByteBufUtils.writeUTF8String(buf, safe(progress.getQuestId()));
+            if (progress == null || progress.getStageIndex() < 0
+                    || progress.getAcceptedWorldTime() < 0L
+                    || progress.getDeadlineWorldTime() < 0L
+                    || progress.getDeadlineWorldTime() > 0L
+                    && progress.getAcceptedWorldTime() > 0L
+                    && progress.getDeadlineWorldTime()
+                    < progress.getAcceptedWorldTime()) {
+                throw new IllegalStateException("invalid active quest");
+            }
+            writeIdentifier(buf, progress.getQuestId());
             buf.writeInt(progress.getStageIndex());
-            ByteBufUtils.writeUTF8String(buf, safe(progress.getStageId()));
+            writeIdentifier(buf, progress.getStageId());
             buf.writeLong(progress.getAcceptedWorldTime());
             buf.writeLong(progress.getDeadlineWorldTime());
 
             Map<String, Integer> objectiveProgress = progress.getObjectiveProgress();
-            buf.writeInt(objectiveProgress.size());
+            LostTalesPacketCodec.writeCount(buf, objectiveProgress.size(),
+                    MAX_OBJECTIVE_PROGRESS, "objective progress");
             for (Map.Entry<String, Integer> entry : objectiveProgress.entrySet()) {
-                ByteBufUtils.writeUTF8String(buf, safe(entry.getKey()));
-                buf.writeInt(entry.getValue() == null ? 0 : Math.max(0, entry.getValue()));
+                if (entry.getKey() == null || entry.getKey().length() == 0
+                        || entry.getValue() == null
+                        || entry.getValue() < 0) {
+                    throw new IllegalStateException(
+                            "invalid objective progress");
+                }
+                writeIdentifier(buf, entry.getKey());
+                buf.writeInt(entry.getValue());
             }
         }
 
-        ByteBufUtils.writeUTF8String(buf, safe(getPinnedQuestId()));
-        buf.writeInt(this.pinnedQuestIds.size());
-        for (String questId : this.pinnedQuestIds) {
-            ByteBufUtils.writeUTF8String(buf, safe(questId));
-        }
-        ByteBufUtils.writeUTF8String(buf, safe(this.pinnedMapMarkerId));
+        writeIdentifier(buf, getPinnedQuestId());
+        writeIdentifierSet(buf, this.pinnedQuestIds, "pinned quest");
+        writeIdentifier(buf, this.pinnedMapMarkerId);
+        writeIdentifierSet(buf, this.discoveredMarkerIds,
+                "discovered marker");
+        writeIdentifierSet(buf, this.completedQuestIds, "completed quest");
+        writeIdentifierSet(buf, this.failedQuestIds, "failed quest");
 
-        buf.writeInt(this.discoveredMarkerIds.size());
-        for (String markerId : this.discoveredMarkerIds) {
-            ByteBufUtils.writeUTF8String(buf, safe(markerId));
-        }
-
-        buf.writeInt(this.completedQuestIds.size());
-        for (String questId : this.completedQuestIds) {
-            ByteBufUtils.writeUTF8String(buf, safe(questId));
-        }
-
-        buf.writeInt(this.failedQuestIds.size());
-        for (String questId : this.failedQuestIds) {
-            ByteBufUtils.writeUTF8String(buf, safe(questId));
-        }
-
-        buf.writeInt(this.dynamicMapMarkers.size());
+        LostTalesPacketCodec.writeCount(buf, this.dynamicMapMarkers.size(),
+                MAX_DYNAMIC_MARKERS, "dynamic marker");
         for (LostTalesMapMarkerDefinition marker : this.dynamicMapMarkers) {
-            ByteBufUtils.writeUTF8String(buf, safe(marker.getId()));
-            ByteBufUtils.writeUTF8String(buf, safe(marker.getName()));
-            ByteBufUtils.writeUTF8String(buf, safe(marker.getIconName()));
-            ByteBufUtils.writeUTF8String(buf, safe(marker.getColorName()));
-            ByteBufUtils.writeUTF8String(buf, safe(marker.getCategoryName()));
+            if (!isValidMarker(marker)) {
+                throw new IllegalStateException("invalid dynamic marker");
+            }
+            writeIdentifier(buf, marker.getId());
+            writeName(buf, marker.getName());
+            writeIdentifier(buf, marker.getIconName());
+            writeIdentifier(buf, marker.getColorName());
+            writeName(buf, marker.getCategoryName());
             buf.writeBoolean(marker.hasFastTravel());
             buf.writeInt(marker.getDimensionId());
             buf.writeDouble(marker.getX());
@@ -292,9 +324,15 @@ public class LostTalesQuestSyncPacket implements IMessage {
             buf.writeBoolean(marker.requiresRegionUnlock());
         }
 
-        buf.writeInt(this.dynamicQuestDefinitions.size());
+        LostTalesPacketCodec.writeCount(buf,
+                this.dynamicQuestDefinitions.size(), MAX_DYNAMIC_QUESTS,
+                "dynamic quest");
         for (LostTalesQuestDefinition quest : this.dynamicQuestDefinitions) {
             writeQuestDefinition(buf, quest);
+        }
+        if (buf.writerIndex() - startIndex > MAX_PACKET_BYTES) {
+            throw new IllegalStateException(
+                    "quest snapshot exceeds packet limit");
         }
     }
 
@@ -341,94 +379,226 @@ public class LostTalesQuestSyncPacket implements IMessage {
         return this.pinnedMapMarkerId == null ? "" : this.pinnedMapMarkerId;
     }
 
-    private static void writeQuestDefinition(ByteBuf buf, LostTalesQuestDefinition quest) {
-        ByteBufUtils.writeUTF8String(buf, safeStatic(quest == null ? "" : quest.getId()));
-        ByteBufUtils.writeUTF8String(buf, safeStatic(quest == null ? "" : quest.getTitle()));
-        ByteBufUtils.writeUTF8String(buf, safeStatic(quest == null ? "" : quest.getDescription()));
-        buf.writeBoolean(quest != null && quest.isRepeatable());
-        ByteBufUtils.writeUTF8String(buf, safeStatic(quest == null ? "" : quest.getStartMode()));
-        writeStringMap(buf, quest == null ? null : quest.getPrerequisites());
-        writeStringMap(buf, quest == null ? null : quest.getRewards());
-        writeStringMap(buf, quest == null ? null : quest.getInteraction());
-        writeStringMap(buf, quest == null ? null : quest.getMarkers());
-        writeStringMap(buf, quest == null ? null : quest.getJournalLog());
+    public boolean isMalformed() {
+        return this.malformed;
+    }
 
-        List<LostTalesQuestStageDefinition> stages = quest == null ? Collections.<LostTalesQuestStageDefinition>emptyList() : quest.getStages();
-        buf.writeInt(stages.size());
+    private static void writeQuestDefinition(ByteBuf buf, LostTalesQuestDefinition quest) {
+        if (quest == null || quest.getId() == null
+                || quest.getId().length() == 0) {
+            throw new IllegalStateException("invalid dynamic quest");
+        }
+        writeIdentifier(buf, quest.getId());
+        writeName(buf, quest.getTitle());
+        writeText(buf, quest.getDescription());
+        buf.writeBoolean(quest.isRepeatable());
+        writeIdentifier(buf, quest.getStartMode());
+        writeStringMap(buf, quest.getPrerequisites(), "prerequisite");
+        writeStringMap(buf, quest.getRewards(), "reward");
+        writeStringMap(buf, quest.getInteraction(), "interaction");
+        writeStringMap(buf, quest.getMarkers(), "quest marker");
+        writeStringMap(buf, quest.getJournalLog(), "journal log");
+
+        List<LostTalesQuestStageDefinition> stages = quest.getStages();
+        LostTalesPacketCodec.writeCount(buf, stages.size(),
+                MAX_QUEST_STAGES, "quest stage");
         for (LostTalesQuestStageDefinition stage : stages) {
-            ByteBufUtils.writeUTF8String(buf, safeStatic(stage == null ? "" : stage.getId()));
-            List<LostTalesQuestObjectiveDefinition> objectives = stage == null ? Collections.<LostTalesQuestObjectiveDefinition>emptyList() : stage.getObjectives();
-            buf.writeInt(objectives.size());
+            if (stage == null) {
+                throw new IllegalStateException("invalid quest stage");
+            }
+            writeIdentifier(buf, stage.getId());
+            List<LostTalesQuestObjectiveDefinition> objectives =
+                    stage.getObjectives();
+            LostTalesPacketCodec.writeCount(buf, objectives.size(),
+                    MAX_STAGE_OBJECTIVES, "stage objective");
             for (LostTalesQuestObjectiveDefinition objective : objectives) {
-                ByteBufUtils.writeUTF8String(buf, safeStatic(objective == null ? "" : objective.getId()));
-                ByteBufUtils.writeUTF8String(buf, safeStatic(objective == null ? "" : objective.getType()));
-                ByteBufUtils.writeUTF8String(buf, safeStatic(objective == null ? "" : objective.getDescription()));
-                buf.writeBoolean(objective != null && objective.isOptional());
-                writeStringMap(buf, objective == null ? null : objective.getParams());
+                if (objective == null || objective.getId() == null
+                        || objective.getId().length() == 0
+                        || objective.getType() == null
+                        || objective.getType().length() == 0) {
+                    throw new IllegalStateException(
+                            "invalid quest objective");
+                }
+                writeIdentifier(buf, objective.getId());
+                writeIdentifier(buf, objective.getType());
+                writeText(buf, objective.getDescription());
+                buf.writeBoolean(objective.isOptional());
+                writeStringMap(buf, objective.getParams(),
+                        "objective parameter");
             }
         }
     }
 
     private static LostTalesQuestDefinition readQuestDefinition(ByteBuf buf) {
-        String id = ByteBufUtils.readUTF8String(buf);
-        String title = ByteBufUtils.readUTF8String(buf);
-        String description = ByteBufUtils.readUTF8String(buf);
+        String id = readIdentifier(buf);
+        String title = readName(buf);
+        String description = readText(buf);
         boolean repeatable = buf.readBoolean();
-        String startMode = ByteBufUtils.readUTF8String(buf);
-        Map<String, String> prerequisites = readStringMap(buf);
-        Map<String, String> rewards = readStringMap(buf);
-        Map<String, String> interaction = readStringMap(buf);
-        Map<String, String> markers = readStringMap(buf);
-        Map<String, String> journalLog = readStringMap(buf);
+        String startMode = readIdentifier(buf);
+        Map<String, String> prerequisites = readStringMap(
+                buf, "prerequisite");
+        Map<String, String> rewards = readStringMap(buf, "reward");
+        Map<String, String> interaction = readStringMap(buf, "interaction");
+        Map<String, String> markers = readStringMap(buf, "quest marker");
+        Map<String, String> journalLog = readStringMap(buf, "journal log");
 
         List<LostTalesQuestStageDefinition> stages = new ArrayList<LostTalesQuestStageDefinition>();
-        int stageCount = Math.max(0, buf.readInt());
+        int stageCount = LostTalesPacketCodec.readCount(
+                buf, MAX_QUEST_STAGES, "quest stage");
         for (int i = 0; i < stageCount; i++) {
-            String stageId = ByteBufUtils.readUTF8String(buf);
+            String stageId = readIdentifier(buf);
             List<LostTalesQuestObjectiveDefinition> objectives = new ArrayList<LostTalesQuestObjectiveDefinition>();
-            int objectiveCount = Math.max(0, buf.readInt());
+            int objectiveCount = LostTalesPacketCodec.readCount(
+                    buf, MAX_STAGE_OBJECTIVES, "stage objective");
             for (int j = 0; j < objectiveCount; j++) {
-                String objectiveId = ByteBufUtils.readUTF8String(buf);
-                String objectiveType = ByteBufUtils.readUTF8String(buf);
-                String objectiveDescription = ByteBufUtils.readUTF8String(buf);
+                String objectiveId = readIdentifier(buf);
+                String objectiveType = readIdentifier(buf);
+                String objectiveDescription = readText(buf);
                 boolean optional = buf.readBoolean();
-                Map<String, String> params = readStringMap(buf);
-                if (objectiveId != null && objectiveId.length() > 0 && objectiveType != null && objectiveType.length() > 0) {
-                    objectives.add(new LostTalesQuestObjectiveDefinition(objectiveId, objectiveType, objectiveDescription, optional, params));
+                Map<String, String> params = readStringMap(
+                        buf, "objective parameter");
+                if (objectiveId.length() == 0
+                        || objectiveType.length() == 0) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid quest objective");
                 }
+                objectives.add(new LostTalesQuestObjectiveDefinition(
+                        objectiveId, objectiveType, objectiveDescription,
+                        optional, params));
             }
             stages.add(new LostTalesQuestStageDefinition(stageId, objectives));
         }
 
-        if (id == null || id.length() == 0) {
-            return null;
+        if (id.length() == 0) {
+            throw new LostTalesPacketCodec.DecodeException(
+                    "dynamic quest ID is empty");
         }
         return new LostTalesQuestDefinition(id, title, description, repeatable, startMode, prerequisites, rewards, interaction, markers, journalLog, stages);
     }
 
-    private static void writeStringMap(ByteBuf buf, Map<String, String> values) {
+    private static void writeStringMap(ByteBuf buf, Map<String, String> values,
+                                       String fieldName) {
         if (values == null || values.isEmpty()) {
             buf.writeInt(0);
             return;
         }
-        buf.writeInt(values.size());
+        LostTalesPacketCodec.writeCount(buf, values.size(),
+                MAX_STRING_MAP_ENTRIES, fieldName);
         for (Map.Entry<String, String> entry : values.entrySet()) {
-            ByteBufUtils.writeUTF8String(buf, safeStatic(entry.getKey()));
-            ByteBufUtils.writeUTF8String(buf, safeStatic(entry.getValue()));
+            if (entry.getKey() == null || entry.getKey().length() == 0) {
+                throw new IllegalStateException(
+                        "invalid " + fieldName + " key");
+            }
+            writeIdentifier(buf, entry.getKey());
+            LostTalesPacketCodec.writeUtf8String(
+                    buf, safeStatic(entry.getValue()), MAX_MAP_VALUE_BYTES);
         }
     }
 
-    private static Map<String, String> readStringMap(ByteBuf buf) {
+    private static Map<String, String> readStringMap(ByteBuf buf,
+                                                     String fieldName) {
         LinkedHashMap<String, String> map = new LinkedHashMap<String, String>();
-        int count = Math.max(0, buf.readInt());
+        int count = LostTalesPacketCodec.readCount(
+                buf, MAX_STRING_MAP_ENTRIES, fieldName);
         for (int i = 0; i < count; i++) {
-            String key = ByteBufUtils.readUTF8String(buf);
-            String value = ByteBufUtils.readUTF8String(buf);
-            if (key != null && key.length() > 0) {
-                map.put(key, value == null ? "" : value);
+            String key = readIdentifier(buf);
+            String value = LostTalesPacketCodec.readUtf8String(
+                    buf, MAX_MAP_VALUE_BYTES);
+            if (key.length() == 0) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "invalid " + fieldName + " key");
             }
+            map.put(key, value);
         }
         return map;
+    }
+
+    private void clearState() {
+        this.activeQuests.clear();
+        this.completedQuestIds.clear();
+        this.failedQuestIds.clear();
+        this.discoveredMarkerIds.clear();
+        this.pinnedQuestIds.clear();
+        this.dynamicMapMarkers.clear();
+        this.dynamicQuestDefinitions.clear();
+        this.pinnedMapMarkerId = "";
+    }
+
+    private static void readIdentifierSet(ByteBuf buf, Set<String> target,
+                                          String fieldName) {
+        int count = LostTalesPacketCodec.readCount(
+                buf, MAX_QUEST_ID_COLLECTION, fieldName);
+        for (int i = 0; i < count; i++) {
+            String value = readIdentifier(buf);
+            if (value.length() == 0) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "empty " + fieldName + " ID");
+            }
+            target.add(value);
+        }
+    }
+
+    private static void writeIdentifierSet(ByteBuf buf, Set<String> values,
+                                           String fieldName) {
+        LostTalesPacketCodec.writeCount(buf, values.size(),
+                MAX_QUEST_ID_COLLECTION, fieldName);
+        for (String value : values) {
+            if (value == null || value.length() == 0) {
+                throw new IllegalStateException(
+                        "empty " + fieldName + " ID");
+            }
+            writeIdentifier(buf, value);
+        }
+    }
+
+    private static void addIfPresent(Set<String> target, String value) {
+        if (value != null && value.length() > 0) {
+            target.add(value);
+        }
+    }
+
+    private static String readIdentifier(ByteBuf buf) {
+        return LostTalesPacketCodec.readUtf8String(
+                buf, MAX_IDENTIFIER_BYTES);
+    }
+
+    private static String readName(ByteBuf buf) {
+        return LostTalesPacketCodec.readUtf8String(buf, MAX_NAME_BYTES);
+    }
+
+    private static String readText(ByteBuf buf) {
+        return LostTalesPacketCodec.readUtf8String(buf, MAX_TEXT_BYTES);
+    }
+
+    private static void writeIdentifier(ByteBuf buf, String value) {
+        LostTalesPacketCodec.writeUtf8String(
+                buf, safeStatic(value), MAX_IDENTIFIER_BYTES);
+    }
+
+    private static void writeName(ByteBuf buf, String value) {
+        LostTalesPacketCodec.writeUtf8String(
+                buf, safeStatic(value), MAX_NAME_BYTES);
+    }
+
+    private static void writeText(ByteBuf buf, String value) {
+        LostTalesPacketCodec.writeUtf8String(
+                buf, safeStatic(value), MAX_TEXT_BYTES);
+    }
+
+    private static boolean isValidMarker(
+            LostTalesMapMarkerDefinition marker) {
+        return marker != null && marker.getId() != null
+                && marker.getId().length() > 0
+                && isFinite(marker.getX()) && isFinite(marker.getY())
+                && isFinite(marker.getZ())
+                && isFinite(marker.getCompassFadeInRadius())
+                && isFinite(marker.getDiscoveryRadius())
+                && marker.getCompassFadeInRadius() >= 0.0D
+                && marker.getDiscoveryRadius() >= 0.0D;
+    }
+
+    private static boolean isFinite(double value) {
+        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
     private static String safeStatic(String value) {
@@ -443,16 +613,22 @@ public class LostTalesQuestSyncPacket implements IMessage {
         return pinned;
     }
 
-    private String safe(String value) {
-        return value == null ? "" : value;
-    }
-
     /** Common-safe clientbound handler; real client work is delegated to the sided proxy. */
     public static class Handler implements IMessageHandler<LostTalesQuestSyncPacket, IMessage> {
         @Override
-        public IMessage onMessage(LostTalesQuestSyncPacket message, MessageContext ctx) {
-            if (LostTalesMod.proxy != null) {
-                LostTalesMod.proxy.handleQuestSync(message);
+        public IMessage onMessage(
+                final LostTalesQuestSyncPacket message,
+                MessageContext ctx) {
+            if (message != null && !message.isMalformed()
+                    && LostTalesMod.proxy != null) {
+                LostTalesMod.proxy.scheduleClientTask(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (LostTalesMod.proxy != null) {
+                            LostTalesMod.proxy.handleQuestSync(message);
+                        }
+                    }
+                });
             }
             return null;
         }

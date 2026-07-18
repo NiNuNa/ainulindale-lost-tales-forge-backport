@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
@@ -16,6 +17,14 @@ import net.minecraftforge.common.util.Constants;
  * modern datapack systems that do not exist in Forge 1.7.10.
  */
 public final class LostTalesQuestDefinitionNbt {
+    public static final int MAX_STAGES = 256;
+    public static final int MAX_OBJECTIVES_PER_STAGE = 512;
+    public static final int MAX_MAP_ENTRIES = 256;
+    public static final int MAX_IDENTIFIER_CHARACTERS = 256;
+    public static final int MAX_NAME_CHARACTERS = 1024;
+    public static final int MAX_TEXT_CHARACTERS = 8192;
+    public static final int MAX_MAP_VALUE_CHARACTERS = 4096;
+
     private static final String KEY_ID = "Id";
     private static final String KEY_TITLE = "Title";
     private static final String KEY_DESCRIPTION = "Description";
@@ -85,7 +94,7 @@ public final class LostTalesQuestDefinitionNbt {
     }
 
     public static LostTalesQuestDefinition read(NBTTagCompound tag) {
-        if (tag == null || !tag.hasKey(KEY_ID)) {
+        if (!isStructurallyReasonable(tag)) {
             return null;
         }
 
@@ -135,6 +144,55 @@ public final class LostTalesQuestDefinitionNbt {
         );
     }
 
+    public static boolean isStructurallyReasonable(NBTTagCompound tag) {
+        if (!hasReasonableString(
+                tag, KEY_ID, MAX_IDENTIFIER_CHARACTERS, true)
+                || !hasReasonableString(
+                tag, KEY_TITLE, MAX_NAME_CHARACTERS, false)
+                || !hasReasonableString(
+                tag, KEY_DESCRIPTION, MAX_TEXT_CHARACTERS, false)
+                || !hasReasonableString(
+                tag, KEY_START_MODE, MAX_IDENTIFIER_CHARACTERS, false)
+                || !isStringMapReasonable(tag, KEY_PREREQUISITES)
+                || !isStringMapReasonable(tag, KEY_REWARDS)
+                || !isStringMapReasonable(tag, KEY_INTERACTION)
+                || !isStringMapReasonable(tag, KEY_MARKERS)
+                || !isStringMapReasonable(tag, KEY_JOURNAL_LOG)
+                || !hasCompoundListWithinLimit(tag, KEY_STAGES,
+                MAX_STAGES)) {
+            return false;
+        }
+
+        NBTTagList stages = tag.getTagList(
+                KEY_STAGES, Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < stages.tagCount(); i++) {
+            NBTTagCompound stage = stages.getCompoundTagAt(i);
+            if (!hasReasonableString(
+                    stage, KEY_STAGE_ID, MAX_IDENTIFIER_CHARACTERS, false)
+                    || !hasCompoundListWithinLimit(stage, KEY_OBJECTIVES,
+                    MAX_OBJECTIVES_PER_STAGE)) {
+                return false;
+            }
+            NBTTagList objectives = stage.getTagList(
+                    KEY_OBJECTIVES, Constants.NBT.TAG_COMPOUND);
+            for (int j = 0; j < objectives.tagCount(); j++) {
+                NBTTagCompound objective = objectives.getCompoundTagAt(j);
+                if (!hasReasonableString(objective, KEY_OBJECTIVE_ID,
+                        MAX_IDENTIFIER_CHARACTERS, true)
+                        || !hasReasonableString(objective,
+                        KEY_OBJECTIVE_TYPE, MAX_IDENTIFIER_CHARACTERS, true)
+                        || !hasReasonableString(objective,
+                        KEY_OBJECTIVE_DESCRIPTION,
+                        MAX_TEXT_CHARACTERS, false)
+                        || !isStringMapReasonable(
+                        objective, KEY_OBJECTIVE_PARAMS)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     private static NBTTagList writeStringMap(Map<String, String> values) {
         NBTTagList list = new NBTTagList();
         if (values == null || values.isEmpty()) {
@@ -169,5 +227,56 @@ public final class LostTalesQuestDefinitionNbt {
 
     private static String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private static boolean isStringMapReasonable(
+            NBTTagCompound owner, String key) {
+        if (!hasCompoundListWithinLimit(owner, key, MAX_MAP_ENTRIES)) {
+            return false;
+        }
+        NBTTagList list = owner.getTagList(
+                key, Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < list.tagCount(); i++) {
+            NBTTagCompound entry = list.getCompoundTagAt(i);
+            if (!hasReasonableString(entry, KEY_MAP_KEY,
+                    MAX_IDENTIFIER_CHARACTERS, true)
+                    || !hasReasonableString(entry, KEY_MAP_VALUE,
+                    MAX_MAP_VALUE_CHARACTERS, false)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean hasCompoundListWithinLimit(
+            NBTTagCompound owner, String key, int maximum) {
+        if (owner == null) {
+            return false;
+        }
+        if (!owner.hasKey(key)) {
+            return true;
+        }
+        NBTBase raw = owner.getTag(key);
+        if (!(raw instanceof NBTTagList)) {
+            return false;
+        }
+        NBTTagList list = (NBTTagList) raw;
+        return (list.tagCount() == 0
+                || list.func_150303_d() == Constants.NBT.TAG_COMPOUND)
+                && list.tagCount() <= maximum;
+    }
+
+    private static boolean hasReasonableString(
+            NBTTagCompound owner, String key, int maximum,
+            boolean required) {
+        if (owner == null || !owner.hasKey(key)) {
+            return !required;
+        }
+        if (!owner.hasKey(key, Constants.NBT.TAG_STRING)) {
+            return false;
+        }
+        String value = owner.getString(key);
+        return (!required || value.length() > 0)
+                && value.length() <= maximum;
     }
 }

@@ -3,6 +3,7 @@
 !src/**/build/
 build/
 .gradle/
+.gradle-user-home/
 .gradletasknamecache
 
 # Gradle GUI config
