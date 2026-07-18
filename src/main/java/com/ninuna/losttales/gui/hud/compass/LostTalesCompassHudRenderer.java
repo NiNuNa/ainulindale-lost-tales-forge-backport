@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraController;
 import com.ninuna.losttales.client.diagnostics.LostTalesClientDiagnostics;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerBatchBuilder;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
@@ -30,6 +31,7 @@ public class LostTalesCompassHudRenderer {
     public static final int COMPASS_HUD_TEXTURE_HEIGHT = 64;
     public static final int COMPASS_WIDTH = COMPASS_HUD_TEXTURE_WIDTH;
     public static final int COMPASS_HEIGHT = 24;
+    private static final int PLACEMENT_HEIGHT = 42;
 
     public static final int MAP_MARKER_OFFSET_Y = 8;
     public static final int MAP_MARKER_NAME_LABEL_OFFSET_Y = 3;
@@ -68,6 +70,14 @@ public class LostTalesCompassHudRenderer {
 
     private LostTalesCompassHudRenderer() {}
 
+    public static int getPlacementWidth() {
+        return COMPASS_WIDTH;
+    }
+
+    public static int getPlacementHeight() {
+        return PLACEMENT_HEIGHT;
+    }
+
     public static void render(Minecraft minecraft, float partialTicks) {
         if (!LostTalesConfig.showLostTalesHud || !LostTalesConfig.showCompassHud || minecraft == null || minecraft.thePlayer == null || minecraft.theWorld == null || minecraft.gameSettings.hideGUI) {
             return;
@@ -77,12 +87,18 @@ public class LostTalesCompassHudRenderer {
         int width = resolution.getScaledWidth();
         int height = resolution.getScaledHeight();
 
-        int offsetX = LostTalesConfig.compassHudOffsetX;
-        int offsetY = LostTalesConfig.compassHudOffsetY;
         int displayRadiusDeg = MathHelper.clamp_int(LostTalesConfig.compassHudDisplayRadius, 45, 225);
-
-        int compassX = (width - COMPASS_WIDTH) * offsetX / 100;
-        int compassY = height * offsetY / 100 + minecraft.fontRenderer.FONT_HEIGHT + MAP_MARKER_DISTANCE_LABEL_OFFSET_Y;
+        HudPlacementLayout.Bounds placement = HudPlacementLayout.calculate(
+                width, height, COMPASS_WIDTH, PLACEMENT_HEIGHT,
+                LostTalesConfig.compassHudOffsetX,
+                LostTalesConfig.compassHudOffsetY,
+                HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT,
+                HudPlacementLayout.CoordinateMode.SCREEN_PERCENT,
+                0,
+                minecraft.fontRenderer.FONT_HEIGHT
+                        + MAP_MARKER_DISTANCE_LABEL_OFFSET_Y);
+        int compassX = placement.x;
+        int compassY = placement.y;
         int centerX = compassX + COMPASS_WIDTH / 2;
 
         float pxPerDeg = (float) COMPASS_WIDTH / (float) displayRadiusDeg;

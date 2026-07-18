@@ -16,7 +16,5 @@ Start with [the project overview](wiki/Ainulindalë_Lost_Tales.md), then use the
 - [Configuration and commands](wiki/Configuration_and_Commands.md)
 - [Multiplayer and saved-data behavior](wiki/Multiplayer_and_Data_Safety.md)
 - [Development and building](wiki/Development.md)
-- [Known limitations](wiki/Known_Limitations.md)
 
 Pages for [classes](wiki/Classes.md), [effects](wiki/Effects.md), [governments](wiki/Governments.md), [powers and abilities](wiki/Powers_and_Abilities.md), [skills](wiki/Skills.md), and [subfactions](wiki/Subfactions.md) explain that those planned systems are not implemented yet.
-

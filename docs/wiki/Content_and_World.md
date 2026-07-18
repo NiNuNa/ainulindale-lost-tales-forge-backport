@@ -1,6 +1,6 @@
 # Items, blocks, entities, and world content
 
-Lost Tales registers 68 items, 11 blocks, four entities, four LOTR biomes, additional waypoints and roads, and one structure-spawner entry. Some of this content is experimental; see [Known Limitations](Known_Limitations.md) before using every registry entry in a released pack.
+Lost Tales registers 68 items, 11 blocks, four entities, four LOTR biomes, additional waypoints and roads, and one structure-spawner entry. Experimental registry entries are identified below so their stable saved identifiers are not removed accidentally.
 
 ## Items
 

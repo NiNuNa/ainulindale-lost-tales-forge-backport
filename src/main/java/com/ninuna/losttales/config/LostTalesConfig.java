@@ -23,6 +23,7 @@ public final class LostTalesConfig {
     public static final String HUD_PRESET_LOTR_SAFE = "lotr-safe";
     public static final String HUD_PRESET_COMPACT = "compact";
     public static final String HUD_PRESET_MINIMAL = "minimal";
+    public static final int HUD_PLACEMENT_VERSION = 2;
     public static final String[] HUD_PRESET_VALUES = new String[] {
             HUD_PRESET_CUSTOM,
             HUD_PRESET_DEFAULT,
@@ -36,11 +37,12 @@ public final class LostTalesConfig {
 
     public static boolean showLostTalesHud = true;
     public static String hudPlacementPreset = HUD_PRESET_CUSTOM;
+    public static int hudPlacementVersion = HUD_PLACEMENT_VERSION;
 
     public static boolean showCompassHud = true;
     public static boolean linkShowCompassHud = false;
-    public static int compassHudOffsetX = 50;
-    public static int compassHudOffsetY = 2;
+    public static double compassHudOffsetX = 50.0D;
+    public static double compassHudOffsetY = 2.0D;
     public static int compassHudDisplayRadius = 90;
     public static boolean showStaticCompassMarkers = true;
     public static boolean showLotrWaypointCompassMarkers = true;
@@ -59,8 +61,8 @@ public final class LostTalesConfig {
 
     public static boolean showPartyHud = true;
     public static boolean linkShowPartyHud = false;
-    public static int partyHudOffsetX = 2;
-    public static int partyHudOffsetY = 18;
+    public static double partyHudOffsetX = 2.0D;
+    public static double partyHudOffsetY = 18.0D;
     public static int partyCompassMarkerFadeRadius = 100;
 
     public static int partyStatusUpdateIntervalTicks = 10;
@@ -73,17 +75,23 @@ public final class LostTalesConfig {
     public static boolean showQuickLootHud = true;
     public static boolean linkShowQuickLootHud = false;
     public static int quickLootHudMaxRows = 5;
-    public static int quickLootHudOffsetX = 24;
-    public static int quickLootHudOffsetY = 32;
+    public static double quickLootHudOffsetX = 24.0D;
+    public static double quickLootHudOffsetY = 32.0D;
 
     public static boolean showQuestHud = true;
     public static boolean linkShowQuestHud = false;
-    public static int questHudOffsetX = 2;
-    public static int questHudOffsetY = 38;
+    public static double questHudOffsetX = 2.0D;
+    public static double questHudOffsetY = 38.0D;
     public static int questHudMaxObjectives = 3;
     public static int questHudMaxTrackedQuests = 4;
     public static int questHudObjectiveLineCount = 2;
     public static boolean showQuestHudNotifications = true;
+    public static double questNotificationHudOffsetX = 50.0D;
+    public static double questNotificationHudOffsetY = 75.0D;
+    public static double mapDiscoveryHudOffsetX = 50.0D;
+    public static double mapDiscoveryHudOffsetY = 35.0D;
+    public static double areaNoticeHudOffsetX = 50.0D;
+    public static double areaNoticeHudOffsetY = 15.0D;
     public static boolean showWorldQuestMarkers = true;
     public static boolean showDiscoveredWorldMapMarkers = true;
     public static int worldQuestMarkerMaxDistance = 128;
@@ -317,6 +325,14 @@ public final class LostTalesConfig {
                     showLostTalesHud,
                     "Master toggle for Lost Tales HUD elements."
             );
+            int loadedHudPlacementVersion = config.getInt(
+                    "hudPlacementVersion",
+                    CATEGORY_CLIENT,
+                    1,
+                    1,
+                    HUD_PLACEMENT_VERSION,
+                    "Internal client HUD coordinate version. Older Quick Loot positions are migrated automatically."
+            );
             Property hudPresetProperty = config.get(
                     CATEGORY_CLIENT,
                     "hudPlacementPreset",
@@ -338,20 +354,14 @@ public final class LostTalesConfig {
                     linkShowCompassHud,
                     "When true, changing showLostTalesHud also changes showCompassHud. Disabled by default in the 1.7.10 backport to preserve existing per-HUD settings."
             );
-            compassHudOffsetX = config.getInt(
-                    "compassHudOffsetX",
-                    CATEGORY_CLIENT,
-                    compassHudOffsetX,
-                    0,
-                    100,
+            compassHudOffsetX = getHudPercent(
+                    config, "compassHudOffsetX",
+                    compassHudOffsetX, 0.0D, 100.0D,
                     "Horizontal compass position as a percentage of the scaled screen width."
             );
-            compassHudOffsetY = config.getInt(
-                    "compassHudOffsetY",
-                    CATEGORY_CLIENT,
-                    compassHudOffsetY,
-                    0,
-                    100,
+            compassHudOffsetY = getHudPercent(
+                    config, "compassHudOffsetY",
+                    compassHudOffsetY, 0.0D, 100.0D,
                     "Vertical compass position as a percentage of the scaled screen height."
             );
             compassHudDisplayRadius = config.getInt(
@@ -466,20 +476,14 @@ public final class LostTalesConfig {
                     linkShowPartyHud,
                     "When true, changing showLostTalesHud also changes showPartyHud."
             );
-            partyHudOffsetX = config.getInt(
-                    "partyHudOffsetX",
-                    CATEGORY_CLIENT,
-                    partyHudOffsetX,
-                    0,
-                    100,
+            partyHudOffsetX = getHudPercent(
+                    config, "partyHudOffsetX",
+                    partyHudOffsetX, 0.0D, 100.0D,
                     "Horizontal party HUD position as a percentage of the scaled screen width."
             );
-            partyHudOffsetY = config.getInt(
-                    "partyHudOffsetY",
-                    CATEGORY_CLIENT,
-                    partyHudOffsetY,
-                    0,
-                    100,
+            partyHudOffsetY = getHudPercent(
+                    config, "partyHudOffsetY",
+                    partyHudOffsetY, 0.0D, 100.0D,
                     "Vertical party HUD position as a percentage of the scaled screen height."
             );
             partyCompassMarkerFadeRadius = config.getInt(
@@ -549,22 +553,23 @@ public final class LostTalesConfig {
                     linkShowQuickLootHud,
                     "When true, changing showLostTalesHud also changes showQuickLootHud. Disabled by default in the 1.7.10 backport to preserve existing per-HUD settings."
             );
-            quickLootHudOffsetX = config.getInt(
-                    "quickLootHudOffsetX",
-                    CATEGORY_CLIENT,
-                    quickLootHudOffsetX,
-                    0,
-                    100,
-                    "Horizontal quick-loot position as a percentage of the right half of the screen."
+            quickLootHudOffsetX = getHudPercent(
+                    config, "quickLootHudOffsetX",
+                    loadedHudPlacementVersion < HUD_PLACEMENT_VERSION
+                            ? 24.0D : quickLootHudOffsetX,
+                    0.0D, 100.0D,
+                    "Horizontal quick-loot position as a percentage of the scaled screen width."
             );
-            quickLootHudOffsetY = config.getInt(
-                    "quickLootHudOffsetY",
-                    CATEGORY_CLIENT,
-                    quickLootHudOffsetY,
-                    0,
-                    100,
+            quickLootHudOffsetY = getHudPercent(
+                    config, "quickLootHudOffsetY",
+                    quickLootHudOffsetY, 0.0D, 100.0D,
                     "Vertical quick-loot position as a percentage of the scaled screen height."
             );
+            if (loadedHudPlacementVersion < HUD_PLACEMENT_VERSION) {
+                quickLootHudOffsetX = migrateLegacyQuickLootOffsetX(
+                        quickLootHudOffsetX);
+            }
+            hudPlacementVersion = HUD_PLACEMENT_VERSION;
             quickLootHudMaxRows = config.getInt(
                     "quickLootHudMaxRows",
                     CATEGORY_CLIENT,
@@ -586,20 +591,14 @@ public final class LostTalesConfig {
                     linkShowQuestHud,
                     "When true, changing showLostTalesHud also changes showQuestHud. Disabled by default in the 1.7.10 backport to preserve existing per-HUD settings."
             );
-            questHudOffsetX = config.getInt(
-                    "questHudOffsetX",
-                    CATEGORY_CLIENT,
-                    questHudOffsetX,
-                    0,
-                    100,
+            questHudOffsetX = getHudPercent(
+                    config, "questHudOffsetX",
+                    questHudOffsetX, 0.0D, 100.0D,
                     "Horizontal quest tracker position as a percentage of the scaled screen width."
             );
-            questHudOffsetY = config.getInt(
-                    "questHudOffsetY",
-                    CATEGORY_CLIENT,
-                    questHudOffsetY,
-                    0,
-                    100,
+            questHudOffsetY = getHudPercent(
+                    config, "questHudOffsetY",
+                    questHudOffsetY, 0.0D, 100.0D,
                     "Vertical quest tracker position as a percentage of the scaled screen height."
             );
             questHudMaxObjectives = config.getInt(
@@ -631,6 +630,36 @@ public final class LostTalesConfig {
                     CATEGORY_CLIENT,
                     showQuestHudNotifications,
                     "Render centered quest notification banners for quest starts, objective progress, and completions."
+            );
+            questNotificationHudOffsetX = getHudPercent(
+                    config, "questNotificationHudOffsetX",
+                    questNotificationHudOffsetX, 0.0D, 100.0D,
+                    "Horizontal quest-notification position within the available scaled screen width."
+            );
+            questNotificationHudOffsetY = getHudPercent(
+                    config, "questNotificationHudOffsetY",
+                    questNotificationHudOffsetY, 0.0D, 100.0D,
+                    "Vertical quest-notification position within the available scaled screen height."
+            );
+            mapDiscoveryHudOffsetX = getHudPercent(
+                    config, "mapDiscoveryHudOffsetX",
+                    mapDiscoveryHudOffsetX, 0.0D, 100.0D,
+                    "Horizontal location-discovery banner position within the available scaled screen width."
+            );
+            mapDiscoveryHudOffsetY = getHudPercent(
+                    config, "mapDiscoveryHudOffsetY",
+                    mapDiscoveryHudOffsetY, 0.0D, 100.0D,
+                    "Vertical location-discovery banner position within the available scaled screen height."
+            );
+            areaNoticeHudOffsetX = getHudPercent(
+                    config, "areaNoticeHudOffsetX",
+                    areaNoticeHudOffsetX, 0.0D, 100.0D,
+                    "Horizontal area-name notice position within the available scaled screen width."
+            );
+            areaNoticeHudOffsetY = getHudPercent(
+                    config, "areaNoticeHudOffsetY",
+                    areaNoticeHudOffsetY, 0.0D, 100.0D,
+                    "Vertical area-name notice position within the available scaled screen height."
             );
             showWorldQuestMarkers = config.getBoolean(
                     "showWorldQuestMarkers",
@@ -911,38 +940,54 @@ public final class LostTalesConfig {
             compassHudOffsetY = 2;
             partyHudOffsetX = 2;
             partyHudOffsetY = 18;
-            quickLootHudOffsetX = 24;
+            quickLootHudOffsetX = 62;
             quickLootHudOffsetY = 32;
             questHudOffsetX = 2;
             questHudOffsetY = 38;
+            setNotificationPresetOffsets(50, 75, 50, 35, 50, 15);
         } else if (HUD_PRESET_LOTR_SAFE.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 12;
             partyHudOffsetX = 2;
             partyHudOffsetY = 28;
-            quickLootHudOffsetX = 22;
+            quickLootHudOffsetX = 61;
             quickLootHudOffsetY = 34;
             questHudOffsetX = 2;
             questHudOffsetY = 52;
+            setNotificationPresetOffsets(50, 78, 50, 32, 50, 27);
         } else if (HUD_PRESET_COMPACT.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 7;
             partyHudOffsetX = 1;
             partyHudOffsetY = 26;
-            quickLootHudOffsetX = 34;
+            quickLootHudOffsetX = 67;
             quickLootHudOffsetY = 37;
             questHudOffsetX = 1;
             questHudOffsetY = 57;
+            setNotificationPresetOffsets(50, 78, 50, 30, 50, 22);
         } else if (HUD_PRESET_MINIMAL.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 4;
             partyHudOffsetX = 1;
             partyHudOffsetY = 18;
-            quickLootHudOffsetX = 42;
+            quickLootHudOffsetX = 71;
             quickLootHudOffsetY = 42;
             questHudOffsetX = 1;
             questHudOffsetY = 70;
+            setNotificationPresetOffsets(50, 82, 50, 28, 50, 18);
         }
+    }
+
+    private static void setNotificationPresetOffsets(
+            int questX, int questY,
+            int discoveryX, int discoveryY,
+            int areaX, int areaY) {
+        questNotificationHudOffsetX = questX;
+        questNotificationHudOffsetY = questY;
+        mapDiscoveryHudOffsetX = discoveryX;
+        mapDiscoveryHudOffsetY = discoveryY;
+        areaNoticeHudOffsetX = areaX;
+        areaNoticeHudOffsetY = areaY;
     }
 
     public static String normalizeHudPreset(String preset) {
@@ -981,6 +1026,21 @@ public final class LostTalesConfig {
     }
 
     public static boolean setHudOffset(String element, int x, int y) {
+        return setHudOffset(element, (double)x, (double)y);
+    }
+
+    public static boolean setHudOffset(String element,
+                                       double x, double y) {
+        boolean updated = updateHudOffset(element, x, y);
+        if (updated) {
+            save();
+        }
+        return updated;
+    }
+
+    /** Updates the live client preview without writing the config every drag frame. */
+    public static boolean updateHudOffset(String element,
+                                          double x, double y) {
         String key = normalizeHudElement(element);
         if (key.length() == 0) {
             return false;
@@ -1001,11 +1061,18 @@ public final class LostTalesConfig {
         } else if ("quest".equals(key)) {
             questHudOffsetX = x;
             questHudOffsetY = y;
+        } else if ("questnotifications".equals(key)) {
+            questNotificationHudOffsetX = x;
+            questNotificationHudOffsetY = y;
+        } else if ("mapdiscovery".equals(key)) {
+            mapDiscoveryHudOffsetX = x;
+            mapDiscoveryHudOffsetY = y;
+        } else if ("areanotice".equals(key)) {
+            areaNoticeHudOffsetX = x;
+            areaNoticeHudOffsetY = y;
         } else {
             return false;
         }
-
-        save();
         return true;
     }
 
@@ -1023,6 +1090,18 @@ public final class LostTalesConfig {
         if ("quest".equals(key)) {
             return setHudOffset(key, questHudOffsetX + dx, questHudOffsetY + dy);
         }
+        if ("questnotifications".equals(key)) {
+            return setHudOffset(key, questNotificationHudOffsetX + dx,
+                    questNotificationHudOffsetY + dy);
+        }
+        if ("mapdiscovery".equals(key)) {
+            return setHudOffset(key, mapDiscoveryHudOffsetX + dx,
+                    mapDiscoveryHudOffsetY + dy);
+        }
+        if ("areanotice".equals(key)) {
+            return setHudOffset(key, areaNoticeHudOffsetX + dx,
+                    areaNoticeHudOffsetY + dy);
+        }
         return false;
     }
 
@@ -1030,7 +1109,10 @@ public final class LostTalesConfig {
         if (element == null) {
             return "";
         }
-        String key = element.trim().toLowerCase().replace("_", "").replace("-", "");
+        String key = element.trim().toLowerCase()
+                .replace("_", "")
+                .replace("-", "")
+                .replace(" ", "");
         if ("compass".equals(key)) {
             return "compass";
         }
@@ -1042,6 +1124,24 @@ public final class LostTalesConfig {
         }
         if ("quest".equals(key) || "quests".equals(key) || "questhud".equals(key) || "tracker".equals(key)) {
             return "quest";
+        }
+        if ("questnotifications".equals(key)
+                || "questnotification".equals(key)
+                || "notifications".equals(key)
+                || "notification".equals(key)
+                || "toast".equals(key)
+                || "toasts".equals(key)) {
+            return "questnotifications";
+        }
+        if ("mapdiscovery".equals(key)
+                || "locationdiscovery".equals(key)
+                || "discovery".equals(key)) {
+            return "mapdiscovery";
+        }
+        if ("areanotice".equals(key)
+                || "areaname".equals(key)
+                || "area".equals(key)) {
+            return "areanotice";
         }
         return "";
     }
@@ -1055,16 +1155,25 @@ public final class LostTalesConfig {
         quickLootHudOffsetY = clampPercent(quickLootHudOffsetY);
         questHudOffsetX = clampPercent(questHudOffsetX);
         questHudOffsetY = clampPercent(questHudOffsetY);
+        questNotificationHudOffsetX = clampPercent(
+                questNotificationHudOffsetX);
+        questNotificationHudOffsetY = clampPercent(
+                questNotificationHudOffsetY);
+        mapDiscoveryHudOffsetX = clampPercent(mapDiscoveryHudOffsetX);
+        mapDiscoveryHudOffsetY = clampPercent(mapDiscoveryHudOffsetY);
+        areaNoticeHudOffsetX = clampPercent(areaNoticeHudOffsetX);
+        areaNoticeHudOffsetY = clampPercent(areaNoticeHudOffsetY);
     }
 
-    private static int clampPercent(int value) {
-        if (value < 0) {
-            return 0;
+    static double migrateLegacyQuickLootOffsetX(double legacyOffsetX) {
+        return clampPercent(50.0D + clampPercent(legacyOffsetX) / 2.0D);
+    }
+
+    private static double clampPercent(double value) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            return 0.0D;
         }
-        if (value > 100) {
-            return 100;
-        }
-        return value;
+        return Math.max(0.0D, Math.min(100.0D, value));
     }
 
     public static void save() {
@@ -1168,6 +1277,8 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CHARACTERS, "characterDeletionRetentionDays",
                 characterDeletionRetentionDays).set(characterDeletionRetentionDays);
         config.get(CATEGORY_CLIENT, "showLostTalesHud", showLostTalesHud).set(showLostTalesHud);
+        config.get(CATEGORY_CLIENT, "hudPlacementVersion",
+                hudPlacementVersion).set(hudPlacementVersion);
         Property hudPresetProperty = config.get(CATEGORY_CLIENT, "hudPlacementPreset", hudPlacementPreset);
         hudPresetProperty.set(hudPlacementPreset);
         hudPresetProperty.setValidValues(HUD_PRESET_VALUES);
@@ -1212,6 +1323,18 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "questHudMaxTrackedQuests", questHudMaxTrackedQuests).set(questHudMaxTrackedQuests);
         config.get(CATEGORY_CLIENT, "questHudObjectiveLineCount", questHudObjectiveLineCount).set(questHudObjectiveLineCount);
         config.get(CATEGORY_CLIENT, "showQuestHudNotifications", showQuestHudNotifications).set(showQuestHudNotifications);
+        config.get(CATEGORY_CLIENT, "questNotificationHudOffsetX",
+                questNotificationHudOffsetX).set(questNotificationHudOffsetX);
+        config.get(CATEGORY_CLIENT, "questNotificationHudOffsetY",
+                questNotificationHudOffsetY).set(questNotificationHudOffsetY);
+        config.get(CATEGORY_CLIENT, "mapDiscoveryHudOffsetX",
+                mapDiscoveryHudOffsetX).set(mapDiscoveryHudOffsetX);
+        config.get(CATEGORY_CLIENT, "mapDiscoveryHudOffsetY",
+                mapDiscoveryHudOffsetY).set(mapDiscoveryHudOffsetY);
+        config.get(CATEGORY_CLIENT, "areaNoticeHudOffsetX",
+                areaNoticeHudOffsetX).set(areaNoticeHudOffsetX);
+        config.get(CATEGORY_CLIENT, "areaNoticeHudOffsetY",
+                areaNoticeHudOffsetY).set(areaNoticeHudOffsetY);
         config.get(CATEGORY_CLIENT, "showWorldQuestMarkers", showWorldQuestMarkers).set(showWorldQuestMarkers);
         config.get(CATEGORY_CLIENT, "showDiscoveredWorldMapMarkers", showDiscoveredWorldMapMarkers).set(showDiscoveredWorldMapMarkers);
         config.get(CATEGORY_CLIENT, "worldQuestMarkerMaxDistance", worldQuestMarkerMaxDistance).set(worldQuestMarkerMaxDistance);
@@ -1331,11 +1454,36 @@ public final class LostTalesConfig {
         return value;
     }
 
+    static double getHudPercent(
+            Configuration config, String key, double defaultValue,
+            double minimum, double maximum, String comment) {
+        if (config.hasKey(CATEGORY_CLIENT, key)) {
+            Property existing = config.getCategory(CATEGORY_CLIENT).get(key);
+            if (existing != null
+                    && existing.getType() != Property.Type.DOUBLE) {
+                // Old releases declared HUD offsets as integers. Recreate the
+                // property so Forge's config GUI accepts precise drag values.
+                defaultValue = existing.getDouble(defaultValue);
+                config.getCategory(CATEGORY_CLIENT).remove(key);
+            }
+        }
+        return getBoundedDouble(config, CATEGORY_CLIENT, key, defaultValue,
+                minimum, maximum, comment);
+    }
+
     private static double getBoundedDouble(
             Configuration config, String key, double defaultValue,
             double minimum, double maximum, String comment) {
+        return getBoundedDouble(config, CATEGORY_RANGED_COMBAT, key,
+                defaultValue, minimum, maximum, comment);
+    }
+
+    private static double getBoundedDouble(
+            Configuration config, String category, String key,
+            double defaultValue, double minimum, double maximum,
+            String comment) {
         Property property = config.get(
-                CATEGORY_RANGED_COMBAT, key, defaultValue,
+                category, key, defaultValue,
                 comment, minimum, maximum);
         double value = property.getDouble(defaultValue);
         double bounded = Math.max(minimum, Math.min(maximum, value));

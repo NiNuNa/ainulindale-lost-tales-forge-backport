@@ -2,7 +2,7 @@ package com.ninuna.losttales.gui.hud.mapmarker;
 
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.config.LostTalesConfig;
-import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
+import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -15,8 +15,29 @@ public final class LostTalesMapMarkerHudRenderer {
     private static final int MIN_TEXT_ALPHA = 4;
     private static final int DISCOVERY_LINE_WIDTH = 88;
     private static final int DISCOVERY_LINE_GAP = 9;
+    private static final int DISCOVERY_NOTICE_WIDTH =
+            (DISCOVERY_LINE_WIDTH + DISCOVERY_LINE_GAP) * 2;
+    private static final int DISCOVERY_NOTICE_HEIGHT = 30;
+    private static final int AREA_NOTICE_WIDTH = 180;
+    private static final int AREA_NOTICE_HEIGHT = 12;
 
     private LostTalesMapMarkerHudRenderer() {}
+
+    public static int getDiscoveryPlacementWidth() {
+        return DISCOVERY_NOTICE_WIDTH;
+    }
+
+    public static int getDiscoveryPlacementHeight() {
+        return DISCOVERY_NOTICE_HEIGHT;
+    }
+
+    public static int getAreaPlacementWidth() {
+        return AREA_NOTICE_WIDTH;
+    }
+
+    public static int getAreaPlacementHeight() {
+        return AREA_NOTICE_HEIGHT;
+    }
 
     public static void render(Minecraft minecraft, float partialTicks) {
         if (!LostTalesConfig.showLostTalesHud || !LostTalesConfig.showCompassHud || minecraft == null || minecraft.thePlayer == null || minecraft.theWorld == null || minecraft.gameSettings.hideGUI) {
@@ -49,10 +70,17 @@ public final class LostTalesMapMarkerHudRenderer {
         }
 
         FontRenderer font = minecraft.fontRenderer;
-        int screenWidth = resolution.getScaledWidth();
-        int y = resolution.getScaledHeight() / 3;
+        HudPlacementLayout.Bounds placement = HudPlacementLayout.calculate(
+                resolution.getScaledWidth(), resolution.getScaledHeight(),
+                DISCOVERY_NOTICE_WIDTH, DISCOVERY_NOTICE_HEIGHT,
+                LostTalesConfig.mapDiscoveryHudOffsetX,
+                LostTalesConfig.mapDiscoveryHudOffsetY,
+                HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT,
+                HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT);
+        int centerX = placement.x + placement.width / 2;
+        int y = placement.y;
         String title = "Location Discovered";
-        String name = notice.getName();
+        String name = trimToWidth(font, notice.getName(), placement.width);
 
         int titleColor = colorWithAlpha(0xD9D1B8, alpha * 0.78F);
         int nameColor = colorWithAlpha(0xFFFFFF, alpha);
@@ -61,12 +89,11 @@ public final class LostTalesMapMarkerHudRenderer {
             return;
         }
 
-        int titleX = (screenWidth - font.getStringWidth(title)) / 2;
-        int nameX = (screenWidth - font.getStringWidth(name)) / 2;
+        int titleX = centerX - font.getStringWidth(title) / 2;
+        int nameX = centerX - font.getStringWidth(name) / 2;
         font.drawStringWithShadow(title, titleX, y, titleColor);
         font.drawStringWithShadow(name, nameX, y + 13, nameColor);
 
-        int centerX = screenWidth / 2;
         int lineY = y + 26;
         Gui.drawRect(centerX - DISCOVERY_LINE_GAP - DISCOVERY_LINE_WIDTH, lineY, centerX - DISCOVERY_LINE_GAP, lineY + 1, lineColor);
         Gui.drawRect(centerX + DISCOVERY_LINE_GAP, lineY, centerX + DISCOVERY_LINE_GAP + DISCOVERY_LINE_WIDTH, lineY + 1, lineColor);
@@ -87,14 +114,18 @@ public final class LostTalesMapMarkerHudRenderer {
         }
 
         FontRenderer font = minecraft.fontRenderer;
-        int screenWidth = resolution.getScaledWidth();
-        int screenHeight = resolution.getScaledHeight();
-        int compassX = (screenWidth - LostTalesCompassHudRenderer.COMPASS_WIDTH) * LostTalesConfig.compassHudOffsetX / 100;
-        int compassY = screenHeight * LostTalesConfig.compassHudOffsetY / 100 + font.FONT_HEIGHT + LostTalesCompassHudRenderer.MAP_MARKER_DISTANCE_LABEL_OFFSET_Y;
-        int x = compassX + LostTalesCompassHudRenderer.COMPASS_WIDTH / 2;
-        int y = compassY + LostTalesCompassHudRenderer.COMPASS_HEIGHT + font.FONT_HEIGHT + 14;
+        HudPlacementLayout.Bounds placement = HudPlacementLayout.calculate(
+                resolution.getScaledWidth(), resolution.getScaledHeight(),
+                AREA_NOTICE_WIDTH, AREA_NOTICE_HEIGHT,
+                LostTalesConfig.areaNoticeHudOffsetX,
+                LostTalesConfig.areaNoticeHudOffsetY,
+                HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT,
+                HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT);
+        int x = placement.x + placement.width / 2;
+        int y = placement.y;
 
-        String text = notice.getName();
+        String text = trimToWidth(font, notice.getName(),
+                Math.round(AREA_NOTICE_WIDTH / 0.72F));
         int color = colorWithAlpha(0xFFFFFF, alpha * 0.74F);
         if (color != 0) {
             float scale = 0.72F;
@@ -137,5 +168,13 @@ public final class LostTalesMapMarkerHudRenderer {
     private static void drawSmallDiamond(int centerX, int centerY, int color) {
         Gui.drawRect(centerX, centerY - 3, centerX + 1, centerY + 4, color);
         Gui.drawRect(centerX - 2, centerY - 1, centerX + 3, centerY + 2, color);
+    }
+
+    private static String trimToWidth(FontRenderer font,
+                                      String text, int width) {
+        if (text == null || text.length() == 0) {
+            return "";
+        }
+        return font.trimStringToWidth(text, Math.max(1, width));
     }
 }

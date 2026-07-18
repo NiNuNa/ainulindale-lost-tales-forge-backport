@@ -5,6 +5,7 @@ import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.inventory.LostTalesQuickLootInventoryHelper;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderHelper;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
@@ -66,6 +67,16 @@ public final class LostTalesQuickLootHudRenderer {
     private static boolean wasLookingAtContainer;
 
     private LostTalesQuickLootHudRenderer() {}
+
+    public static int getPlacementWidth() {
+        return TEXTURE_WIDTH;
+    }
+
+    public static int getPlacementHeight() {
+        int rows = Math.max(1, LostTalesConfig.quickLootHudMaxRows);
+        return TOP_HEIGHT + rows * ROW_HEIGHT + BOTTOM_HEIGHT
+                + INPUT_HINT_HEIGHT + 8;
+    }
 
     public static void render(Minecraft minecraft) {
         if (!LostTalesConfig.showLostTalesHud || !LostTalesConfig.showQuickLootHud || minecraft == null || minecraft.thePlayer == null || minecraft.theWorld == null || minecraft.gameSettings.hideGUI) {
@@ -150,15 +161,19 @@ public final class LostTalesQuickLootHudRenderer {
         int screenWidth = resolution.getScaledWidth();
         int screenHeight = resolution.getScaledHeight();
 
-        int panelX = screenWidth / 2 + screenWidth / 2 * LostTalesConfig.quickLootHudOffsetX / 100;
-        int panelY = screenHeight * LostTalesConfig.quickLootHudOffsetY / 100;
-        int estimatedPanelHeight = TOP_HEIGHT + Math.max(1, LostTalesConfig.quickLootHudMaxRows) * ROW_HEIGHT + BOTTOM_HEIGHT + INPUT_HINT_HEIGHT + 8;
-        panelX = MathHelper.clamp_int(panelX, 4, Math.max(4, screenWidth - TEXTURE_WIDTH - 4));
-        panelY = MathHelper.clamp_int(panelY, 4, Math.max(4, screenHeight - estimatedPanelHeight - 4));
+        int visibleRows = Math.max(1, LostTalesConfig.quickLootHudMaxRows);
+        HudPlacementLayout.Bounds placement = HudPlacementLayout.calculate(
+                screenWidth, screenHeight,
+                getPlacementWidth(), getPlacementHeight(),
+                LostTalesConfig.quickLootHudOffsetX,
+                LostTalesConfig.quickLootHudOffsetY,
+                HudPlacementLayout.CoordinateMode.SCREEN_PERCENT,
+                HudPlacementLayout.CoordinateMode.SCREEN_PERCENT);
+        int panelX = placement.x;
+        int panelY = placement.y;
         int itemX = panelX + 17;
         int itemNameX = itemX + 21;
         int rowY = panelY + TOP_HEIGHT;
-        int visibleRows = Math.max(1, LostTalesConfig.quickLootHudMaxRows);
 
         List<Integer> slots = snapshot.getNonEmptySlots();
         selectedRow = MathHelper.clamp_int(selectedRow, 0, Math.max(0, slots.size() - 1));
@@ -172,8 +187,12 @@ public final class LostTalesQuickLootHudRenderer {
         GL11.glDisable(GL11.GL_DEPTH_TEST);
 
         drawQuickLootTexture(minecraft, TEXTURE, panelX, panelY, 0, 0, TEXTURE_WIDTH, TOP_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
-        renderHorizontalOrnament(minecraft, font, panelX, panelY, snapshot.title);
-        font.drawStringWithShadow(snapshot.title == null ? "Container" : snapshot.title, panelX + 3, panelY + font.FONT_HEIGHT / 2, 0xFFFFFF);
+        String title = font.trimStringToWidth(
+                snapshot.title == null ? "Container" : snapshot.title,
+                TEXTURE_WIDTH - 12);
+        renderHorizontalOrnament(minecraft, font, panelX, panelY, title);
+        font.drawStringWithShadow(title, panelX + 3,
+                panelY + font.FONT_HEIGHT / 2, 0xFFFFFF);
 
         if (slots.isEmpty()) {
             drawQuickLootTexture(minecraft, TEXTURE, panelX, rowY, 0, 25, TEXTURE_WIDTH, ROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
@@ -190,7 +209,9 @@ public final class LostTalesQuickLootHudRenderer {
                     drawQuickLootTexture(minecraft, TEXTURE, panelX + SELECTION_OFFSET_X, y + 1, 0, SELECTION_TEXTURE_V, SELECTION_WIDTH, SELECTION_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
                 }
                 renderStack(minecraft, stack, itemX, y + 3);
-                String name = stack == null ? "" : stack.getDisplayName();
+                String name = font.trimStringToWidth(
+                        stack == null ? "" : stack.getDisplayName(),
+                        TEXTURE_WIDTH - (itemNameX - panelX) - 8);
                 font.drawStringWithShadow(name, itemNameX, y + 7, 0xFFFFFF);
             }
         }

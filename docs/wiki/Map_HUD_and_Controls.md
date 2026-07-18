@@ -9,7 +9,7 @@ Lost Tales adds client displays on top of server-owned quest, party, combat, and
 | Open character menu | Caps Lock |
 | Open quest journal | J |
 | Toggle Lost Tales HUD | H |
-| Open HUD placement preview | Left Alt + H |
+| Open HUD placement editor | Left Alt + H |
 | Quick-loot use | R |
 | Modifier | Left Alt |
 | Swap camera shoulder | C |
@@ -25,10 +25,16 @@ The client can display:
 - a compass with discovered markers, eligible LOTR waypoints, hostile combat contacts, party members, and the party go-here marker;
 - a four-member party status panel;
 - a quick-loot container preview;
-- pinned quest objectives and quest notifications;
+- pinned quest objectives;
+- quest notification toasts;
+- location-discovery banners and area-name notices;
 - discovered and active quest markers in the world.
 
-HUD positions use percentage offsets and can be moved through the placement preview or Forge config screen. Built-in placement presets are `default`, `lotr-safe`, `compact`, and `minimal`; `custom` preserves manual positions.
+Open the placement editor, click a HUD box to select it, and drag it. Panels cannot cross the four-pixel screen margin. A panel snaps when its center comes within six scaled pixels of the horizontal or vertical screen axis. The background uses a ten-pixel grid with stronger fifty-pixel divisions. Press Escape to save and return. A selected panel can also be nudged one pixel with the arrow keys, or ten pixels while holding the Modifier key.
+
+The editor includes every fixed-position Lost Tales panel: Compass, Party, Quick Loot, Quest Tracker, Quest Notifications, Location Discovery, and Area Name. World-space markers, the aiming reticle, projectile trajectory, and full-screen visual effects are not placement panels because their screen position is derived from the world, crosshair, or full display.
+
+HUD positions use bounded percentage offsets. Quick Loot uses the full screen and existing right-side positions migrate automatically. Built-in placement presets remain available through configuration and `/losttales hud`: `default`, `lotr-safe`, `compact`, and `minimal`; `custom` preserves manual positions.
 
 The `/losttales hud` operator helper only changes settings in an integrated server, where client and server share one process. A dedicated server refuses the command because it cannot edit a remote client's HUD configuration.
 
@@ -55,4 +61,3 @@ Target lock and trajectory rendering are client aids. Entity attacks, interactio
 After a compatible weapon reaches its normal full draw, the default server charge tiers begin at 10, 24, and 42 additional ticks. Their default damage multipliers are 1.12, 1.30, and 1.60. Their default velocity multipliers are 1.04, 1.09, and 1.16. Servers can disable or tune the system.
 
 If a camera transformer does not match the installed game or dependency bytecode, the affected path falls back to vanilla behavior and logs a warning.
-

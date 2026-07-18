@@ -14,7 +14,7 @@ Forge writes the main options to `config/losttales.cfg`. Its categories are:
 
 The optional camera uses `config/losttales-third-person.cfg`. Editable camera-preset JSON files are installed without overwriting user changes under `config/losttales/camera_presets/`.
 
-Use the Forge Mods configuration screen for local display and camera settings. Server owners should edit authoritative gameplay categories while the server is stopped, then review the generated comments and bounds.
+Use the Forge Mods configuration screen for local display and camera settings. The HUD placement editor provides drag-and-drop positioning for all fixed Lost Tales panels; its values are the same bounded offsets stored in `losttales.cfg`. Server owners should edit authoritative gameplay categories while the server is stopped, then review the generated comments and bounds.
 
 ## Server commands
 
@@ -38,4 +38,3 @@ Run `/losttales help` for the current subcommand list and use tab completion for
 ## Compatibility-sensitive settings
 
 Do not change numeric biome or entity IDs by editing source in an existing pack. Do not rename registry entries or JSON identifiers without a migration. Character and quest size limits are safety bounds, not tuning values; lowering them below existing saved data can make that data read-only or invalid.
-

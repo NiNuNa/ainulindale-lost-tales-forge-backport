@@ -31,4 +31,4 @@ The long-term RPG direction does not mean every planned system exists. There is 
 
 These pages describe the current source and bundled resources. Experimental registry entries are marked as such. Registry names, packet identifiers, and saved-data formats are compatibility-sensitive and should not be renamed casually.
 
-See [Known Limitations](Known_Limitations.md) before using this build in a long-running world.
+Review [multiplayer and saved-data behavior](Multiplayer_and_Data_Safety.md) before using this build in a long-running world, and see [Development](Development.md) for the pinned legacy toolchain and dependency versions.

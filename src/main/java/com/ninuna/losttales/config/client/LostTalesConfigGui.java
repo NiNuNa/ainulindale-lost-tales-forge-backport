@@ -40,7 +40,9 @@ public class LostTalesConfigGui extends GuiConfig {
     @Override
     public void initGui() {
         super.initGui();
-        this.buttonList.add(new GuiButton(BUTTON_HUD_PLACEMENT, Math.max(4, this.width - 154), 8, 150, 20, "HUD Placement Preview"));
+        this.buttonList.add(new GuiButton(BUTTON_HUD_PLACEMENT,
+                Math.max(4, this.width - 154), 8, 150, 20,
+                "HUD Placement Editor"));
     }
 
     @Override
@@ -93,7 +95,10 @@ public class LostTalesConfigGui extends GuiConfig {
                 "showCompassHud", "linkShowCompassHud", "compassHudOffsetX", "compassHudOffsetY",
                 "showPartyHud", "linkShowPartyHud", "partyHudOffsetX", "partyHudOffsetY",
                 "showQuickLootHud", "linkShowQuickLootHud", "quickLootHudOffsetX", "quickLootHudOffsetY",
-                "showQuestHud", "linkShowQuestHud", "questHudOffsetX", "questHudOffsetY")));
+                "showQuestHud", "linkShowQuestHud", "questHudOffsetX", "questHudOffsetY",
+                "questNotificationHudOffsetX", "questNotificationHudOffsetY",
+                "mapDiscoveryHudOffsetX", "mapDiscoveryHudOffsetY",
+                "areaNoticeHudOffsetX", "areaNoticeHudOffsetY")));
         elements.add(group("compass", "losttales.config.category.client.compass", pick(client,
                 "compassHudDisplayRadius", "showStaticCompassMarkers", "showLotrWaypointCompassMarkers",
                 "onlyShowUnlockedLotrWaypoints", "showHostileCompassMarkers",
@@ -157,6 +162,7 @@ public class LostTalesConfigGui extends GuiConfig {
         }
         Set<String> used = new HashSet<String>();
         used.add("onlyShowAggroHostileCompassMarkers");
+        used.add("hudPlacementVersion");
         if (groups != null) {
             for (IConfigElement group : groups) {
                 if (group == null || group.getChildElements() == null) {
