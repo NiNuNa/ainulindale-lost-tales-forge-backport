@@ -165,10 +165,10 @@ public class LostTalesCommonProxy {
         ELostTalesStructure.initAndRegisterStructures();
         ELostTalesCrafting.initAndRegisterCrafting();
         ELostTalesFaction.initAndRegisterFactions();
+        LostTalesMapOverlay.applyWorldGenerationMap();
         LostTalesMapMarkerWaypointRegistry.initAndRegisterWaypoints();
         ELostTalesAchievement.initAndRegisterAchievements();
 
-        LostTalesMapOverlay.applyWorldGenerationMap();
         ELostTalesRoad.initAndRegisterRoads();
     }
 

@@ -118,7 +118,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             for (LOTRAbstractWaypoint waypoint : waypoints) {
                 LostTalesMapMarkerData marker = getReplacementMarker(waypoint);
                 if (marker == null || !shouldRenderReplacementWaypoint(
-                        context.minecraft, waypoint, marker, includeHidden)) {
+                        waypoint, marker, includeHidden)) {
                     continue;
                 }
 
@@ -539,7 +539,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             LostTalesMapMarkerData marker = getReplacementMarker(waypoint);
             if (marker == null || isLockedMappedMarkerVisible(marker)
                     || !shouldRenderReplacementWaypoint(
-                    context.minecraft, waypoint, marker, false)) {
+                    waypoint, marker, false)) {
                 continue;
             }
             ScreenPosition position = transformMarker(context, marker);
@@ -800,34 +800,14 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         return safeString(first.getId()).equals(safeString(second.getId()));
     }
 
-    private static boolean shouldRenderWaypoint(Minecraft minecraft, LOTRAbstractWaypoint waypoint, boolean includeHidden) {
-        if (waypoint == null) {
-            return false;
-        }
-        if (!includeHidden && !isWaypointVisibleInLotrToggles(waypoint)) {
-            return false;
-        }
-        try {
-            if (waypoint.isHidden() && (minecraft.thePlayer == null || !waypoint.hasPlayerUnlocked(minecraft.thePlayer))) {
-                return false;
-            }
-        } catch (Throwable ignored) {
-            return false;
-        }
-        return true;
-    }
-
     private static boolean shouldRenderReplacementWaypoint(
-            Minecraft minecraft, LOTRAbstractWaypoint waypoint,
+            LOTRAbstractWaypoint waypoint,
             LostTalesMapMarkerData marker, boolean includeHidden) {
         if (waypoint == null
                 || !includeHidden && !isWaypointVisibleInLotrToggles(waypoint)) {
             return false;
         }
-        return isUndiscoveredButVisible(marker)
-                || LostTalesClientMapMarkerVisibility
-                .isNonDiscoverableVisible(marker)
-                || shouldRenderWaypoint(minecraft, waypoint, includeHidden);
+        return shouldShowLostTalesIcon(marker);
     }
 
     private static boolean isWaypointVisibleInLotrToggles(LOTRAbstractWaypoint waypoint) {

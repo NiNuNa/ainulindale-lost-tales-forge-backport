@@ -22,9 +22,10 @@ import lotr.common.world.map.LOTRWaypoint;
  * Registers Lost Tales JSON map markers as public LOTR waypoints.
  *
  * <p>These are not LOTRCustomWaypoint instances. They are normal global/public
- * LOTRWaypoint enum entries with one private fast-travel region per marker.
- * Map visibility uses the marker coordinate's native biome region, while the
- * private region is unlocked only after marker discovery.</p>
+ * LOTRWaypoint enum entries. Existing LOTR and Lost Tales waypoints are bound
+ * to the same marker index; only newly generated discoverable waypoints need
+ * a private fast-travel region. Map visibility follows the waypoint region
+ * that LOTR unlocks when its associated biome is visited.</p>
  */
 public final class LostTalesMapMarkerWaypointRegistry {
     private static final String LOTR_WAYPOINT_MARKER_PREFIX = "lotr:waypoint:";
@@ -116,12 +117,13 @@ public final class LostTalesMapMarkerWaypointRegistry {
         if (marker.getDimensionId() != LOTRDimension.MIDDLE_EARTH.dimensionID) {
             return;
         }
-        if (isExistingLotrWaypointMarker(marker)) {
+        String markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(marker.getId());
+        if (markerId.length() == 0 || WAYPOINTS_BY_MARKER_ID.containsKey(markerId)) {
             return;
         }
 
-        String markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(marker.getId());
-        if (markerId.length() == 0 || WAYPOINTS_BY_MARKER_ID.containsKey(markerId)) {
+        if (isExistingLotrWaypointMarker(marker)) {
+            bindExistingWaypoint(markerId, marker);
             return;
         }
 
@@ -158,6 +160,36 @@ public final class LostTalesMapMarkerWaypointRegistry {
         } catch (RuntimeException e) {
             FMLLog.warning("[%s] Failed to register public LOTR waypoint for map marker %s: %s", LostTalesMetaData.MOD_ID, markerId, e.getMessage());
         }
+    }
+
+    private static void bindExistingWaypoint(
+            String markerId, LostTalesMapMarkerDefinition marker) {
+        String code = marker.getFastTravelWaypointCode();
+        LOTRWaypoint waypoint = resolveExistingWaypoint(marker);
+        if (waypoint == null) {
+            FMLLog.warning("[%s] Map marker %s references missing LOTR waypoint %s",
+                    LostTalesMetaData.MOD_ID, markerId, code);
+            return;
+        }
+        WAYPOINTS_BY_MARKER_ID.put(markerId, waypoint);
+        LOTRWaypoint.Region region = LostTalesMapMarkerRegionResolver
+                .resolveWaypointRegion(waypoint);
+        if (region != null) {
+            REGIONS_BY_MARKER_ID.put(markerId, region);
+        } else {
+            FMLLog.warning("[%s] LOTR waypoint %s for map marker %s has no region",
+                    LostTalesMetaData.MOD_ID, code, markerId);
+        }
+    }
+
+    static LOTRWaypoint resolveExistingWaypoint(
+            LostTalesMapMarkerDefinition marker) {
+        if (marker == null) {
+            return null;
+        }
+        String code = marker.getFastTravelWaypointCode();
+        return code == null || code.length() == 0
+                ? null : LOTRWaypoint.waypointForName(code);
     }
 
     /** Package-visible for policy regression tests without mutating the enum. */

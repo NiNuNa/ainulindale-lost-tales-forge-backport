@@ -180,6 +180,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "AccessoryConcealmentHooks";
     private static final String ACCESSORY_LOTR_MAP_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/LotrAccessoryMapHooks";
+    private static final String LOTR_MAP_EDGE_FILL_HOOK_OWNER =
+            "com/ninuna/losttales/client/map/"
+                    + "LostTalesLotrMapEdgeRenderer";
 
     @Override
     public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -229,7 +232,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return transformLotrSpeech(basicClass);
         }
         if (LOTR_GUI_MAP.equals(transformedName)) {
-            return transformLotrMapPlayerNames(basicClass);
+            return transformLotrGuiMap(basicClass);
         }
         if (LOTR_LEVEL_DATA.equals(transformedName)) {
             return transformLotrPlayerLocations(basicClass);
@@ -708,53 +711,114 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
     }
 
-    /** Replaces only LOTR map tooltip labels, never GameProfile identity. */
-    private static byte[] transformLotrMapPlayerNames(byte[] basicClass) {
+    /** Applies client map rendering hooks without changing LOTR map data. */
+    private static byte[] transformLotrGuiMap(byte[] basicClass) {
         try {
             ClassNode owner = read(basicClass);
+            boolean changed = false;
+            boolean playerNameHookPresent = false;
+            boolean edgeFillHookPresent = false;
             for (Object value : owner.methods) {
                 MethodNode method = (MethodNode)value;
-                if (!"renderPlayers".equals(method.name)
-                        || !"(II)V".equals(method.desc)) {
-                    continue;
-                }
-                if (containsHook(
-                        method, CLIENT_IDENTITY_HOOK_OWNER,
-                        "resolveMapPlayerName")) {
-                    return basicClass;
-                }
-                for (AbstractInsnNode instruction =
-                     method.instructions.getFirst();
-                     instruction != null;
-                     instruction = instruction.getNext()) {
-                    if (!(instruction instanceof MethodInsnNode)) {
-                        continue;
+                if ("renderPlayers".equals(method.name)
+                        && "(II)V".equals(method.desc)) {
+                    playerNameHookPresent = containsHook(
+                            method, CLIENT_IDENTITY_HOOK_OWNER,
+                            "resolveMapPlayerName");
+                    if (!playerNameHookPresent) {
+                        for (AbstractInsnNode instruction =
+                             method.instructions.getFirst();
+                             instruction != null;
+                             instruction = instruction.getNext()) {
+                            if (!(instruction instanceof MethodInsnNode)) {
+                                continue;
+                            }
+                            MethodInsnNode invocation =
+                                    (MethodInsnNode)instruction;
+                            if (invocation.getOpcode()
+                                    != Opcodes.INVOKEVIRTUAL
+                                    || !"com/mojang/authlib/GameProfile"
+                                    .equals(invocation.owner)
+                                    || !"getName".equals(invocation.name)
+                                    || !"()Ljava/lang/String;"
+                                    .equals(invocation.desc)) {
+                                continue;
+                            }
+                            invocation.setOpcode(Opcodes.INVOKESTATIC);
+                            invocation.owner = CLIENT_IDENTITY_HOOK_OWNER;
+                            invocation.name = "resolveMapPlayerName";
+                            invocation.desc = MAP_PLAYER_NAME_HOOK_DESC;
+                            playerNameHookPresent = true;
+                            changed = true;
+                            info("Patched LOTR map player tooltips with "
+                                    + "roleplay names");
+                            break;
+                        }
                     }
-                    MethodInsnNode invocation =
-                            (MethodInsnNode)instruction;
-                    if (invocation.getOpcode() != Opcodes.INVOKEVIRTUAL
-                            || !"com/mojang/authlib/GameProfile"
-                            .equals(invocation.owner)
-                            || !"getName".equals(invocation.name)
-                            || !"()Ljava/lang/String;"
-                            .equals(invocation.desc)) {
-                        continue;
+                } else if ("renderMapAndOverlay".equals(method.name)
+                        && "(ZFZ)V".equals(method.desc)) {
+                    edgeFillHookPresent = containsHook(
+                            method, LOTR_MAP_EDGE_FILL_HOOK_OWNER,
+                            "fillClippedMapBackground");
+                    if (!edgeFillHookPresent) {
+                        edgeFillHookPresent = injectLotrMapEdgeFill(method);
+                        changed |= edgeFillHookPresent;
                     }
-                    invocation.setOpcode(Opcodes.INVOKESTATIC);
-                    invocation.owner = CLIENT_IDENTITY_HOOK_OWNER;
-                    invocation.name = "resolveMapPlayerName";
-                    invocation.desc = MAP_PLAYER_NAME_HOOK_DESC;
-                    info("Patched LOTR map player tooltips with roleplay names");
-                    return write(owner);
                 }
             }
-            warn("Could not patch LOTR map player tooltip names");
-            return basicClass;
+            if (!playerNameHookPresent) {
+                warn("Could not patch LOTR map player tooltip names");
+            }
+            if (!edgeFillHookPresent) {
+                warn("Could not patch LOTR clipped map background");
+            }
+            return changed ? write(owner) : basicClass;
         } catch (Throwable throwable) {
-            warn("Failed to patch LOTR map player tooltip names: "
+            warn("Failed to patch LOTR map rendering: "
                     + throwable);
             return basicClass;
         }
+    }
+
+    private static boolean injectLotrMapEdgeFill(MethodNode method) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof MethodInsnNode)) {
+                continue;
+            }
+            MethodInsnNode call = (MethodInsnNode)instruction;
+            if (call.getOpcode() != Opcodes.INVOKESTATIC
+                    || !"lotr/client/LOTRTextures".equals(call.owner)
+                    || !"drawMap".equals(call.name)) {
+                continue;
+            }
+
+            InsnList hook = new InsnList();
+            hook.add(new VarInsnNode(Opcodes.ILOAD, 1));
+            addStaticIntField(hook, LOTR_GUI_MAP, "mapXMin");
+            addStaticIntField(hook, LOTR_GUI_MAP, "mapXMax");
+            addStaticIntField(hook, LOTR_GUI_MAP, "mapYMin");
+            addStaticIntField(hook, LOTR_GUI_MAP, "mapYMax");
+            addStaticIntField(hook, LOTR_GUI_MAP, "mapXMin_W");
+            addStaticIntField(hook, LOTR_GUI_MAP, "mapXMax_W");
+            addStaticIntField(hook, LOTR_GUI_MAP, "mapYMin_W");
+            addStaticIntField(hook, LOTR_GUI_MAP, "mapYMax_W");
+            hook.add(new MethodInsnNode(
+                    Opcodes.INVOKESTATIC,
+                    LOTR_MAP_EDGE_FILL_HOOK_OWNER,
+                    "fillClippedMapBackground",
+                    "(ZIIIIIIII)V"));
+            method.instructions.insertBefore(call, hook);
+            info("Patched clipped LOTR map previews with ocean padding");
+            return true;
+        }
+        return false;
+    }
+
+    private static void addStaticIntField(
+            InsnList instructions, String owner, String name) {
+        instructions.add(new FieldInsnNode(
+                Opcodes.GETSTATIC, owner.replace('.', '/'), name, "I"));
     }
 
     /** Filters concealed players before LOTR serializes map coordinates. */

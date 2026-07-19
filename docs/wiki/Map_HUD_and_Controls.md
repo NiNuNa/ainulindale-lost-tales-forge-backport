@@ -40,9 +40,11 @@ The `/losttales hud` operator helper only changes settings in an integrated serv
 
 ## Map markers and waypoints
 
-The bundled resources define 290 static map markers across cities, towns, settlements, forts, camps, caves, and LOTR waypoint mappings. A marker can be hidden until discovered, pinned, shown on the compass, linked to quest stages, or used to unlock an associated public LOTR waypoint.
+The bundled resources define 291 static map markers across cities, towns, settlements, forts, camps, caves, and LOTR waypoint mappings. A marker can be hidden until discovered, pinned, shown on the compass, linked to quest stages, or used to unlock an associated public LOTR waypoint.
 
 Lost Tales adds its overlay to LOTR's Middle-earth map and uses the normal LOTR biome or faction fast-travel region whenever possible. Fast travel remains subject to LOTR's own region and waypoint rules. Combat markers are transient, server-approved, and never saved as discovered locations.
+
+Every bundled LOTR waypoint marker uses the same discovery and visibility rules, including the Sun Elves, Moon Elves, Odane, and Orocarni. Entering the biome associated with a waypoint unlocks its LOTR fast-travel region and reveals the marker on the map. Moving close enough discovers the exact location and stores that state on the server. Added faction waypoints use their territory's existing biome region; Odane uses its generated Odane biome region.
 
 `/losttales mapmarker` provides permission-level-2 tools to inspect, discover, forget, track, or untrack markers for testing and administration.
 

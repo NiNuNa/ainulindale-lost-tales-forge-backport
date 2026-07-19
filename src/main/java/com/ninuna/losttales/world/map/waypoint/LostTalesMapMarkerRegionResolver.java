@@ -22,11 +22,7 @@ public final class LostTalesMapMarkerRegionResolver {
                 marker.getFastTravelWaypointCode());
     }
 
-    /**
-     * Runtime resolver that uses the actual world biome when available. This
-     * matches the region LOTR unlocks while the player explores and avoids
-     * early-startup biome-image timing differences.
-     */
+    /** Resolves the same region that owns the marker's LOTR waypoint. */
     public static LOTRWaypoint.Region resolve(
             World world, LostTalesMapMarkerDefinition marker) {
         if (marker == null) {
@@ -80,36 +76,38 @@ public final class LostTalesMapMarkerRegionResolver {
             return waypointRegion;
         }
 
-        LOTRBiome biome = null;
         try {
             if (LOTRGenLayerWorld.loadedBiomeImage()) {
-                biome = LOTRGenLayerWorld.getBiomeOrOcean(
+                LOTRBiome biome = LOTRGenLayerWorld.getBiomeOrOcean(
                         LOTRWaypoint.worldToMapX(worldX),
                         LOTRWaypoint.worldToMapZ(worldZ));
+                return biome == null ? null : biome.getBiomeWaypoints();
             }
         } catch (RuntimeException ignored) {
             // Dedicated bootstrap and headless tests can reach this helper
-            // before LOTR's biome layers exist. Fall back to waypoint region.
+            // before LOTR's biome layers exist.
         }
-        if (biome != null && biome.getBiomeWaypoints() != null) {
-            return biome.getBiomeWaypoints();
-        }
-
         return null;
     }
 
-    private static LOTRWaypoint.Region resolveWaypointRegion(
+    static LOTRWaypoint.Region resolveWaypointRegion(
             String fastTravelWaypointCode) {
         LOTRWaypoint waypoint = fastTravelWaypointCode == null
                 || fastTravelWaypointCode.length() == 0
                 ? null : LOTRWaypoint.waypointForName(
                         fastTravelWaypointCode);
-        if (waypoint != null) {
-            for (LOTRWaypoint.Region region : LOTRWaypoint.Region.values()) {
-                if (region != null && region.waypoints != null
-                        && region.waypoints.contains(waypoint)) {
-                    return region;
-                }
+        return resolveWaypointRegion(waypoint);
+    }
+
+    static LOTRWaypoint.Region resolveWaypointRegion(
+            LOTRWaypoint waypoint) {
+        if (waypoint == null) {
+            return null;
+        }
+        for (LOTRWaypoint.Region region : LOTRWaypoint.Region.values()) {
+            if (region != null && region.waypoints != null
+                    && region.waypoints.contains(waypoint)) {
+                return region;
             }
         }
         return null;

@@ -2,7 +2,6 @@ package com.ninuna.losttales.world.biome.gen;
 
 import com.ninuna.losttales.achievement.ELostTalesAchievement;
 import com.ninuna.losttales.world.biome.LostTalesBiomeBase;
-import com.ninuna.losttales.world.map.waypoint.ELostTalesWaypoint;
 import java.util.Random;
 import lotr.common.LOTRAchievement;
 import lotr.common.LOTRMod;
@@ -53,7 +52,7 @@ public class LostTalesBiomeGenMoonElfVale extends LostTalesBiomeBase {
 
     @Override
     public LOTRWaypoint.Region getBiomeWaypoints() {
-        return ELostTalesWaypoint.Region.MOON_ELVES.getRegion();
+        return LOTRWaypoint.Region.FORODWAITH;
     }
 
     @Override

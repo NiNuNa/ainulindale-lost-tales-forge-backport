@@ -60,12 +60,12 @@ public final class LostTalesWaypointFastTravelPolicy {
             return true;
         }
         if (marker.requiresRegionUnlock()) {
-            LOTRWaypoint.Region locationRegion =
+            LOTRWaypoint.Region markerRegion =
                     LostTalesMapMarkerRegionResolver.resolve(
                             player.worldObj, marker);
             LOTRPlayerData lotrData = LOTRLevelData.getData(player);
-            if (locationRegion == null || lotrData == null
-                    || !lotrData.isFTRegionUnlocked(locationRegion)) {
+            if (markerRegion == null || lotrData == null
+                    || !lotrData.isFTRegionUnlocked(markerRegion)) {
                 return false;
             }
         }

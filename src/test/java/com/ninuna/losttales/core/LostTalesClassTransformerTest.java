@@ -57,6 +57,9 @@ public final class LostTalesClassTransformerTest {
                     + "AccessoryConcealmentHooks";
     private static final String ACCESSORY_LOTR_MAP_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/LotrAccessoryMapHooks";
+    private static final String LOTR_MAP_EDGE_FILL_HOOK_OWNER =
+            "com/ninuna/losttales/client/map/"
+                    + "LostTalesLotrMapEdgeRenderer";
 
     @Test
     public void factionBountiesUseRoleplayCharacterUuid() throws Exception {
@@ -185,6 +188,15 @@ public final class LostTalesClassTransformerTest {
                 transformed, "renderPlayers",
                 CLIENT_IDENTITY_HOOK_OWNER,
                 "resolveMapPlayerName"));
+    }
+
+    @Test
+    public void clippedLotrMapPreviewsUseOceanPadding() throws Exception {
+        ClassNode transformed = transform("lotr.client.gui.LOTRGuiMap");
+        assertTrue(containsStaticHook(
+                transformed, "renderMapAndOverlay",
+                LOTR_MAP_EDGE_FILL_HOOK_OWNER,
+                "fillClippedMapBackground"));
     }
 
     @Test

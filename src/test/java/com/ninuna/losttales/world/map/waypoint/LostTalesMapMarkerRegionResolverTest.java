@@ -37,7 +37,19 @@ public final class LostTalesMapMarkerRegionResolverTest {
                 .resolveInheritedRegion(marker));
         assertTrue(
                 LostTalesMapMarkerWaypointRegistry
-                        .usesPrivateRegion(marker));
+                .usesPrivateRegion(marker));
+    }
+
+    @Test
+    public void waypointRegionTakesPriorityOverCoordinateFallback() {
+        LOTRWaypoint.Region hobbitonRegion = LostTalesMapMarkerRegionResolver
+                .resolveWaypointRegion(LOTRWaypoint.HOBBITON);
+        assertNotNull(hobbitonRegion);
+        assertSame(hobbitonRegion, LostTalesMapMarkerRegionResolver.resolve(
+                LOTRDimension.MIDDLE_EARTH.dimensionID,
+                LOTRWaypoint.MINAS_TIRITH.getXCoord(),
+                LOTRWaypoint.MINAS_TIRITH.getZCoord(),
+                LOTRWaypoint.HOBBITON.getCodeName()));
     }
 
     private static LostTalesMapMarkerDefinition marker(

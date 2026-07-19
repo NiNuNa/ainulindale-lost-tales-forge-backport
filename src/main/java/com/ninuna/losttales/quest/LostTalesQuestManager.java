@@ -647,9 +647,13 @@ public final class LostTalesQuestManager {
             return changed;
         }
         for (String markerId : data.getDiscoveredMarkerIds()) {
-            LostTalesMapMarkerDefinition dynamicMarker = data.getDynamicMapMarker(markerId);
+            LostTalesMapMarkerDefinition marker =
+                    data.getDynamicMapMarker(markerId);
+            if (marker == null) {
+                marker = LostTalesMapMarkerCatalog.getMarker(markerId);
+            }
             changed |= LostTalesMapMarkerWaypointUnlockHelper
-                    .unlockWaypointForDiscoveredMarker(player, dynamicMarker);
+                    .unlockWaypointForDiscoveredMarker(player, marker);
         }
         return changed;
     }

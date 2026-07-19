@@ -33,6 +33,9 @@ public final class LostTalesMapMarkerWaypointRegistryTest {
 
     @Test
     public void everyFastTravelMarkerHasARegistrationStrategy() {
+        // Register Lost Tales' additional enum entries before resolving the
+        // codes stored by their bundled marker definitions.
+        ELostTalesWaypoint.values();
         LostTalesMapMarkerCatalog.reloadFromClasspath();
         int checked = 0;
         for (LostTalesMapMarkerDefinition marker
@@ -49,6 +52,15 @@ public final class LostTalesMapMarkerWaypointRegistryTest {
                 assertTrue("Existing LOTR waypoint marker needs a code: "
                                 + marker.getId(),
                         marker.getFastTravelWaypointCode().length() > 0);
+                assertNotNull("Waypoint code must resolve: " + marker.getId(),
+                        LOTRWaypoint.waypointForName(
+                                marker.getFastTravelWaypointCode()));
+                assertSame("Registry must bind the exact existing waypoint: "
+                                + marker.getId(),
+                        LOTRWaypoint.waypointForName(
+                                marker.getFastTravelWaypointCode()),
+                        LostTalesMapMarkerWaypointRegistry
+                                .resolveExistingWaypoint(marker));
             }
             checked++;
         }

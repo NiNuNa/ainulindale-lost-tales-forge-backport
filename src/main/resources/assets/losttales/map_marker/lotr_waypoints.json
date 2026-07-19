@@ -4778,23 +4778,6 @@
       "fastTravelWaypointCode": "ODANE_EASTWATCH"
     },
     {
-      "id": "lotr:waypoint:lossoth",
-      "name": "Lossoth Lands",
-      "icon": "fort",
-      "color": "white",
-      "dimension": "lotr:middle_earth",
-      "x": 6464.0,
-      "y": 64.0,
-      "z": -48576.0,
-      "compassFadeInRadius": 640.0,
-      "discoveryRadius": 24.0,
-      "isDiscoverable": true,
-      "hiddenUntilDiscovered": false,
-      "requiresRegionUnlock": true,
-      "hasFastTravel": true,
-      "fastTravelWaypointCode": "LOSSOTH"
-    },
-    {
       "id": "lotr:waypoint:orocarni",
       "name": "Orocarni",
       "icon": "fort",

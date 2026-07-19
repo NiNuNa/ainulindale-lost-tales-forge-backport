@@ -59,10 +59,10 @@ public final class LostTalesClientMapMarkerVisibility {
     public static boolean isRegionRequirementMet(
             LostTalesMapMarkerData marker) {
         return marker != null && (!marker.requiresRegionUnlock()
-                || isLocationRegionUnlocked(marker));
+                || isWaypointRegionUnlocked(marker));
     }
 
-    private static boolean isLocationRegionUnlocked(
+    private static boolean isWaypointRegionUnlocked(
             LostTalesMapMarkerData marker) {
         if (marker == null || marker.getDimensionId()
                 != LOTRDimension.MIDDLE_EARTH.dimensionID) {
