@@ -5,6 +5,7 @@ package com.ninuna.losttales.gui;
  */
 public final class LostTalesGuiIds {
     public static final int MISSIVE_BOARD = 1;
+    public static final int WAYSTONE = 2;
 
     private LostTalesGuiIds() {}
 }

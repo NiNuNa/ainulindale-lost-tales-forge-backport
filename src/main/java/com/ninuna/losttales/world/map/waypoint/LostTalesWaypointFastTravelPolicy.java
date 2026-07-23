@@ -1,6 +1,7 @@
 package com.ninuna.losttales.world.map.waypoint;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.compat.lotr.LostTalesLotrWaystoneTravelAdapter;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import lotr.common.LOTRLevelData;
 import lotr.common.LOTRPlayerData;
@@ -43,6 +44,8 @@ public final class LostTalesWaypointFastTravelPolicy {
             return;
         }
         LOTRPlayerData data = LOTRLevelData.getData(player);
+        LostTalesLotrWaystoneTravelAdapter.revalidatePending(
+                player, data);
         LOTRAbstractWaypoint target = data == null
                 ? null : data.getTargetFTWaypoint();
         if (target != null && !isAllowed(player, target)) {

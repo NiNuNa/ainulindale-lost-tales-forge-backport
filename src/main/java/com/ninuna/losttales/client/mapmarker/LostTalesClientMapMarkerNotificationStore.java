@@ -99,7 +99,9 @@ public final class LostTalesClientMapMarkerNotificationStore {
 
             double radius = Math.max(1.0D, marker.getDiscoveryRadius());
             double dx = player.posX - marker.getX();
-            double dy = player.posY - marker.getY();
+            double markerY = marker.getEffectiveY(
+                    minecraft.theWorld, player.posY);
+            double dy = player.posY - markerY;
             double dz = player.posZ - marker.getZ();
             double distSq = dx * dx + dy * dy + dz * dz;
             if (distSq > radius * radius) {
@@ -156,7 +158,11 @@ public final class LostTalesClientMapMarkerNotificationStore {
         }
         double radius = Math.max(1.0D, marker.getDiscoveryRadius());
         double dx = player.posX - marker.getX();
-        double dy = player.posY - marker.getY();
+        Minecraft minecraft = Minecraft.getMinecraft();
+        double markerY = marker.getEffectiveY(
+                minecraft == null ? null : minecraft.theWorld,
+                player.posY);
+        double dy = player.posY - markerY;
         double dz = player.posZ - marker.getZ();
         return dx * dx + dy * dy + dz * dz <= radius * radius;
     }

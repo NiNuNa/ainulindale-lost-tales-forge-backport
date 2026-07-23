@@ -1,0 +1,58 @@
+{
+  "map_markers": [
+    {
+      "id": "losttales:test_city_northgate",
+      "name": "Northgate Test City",
+      "icon": "fort",
+      "color": "orange",
+      "dimension": "lotr:middle_earth",
+      "x": 512.0,
+      "z": -384.0,
+      "compassFadeInRadius": 320.0,
+      "discoveryRadius": 18.0,
+      "isDiscoverable": false,
+      "hiddenUntilDiscovered": false,
+      "requiresRegionUnlock": false,
+      "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
+      "description": "A visible test city for validating automatic terrain height, waystone generation, and fast travel."
+    },
+    {
+      "id": "losttales:test_city_lakewatch",
+      "name": "Lakewatch Test City",
+      "icon": "fort",
+      "color": "blue",
+      "dimension": "lotr:middle_earth",
+      "x": -544.0,
+      "z": 448.0,
+      "compassFadeInRadius": 320.0,
+      "discoveryRadius": 18.0,
+      "isDiscoverable": true,
+      "hiddenUntilDiscovered": false,
+      "requiresRegionUnlock": true,
+      "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
+      "description": "A discovery-gated test city used to verify ground-resolved markers and generated waystones."
+    },
+    {
+      "id": "losttales:test_city_sunfield",
+      "name": "Sunfield Test City",
+      "icon": "tavern",
+      "color": "yellow",
+      "dimension": "lotr:middle_earth",
+      "x": 720.0,
+      "z": 256.0,
+      "compassFadeInRadius": 320.0,
+      "discoveryRadius": 18.0,
+      "isDiscoverable": true,
+      "hiddenUntilDiscovered": true,
+      "requiresRegionUnlock": true,
+      "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
+      "description": "A hidden test city for checking discovery, map visibility, and automatic surface placement."
+    }
+  ]
+}

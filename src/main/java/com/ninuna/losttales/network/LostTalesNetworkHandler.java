@@ -2,6 +2,7 @@ package com.ninuna.losttales.network;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
+import com.ninuna.losttales.network.packet.LostTalesMapMarkerSnapshotPacket;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMissiveAcceptPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
@@ -13,6 +14,9 @@ import com.ninuna.losttales.network.packet.LostTalesQuickLootRequestPacket;
 import com.ninuna.losttales.network.packet.LostTalesThirdPersonEntityActionPacket;
 import com.ninuna.losttales.network.packet.LostTalesThirdPersonBlockActionPacket;
 import com.ninuna.losttales.network.packet.LostTalesThirdPersonAimPacket;
+import com.ninuna.losttales.network.packet.LostTalesWaystoneSettingsRequestPacket;
+import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
+import com.ninuna.losttales.network.packet.LostTalesWaystoneTravelRequestPacket;
 import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
 import com.ninuna.losttales.network.packet.AccessoryEffectSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPacket;
@@ -59,6 +63,8 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesThirdPersonEntityActionPacket.Handler.class, LostTalesThirdPersonEntityActionPacket.class, 25, Side.SERVER);
         CHANNEL.registerMessage(LostTalesThirdPersonBlockActionPacket.Handler.class, LostTalesThirdPersonBlockActionPacket.class, 26, Side.SERVER);
         CHANNEL.registerMessage(LostTalesThirdPersonAimPacket.Handler.class, LostTalesThirdPersonAimPacket.class, 27, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesWaystoneSettingsRequestPacket.Handler.class, LostTalesWaystoneSettingsRequestPacket.class, 32, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesWaystoneTravelRequestPacket.Handler.class, LostTalesWaystoneTravelRequestPacket.class, 34, Side.SERVER);
 
         // Server -> client snapshots. These are registered from the common proxy so a
         // dedicated server also knows the packet discriminators when it sends them.
@@ -80,5 +86,7 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesChargeTierSyncPacket.Handler.class, LostTalesChargeTierSyncPacket.class, 28, Side.CLIENT);
         CHANNEL.registerMessage(AccessoryInventorySyncPacket.Handler.class, AccessoryInventorySyncPacket.class, 29, Side.CLIENT);
         CHANNEL.registerMessage(AccessoryEffectSyncPacket.Handler.class, AccessoryEffectSyncPacket.class, 30, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesMapMarkerSnapshotPacket.Handler.class, LostTalesMapMarkerSnapshotPacket.class, 31, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesWaystoneStatePacket.Handler.class, LostTalesWaystoneStatePacket.class, 33, Side.CLIENT);
     }
 }

@@ -2,6 +2,10 @@ package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibilityPolicy;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerWorldData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
@@ -650,7 +654,12 @@ public final class LostTalesQuestManager {
             LostTalesMapMarkerDefinition marker =
                     data.getDynamicMapMarker(markerId);
             if (marker == null) {
-                marker = LostTalesMapMarkerCatalog.getMarker(markerId);
+                LostTalesMapMarkerRecord record =
+                        LostTalesMapMarkerStorage.get(player.worldObj)
+                                .getRecord(markerId);
+                marker = record != null && record.isActive()
+                        ? record.toDefinition()
+                        : LostTalesMapMarkerCatalog.getMarker(markerId);
             }
             changed |= LostTalesMapMarkerWaypointUnlockHelper
                     .unlockWaypointForDiscoveredMarker(player, marker);
@@ -668,17 +677,30 @@ public final class LostTalesQuestManager {
         }
         boolean changed = false;
         int playerDimension = player.worldObj.provider.dimensionId;
-        for (LostTalesMapMarkerDefinition marker : LostTalesMapMarkerCatalog.getMarkers()) {
-            if (marker == null || marker.getId() == null || marker.getId().length() == 0 || marker.getDimensionId() != playerDimension || !marker.isDiscoverable() || data.isMarkerDiscovered(marker.getId())) {
+        LostTalesMapMarkerWorldData markerData =
+                LostTalesMapMarkerStorage.get(player.worldObj);
+        for (LostTalesMapMarkerRecord record
+                : markerData.getDiscoveryCandidates(
+                        playerDimension, player.posX, player.posZ)) {
+            if (record == null
+                    || !LostTalesMapMarkerVisibilityPolicy.canView(
+                            record, player)
+                    || !record.isDiscoverable()
+                    || data.isMarkerDiscovered(record.getId())) {
                 continue;
             }
-            double radius = Math.max(1.0D, marker.getDiscoveryRadius());
-            double dx = player.posX - marker.getX();
-            double dy = player.posY - marker.getY();
-            double dz = player.posZ - marker.getZ();
+            double radius = Math.max(
+                    1.0D, record.getDiscoveryRadius());
+            double dx = player.posX - record.getX();
+            double markerY = record.getEffectiveY(
+                    player.worldObj, player.posY);
+            double dy = player.posY - markerY;
+            double dz = player.posZ - record.getZ();
             if (dx * dx + dy * dy + dz * dz <= radius * radius) {
-                if (data.discoverMarker(marker.getId())) {
+                if (data.discoverMarker(record.getId())) {
                     changed = true;
+                    LostTalesMapMarkerDefinition marker =
+                            record.toDefinition();
                     addLotrWaypointForDiscoveredMarker(player, marker);
                     sendMapMarkerDiscoveryNotification(player, marker);
                 }

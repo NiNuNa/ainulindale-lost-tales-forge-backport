@@ -27,6 +27,7 @@ import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityPlushie;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityStatue;
+import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.command.ELostTalesCommand;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -47,6 +48,8 @@ import com.ninuna.losttales.network.server.LostTalesThirdPersonAimService;
 import com.ninuna.losttales.network.server.LostTalesThirdPersonProjectileAimHandler;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
+import com.ninuna.losttales.network.packet.LostTalesMapMarkerSnapshotPacket;
+import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
@@ -87,6 +90,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
+import com.ninuna.losttales.world.waystone.LostTalesWaystoneGenerationHandler;
 import software.bernie.geckolib3.GeckoLib;
 
 public class LostTalesCommonProxy {
@@ -118,6 +122,8 @@ public class LostTalesCommonProxy {
                 new LostTalesThirdPersonProjectileAimHandler();
         LostTalesChargeService chargeService =
                 new LostTalesChargeService();
+        LostTalesWaystoneGenerationHandler waystoneGenerationHandler =
+                new LostTalesWaystoneGenerationHandler();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
         MinecraftForge.EVENT_BUS.register(accessoryPlayerEventHandler);
         MinecraftForge.EVENT_BUS.register(accessoryConcealmentEventHandler);
@@ -129,6 +135,10 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(mobAggroEventHandler);
         MinecraftForge.EVENT_BUS.register(projectileAimHandler);
         MinecraftForge.EVENT_BUS.register(chargeService);
+        MinecraftForge.EVENT_BUS.register(waystoneGenerationHandler);
+        MinecraftForge.TERRAIN_GEN_BUS.register(waystoneGenerationHandler);
+        GameRegistry.registerWorldGenerator(
+                waystoneGenerationHandler, 1000);
         FMLCommonHandler.instance().bus().register(questPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(accessoryPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(questObjectiveEventHandler);
@@ -141,6 +151,8 @@ public class LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(serverTaskQueue);
         FMLCommonHandler.instance().bus().register(networkPlayerEventHandler);
         FMLCommonHandler.instance().bus().register(chargeService);
+        FMLCommonHandler.instance().bus().register(
+                waystoneGenerationHandler);
 
         ELostTalesItem.initAndRegisterItems();
         AccessoryBootstrap.initialize();
@@ -187,6 +199,8 @@ public class LostTalesCommonProxy {
         GameRegistry.registerTileEntity(LostTalesTileEntityLamp.class, "lamp");
         GameRegistry.registerTileEntity(LostTalesTileEntityPlushie.class, "plushie");
         GameRegistry.registerTileEntity(LostTalesTileEntityMissiveBoard.class, "missive_board");
+        GameRegistry.registerTileEntity(
+                LostTalesTileEntityWaystone.class, "losttales_waystone");
     }
 
     /**
@@ -217,6 +231,12 @@ public class LostTalesCommonProxy {
     public void handleMobAggroSync(LostTalesMobAggroSyncPacket packet) {}
 
     public void handleMapMarkerDiscovery(LostTalesMapMarkerDiscoveryPacket packet) {}
+
+    public void handleMapMarkerSnapshot(
+            LostTalesMapMarkerSnapshotPacket packet) {}
+
+    public void handleWaystoneState(
+            LostTalesWaystoneStatePacket packet) {}
 
     public void handleChargeTierSync(LostTalesChargeTierSyncPacket packet) {}
 

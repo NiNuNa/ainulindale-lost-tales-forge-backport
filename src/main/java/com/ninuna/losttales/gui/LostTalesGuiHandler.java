@@ -2,9 +2,15 @@ package com.ninuna.losttales.gui;
 
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
+import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
 import com.ninuna.losttales.inventory.container.LostTalesContainerMissiveBoard;
+import com.ninuna.losttales.inventory.container.LostTalesContainerWaystone;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
+import com.ninuna.losttales.mapmarker.LostTalesWaystoneSettingsService;
 import cpw.mods.fml.common.network.IGuiHandler;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 
@@ -25,6 +31,33 @@ public class LostTalesGuiHandler implements IGuiHandler {
                 LostTalesTileEntityMissiveBoard board = (LostTalesTileEntityMissiveBoard) tileEntity;
                 if (board.isUseableByPlayer(player)) {
                     return new LostTalesContainerMissiveBoard(player.inventory, board);
+                }
+            }
+        }
+        if (id == LostTalesGuiIds.WAYSTONE
+                && player instanceof EntityPlayerMP) {
+            TileEntity tileEntity = world.getTileEntity(x, y, z);
+            if (tileEntity instanceof LostTalesTileEntityWaystone) {
+                LostTalesTileEntityWaystone waystone =
+                        (LostTalesTileEntityWaystone)tileEntity;
+                LostTalesMapMarkerRecord record =
+                        LostTalesMapMarkerStorage.get(world)
+                                .getRecord(waystone.getMarkerId());
+                if (waystone.isUseableByPlayer(player)
+                        && waystone.isLinked()
+                        && record != null && record.isActive()
+                        && record.isLinked()
+                        && record.getLinkToken() != null
+                        && record.getLinkToken().equals(
+                                waystone.getLinkToken())
+                        && record.getLinkedDimensionId()
+                                == world.provider.dimensionId
+                        && record.getLinkedX() == x
+                        && record.getLinkedY() == y
+                        && record.getLinkedZ() == z) {
+                    LostTalesWaystoneSettingsService.sendState(
+                            (EntityPlayerMP)player, waystone, record);
+                    return new LostTalesContainerWaystone(waystone);
                 }
             }
         }

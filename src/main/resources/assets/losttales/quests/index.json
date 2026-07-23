@@ -1,0 +1,18 @@
+{
+  "quests": [
+    "quests/test_quest.json",
+    "quests/missive/gather_gold_ore.json",
+    "quests/missive/kill_orc.json",
+    "quests/path/blacksmith/test_crafting_quest.json",
+    "quests/tutorial/meet_nia.json",
+    "quests/tutorial/cheese_cache.json",
+    "quests/tutorial/starter_note.json",
+    "quests/path/survivalist/first_sparks.json",
+    "quests/path/survivalist/stone_and_shelter.json",
+    "quests/path/survivalist/food_for_the_road.json",
+    "quests/path/survivalist/tools_of_the_trail.json",
+    "quests/path/survivalist/under_open_sky.json",
+    "quests/path/survivalist/night_watch.json",
+    "quests/path/survivalist/keeper_of_the_trail.json"
+  ]
+}

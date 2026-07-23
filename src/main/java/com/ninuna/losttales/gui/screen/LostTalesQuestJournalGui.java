@@ -211,7 +211,7 @@ public class LostTalesQuestJournalGui extends GuiScreen {
 
         if (rows.isEmpty()) {
             String message = LostTalesClientQuestDefinitionStore.getQuests().isEmpty()
-                    ? "No quest definitions were loaded from assets/losttales/quest."
+                    ? "No quest definitions were loaded from assets/losttales/quests."
                     : "No started quests yet. Collect or accept a quest to add it to the journal.";
             drawWrappedText(message, layout.leftX + 8, layout.contentTop + 10, layout.leftWidth - 16, LostTalesSkyrimUiStyle.TEXT_MUTED, visibleHeight - 20);
         }
@@ -272,7 +272,7 @@ public class LostTalesQuestJournalGui extends GuiScreen {
     private void drawQuestDetails(List<LostTalesQuestDefinition> quests, JournalLayout layout) {
         if (quests.isEmpty()) {
             String message = LostTalesClientQuestDefinitionStore.getQuests().isEmpty()
-                    ? "The client did not load any quest JSON files. Check quest/index.json and bundled quest files."
+                    ? "The client did not load any quest JSON files. Check quests/index.json and bundled quest files."
                     : "Started quests will appear here after you collect or accept them in the world.";
             drawWrappedText(message, layout.rightX, layout.contentTop + 12, layout.rightWidth, LostTalesSkyrimUiStyle.TEXT_MUTED, layout.contentBottom - layout.contentTop - 24);
             this.detailScroll = 0;

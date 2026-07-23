@@ -1,11 +1,14 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerHeightResolver;
+import net.minecraft.world.World;
+
 /**
  * Simple client-side map marker description used by the 1.7.10 compass HUD.
  *
  * The NeoForge branch loads markers through datapacks/codecs. Minecraft 1.7.10
  * does not have that system, so the backport keeps a small immutable data class
- * loaded from JSON files under assets/losttales/map_marker/.
+ * loaded from JSON files under assets/losttales/map_markers/.
  */
 public final class LostTalesMapMarkerData {
     public static final String CATEGORY_DEFAULT = "Map Marker";
@@ -140,6 +143,22 @@ public final class LostTalesMapMarkerData {
 
     public double getY() {
         return this.y;
+    }
+
+    public boolean hasExplicitY() {
+        return !LostTalesMapMarkerHeightResolver.isAutomatic(this.y);
+    }
+
+    public double getEffectiveY(World world) {
+        return LostTalesMapMarkerHeightResolver.resolve(
+                world, this.dimensionId,
+                this.x, this.y, this.z);
+    }
+
+    public double getEffectiveY(World world, double fallbackY) {
+        return LostTalesMapMarkerHeightResolver.resolveOr(
+                world, this.dimensionId,
+                this.x, this.y, this.z, fallbackY);
     }
 
     public double getZ() {

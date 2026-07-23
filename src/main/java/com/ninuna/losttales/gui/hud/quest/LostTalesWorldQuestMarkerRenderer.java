@@ -73,7 +73,9 @@ public final class LostTalesWorldQuestMarkerRenderer {
                 }
 
                 double dxPlayer = player.posX - marker.getX();
-                double dyPlayer = player.posY - marker.getY();
+                double markerY = marker.getEffectiveY(
+                        minecraft.theWorld, player.posY);
+                double dyPlayer = player.posY - markerY;
                 double dzPlayer = player.posZ - marker.getZ();
                 double distSq = dxPlayer * dxPlayer + dyPlayer * dyPlayer + dzPlayer * dzPlayer;
                 if (distSq > maxDistanceSq && !activeQuestMarker) {
@@ -84,7 +86,7 @@ public final class LostTalesWorldQuestMarkerRenderer {
                 }
 
                 String label = activeQuestMarker ? activeQuestMarkers.get(marker.getId()) : marker.getName();
-                renderMarkerLabel(minecraft.fontRenderer, label, marker.getX(), marker.getY(), marker.getZ(), pinned, activeQuestMarker, Math.sqrt(distSq), maxDistance, cameraX, cameraY, cameraZ);
+                renderMarkerLabel(minecraft.fontRenderer, label, marker.getX(), markerY, marker.getZ(), pinned, activeQuestMarker, Math.sqrt(distSq), maxDistance, cameraX, cameraY, cameraZ);
             }
 
             for (LostTalesClientQuestMarkerHelper.ActiveCoordinateMarker marker : activeCoordinateMarkers) {

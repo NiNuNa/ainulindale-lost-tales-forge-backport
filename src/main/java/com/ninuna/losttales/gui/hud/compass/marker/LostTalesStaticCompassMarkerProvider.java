@@ -67,14 +67,16 @@ public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMar
             }
 
             double compassFadeInRadius = activeQuestMarker || pinned ? Math.max(entry.getCompassFadeInRadius(), 512.0D) : entry.getCompassFadeInRadius();
+            double markerY = entry.getEffectiveY(
+                    minecraft.theWorld, minecraft.thePlayer.posY);
             if (activeQuestMarker) {
-                markers.add(LostTalesCompassMarker.questPosition(name, entry.getX(), entry.getY(), entry.getZ(), true, compassFadeInRadius));
+                markers.add(LostTalesCompassMarker.questPosition(name, entry.getX(), markerY, entry.getZ(), true, compassFadeInRadius));
             } else {
                 markers.add(LostTalesCompassMarker.position(
                         name,
                         icon,
                         entry.getX(),
-                        entry.getY(),
+                        markerY,
                         entry.getZ(),
                         scaleWithFocus,
                         showDistanceLabel,

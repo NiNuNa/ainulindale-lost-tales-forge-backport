@@ -146,13 +146,15 @@ public final class LotrCustomWaypointStateAdapter {
             NBTTagCompound use = uses.getCompoundTagAt(index);
             validateKeys(use, USE_KEYS, USE_KEYS,
                     "LOTR custom-waypoint use count");
-            int id = requireCustomId(use, TAG_CUSTOM_ID);
+            int id = requireUseId(use, TAG_CUSTOM_ID);
             int count = requireInteger(use, TAG_COUNT);
             if (count < 0 || !useIds.add(Integer.valueOf(id))) {
                 throw new IllegalArgumentException(
                         "LOTR custom-waypoint use count is negative or duplicated");
             }
-            greatestId = Math.max(greatestId, id);
+            if (id >= FIRST_CUSTOM_ID) {
+                greatestId = Math.max(greatestId, id);
+            }
         }
 
         int nextId = state.getInteger(TAG_NEXT_CUSTOM_ID);
@@ -509,6 +511,15 @@ public final class LotrCustomWaypointStateAdapter {
         int id = requireInteger(compound, key);
         if (id < FIRST_CUSTOM_ID) {
             throw new IllegalArgumentException(key + " is not a custom-waypoint ID");
+        }
+        return id;
+    }
+
+    private static int requireUseId(NBTTagCompound compound, String key) {
+        int id = requireInteger(compound, key);
+        if (id < 1) {
+            throw new IllegalArgumentException(
+                    key + " is not a waypoint-use ID");
         }
         return id;
     }

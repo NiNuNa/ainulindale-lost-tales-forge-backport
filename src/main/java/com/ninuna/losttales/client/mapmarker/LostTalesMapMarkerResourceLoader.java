@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.util.LostTalesDimensionHelper;
 import java.io.IOException;
@@ -38,7 +39,7 @@ final class LostTalesMapMarkerResourceLoader {
         }
 
         for (String fileName : SHARED_MARKER_FILES) {
-            ResourceLocation location = new ResourceLocation(LostTalesMetaData.MOD_ID, "map_marker/" + fileName + ".json");
+            ResourceLocation location = new ResourceLocation(LostTalesMetaData.MOD_ID, "map_markers/" + fileName + ".json");
             loadFile(resourceManager, location, markers);
         }
         return markers;
@@ -88,7 +89,7 @@ final class LostTalesMapMarkerResourceLoader {
         if (name == null || name.length() == 0) {
             return null;
         }
-        if (!hasNumber(object, "x") || !hasNumber(object, "y") || !hasNumber(object, "z")) {
+        if (!hasNumber(object, "x") || !hasNumber(object, "z")) {
             return null;
         }
 
@@ -104,8 +105,13 @@ final class LostTalesMapMarkerResourceLoader {
         String description = getString(object, "description", getString(object, "info", getString(object, "lore", "")));
         int dimensionId = parseDimensionId(getString(object, "dimension", "lotr:middle_earth"));
         double x = object.get("x").getAsDouble();
-        double y = object.get("y").getAsDouble();
+        double y = hasNumber(object, "y")
+                ? object.get("y").getAsDouble()
+                : LostTalesMapMarkerDefinition.AUTOMATIC_Y;
         double z = object.get("z").getAsDouble();
+        if (!isFinite(x) || !isFinite(y) || !isFinite(z)) {
+            return null;
+        }
         double compassFadeInRadius = getDouble(object, "compassFadeInRadius", getDouble(object, "fadeInRadius", 128.0D));
         double discoveryRadius = Math.max(1.0D, getDouble(object, "discoveryRadius", getDouble(object, "unlockRadius", 8.0D)));
         boolean hiddenUntilDiscovered = getBoolean(object, "hiddenUntilDiscovered", getBoolean(object, "requiresDiscovery", false));
@@ -167,6 +173,10 @@ final class LostTalesMapMarkerResourceLoader {
 
     private static int parseDimensionId(String dimensionName) {
         return LostTalesDimensionHelper.parseDimensionId(dimensionName, LOTRDimension.MIDDLE_EARTH.dimensionID);
+    }
+
+    private static boolean isFinite(double value) {
+        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
 }

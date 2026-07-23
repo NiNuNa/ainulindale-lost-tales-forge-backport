@@ -3,6 +3,8 @@ package com.ninuna.losttales.client.mapmarker;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.PartyClientRequestManager;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
+import com.ninuna.losttales.network.LostTalesNetworkHandler;
+import com.ninuna.losttales.network.packet.LostTalesWaystoneTravelRequestPacket;
 import java.util.List;
 import lotr.client.LOTRKeyHandler;
 import lotr.client.gui.LOTRGuiMap;
@@ -176,8 +178,56 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     protected void keyTyped(char typedChar, int keyCode) {
         if (this.selectedCustomMarker != null
                 && keyCode == LOTRKeyHandler.keyBindingFastTravel.getKeyCode()) {
+            if (this.selectedCustomMarker.hasFastTravel()
+                    && (!this.selectedCustomMarker.isDiscoverable()
+                    || LostTalesClientMapMarkerVisibility.isDiscovered(
+                            this.selectedCustomMarker))
+                    && sendWaystoneTravel(
+                            this.selectedCustomMarker.getId())) {
+                return;
+            }
             return;
         }
+        if (keyCode == LOTRKeyHandler.keyBindingFastTravel.getKeyCode()) {
+            LOTRAbstractWaypoint selected =
+                    LostTalesLotrMapMarkerIconOverlay
+                            .getSelectedWaypoint(this);
+            LostTalesMapMarkerData marker =
+                    LostTalesLotrMapMarkerIconOverlay
+                            .getMarkerForWaypoint(selected);
+            if (marker != null && marker.hasFastTravel()
+                    && sendWaystoneTravel(marker.getId())) {
+                return;
+            }
+        }
         super.keyTyped(typedChar, keyCode);
+    }
+
+    private boolean sendWaystoneTravel(String destinationMarkerId) {
+        if (this.mc == null || this.mc.thePlayer == null
+                || destinationMarkerId == null
+                || destinationMarkerId.length() == 0) {
+            return false;
+        }
+        LostTalesClientWaystoneTravelContext.Context context =
+                LostTalesClientWaystoneTravelContext.get(
+                        this.mc.thePlayer.dimension);
+        if (context == null) {
+            return false;
+        }
+        try {
+            LostTalesNetworkHandler.CHANNEL.sendToServer(
+                    new LostTalesWaystoneTravelRequestPacket(
+                            context.getX(), context.getY(),
+                            context.getZ(),
+                            context.getSourceMarkerId(),
+                            destinationMarkerId));
+            LostTalesClientWaystoneTravelContext.clear();
+            this.mc.thePlayer.closeScreen();
+            return true;
+        } catch (IllegalArgumentException exception) {
+            LostTalesClientWaystoneTravelContext.clear();
+            return false;
+        }
     }
 }

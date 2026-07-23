@@ -7,7 +7,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -41536.0,
-      "y": 64.0,
       "z": -26432.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -15,6 +14,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HIMLING"
     },
     {
@@ -24,7 +25,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -57920.0,
-      "y": 64.0,
       "z": -24000.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -32,6 +32,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "TOL_FUIN"
     },
     {
@@ -41,7 +43,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -92480.0,
-      "y": 64.0,
       "z": -4032.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -49,6 +50,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "TOL_MORWEN"
     },
     {
@@ -58,7 +61,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -95424.0,
-      "y": 64.0,
       "z": 128448.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -66,6 +68,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MENELTARMA_SUMMIT"
     },
     {
@@ -75,7 +79,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 704.0,
-      "y": 64.0,
       "z": -320.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -83,6 +86,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HOBBITON"
     },
     {
@@ -92,7 +97,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 5568.0,
-      "y": 64.0,
       "z": -576.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -100,6 +104,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "BRANDYWINE_BRIDGE"
     },
     {
@@ -109,7 +115,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 9408.0,
-      "y": 64.0,
       "z": 9280.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -117,6 +122,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "SARN_FORD"
     },
     {
@@ -126,7 +133,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 1344.0,
-      "y": 64.0,
       "z": 4544.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -134,6 +140,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "LONGBOTTOM"
     },
     {
@@ -143,7 +151,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -1728.0,
-      "y": 64.0,
       "z": 1216.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -151,6 +158,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MICHEL_DELVING"
     },
     {
@@ -160,7 +169,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 4544.0,
-      "y": 64.0,
       "z": 2880.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -168,6 +176,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "WILLOWBOTTOM"
     },
     {
@@ -177,7 +187,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 6080.0,
-      "y": 64.0,
       "z": 576.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -185,6 +194,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "BUCKLEBURY"
     },
     {
@@ -194,7 +205,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 4288.0,
-      "y": 64.0,
       "z": -320.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -202,6 +212,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "WHITFURROWS"
     },
     {
@@ -211,7 +223,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 2752.0,
-      "y": 64.0,
       "z": -192.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -219,6 +230,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "FROGMORTON"
     },
     {
@@ -228,7 +241,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 1600.0,
-      "y": 64.0,
       "z": -3648.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -236,6 +248,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "OATBARTON"
     },
     {
@@ -245,7 +259,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 3904.0,
-      "y": 64.0,
       "z": -2112.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -253,6 +266,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "SCARY"
     },
     {
@@ -262,7 +277,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -448.0,
-      "y": 64.0,
       "z": -2752.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -270,6 +284,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "NEEDLEHOLE"
     },
     {
@@ -279,7 +295,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -3136.0,
-      "y": 64.0,
       "z": -1472.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -287,6 +302,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "LITTLE_DELVING"
     },
     {
@@ -296,7 +313,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -320.0,
-      "y": 64.0,
       "z": 448.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -304,6 +320,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "WAYMEET"
     },
     {
@@ -313,7 +331,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 704.0,
-      "y": 64.0,
       "z": 1472.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -321,6 +338,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "TUCKBOROUGH"
     },
     {
@@ -330,7 +349,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -1600.0,
-      "y": 64.0,
       "z": -2496.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -338,6 +356,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "NOBOTTLE"
     },
     {
@@ -347,7 +367,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -4032.0,
-      "y": 64.0,
       "z": -2240.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -355,6 +374,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "TIGHFIELD"
     },
     {
@@ -364,7 +385,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 3008.0,
-      "y": 64.0,
       "z": -2496.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -372,6 +392,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "BROCKENBORINGS"
     },
     {
@@ -381,7 +403,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 5184.0,
-      "y": 64.0,
       "z": 2496.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -389,6 +410,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DEEPHALLOW"
     },
     {
@@ -398,7 +421,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 5056.0,
-      "y": 64.0,
       "z": 960.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -406,6 +428,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "STOCK"
     },
     {
@@ -415,7 +439,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 1344.0,
-      "y": 64.0,
       "z": 64.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -423,6 +446,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "BYWATER"
     },
     {
@@ -432,7 +457,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 960.0,
-      "y": 64.0,
       "z": -1216.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -440,6 +464,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "OVERHILL"
     },
     {
@@ -449,7 +475,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 6208.0,
-      "y": 64.0,
       "z": 2240.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -457,6 +482,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HAYSEND"
     },
     {
@@ -466,7 +493,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 5952.0,
-      "y": 64.0,
       "z": -192.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -474,6 +500,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HAY_GATE"
     },
     {
@@ -483,7 +511,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -6080.0,
-      "y": 64.0,
       "z": 1984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -491,6 +518,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GREENHOLM"
     },
     {
@@ -500,7 +529,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 9152.0,
-      "y": 64.0,
       "z": 2496.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -508,6 +536,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "WITHYWINDLE_VALLEY"
     },
     {
@@ -517,7 +547,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -36288.0,
-      "y": 64.0,
       "z": -1472.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -525,6 +554,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "FORLOND"
     },
     {
@@ -534,7 +565,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -26176.0,
-      "y": 64.0,
       "z": 6848.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -542,6 +572,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HARLOND"
     },
     {
@@ -551,7 +583,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -17984.0,
-      "y": 64.0,
       "z": -1600.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -559,6 +590,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MITHLOND_NORTH"
     },
     {
@@ -568,7 +601,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -16704.0,
-      "y": 64.0,
       "z": -64.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -576,6 +608,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MITHLOND_SOUTH"
     },
     {
@@ -585,7 +619,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -35520.0,
-      "y": 64.0,
       "z": -11712.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -593,6 +626,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "FORLINDON"
     },
     {
@@ -602,7 +637,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -25408.0,
-      "y": 64.0,
       "z": 19008.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -610,6 +644,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HARLINDON"
     },
     {
@@ -619,7 +655,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -12736.0,
-      "y": 64.0,
       "z": 1600.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -627,6 +662,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "TOWER_HILLS"
     },
     {
@@ -636,7 +673,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -39616.0,
-      "y": 64.0,
       "z": -2752.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -644,6 +680,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "AMON_EREB"
     },
     {
@@ -653,7 +691,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -24000.0,
-      "y": 64.0,
       "z": -16576.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -661,6 +698,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "BELEGOST"
     },
     {
@@ -670,7 +709,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -23488.0,
-      "y": 64.0,
       "z": -11968.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -678,6 +716,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "NOGROD"
     },
     {
@@ -687,7 +727,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -27840.0,
-      "y": 64.0,
       "z": -26176.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -695,6 +734,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOUNT_RERIR"
     },
     {
@@ -704,7 +745,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -26944.0,
-      "y": 64.0,
       "z": -13120.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -712,6 +752,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOUNT_DOLMED"
     },
     {
@@ -721,7 +763,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -21568.0,
-      "y": 64.0,
       "z": -7488.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -729,6 +770,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "THORIN_HALLS"
     },
     {
@@ -738,7 +781,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -18752.0,
-      "y": 64.0,
       "z": -30784.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -746,6 +788,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ARVEDUI_MINES"
     },
     {
@@ -755,7 +799,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -17984.0,
-      "y": 64.0,
       "z": 8128.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -763,6 +806,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "THRAIN_HALLS"
     },
     {
@@ -772,7 +817,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 15424.0,
-      "y": 64.0,
       "z": -13248.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -780,6 +824,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "NORTH_DOWNS"
     },
     {
@@ -789,7 +835,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 19264.0,
-      "y": 64.0,
       "z": 4928.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -797,6 +842,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "SOUTH_DOWNS"
     },
     {
@@ -806,7 +853,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -8000.0,
-      "y": 64.0,
       "z": 29120.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -814,6 +860,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ERYN_VORN"
     },
     {
@@ -823,7 +871,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 21696.0,
-      "y": 64.0,
       "z": 19008.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -831,6 +878,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "THARBAD"
     },
     {
@@ -840,7 +889,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 11200.0,
-      "y": 64.0,
       "z": -9920.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -848,6 +896,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "FORNOST"
     },
     {
@@ -857,7 +907,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 576.0,
-      "y": 64.0,
       "z": -8768.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -865,6 +914,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ANNUMINAS"
     },
     {
@@ -874,7 +925,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 14144.0,
-      "y": 64.0,
       "z": 10304.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -882,6 +932,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GREENWAY_CROSSROADS"
     },
     {
@@ -891,7 +943,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 13504.0,
-      "y": 64.0,
       "z": 576.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -899,6 +950,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "BREE"
     },
     {
@@ -908,7 +961,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 14656.0,
-      "y": 64.0,
       "z": 576.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -916,6 +968,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "STADDLE"
     },
     {
@@ -925,7 +979,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 15040.0,
-      "y": 64.0,
       "z": 192.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -933,6 +986,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "COMBE"
     },
     {
@@ -942,7 +997,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 15168.0,
-      "y": 64.0,
       "z": -192.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -950,6 +1004,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ARCHET"
     },
     {
@@ -959,7 +1015,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 17984.0,
-      "y": 64.0,
       "z": 1728.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -967,6 +1022,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "FORSAKEN_INN"
     },
     {
@@ -976,7 +1033,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 24128.0,
-      "y": 64.0,
       "z": -832.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -984,6 +1040,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "WEATHERTOP"
     },
     {
@@ -993,7 +1051,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 35648.0,
-      "y": 64.0,
       "z": -1984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1001,6 +1058,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "LAST_BRIDGE"
     },
     {
@@ -1010,7 +1069,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 27968.0,
-      "y": 64.0,
       "z": 15040.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1018,6 +1076,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "OLD_ELF_WAY"
     },
     {
@@ -1027,7 +1087,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 46528.0,
-      "y": 64.0,
       "z": -1088.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1035,6 +1094,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RIVENDELL"
     },
     {
@@ -1044,7 +1105,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 45248.0,
-      "y": 64.0,
       "z": -832.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1052,6 +1112,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "FORD_BRUINEN"
     },
     {
@@ -1061,7 +1123,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 41024.0,
-      "y": 64.0,
       "z": -3392.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1069,6 +1130,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "THE_TROLLSHAWS"
     },
     {
@@ -1078,7 +1141,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 25664.0,
-      "y": 64.0,
       "z": -28992.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1086,6 +1148,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CARN_DUM"
     },
     {
@@ -1095,7 +1159,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 41536.0,
-      "y": 64.0,
       "z": 18368.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1103,6 +1166,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "WEST_GATE"
     },
     {
@@ -1112,7 +1177,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 38720.0,
-      "y": 64.0,
       "z": 17984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1120,6 +1184,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "OST_IN_EDHIL"
     },
     {
@@ -1129,7 +1195,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 33728.0,
-      "y": 64.0,
       "z": 27712.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1137,6 +1202,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "NORTH_DUNLAND"
     },
     {
@@ -1146,7 +1213,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 33344.0,
-      "y": 64.0,
       "z": 38080.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1154,6 +1220,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "SOUTH_DUNLAND"
     },
     {
@@ -1163,7 +1231,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 37440.0,
-      "y": 64.0,
       "z": 45760.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1171,6 +1238,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "FORDS_OF_ISEN"
     },
     {
@@ -1180,7 +1249,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 34624.0,
-      "y": 64.0,
       "z": 33344.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1188,6 +1256,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DWARROWVALE"
     },
     {
@@ -1197,7 +1267,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 34240.0,
-      "y": 64.0,
       "z": 47168.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1205,6 +1274,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "WULFBURG"
     },
     {
@@ -1214,7 +1285,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 7360.0,
-      "y": 64.0,
       "z": 35136.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1222,6 +1292,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "LOND_DAER"
     },
     {
@@ -1231,7 +1303,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 27584.0,
-      "y": 64.0,
       "z": 41024.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1239,6 +1310,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ENEDWAITH_ROAD"
     },
     {
@@ -1248,7 +1321,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 7872.0,
-      "y": 64.0,
       "z": 50880.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1256,6 +1328,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOUTHS_ISEN"
     },
     {
@@ -1265,7 +1339,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 37440.0,
-      "y": 64.0,
       "z": 42496.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1273,6 +1346,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ISENGARD"
     },
     {
@@ -1282,7 +1357,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -3008.0,
-      "y": 64.0,
       "z": -43456.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1290,6 +1364,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CAPE_OF_FOROCHEL"
     },
     {
@@ -1299,7 +1375,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 1984.0,
-      "y": 64.0,
       "z": -34624.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1307,6 +1382,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "SOUTH_FOROCHEL"
     },
     {
@@ -1316,7 +1393,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 80832.0,
-      "y": 64.0,
       "z": -22208.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1324,6 +1400,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "WITHERED_HEATH"
     },
     {
@@ -1333,7 +1411,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 49344.0,
-      "y": 64.0,
       "z": -17600.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1341,6 +1418,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOUNT_GUNDABAD"
     },
     {
@@ -1350,7 +1429,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 37952.0,
-      "y": 64.0,
       "z": -17984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1358,6 +1436,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOUNT_GRAM"
     },
     {
@@ -1367,7 +1447,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 52800.0,
-      "y": 64.0,
       "z": -3008.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1375,6 +1454,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HIGH_PASS"
     },
     {
@@ -1384,7 +1465,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 45632.0,
-      "y": 64.0,
       "z": 14784.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1392,6 +1472,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOUNT_CARADHRAS"
     },
     {
@@ -1401,7 +1483,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 44608.0,
-      "y": 64.0,
       "z": 17216.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1409,6 +1490,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOUNT_CELEBDIL"
     },
     {
@@ -1418,7 +1501,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 48832.0,
-      "y": 64.0,
       "z": 15936.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1426,6 +1508,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOUNT_FANUIDHOL"
     },
     {
@@ -1435,7 +1519,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 38592.0,
-      "y": 64.0,
       "z": 38592.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1443,6 +1526,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOUNT_METHEDRAS"
     },
     {
@@ -1452,7 +1537,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 52544.0,
-      "y": 64.0,
       "z": -4288.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1460,6 +1544,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GOBLIN_TOWN"
     },
     {
@@ -1469,7 +1555,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 55872.0,
-      "y": 64.0,
       "z": -5696.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1477,6 +1562,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "EAGLES_EYRIE"
     },
     {
@@ -1486,7 +1573,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 57920.0,
-      "y": 64.0,
       "z": -22464.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1494,6 +1580,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DAINS_HALLS"
     },
     {
@@ -1503,7 +1591,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 67264.0,
-      "y": 64.0,
       "z": -21440.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1511,6 +1598,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "SCATHA"
     },
     {
@@ -1520,7 +1609,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 60352.0,
-      "y": 64.0,
       "z": -6208.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1528,6 +1616,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CARROCK"
     },
     {
@@ -1537,7 +1627,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 60736.0,
-      "y": 64.0,
       "z": -3520.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1545,6 +1634,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "OLD_FORD"
     },
     {
@@ -1554,7 +1645,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 62016.0,
-      "y": 64.0,
       "z": 7744.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1562,6 +1652,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GLADDEN_FIELDS"
     },
     {
@@ -1571,7 +1663,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 47040.0,
-      "y": 64.0,
       "z": 17216.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1579,6 +1670,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DIMRILL_DALE"
     },
     {
@@ -1588,7 +1681,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 60352.0,
-      "y": 64.0,
       "z": 29504.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1596,6 +1688,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "FIELD_OF_CELEBRANT"
     },
     {
@@ -1605,7 +1699,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 68544.0,
-      "y": 64.0,
       "z": 51264.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1613,6 +1706,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RAUROS"
     },
     {
@@ -1622,7 +1717,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 63040.0,
-      "y": 64.0,
       "z": -6336.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1630,6 +1724,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "BEORN"
     },
     {
@@ -1639,7 +1735,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 63168.0,
-      "y": 64.0,
       "z": -9536.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1647,6 +1742,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "FOREST_GATE"
     },
     {
@@ -1656,7 +1753,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 56512.0,
-      "y": 64.0,
       "z": -17856.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1664,6 +1760,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "FRAMSBURG"
     },
     {
@@ -1673,7 +1771,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 60864.0,
-      "y": 64.0,
       "z": 22464.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1681,6 +1778,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ANDUIN_CROSSROADS"
     },
     {
@@ -1690,7 +1789,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 69696.0,
-      "y": 64.0,
       "z": 30272.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1698,6 +1796,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "EAST_RHOVANION_ROAD"
     },
     {
@@ -1707,7 +1807,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 78144.0,
-      "y": 64.0,
       "z": -12352.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1715,6 +1814,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "THRANDUIL_HALLS"
     },
     {
@@ -1724,7 +1825,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 67776.0,
-      "y": 64.0,
       "z": 21056.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1732,6 +1832,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DOL_GULDUR"
     },
     {
@@ -1741,7 +1843,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 79424.0,
-      "y": 64.0,
       "z": -7360.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1749,6 +1850,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MIRKWOOD_MOUNTAINS"
     },
     {
@@ -1758,7 +1861,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 68288.0,
-      "y": 64.0,
       "z": 4160.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1766,6 +1868,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RHOSGOBEL"
     },
     {
@@ -1775,7 +1879,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 75072.0,
-      "y": 64.0,
       "z": -10176.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1783,6 +1886,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ENCHANTED_RIVER"
     },
     {
@@ -1792,7 +1897,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 85056.0,
-      "y": 64.0,
       "z": -4288.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1800,6 +1904,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RIVER_GATE"
     },
     {
@@ -1809,7 +1915,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 80320.0,
-      "y": 64.0,
       "z": 12096.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1817,6 +1922,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "EAST_BIGHT"
     },
     {
@@ -1826,7 +1933,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 91456.0,
-      "y": 64.0,
       "z": 17984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1834,6 +1940,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "OLD_RHOVANION"
     },
     {
@@ -1843,7 +1951,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 111424.0,
-      "y": 64.0,
       "z": 19520.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1851,6 +1958,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DORWINION_CROSSROADS"
     },
     {
@@ -1860,7 +1969,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 83648.0,
-      "y": 64.0,
       "z": -15424.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1868,6 +1976,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "EREBOR"
     },
     {
@@ -1877,7 +1987,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 83776.0,
-      "y": 64.0,
       "z": -14656.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1885,6 +1994,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DALE_CITY"
     },
     {
@@ -1894,7 +2005,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 83392.0,
-      "y": 64.0,
       "z": -12480.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1902,6 +2012,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "LONG_LAKE"
     },
     {
@@ -1911,7 +2023,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 92736.0,
-      "y": 64.0,
       "z": 2496.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1919,6 +2030,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RUNNING_FORD"
     },
     {
@@ -1928,7 +2041,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 107712.0,
-      "y": 64.0,
       "z": -5056.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1936,6 +2048,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "REDWATER_FORD"
     },
     {
@@ -1945,7 +2059,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 96960.0,
-      "y": 64.0,
       "z": -6336.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1953,6 +2066,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DALE_CROSSROADS"
     },
     {
@@ -1962,7 +2077,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 108480.0,
-      "y": 64.0,
       "z": 4928.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1970,6 +2084,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DALE_PORT"
     },
     {
@@ -1979,7 +2095,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 99648.0,
-      "y": 64.0,
       "z": -15552.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -1987,6 +2102,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "WEST_PEAK"
     },
     {
@@ -1996,7 +2113,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 117696.0,
-      "y": 64.0,
       "z": -15296.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2004,6 +2120,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "EAST_PEAK"
     },
     {
@@ -2013,7 +2131,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 55360.0,
-      "y": 64.0,
       "z": 22080.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2021,6 +2138,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CARAS_GALADHON"
     },
     {
@@ -2030,7 +2149,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 53824.0,
-      "y": 64.0,
       "z": 21440.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2038,6 +2156,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CERIN_AMROTH"
     },
     {
@@ -2047,7 +2167,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 49728.0,
-      "y": 64.0,
       "z": 21056.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2055,6 +2174,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "NIMRODEL"
     },
     {
@@ -2064,7 +2185,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 45248.0,
-      "y": 64.0,
       "z": 38464.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2072,6 +2192,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DERNDINGLE"
     },
     {
@@ -2081,7 +2203,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 43968.0,
-      "y": 64.0,
       "z": 36416.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2089,6 +2210,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "WELLINGHALL"
     },
     {
@@ -2098,7 +2221,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 49984.0,
-      "y": 64.0,
       "z": 38464.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2106,6 +2228,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "TREEBEARD_HILL"
     },
     {
@@ -2115,7 +2239,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 60864.0,
-      "y": 64.0,
       "z": 36544.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2123,6 +2246,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "WOLD"
     },
     {
@@ -2132,7 +2257,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 48704.0,
-      "y": 64.0,
       "z": 53568.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2140,6 +2264,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "EDORAS"
     },
     {
@@ -2149,7 +2275,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 40768.0,
-      "y": 64.0,
       "z": 49344.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2157,6 +2282,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HELMS_DEEP"
     },
     {
@@ -2166,7 +2293,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 41792.0,
-      "y": 64.0,
       "z": 48448.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2174,6 +2300,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HELMS_CROSSROADS"
     },
     {
@@ -2183,7 +2311,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 41152.0,
-      "y": 64.0,
       "z": 41920.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2191,6 +2318,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "URUK_HIGHLANDS"
     },
     {
@@ -2200,7 +2329,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 62656.0,
-      "y": 64.0,
       "z": 60480.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2208,6 +2336,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MERING_STREAM"
     },
     {
@@ -2217,7 +2347,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 54976.0,
-      "y": 64.0,
       "z": 47936.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2225,6 +2354,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ENTWADE"
     },
     {
@@ -2234,7 +2365,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 60992.0,
-      "y": 64.0,
       "z": 51264.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2242,6 +2372,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "EASTMARK"
     },
     {
@@ -2251,7 +2383,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 52928.0,
-      "y": 64.0,
       "z": 57408.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2259,6 +2390,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ALDBURG"
     },
     {
@@ -2268,7 +2401,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 43968.0,
-      "y": 64.0,
       "z": 50240.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2276,6 +2408,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GRIMSLADE"
     },
     {
@@ -2285,7 +2419,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 23360.0,
-      "y": 64.0,
       "z": 49088.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2293,6 +2426,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CORSAIRS_LANDING"
     },
     {
@@ -2302,7 +2437,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 37056.0,
-      "y": 64.0,
       "z": 53056.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2310,6 +2444,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "FRECA_HOLD"
     },
     {
@@ -2319,7 +2455,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 46784.0,
-      "y": 64.0,
       "z": 54336.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2327,6 +2462,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DUNHARROW"
     },
     {
@@ -2336,7 +2473,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 50624.0,
-      "y": 64.0,
       "z": 61888.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2344,6 +2480,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "TARLANG"
     },
     {
@@ -2353,7 +2491,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 4544.0,
-      "y": 64.0,
       "z": 77120.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2361,6 +2498,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RAS_MORTHIL"
     },
     {
@@ -2370,7 +2509,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 78016.0,
-      "y": 64.0,
       "z": 66240.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2378,6 +2516,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MINAS_TIRITH"
     },
     {
@@ -2387,7 +2527,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 79040.0,
-      "y": 64.0,
       "z": 61120.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2395,6 +2534,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CAIR_ANDROS"
     },
     {
@@ -2404,7 +2545,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 63936.0,
-      "y": 64.0,
       "z": 60864.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2412,6 +2552,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HALIFIRIEN"
     },
     {
@@ -2421,7 +2563,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 66624.0,
-      "y": 64.0,
       "z": 61760.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2429,6 +2570,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CALENHAD"
     },
     {
@@ -2438,7 +2581,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 69184.0,
-      "y": 64.0,
       "z": 62656.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2446,6 +2588,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MINRIMMON"
     },
     {
@@ -2455,7 +2599,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 71360.0,
-      "y": 64.0,
       "z": 63040.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2463,6 +2606,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ERELAS"
     },
     {
@@ -2472,7 +2617,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 73536.0,
-      "y": 64.0,
       "z": 63808.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2480,6 +2624,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "NARDOL"
     },
     {
@@ -2489,7 +2635,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 75840.0,
-      "y": 64.0,
       "z": 63808.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2497,6 +2642,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "EILENACH"
     },
     {
@@ -2506,7 +2653,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 77632.0,
-      "y": 64.0,
       "z": 64192.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2514,6 +2660,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "AMON_DIN"
     },
     {
@@ -2523,7 +2671,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 79168.0,
-      "y": 64.0,
       "z": 66112.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2531,6 +2678,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "OSGILIATH_WEST"
     },
     {
@@ -2540,7 +2689,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 80064.0,
-      "y": 64.0,
       "z": 66112.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2548,6 +2696,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "OSGILIATH_EAST"
     },
     {
@@ -2557,7 +2707,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 80320.0,
-      "y": 64.0,
       "z": 68800.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2565,6 +2714,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "EMYN_ARNEN"
     },
     {
@@ -2574,7 +2725,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 81088.0,
-      "y": 64.0,
       "z": 59200.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2582,6 +2732,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HENNETH_ANNUN"
     },
     {
@@ -2591,7 +2743,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 81984.0,
-      "y": 64.0,
       "z": 64832.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2599,6 +2750,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CROSSROADS_ITHILIEN"
     },
     {
@@ -2608,7 +2761,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 81600.0,
-      "y": 64.0,
       "z": 53952.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2616,6 +2768,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "NORTH_ITHILIEN"
     },
     {
@@ -2625,7 +2779,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 80960.0,
-      "y": 64.0,
       "z": 81984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2633,6 +2786,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CROSSINGS_OF_POROS"
     },
     {
@@ -2642,7 +2797,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 74304.0,
-      "y": 64.0,
       "z": 79168.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2650,6 +2804,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "PELARGIR"
     },
     {
@@ -2659,7 +2815,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 61760.0,
-      "y": 64.0,
       "z": 78400.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2667,6 +2822,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "LINHIR"
     },
     {
@@ -2676,7 +2833,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 59328.0,
-      "y": 64.0,
       "z": 81856.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2684,6 +2840,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ANDUIN_MOUTH"
     },
     {
@@ -2693,7 +2851,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 75200.0,
-      "y": 64.0,
       "z": 67136.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2701,6 +2858,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "IMLOTH_MELUI"
     },
     {
@@ -2710,7 +2869,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 77120.0,
-      "y": 64.0,
       "z": 69440.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2718,6 +2876,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CROSSINGS_ERUI"
     },
     {
@@ -2727,7 +2887,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 54464.0,
-      "y": 64.0,
       "z": 66368.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2735,6 +2894,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CALEMBEL"
     },
     {
@@ -2744,7 +2905,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 57152.0,
-      "y": 64.0,
       "z": 67776.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2752,6 +2912,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ETHRING"
     },
     {
@@ -2761,7 +2923,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 48192.0,
-      "y": 64.0,
       "z": 60864.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2769,6 +2930,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ERECH"
     },
     {
@@ -2778,7 +2941,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 30144.0,
-      "y": 64.0,
       "z": 69568.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2786,6 +2948,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GREEN_HILLS"
     },
     {
@@ -2795,7 +2959,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 44608.0,
-      "y": 64.0,
       "z": 77248.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2803,6 +2966,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DOL_AMROTH"
     },
     {
@@ -2812,7 +2977,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 48576.0,
-      "y": 64.0,
       "z": 72128.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2820,6 +2984,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "EDHELLOND"
     },
     {
@@ -2829,7 +2995,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 55232.0,
-      "y": 64.0,
       "z": 73024.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2837,6 +3002,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "TARNOST"
     },
     {
@@ -2846,7 +3013,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 55104.0,
-      "y": 64.0,
       "z": 87616.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2854,6 +3020,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "TOLFALAS_ISLAND"
     },
     {
@@ -2863,7 +3031,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 67264.0,
-      "y": 64.0,
       "z": 51392.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2871,6 +3038,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "AMON_HEN"
     },
     {
@@ -2880,7 +3049,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 72000.0,
-      "y": 64.0,
       "z": 49984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2888,6 +3056,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "AMON_LHAW"
     },
     {
@@ -2897,7 +3067,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 68800.0,
-      "y": 64.0,
       "z": 48960.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2905,6 +3074,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ARGONATH"
     },
     {
@@ -2914,7 +3085,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 65216.0,
-      "y": 64.0,
       "z": 33088.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2922,6 +3092,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "NORTH_UNDEEP"
     },
     {
@@ -2931,7 +3103,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 67264.0,
-      "y": 64.0,
       "z": 37696.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2939,6 +3110,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "SOUTH_UNDEEP"
     },
     {
@@ -2948,7 +3121,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 84544.0,
-      "y": 64.0,
       "z": 51392.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2956,6 +3128,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MORANNON"
     },
     {
@@ -2965,7 +3139,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 84544.0,
-      "y": 64.0,
       "z": 53184.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2973,6 +3146,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "UDUN"
     },
     {
@@ -2982,7 +3157,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 92608.0,
-      "y": 64.0,
       "z": 60736.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -2990,6 +3164,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOUNT_DOOM"
     },
     {
@@ -2999,7 +3175,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 97728.0,
-      "y": 64.0,
       "z": 59712.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3007,6 +3182,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "BARAD_DUR"
     },
     {
@@ -3016,7 +3193,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 83392.0,
-      "y": 64.0,
       "z": 65216.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3024,6 +3200,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MINAS_MORGUL"
     },
     {
@@ -3033,7 +3211,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 83776.0,
-      "y": 64.0,
       "z": 54976.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3041,6 +3218,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DURTHANG"
     },
     {
@@ -3050,7 +3229,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 87488.0,
-      "y": 64.0,
       "z": 55872.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3058,6 +3236,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CARACH_ANGREN"
     },
     {
@@ -3067,7 +3247,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 85696.0,
-      "y": 64.0,
       "z": 63424.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3075,6 +3254,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CIRITH_UNGOL"
     },
     {
@@ -3084,7 +3265,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 95808.0,
-      "y": 64.0,
       "z": 71232.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3092,6 +3272,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MORIGOST"
     },
     {
@@ -3101,7 +3283,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 106304.0,
-      "y": 64.0,
       "z": 66368.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3109,6 +3290,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "NARGROTH"
     },
     {
@@ -3118,7 +3301,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 109248.0,
-      "y": 64.0,
       "z": 65984.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3126,6 +3308,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "AMON_ANGREN"
     },
     {
@@ -3135,7 +3319,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 111680.0,
-      "y": 64.0,
       "z": 62016.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3143,6 +3326,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "SEREGOST"
     },
     {
@@ -3152,7 +3337,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 120896.0,
-      "y": 64.0,
       "z": 55616.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3160,6 +3344,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "FELLBEASTS"
     },
     {
@@ -3169,7 +3355,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 131904.0,
-      "y": 64.0,
       "z": 52160.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3177,6 +3362,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "EASTERN_GUARD"
     },
     {
@@ -3186,7 +3373,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 113472.0,
-      "y": 64.0,
       "z": 76096.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3194,6 +3380,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "NURNEN_NORTHERN_SHORE"
     },
     {
@@ -3203,7 +3391,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 116288.0,
-      "y": 64.0,
       "z": 81856.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3211,6 +3398,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "NURNEN_SOUTHERN_SHORE"
     },
     {
@@ -3220,7 +3409,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 107584.0,
-      "y": 64.0,
       "z": 81088.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3228,6 +3416,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "NURNEN_WESTERN_SHORE"
     },
     {
@@ -3237,7 +3427,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 121408.0,
-      "y": 64.0,
       "z": 75072.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3245,6 +3434,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "NURNEN_EASTERN_SHORE"
     },
     {
@@ -3254,7 +3445,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 106688.0,
-      "y": 64.0,
       "z": 79936.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3262,6 +3452,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "THAURBAND"
     },
     {
@@ -3271,7 +3463,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 89920.0,
-      "y": 64.0,
       "z": 85824.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3279,6 +3470,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "VALLEY_OF_SPIDERS"
     },
     {
@@ -3288,7 +3481,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 124736.0,
-      "y": 64.0,
       "z": 17088.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3296,6 +3488,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DORWINION_PORT"
     },
     {
@@ -3305,7 +3499,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 121408.0,
-      "y": 64.0,
       "z": 26816.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3313,6 +3506,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DORWINION_COURT"
     },
     {
@@ -3322,7 +3517,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 123712.0,
-      "y": 64.0,
       "z": 32832.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3330,6 +3524,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DORWINION_FORD"
     },
     {
@@ -3339,7 +3535,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 118208.0,
-      "y": 64.0,
       "z": 28224.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3347,6 +3542,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DORWINION_HILLS"
     },
     {
@@ -3356,7 +3553,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 181568.0,
-      "y": 64.0,
       "z": 13504.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3364,6 +3560,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RHUN_ROAD_WAY"
     },
     {
@@ -3373,7 +3571,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 181952.0,
-      "y": 64.0,
       "z": 42048.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3381,6 +3578,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "BALCARAS"
     },
     {
@@ -3390,7 +3589,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 143680.0,
-      "y": 64.0,
       "z": 76992.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3398,6 +3596,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "KHAND_NORTH_ROAD"
     },
     {
@@ -3407,7 +3607,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 135360.0,
-      "y": 64.0,
       "z": 32576.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3415,6 +3614,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RHUN_CAPITAL"
     },
     {
@@ -3424,7 +3625,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 138048.0,
-      "y": 64.0,
       "z": 19008.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3432,6 +3632,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "KHAMUL_TOWER"
     },
     {
@@ -3441,7 +3643,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 131136.0,
-      "y": 64.0,
       "z": 48960.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3449,6 +3650,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MORDOR_FORD"
     },
     {
@@ -3458,7 +3661,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 139968.0,
-      "y": 64.0,
       "z": 23616.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3466,6 +3668,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RHUN_NORTH_CITY"
     },
     {
@@ -3475,7 +3679,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 142272.0,
-      "y": 64.0,
       "z": 20416.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3483,6 +3686,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "BAZYLAN"
     },
     {
@@ -3492,7 +3697,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 126016.0,
-      "y": 64.0,
       "z": 31936.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3500,6 +3704,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "BORDER_TOWN"
     },
     {
@@ -3509,7 +3715,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 131520.0,
-      "y": 64.0,
       "z": 28992.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3517,6 +3722,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RHUN_SEA_CITY"
     },
     {
@@ -3526,7 +3733,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 144960.0,
-      "y": 64.0,
       "z": 10432.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3534,6 +3740,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RHUN_NORTH_FORD"
     },
     {
@@ -3543,7 +3751,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 158144.0,
-      "y": 64.0,
       "z": 10944.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3551,6 +3758,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RHUN_NORTHEAST"
     },
     {
@@ -3560,7 +3769,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 135616.0,
-      "y": 64.0,
       "z": 41664.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3568,6 +3776,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RHUN_SOUTH_PASS"
     },
     {
@@ -3577,7 +3787,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 153664.0,
-      "y": 64.0,
       "z": 29760.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3585,6 +3794,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RHUN_EAST_CITY"
     },
     {
@@ -3594,7 +3805,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 150208.0,
-      "y": 64.0,
       "z": 26432.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3602,6 +3812,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RHUN_EAST_TOWN"
     },
     {
@@ -3611,7 +3823,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 139584.0,
-      "y": 64.0,
       "z": 52672.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3619,6 +3830,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "RHUN_SOUTHEAST"
     },
     {
@@ -3628,7 +3841,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 194112.0,
-      "y": 64.0,
       "z": 9024.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3636,6 +3848,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "BARAZ_DUM"
     },
     {
@@ -3645,7 +3859,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 88768.0,
-      "y": 64.0,
       "z": 104256.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3653,6 +3866,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CROSSINGS_OF_HARAD"
     },
     {
@@ -3662,7 +3877,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 68288.0,
-      "y": 64.0,
       "z": 106432.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3670,6 +3884,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HARNEN_SEA_TOWN"
     },
     {
@@ -3679,7 +3895,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 90688.0,
-      "y": 64.0,
       "z": 106688.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3687,6 +3902,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HARNEN_ROAD_TOWN"
     },
     {
@@ -3696,7 +3913,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 96832.0,
-      "y": 64.0,
       "z": 96320.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3704,6 +3920,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HARNEN_BLACK_TOWN"
     },
     {
@@ -3713,7 +3931,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 93376.0,
-      "y": 64.0,
       "z": 104384.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3721,6 +3938,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CROSSINGS_OF_LITHNEN"
     },
     {
@@ -3730,7 +3949,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 81600.0,
-      "y": 64.0,
       "z": 106048.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3738,6 +3956,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HARNEN_RIVER_TOWN"
     },
     {
@@ -3747,7 +3967,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 123968.0,
-      "y": 64.0,
       "z": 89920.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3755,6 +3974,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "KHAND_FORD"
     },
     {
@@ -3764,7 +3985,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 51776.0,
-      "y": 64.0,
       "z": 122816.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3772,6 +3992,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "UMBAR_CITY"
     },
     {
@@ -3781,7 +4003,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 56640.0,
-      "y": 64.0,
       "z": 123968.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3789,6 +4010,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "UMBAR_GATE"
     },
     {
@@ -3798,7 +4021,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 36800.0,
-      "y": 64.0,
       "z": 126912.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3806,6 +4028,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GATE_HERUMOR"
     },
     {
@@ -3815,7 +4039,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 28736.0,
-      "y": 64.0,
       "z": 143168.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3823,6 +4046,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "CEDAR_ROAD"
     },
     {
@@ -3832,7 +4057,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 46016.0,
-      "y": 64.0,
       "z": 139712.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3840,6 +4064,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "FERTILE_VALLEY"
     },
     {
@@ -3849,7 +4075,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 55744.0,
-      "y": 64.0,
       "z": 134592.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3857,6 +4082,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GARDENS_BERUTHIEL"
     },
     {
@@ -3866,7 +4093,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 58304.0,
-      "y": 64.0,
       "z": 128960.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3874,6 +4100,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "AIN_AL_HARAD"
     },
     {
@@ -3883,7 +4111,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 52288.0,
-      "y": 64.0,
       "z": 115392.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3891,6 +4118,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GATE_FUINUR"
     },
     {
@@ -3900,7 +4129,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 55744.0,
-      "y": 64.0,
       "z": 109120.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3908,6 +4136,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "COAST_FORTRESS"
     },
     {
@@ -3917,7 +4147,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 59840.0,
-      "y": 64.0,
       "z": 111424.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3925,6 +4154,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "SANDHILL_TOWN"
     },
     {
@@ -3934,7 +4165,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 34624.0,
-      "y": 64.0,
       "z": 141760.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3942,6 +4172,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "COAST_RIVER_TOWN"
     },
     {
@@ -3951,7 +4183,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 45504.0,
-      "y": 64.0,
       "z": 129600.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3959,6 +4190,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "COAST_CITY"
     },
     {
@@ -3968,7 +4201,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 96448.0,
-      "y": 64.0,
       "z": 112832.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3976,6 +4208,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DESERT_TOWN"
     },
     {
@@ -3985,7 +4219,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 42432.0,
-      "y": 64.0,
       "z": 159552.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -3993,6 +4226,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "SOUTH_DESERT_TOWN"
     },
     {
@@ -4002,7 +4237,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 48832.0,
-      "y": 64.0,
       "z": 160576.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4010,6 +4244,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "DESERT_RIVER_TOWN"
     },
     {
@@ -4019,7 +4255,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 117056.0,
-      "y": 64.0,
       "z": 160320.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4027,6 +4262,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GULF_OF_HARAD"
     },
     {
@@ -4036,7 +4273,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 106304.0,
-      "y": 64.0,
       "z": 152640.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4044,6 +4280,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GULF_CITY"
     },
     {
@@ -4053,7 +4291,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 112192.0,
-      "y": 64.0,
       "z": 166720.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4061,6 +4298,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GULF_FORD"
     },
     {
@@ -4070,7 +4309,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 112960.0,
-      "y": 64.0,
       "z": 162752.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4078,6 +4316,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GULF_TRADE_TOWN"
     },
     {
@@ -4087,7 +4327,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 104512.0,
-      "y": 64.0,
       "z": 146496.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4095,6 +4334,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GULF_NORTH_TOWN"
     },
     {
@@ -4104,7 +4345,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 156992.0,
-      "y": 64.0,
       "z": 172992.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4112,6 +4352,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GULF_EAST_BAY"
     },
     {
@@ -4121,7 +4363,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 132800.0,
-      "y": 64.0,
       "z": 168896.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4129,6 +4370,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GULF_EAST_PORT"
     },
     {
@@ -4138,7 +4381,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 19136.0,
-      "y": 64.0,
       "z": 149696.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4146,6 +4388,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOUNT_SAND"
     },
     {
@@ -4155,7 +4399,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 9536.0,
-      "y": 64.0,
       "z": 210240.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4163,6 +4406,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOUNT_GREEN"
     },
     {
@@ -4172,7 +4417,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 26816.0,
-      "y": 64.0,
       "z": 238144.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4180,6 +4424,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOUNT_THUNDER"
     },
     {
@@ -4189,7 +4435,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 63808.0,
-      "y": 64.0,
       "z": 171200.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4197,6 +4442,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GREAT_PLAINS_NORTH"
     },
     {
@@ -4206,7 +4453,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 83520.0,
-      "y": 64.0,
       "z": 220480.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4214,6 +4460,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GREAT_PLAINS_SOUTH"
     },
     {
@@ -4223,7 +4471,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 30528.0,
-      "y": 64.0,
       "z": 190144.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4231,6 +4478,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GREAT_PLAINS_WEST"
     },
     {
@@ -4240,7 +4489,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 105920.0,
-      "y": 64.0,
       "z": 185152.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4248,6 +4496,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GREAT_PLAINS_EAST"
     },
     {
@@ -4257,7 +4507,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 95680.0,
-      "y": 64.0,
       "z": 242240.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4265,6 +4514,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "GREEN_VALLEY"
     },
     {
@@ -4274,7 +4525,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 123456.0,
-      "y": 64.0,
       "z": 202304.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4282,6 +4532,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HARAD_LAKES"
     },
     {
@@ -4291,7 +4543,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 37184.0,
-      "y": 64.0,
       "z": 238400.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4299,6 +4550,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "LAKE_HARAD"
     },
     {
@@ -4308,7 +4561,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 132672.0,
-      "y": 64.0,
       "z": 269888.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4316,6 +4568,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HARADUIN_MOUTH"
     },
     {
@@ -4325,7 +4579,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 92608.0,
-      "y": 64.0,
       "z": 363968.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4333,6 +4586,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ISLE_MIST"
     },
     {
@@ -4342,7 +4597,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 11712.0,
-      "y": 64.0,
       "z": 241088.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4350,6 +4604,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "TAURELONDE"
     },
     {
@@ -4359,7 +4615,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 37824.0,
-      "y": 64.0,
       "z": 390208.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4367,6 +4622,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HARAD_HORN"
     },
     {
@@ -4376,7 +4633,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 130880.0,
-      "y": 64.0,
       "z": 186688.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4384,6 +4640,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "TOWN_BONES"
     },
     {
@@ -4393,7 +4651,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 103872.0,
-      "y": 64.0,
       "z": 248768.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4401,6 +4658,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "HARADUIN_BRIDGE"
     },
     {
@@ -4410,7 +4669,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 18240.0,
-      "y": 64.0,
       "z": 246592.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4418,6 +4676,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "JUNGLE_CITY_TRADE"
     },
     {
@@ -4427,7 +4687,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 35136.0,
-      "y": 64.0,
       "z": 248384.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4435,6 +4694,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "JUNGLE_CITY_OLD"
     },
     {
@@ -4444,7 +4705,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 78016.0,
-      "y": 64.0,
       "z": 239936.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4452,6 +4712,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "JUNGLE_CITY_NORTH"
     },
     {
@@ -4461,7 +4723,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 100416.0,
-      "y": 64.0,
       "z": 260672.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4469,6 +4730,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "JUNGLE_CITY_EAST"
     },
     {
@@ -4478,7 +4741,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 73024.0,
-      "y": 64.0,
       "z": 272832.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4486,6 +4748,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "JUNGLE_CITY_CAPITAL"
     },
     {
@@ -4495,7 +4759,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 47936.0,
-      "y": 64.0,
       "z": 320960.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4503,6 +4766,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "JUNGLE_CITY_DEEP"
     },
     {
@@ -4512,7 +4777,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 99904.0,
-      "y": 64.0,
       "z": 282944.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4520,6 +4784,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "JUNGLE_CITY_WATCH"
     },
     {
@@ -4529,7 +4795,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 57280.0,
-      "y": 64.0,
       "z": 297536.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4537,6 +4802,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "JUNGLE_CITY_CAVES"
     },
     {
@@ -4546,7 +4813,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 54592.0,
-      "y": 64.0,
       "z": 263360.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4554,6 +4820,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "JUNGLE_CITY_STONE"
     },
     {
@@ -4563,7 +4831,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 94784.0,
-      "y": 64.0,
       "z": 272192.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4571,6 +4838,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "JUNGLE_LAKES"
     },
     {
@@ -4580,7 +4849,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 148032.0,
-      "y": 64.0,
       "z": 206400.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4588,6 +4856,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "TROLL_ISLAND"
     },
     {
@@ -4597,7 +4867,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 144192.0,
-      "y": 64.0,
       "z": 226112.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4605,6 +4874,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "BLACK_COAST"
     },
     {
@@ -4614,7 +4885,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 139200.0,
-      "y": 64.0,
       "z": 240064.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4622,6 +4892,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "BLOOD_RIVER"
     },
     {
@@ -4631,7 +4903,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 146240.0,
-      "y": 64.0,
       "z": 273088.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4639,6 +4910,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "SHADOW_POINT"
     },
     {
@@ -4648,7 +4921,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 131136.0,
-      "y": 64.0,
       "z": 229568.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4656,6 +4928,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "OLD_JUNGLE_RUIN"
     },
     {
@@ -4665,7 +4939,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 216896.0,
-      "y": 64.0,
       "z": 100416.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4673,6 +4946,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "SUN_ELVES"
     },
     {
@@ -4682,7 +4957,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 97088.0,
-      "y": 64.0,
       "z": -24896.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4690,6 +4964,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOON_ELVES"
     },
     {
@@ -4699,7 +4975,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 99264.0,
-      "y": 64.0,
       "z": -25408.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4707,6 +4982,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "MOON_ELVES_2"
     },
     {
@@ -4716,7 +4993,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 297280.0,
-      "y": 64.0,
       "z": 7744.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4724,6 +5000,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ODANE"
     },
     {
@@ -4733,7 +5011,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 298560.0,
-      "y": 64.0,
       "z": 704.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4741,6 +5018,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ODANE_MOUNTAINS"
     },
     {
@@ -4750,7 +5029,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 289344.0,
-      "y": 64.0,
       "z": 15424.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4758,6 +5036,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ODANE_PORT"
     },
     {
@@ -4767,7 +5047,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 303040.0,
-      "y": 64.0,
       "z": 13120.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4775,6 +5054,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "ODANE_EASTWATCH"
     },
     {
@@ -4784,7 +5065,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 205504.0,
-      "y": 64.0,
       "z": 23744.0,
       "compassFadeInRadius": 640.0,
       "discoveryRadius": 24.0,
@@ -4792,6 +5072,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "fastTravelWaypointCode": "OROCARNI"
     }
   ]

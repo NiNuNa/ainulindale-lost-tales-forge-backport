@@ -82,7 +82,10 @@ public final class LostTalesQuestDefinitionJsonParser {
         if (colonIndex > 0) {
             normalized = normalized.substring(colonIndex + 1);
         }
-        if (normalized.startsWith("quest/")) {
+        if (normalized.startsWith("quests/")) {
+            normalized = normalized.substring("quests/".length());
+        } else if (normalized.startsWith("quest/")) {
+            // Preserve IDs derived from legacy resource paths.
             normalized = normalized.substring("quest/".length());
         }
         if (normalized.endsWith(".json")) {

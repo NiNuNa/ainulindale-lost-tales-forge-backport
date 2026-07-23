@@ -272,7 +272,17 @@ public final class LostTalesQuestHudRenderer {
             }
             LostTalesMapMarkerData marker = LostTalesClientMapMarkerStore.getSharedMarker(normalized);
             if (marker != null && marker.getDimensionId() == dimension) {
-                targets.add(new HudQuestTarget(marker.getX(), marker.getY(), marker.getZ()));
+                Minecraft minecraft = Minecraft.getMinecraft();
+                double fallbackY = minecraft == null
+                        || minecraft.thePlayer == null
+                        ? 64.0D : minecraft.thePlayer.posY;
+                targets.add(new HudQuestTarget(
+                        marker.getX(),
+                        marker.getEffectiveY(
+                                minecraft == null
+                                        ? null : minecraft.theWorld,
+                                fallbackY),
+                        marker.getZ()));
             }
         }
     }

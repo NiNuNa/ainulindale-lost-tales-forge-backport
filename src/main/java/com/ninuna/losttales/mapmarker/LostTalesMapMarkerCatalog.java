@@ -136,7 +136,7 @@ public final class LostTalesMapMarkerCatalog {
     private static void loadFileFromClasspath(String fileName, Map<String, LostTalesMapMarkerDefinition> markers) {
         Reader reader = null;
         try {
-            String path = "assets/" + LostTalesMetaData.MOD_ID + "/map_marker/" + fileName + ".json";
+            String path = "assets/" + LostTalesMetaData.MOD_ID + "/map_markers/" + fileName + ".json";
             InputStream stream = LostTalesMapMarkerCatalog.class.getClassLoader().getResourceAsStream(path);
             if (stream == null) {
                 return;
@@ -153,13 +153,30 @@ public final class LostTalesMapMarkerCatalog {
             }
 
             JsonArray array = markersElement.getAsJsonArray();
+            LostTalesMapMarkerSource source = "lotr_waypoints".equals(fileName)
+                    ? LostTalesMapMarkerSource.LOTR_ADAPTER
+                    : LostTalesMapMarkerSource.CUSTOM_PRESET;
             for (JsonElement entryElement : array) {
                 if (entryElement == null || !entryElement.isJsonObject()) {
                     continue;
                 }
-                LostTalesMapMarkerDefinition marker = parseMarker(entryElement.getAsJsonObject());
-                if (marker != null) {
+                try {
+                    LostTalesMapMarkerDefinition marker = parseMarker(
+                            entryElement.getAsJsonObject(), source);
+                    if (marker == null) {
+                        continue;
+                    }
+                    if (markers.containsKey(marker.getId())) {
+                        FMLLog.warning(
+                                "[%s] Ignoring duplicate map marker id %s in %s.json",
+                                LostTalesMetaData.MOD_ID, marker.getId(), fileName);
+                        continue;
+                    }
                     markers.put(marker.getId(), marker);
+                } catch (RuntimeException e) {
+                    FMLLog.warning(
+                            "[%s] Ignoring malformed map marker entry in %s.json: %s",
+                            LostTalesMetaData.MOD_ID, fileName, e.getMessage());
                 }
             }
         } catch (RuntimeException e) {
@@ -169,12 +186,16 @@ public final class LostTalesMapMarkerCatalog {
         }
     }
 
-    private static LostTalesMapMarkerDefinition parseMarker(JsonObject object) {
+    static LostTalesMapMarkerDefinition parseMarker(
+            JsonObject object, LostTalesMapMarkerSource source) {
+        if (source == null) {
+            source = LostTalesMapMarkerSource.CUSTOM_PRESET;
+        }
         String name = getString(object, "name", null);
         if (name == null || name.length() == 0) {
             return null;
         }
-        if (!hasNumber(object, "x") || !hasNumber(object, "y") || !hasNumber(object, "z")) {
+        if (!hasNumber(object, "x") || !hasNumber(object, "z")) {
             return null;
         }
 
@@ -190,14 +211,32 @@ public final class LostTalesMapMarkerCatalog {
         String description = getString(object, "description", getString(object, "info", getString(object, "lore", "")));
         int dimensionId = LostTalesDimensionHelper.parseDimensionId(getString(object, "dimension", "lotr:middle_earth"), LOTRDimension.MIDDLE_EARTH.dimensionID);
         double x = object.get("x").getAsDouble();
-        double y = object.get("y").getAsDouble();
+        double y = hasNumber(object, "y")
+                ? object.get("y").getAsDouble()
+                : LostTalesMapMarkerDefinition.AUTOMATIC_Y;
         double z = object.get("z").getAsDouble();
+        if (!isFinite(x) || !isFinite(y) || !isFinite(z)) {
+            return null;
+        }
         double compassFadeInRadius = getDouble(object, "compassFadeInRadius", getDouble(object, "fadeInRadius", 128.0D));
         double discoveryRadius = Math.max(1.0D, getDouble(object, "discoveryRadius", getDouble(object, "unlockRadius", 8.0D)));
+        if (!isFinite(compassFadeInRadius)
+                || !isFinite(discoveryRadius)) {
+            return null;
+        }
         boolean hidden = getBoolean(object, "hiddenUntilDiscovered", getBoolean(object, "requiresDiscovery", false));
         boolean discoverable = getBoolean(object, "isDiscoverable", true);
         boolean requiresRegionUnlock = getBoolean(
                 object, "requiresRegionUnlock", true);
+        boolean hasWaystone = getBoolean(
+                object, "hasWaystone", source.defaultHasWaystone());
+        String structureType = getString(
+                object, "waystoneStructureType",
+                getString(object, "structureType", ""));
+        structureType = normalizeStructureType(structureType, hasWaystone);
+        if (structureType == null) {
+            return null;
+        }
         if (getBoolean(object, "discoveredByDefault", false)) {
             hidden = false;
             discoverable = false;
@@ -206,7 +245,28 @@ public final class LostTalesMapMarkerCatalog {
                 category, description, hasFastTravel,
                 fastTravelWaypointCode, dimensionId, x, y, z,
                 compassFadeInRadius, discoveryRadius, hidden,
-                discoverable, requiresRegionUnlock);
+                discoverable, requiresRegionUnlock, source,
+                hasWaystone, structureType);
+    }
+
+    private static String normalizeStructureType(String value,
+                                                 boolean hasWaystone) {
+        String normalized = value == null ? "" : value.trim().toLowerCase();
+        if (normalized.length() == 0 && hasWaystone) {
+            normalized = LostTalesMapMarkerDefinition.DEFAULT_WAYSTONE_STRUCTURE;
+        }
+        if (normalized.length() == 0) {
+            return "";
+        }
+        if (normalized.length() > 128
+                || !normalized.matches("[a-z0-9_.-]+:[a-z0-9_./-]+")) {
+            return null;
+        }
+        return normalized;
+    }
+
+    private static boolean isFinite(double value) {
+        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
     private static boolean hasNumber(JsonObject object, String key) {

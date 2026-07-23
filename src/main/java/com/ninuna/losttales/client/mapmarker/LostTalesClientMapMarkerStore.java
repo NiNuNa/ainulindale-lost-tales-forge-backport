@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import lotr.common.LOTRDimension;
@@ -46,6 +47,31 @@ public final class LostTalesClientMapMarkerStore {
         return markerSnapshot.markersById.get(markerId);
     }
 
+    static Object getSnapshotIdentity() {
+        return markerSnapshot;
+    }
+
+    static LostTalesMapMarkerData findMappedFastTravelMarker(
+            String waypointCode, String waypointDisplay,
+            int worldX, int worldZ) {
+        MarkerSnapshot snapshot = markerSnapshot;
+        LostTalesMapMarkerData marker = snapshot.fastTravelByCode.get(
+                normalizeLookupKey(waypointCode));
+        if (marker != null) {
+            return marker;
+        }
+        marker = snapshot.fastTravelByPosition.get(
+                coordinateKey(worldX, worldZ));
+        if (marker != null) {
+            return marker;
+        }
+        marker = snapshot.fastTravelByName.get(
+                normalizeLookupKey(waypointCode));
+        return marker != null ? marker
+                : snapshot.fastTravelByName.get(
+                        normalizeLookupKey(waypointDisplay));
+    }
+
     public static boolean hasSharedMarker(String markerId) {
         return getSharedMarker(markerId) != null;
     }
@@ -70,6 +96,23 @@ public final class LostTalesClientMapMarkerStore {
             }
         }
         dynamicMarkers = Collections.unmodifiableList(new ArrayList<LostTalesMapMarkerData>(byId.values()));
+        rebuildSnapshot();
+    }
+
+    public static synchronized void setServerMarkers(
+            Collection<LostTalesMapMarkerDefinition> markers) {
+        Map<String, LostTalesMapMarkerData> byId =
+                new LinkedHashMap<String, LostTalesMapMarkerData>();
+        if (markers != null) {
+            for (LostTalesMapMarkerDefinition marker : markers) {
+                LostTalesMapMarkerData data = toClientMarker(marker);
+                if (data != null) {
+                    byId.put(data.getId(), data);
+                }
+            }
+        }
+        sharedMarkers = Collections.unmodifiableList(
+                new ArrayList<LostTalesMapMarkerData>(byId.values()));
         rebuildSnapshot();
     }
 
@@ -114,12 +157,21 @@ public final class LostTalesClientMapMarkerStore {
         private final List<LostTalesMapMarkerData> allMarkers;
         private final Set<String> markerIds;
         private final Map<String, LostTalesMapMarkerData> markersById;
+        private final Map<String, LostTalesMapMarkerData> fastTravelByCode;
+        private final Map<String, LostTalesMapMarkerData> fastTravelByPosition;
+        private final Map<String, LostTalesMapMarkerData> fastTravelByName;
 
         private MarkerSnapshot(List<LostTalesMapMarkerData> allMarkers, Set<String> markerIds,
-                               Map<String, LostTalesMapMarkerData> markersById) {
+                               Map<String, LostTalesMapMarkerData> markersById,
+                               Map<String, LostTalesMapMarkerData> fastTravelByCode,
+                               Map<String, LostTalesMapMarkerData> fastTravelByPosition,
+                               Map<String, LostTalesMapMarkerData> fastTravelByName) {
             this.allMarkers = allMarkers;
             this.markerIds = markerIds;
             this.markersById = markersById;
+            this.fastTravelByCode = fastTravelByCode;
+            this.fastTravelByPosition = fastTravelByPosition;
+            this.fastTravelByName = fastTravelByName;
         }
 
         private static MarkerSnapshot create(List<LostTalesMapMarkerData> shared,
@@ -133,10 +185,36 @@ public final class LostTalesClientMapMarkerStore {
             addMarkers(shared, combined, ids, byId, false);
             addMarkers(dynamic, combined, ids, byId, true);
 
+            Map<String, LostTalesMapMarkerData> byCode =
+                    new LinkedHashMap<String, LostTalesMapMarkerData>();
+            Map<String, LostTalesMapMarkerData> byPosition =
+                    new LinkedHashMap<String, LostTalesMapMarkerData>();
+            Map<String, LostTalesMapMarkerData> byName =
+                    new LinkedHashMap<String, LostTalesMapMarkerData>();
+            for (LostTalesMapMarkerData marker : combined) {
+                if (!isFastTravelMappingCandidate(marker)) {
+                    continue;
+                }
+                String code = normalizeLookupKey(
+                        marker.getFastTravelWaypointCode());
+                if (code.length() > 0) {
+                    putFirst(byCode, code, marker);
+                    continue;
+                }
+                putFirst(byPosition, coordinateKey(
+                        (int)Math.round(marker.getX()),
+                        (int)Math.round(marker.getZ())), marker);
+                putFirst(byName, normalizeLookupKey(
+                        marker.getName()), marker);
+            }
+
             return new MarkerSnapshot(
                     Collections.unmodifiableList(combined),
                     Collections.unmodifiableSet(ids),
-                    Collections.unmodifiableMap(byId)
+                    Collections.unmodifiableMap(byId),
+                    Collections.unmodifiableMap(byCode),
+                    Collections.unmodifiableMap(byPosition),
+                    Collections.unmodifiableMap(byName)
             );
         }
 
@@ -162,11 +240,53 @@ public final class LostTalesClientMapMarkerStore {
         }
     }
 
+    private static boolean isFastTravelMappingCandidate(
+            LostTalesMapMarkerData marker) {
+        return marker != null && marker.hasFastTravel()
+                && marker.getDimensionId()
+                        == LOTRDimension.MIDDLE_EARTH.dimensionID;
+    }
+
+    private static void putFirst(
+            Map<String, LostTalesMapMarkerData> map, String key,
+            LostTalesMapMarkerData marker) {
+        if (key != null && key.length() > 0
+                && !map.containsKey(key)) {
+            map.put(key, marker);
+        }
+    }
+
+    private static String normalizeLookupKey(String value) {
+        String normalized = value == null ? ""
+                : value.trim().toUpperCase(Locale.ROOT);
+        StringBuilder builder =
+                new StringBuilder(normalized.length());
+        for (int index = 0; index < normalized.length(); index++) {
+            char character = normalized.charAt(index);
+            if (character >= 'A' && character <= 'Z'
+                    || character >= '0' && character <= '9') {
+                builder.append(character);
+            } else if (builder.length() > 0
+                    && builder.charAt(builder.length() - 1) != '_') {
+                builder.append('_');
+            }
+        }
+        while (builder.length() > 0
+                && builder.charAt(builder.length() - 1) == '_') {
+            builder.deleteCharAt(builder.length() - 1);
+        }
+        return builder.toString();
+    }
+
+    private static String coordinateKey(int x, int z) {
+        return x + ":" + z;
+    }
+
     private static List<LostTalesMapMarkerData> createFallbackMarkers() {
         List<LostTalesMapMarkerData> markers = new ArrayList<LostTalesMapMarkerData>();
         int middleEarth = LOTRDimension.MIDDLE_EARTH.dimensionID;
-        markers.add(new LostTalesMapMarkerData("fallback-town", "Town", LostTalesCompassMarkerIcon.FORT.name(), "red", middleEarth, 15.0D, 64.0D, 15.0D, 160.0D, 10.0D));
-        markers.add(new LostTalesMapMarkerData("fallback-cheese-fort", "Cheese's Fort", LostTalesCompassMarkerIcon.FORT.name(), "white", middleEarth, -180.0D, 64.0D, -140.0D, 250.0D, 10.0D));
+        markers.add(new LostTalesMapMarkerData("fallback-town", "Town", LostTalesCompassMarkerIcon.FORT.name(), "red", middleEarth, 15.0D, LostTalesMapMarkerDefinition.AUTOMATIC_Y, 15.0D, 160.0D, 10.0D));
+        markers.add(new LostTalesMapMarkerData("fallback-cheese-fort", "Cheese's Fort", LostTalesCompassMarkerIcon.FORT.name(), "white", middleEarth, -180.0D, LostTalesMapMarkerDefinition.AUTOMATIC_Y, -140.0D, 250.0D, 10.0D));
         return Collections.unmodifiableList(markers);
     }
 }

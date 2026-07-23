@@ -12,7 +12,7 @@ import net.minecraft.world.World;
 
 public class LostTalesWorldGenOdaneGlowstoneHouse extends LOTRWorldGenStructureBase2 {
 
-    private static final String SCAN_RESOURCE = "/assets/losttales/strscan/glowstoneHouse.strscan";
+    private static final String SCAN_RESOURCE = "/assets/losttales/strscans/glowstoneHouse.strscan";
     private static final int MIN_X = 0;
     private static final int MAX_X = 3;
     private static final int MIN_Z = -4;

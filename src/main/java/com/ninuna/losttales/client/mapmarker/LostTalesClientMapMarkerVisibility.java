@@ -2,6 +2,8 @@ package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapMarkerRegionResolver;
+import java.util.HashMap;
+import java.util.Map;
 import lotr.common.LOTRDimension;
 import lotr.common.LOTRLevelData;
 import lotr.common.LOTRPlayerData;
@@ -10,6 +12,12 @@ import net.minecraft.client.Minecraft;
 
 /** Shared client rule for discovered, regional-question-mark, and hidden states. */
 public final class LostTalesClientMapMarkerVisibility {
+    private static final Map<String, Boolean> REGION_UNLOCK_CACHE =
+            new HashMap<String, Boolean>();
+    private static Object regionCacheWorld;
+    private static Object regionCachePlayer;
+    private static Object regionCacheSnapshot;
+    private static long regionCacheTick = Long.MIN_VALUE;
 
     private LostTalesClientMapMarkerVisibility() {}
 
@@ -69,9 +77,40 @@ public final class LostTalesClientMapMarkerVisibility {
             return false;
         }
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft == null || minecraft.thePlayer == null) {
+        if (minecraft == null || minecraft.thePlayer == null
+                || minecraft.theWorld == null) {
             return false;
         }
+        long tick = minecraft.theWorld.getTotalWorldTime();
+        Object snapshot =
+                LostTalesClientMapMarkerStore.getSnapshotIdentity();
+        if (regionCacheWorld != minecraft.theWorld
+                || regionCachePlayer != minecraft.thePlayer
+                || regionCacheSnapshot != snapshot
+                || regionCacheTick != tick) {
+            REGION_UNLOCK_CACHE.clear();
+            regionCacheWorld = minecraft.theWorld;
+            regionCachePlayer = minecraft.thePlayer;
+            regionCacheSnapshot = snapshot;
+            regionCacheTick = tick;
+        }
+        String cacheKey = marker.getId();
+        Boolean cached = cacheKey == null
+                ? null : REGION_UNLOCK_CACHE.get(cacheKey);
+        if (cached != null) {
+            return cached.booleanValue();
+        }
+        boolean unlocked = computeWaypointRegionUnlocked(
+                minecraft, marker);
+        if (cacheKey != null && cacheKey.length() > 0) {
+            REGION_UNLOCK_CACHE.put(
+                    cacheKey, Boolean.valueOf(unlocked));
+        }
+        return unlocked;
+    }
+
+    private static boolean computeWaypointRegionUnlocked(
+            Minecraft minecraft, LostTalesMapMarkerData marker) {
         try {
             LOTRWaypoint.Region region =
                     LostTalesMapMarkerRegionResolver.resolve(

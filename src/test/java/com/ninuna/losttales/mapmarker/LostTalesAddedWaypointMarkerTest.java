@@ -57,7 +57,7 @@ public class LostTalesAddedWaypointMarkerTest {
     public void everyLotrWaypointExplicitlyRequiresRegionUnlock()
             throws Exception {
         InputStream stream = getClass().getClassLoader().getResourceAsStream(
-                "assets/losttales/map_marker/lotr_waypoints.json");
+                "assets/losttales/map_markers/lotr_waypoints.json");
         assertNotNull(stream);
         int waypointMarkerCount = 0;
         try {

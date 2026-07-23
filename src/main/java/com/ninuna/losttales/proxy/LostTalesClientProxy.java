@@ -4,6 +4,7 @@ import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityPlushie;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityStatue;
+import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
@@ -24,6 +25,7 @@ import com.ninuna.losttales.client.event.LostTalesClientEventHandler;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
+import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneStateStore;
 import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
@@ -35,6 +37,7 @@ import com.ninuna.losttales.client.render.renderer.item.LostTalesItemRendererArm
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererLamp;
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererPlushie;
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererStatue;
+import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererWaystone;
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererUrn;
 import com.ninuna.losttales.config.client.LostTalesConfigGuiEventHandler;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
@@ -44,8 +47,11 @@ import com.ninuna.losttales.gui.ELostTalesMapLabels;
 import com.ninuna.losttales.gui.LostTalesGuiIds;
 import com.ninuna.losttales.gui.screen.LostTalesMissiveBoardGui;
 import com.ninuna.losttales.gui.screen.LostTalesMissiveLetterReaderGui;
+import com.ninuna.losttales.gui.screen.LostTalesWaystoneGui;
 import com.ninuna.losttales.item.armor.LostTalesItemArmor3D;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
+import com.ninuna.losttales.network.packet.LostTalesMapMarkerSnapshotPacket;
+import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
@@ -115,6 +121,9 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityUrn.class, new LostTalesTileEntityRendererUrn());
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityStatue.class, new LostTalesTileEntityRendererStatue());
+        ClientRegistry.bindTileEntitySpecialRenderer(
+                LostTalesTileEntityWaystone.class,
+                new LostTalesTileEntityRendererWaystone());
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityLamp.class, new LostTalesTileEntityRendererLamp());
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityPlushie.class, new LostTalesTileEntityRendererPlushie());
 
@@ -166,6 +175,13 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                 return new LostTalesMissiveBoardGui(player.inventory, (LostTalesTileEntityMissiveBoard) tileEntity);
             }
         }
+        if (id == LostTalesGuiIds.WAYSTONE) {
+            TileEntity tileEntity = world.getTileEntity(x, y, z);
+            if (tileEntity instanceof LostTalesTileEntityWaystone) {
+                return new LostTalesWaystoneGui(
+                        (LostTalesTileEntityWaystone)tileEntity);
+            }
+        }
         return null;
     }
 
@@ -200,6 +216,21 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         if (packet != null) {
             LostTalesClientMapMarkerNotificationStore.showDiscovery(packet.getMarkerId(), packet.getMarkerName());
         }
+    }
+
+    @Override
+    public void handleMapMarkerSnapshot(
+            LostTalesMapMarkerSnapshotPacket packet) {
+        if (packet != null && !packet.isMalformed()) {
+            LostTalesClientMapMarkerStore.setServerMarkers(
+                    packet.getMarkers());
+        }
+    }
+
+    @Override
+    public void handleWaystoneState(
+            LostTalesWaystoneStatePacket packet) {
+        LostTalesClientWaystoneStateStore.accept(packet);
     }
 
     @Override

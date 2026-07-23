@@ -22,12 +22,12 @@ import java.util.Map;
  * quest definitions available on dedicated servers.
  */
 public final class LostTalesQuestRegistry {
-    private static final String INDEX_FILE = "quest/index.json";
+    private static final String INDEX_FILE = "quests/index.json";
     private static final String[] FALLBACK_QUEST_FILES = new String[] {
-            "quest/test_quest.json",
-            "quest/missive/gather_gold_ore.json",
-            "quest/missive/kill_orc.json",
-            "quest/path/blacksmith/test_crafting_quest.json"
+            "quests/test_quest.json",
+            "quests/missive/gather_gold_ore.json",
+            "quests/missive/kill_orc.json",
+            "quests/path/blacksmith/test_crafting_quest.json"
     };
 
     private static final Map<String, LostTalesQuestDefinition> STATIC_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();

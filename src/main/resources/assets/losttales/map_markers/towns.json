@@ -7,7 +7,6 @@
       "color": "red",
       "dimension": "lotr:middle_earth",
       "x": 15.0,
-      "y": 64.0,
       "z": 15.0,
       "compassFadeInRadius": 180.0,
       "discoveryRadius": 12.0,
@@ -15,6 +14,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "description": "A small test town marker used to verify Lost Tales discovery, compass labels, and public LOTR waypoint unlocking."
     },
     {
@@ -24,7 +25,6 @@
       "color": "yellow",
       "dimension": "lotr:middle_earth",
       "x": 180.0,
-      "y": 64.0,
       "z": 40.0,
       "compassFadeInRadius": 220.0,
       "discoveryRadius": 14.0,
@@ -32,6 +32,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "description": "A modest market along the Greenway where travellers gather before continuing through the Shire borderlands."
     },
     {
@@ -41,14 +43,15 @@
       "color": "green",
       "dimension": "lotr:middle_earth",
       "x": -210.0,
-      "y": 66.0,
       "z": 95.0,
       "compassFadeInRadius": 240.0,
       "discoveryRadius": 14.0,
       "isDiscoverable": true,
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
-      "hasFastTravel": false
+      "hasFastTravel": false,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house"
     }
   ]
 }

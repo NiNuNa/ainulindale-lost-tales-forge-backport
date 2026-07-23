@@ -17,6 +17,7 @@ public final class LostTalesConfig {
     public static final String CATEGORY_COMBAT_MARKERS = "combat_markers";
     public static final String CATEGORY_PARTY = "party";
     public static final String CATEGORY_RANGED_COMBAT = "ranged_combat";
+    public static final String CATEGORY_WAYSTONES = "waystones";
 
     public static final String HUD_PRESET_CUSTOM = "custom";
     public static final String HUD_PRESET_DEFAULT = "default";
@@ -109,6 +110,13 @@ public final class LostTalesConfig {
     public static boolean autoPinQuestOnStart = true;
     public static boolean autoDiscoverNearbyMapMarkers = true;
     public static int mapMarkerDiscoveryScanIntervalTicks = 40;
+
+    public static boolean enableWaystoneRecipe = true;
+    public static String waystoneRecipeCornerIngredient =
+            "minecraft:stonebrick";
+    public static String waystoneRecipeEdgeIngredient = "ore:ingotGold";
+    public static String waystoneRecipeCenterIngredient =
+            "minecraft:ender_pearl";
 
     public static boolean enableDynamicMissiveBoards = true;
     public static int missiveBoardMinAvailable = 5;
@@ -757,6 +765,31 @@ public final class LostTalesConfig {
                     "How often, in ticks, nearby map marker discovery is checked on the server."
             );
 
+            enableWaystoneRecipe = config.getBoolean(
+                    "enableWaystoneRecipe",
+                    CATEGORY_WAYSTONES,
+                    enableWaystoneRecipe,
+                    "Register the Lost Tales waystone crafting recipe. Recipe changes require a restart."
+            );
+            waystoneRecipeCornerIngredient = config.getString(
+                    "waystoneRecipeCornerIngredient",
+                    CATEGORY_WAYSTONES,
+                    waystoneRecipeCornerIngredient,
+                    "Registry name (namespace:path[@meta]) or ore dictionary name prefixed with ore: used in recipe corners."
+            );
+            waystoneRecipeEdgeIngredient = config.getString(
+                    "waystoneRecipeEdgeIngredient",
+                    CATEGORY_WAYSTONES,
+                    waystoneRecipeEdgeIngredient,
+                    "Registry name (namespace:path[@meta]) or ore dictionary name prefixed with ore: used on recipe edges."
+            );
+            waystoneRecipeCenterIngredient = config.getString(
+                    "waystoneRecipeCenterIngredient",
+                    CATEGORY_WAYSTONES,
+                    waystoneRecipeCenterIngredient,
+                    "Registry name (namespace:path[@meta]) or ore dictionary name prefixed with ore: used at the recipe center."
+            );
+
             enableDynamicMissiveBoards = config.getBoolean(
                     "enableDynamicMissiveBoards",
                     CATEGORY_MISSIVES,
@@ -1204,6 +1237,8 @@ public final class LostTalesConfig {
         config.getCategory(CATEGORY_PARTY).setLanguageKey("losttales.config.category.party");
         config.getCategory(CATEGORY_RANGED_COMBAT).setLanguageKey(
                 "losttales.config.category.rangedCombat");
+        config.getCategory(CATEGORY_WAYSTONES).setLanguageKey(
+                "losttales.config.category.waystones");
     }
 
     private static void writeCurrentValues(Configuration config) {
@@ -1350,6 +1385,10 @@ public final class LostTalesConfig {
         config.get(CATEGORY_QUESTS, "autoPinQuestOnStart", autoPinQuestOnStart).set(autoPinQuestOnStart);
         config.get(CATEGORY_QUESTS, "autoDiscoverNearbyMapMarkers", autoDiscoverNearbyMapMarkers).set(autoDiscoverNearbyMapMarkers);
         config.get(CATEGORY_QUESTS, "mapMarkerDiscoveryScanIntervalTicks", mapMarkerDiscoveryScanIntervalTicks).set(mapMarkerDiscoveryScanIntervalTicks);
+        config.get(CATEGORY_WAYSTONES, "enableWaystoneRecipe", enableWaystoneRecipe).set(enableWaystoneRecipe);
+        config.get(CATEGORY_WAYSTONES, "waystoneRecipeCornerIngredient", waystoneRecipeCornerIngredient).set(waystoneRecipeCornerIngredient);
+        config.get(CATEGORY_WAYSTONES, "waystoneRecipeEdgeIngredient", waystoneRecipeEdgeIngredient).set(waystoneRecipeEdgeIngredient);
+        config.get(CATEGORY_WAYSTONES, "waystoneRecipeCenterIngredient", waystoneRecipeCenterIngredient).set(waystoneRecipeCenterIngredient);
         config.get(CATEGORY_MISSIVES, "enableDynamicMissiveBoards", enableDynamicMissiveBoards).set(enableDynamicMissiveBoards);
         config.get(CATEGORY_MISSIVES, "missiveBoardMinAvailable", missiveBoardMinAvailable).set(missiveBoardMinAvailable);
         config.get(CATEGORY_MISSIVES, "missiveBoardMaxAvailable", missiveBoardMaxAvailable).set(missiveBoardMaxAvailable);

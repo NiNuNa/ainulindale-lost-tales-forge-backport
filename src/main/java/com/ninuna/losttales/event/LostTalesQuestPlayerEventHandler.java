@@ -1,10 +1,13 @@
 package com.ninuna.losttales.event;
 
 import com.ninuna.losttales.quest.LostTalesQuestManager;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSyncManager;
+import com.ninuna.losttales.compat.lotr.LostTalesLotrWaystoneTravelAdapter;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerChangedDimensionEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent;
+import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedOutEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerRespawnEvent;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -36,6 +39,14 @@ public final class LostTalesQuestPlayerEventHandler {
     }
 
     @SubscribeEvent
+    public void onPlayerLoggedOut(PlayerLoggedOutEvent event) {
+        if (event.player instanceof EntityPlayerMP) {
+            LostTalesLotrWaystoneTravelAdapter.clearPending(
+                    (EntityPlayerMP)event.player);
+        }
+    }
+
+    @SubscribeEvent
     public void onPlayerChangedDimension(PlayerChangedDimensionEvent event) {
         refreshAndSyncIfServerPlayer(event.player);
     }
@@ -48,6 +59,7 @@ public final class LostTalesQuestPlayerEventHandler {
     private void refreshAndSyncIfServerPlayer(EntityPlayer player) {
         if (player instanceof EntityPlayerMP && player.worldObj != null && !player.worldObj.isRemote) {
             LostTalesQuestManager.refreshPlayerState((EntityPlayerMP) player);
+            LostTalesMapMarkerSyncManager.sync((EntityPlayerMP)player);
         }
     }
 }

@@ -1,9 +1,15 @@
 package com.ninuna.losttales.mapmarker;
 
+import net.minecraft.world.World;
+
 /** Server-safe metadata for bundled/static map markers. */
 public final class LostTalesMapMarkerDefinition {
     public static final String CATEGORY_DEFAULT = "Map Marker";
     public static final String CATEGORY_POINT_OF_INTEREST = "Point of Interest";
+    public static final String DEFAULT_WAYSTONE_STRUCTURE =
+            "losttales:glowstone_house";
+    public static final double AUTOMATIC_Y =
+            LostTalesMapMarkerHeightResolver.AUTOMATIC_Y;
 
     private final String id;
     private final String name;
@@ -26,6 +32,11 @@ public final class LostTalesMapMarkerDefinition {
     private final boolean discoverable;
     /** True when visibility also requires the marker's LOTR region to be visited. */
     private final boolean requiresRegionUnlock;
+    private final LostTalesMapMarkerSource source;
+    /** Desired physical representation; placement/link state is persisted elsewhere. */
+    private final boolean hasWaystone;
+    /** Namespaced structure placer selected if physical generation is enabled. */
+    private final String waystoneStructureType;
 
     public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, int dimensionId, double x, double y, double z, boolean hiddenUntilDiscovered) {
         this(id, name, iconName, colorName, CATEGORY_DEFAULT, false, dimensionId, x, y, z, 128.0D, 8.0D, hiddenUntilDiscovered, hiddenUntilDiscovered);
@@ -59,6 +70,29 @@ public final class LostTalesMapMarkerDefinition {
     }
 
     public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, String categoryName, String description, boolean hasFastTravel, String fastTravelWaypointCode, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable, boolean requiresRegionUnlock) {
+        this(id, name, iconName, colorName, categoryName, description,
+                hasFastTravel, fastTravelWaypointCode, dimensionId,
+                x, y, z, compassFadeInRadius, discoveryRadius,
+                hiddenUntilDiscovered, discoverable, requiresRegionUnlock,
+                LostTalesMapMarkerSource.QUEST_DYNAMIC, false, "");
+    }
+
+    public LostTalesMapMarkerDefinition(String id, String name,
+                                        String iconName, String colorName,
+                                        String categoryName,
+                                        String description,
+                                        boolean hasFastTravel,
+                                        String fastTravelWaypointCode,
+                                        int dimensionId,
+                                        double x, double y, double z,
+                                        double compassFadeInRadius,
+                                        double discoveryRadius,
+                                        boolean hiddenUntilDiscovered,
+                                        boolean discoverable,
+                                        boolean requiresRegionUnlock,
+                                        LostTalesMapMarkerSource source,
+                                        boolean hasWaystone,
+                                        String waystoneStructureType) {
         this.id = id;
         this.name = name;
         this.iconName = iconName;
@@ -77,8 +111,21 @@ public final class LostTalesMapMarkerDefinition {
                 && hiddenUntilDiscovered;
         this.discoverable = discoverable;
         this.requiresRegionUnlock = requiresRegionUnlock;
+        this.source = source == null
+                ? LostTalesMapMarkerSource.QUEST_DYNAMIC : source;
+        this.hasWaystone = hasWaystone;
+        this.waystoneStructureType = normalizeStructureType(
+                waystoneStructureType, hasWaystone);
     }
 
+    private static String normalizeStructureType(String value,
+                                                 boolean hasWaystone) {
+        String normalized = value == null ? "" : value.trim().toLowerCase();
+        if (normalized.length() == 0 && hasWaystone) {
+            return DEFAULT_WAYSTONE_STRUCTURE;
+        }
+        return normalized;
+    }
 
     private static String normalizeDescription(String description, String categoryName) {
         if (description != null && description.trim().length() > 0) {
@@ -136,6 +183,22 @@ public final class LostTalesMapMarkerDefinition {
         return y;
     }
 
+    public boolean hasExplicitY() {
+        return !LostTalesMapMarkerHeightResolver.isAutomatic(this.y);
+    }
+
+    public double getEffectiveY(World world) {
+        return LostTalesMapMarkerHeightResolver.resolve(
+                world, this.dimensionId,
+                this.x, this.y, this.z);
+    }
+
+    public double getEffectiveY(World world, double fallbackY) {
+        return LostTalesMapMarkerHeightResolver.resolveOr(
+                world, this.dimensionId,
+                this.x, this.y, this.z, fallbackY);
+    }
+
     public double getZ() {
         return z;
     }
@@ -162,6 +225,17 @@ public final class LostTalesMapMarkerDefinition {
         return requiresRegionUnlock;
     }
 
+    public LostTalesMapMarkerSource getSource() {
+        return this.source;
+    }
+
+    public boolean hasWaystone() {
+        return this.hasWaystone;
+    }
+
+    public String getWaystoneStructureType() {
+        return this.waystoneStructureType;
+    }
 
     public String getShortDescription() {
         return id + " (" + name + ", dim " + dimensionId + " @ " + format(x) + ", " + format(y) + ", " + format(z) + ", discovery " + format(discoveryRadius) + ")";

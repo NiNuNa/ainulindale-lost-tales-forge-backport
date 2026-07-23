@@ -7,7 +7,6 @@
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -180.0,
-      "y": 64.0,
       "z": -140.0,
       "compassFadeInRadius": 250.0,
       "discoveryRadius": 12.0,
@@ -15,6 +14,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "description": "A fortified test outpost claimed by Cheese, useful for checking discovered fort markers and public waypoint rendering."
     },
     {
@@ -24,7 +25,6 @@
       "color": "orange",
       "dimension": "lotr:middle_earth",
       "x": 300.0,
-      "y": 72.0,
       "z": -110.0,
       "compassFadeInRadius": 280.0,
       "discoveryRadius": 16.0,
@@ -32,6 +32,8 @@
       "hiddenUntilDiscovered": false,
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
+      "hasWaystone": true,
+      "waystoneStructureType": "losttales:glowstone_house",
       "description": "A ruined watchtower overlooking the road, still useful as a landmark for wandering travellers."
     }
   ]

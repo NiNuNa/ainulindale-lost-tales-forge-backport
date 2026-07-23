@@ -100,7 +100,7 @@ public final class LostTalesMapMarkerWaypointRegistryTest {
             }
             checked++;
         }
-        assertEquals("Unexpected generated waypoint count", 5, checked);
+        assertEquals("Unexpected generated waypoint count", 8, checked);
     }
 
     @Test

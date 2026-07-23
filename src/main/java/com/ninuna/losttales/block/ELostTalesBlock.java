@@ -9,6 +9,7 @@ import com.ninuna.losttales.block.custom.LostTalesBlockPlushie;
 import com.ninuna.losttales.block.custom.LostTalesBlockStatueTall;
 import com.ninuna.losttales.block.custom.LostTalesBlockUrnBase;
 import com.ninuna.losttales.block.custom.LostTalesBlockUrnTall;
+import com.ninuna.losttales.block.custom.LostTalesBlockWaystone;
 import com.ninuna.losttales.creativetab.ELostTalesCreativeTabs;
 import com.ninuna.losttales.entity.ELostTalesUser;
 import com.ninuna.losttales.item.block.LostTalesItemBlockBase;
@@ -32,6 +33,7 @@ public enum ELostTalesBlock {
 
     //  Blocks - Statue.
     STATUE_WATCH_STONE(new LostTalesBlockStatueTall(Material.rock, ELostTalesUser.SCOSHER).setBlockName("watch_stone").setCreativeTab(ELostTalesCreativeTabs.BLOCKS_DECORATION.getCreativeTab())),
+    WAYSTONE(new LostTalesBlockWaystone().setBlockName("waystone").setCreativeTab(ELostTalesCreativeTabs.BLOCKS_DECORATION.getCreativeTab())),
 
     //  Blocks - Lamp.
     LAMP_TEST(new LostTalesBlockLampTall(ELostTalesUser.CAPTAIN_CHEESE).setBlockName("test_lamp").setCreativeTab(ELostTalesCreativeTabs.BLOCKS_DECORATION.getCreativeTab())),
@@ -74,6 +76,10 @@ public enum ELostTalesBlock {
                 GameRegistry.registerBlock(b.getBlock(), LostTalesItemBlockBase.class, b.getBlock().getUnlocalizedName().substring(5));
             }
         }
+        // The world uses a TESR; this existing texture is only the temporary
+        // inventory/particle fallback until a dedicated waystone item model lands.
+        WAYSTONE.getBlock().setBlockTextureName(
+                LostTalesMetaData.MOD_ID + ":missive_board");
     }
 
     public Block getBlock() {
