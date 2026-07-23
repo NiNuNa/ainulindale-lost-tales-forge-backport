@@ -58,7 +58,6 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
                 String category = readName(buffer);
                 String description = readText(buffer);
                 boolean fastTravel = buffer.readBoolean();
-                String waypointCode = readId(buffer);
                 int dimensionId = buffer.readInt();
                 double x = buffer.readDouble();
                 double y = buffer.readDouble();
@@ -84,7 +83,7 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
                 }
                 this.markers.add(new LostTalesMapMarkerDefinition(
                         id, name, icon, color, category, description,
-                        fastTravel, waypointCode, dimensionId,
+                        fastTravel, dimensionId,
                         x, y, z, compassRadius, discoveryRadius,
                         hidden, discoverable, requiresRegion,
                         source, hasWaystone, structureType));
@@ -112,7 +111,6 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
             writeName(buffer, marker.getCategoryName());
             writeText(buffer, marker.getDescription());
             buffer.writeBoolean(marker.hasFastTravel());
-            writeId(buffer, marker.getFastTravelWaypointCode());
             buffer.writeInt(marker.getDimensionId());
             buffer.writeDouble(marker.getX());
             buffer.writeDouble(marker.getY());

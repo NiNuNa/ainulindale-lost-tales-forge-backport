@@ -71,6 +71,29 @@ public final class LostTalesWaystoneSettingsRequestPacket
         return packet;
     }
 
+    public static LostTalesWaystoneSettingsRequestPacket
+    shareFellowship(
+            boolean remove, int x, int y, int z,
+            String markerId, long expectedRevision,
+            String fellowshipName) {
+        LostTalesWaystoneSettingsRequestPacket packet =
+                new LostTalesWaystoneSettingsRequestPacket();
+        packet.operation = remove
+                ? LostTalesWaystoneSettingsOperation
+                        .UNSHARE_FELLOWSHIP
+                : LostTalesWaystoneSettingsOperation
+                        .SHARE_FELLOWSHIP;
+        packet.x = x;
+        packet.y = y;
+        packet.z = z;
+        packet.markerId = markerId == null ? "" : markerId;
+        packet.expectedRevision = expectedRevision;
+        packet.targetPlayerName =
+                fellowshipName == null ? "" : fellowshipName;
+        packet.validate();
+        return packet;
+    }
+
     @Override
     public void fromBytes(ByteBuf buffer) {
         this.malformed = false;
@@ -103,9 +126,6 @@ public final class LostTalesWaystoneSettingsRequestPacket
                         LostTalesPacketCodec.readUtf8String(
                                 buffer, MAX_DESCRIPTION_BYTES);
                 boolean fastTravel = buffer.readBoolean();
-                String fastTravelCode =
-                        LostTalesPacketCodec.readUtf8String(
-                                buffer, MAX_TEXT_BYTES);
                 int markerDimensionId = buffer.readInt();
                 double markerX = buffer.readDouble();
                 double markerY = buffer.readDouble();
@@ -127,8 +147,7 @@ public final class LostTalesWaystoneSettingsRequestPacket
                 this.settings =
                         new LostTalesMapMarkerEditableSettings(
                                 name, icon, color, category, description,
-                                fastTravel, fastTravelCode,
-                                markerDimensionId,
+                                fastTravel, markerDimensionId,
                                 markerX, markerY, markerZ,
                                 compassRadius, discoveryRadius,
                                 hiddenUntilDiscovered, discoverable,
@@ -174,9 +193,6 @@ public final class LostTalesWaystoneSettingsRequestPacket
                     buffer, value.getDescription(),
                     MAX_DESCRIPTION_BYTES);
             buffer.writeBoolean(value.hasFastTravel());
-            LostTalesPacketCodec.writeUtf8String(
-                    buffer, value.getFastTravelWaypointCode(),
-                    MAX_TEXT_BYTES);
             buffer.writeInt(value.getDimensionId());
             buffer.writeDouble(value.getX());
             buffer.writeDouble(value.getY());
@@ -256,9 +272,6 @@ public final class LostTalesWaystoneSettingsRequestPacket
                         value.getCategoryName(), MAX_TEXT_BYTES)
                 && LostTalesPacketCodec.isUtf8WithinLimit(
                         value.getDescription(), MAX_DESCRIPTION_BYTES)
-                && LostTalesPacketCodec.isUtf8WithinLimit(
-                        value.getFastTravelWaypointCode(),
-                        MAX_TEXT_BYTES)
                 && LostTalesPacketCodec.isUtf8WithinLimit(
                         value.getWaystoneStructureType(),
                         MAX_STRUCTURE_ID_BYTES)

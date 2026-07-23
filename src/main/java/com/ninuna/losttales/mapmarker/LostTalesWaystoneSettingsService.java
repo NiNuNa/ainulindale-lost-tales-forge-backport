@@ -1,15 +1,19 @@
 package com.ninuna.losttales.mapmarker;
 
+import com.mojang.authlib.GameProfile;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
 import com.ninuna.losttales.compat.lotr.LostTalesWaystonePermissionPolicy;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneSettingsRequestPacket;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
-import com.ninuna.losttales.world.waystone.LostTalesWaystoneStructureRegistry;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import lotr.common.LOTRLevelData;
+import lotr.common.LOTRPlayerData;
+import lotr.common.fellowship.LOTRFellowship;
+import lotr.common.fellowship.LOTRFellowshipData;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
@@ -52,15 +56,26 @@ public final class LostTalesWaystoneSettingsService {
         LostTalesMapMarkerRecord updated;
         switch (request.getOperation()) {
             case SAVE:
-                updated = applySettings(player, context.record, request);
+                updated = applySettings(
+                        player, context.record, request);
                 break;
             case SHARE_PLAYER:
-                updated = applySharing(
+                updated = applyPlayerSharing(
                         player, context.record,
                         request.getTargetPlayerName(), false);
                 break;
             case UNSHARE_PLAYER:
-                updated = applySharing(
+                updated = applyPlayerSharing(
+                        player, context.record,
+                        request.getTargetPlayerName(), true);
+                break;
+            case SHARE_FELLOWSHIP:
+                updated = applyFellowshipSharing(
+                        player, context.record,
+                        request.getTargetPlayerName(), false);
+                break;
+            case UNSHARE_FELLOWSHIP:
+                updated = applyFellowshipSharing(
                         player, context.record,
                         request.getTargetPlayerName(), true);
                 break;
@@ -105,7 +120,7 @@ public final class LostTalesWaystoneSettingsService {
                 new LostTalesWaystoneStatePacket(
                         player.dimension,
                         tile.xCoord, tile.yCoord, tile.zCoord,
-                        record, canEdit, operator, operator),
+                        record, canEdit, operator),
                 player);
     }
 
@@ -133,7 +148,7 @@ public final class LostTalesWaystoneSettingsService {
                 LostTalesMapMarkerStorage.get(world);
         LostTalesMapMarkerRecord record =
                 data.getRecord(request.getMarkerId());
-        if (record == null || !record.isActive() || !record.isLinked()
+        if (record == null || !record.isLinked()
                 || record.getLinkedDimensionId()
                         != world.provider.dimensionId
                 || record.getLinkedX() != request.getX()
@@ -161,11 +176,7 @@ public final class LostTalesWaystoneSettingsService {
         String color = normalizeColor(requested.getColorName());
         String category = trim(requested.getCategoryName());
         String description = trim(requested.getDescription());
-        String fastTravelCode =
-                trim(requested.getFastTravelWaypointCode());
-        String structureType =
-                trim(requested.getWaystoneStructureType())
-                        .toLowerCase(Locale.ROOT);
+        String structureType = record.getWaystoneStructureType();
         double x = requested.getX();
         double y = requested.getY();
         double z = requested.getZ();
@@ -185,8 +196,6 @@ public final class LostTalesWaystoneSettingsService {
                         > LostTalesMapMarkerRecord.MAX_NAME_LENGTH
                 || description.length()
                         > LostTalesMapMarkerRecord.MAX_TEXT_LENGTH
-                || fastTravelCode.length()
-                        > LostTalesMapMarkerRecord.MAX_NAME_LENGTH
                 || !validCoordinate(x)
                 || !validMarkerY(y)
                 || !validCoordinate(z)
@@ -203,40 +212,21 @@ public final class LostTalesWaystoneSettingsService {
             deny(player, "chat.losttales.waystone.public_denied");
             return null;
         }
-        boolean operator =
-                LostTalesWaystonePermissionPolicy.isOperator(player);
-        if (!operator && changesAdvancedFields(record, requested)) {
-            deny(player, "chat.losttales.waystone.advanced_denied");
-            return null;
-        }
-        if (record.isLinked() && !requested.hasWaystone()) {
-            deny(player, "chat.losttales.waystone.linked_required");
-            return null;
-        }
-        if (requested.hasWaystone()
-                && (structureType.length() == 0
-                    || structureType.length()
-                            > LostTalesMapMarkerRecord
-                                    .MAX_STRUCTURE_ID_LENGTH
-                    || !structureType.matches(
-                            "[a-z0-9_.-]+:[a-z0-9_./-]+")
-                    || (!structureType.equals(
-                            record.getWaystoneStructureType())
-                        && LostTalesWaystoneStructureRegistry.get(
-                                structureType) == null))) {
-            deny(player, "chat.losttales.waystone.invalid_structure");
+        if (changesPhysicalFields(record, requested)) {
+            deny(player, "chat.losttales.waystone.invalid_settings");
             return null;
         }
         LostTalesMapMarkerEditableSettings normalized =
                 new LostTalesMapMarkerEditableSettings(
                         name, icon, color, category, description,
-                        requested.hasFastTravel(), fastTravelCode,
-                        requested.getDimensionId(), x, y, z,
+                        requested.hasFastTravel(),
+                        record.getDimensionId(),
+                        record.getX(), record.getY(), record.getZ(),
                         compassRadius, discoveryRadius,
                         requested.isHiddenUntilDiscovered(),
                         requested.isDiscoverable(),
                         requested.requiresRegionUnlock(),
-                        requested.hasWaystone(), structureType,
+                        record.hasWaystone(), structureType,
                         visibility);
         try {
             return record.withEditableSettings(normalized);
@@ -246,15 +236,13 @@ public final class LostTalesWaystoneSettingsService {
         }
     }
 
-    private static boolean changesAdvancedFields(
+    private static boolean changesPhysicalFields(
             LostTalesMapMarkerRecord record,
             LostTalesMapMarkerEditableSettings settings) {
         return record.getDimensionId() != settings.getDimensionId()
                 || different(record.getX(), settings.getX())
                 || different(record.getY(), settings.getY())
                 || different(record.getZ(), settings.getZ())
-                || !record.getFastTravelWaypointCode().equals(
-                        trim(settings.getFastTravelWaypointCode()))
                 || record.hasWaystone() != settings.hasWaystone()
                 || !record.getWaystoneStructureType().equals(
                         trim(settings.getWaystoneStructureType())
@@ -290,17 +278,16 @@ public final class LostTalesWaystoneSettingsService {
         return value == null ? "" : value.trim();
     }
 
-    private static LostTalesMapMarkerRecord applySharing(
+    private static LostTalesMapMarkerRecord applyPlayerSharing(
             EntityPlayerMP player,
             LostTalesMapMarkerRecord record,
             String playerName, boolean remove) {
-        EntityPlayerMP target = findOnlinePlayer(playerName);
-        if (target == null) {
+        UUID targetId = findPlayerId(playerName);
+        if (targetId == null) {
             deny(player, "chat.losttales.waystone.player_not_found");
             return null;
         }
-        UUID targetId = target.getUniqueID();
-        if (targetId == null || targetId.equals(record.getOwnerPlayerId())) {
+        if (targetId.equals(record.getOwnerPlayerId())) {
             deny(player, "chat.losttales.waystone.invalid_share");
             return null;
         }
@@ -325,25 +312,92 @@ public final class LostTalesWaystoneSettingsService {
         return record.withSharedPlayers(shared, visibility);
     }
 
-    private static EntityPlayerMP findOnlinePlayer(String playerName) {
+    private static LostTalesMapMarkerRecord
+    applyFellowshipSharing(
+            EntityPlayerMP player,
+            LostTalesMapMarkerRecord record,
+            String fellowshipName, boolean remove) {
+        LOTRFellowship fellowship = resolveFellowship(
+                player, record, fellowshipName, remove);
+        if (fellowship == null
+                || fellowship.getFellowshipID() == null
+                || !remove && fellowship.isDisbanded()) {
+            deny(player,
+                    "chat.losttales.waystone.fellowship_not_found");
+            return null;
+        }
+        Set<UUID> shared = new LinkedHashSet<UUID>(
+                record.getSharedFellowshipIds());
+        UUID fellowshipId = fellowship.getFellowshipID();
+        if (remove) {
+            shared.remove(fellowshipId);
+        } else {
+            if (shared.size()
+                    >= LostTalesMapMarkerRecord
+                            .MAX_SHARED_FELLOWSHIPS) {
+                deny(player,
+                        "chat.losttales.waystone.share_limit");
+                return null;
+            }
+            shared.add(fellowshipId);
+        }
+        LostTalesMapMarkerVisibility visibility =
+                record.getVisibility();
+        if (!remove
+                && visibility
+                        == LostTalesMapMarkerVisibility.PRIVATE) {
+            visibility = LostTalesMapMarkerVisibility.SHARED;
+        }
+        return record.withSharedFellowships(
+                shared, visibility);
+    }
+
+    private static LOTRFellowship resolveFellowship(
+            EntityPlayerMP player,
+            LostTalesMapMarkerRecord record,
+            String fellowshipName, boolean remove) {
+        String normalized = trim(fellowshipName);
+        if (normalized.length() == 0) {
+            return null;
+        }
+        if (remove) {
+            for (UUID fellowshipId
+                    : record.getSharedFellowshipIds()) {
+                LOTRFellowship fellowship =
+                        LOTRFellowshipData.getFellowship(
+                                fellowshipId);
+                if (fellowship != null
+                        && ((fellowship.getName() != null
+                                && fellowship.getName()
+                                        .equalsIgnoreCase(normalized))
+                        || fellowshipId.toString()
+                                .equalsIgnoreCase(normalized))) {
+                    return fellowship;
+                }
+            }
+        }
+        UUID fellowshipOwner =
+                record.getOwnerPlayerId() == null
+                        ? player.getUniqueID()
+                        : record.getOwnerPlayerId();
+        LOTRPlayerData ownerData =
+                LOTRLevelData.getData(fellowshipOwner);
+        return ownerData == null ? null
+                : ownerData.getFellowshipByName(normalized);
+    }
+
+    private static UUID findPlayerId(String playerName) {
         String normalized =
                 playerName == null ? "" : playerName.trim();
         MinecraftServer server = MinecraftServer.getServer();
         if (normalized.length() == 0 || server == null
                 || server.getConfigurationManager() == null
-                || server.getConfigurationManager().playerEntityList
-                        == null) {
+                || server.func_152358_ax() == null) {
             return null;
         }
-        for (Object value
-                : server.getConfigurationManager().playerEntityList) {
-            if (value instanceof EntityPlayerMP
-                    && ((EntityPlayerMP)value).getCommandSenderName()
-                            .equalsIgnoreCase(normalized)) {
-                return (EntityPlayerMP)value;
-            }
-        }
-        return null;
+        GameProfile profile = server.func_152358_ax()
+                .func_152655_a(normalized);
+        return profile == null ? null : profile.getId();
     }
 
     private static String normalizeColor(String value) {

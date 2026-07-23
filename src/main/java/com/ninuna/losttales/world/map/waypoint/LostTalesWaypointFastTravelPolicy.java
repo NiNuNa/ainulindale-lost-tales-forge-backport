@@ -1,11 +1,15 @@
 package com.ninuna.losttales.world.map.waypoint;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibilityPolicy;
 import com.ninuna.losttales.compat.lotr.LostTalesLotrWaystoneTravelAdapter;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import lotr.common.LOTRLevelData;
 import lotr.common.LOTRPlayerData;
 import lotr.common.world.map.LOTRAbstractWaypoint;
+import lotr.common.world.map.LOTRCustomWaypoint;
 import lotr.common.world.map.LOTRWaypoint;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.ChatComponentTranslation;
@@ -29,7 +33,26 @@ public final class LostTalesWaypointFastTravelPolicy {
         if (data == null || waypoint == null || player == null) {
             return;
         }
+        LostTalesMapMarkerRecord record =
+                getSavedMarker(player, waypoint);
         if (isAllowed(player, waypoint)) {
+            if (record != null && record.isLinked()) {
+                LOTRCustomWaypoint safe =
+                        LostTalesLotrWaystoneTravelAdapter
+                                .createSafeDestinationWaypoint(
+                                        player, record);
+                if (safe == null) {
+                    player.closeScreen();
+                    player.addChatMessage(new ChatComponentTranslation(
+                            "chat.losttales.fast_travel.unsafe"));
+                    return;
+                }
+                data.setTargetFTWaypoint(safe);
+                LostTalesLotrWaystoneTravelAdapter
+                        .trackNativeTravel(
+                                player, safe, record);
+                return;
+            }
             data.setTargetFTWaypoint(waypoint);
             return;
         }
@@ -56,27 +79,59 @@ public final class LostTalesWaypointFastTravelPolicy {
 
     public static boolean isAllowed(
             EntityPlayerMP player, LOTRAbstractWaypoint waypoint) {
-        LostTalesMapMarkerDefinition marker =
-                LostTalesMapMarkerWaypointRegistry
-                        .getMarkerForWaypoint(waypoint);
-        if (marker == null) {
-            return true;
+        LostTalesMapMarkerRecord record =
+                getSavedMarker(player, waypoint);
+        if (record == null) {
+            LostTalesMapMarkerDefinition marker =
+                    LostTalesMapMarkerWaypointRegistry
+                            .getMarkerForWaypoint(waypoint);
+            if (marker == null) {
+                return true;
+            }
+            return false;
         }
-        if (marker.requiresRegionUnlock()) {
+        if (!record.hasFastTravel()
+                || record.getDimensionId() != player.dimension
+                || !LostTalesMapMarkerVisibilityPolicy.canView(
+                        record, player)) {
+            return false;
+        }
+        if (record.requiresRegionUnlock()) {
             LOTRWaypoint.Region markerRegion =
                     LostTalesMapMarkerRegionResolver.resolve(
-                            player.worldObj, marker);
+                            player.worldObj, record.toDefinition());
             LOTRPlayerData lotrData = LOTRLevelData.getData(player);
             if (markerRegion == null || lotrData == null
                     || !lotrData.isFTRegionUnlocked(markerRegion)) {
                 return false;
             }
         }
-        if (!marker.isDiscoverable()) {
+        if (!record.isDiscoverable()) {
             return true;
         }
         LostTalesQuestPlayerData data =
                 LostTalesQuestPlayerData.get(player);
-        return data != null && data.isMarkerDiscovered(marker.getId());
+        return data != null && data.isMarkerDiscovered(record.getId());
+    }
+
+    private static LostTalesMapMarkerRecord getSavedMarker(
+            EntityPlayerMP player, LOTRAbstractWaypoint waypoint) {
+        if (player == null || player.worldObj == null
+                || waypoint == null) {
+            return null;
+        }
+        com.ninuna.losttales.mapmarker.LostTalesMapMarkerWorldData data =
+                LostTalesMapMarkerStorage.get(player.worldObj);
+        if (waypoint instanceof LOTRCustomWaypoint) {
+            LostTalesMapMarkerRecord byTravelId =
+                    data.findByLotrTravelId(waypoint.getID());
+            if (byTravelId != null) {
+                return byTravelId;
+            }
+        }
+        LostTalesMapMarkerDefinition marker =
+                LostTalesMapMarkerWaypointRegistry
+                        .getMarkerForWaypoint(waypoint);
+        return marker == null ? null : data.getRecord(marker.getId());
     }
 }

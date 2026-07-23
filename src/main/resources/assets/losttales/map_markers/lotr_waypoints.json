@@ -15,8 +15,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HIMLING"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:tol_fuin",
@@ -33,8 +32,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "TOL_FUIN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:tol_morwen",
@@ -51,8 +49,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "TOL_MORWEN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:meneltarma_summit",
@@ -69,8 +66,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MENELTARMA_SUMMIT"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:hobbiton",
@@ -87,8 +83,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HOBBITON"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:brandywine_bridge",
@@ -105,8 +100,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "BRANDYWINE_BRIDGE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:sarn_ford",
@@ -123,8 +117,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "SARN_FORD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:longbottom",
@@ -141,8 +134,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "LONGBOTTOM"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:michel_delving",
@@ -159,8 +151,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MICHEL_DELVING"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:willowbottom",
@@ -177,8 +168,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "WILLOWBOTTOM"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:bucklebury",
@@ -195,8 +185,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "BUCKLEBURY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:whitfurrows",
@@ -213,8 +202,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "WHITFURROWS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:frogmorton",
@@ -231,8 +219,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "FROGMORTON"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:oatbarton",
@@ -249,8 +236,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "OATBARTON"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:scary",
@@ -267,8 +253,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "SCARY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:needlehole",
@@ -285,8 +270,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "NEEDLEHOLE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:little_delving",
@@ -303,8 +287,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "LITTLE_DELVING"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:waymeet",
@@ -321,8 +304,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "WAYMEET"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:tuckborough",
@@ -339,8 +321,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "TUCKBOROUGH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:nobottle",
@@ -357,8 +338,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "NOBOTTLE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:tighfield",
@@ -375,8 +355,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "TIGHFIELD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:brockenborings",
@@ -393,8 +372,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "BROCKENBORINGS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:deephallow",
@@ -411,8 +389,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DEEPHALLOW"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:stock",
@@ -429,8 +406,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "STOCK"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:bywater",
@@ -447,8 +423,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "BYWATER"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:overhill",
@@ -465,8 +440,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "OVERHILL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:haysend",
@@ -483,8 +457,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HAYSEND"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:hay_gate",
@@ -501,8 +474,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HAY_GATE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:greenholm",
@@ -519,8 +491,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GREENHOLM"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:withywindle_valley",
@@ -537,8 +508,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "WITHYWINDLE_VALLEY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:forlond",
@@ -555,8 +525,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "FORLOND"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:harlond",
@@ -573,8 +542,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HARLOND"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mithlond_north",
@@ -591,8 +559,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MITHLOND_NORTH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mithlond_south",
@@ -609,8 +576,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MITHLOND_SOUTH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:forlindon",
@@ -627,8 +593,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "FORLINDON"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:harlindon",
@@ -645,8 +610,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HARLINDON"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:tower_hills",
@@ -663,8 +627,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "TOWER_HILLS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:amon_ereb",
@@ -681,8 +644,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "AMON_EREB"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:belegost",
@@ -699,8 +661,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "BELEGOST"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:nogrod",
@@ -717,8 +678,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "NOGROD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mount_rerir",
@@ -735,8 +695,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOUNT_RERIR"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mount_dolmed",
@@ -753,8 +712,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOUNT_DOLMED"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:thorin_halls",
@@ -771,8 +729,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "THORIN_HALLS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:arvedui_mines",
@@ -789,8 +746,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ARVEDUI_MINES"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:thrain_halls",
@@ -807,8 +763,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "THRAIN_HALLS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:north_downs",
@@ -825,8 +780,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "NORTH_DOWNS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:south_downs",
@@ -843,8 +797,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "SOUTH_DOWNS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:eryn_vorn",
@@ -861,8 +814,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ERYN_VORN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:tharbad",
@@ -879,8 +831,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "THARBAD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:fornost",
@@ -897,8 +848,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "FORNOST"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:annuminas",
@@ -915,8 +865,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ANNUMINAS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:greenway_crossroads",
@@ -933,8 +882,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GREENWAY_CROSSROADS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:bree",
@@ -951,8 +899,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "BREE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:staddle",
@@ -969,8 +916,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "STADDLE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:combe",
@@ -987,8 +933,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "COMBE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:archet",
@@ -1005,8 +950,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ARCHET"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:forsaken_inn",
@@ -1023,8 +967,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "FORSAKEN_INN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:weathertop",
@@ -1041,8 +984,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "WEATHERTOP"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:last_bridge",
@@ -1059,8 +1001,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "LAST_BRIDGE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:old_elf_way",
@@ -1077,8 +1018,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "OLD_ELF_WAY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:rivendell",
@@ -1095,8 +1035,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RIVENDELL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:ford_bruinen",
@@ -1113,8 +1052,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "FORD_BRUINEN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:the_trollshaws",
@@ -1131,8 +1069,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "THE_TROLLSHAWS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:carn_dum",
@@ -1149,8 +1086,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CARN_DUM"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:west_gate",
@@ -1167,8 +1103,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "WEST_GATE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:ost_in_edhil",
@@ -1185,8 +1120,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "OST_IN_EDHIL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:north_dunland",
@@ -1203,8 +1137,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "NORTH_DUNLAND"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:south_dunland",
@@ -1221,8 +1154,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "SOUTH_DUNLAND"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:fords_of_isen",
@@ -1239,8 +1171,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "FORDS_OF_ISEN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:dwarrowvale",
@@ -1257,8 +1188,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DWARROWVALE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:wulfburg",
@@ -1275,8 +1205,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "WULFBURG"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:lond_daer",
@@ -1293,8 +1222,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "LOND_DAER"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:enedwaith_road",
@@ -1311,8 +1239,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ENEDWAITH_ROAD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mouths_isen",
@@ -1329,8 +1256,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOUTHS_ISEN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:isengard",
@@ -1347,8 +1273,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ISENGARD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:cape_of_forochel",
@@ -1365,8 +1290,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CAPE_OF_FOROCHEL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:south_forochel",
@@ -1383,8 +1307,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "SOUTH_FOROCHEL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:withered_heath",
@@ -1401,8 +1324,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "WITHERED_HEATH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mount_gundabad",
@@ -1419,8 +1341,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOUNT_GUNDABAD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mount_gram",
@@ -1437,8 +1358,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOUNT_GRAM"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:high_pass",
@@ -1455,8 +1375,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HIGH_PASS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mount_caradhras",
@@ -1473,8 +1392,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOUNT_CARADHRAS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mount_celebdil",
@@ -1491,8 +1409,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOUNT_CELEBDIL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mount_fanuidhol",
@@ -1509,8 +1426,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOUNT_FANUIDHOL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mount_methedras",
@@ -1527,8 +1443,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOUNT_METHEDRAS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:goblin_town",
@@ -1545,8 +1460,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GOBLIN_TOWN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:eagles_eyrie",
@@ -1563,8 +1477,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "EAGLES_EYRIE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:dains_halls",
@@ -1581,8 +1494,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DAINS_HALLS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:scatha",
@@ -1599,8 +1511,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "SCATHA"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:carrock",
@@ -1617,8 +1528,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CARROCK"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:old_ford",
@@ -1635,8 +1545,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "OLD_FORD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:gladden_fields",
@@ -1653,8 +1562,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GLADDEN_FIELDS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:dimrill_dale",
@@ -1671,8 +1579,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DIMRILL_DALE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:field_of_celebrant",
@@ -1689,8 +1596,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "FIELD_OF_CELEBRANT"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:rauros",
@@ -1707,8 +1613,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RAUROS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:beorn",
@@ -1725,8 +1630,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "BEORN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:forest_gate",
@@ -1743,8 +1647,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "FOREST_GATE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:framsburg",
@@ -1761,8 +1664,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "FRAMSBURG"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:anduin_crossroads",
@@ -1779,8 +1681,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ANDUIN_CROSSROADS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:east_rhovanion_road",
@@ -1797,8 +1698,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "EAST_RHOVANION_ROAD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:thranduil_halls",
@@ -1815,8 +1715,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "THRANDUIL_HALLS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:dol_guldur",
@@ -1833,8 +1732,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DOL_GULDUR"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mirkwood_mountains",
@@ -1851,8 +1749,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MIRKWOOD_MOUNTAINS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:rhosgobel",
@@ -1869,8 +1766,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RHOSGOBEL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:enchanted_river",
@@ -1887,8 +1783,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ENCHANTED_RIVER"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:river_gate",
@@ -1905,8 +1800,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RIVER_GATE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:east_bight",
@@ -1923,8 +1817,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "EAST_BIGHT"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:old_rhovanion",
@@ -1941,8 +1834,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "OLD_RHOVANION"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:dorwinion_crossroads",
@@ -1959,8 +1851,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DORWINION_CROSSROADS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:erebor",
@@ -1977,8 +1868,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "EREBOR"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:dale_city",
@@ -1995,8 +1885,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DALE_CITY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:long_lake",
@@ -2013,8 +1902,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "LONG_LAKE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:running_ford",
@@ -2031,8 +1919,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RUNNING_FORD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:redwater_ford",
@@ -2049,8 +1936,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "REDWATER_FORD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:dale_crossroads",
@@ -2067,8 +1953,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DALE_CROSSROADS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:dale_port",
@@ -2085,8 +1970,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DALE_PORT"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:west_peak",
@@ -2103,8 +1987,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "WEST_PEAK"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:east_peak",
@@ -2121,8 +2004,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "EAST_PEAK"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:caras_galadhon",
@@ -2139,8 +2021,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CARAS_GALADHON"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:cerin_amroth",
@@ -2157,8 +2038,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CERIN_AMROTH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:nimrodel",
@@ -2175,8 +2055,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "NIMRODEL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:derndingle",
@@ -2193,8 +2072,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DERNDINGLE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:wellinghall",
@@ -2211,8 +2089,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "WELLINGHALL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:treebeard_hill",
@@ -2229,8 +2106,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "TREEBEARD_HILL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:wold",
@@ -2247,8 +2123,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "WOLD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:edoras",
@@ -2265,8 +2140,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "EDORAS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:helms_deep",
@@ -2283,8 +2157,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HELMS_DEEP"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:helms_crossroads",
@@ -2301,8 +2174,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HELMS_CROSSROADS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:uruk_highlands",
@@ -2319,8 +2191,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "URUK_HIGHLANDS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mering_stream",
@@ -2337,8 +2208,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MERING_STREAM"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:entwade",
@@ -2355,8 +2225,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ENTWADE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:eastmark",
@@ -2373,8 +2242,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "EASTMARK"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:aldburg",
@@ -2391,8 +2259,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ALDBURG"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:grimslade",
@@ -2409,8 +2276,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GRIMSLADE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:corsairs_landing",
@@ -2427,8 +2293,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CORSAIRS_LANDING"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:freca_hold",
@@ -2445,8 +2310,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "FRECA_HOLD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:dunharrow",
@@ -2463,8 +2327,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DUNHARROW"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:tarlang",
@@ -2481,8 +2344,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "TARLANG"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:ras_morthil",
@@ -2499,8 +2361,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RAS_MORTHIL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:minas_tirith",
@@ -2517,8 +2378,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MINAS_TIRITH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:cair_andros",
@@ -2535,8 +2395,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CAIR_ANDROS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:halifirien",
@@ -2553,8 +2412,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HALIFIRIEN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:calenhad",
@@ -2571,8 +2429,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CALENHAD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:minrimmon",
@@ -2589,8 +2446,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MINRIMMON"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:erelas",
@@ -2607,8 +2463,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ERELAS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:nardol",
@@ -2625,8 +2480,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "NARDOL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:eilenach",
@@ -2643,8 +2497,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "EILENACH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:amon_din",
@@ -2661,8 +2514,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "AMON_DIN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:osgiliath_west",
@@ -2679,8 +2531,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "OSGILIATH_WEST"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:osgiliath_east",
@@ -2697,8 +2548,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "OSGILIATH_EAST"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:emyn_arnen",
@@ -2715,8 +2565,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "EMYN_ARNEN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:henneth_annun",
@@ -2733,8 +2582,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HENNETH_ANNUN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:crossroads_ithilien",
@@ -2751,8 +2599,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CROSSROADS_ITHILIEN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:north_ithilien",
@@ -2769,8 +2616,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "NORTH_ITHILIEN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:crossings_of_poros",
@@ -2787,8 +2633,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CROSSINGS_OF_POROS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:pelargir",
@@ -2805,8 +2650,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "PELARGIR"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:linhir",
@@ -2823,8 +2667,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "LINHIR"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:anduin_mouth",
@@ -2841,8 +2684,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ANDUIN_MOUTH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:imloth_melui",
@@ -2859,8 +2701,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "IMLOTH_MELUI"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:crossings_erui",
@@ -2877,8 +2718,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CROSSINGS_ERUI"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:calembel",
@@ -2895,8 +2735,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CALEMBEL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:ethring",
@@ -2913,8 +2752,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ETHRING"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:erech",
@@ -2931,8 +2769,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ERECH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:green_hills",
@@ -2949,8 +2786,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GREEN_HILLS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:dol_amroth",
@@ -2967,8 +2803,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DOL_AMROTH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:edhellond",
@@ -2985,8 +2820,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "EDHELLOND"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:tarnost",
@@ -3003,8 +2837,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "TARNOST"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:tolfalas_island",
@@ -3021,8 +2854,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "TOLFALAS_ISLAND"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:amon_hen",
@@ -3039,8 +2871,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "AMON_HEN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:amon_lhaw",
@@ -3057,8 +2888,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "AMON_LHAW"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:argonath",
@@ -3075,8 +2905,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ARGONATH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:north_undeep",
@@ -3093,8 +2922,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "NORTH_UNDEEP"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:south_undeep",
@@ -3111,8 +2939,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "SOUTH_UNDEEP"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:morannon",
@@ -3129,8 +2956,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MORANNON"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:udun",
@@ -3147,8 +2973,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "UDUN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mount_doom",
@@ -3165,8 +2990,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOUNT_DOOM"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:barad_dur",
@@ -3183,8 +3007,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "BARAD_DUR"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:minas_morgul",
@@ -3201,8 +3024,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MINAS_MORGUL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:durthang",
@@ -3219,8 +3041,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DURTHANG"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:carach_angren",
@@ -3237,8 +3058,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CARACH_ANGREN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:cirith_ungol",
@@ -3255,8 +3075,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CIRITH_UNGOL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:morigost",
@@ -3273,8 +3092,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MORIGOST"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:nargroth",
@@ -3291,8 +3109,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "NARGROTH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:amon_angren",
@@ -3309,8 +3126,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "AMON_ANGREN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:seregost",
@@ -3327,8 +3143,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "SEREGOST"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:fellbeasts",
@@ -3345,8 +3160,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "FELLBEASTS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:eastern_guard",
@@ -3363,8 +3177,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "EASTERN_GUARD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:nurnen_northern_shore",
@@ -3381,8 +3194,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "NURNEN_NORTHERN_SHORE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:nurnen_southern_shore",
@@ -3399,8 +3211,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "NURNEN_SOUTHERN_SHORE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:nurnen_western_shore",
@@ -3417,8 +3228,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "NURNEN_WESTERN_SHORE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:nurnen_eastern_shore",
@@ -3435,8 +3245,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "NURNEN_EASTERN_SHORE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:thaurband",
@@ -3453,8 +3262,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "THAURBAND"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:valley_of_spiders",
@@ -3471,8 +3279,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "VALLEY_OF_SPIDERS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:dorwinion_port",
@@ -3489,8 +3296,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DORWINION_PORT"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:dorwinion_court",
@@ -3507,8 +3313,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DORWINION_COURT"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:dorwinion_ford",
@@ -3525,8 +3330,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DORWINION_FORD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:dorwinion_hills",
@@ -3543,8 +3347,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DORWINION_HILLS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:rhun_road_way",
@@ -3561,8 +3364,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RHUN_ROAD_WAY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:balcaras",
@@ -3579,8 +3381,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "BALCARAS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:khand_north_road",
@@ -3597,8 +3398,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "KHAND_NORTH_ROAD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:rhun_capital",
@@ -3615,8 +3415,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RHUN_CAPITAL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:khamul_tower",
@@ -3633,8 +3432,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "KHAMUL_TOWER"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mordor_ford",
@@ -3651,8 +3449,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MORDOR_FORD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:rhun_north_city",
@@ -3669,8 +3466,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RHUN_NORTH_CITY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:bazylan",
@@ -3687,8 +3483,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "BAZYLAN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:border_town",
@@ -3705,8 +3500,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "BORDER_TOWN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:rhun_sea_city",
@@ -3723,8 +3517,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RHUN_SEA_CITY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:rhun_north_ford",
@@ -3741,8 +3534,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RHUN_NORTH_FORD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:rhun_northeast",
@@ -3759,8 +3551,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RHUN_NORTHEAST"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:rhun_south_pass",
@@ -3777,8 +3568,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RHUN_SOUTH_PASS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:rhun_east_city",
@@ -3795,8 +3585,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RHUN_EAST_CITY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:rhun_east_town",
@@ -3813,8 +3602,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RHUN_EAST_TOWN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:rhun_southeast",
@@ -3831,8 +3619,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "RHUN_SOUTHEAST"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:baraz_dum",
@@ -3849,8 +3636,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "BARAZ_DUM"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:crossings_of_harad",
@@ -3867,8 +3653,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CROSSINGS_OF_HARAD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:harnen_sea_town",
@@ -3885,8 +3670,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HARNEN_SEA_TOWN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:harnen_road_town",
@@ -3903,8 +3687,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HARNEN_ROAD_TOWN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:harnen_black_town",
@@ -3921,8 +3704,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HARNEN_BLACK_TOWN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:crossings_of_lithnen",
@@ -3939,8 +3721,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CROSSINGS_OF_LITHNEN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:harnen_river_town",
@@ -3957,8 +3738,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HARNEN_RIVER_TOWN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:khand_ford",
@@ -3975,8 +3755,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "KHAND_FORD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:umbar_city",
@@ -3993,8 +3772,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "UMBAR_CITY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:umbar_gate",
@@ -4011,8 +3789,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "UMBAR_GATE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:gate_herumor",
@@ -4029,8 +3806,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GATE_HERUMOR"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:cedar_road",
@@ -4047,8 +3823,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "CEDAR_ROAD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:fertile_valley",
@@ -4065,8 +3840,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "FERTILE_VALLEY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:gardens_beruthiel",
@@ -4083,8 +3857,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GARDENS_BERUTHIEL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:ain_al_harad",
@@ -4101,8 +3874,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "AIN_AL_HARAD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:gate_fuinur",
@@ -4119,8 +3891,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GATE_FUINUR"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:coast_fortress",
@@ -4137,8 +3908,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "COAST_FORTRESS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:sandhill_town",
@@ -4155,8 +3925,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "SANDHILL_TOWN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:coast_river_town",
@@ -4173,8 +3942,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "COAST_RIVER_TOWN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:coast_city",
@@ -4191,8 +3959,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "COAST_CITY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:desert_town",
@@ -4209,8 +3976,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DESERT_TOWN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:south_desert_town",
@@ -4227,8 +3993,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "SOUTH_DESERT_TOWN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:desert_river_town",
@@ -4245,8 +4010,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "DESERT_RIVER_TOWN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:gulf_of_harad",
@@ -4263,8 +4027,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GULF_OF_HARAD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:gulf_city",
@@ -4281,8 +4044,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GULF_CITY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:gulf_ford",
@@ -4299,8 +4061,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GULF_FORD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:gulf_trade_town",
@@ -4317,8 +4078,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GULF_TRADE_TOWN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:gulf_north_town",
@@ -4335,8 +4095,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GULF_NORTH_TOWN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:gulf_east_bay",
@@ -4353,8 +4112,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GULF_EAST_BAY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:gulf_east_port",
@@ -4371,8 +4129,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GULF_EAST_PORT"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mount_sand",
@@ -4389,8 +4146,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOUNT_SAND"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mount_green",
@@ -4407,8 +4163,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOUNT_GREEN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:mount_thunder",
@@ -4425,8 +4180,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOUNT_THUNDER"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:great_plains_north",
@@ -4443,8 +4197,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GREAT_PLAINS_NORTH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:great_plains_south",
@@ -4461,8 +4214,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GREAT_PLAINS_SOUTH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:great_plains_west",
@@ -4479,8 +4231,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GREAT_PLAINS_WEST"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:great_plains_east",
@@ -4497,8 +4248,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GREAT_PLAINS_EAST"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:green_valley",
@@ -4515,8 +4265,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "GREEN_VALLEY"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:harad_lakes",
@@ -4533,8 +4282,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HARAD_LAKES"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:lake_harad",
@@ -4551,8 +4299,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "LAKE_HARAD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:haraduin_mouth",
@@ -4569,8 +4316,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HARADUIN_MOUTH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:isle_mist",
@@ -4587,8 +4333,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ISLE_MIST"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:taurelonde",
@@ -4605,8 +4350,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "TAURELONDE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:harad_horn",
@@ -4623,8 +4367,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HARAD_HORN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:town_bones",
@@ -4641,8 +4384,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "TOWN_BONES"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:haraduin_bridge",
@@ -4659,8 +4401,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "HARADUIN_BRIDGE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:jungle_city_trade",
@@ -4677,8 +4418,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "JUNGLE_CITY_TRADE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:jungle_city_old",
@@ -4695,8 +4435,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "JUNGLE_CITY_OLD"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:jungle_city_north",
@@ -4713,8 +4452,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "JUNGLE_CITY_NORTH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:jungle_city_east",
@@ -4731,8 +4469,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "JUNGLE_CITY_EAST"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:jungle_city_capital",
@@ -4749,8 +4486,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "JUNGLE_CITY_CAPITAL"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:jungle_city_deep",
@@ -4767,8 +4503,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "JUNGLE_CITY_DEEP"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:jungle_city_watch",
@@ -4785,8 +4520,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "JUNGLE_CITY_WATCH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:jungle_city_caves",
@@ -4803,8 +4537,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "JUNGLE_CITY_CAVES"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:jungle_city_stone",
@@ -4821,8 +4554,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "JUNGLE_CITY_STONE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:jungle_lakes",
@@ -4839,8 +4571,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "JUNGLE_LAKES"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:troll_island",
@@ -4857,8 +4588,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "TROLL_ISLAND"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:black_coast",
@@ -4875,8 +4605,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "BLACK_COAST"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:blood_river",
@@ -4893,8 +4622,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "BLOOD_RIVER"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:shadow_point",
@@ -4911,8 +4639,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "SHADOW_POINT"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:old_jungle_ruin",
@@ -4929,8 +4656,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "OLD_JUNGLE_RUIN"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:sun_elves",
@@ -4947,8 +4673,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "SUN_ELVES"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:moon_elves",
@@ -4965,8 +4690,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOON_ELVES"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:moon_elves_2",
@@ -4983,8 +4707,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "MOON_ELVES_2"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:odane",
@@ -5001,8 +4724,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ODANE"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:odane_mountains",
@@ -5019,8 +4741,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ODANE_MOUNTAINS"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:odane_port",
@@ -5037,8 +4758,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ODANE_PORT"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:odane_eastwatch",
@@ -5055,8 +4775,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "ODANE_EASTWATCH"
+      "waystoneStructureType": "losttales:glowstone_house"
     },
     {
       "id": "lotr:waypoint:orocarni",
@@ -5073,8 +4792,7 @@
       "requiresRegionUnlock": true,
       "hasFastTravel": true,
       "hasWaystone": true,
-      "waystoneStructureType": "losttales:glowstone_house",
-      "fastTravelWaypointCode": "OROCARNI"
+      "waystoneStructureType": "losttales:glowstone_house"
     }
   ]
 }

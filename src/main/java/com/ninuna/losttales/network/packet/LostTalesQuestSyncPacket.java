@@ -233,7 +233,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
                 this.dynamicMapMarkers.add(
                         new LostTalesMapMarkerDefinition(
                                 markerId, name, icon, color, category, "",
-                                hasFastTravel, "", dimensionId, x, y, z,
+                                hasFastTravel, dimensionId, x, y, z,
                                 compassFadeInRadius, discoveryRadius, hidden,
                                 discoverable, requiresRegionUnlock));
             }

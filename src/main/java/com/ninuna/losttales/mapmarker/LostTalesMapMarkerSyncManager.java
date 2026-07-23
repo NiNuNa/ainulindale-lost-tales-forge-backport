@@ -20,7 +20,7 @@ public final class LostTalesMapMarkerSyncManager {
                 LostTalesMapMarkerStorage.get(player.worldObj);
         ArrayList<LostTalesMapMarkerDefinition> visible =
                 new ArrayList<LostTalesMapMarkerDefinition>();
-        for (LostTalesMapMarkerRecord record : data.getActiveRecords()) {
+        for (LostTalesMapMarkerRecord record : data.getRecords()) {
             if (LostTalesMapMarkerVisibilityPolicy.canView(
                     record, player)) {
                 visible.add(record.toDefinition());

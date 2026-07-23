@@ -87,7 +87,7 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
     private void sendUsage(ICommandSender sender) {
         send(sender, EnumChatFormatting.GOLD + "Lost Tales commands:");
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " quest <defs|list|start|complete|reset|abandon|pin|unpin|starter|scan>");
-        send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " mapmarker <known|list|discover|forget|track|untrack|retry>");
+        send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " mapmarker <known|list|discover|forget|track|untrack|retry|reseed>");
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " hud <status|preset|set|move|toggle>");
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " summon <entity> [x] [y] [z] [dataTag]");
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " party <status|validate|repair|clearcombat>");

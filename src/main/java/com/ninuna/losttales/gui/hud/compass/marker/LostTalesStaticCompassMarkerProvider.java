@@ -27,7 +27,7 @@ public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMar
         for (LostTalesMapMarkerData entry : LostTalesClientMapMarkerStore.getSharedMarkers()) {
             if (entry.getDimensionId() != dimension) continue;
             if (!LostTalesConfig.showLotrWaypointCompassMarkers
-                    && entry.getFastTravelWaypointCode().length() > 0) {
+                    && entry.getLotrWaypointId().length() > 0) {
                 continue;
             }
 
@@ -70,14 +70,17 @@ public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMar
             double markerY = entry.getEffectiveY(
                     minecraft.theWorld, minecraft.thePlayer.posY);
             if (activeQuestMarker) {
-                markers.add(LostTalesCompassMarker.questPosition(name, entry.getX(), markerY, entry.getZ(), true, compassFadeInRadius));
+                markers.add(LostTalesCompassMarker.questPosition(
+                        name, entry.getCompassTargetX(), markerY,
+                        entry.getCompassTargetZ(), true,
+                        compassFadeInRadius));
             } else {
                 markers.add(LostTalesCompassMarker.position(
                         name,
                         icon,
-                        entry.getX(),
+                        entry.getCompassTargetX(),
                         markerY,
-                        entry.getZ(),
+                        entry.getCompassTargetZ(),
                         scaleWithFocus,
                         showDistanceLabel,
                         compassFadeInRadius,

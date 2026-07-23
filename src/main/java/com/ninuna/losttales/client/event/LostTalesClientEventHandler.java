@@ -23,7 +23,10 @@ import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.client.gui.LostTalesGuiInventory;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
+import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneStateStore;
+import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneTravelContext;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
+import com.ninuna.losttales.client.mapmarker.LostTalesLotrMainMenuMapHook;
 import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
@@ -95,6 +98,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientQuestDefinitionStore.clearDynamicQuestDefinitions();
         LostTalesClientMapMarkerNotificationStore.clear();
         LostTalesClientMapMarkerStore.clearDynamicMarkers();
+        LostTalesClientWaystoneStateStore.clear();
+        LostTalesClientWaystoneTravelContext.clear();
         LostTalesClientMobAggroCache.clear();
         LostTalesClientQuickLootCache.clear();
         ClientCharacterRosterCache.clear();
@@ -242,6 +247,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void replaceLotrMapGui(GuiOpenEvent event) {
+        LostTalesLotrMainMenuMapHook.install(event.gui);
         if (event.gui != null && event.gui.getClass() == LOTRGuiMap.class) {
             event.gui = new LostTalesLotrMapGui();
         } else if (event.gui != null

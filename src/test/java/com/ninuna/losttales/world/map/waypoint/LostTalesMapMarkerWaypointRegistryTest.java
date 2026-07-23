@@ -8,6 +8,9 @@ import static org.junit.Assert.assertTrue;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import java.lang.reflect.Field;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import lotr.common.LOTRDimension;
 import lotr.common.world.map.LOTRWaypoint;
 import org.junit.Test;
@@ -49,22 +52,57 @@ public final class LostTalesMapMarkerWaypointRegistryTest {
                     marker.getDimensionId());
             if (LostTalesMapMarkerWaypointRegistry
                     .isExistingLotrWaypointMarker(marker)) {
-                assertTrue("Existing LOTR waypoint marker needs a code: "
+                assertTrue("Existing LOTR waypoint marker needs an ID: "
                                 + marker.getId(),
-                        marker.getFastTravelWaypointCode().length() > 0);
-                assertNotNull("Waypoint code must resolve: " + marker.getId(),
+                        marker.getLotrWaypointId().length() > 0);
+                assertNotNull("Waypoint ID must resolve: " + marker.getId(),
                         LOTRWaypoint.waypointForName(
-                                marker.getFastTravelWaypointCode()));
+                                marker.getLotrWaypointId()));
                 assertSame("Registry must bind the exact existing waypoint: "
                                 + marker.getId(),
                         LOTRWaypoint.waypointForName(
-                                marker.getFastTravelWaypointCode()),
+                                marker.getLotrWaypointId()),
                         LostTalesMapMarkerWaypointRegistry
                                 .resolveExistingWaypoint(marker));
             }
             checked++;
         }
         assertTrue("Expected bundled fast-travel markers", checked > 0);
+    }
+
+    @Test
+    public void everyLotrModWaypointHasExactlyOneBundledMarker()
+            throws Exception {
+        ELostTalesWaypoint.values();
+        LostTalesMapMarkerCatalog.reloadFromClasspath();
+        Map<String, Integer> markerCounts =
+                new LinkedHashMap<String, Integer>();
+        for (LostTalesMapMarkerDefinition marker
+                : LostTalesMapMarkerCatalog.getMarkers()) {
+            String code = marker.getLotrWaypointId();
+            if (code.length() == 0) {
+                continue;
+            }
+            Integer previous = markerCounts.get(code);
+            markerCounts.put(code, Integer.valueOf(
+                    previous == null ? 1 : previous.intValue() + 1));
+        }
+
+        int dependencyWaypointCount = 0;
+        for (Field field : LOTRWaypoint.class.getFields()) {
+            if (!field.isEnumConstant()
+                    || field.getType() != LOTRWaypoint.class) {
+                continue;
+            }
+            LOTRWaypoint waypoint = (LOTRWaypoint)field.get(null);
+            assertEquals("Missing or duplicate marker for "
+                            + waypoint.name(),
+                    Integer.valueOf(1),
+                    markerCounts.get(waypoint.name()));
+            dependencyWaypointCount++;
+        }
+        assertEquals("Unexpected LOTR v36.15 waypoint count",
+                274, dependencyWaypointCount);
     }
 
     @Test
@@ -110,7 +148,7 @@ public final class LostTalesMapMarkerWaypointRegistryTest {
                         "lotr:waypoint:hobbiton");
         assertNotNull(hobbiton);
         LOTRWaypoint waypoint = LOTRWaypoint.waypointForName(
-                hobbiton.getFastTravelWaypointCode());
+                hobbiton.getLotrWaypointId());
         assertNotNull(waypoint);
 
         LOTRWaypoint.Region expected = null;
@@ -124,6 +162,24 @@ public final class LostTalesMapMarkerWaypointRegistryTest {
         assertNotNull(expected);
         assertSame(expected,
                 LostTalesMapMarkerRegionResolver.resolve(hobbiton));
+    }
+
+    @Test
+    public void disabledNativeMarkerStillMatchesForServerDenial() {
+        LostTalesMapMarkerDefinition disabled =
+                new LostTalesMapMarkerDefinition(
+                        "lotr:waypoint:bree", "Bree",
+                        "fort", "white", "Town", "",
+                        false,
+                        LOTRDimension.MIDDLE_EARTH.dimensionID,
+                        LOTRWaypoint.BREE.getXCoord(),
+                        LostTalesMapMarkerDefinition.AUTOMATIC_Y,
+                        LOTRWaypoint.BREE.getZCoord(),
+                        128.0D, 8.0D,
+                        false, false, true);
+
+        assertTrue(LostTalesMapMarkerWaypointRegistry
+                .matchesWaypoint(disabled, LOTRWaypoint.BREE));
     }
 
 }

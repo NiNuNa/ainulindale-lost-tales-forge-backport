@@ -17,6 +17,7 @@ public final class LostTalesMapMarkerRecord {
     public static final int MAX_TEXT_LENGTH = 1024;
     public static final int MAX_STRUCTURE_ID_LENGTH = 128;
     public static final int MAX_SHARED_PLAYERS = 256;
+    public static final int MAX_SHARED_FELLOWSHIPS = 64;
     public static final double MAX_ABSOLUTE_COORDINATE = 30000000.0D;
     public static final double MAX_RADIUS = 1000000.0D;
 
@@ -28,7 +29,6 @@ public final class LostTalesMapMarkerRecord {
     private final String categoryName;
     private final String description;
     private final boolean hasFastTravel;
-    private final String fastTravelWaypointCode;
     private final int dimensionId;
     private final double x;
     private final double y;
@@ -43,7 +43,7 @@ public final class LostTalesMapMarkerRecord {
     private final UUID ownerPlayerId;
     private final LostTalesMapMarkerVisibility visibility;
     private final Set<UUID> sharedPlayerIds;
-    private final boolean active;
+    private final Set<UUID> sharedFellowshipIds;
     private final LostTalesWaystoneGenerationState generationState;
     private final String generationMessage;
     private final boolean linked;
@@ -69,8 +69,6 @@ public final class LostTalesMapMarkerRecord {
                 LostTalesMapMarkerDefinition.CATEGORY_DEFAULT);
         this.description = bounded(builder.description, MAX_TEXT_LENGTH, "");
         this.hasFastTravel = builder.hasFastTravel;
-        this.fastTravelWaypointCode = bounded(
-                builder.fastTravelWaypointCode, MAX_NAME_LENGTH, "");
         this.dimensionId = builder.dimensionId;
         this.x = requireCoordinate(builder.x, "x");
         this.y = requireCoordinate(builder.y, "y");
@@ -106,7 +104,21 @@ public final class LostTalesMapMarkerRecord {
             }
         }
         this.sharedPlayerIds = Collections.unmodifiableSet(shared);
-        this.active = builder.active;
+        LinkedHashSet<UUID> sharedFellowships =
+                new LinkedHashSet<UUID>();
+        if (builder.sharedFellowshipIds != null) {
+            for (UUID fellowshipId : builder.sharedFellowshipIds) {
+                if (fellowshipId != null) {
+                    sharedFellowships.add(fellowshipId);
+                }
+                if (sharedFellowships.size()
+                        >= MAX_SHARED_FELLOWSHIPS) {
+                    break;
+                }
+            }
+        }
+        this.sharedFellowshipIds =
+                Collections.unmodifiableSet(sharedFellowships);
         this.generationState = builder.generationState == null
                 ? (builder.hasWaystone
                     ? LostTalesWaystoneGenerationState.NOT_ATTEMPTED
@@ -142,8 +154,7 @@ public final class LostTalesMapMarkerRecord {
                 .colorName(definition.getColorName())
                 .categoryName(definition.getCategoryName())
                 .description(definition.getDescription())
-                .fastTravel(definition.hasFastTravel(),
-                        definition.getFastTravelWaypointCode())
+                .fastTravel(definition.hasFastTravel())
                 .position(definition.getDimensionId(),
                         definition.getX(), definition.getY(), definition.getZ())
                 .radii(definition.getCompassFadeInRadius(),
@@ -154,7 +165,6 @@ public final class LostTalesMapMarkerRecord {
                 .waystone(definition.hasWaystone(),
                         definition.getWaystoneStructureType())
                 .visibility(LostTalesMapMarkerVisibility.PUBLIC)
-                .active(true)
                 .build();
     }
 
@@ -172,14 +182,13 @@ public final class LostTalesMapMarkerRecord {
                 .colorName("white")
                 .categoryName("Waystone")
                 .description("A player-placed waystone.")
-                .fastTravel(true, "")
+                .fastTravel(true)
                 .position(dimensionId, x, y, z)
                 .radii(128.0D, 8.0D)
                 .discovery(true, true, false)
                 .waystone(true, "losttales:player_placed")
                 .ownerPlayerId(ownerPlayerId)
                 .visibility(LostTalesMapMarkerVisibility.PRIVATE)
-                .active(true)
                 .generationState(LostTalesWaystoneGenerationState.PLACED, "")
                 .link(dimensionId, (int)Math.floor(x), (int)Math.floor(y),
                         (int)Math.floor(z), linkToken)
@@ -196,17 +205,6 @@ public final class LostTalesMapMarkerRecord {
                 .position(dimensionId, x, y, z)
                 .link(dimensionId, x, y, z, token)
                 .generationState(LostTalesWaystoneGenerationState.PLACED, "")
-                .active(true)
-                .revision(this.revision + 1L)
-                .build();
-    }
-
-    public LostTalesMapMarkerRecord withRemoved(String reason) {
-        return toBuilder()
-                .active(false)
-                .clearLink()
-                .generationState(
-                        LostTalesWaystoneGenerationState.REMOVED, reason)
                 .revision(this.revision + 1L)
                 .build();
     }
@@ -219,50 +217,11 @@ public final class LostTalesMapMarkerRecord {
                 .build();
     }
 
-    public LostTalesMapMarkerRecord reconcilePresetDefinition(
-            LostTalesMapMarkerDefinition definition) {
-        if (definition == null || !this.id.equals(definition.getId())
-                || this.source != definition.getSource()
-                || this.source == LostTalesMapMarkerSource.PLAYER_CREATED
-                || this.source == LostTalesMapMarkerSource.QUEST_DYNAMIC
-                || !this.active || this.linked) {
-            return this;
-        }
-        LostTalesWaystoneGenerationState desiredState =
-                definition.hasWaystone()
-                        ? LostTalesWaystoneGenerationState.NOT_ATTEMPTED
-                        : LostTalesWaystoneGenerationState.DISABLED;
-        boolean changed = this.dimensionId
-                        != definition.getDimensionId()
-                || Double.doubleToLongBits(this.x)
-                        != Double.doubleToLongBits(definition.getX())
-                || Double.doubleToLongBits(this.y)
-                        != Double.doubleToLongBits(definition.getY())
-                || Double.doubleToLongBits(this.z)
-                        != Double.doubleToLongBits(definition.getZ())
-                || this.hasWaystone != definition.hasWaystone()
-                || !this.waystoneStructureType.equals(
-                        definition.getWaystoneStructureType())
-                || this.generationState != desiredState;
-        if (!changed) {
-            return this;
-        }
-        return toBuilder()
-                .position(definition.getDimensionId(),
-                        definition.getX(), definition.getY(),
-                        definition.getZ())
-                .waystone(definition.hasWaystone(),
-                        definition.getWaystoneStructureType())
-                .generationState(desiredState, "preset_definition_updated")
-                .revision(this.revision + 1L)
-                .build();
-    }
-
     public LostTalesMapMarkerDefinition toDefinition() {
         return new LostTalesMapMarkerDefinition(
                 this.id, this.name, this.iconName, this.colorName,
                 this.categoryName, this.description,
-                this.hasFastTravel, this.fastTravelWaypointCode,
+                this.hasFastTravel,
                 this.dimensionId, this.x, this.y, this.z,
                 this.compassFadeInRadius, this.discoveryRadius,
                 this.hiddenUntilDiscovered, this.discoverable,
@@ -277,7 +236,7 @@ public final class LostTalesMapMarkerRecord {
         return toBuilder()
                 .name(name)
                 .colorName(colorName)
-                .fastTravel(hasFastTravel, this.fastTravelWaypointCode)
+                .fastTravel(hasFastTravel)
                 .radii(this.compassFadeInRadius, discoveryRadius)
                 .visibility(visibility)
                 .revision(this.revision + 1L)
@@ -296,8 +255,7 @@ public final class LostTalesMapMarkerRecord {
                 .colorName(settings.getColorName())
                 .categoryName(settings.getCategoryName())
                 .description(settings.getDescription())
-                .fastTravel(settings.hasFastTravel(),
-                        settings.getFastTravelWaypointCode())
+                .fastTravel(settings.hasFastTravel())
                 .position(settings.getDimensionId(),
                         settings.getX(), settings.getY(),
                         settings.getZ())
@@ -323,6 +281,16 @@ public final class LostTalesMapMarkerRecord {
                 .build();
     }
 
+    public LostTalesMapMarkerRecord withSharedFellowships(
+            Set<UUID> sharedFellowshipIds,
+            LostTalesMapMarkerVisibility visibility) {
+        return toBuilder()
+                .sharedFellowshipIds(sharedFellowshipIds)
+                .visibility(visibility)
+                .revision(this.revision + 1L)
+                .build();
+    }
+
     public String getId() { return this.id; }
     public LostTalesMapMarkerSource getSource() { return this.source; }
     public String getName() { return this.name; }
@@ -331,7 +299,9 @@ public final class LostTalesMapMarkerRecord {
     public String getCategoryName() { return this.categoryName; }
     public String getDescription() { return this.description; }
     public boolean hasFastTravel() { return this.hasFastTravel; }
-    public String getFastTravelWaypointCode() { return this.fastTravelWaypointCode; }
+    public String getLotrWaypointId() {
+        return LostTalesMapMarkerIdResolver.resolveLotrWaypointId(this.id);
+    }
     public int getDimensionId() { return this.dimensionId; }
     public double getX() { return this.x; }
     public double getY() { return this.y; }
@@ -359,7 +329,9 @@ public final class LostTalesMapMarkerRecord {
     public UUID getOwnerPlayerId() { return this.ownerPlayerId; }
     public LostTalesMapMarkerVisibility getVisibility() { return this.visibility; }
     public Set<UUID> getSharedPlayerIds() { return this.sharedPlayerIds; }
-    public boolean isActive() { return this.active; }
+    public Set<UUID> getSharedFellowshipIds() {
+        return this.sharedFellowshipIds;
+    }
     public LostTalesWaystoneGenerationState getGenerationState() { return this.generationState; }
     public String getGenerationMessage() { return this.generationMessage; }
     public boolean isLinked() { return this.linked; }
@@ -438,7 +410,6 @@ public final class LostTalesMapMarkerRecord {
         private String categoryName = LostTalesMapMarkerDefinition.CATEGORY_DEFAULT;
         private String description = "";
         private boolean hasFastTravel;
-        private String fastTravelWaypointCode = "";
         private int dimensionId;
         private double x;
         private double y = 64.0D;
@@ -454,7 +425,8 @@ public final class LostTalesMapMarkerRecord {
         private LostTalesMapMarkerVisibility visibility =
                 LostTalesMapMarkerVisibility.PRIVATE;
         private Set<UUID> sharedPlayerIds = Collections.emptySet();
-        private boolean active = true;
+        private Set<UUID> sharedFellowshipIds =
+                Collections.emptySet();
         private LostTalesWaystoneGenerationState generationState;
         private String generationMessage = "";
         private boolean linked;
@@ -479,7 +451,6 @@ public final class LostTalesMapMarkerRecord {
             this.categoryName = record.categoryName;
             this.description = record.description;
             this.hasFastTravel = record.hasFastTravel;
-            this.fastTravelWaypointCode = record.fastTravelWaypointCode;
             this.dimensionId = record.dimensionId;
             this.x = record.x;
             this.y = record.y;
@@ -494,7 +465,8 @@ public final class LostTalesMapMarkerRecord {
             this.ownerPlayerId = record.ownerPlayerId;
             this.visibility = record.visibility;
             this.sharedPlayerIds = record.sharedPlayerIds;
-            this.active = record.active;
+            this.sharedFellowshipIds =
+                    record.sharedFellowshipIds;
             this.generationState = record.generationState;
             this.generationMessage = record.generationMessage;
             this.linked = record.linked;
@@ -511,9 +483,8 @@ public final class LostTalesMapMarkerRecord {
         public Builder colorName(String value) { this.colorName = value; return this; }
         public Builder categoryName(String value) { this.categoryName = value; return this; }
         public Builder description(String value) { this.description = value; return this; }
-        public Builder fastTravel(boolean enabled, String code) {
+        public Builder fastTravel(boolean enabled) {
             this.hasFastTravel = enabled;
-            this.fastTravelWaypointCode = code;
             return this;
         }
         public Builder position(int dimensionId, double x, double y, double z) {
@@ -543,7 +514,10 @@ public final class LostTalesMapMarkerRecord {
         public Builder ownerPlayerId(UUID value) { this.ownerPlayerId = value; return this; }
         public Builder visibility(LostTalesMapMarkerVisibility value) { this.visibility = value; return this; }
         public Builder sharedPlayerIds(Set<UUID> value) { this.sharedPlayerIds = value; return this; }
-        public Builder active(boolean value) { this.active = value; return this; }
+        public Builder sharedFellowshipIds(Set<UUID> value) {
+            this.sharedFellowshipIds = value;
+            return this;
+        }
         public Builder generationState(
                 LostTalesWaystoneGenerationState value, String message) {
             this.generationState = value;

@@ -25,9 +25,9 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     private long revision;
     private LostTalesMapMarkerEditableSettings settings;
     private int sharedPlayerCount;
+    private int sharedFellowshipCount;
     private boolean canEdit;
     private boolean canMakePublic;
-    private boolean canEditAdvanced;
     private boolean malformed;
 
     public LostTalesWaystoneStatePacket() {}
@@ -35,8 +35,7 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     public LostTalesWaystoneStatePacket(
             int dimensionId, int x, int y, int z,
             LostTalesMapMarkerRecord record,
-            boolean canEdit, boolean canMakePublic,
-            boolean canEditAdvanced) {
+            boolean canEdit, boolean canMakePublic) {
         if (record == null) {
             throw new IllegalArgumentException(
                     "waystone state requires a marker record");
@@ -50,9 +49,10 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
         this.settings =
                 LostTalesMapMarkerEditableSettings.fromRecord(record);
         this.sharedPlayerCount = record.getSharedPlayerIds().size();
+        this.sharedFellowshipCount =
+                record.getSharedFellowshipIds().size();
         this.canEdit = canEdit;
         this.canMakePublic = canMakePublic;
-        this.canEditAdvanced = canEditAdvanced;
         validate();
     }
 
@@ -83,9 +83,6 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
             String description = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_DESCRIPTION_BYTES);
             boolean fastTravel = buffer.readBoolean();
-            String fastTravelCode =
-                    LostTalesPacketCodec.readUtf8String(
-                            buffer, MAX_TEXT_BYTES);
             int markerDimensionId = buffer.readInt();
             double markerX = buffer.readDouble();
             double markerY = buffer.readDouble();
@@ -106,16 +103,16 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                     : LostTalesMapMarkerVisibility.values()[visibilityId];
             this.settings = new LostTalesMapMarkerEditableSettings(
                     name, icon, color, category, description,
-                    fastTravel, fastTravelCode,
-                    markerDimensionId, markerX, markerY, markerZ,
+                    fastTravel, markerDimensionId,
+                    markerX, markerY, markerZ,
                     compassRadius, discoveryRadius,
                     hiddenUntilDiscovered, discoverable,
                     requiresRegionUnlock, hasWaystone,
                     structureType, visibility);
             this.sharedPlayerCount = buffer.readInt();
+            this.sharedFellowshipCount = buffer.readInt();
             this.canEdit = buffer.readBoolean();
             this.canMakePublic = buffer.readBoolean();
-            this.canEditAdvanced = buffer.readBoolean();
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -147,9 +144,6 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                 buffer, value.getDescription(),
                 MAX_DESCRIPTION_BYTES);
         buffer.writeBoolean(value.hasFastTravel());
-        LostTalesPacketCodec.writeUtf8String(
-                buffer, value.getFastTravelWaypointCode(),
-                MAX_TEXT_BYTES);
         buffer.writeInt(value.getDimensionId());
         buffer.writeDouble(value.getX());
         buffer.writeDouble(value.getY());
@@ -165,9 +159,9 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                 MAX_STRUCTURE_ID_BYTES);
         buffer.writeByte(value.getVisibility().ordinal());
         buffer.writeInt(this.sharedPlayerCount);
+        buffer.writeInt(this.sharedFellowshipCount);
         buffer.writeBoolean(this.canEdit);
         buffer.writeBoolean(this.canMakePublic);
-        buffer.writeBoolean(this.canEditAdvanced);
     }
 
     private void validate() {
@@ -180,7 +174,11 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                 || !isValidSettings(this.settings)
                 || this.sharedPlayerCount < 0
                 || this.sharedPlayerCount
-                        > LostTalesMapMarkerRecord.MAX_SHARED_PLAYERS) {
+                        > LostTalesMapMarkerRecord.MAX_SHARED_PLAYERS
+                || this.sharedFellowshipCount < 0
+                || this.sharedFellowshipCount
+                        > LostTalesMapMarkerRecord
+                                .MAX_SHARED_FELLOWSHIPS) {
             throw new IllegalArgumentException(
                     "invalid waystone state");
         }
@@ -206,9 +204,6 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     }
     public boolean hasFastTravel() {
         return this.settings.hasFastTravel();
-    }
-    public String getFastTravelWaypointCode() {
-        return this.settings.getFastTravelWaypointCode();
     }
     public int getMarkerDimensionId() {
         return this.settings.getDimensionId();
@@ -243,12 +238,12 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     public int getSharedPlayerCount() {
         return this.sharedPlayerCount;
     }
+    public int getSharedFellowshipCount() {
+        return this.sharedFellowshipCount;
+    }
     public boolean canEdit() { return this.canEdit; }
     public boolean canMakePublic() {
         return this.canMakePublic;
-    }
-    public boolean canEditAdvanced() {
-        return this.canEditAdvanced;
     }
     public boolean isMalformed() { return this.malformed; }
 
@@ -267,9 +262,6 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                         value.getCategoryName(), MAX_TEXT_BYTES)
                 && LostTalesPacketCodec.isUtf8WithinLimit(
                         value.getDescription(), MAX_DESCRIPTION_BYTES)
-                && LostTalesPacketCodec.isUtf8WithinLimit(
-                        value.getFastTravelWaypointCode(),
-                        MAX_TEXT_BYTES)
                 && LostTalesPacketCodec.isUtf8WithinLimit(
                         value.getWaystoneStructureType(),
                         MAX_STRUCTURE_ID_BYTES)

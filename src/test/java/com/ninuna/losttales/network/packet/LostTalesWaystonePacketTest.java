@@ -6,6 +6,7 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import java.util.Collections;
 import java.util.UUID;
 import org.junit.Test;
 
@@ -44,16 +45,43 @@ public final class LostTalesWaystonePacketTest {
     }
 
     @Test
+    public void fellowshipSharingRequestRoundTripsTargetAndOperation() {
+        LostTalesWaystoneSettingsRequestPacket original =
+                LostTalesWaystoneSettingsRequestPacket
+                        .shareFellowship(
+                                false, 12, 70, -8,
+                                "losttales:player/test", 4L,
+                                "The Prancing Ponies");
+        ByteBuf buffer = Unpooled.buffer();
+        original.toBytes(buffer);
+        LostTalesWaystoneSettingsRequestPacket decoded =
+                new LostTalesWaystoneSettingsRequestPacket();
+        decoded.fromBytes(buffer);
+
+        assertFalse(decoded.isMalformed());
+        assertEquals(
+                com.ninuna.losttales.mapmarker
+                        .LostTalesWaystoneSettingsOperation
+                        .SHARE_FELLOWSHIP,
+                decoded.getOperation());
+        assertEquals("The Prancing Ponies",
+                decoded.getTargetPlayerName());
+    }
+
+    @Test
     public void statePacketRoundTripsAuthorityFlags() {
         LostTalesMapMarkerRecord record =
                 LostTalesMapMarkerRecord.createPlayerMarker(
                         "losttales:player/state", "State Waystone",
                         UUID.randomUUID(), 0, 4, 65, 9,
-                        UUID.randomUUID());
+                        UUID.randomUUID()).toBuilder()
+                        .sharedFellowshipIds(Collections.singleton(
+                                UUID.randomUUID()))
+                        .build();
         LostTalesWaystoneStatePacket original =
                 new LostTalesWaystoneStatePacket(
                         0, 4, 65, 9, record,
-                        true, false, true);
+                        true, false);
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesWaystoneStatePacket decoded =
@@ -65,11 +93,11 @@ public final class LostTalesWaystonePacketTest {
         assertEquals(record.getRevision(), decoded.getRevision());
         assertTrue(decoded.canEdit());
         assertFalse(decoded.canMakePublic());
-        assertTrue(decoded.canEditAdvanced());
         assertEquals(record.getDescription(),
                 decoded.getDescription());
         assertEquals(record.getDimensionId(),
                 decoded.getMarkerDimensionId());
+        assertEquals(1, decoded.getSharedFellowshipCount());
     }
 
     @Test
@@ -100,8 +128,7 @@ public final class LostTalesWaystonePacketTest {
         return new LostTalesMapMarkerEditableSettings(
                 "Bree Gate", "tavern", "#aabbcc",
                 "Town", "The west gate of Bree.",
-                true, "bree",
-                100, 12.5D,
+                true, 100, 12.5D,
                 LostTalesMapMarkerHeightResolver.AUTOMATIC_Y,
                 -8.5D, 220.0D, 32.0D,
                 true, true, true,

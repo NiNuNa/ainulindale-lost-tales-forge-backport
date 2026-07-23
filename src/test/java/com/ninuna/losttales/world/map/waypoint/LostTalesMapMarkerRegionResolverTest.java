@@ -56,14 +56,13 @@ public final class LostTalesMapMarkerRegionResolverTest {
             boolean discoverable, boolean hiddenUntilDiscovered,
             boolean requiresRegionUnlock) {
         return new LostTalesMapMarkerDefinition(
-                "losttales:region_policy_test",
+                "lotr:waypoint:hobbiton",
                 "Region policy test",
                 "fort",
                 "white",
                 LostTalesMapMarkerDefinition.CATEGORY_POINT_OF_INTEREST,
                 "Test marker",
                 true,
-                "HOBBITON",
                 LOTRDimension.MIDDLE_EARTH.dimensionID,
                 15.0D,
                 64.0D,

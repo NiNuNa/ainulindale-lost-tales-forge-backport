@@ -42,6 +42,28 @@ public final class LostTalesMapMarkerVisibilityPolicyTest {
                 publicRecord, stranger, false));
     }
 
+    @Test
+    public void sharedFellowshipGrantsCurrentMembersAccess() {
+        UUID owner = UUID.randomUUID();
+        UUID member = UUID.randomUUID();
+        UUID fellowship = UUID.randomUUID();
+        UUID otherFellowship = UUID.randomUUID();
+        LostTalesMapMarkerRecord shared = playerRecord(owner)
+                .withSharedFellowships(
+                        Collections.singleton(fellowship),
+                        LostTalesMapMarkerVisibility.SHARED);
+
+        assertTrue(LostTalesMapMarkerVisibilityPolicy.canView(
+                shared, member, false,
+                Collections.singleton(fellowship)));
+        assertFalse(LostTalesMapMarkerVisibilityPolicy.canView(
+                shared, member, false,
+                Collections.singleton(otherFellowship)));
+        assertFalse(LostTalesMapMarkerVisibilityPolicy.canView(
+                shared, member, false,
+                Collections.<UUID>emptySet()));
+    }
+
     private static LostTalesMapMarkerRecord playerRecord(UUID owner) {
         return LostTalesMapMarkerRecord.createPlayerMarker(
                 "losttales:player/test", "Test Waystone",

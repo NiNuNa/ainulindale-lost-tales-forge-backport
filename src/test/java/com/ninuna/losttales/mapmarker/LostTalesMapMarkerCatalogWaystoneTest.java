@@ -16,25 +16,35 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public final class LostTalesMapMarkerCatalogWaystoneTest {
-
     @Test
-    public void legacyCustomPresetDefaultsToWaystoneHouse() {
-        LostTalesMapMarkerDefinition marker = LostTalesMapMarkerCatalog.parseMarker(
-                markerJson("losttales:test"), LostTalesMapMarkerSource.CUSTOM_PRESET);
+    public void lotrWaypointIdCanBeDerivedFromMarkerId() {
+        JsonObject json = markerJson("lotr:waypoint:oatbarton");
+        json.remove("lotrWaypointId");
 
-        assertTrue(marker.hasWaystone());
-        assertEquals(LostTalesMapMarkerDefinition.DEFAULT_WAYSTONE_STRUCTURE,
-                marker.getWaystoneStructureType());
+        LostTalesMapMarkerDefinition marker =
+                LostTalesMapMarkerCatalog.parseMarker(
+                        json, LostTalesMapMarkerSource.LOTR_ADAPTER);
+
+        assertNotNull(marker);
+        assertEquals("OATBARTON", marker.getLotrWaypointId());
     }
 
     @Test
-    public void legacyLotrPresetDefaultsToNoWaystone() {
+    public void omittedWaystoneIntentIsAlwaysFalse() {
         LostTalesMapMarkerDefinition marker = LostTalesMapMarkerCatalog.parseMarker(
-                markerJson("lotr:waypoint:test"),
-                LostTalesMapMarkerSource.LOTR_ADAPTER);
+                markerJson("losttales:test"), LostTalesMapMarkerSource.CUSTOM_PRESET);
 
         assertFalse(marker.hasWaystone());
         assertEquals("", marker.getWaystoneStructureType());
+    }
+
+    @Test
+    public void waystoneIntentRequiresAnExplicitStructureType() {
+        JsonObject json = markerJson("losttales:test");
+        json.addProperty("hasWaystone", true);
+
+        assertNull(LostTalesMapMarkerCatalog.parseMarker(
+                json, LostTalesMapMarkerSource.CUSTOM_PRESET));
     }
 
     @Test
@@ -45,7 +55,9 @@ public final class LostTalesMapMarkerCatalogWaystoneTest {
                 nonFinite, LostTalesMapMarkerSource.CUSTOM_PRESET));
 
         JsonObject invalidStructure = markerJson("losttales:bad_structure");
-        invalidStructure.addProperty("structureType", "not namespaced");
+        invalidStructure.addProperty("hasWaystone", true);
+        invalidStructure.addProperty(
+                "waystoneStructureType", "not namespaced");
         assertNull(LostTalesMapMarkerCatalog.parseMarker(
                 invalidStructure, LostTalesMapMarkerSource.CUSTOM_PRESET));
     }
@@ -124,10 +136,34 @@ public final class LostTalesMapMarkerCatalogWaystoneTest {
                         assertTrue(id
                                 + " must generate a physical waystone",
                                 hasWaystone);
+                        assertFalse(id
+                                        + " must derive its LOTR waypoint "
+                                        + "identity from the marker ID",
+                                marker.has("lotrWaypointId"));
+                        assertTrue(id
+                                        + " must use the LOTR waypoint "
+                                        + "marker namespace",
+                                LostTalesMapMarkerIdResolver
+                                        .resolveLotrWaypointId(id)
+                                        .length() > 0);
                     }
                     assertTrue(id
                                     + " must declare waystoneStructureType",
                             marker.has("waystoneStructureType"));
+                    assertFalse(id + " must not use pre-release info",
+                            marker.has("info"));
+                    assertFalse(id + " must not use pre-release lore",
+                            marker.has("lore"));
+                    assertFalse(id + " must not use pre-release fadeInRadius",
+                            marker.has("fadeInRadius"));
+                    assertFalse(id + " must not use pre-release unlockRadius",
+                            marker.has("unlockRadius"));
+                    assertFalse(id + " must not use pre-release requiresDiscovery",
+                            marker.has("requiresDiscovery"));
+                    assertFalse(id + " must not use pre-release discoveredByDefault",
+                            marker.has("discoveredByDefault"));
+                    assertFalse(id + " must not use pre-release structureType",
+                            marker.has("structureType"));
                     String structure = marker.get(
                             "waystoneStructureType").getAsString();
                     assertTrue(id

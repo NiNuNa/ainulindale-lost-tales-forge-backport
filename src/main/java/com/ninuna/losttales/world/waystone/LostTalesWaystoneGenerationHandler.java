@@ -99,7 +99,7 @@ public final class LostTalesWaystoneGenerationHandler
             return;
         }
         Collection<LostTalesMapMarkerRecord> candidates =
-                data.getActiveRecordsNearChunks(
+                data.getRecordsNearChunks(
                         world.provider.dimensionId,
                         chunkX, chunkZ, radiusChunks);
         for (LostTalesMapMarkerRecord record : candidates) {

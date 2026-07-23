@@ -269,9 +269,6 @@ public final class LostTalesQuestManager {
     }
 
     public static boolean revealMapMarker(EntityPlayer player, String markerId) {
-        if (!LostTalesConfig.enableQuestMarkerDiscovery) {
-            return false;
-        }
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         if (data == null || markerId == null || markerId.trim().length() == 0) {
             return false;
@@ -287,7 +284,7 @@ public final class LostTalesQuestManager {
 
 
     public static boolean revealQuestGiverMarker(EntityPlayer player, LostTalesQuestDefinition quest, Entity target, boolean sync) {
-        if (!LostTalesConfig.enableQuestMarkerDiscovery || player == null || quest == null || target == null || player.worldObj == null) {
+        if (player == null || quest == null || target == null || player.worldObj == null) {
             return false;
         }
         List<String> markerIds = LostTalesQuestMarkerHelper.collectDynamicQuestGiverMarkerIds(quest);
@@ -325,7 +322,7 @@ public final class LostTalesQuestManager {
     }
 
     public static boolean revealQuestGiverMarker(EntityPlayer player, LostTalesQuestDefinition quest, Block block, int x, int y, int z, boolean sync) {
-        if (!LostTalesConfig.enableQuestMarkerDiscovery || player == null || quest == null || block == null || player.worldObj == null) {
+        if (player == null || quest == null || block == null || player.worldObj == null) {
             return false;
         }
         List<String> markerIds = LostTalesQuestMarkerHelper.collectDynamicQuestGiverMarkerIds(quest);
@@ -381,9 +378,6 @@ public final class LostTalesQuestManager {
     }
 
     public static boolean pinMapMarker(EntityPlayer player, String markerId) {
-        if (!LostTalesConfig.enableQuestMarkerDiscovery) {
-            return false;
-        }
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         if (data == null || markerId == null || markerId.trim().length() == 0) {
             return false;
@@ -647,9 +641,6 @@ public final class LostTalesQuestManager {
         boolean changed =
                 LostTalesMapMarkerWaypointUnlockHelper.reconcileBundledWaypointRegions(
                         player, data.getDiscoveredMarkerIds());
-        if (!LostTalesConfig.enableQuestMarkerDiscovery) {
-            return changed;
-        }
         for (String markerId : data.getDiscoveredMarkerIds()) {
             LostTalesMapMarkerDefinition marker =
                     data.getDynamicMapMarker(markerId);
@@ -657,7 +648,7 @@ public final class LostTalesQuestManager {
                 LostTalesMapMarkerRecord record =
                         LostTalesMapMarkerStorage.get(player.worldObj)
                                 .getRecord(markerId);
-                marker = record != null && record.isActive()
+                marker = record != null
                         ? record.toDefinition()
                         : LostTalesMapMarkerCatalog.getMarker(markerId);
             }
@@ -668,7 +659,7 @@ public final class LostTalesQuestManager {
     }
 
     public static boolean discoverNearbyMapMarkers(EntityPlayerMP player, boolean notifyVisibleMarkers) {
-        if (!LostTalesConfig.enableQuestMarkerDiscovery || !LostTalesConfig.autoDiscoverNearbyMapMarkers || player == null || player.worldObj == null || player.worldObj.isRemote) {
+        if (!LostTalesConfig.autoDiscoverNearbyMapMarkers || player == null || player.worldObj == null || player.worldObj.isRemote) {
             return false;
         }
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
@@ -717,7 +708,7 @@ public final class LostTalesQuestManager {
     }
 
     private static boolean shouldScanMarkerDiscovery(EntityPlayerMP player) {
-        if (!LostTalesConfig.enableQuestMarkerDiscovery || !LostTalesConfig.autoDiscoverNearbyMapMarkers || player == null) {
+        if (!LostTalesConfig.autoDiscoverNearbyMapMarkers || player == null) {
             return false;
         }
         int interval = Math.max(20, LostTalesConfig.mapMarkerDiscoveryScanIntervalTicks);
@@ -817,7 +808,7 @@ public final class LostTalesQuestManager {
     }
 
     private static boolean revealQuestMarkers(EntityPlayer player, LostTalesQuestDefinition quest, boolean notify) {
-        if (!LostTalesConfig.enableQuestMarkerDiscovery || player == null || quest == null || quest.getMarkers().isEmpty()) {
+        if (player == null || quest == null || quest.getMarkers().isEmpty()) {
             return false;
         }
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);

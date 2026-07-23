@@ -105,7 +105,6 @@ public final class LostTalesConfig {
     public static boolean allowQuestJournalStarts = true;
     public static boolean allowQuestItemStarts = true;
     public static boolean allowQuestInteractionStarts = true;
-    public static boolean enableQuestMarkerDiscovery = true;
     public static boolean autoRevealQuestMarkersOnStart = true;
     public static boolean autoPinQuestOnStart = true;
     public static boolean autoDiscoverNearbyMapMarkers = true;
@@ -731,12 +730,6 @@ public final class LostTalesConfig {
                     CATEGORY_QUESTS,
                     allowQuestInteractionStarts,
                     "Allow right-click entity/block quest giver hooks for quests whose startMode allows interaction starts."
-            );
-            enableQuestMarkerDiscovery = config.getBoolean(
-                    "enableQuestMarkerDiscovery",
-                    CATEGORY_QUESTS,
-                    enableQuestMarkerDiscovery,
-                    "Sync player-discovered quest map marker IDs and hide marker hints until discovered."
             );
             autoRevealQuestMarkersOnStart = config.getBoolean(
                     "autoRevealQuestMarkersOnStart",
@@ -1380,7 +1373,6 @@ public final class LostTalesConfig {
         config.get(CATEGORY_QUESTS, "allowQuestJournalStarts", allowQuestJournalStarts).set(allowQuestJournalStarts);
         config.get(CATEGORY_QUESTS, "allowQuestItemStarts", allowQuestItemStarts).set(allowQuestItemStarts);
         config.get(CATEGORY_QUESTS, "allowQuestInteractionStarts", allowQuestInteractionStarts).set(allowQuestInteractionStarts);
-        config.get(CATEGORY_QUESTS, "enableQuestMarkerDiscovery", enableQuestMarkerDiscovery).set(enableQuestMarkerDiscovery);
         config.get(CATEGORY_QUESTS, "autoRevealQuestMarkersOnStart", autoRevealQuestMarkersOnStart).set(autoRevealQuestMarkersOnStart);
         config.get(CATEGORY_QUESTS, "autoPinQuestOnStart", autoPinQuestOnStart).set(autoPinQuestOnStart);
         config.get(CATEGORY_QUESTS, "autoDiscoverNearbyMapMarkers", autoDiscoverNearbyMapMarkers).set(autoDiscoverNearbyMapMarkers);

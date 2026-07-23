@@ -27,8 +27,8 @@ public class LostTalesAddedWaypointMarkerTest {
         LostTalesMapMarkerCatalog.reloadFromClasspath();
         Map<String, LostTalesMapMarkerDefinition> markersByWaypointCode = new LinkedHashMap<String, LostTalesMapMarkerDefinition>();
         for (LostTalesMapMarkerDefinition marker : LostTalesMapMarkerCatalog.getMarkers()) {
-            if (marker.hasFastTravel() && marker.getFastTravelWaypointCode().length() > 0) {
-                markersByWaypointCode.put(marker.getFastTravelWaypointCode(), marker);
+            if (marker.hasFastTravel() && marker.getLotrWaypointId().length() > 0) {
+                markersByWaypointCode.put(marker.getLotrWaypointId(), marker);
             }
         }
 

@@ -19,10 +19,9 @@ public final class LostTalesMapMarkerEditableSettingsTest {
         LostTalesMapMarkerEditableSettings settings =
                 new LostTalesMapMarkerEditableSettings(
                         "New", "tavern", "orange", "City",
-                        "Updated description", true, "bree",
-                        100, 512.0D,
-                        LostTalesMapMarkerHeightResolver.AUTOMATIC_Y,
-                        -384.0D, 320.0D, 18.0D,
+                        "Updated description", true,
+                        100, 4.0D, 70.0D,
+                        8.0D, 320.0D, 18.0D,
                         true, true, false,
                         true, "losttales:glowstone_house",
                         LostTalesMapMarkerVisibility.SHARED);
@@ -37,11 +36,10 @@ public final class LostTalesMapMarkerEditableSettingsTest {
         assertEquals("City", updated.getCategoryName());
         assertEquals("Updated description",
                 updated.getDescription());
-        assertEquals("bree",
-                updated.getFastTravelWaypointCode());
-        assertEquals(512.0D, updated.getX(), 0.0D);
-        assertEquals(LostTalesMapMarkerHeightResolver.AUTOMATIC_Y,
-                updated.getY(), 0.0D);
+        assertEquals("",
+                updated.getLotrWaypointId());
+        assertEquals(4.0D, updated.getX(), 0.0D);
+        assertEquals(70.0D, updated.getY(), 0.0D);
         assertEquals(320.0D,
                 updated.getCompassFadeInRadius(), 0.0D);
         assertTrue(updated.isHiddenUntilDiscovered());

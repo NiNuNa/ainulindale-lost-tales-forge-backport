@@ -14,30 +14,38 @@ import static org.junit.Assert.assertTrue;
 public final class LostTalesMapMarkerWorldDataTest {
 
     @Test
-    public void removedPresetTombstoneIsNotReseeded() {
+    public void deletedPresetIsNotReseeded() {
         LostTalesMapMarkerDefinition definition =
                 new LostTalesMapMarkerDefinition(
                         "losttales:preset", "Preset", "fort", "white",
-                        "Town", "", true, "", 0,
+                        "Town", "", true, 0,
                         32, 64, 32, 128, 8,
                         true, true, false,
                         LostTalesMapMarkerSource.CUSTOM_PRESET,
                         true,
-                        LostTalesMapMarkerDefinition.DEFAULT_WAYSTONE_STRUCTURE);
+                        "losttales:glowstone_house");
         LostTalesMapMarkerWorldData data =
                 new LostTalesMapMarkerWorldData("test");
         data.seedDefinitions(Collections.singleton(definition));
         LostTalesMapMarkerRecord seeded =
                 data.getRecord(definition.getId());
         assertNotNull(seeded);
+        assertTrue(data.getOrCreateLotrTravelId(
+                definition.getId()) > 0);
 
-        data.saveRecord(seeded.withLink(
-                0, 32, 70, 32, UUID.randomUUID()).withRemoved("broken"));
+        assertTrue(data.removeRecord(definition.getId()));
+        assertEquals(0, data.getLotrTravelId(definition.getId()));
         data.seedDefinitions(Collections.singleton(definition));
 
-        assertEquals(LostTalesWaystoneGenerationState.REMOVED,
-                data.getRecord(definition.getId()).getGenerationState());
-        assertFalse(data.getRecord(definition.getId()).isActive());
+        assertEquals(null, data.getRecord(definition.getId()));
+
+        NBTTagCompound serialized = new NBTTagCompound();
+        data.writeToNBT(serialized);
+        LostTalesMapMarkerWorldData restored =
+                new LostTalesMapMarkerWorldData("restored");
+        restored.readFromNBT(serialized);
+        restored.seedDefinitions(Collections.singleton(definition));
+        assertEquals(null, restored.getRecord(definition.getId()));
     }
 
     @Test
@@ -69,7 +77,7 @@ public final class LostTalesMapMarkerWorldDataTest {
     }
 
     @Test
-    public void updatedPresetCoordinatesAndFailedGenerationAreReconciled() {
+    public void updatedJsonDoesNotOverwriteSavedMarkerState() {
         LostTalesMapMarkerDefinition original =
                 definition("losttales:reconciled", 64.0D);
         LostTalesMapMarkerWorldData data =
@@ -90,12 +98,11 @@ public final class LostTalesMapMarkerWorldDataTest {
                         LostTalesMapMarkerDefinition.AUTOMATIC_Y);
 
         restored.seedDefinitions(Collections.singleton(updated));
-        LostTalesMapMarkerRecord reconciled =
+        LostTalesMapMarkerRecord saved =
                 restored.getRecord(updated.getId());
-        assertEquals(LostTalesMapMarkerDefinition.AUTOMATIC_Y,
-                reconciled.getY(), 0.0D);
-        assertEquals(LostTalesWaystoneGenerationState.NOT_ATTEMPTED,
-                reconciled.getGenerationState());
+        assertEquals(64.0D, saved.getY(), 0.0D);
+        assertEquals(LostTalesWaystoneGenerationState.FAILED_OR_BLOCKED,
+                saved.getGenerationState());
     }
 
     @Test
@@ -126,6 +133,53 @@ public final class LostTalesMapMarkerWorldDataTest {
         assertFalse(preserved.hasKey("Markers"));
     }
 
+    @Test
+    public void linkedMarkerPositionIsRepairedToPhysicalWaystone() {
+        LostTalesMapMarkerDefinition definition =
+                definition("losttales:misaligned");
+        LostTalesMapMarkerWorldData data =
+                new LostTalesMapMarkerWorldData("test");
+        data.seedDefinitions(Collections.singleton(definition));
+        LostTalesMapMarkerRecord misaligned =
+                data.getRecord(definition.getId())
+                        .withLink(0, 200, 70, -300,
+                                UUID.randomUUID())
+                        .toBuilder()
+                        .position(0, 192.0D, 70.0D, -288.0D)
+                        .revision(3L)
+                        .build();
+        NBTTagCompound serialized = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(
+                serialized, Collections.singleton(misaligned),
+                Collections.<NBTTagCompound>emptyList());
+        serialized.setBoolean("CatalogInitialized", true);
+        LostTalesMapMarkerWorldData restored =
+                new LostTalesMapMarkerWorldData("restored");
+        restored.readFromNBT(serialized);
+        LostTalesMapMarkerRecord repaired =
+                restored.getRecord(definition.getId());
+
+        assertEquals(200.0D, repaired.getX(), 0.0D);
+        assertEquals(70.0D, repaired.getY(), 0.0D);
+        assertEquals(-300.0D, repaired.getZ(), 0.0D);
+        assertEquals(4L, repaired.getRevision());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void repositoryRejectsNewLinkedPositionMismatch() {
+        LostTalesMapMarkerDefinition definition =
+                definition("losttales:new_misalignment");
+        LostTalesMapMarkerWorldData data =
+                new LostTalesMapMarkerWorldData("test");
+        data.seedDefinitions(Collections.singleton(definition));
+        data.saveRecord(data.getRecord(definition.getId())
+                .withLink(0, 200, 70, -300, UUID.randomUUID())
+                .toBuilder()
+                .position(0, 201.0D, 70.0D, -300.0D)
+                .revision(3L)
+                .build());
+    }
+
     private static LostTalesMapMarkerDefinition definition(String id) {
         return definition(id, 64.0D);
     }
@@ -134,11 +188,11 @@ public final class LostTalesMapMarkerWorldDataTest {
             String id, double y) {
         return new LostTalesMapMarkerDefinition(
                 id, id, "fort", "white",
-                "Town", "", true, "", 0,
+                "Town", "", true, 0,
                 32, y, 32, 128, 8,
                 true, true, false,
                 LostTalesMapMarkerSource.CUSTOM_PRESET,
                 true,
-                LostTalesMapMarkerDefinition.DEFAULT_WAYSTONE_STRUCTURE);
+                "losttales:glowstone_house");
     }
 }

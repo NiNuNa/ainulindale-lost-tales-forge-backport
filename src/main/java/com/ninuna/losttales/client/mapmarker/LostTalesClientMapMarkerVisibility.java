@@ -37,10 +37,7 @@ public final class LostTalesClientMapMarkerVisibility {
         return isRegionRequirementMet(marker);
     }
 
-    /**
-     * Full-map visibility policy. When discovery is disabled, the hidden flag
-     * is meaningless and the marker follows only its normal LOTR region.
-     */
+    /** Full-map visibility policy for discovered and discoverable markers. */
     public static boolean isMapVisible(LostTalesMapMarkerData marker) {
         if (marker == null) {
             return false;
@@ -117,7 +114,7 @@ public final class LostTalesClientMapMarkerVisibility {
                             minecraft.theWorld,
                             marker.getDimensionId(), marker.getX(),
                             marker.getZ(),
-                            marker.getFastTravelWaypointCode());
+                            marker.getLotrWaypointId());
             LOTRPlayerData data = LOTRLevelData.getData(minecraft.thePlayer);
             return region != null && data != null
                     && data.isFTRegionUnlocked(region);

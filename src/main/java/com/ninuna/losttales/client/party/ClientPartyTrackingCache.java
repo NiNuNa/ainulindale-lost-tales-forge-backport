@@ -114,7 +114,6 @@ public final class ClientPartyTrackingCache {
                     "Go Here",
                     "A personal marker for this roleplaying character. It is shared while in a party.",
                     false,
-                    "",
                     marker.getDimensionId(),
                     marker.getX(), marker.getY(), marker.getZ(),
                     0.0D,

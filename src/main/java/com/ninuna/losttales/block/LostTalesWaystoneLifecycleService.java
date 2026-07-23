@@ -43,8 +43,7 @@ public final class LostTalesWaystoneLifecycleService {
                             tileEntity.getWorldObj());
             LostTalesMapMarkerRecord record =
                     data.getRecord(tileEntity.getMarkerId());
-            if (record == null || !record.isActive()
-                    || !record.isLinked()
+            if (record == null || !record.isLinked()
                     || !tileEntity.getLinkToken().equals(
                             record.getLinkToken())
                     || record.getLinkedDimensionId()
@@ -54,13 +53,12 @@ public final class LostTalesWaystoneLifecycleService {
                     || record.getLinkedZ() != tileEntity.zCoord) {
                 return;
             }
-            data.saveRecord(record.withRemoved(
-                    reason == null ? "waystone_removed" : reason));
+            data.removeRecord(record.getId());
             LostTalesMapMarkerSyncManager.syncAll();
         } catch (RuntimeException exception) {
             try {
                 FMLLog.severe(
-                        "[%s] Failed to retire marker for removed waystone %s: %s",
+                        "[%s] Failed to delete marker for removed waystone %s: %s",
                         LostTalesMetaData.MOD_ID,
                         tileEntity.getMarkerId(),
                         exception.getMessage());

@@ -33,6 +33,7 @@ import lotr.common.world.map.LOTRAbstractWaypoint;
 import lotr.common.world.map.LOTRCustomWaypoint;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
@@ -93,7 +94,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         List<LOTRAbstractWaypoint> filtered = new ArrayList<LOTRAbstractWaypoint>(waypoints.size());
         for (LOTRAbstractWaypoint waypoint : waypoints) {
             LostTalesMapMarkerData marker = getMappedMarker(waypoint);
-            if (marker != null) {
+            if (marker != null || hasDecorativeMapping(waypoint)) {
                 // Lost Tales owns both the icon and hover hitbox for every
                 // mapped waypoint. Mixing JSON icon coordinates with LOTR's
                 // native pass caused visible markers that could not be hovered
@@ -188,6 +189,58 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         } finally {
             endIconRender();
         }
+    }
+
+    /**
+     * Draws resource-defined markers over LOTR's animated menu map. This view
+     * is intentionally decorative: it does not read player discovery,
+     * ownership, region, or server-synchronized marker state. Definitions
+     * explicitly hidden until discovery are omitted because showing them here
+     * would reveal locations that the author marked as secret.
+     */
+    public static void renderDecorativeBackgroundMarkers(
+            LOTRGuiMap gui, boolean sepia) {
+        RenderContext context = createMenuRenderContext(gui);
+        if (context == null) {
+            return;
+        }
+        beginMenuMapClipping(context);
+        try {
+            beginIconRender();
+            try {
+                for (LostTalesMapMarkerData marker :
+                        LostTalesClientMapMarkerStore
+                                .getDecorativeMarkers()) {
+                    if (!shouldRenderDecorativeMarker(marker)) {
+                        continue;
+                    }
+                    ScreenPosition position =
+                            transformMarker(context, marker);
+                    if (position == null || !iconOverlapsMap(
+                            position.x, position.y,
+                            ICON_DRAW_SIZE + 2, context)) {
+                        continue;
+                    }
+                    drawDecorativeMarkerIcon(
+                            context.minecraft, marker,
+                            position.x, position.y, sepia);
+                }
+            } finally {
+                endIconRender();
+            }
+        } catch (Throwable ignored) {
+            // The menu remains usable if LOTR changes its fake-map internals.
+        } finally {
+            endMenuMapClipping();
+        }
+    }
+
+    static boolean shouldRenderDecorativeMarker(
+            LostTalesMapMarkerData marker) {
+        return marker != null
+                && !marker.isHiddenUntilDiscovered()
+                && marker.getDimensionId()
+                        == LOTRDimension.MIDDLE_EARTH.dimensionID;
     }
 
     /**
@@ -508,18 +561,21 @@ public final class LostTalesLotrMapMarkerIconOverlay {
 
     /** Draws native LOTR hover text at the exact replacement-icon hitbox. */
     public static void renderMappedWaypointHoverTooltip(
-            LOTRGuiMap gui, int mouseX, int mouseY) {
+            LOTRGuiMap gui, LostTalesMapMarkerData selectedMarker,
+            int mouseX, int mouseY) {
         RenderContext context = createRenderContext(gui);
         if (context == null || context.alpha <= 0.0F) {
             return;
         }
         LOTRAbstractWaypoint waypoint = getHoveredMappedWaypoint(
                 gui, mouseX, mouseY);
-        if (waypoint == null || isSelectedWaypoint(gui, waypoint)) {
+        LostTalesMapMarkerData marker = getMarkerForWaypoint(waypoint);
+        if (marker == null || sameMarker(marker, selectedMarker)) {
             return;
         }
         renderLotrWaypointTooltip(
-                context, waypoint, false, mouseX, mouseY);
+                context, new LostTalesMarkerWaypoint(marker),
+                false, mouseX, mouseY);
     }
 
     /** Finds a visible, non-private replacement using its rendered position. */
@@ -560,21 +616,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             }
         }
         return nearest;
-    }
-
-    /** Hands our replacement hit back to LOTR's normal selection/FT flow. */
-    public static boolean selectLotrWaypoint(
-            LOTRGuiMap gui, LOTRAbstractWaypoint waypoint) {
-        if (gui == null || waypoint == null || !ensureReflection()
-                || selectedWaypointField == null) {
-            return false;
-        }
-        try {
-            selectedWaypointField.set(gui, waypoint);
-            return true;
-        } catch (Throwable ignored) {
-            return false;
-        }
     }
 
     public static void renderLockedMappedMarkerHoverTooltip(
@@ -640,21 +681,12 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         }
     }
 
-    private static boolean isSelectedWaypoint(
-            LOTRGuiMap gui, LOTRAbstractWaypoint waypoint) {
-        if (gui == null || waypoint == null || !ensureReflection()
-                || selectedWaypointField == null) {
-            return false;
-        }
-        try {
-            return selectedWaypointField.get(gui) == waypoint;
-        } catch (Throwable ignored) {
-            return false;
-        }
-    }
-
-    /** Clears a native selection that became private after a character swap. */
-    public static void clearUndiscoveredLotrSelection(LOTRGuiMap gui) {
+    /**
+     * Clears native interaction state that no longer has an authoritative
+     * visible marker. The decorative catalog still identifies deleted native
+     * waypoints so their invisible LOTR hitboxes cannot remain selectable.
+     */
+    public static void clearInvalidLotrSelection(LOTRGuiMap gui) {
         if (gui == null || !ensureReflection() || selectedWaypointField == null) {
             return;
         }
@@ -665,13 +697,23 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             }
             LostTalesMapMarkerData marker = getMappedMarker(
                     (LOTRAbstractWaypoint)selected);
-            if (marker != null && marker.isDiscoverable()
-                    && !isDiscovered(marker)) {
+            if ((marker == null
+                    && hasDecorativeMapping(
+                            (LOTRAbstractWaypoint)selected))
+                    || (marker != null && marker.isDiscoverable()
+                    && !isDiscovered(marker))) {
                 selectedWaypointField.set(gui, null);
             }
         } catch (Throwable ignored) {
             // Selection cleanup is best-effort; the server policy still denies it.
         }
+    }
+
+    public static boolean isDeletedMappedWaypoint(
+            LOTRAbstractWaypoint waypoint) {
+        return waypoint != null
+                && getMappedMarker(waypoint) == null
+                && hasDecorativeMapping(waypoint);
     }
 
     private static List<LostTalesMapMarkerData> getVisibleStandaloneMarkers() {
@@ -717,10 +759,21 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         if (waypoint == null) {
             return null;
         }
-        return LostTalesClientMapMarkerStore.findMappedFastTravelMarker(
+        return LostTalesClientMapMarkerStore.findMappedWaypointMarker(
                 safeString(waypoint.getCodeName()),
                 safeString(waypoint.getDisplayName()),
                 waypoint.getXCoord(), waypoint.getZCoord());
+    }
+
+    private static boolean hasDecorativeMapping(
+            LOTRAbstractWaypoint waypoint) {
+        return waypoint != null
+                && LostTalesClientMapMarkerStore
+                        .hasDecorativeWaypointMapping(
+                                safeString(waypoint.getCodeName()),
+                                safeString(waypoint.getDisplayName()),
+                                waypoint.getXCoord(),
+                                waypoint.getZCoord());
     }
 
     private static boolean isReplacementMarkerEligible(LostTalesMapMarkerData marker) {
@@ -728,7 +781,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     }
 
     private static boolean isWaypointMappingEligible(LostTalesMapMarkerData marker) {
-        if (marker == null || !marker.hasFastTravel()) {
+        if (marker == null) {
             return false;
         }
         if (marker.getDimensionId() != LOTRDimension.MIDDLE_EARTH.dimensionID) {
@@ -744,8 +797,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         if (marker.getDimensionId() != LOTRDimension.MIDDLE_EARTH.dimensionID) {
             return false;
         }
-        if (marker.hasFastTravel()
-                && hasNativeWaypointMapping(marker)) {
+        if (hasNativeWaypointMapping(marker)) {
             return false;
         }
         return shouldShowLostTalesIcon(marker);
@@ -815,7 +867,9 @@ public final class LostTalesLotrMapMarkerIconOverlay {
 
     private static boolean isSelectableCustomMarker(
             LostTalesMapMarkerData marker) {
-        if (isLockedMappedMarkerVisible(marker)) {
+        if (isWaypointMappingEligible(marker)
+                && shouldShowLostTalesIcon(marker)
+                && hasNativeWaypointMapping(marker)) {
             return true;
         }
         return shouldRenderStandaloneMarker(marker)
@@ -892,6 +946,28 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         }
     }
 
+    private static RenderContext createMenuRenderContext(LOTRGuiMap gui) {
+        if (gui == null || !ensureReflection()) {
+            return null;
+        }
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.fontRenderer == null) {
+            return null;
+        }
+        try {
+            float zoomExp = getZoomExp(gui);
+            return new RenderContext(
+                    gui, minecraft, minecraft.fontRenderer,
+                    zoomExp, 1.0F, 0.0F,
+                    mapXMinField.getInt(null),
+                    mapXMaxField.getInt(null),
+                    mapYMinField.getInt(null),
+                    mapYMaxField.getInt(null));
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     private static ScreenPosition transformMarker(RenderContext context, LostTalesMapMarkerData marker) {
         if (context == null || marker == null) {
             return null;
@@ -945,6 +1021,34 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 && x <= context.mapXMax - EDGE_PADDING
                 && y >= context.mapYMin + EDGE_PADDING
                 && y <= context.mapYMax - EDGE_PADDING;
+    }
+
+    private static boolean iconOverlapsMap(
+            float centerX, float centerY, int drawSize,
+            RenderContext context) {
+        float extent = (float)drawSize / 2.0F;
+        return centerX + extent >= context.mapXMin
+                && centerX - extent <= context.mapXMax
+                && centerY + extent >= context.mapYMin
+                && centerY - extent <= context.mapYMax;
+    }
+
+    private static void beginMenuMapClipping(RenderContext context) {
+        ScaledResolution resolution = new ScaledResolution(
+                context.minecraft,
+                context.minecraft.displayWidth,
+                context.minecraft.displayHeight);
+        int scale = resolution.getScaleFactor();
+        GL11.glEnable(GL11.GL_SCISSOR_TEST);
+        GL11.glScissor(
+                context.mapXMin * scale,
+                (context.gui.height - context.mapYMax) * scale,
+                (context.mapXMax - context.mapXMin) * scale,
+                (context.mapYMax - context.mapYMin) * scale);
+    }
+
+    private static void endMenuMapClipping() {
+        GL11.glDisable(GL11.GL_SCISSOR_TEST);
     }
 
     private static boolean isMouseOverIcon(float screenX, float screenY, int mouseX, int mouseY) {
@@ -1073,6 +1177,69 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 size, icon, 0.0F, 0.0F, 0.0F, alpha * 0.75F);
         drawFixedScreenIcon(minecraft, centerX, centerY, size, icon,
                 color[0], color[1], color[2], alpha);
+    }
+
+    /** Draws the same marker artwork in client editors without map logic. */
+    public static void renderEditorIconPreview(
+            Minecraft minecraft, String iconName, String colorName,
+            float centerX, float centerY) {
+        if (minecraft == null) {
+            return;
+        }
+        LostTalesCompassMarkerIcon icon =
+                LostTalesCompassMarkerIcon.fromName(iconName);
+        float[] color = LostTalesCompassMarker.parseColor(colorName);
+        beginIconRender();
+        try {
+            drawFixedScreenIcon(
+                    minecraft, centerX + 1.0F, centerY + 1.0F,
+                    ICON_DRAW_SIZE, icon,
+                    0.0F, 0.0F, 0.0F, 0.75F);
+            drawFixedScreenIcon(
+                    minecraft, centerX, centerY,
+                    ICON_DRAW_SIZE, icon,
+                    color[0], color[1], color[2], 1.0F);
+        } finally {
+            endIconRender();
+        }
+    }
+
+    private static void drawDecorativeMarkerIcon(
+            Minecraft minecraft, LostTalesMapMarkerData marker,
+            float centerX, float centerY, boolean sepia) {
+        LostTalesCompassMarkerIcon icon =
+                LostTalesCompassMarkerIcon.fromName(
+                        marker.getIconName());
+        float[] color = LostTalesCompassMarker.parseColor(
+                marker.getColorName());
+        if (sepia) {
+            color = toLotrSepiaTint(
+                    color[0], color[1], color[2]);
+        }
+        drawFixedScreenIcon(
+                minecraft, centerX + 1.0F, centerY + 1.0F,
+                ICON_DRAW_SIZE, icon,
+                0.0F, 0.0F, 0.0F, 0.75F);
+        drawFixedScreenIcon(
+                minecraft, centerX, centerY,
+                ICON_DRAW_SIZE, icon,
+                color[0], color[1], color[2], 1.0F);
+    }
+
+    static float[] toLotrSepiaTint(
+            float red, float green, float blue) {
+        return new float[] {
+                clampColor(red * 0.79F + green * 0.39F
+                        + blue * 0.26F),
+                clampColor(red * 0.52F + green * 0.35F
+                        + blue * 0.19F),
+                clampColor(red * 0.35F + green * 0.26F
+                        + blue * 0.15F)
+        };
+    }
+
+    private static float clampColor(float value) {
+        return Math.max(0.0F, Math.min(1.0F, value));
     }
 
     /**
@@ -1362,7 +1529,9 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         @Override
         public String getLoreText(EntityPlayer player) {
             return isUndiscoveredButVisible(this.marker)
-                    ? null : this.marker.getDescription();
+                    ? null
+                    : LostTalesLotrWaypointText.resolveDescription(
+                            this.marker, player);
         }
 
         @Override

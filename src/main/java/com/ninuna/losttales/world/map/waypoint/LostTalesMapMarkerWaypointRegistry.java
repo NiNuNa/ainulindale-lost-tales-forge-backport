@@ -81,28 +81,44 @@ public final class LostTalesMapMarkerWaypointRegistry {
         String code = normalizeWaypointKey(waypoint.getCodeName());
         for (LostTalesMapMarkerDefinition marker
                 : LostTalesMapMarkerCatalog.getMarkers()) {
-            if (marker == null || !marker.hasFastTravel()) {
-                continue;
-            }
-            String markerCode = normalizeWaypointKey(
-                    marker.getFastTravelWaypointCode());
-            if (markerCode.length() > 0 && markerCode.equals(code)) {
-                return marker;
-            }
-            if (markerCode.length() == 0
-                    && Math.abs(marker.getX() - waypoint.getXCoord()) <= 0.5D
-                    && Math.abs(marker.getZ() - waypoint.getZCoord()) <= 0.5D) {
+            if (matchesWaypoint(marker, waypoint, code)) {
                 return marker;
             }
         }
         return null;
     }
 
+    static boolean matchesWaypoint(
+            LostTalesMapMarkerDefinition marker,
+            LOTRAbstractWaypoint waypoint) {
+        return matchesWaypoint(
+                marker, waypoint,
+                waypoint == null ? ""
+                        : normalizeWaypointKey(
+                                waypoint.getCodeName()));
+    }
+
+    private static boolean matchesWaypoint(
+            LostTalesMapMarkerDefinition marker,
+            LOTRAbstractWaypoint waypoint, String waypointCode) {
+        if (marker == null || waypoint == null) {
+            return false;
+        }
+        String markerCode = normalizeWaypointKey(
+                marker.getLotrWaypointId());
+        return markerCode.length() > 0
+                ? markerCode.equals(waypointCode)
+                : Math.abs(marker.getX()
+                        - waypoint.getXCoord()) <= 0.5D
+                    && Math.abs(marker.getZ()
+                        - waypoint.getZCoord()) <= 0.5D;
+    }
+
     public static boolean isExistingLotrWaypointMarker(LostTalesMapMarkerDefinition marker) {
         if (marker == null) {
             return false;
         }
-        String code = marker.getFastTravelWaypointCode();
+        String code = marker.getLotrWaypointId();
         if (code != null && code.length() > 0) {
             return true;
         }
@@ -164,7 +180,7 @@ public final class LostTalesMapMarkerWaypointRegistry {
 
     private static void bindExistingWaypoint(
             String markerId, LostTalesMapMarkerDefinition marker) {
-        String code = marker.getFastTravelWaypointCode();
+        String code = marker.getLotrWaypointId();
         LOTRWaypoint waypoint = resolveExistingWaypoint(marker);
         if (waypoint == null) {
             FMLLog.warning("[%s] Map marker %s references missing LOTR waypoint %s",
@@ -187,7 +203,7 @@ public final class LostTalesMapMarkerWaypointRegistry {
         if (marker == null) {
             return null;
         }
-        String code = marker.getFastTravelWaypointCode();
+        String code = marker.getLotrWaypointId();
         return code == null || code.length() == 0
                 ? null : LOTRWaypoint.waypointForName(code);
     }

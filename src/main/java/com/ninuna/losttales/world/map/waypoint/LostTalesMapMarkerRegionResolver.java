@@ -19,7 +19,7 @@ public final class LostTalesMapMarkerRegionResolver {
             return null;
         }
         return resolve(marker.getDimensionId(), marker.getX(), marker.getZ(),
-                marker.getFastTravelWaypointCode());
+                marker.getLotrWaypointId());
     }
 
     /** Resolves the same region that owns the marker's LOTR waypoint. */
@@ -29,14 +29,14 @@ public final class LostTalesMapMarkerRegionResolver {
             return null;
         }
         return resolve(world, marker.getDimensionId(), marker.getX(),
-                marker.getZ(), marker.getFastTravelWaypointCode());
+                marker.getZ(), marker.getLotrWaypointId());
     }
 
     public static LOTRWaypoint.Region resolve(
             World world, int dimensionId, double worldX, double worldZ,
-            String fastTravelWaypointCode) {
+            String lotrWaypointId) {
         LOTRWaypoint.Region waypointRegion = resolveWaypointRegion(
-                fastTravelWaypointCode);
+                lotrWaypointId);
         if (waypointRegion != null) {
             return waypointRegion;
         }
@@ -60,18 +60,18 @@ public final class LostTalesMapMarkerRegionResolver {
             }
         }
         return resolve(dimensionId, worldX, worldZ,
-                fastTravelWaypointCode);
+                lotrWaypointId);
     }
 
     public static LOTRWaypoint.Region resolve(
             int dimensionId, double worldX, double worldZ,
-            String fastTravelWaypointCode) {
+            String lotrWaypointId) {
         if (dimensionId != LOTRDimension.MIDDLE_EARTH.dimensionID) {
             return null;
         }
 
         LOTRWaypoint.Region waypointRegion = resolveWaypointRegion(
-                fastTravelWaypointCode);
+                lotrWaypointId);
         if (waypointRegion != null) {
             return waypointRegion;
         }
@@ -91,11 +91,11 @@ public final class LostTalesMapMarkerRegionResolver {
     }
 
     static LOTRWaypoint.Region resolveWaypointRegion(
-            String fastTravelWaypointCode) {
-        LOTRWaypoint waypoint = fastTravelWaypointCode == null
-                || fastTravelWaypointCode.length() == 0
+            String lotrWaypointId) {
+        LOTRWaypoint waypoint = lotrWaypointId == null
+                || lotrWaypointId.length() == 0
                 ? null : LOTRWaypoint.waypointForName(
-                        fastTravelWaypointCode);
+                        lotrWaypointId);
         return resolveWaypointRegion(waypoint);
     }
 

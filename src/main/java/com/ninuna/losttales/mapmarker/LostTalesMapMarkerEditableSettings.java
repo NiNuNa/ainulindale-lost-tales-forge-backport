@@ -13,7 +13,6 @@ public final class LostTalesMapMarkerEditableSettings {
     private final String categoryName;
     private final String description;
     private final boolean hasFastTravel;
-    private final String fastTravelWaypointCode;
     private final int dimensionId;
     private final double x;
     private final double y;
@@ -30,7 +29,7 @@ public final class LostTalesMapMarkerEditableSettings {
     public LostTalesMapMarkerEditableSettings(
             String name, String iconName, String colorName,
             String categoryName, String description,
-            boolean hasFastTravel, String fastTravelWaypointCode,
+            boolean hasFastTravel,
             int dimensionId, double x, double y, double z,
             double compassFadeInRadius, double discoveryRadius,
             boolean hiddenUntilDiscovered, boolean discoverable,
@@ -43,7 +42,6 @@ public final class LostTalesMapMarkerEditableSettings {
         this.categoryName = value(categoryName);
         this.description = value(description);
         this.hasFastTravel = hasFastTravel;
-        this.fastTravelWaypointCode = value(fastTravelWaypointCode);
         this.dimensionId = dimensionId;
         this.x = x;
         this.y = y;
@@ -68,7 +66,6 @@ public final class LostTalesMapMarkerEditableSettings {
                 record.getName(), record.getIconName(),
                 record.getColorName(), record.getCategoryName(),
                 record.getDescription(), record.hasFastTravel(),
-                record.getFastTravelWaypointCode(),
                 record.getDimensionId(), record.getX(), record.getY(),
                 record.getZ(), record.getCompassFadeInRadius(),
                 record.getDiscoveryRadius(),
@@ -89,9 +86,6 @@ public final class LostTalesMapMarkerEditableSettings {
     public String getCategoryName() { return this.categoryName; }
     public String getDescription() { return this.description; }
     public boolean hasFastTravel() { return this.hasFastTravel; }
-    public String getFastTravelWaypointCode() {
-        return this.fastTravelWaypointCode;
-    }
     public int getDimensionId() { return this.dimensionId; }
     public double getX() { return this.x; }
     public double getY() { return this.y; }

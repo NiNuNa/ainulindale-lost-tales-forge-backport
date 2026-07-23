@@ -206,9 +206,8 @@ public final class LostTalesMapMarkerCatalog {
         boolean hasFastTravel = getBoolean(object, "hasFastTravel", false);
         String icon = getString(object, "icon", hasFastTravel ? "fort" : "undiscovered");
         String color = getString(object, "color", "white");
-        String fastTravelWaypointCode = getString(object, "fastTravelWaypointCode", "");
         String category = getString(object, "category", hasFastTravel ? LostTalesMapMarkerDefinition.CATEGORY_POINT_OF_INTEREST : LostTalesMapMarkerDefinition.CATEGORY_DEFAULT);
-        String description = getString(object, "description", getString(object, "info", getString(object, "lore", "")));
+        String description = getString(object, "description", "");
         int dimensionId = LostTalesDimensionHelper.parseDimensionId(getString(object, "dimension", "lotr:middle_earth"), LOTRDimension.MIDDLE_EARTH.dimensionID);
         double x = object.get("x").getAsDouble();
         double y = hasNumber(object, "y")
@@ -218,32 +217,26 @@ public final class LostTalesMapMarkerCatalog {
         if (!isFinite(x) || !isFinite(y) || !isFinite(z)) {
             return null;
         }
-        double compassFadeInRadius = getDouble(object, "compassFadeInRadius", getDouble(object, "fadeInRadius", 128.0D));
-        double discoveryRadius = Math.max(1.0D, getDouble(object, "discoveryRadius", getDouble(object, "unlockRadius", 8.0D)));
+        double compassFadeInRadius = getDouble(object, "compassFadeInRadius", 128.0D);
+        double discoveryRadius = Math.max(1.0D, getDouble(object, "discoveryRadius", 8.0D));
         if (!isFinite(compassFadeInRadius)
                 || !isFinite(discoveryRadius)) {
             return null;
         }
-        boolean hidden = getBoolean(object, "hiddenUntilDiscovered", getBoolean(object, "requiresDiscovery", false));
+        boolean hidden = getBoolean(object, "hiddenUntilDiscovered", false);
         boolean discoverable = getBoolean(object, "isDiscoverable", true);
         boolean requiresRegionUnlock = getBoolean(
                 object, "requiresRegionUnlock", true);
-        boolean hasWaystone = getBoolean(
-                object, "hasWaystone", source.defaultHasWaystone());
+        boolean hasWaystone = getBoolean(object, "hasWaystone", false);
         String structureType = getString(
-                object, "waystoneStructureType",
-                getString(object, "structureType", ""));
+                object, "waystoneStructureType", "");
         structureType = normalizeStructureType(structureType, hasWaystone);
         if (structureType == null) {
             return null;
         }
-        if (getBoolean(object, "discoveredByDefault", false)) {
-            hidden = false;
-            discoverable = false;
-        }
         return new LostTalesMapMarkerDefinition(id, name, icon, color,
                 category, description, hasFastTravel,
-                fastTravelWaypointCode, dimensionId, x, y, z,
+                dimensionId, x, y, z,
                 compassFadeInRadius, discoveryRadius, hidden,
                 discoverable, requiresRegionUnlock, source,
                 hasWaystone, structureType);
@@ -253,7 +246,7 @@ public final class LostTalesMapMarkerCatalog {
                                                  boolean hasWaystone) {
         String normalized = value == null ? "" : value.trim().toLowerCase();
         if (normalized.length() == 0 && hasWaystone) {
-            normalized = LostTalesMapMarkerDefinition.DEFAULT_WAYSTONE_STRUCTURE;
+            return null;
         }
         if (normalized.length() == 0) {
             return "";

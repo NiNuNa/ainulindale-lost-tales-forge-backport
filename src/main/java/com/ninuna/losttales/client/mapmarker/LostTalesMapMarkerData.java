@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerHeightResolver;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdResolver;
 import net.minecraft.world.World;
 
 /**
@@ -21,7 +22,6 @@ public final class LostTalesMapMarkerData {
     private final String categoryName;
     private final String description;
     private final boolean hasFastTravel;
-    private final String fastTravelWaypointCode;
     private final int dimensionId;
     private final double x;
     private final double y;
@@ -31,6 +31,7 @@ public final class LostTalesMapMarkerData {
     private final boolean hiddenUntilDiscovered;
     private final boolean discoverable;
     private final boolean requiresRegionUnlock;
+    private final boolean hasWaystone;
 
     public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius) {
         this(id, name, iconName, colorName, CATEGORY_DEFAULT, false, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, false, false);
@@ -45,37 +46,54 @@ public final class LostTalesMapMarkerData {
     }
 
     public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, boolean hasFastTravel, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
-        this(id, name, iconName, colorName, categoryName, hasFastTravel, "", dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, discoverable);
+        this(id, name, iconName, colorName, categoryName, "",
+                hasFastTravel, dimensionId, x, y, z,
+                compassFadeInRadius, discoveryRadius,
+                hiddenUntilDiscovered, discoverable);
     }
 
     public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, boolean hasFastTravel, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable, boolean requiresRegionUnlock) {
         this(id, name, iconName, colorName, categoryName, "",
-                hasFastTravel, "", dimensionId, x, y, z,
+                hasFastTravel, dimensionId, x, y, z,
                 compassFadeInRadius, discoveryRadius,
                 hiddenUntilDiscovered, discoverable,
                 requiresRegionUnlock);
     }
 
-    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, boolean hasFastTravel, String fastTravelWaypointCode, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
-        this(id, name, iconName, colorName, categoryName, "", hasFastTravel, fastTravelWaypointCode, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, discoverable);
-    }
-
-    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, String description, boolean hasFastTravel, String fastTravelWaypointCode, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
+    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, String description, boolean hasFastTravel, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
         this(id, name, iconName, colorName, categoryName, description,
-                hasFastTravel, fastTravelWaypointCode, dimensionId,
+                hasFastTravel, dimensionId,
                 x, y, z, compassFadeInRadius, discoveryRadius,
                 hiddenUntilDiscovered, discoverable, false);
     }
 
-    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, String description, boolean hasFastTravel, String fastTravelWaypointCode, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable, boolean requiresRegionUnlock) {
+    public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, String categoryName, String description, boolean hasFastTravel, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable, boolean requiresRegionUnlock) {
+        this(id, name, iconName, colorName, categoryName, description,
+                hasFastTravel, dimensionId,
+                x, y, z, compassFadeInRadius, discoveryRadius,
+                hiddenUntilDiscovered, discoverable,
+                requiresRegionUnlock, false);
+    }
+
+    public LostTalesMapMarkerData(String id, String name, String iconName,
+                                  String colorName, String categoryName,
+                                  String description,
+                                  boolean hasFastTravel,
+                                  int dimensionId,
+                                  double x, double y, double z,
+                                  double compassFadeInRadius,
+                                  double discoveryRadius,
+                                  boolean hiddenUntilDiscovered,
+                                  boolean discoverable,
+                                  boolean requiresRegionUnlock,
+                                  boolean hasWaystone) {
         this.id = id;
         this.name = name;
         this.iconName = iconName;
         this.colorName = colorName;
         this.categoryName = categoryName == null || categoryName.length() == 0 ? (hasFastTravel ? CATEGORY_POINT_OF_INTEREST : CATEGORY_DEFAULT) : categoryName;
-        this.description = normalizeDescription(description, this.categoryName);
+        this.description = normalizeDescription(description);
         this.hasFastTravel = hasFastTravel;
-        this.fastTravelWaypointCode = fastTravelWaypointCode == null ? "" : fastTravelWaypointCode.trim();
         this.dimensionId = dimensionId;
         this.x = x;
         this.y = y;
@@ -86,17 +104,12 @@ public final class LostTalesMapMarkerData {
                 && hiddenUntilDiscovered;
         this.discoverable = discoverable;
         this.requiresRegionUnlock = requiresRegionUnlock;
+        this.hasWaystone = hasWaystone;
     }
 
 
-    private static String normalizeDescription(String description, String categoryName) {
-        if (description != null && description.trim().length() > 0) {
-            return description.trim();
-        }
-        if (categoryName != null && categoryName.length() > 0) {
-            return "A discovered " + categoryName.toLowerCase() + " in Middle-earth.";
-        }
-        return "A discovered location in Middle-earth.";
+    private static String normalizeDescription(String description) {
+        return description == null ? "" : description.trim();
     }
 
     public String getId() {
@@ -128,8 +141,8 @@ public final class LostTalesMapMarkerData {
     }
 
 
-    public String getFastTravelWaypointCode() {
-        return this.fastTravelWaypointCode;
+    public String getLotrWaypointId() {
+        return LostTalesMapMarkerIdResolver.resolveLotrWaypointId(this.id);
     }
 
 
@@ -190,6 +203,23 @@ public final class LostTalesMapMarkerData {
 
     public boolean requiresRegionUnlock() {
         return this.requiresRegionUnlock;
+    }
+
+    public boolean hasWaystone() {
+        return this.hasWaystone;
+    }
+
+    /**
+     * A waystone's stored X/Z identify its block. The compass points at the
+     * visible center of that block, while non-waystone markers retain their
+     * exact configured coordinates.
+     */
+    public double getCompassTargetX() {
+        return this.hasWaystone ? this.x + 0.5D : this.x;
+    }
+
+    public double getCompassTargetZ() {
+        return this.hasWaystone ? this.z + 0.5D : this.z;
     }
 
 }

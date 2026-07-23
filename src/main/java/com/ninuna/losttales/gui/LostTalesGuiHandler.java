@@ -45,7 +45,7 @@ public class LostTalesGuiHandler implements IGuiHandler {
                                 .getRecord(waystone.getMarkerId());
                 if (waystone.isUseableByPlayer(player)
                         && waystone.isLinked()
-                        && record != null && record.isActive()
+                        && record != null
                         && record.isLinked()
                         && record.getLinkToken() != null
                         && record.getLinkToken().equals(

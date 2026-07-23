@@ -8,6 +8,7 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerWorldData;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapMarkerRegionResolver;
+import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -29,8 +30,18 @@ import net.minecraft.world.World;
  * cooldown, safety, and teleport implementation.
  */
 public final class LostTalesLotrWaystoneTravelAdapter {
+    private static final String GLOWSTONE_HOUSE =
+            "losttales:glowstone_house";
+    private static final int[][] ADJACENT_OFFSETS = {
+            {0, 1}, {1, 0}, {0, -1}, {-1, 0},
+            {0, 2}, {2, 0}, {0, -2}, {-2, 0},
+            {1, 1}, {1, -1}, {-1, -1}, {-1, 1}
+    };
     private static final ConcurrentMap<UUID, PendingTravel> PENDING =
             new ConcurrentHashMap<UUID, PendingTravel>();
+    private static final ConcurrentMap<UUID, PendingNativeTravel>
+            NATIVE_PENDING =
+                    new ConcurrentHashMap<UUID, PendingNativeTravel>();
 
     private LostTalesLotrWaystoneTravelAdapter() {}
 
@@ -66,9 +77,8 @@ public final class LostTalesLotrWaystoneTravelAdapter {
             return;
         }
         LOTRCustomWaypoint waypoint = createWaypoint(
-                resolved.destination, travelId);
-        if (!prepareSafeDestination(
-                player.worldObj, resolved.destination, waypoint)) {
+                player.worldObj, resolved.destination, travelId);
+        if (waypoint == null) {
             deny(player, "chat.losttales.fast_travel.unsafe");
             return;
         }
@@ -91,6 +101,7 @@ public final class LostTalesLotrWaystoneTravelAdapter {
                 sourceX, sourceY, sourceZ,
                 sourceMarkerId, destinationMarkerId,
                 waypoint, resolved.destination.getRevision());
+        NATIVE_PENDING.remove(player.getUniqueID());
         PENDING.put(player.getUniqueID(), pending);
         lotrData.setTargetFTWaypoint(waypoint);
         player.closeScreen();
@@ -108,6 +119,7 @@ public final class LostTalesLotrWaystoneTravelAdapter {
         }
         PendingTravel pending = PENDING.get(player.getUniqueID());
         if (pending == null) {
+            revalidateNativePending(player, lotrData);
             return;
         }
         LOTRAbstractWaypoint target = lotrData.getTargetFTWaypoint();
@@ -128,7 +140,7 @@ public final class LostTalesLotrWaystoneTravelAdapter {
                 && lotrData.canFastTravel()
                 && !player.isPlayerSleeping()
                 && resolved.destination.getRevision()
-                        >= pending.destinationRevision;
+                        == pending.destinationRevision;
         if (valid && lotrData.getTicksUntilFT() <= 1) {
             valid = prepareSafeDestination(
                     player.worldObj, resolved.destination,
@@ -146,7 +158,84 @@ public final class LostTalesLotrWaystoneTravelAdapter {
     public static void clearPending(EntityPlayerMP player) {
         if (player != null && player.getUniqueID() != null) {
             PENDING.remove(player.getUniqueID());
+            NATIVE_PENDING.remove(player.getUniqueID());
         }
+    }
+
+    public static void trackNativeTravel(
+            EntityPlayerMP player, LOTRCustomWaypoint waypoint,
+            LostTalesMapMarkerRecord destination) {
+        if (player == null || player.getUniqueID() == null
+                || waypoint == null || destination == null) {
+            return;
+        }
+        PENDING.remove(player.getUniqueID());
+        NATIVE_PENDING.put(
+                player.getUniqueID(),
+                new PendingNativeTravel(
+                        destination.getId(), waypoint,
+                        destination.getRevision()));
+    }
+
+    private static void revalidateNativePending(
+            EntityPlayerMP player, LOTRPlayerData lotrData) {
+        PendingNativeTravel pending =
+                NATIVE_PENDING.get(player.getUniqueID());
+        if (pending == null) {
+            return;
+        }
+        LOTRAbstractWaypoint target =
+                lotrData.getTargetFTWaypoint();
+        if (target == null || target != pending.waypoint) {
+            NATIVE_PENDING.remove(
+                    player.getUniqueID(), pending);
+            return;
+        }
+        LostTalesMapMarkerRecord destination =
+                LostTalesMapMarkerStorage.get(player.worldObj)
+                        .getRecord(pending.destinationMarkerId);
+        boolean valid = destination != null
+                && destination.getRevision()
+                        == pending.destinationRevision
+                && LostTalesWaypointFastTravelPolicy.isAllowed(
+                        player, target);
+        if (valid && lotrData.getTicksUntilFT() <= 1) {
+            valid = prepareSafeDestination(
+                    player.worldObj, destination,
+                    pending.waypoint);
+        }
+        if (!valid) {
+            NATIVE_PENDING.remove(
+                    player.getUniqueID(), pending);
+            lotrData.setTargetFTWaypoint(null);
+            lotrData.setTicksUntilFT(0);
+            deny(player,
+                    "chat.losttales.fast_travel.revalidation_failed");
+        }
+    }
+
+    /**
+     * Gives native LOTR fast travel the same adjacent arrival used by the
+     * waystone destination screen. Unlinked map markers retain LOTR's normal
+     * target coordinates.
+     */
+    public static LOTRCustomWaypoint createSafeDestinationWaypoint(
+            EntityPlayerMP player, LostTalesMapMarkerRecord destination) {
+        if (player == null || player.worldObj == null
+                || destination == null || !destination.isLinked()) {
+            return null;
+        }
+        LostTalesMapMarkerWorldData data =
+                LostTalesMapMarkerStorage.get(player.worldObj);
+        int travelId;
+        try {
+            travelId = data.getOrCreateLotrTravelId(
+                    destination.getId());
+        } catch (RuntimeException exception) {
+            return null;
+        }
+        return createWaypoint(
+                player.worldObj, destination, travelId);
     }
 
     private static ResolvedTravel resolve(
@@ -186,7 +275,7 @@ public final class LostTalesLotrWaystoneTravelAdapter {
                 || !source.hasFastTravel()
                 || !LostTalesMapMarkerVisibilityPolicy.canView(
                         source, player)
-                || destination == null || !destination.isActive()
+                || destination == null
                 || !destination.hasFastTravel()
                 || destination.getDimensionId()
                         != LOTRDimension.MIDDLE_EARTH.dimensionID
@@ -230,7 +319,7 @@ public final class LostTalesLotrWaystoneTravelAdapter {
             LostTalesMapMarkerRecord record,
             LostTalesTileEntityWaystone tile,
             World world, int x, int y, int z) {
-        return record != null && record.isActive()
+        return record != null
                 && record.isLinked() && record.hasWaystone()
                 && record.getLinkToken() != null
                 && record.getLinkToken().equals(tile.getLinkToken())
@@ -242,10 +331,46 @@ public final class LostTalesLotrWaystoneTravelAdapter {
     }
 
     private static LOTRCustomWaypoint createWaypoint(
-            LostTalesMapMarkerRecord destination, int travelId) {
-        int x = MathHelper.floor_double(destination.getX());
-        int y = MathHelper.floor_double(destination.getY());
-        int z = MathHelper.floor_double(destination.getZ());
+            World world, LostTalesMapMarkerRecord destination,
+            int travelId) {
+        int markerX = MathHelper.floor_double(destination.getX());
+        int markerY = MathHelper.floor_double(destination.getY());
+        int markerZ = MathHelper.floor_double(destination.getZ());
+        if (!destination.isLinked()) {
+            return createWaypointAt(
+                    destination, travelId,
+                    markerX, markerY, markerZ);
+        }
+
+        if (GLOWSTONE_HOUSE.equals(
+                destination.getWaystoneStructureType())) {
+            LOTRCustomWaypoint outsideHouse = createWaypointAt(
+                    destination, travelId,
+                    destination.getLinkedX(),
+                    destination.getLinkedY(),
+                    destination.getLinkedZ() + 3);
+            if (prepareSafeDestination(
+                    world, destination, outsideHouse)) {
+                return outsideHouse;
+            }
+        }
+        for (int[] offset : ADJACENT_OFFSETS) {
+            LOTRCustomWaypoint adjacent = createWaypointAt(
+                    destination, travelId,
+                    destination.getLinkedX() + offset[0],
+                    destination.getLinkedY(),
+                    destination.getLinkedZ() + offset[1]);
+            if (prepareSafeDestination(
+                    world, destination, adjacent)) {
+                return adjacent;
+            }
+        }
+        return null;
+    }
+
+    private static LOTRCustomWaypoint createWaypointAt(
+            LostTalesMapMarkerRecord destination, int travelId,
+            int x, int y, int z) {
         return new LOTRCustomWaypoint(
                 destination.getName(),
                 LostTalesMapCoordinateHelper.worldToMapImageX(
@@ -323,6 +448,21 @@ public final class LostTalesLotrWaystoneTravelAdapter {
             this.sourceY = sourceY;
             this.sourceZ = sourceZ;
             this.sourceMarkerId = sourceMarkerId;
+            this.destinationMarkerId = destinationMarkerId;
+            this.waypoint = waypoint;
+            this.destinationRevision = destinationRevision;
+        }
+    }
+
+    private static final class PendingNativeTravel {
+        private final String destinationMarkerId;
+        private final LOTRCustomWaypoint waypoint;
+        private final long destinationRevision;
+
+        private PendingNativeTravel(
+                String destinationMarkerId,
+                LOTRCustomWaypoint waypoint,
+                long destinationRevision) {
             this.destinationMarkerId = destinationMarkerId;
             this.waypoint = waypoint;
             this.destinationRevision = destinationRevision;

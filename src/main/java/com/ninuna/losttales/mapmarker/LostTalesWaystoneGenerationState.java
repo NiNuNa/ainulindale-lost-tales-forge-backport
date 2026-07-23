@@ -5,8 +5,7 @@ public enum LostTalesWaystoneGenerationState {
     NOT_ATTEMPTED("not_attempted"),
     PLACED("placed"),
     DISABLED("disabled"),
-    FAILED_OR_BLOCKED("failed_or_blocked"),
-    REMOVED("removed");
+    FAILED_OR_BLOCKED("failed_or_blocked");
 
     private final String serializedName;
 

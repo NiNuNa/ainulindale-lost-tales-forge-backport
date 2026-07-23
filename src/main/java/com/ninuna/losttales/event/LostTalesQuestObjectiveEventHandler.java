@@ -90,12 +90,21 @@ public final class LostTalesQuestObjectiveEventHandler {
 
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (event == null || event.phase != TickEvent.Phase.END || !(event.player instanceof EntityPlayerMP) || event.player.worldObj == null || event.player.worldObj.isRemote) {
+        if (event == null || !(event.player instanceof EntityPlayerMP)
+                || event.player.worldObj == null
+                || event.player.worldObj.isRemote) {
             return;
         }
 
-        LostTalesWaypointFastTravelPolicy.cancelUnauthorizedTarget(
-                (EntityPlayerMP)event.player);
+        if (event.phase == TickEvent.Phase.START) {
+            LostTalesWaypointFastTravelPolicy
+                    .cancelUnauthorizedTarget(
+                            (EntityPlayerMP)event.player);
+            return;
+        }
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
 
         if (event.player.ticksExisted % 20 != 0) {
             return;

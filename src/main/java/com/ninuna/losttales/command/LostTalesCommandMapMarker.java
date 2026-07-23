@@ -4,7 +4,9 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerReseedService;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSyncManager;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerWorldData;
 import com.ninuna.losttales.mapmarker.LostTalesWaystoneGenerationState;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
@@ -27,13 +29,12 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.WorldServer;
 import com.ninuna.losttales.world.waystone.LostTalesWaystonePlacementResult;
 import com.ninuna.losttales.world.waystone.LostTalesWaystonePlacementService;
+import cpw.mods.fml.common.FMLLog;
 /**
  * Legacy Forge companion to the modern map-marker command.
  *
- * The 1.21 branch can add/remove shared level markers with server attachments.
- * Minecraft 1.7.10 does not have that storage/networking model yet, so this
- * command focuses on the player-discovery state used by quest marker hints and
- * exposes a read-only catalog of bundled marker JSON for debugging.
+ * Operator tools for player discovery state, bundled marker inspection, and
+ * retrying failed waystone generation.
  */
 public class LostTalesCommandMapMarker extends LostTalesCommandBase {
 
@@ -50,7 +51,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return commandPrefix() + " <list|dynamic|known|discover|forget|track|untrack|retry> [markerId] [player]";
+        return commandPrefix() + " <list|dynamic|known|discover|forget|track|untrack|retry|reseed> [markerId|all] [player]";
     }
 
     @Override
@@ -104,6 +105,16 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
                 retryWaystoneGeneration(sender,
                         LostTalesQuestMarkerHelper.normalizeMarkerId(
                                 args[1]));
+            }
+            return;
+        }
+
+        if ("reseed".equalsIgnoreCase(action)
+                || "regenerate".equalsIgnoreCase(action)) {
+            if (args.length < 2) {
+                sendUsage(sender);
+            } else {
+                reseedMarkers(sender, args[1]);
             }
             return;
         }
@@ -213,7 +224,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         if (LostTalesQuestManager.revealMapMarker(player, markerId)) {
             send(sender, EnumChatFormatting.GREEN + "Discovered marker " + formatMarkerId(markerId) + " for " + player.getCommandSenderName() + ".");
         } else {
-            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " already knows marker " + formatMarkerId(markerId) + " or marker discovery is disabled.");
+            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " already knows marker " + formatMarkerId(markerId) + ".");
         }
     }
 
@@ -266,7 +277,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
                     + "Unknown marker: " + markerId);
             return;
         }
-        if (!record.isActive() || !record.hasWaystone()
+        if (!record.hasWaystone()
                 || record.isLinked()
                 || (record.getGenerationState()
                         != LostTalesWaystoneGenerationState
@@ -313,6 +324,121 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
     private static int floor(double value) {
         int truncated = (int)value;
         return value < truncated ? truncated - 1 : truncated;
+    }
+
+    private void reseedMarkers(
+            ICommandSender sender, String requestedId) {
+        MinecraftServer server = MinecraftServer.getServer();
+        WorldServer overworld = server == null
+                ? null : server.worldServerForDimension(0);
+        if (overworld == null) {
+            send(sender, EnumChatFormatting.RED
+                    + "The marker repository is not available.");
+            return;
+        }
+
+        LostTalesMapMarkerCatalog.reloadFromClasspath();
+        Collection<LostTalesMapMarkerDefinition> definitions;
+        if ("all".equalsIgnoreCase(requestedId)) {
+            definitions = LostTalesMapMarkerCatalog.getMarkers();
+        } else {
+            String markerId =
+                    LostTalesQuestMarkerHelper.normalizeMarkerId(
+                            requestedId);
+            LostTalesMapMarkerDefinition definition =
+                    LostTalesMapMarkerCatalog.getMarker(markerId);
+            if (definition == null) {
+                send(sender, EnumChatFormatting.RED
+                        + "Unknown bundled marker: " + markerId);
+                return;
+            }
+            definitions = java.util.Collections.singleton(definition);
+        }
+
+        LostTalesMapMarkerWorldData data;
+        try {
+            data = LostTalesMapMarkerStorage.get(overworld);
+        } catch (RuntimeException exception) {
+            send(sender, EnumChatFormatting.RED
+                    + "The marker repository could not be opened.");
+            return;
+        }
+        if (data.isReadOnlyForNewerVersion()) {
+            send(sender, EnumChatFormatting.RED
+                    + "The marker repository is read-only because it uses data version "
+                    + data.getUnsupportedDataVersion() + ".");
+            return;
+        }
+
+        int reseeded = 0;
+        int linked = 0;
+        int placed = 0;
+        int deferred = 0;
+        int blocked = 0;
+        String firstFailure = "";
+        for (LostTalesMapMarkerDefinition definition : definitions) {
+            try {
+                LostTalesMapMarkerRecord record =
+                        LostTalesMapMarkerReseedService.reseed(
+                                data, definition);
+                reseeded++;
+                if (record.isLinked()) {
+                    linked++;
+                    continue;
+                }
+                if (!record.hasWaystone()) {
+                    continue;
+                }
+                WorldServer world = server.worldServerForDimension(
+                        record.getDimensionId());
+                int chunkX = floor(record.getX()) >> 4;
+                int chunkZ = floor(record.getZ()) >> 4;
+                if (world == null
+                        || !world.getChunkProvider().chunkExists(
+                                chunkX, chunkZ)) {
+                    deferred++;
+                    continue;
+                }
+                LostTalesWaystonePlacementResult result =
+                        LostTalesWaystonePlacementService.attempt(
+                                world, record);
+                if (result.getStatus()
+                        == LostTalesWaystonePlacementResult.Status.SUCCESS) {
+                    placed++;
+                } else if (result.getStatus()
+                        == LostTalesWaystonePlacementResult.Status.DEFERRED) {
+                    deferred++;
+                } else {
+                    blocked++;
+                }
+            } catch (RuntimeException exception) {
+                blocked++;
+                if (firstFailure.length() == 0) {
+                    firstFailure = definition.getId() + ": "
+                            + exception.getMessage();
+                }
+                FMLLog.warning(
+                        "[%s] Could not reseed bundled marker %s: %s",
+                        LostTalesMetaData.MOD_ID, definition.getId(),
+                        exception.getMessage());
+            }
+        }
+        LostTalesMapMarkerSyncManager.syncAll();
+        send(sender, (blocked == 0
+                ? EnumChatFormatting.GREEN
+                : EnumChatFormatting.YELLOW)
+                + "Reseeded " + reseeded + " bundled marker(s) from JSON"
+                + "; preserved " + linked + " linked waystone(s)"
+                + ", placed " + placed + ", deferred " + deferred
+                + ", blocked " + blocked + ".");
+        if (linked > 0) {
+            send(sender, EnumChatFormatting.GRAY
+                    + "Linked waystones kept their live block coordinates and link tokens.");
+        }
+        if (firstFailure.length() > 0) {
+            send(sender, EnumChatFormatting.RED
+                    + "First reseed failure: " + firstFailure);
+        }
     }
 
     private EntityPlayerMP getTargetPlayer(ICommandSender sender, String[] args, int playerArgIndex) {
@@ -375,6 +501,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         send(sender, EnumChatFormatting.GRAY + commandPrefix() + " track losttales:quest_giver_nia <player>");
         send(sender, EnumChatFormatting.GRAY + commandPrefix() + " forget losttales:quest_giver_nia <player>");
         send(sender, EnumChatFormatting.GRAY + commandPrefix() + " retry losttales:marker_id");
+        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " reseed <markerId|all>");
     }
 
     private String commandPrefix() {
@@ -411,10 +538,14 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
     @Override
     public List addTabCompletionOptions(ICommandSender sender, String[] args) {
         if (args.length == 1) {
-            return getListOfStringsMatchingLastWord(args, "list", "dynamic", "known", "catalog", "discover", "reveal", "forget", "hide", "track", "untrack", "retry");
+            return getListOfStringsMatchingLastWord(args, "list", "dynamic", "known", "catalog", "discover", "reveal", "forget", "hide", "track", "untrack", "retry", "reseed", "regenerate");
         }
-        if (args.length == 2 && ("discover".equalsIgnoreCase(args[0]) || "reveal".equalsIgnoreCase(args[0]) || "forget".equalsIgnoreCase(args[0]) || "hide".equalsIgnoreCase(args[0]) || "track".equalsIgnoreCase(args[0]) || "retry".equalsIgnoreCase(args[0]))) {
+        if (args.length == 2 && ("discover".equalsIgnoreCase(args[0]) || "reveal".equalsIgnoreCase(args[0]) || "forget".equalsIgnoreCase(args[0]) || "hide".equalsIgnoreCase(args[0]) || "track".equalsIgnoreCase(args[0]) || "retry".equalsIgnoreCase(args[0]) || "reseed".equalsIgnoreCase(args[0]) || "regenerate".equalsIgnoreCase(args[0]))) {
             List<String> ids = collectKnownMarkerIds();
+            if ("reseed".equalsIgnoreCase(args[0])
+                    || "regenerate".equalsIgnoreCase(args[0])) {
+                ids.add(0, "all");
+            }
             return getListOfStringsMatchingLastWord(args, ids.toArray(new String[ids.size()]));
         }
         return null;

@@ -23,6 +23,12 @@ import net.minecraft.client.resources.IResourceManager;
  */
 public final class LostTalesClientMapMarkerStore {
     private static volatile List<LostTalesMapMarkerData> sharedMarkers = createFallbackMarkers();
+    private static volatile List<LostTalesMapMarkerData> decorativeMarkers =
+            createFallbackMarkers();
+    private static volatile MarkerSnapshot decorativeSnapshot =
+            MarkerSnapshot.create(
+                    decorativeMarkers,
+                    Collections.<LostTalesMapMarkerData>emptyList());
     private static volatile List<LostTalesMapMarkerData> dynamicMarkers = Collections.emptyList();
     private static volatile MarkerSnapshot markerSnapshot = MarkerSnapshot.create(sharedMarkers, dynamicMarkers);
 
@@ -34,6 +40,10 @@ public final class LostTalesClientMapMarkerStore {
 
     public static List<LostTalesMapMarkerData> getAllMarkers() {
         return markerSnapshot.allMarkers;
+    }
+
+    public static List<LostTalesMapMarkerData> getDecorativeMarkers() {
+        return decorativeMarkers;
     }
 
     public static Set<String> getSharedMarkerIds() {
@@ -51,10 +61,26 @@ public final class LostTalesClientMapMarkerStore {
         return markerSnapshot;
     }
 
-    static LostTalesMapMarkerData findMappedFastTravelMarker(
+    static LostTalesMapMarkerData findMappedWaypointMarker(
             String waypointCode, String waypointDisplay,
             int worldX, int worldZ) {
-        MarkerSnapshot snapshot = markerSnapshot;
+        return findMappedWaypointMarker(
+                markerSnapshot, waypointCode, waypointDisplay,
+                worldX, worldZ);
+    }
+
+    static boolean hasDecorativeWaypointMapping(
+            String waypointCode, String waypointDisplay,
+            int worldX, int worldZ) {
+        return findMappedWaypointMarker(
+                decorativeSnapshot, waypointCode, waypointDisplay,
+                worldX, worldZ) != null;
+    }
+
+    private static LostTalesMapMarkerData findMappedWaypointMarker(
+            MarkerSnapshot snapshot,
+            String waypointCode, String waypointDisplay,
+            int worldX, int worldZ) {
         LostTalesMapMarkerData marker = snapshot.fastTravelByCode.get(
                 normalizeLookupKey(waypointCode));
         if (marker != null) {
@@ -81,7 +107,12 @@ public final class LostTalesClientMapMarkerStore {
         if (loaded.isEmpty()) {
             loaded = createFallbackMarkers();
         }
-        sharedMarkers = Collections.unmodifiableList(new ArrayList<LostTalesMapMarkerData>(loaded));
+        decorativeMarkers = Collections.unmodifiableList(
+                new ArrayList<LostTalesMapMarkerData>(loaded));
+        decorativeSnapshot = MarkerSnapshot.create(
+                decorativeMarkers,
+                Collections.<LostTalesMapMarkerData>emptyList());
+        sharedMarkers = decorativeMarkers;
         rebuildSnapshot();
     }
 
@@ -118,6 +149,7 @@ public final class LostTalesClientMapMarkerStore {
 
     public static synchronized void clearDynamicMarkers() {
         dynamicMarkers = Collections.emptyList();
+        sharedMarkers = decorativeMarkers;
         rebuildSnapshot();
     }
 
@@ -140,7 +172,6 @@ public final class LostTalesClientMapMarkerStore {
                 marker.getCategoryName(),
                 marker.getDescription(),
                 marker.hasFastTravel(),
-                marker.getFastTravelWaypointCode(),
                 marker.getDimensionId(),
                 marker.getX(),
                 marker.getY(),
@@ -149,7 +180,8 @@ public final class LostTalesClientMapMarkerStore {
                 marker.getDiscoveryRadius(),
                 marker.isHiddenUntilDiscovered(),
                 marker.isDiscoverable(),
-                marker.requiresRegionUnlock()
+                marker.requiresRegionUnlock(),
+                marker.hasWaystone()
         );
     }
 
@@ -192,11 +224,11 @@ public final class LostTalesClientMapMarkerStore {
             Map<String, LostTalesMapMarkerData> byName =
                     new LinkedHashMap<String, LostTalesMapMarkerData>();
             for (LostTalesMapMarkerData marker : combined) {
-                if (!isFastTravelMappingCandidate(marker)) {
+                if (!isWaypointMappingCandidate(marker)) {
                     continue;
                 }
                 String code = normalizeLookupKey(
-                        marker.getFastTravelWaypointCode());
+                        marker.getLotrWaypointId());
                 if (code.length() > 0) {
                     putFirst(byCode, code, marker);
                     continue;
@@ -240,10 +272,9 @@ public final class LostTalesClientMapMarkerStore {
         }
     }
 
-    private static boolean isFastTravelMappingCandidate(
+    private static boolean isWaypointMappingCandidate(
             LostTalesMapMarkerData marker) {
-        return marker != null && marker.hasFastTravel()
-                && marker.getDimensionId()
+        return marker != null && marker.getDimensionId()
                         == LOTRDimension.MIDDLE_EARTH.dimensionID;
     }
 

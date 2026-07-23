@@ -15,7 +15,7 @@ public final class LostTalesWaystonePlacementService {
     public static LostTalesWaystonePlacementResult attempt(
             WorldServer world, LostTalesMapMarkerRecord record) {
         if (world == null || record == null
-                || world.isRemote || !record.isActive()
+                || world.isRemote
                 || !record.hasWaystone()
                 || record.getDimensionId()
                         != world.provider.dimensionId) {
@@ -25,9 +25,7 @@ public final class LostTalesWaystonePlacementService {
         if (record.getGenerationState()
                 == LostTalesWaystoneGenerationState.PLACED
                 || record.getGenerationState()
-                == LostTalesWaystoneGenerationState.DISABLED
-                || record.getGenerationState()
-                == LostTalesWaystoneGenerationState.REMOVED) {
+                == LostTalesWaystoneGenerationState.DISABLED) {
             return LostTalesWaystonePlacementResult.blocked(
                     "generation_state_not_placeable");
         }
@@ -53,8 +51,7 @@ public final class LostTalesWaystonePlacementService {
                 == LostTalesWaystonePlacementResult.Status.BLOCKED) {
             LostTalesMapMarkerRecord current =
                     data.getRecord(record.getId());
-            if (current != null && current.isActive()
-                    && current.getGenerationState()
+            if (current != null && current.getGenerationState()
                             != LostTalesWaystoneGenerationState.PLACED) {
                 data.saveRecord(current.withGenerationState(
                         LostTalesWaystoneGenerationState.FAILED_OR_BLOCKED,

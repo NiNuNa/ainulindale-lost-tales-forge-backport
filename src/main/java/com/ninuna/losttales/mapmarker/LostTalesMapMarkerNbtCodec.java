@@ -18,7 +18,7 @@ import net.minecraftforge.common.util.Constants;
 
 /** Versioned, defensive NBT codec for authoritative marker records. */
 public final class LostTalesMapMarkerNbtCodec {
-    public static final int CURRENT_DATA_VERSION = 1;
+    public static final int CURRENT_DATA_VERSION = 3;
     private static final int MAX_RECORDS = 16384;
     private static final int MAX_QUARANTINE = 4096;
 
@@ -139,7 +139,6 @@ public final class LostTalesMapMarkerNbtCodec {
         tag.setString("Category", record.getCategoryName());
         tag.setString("Description", record.getDescription());
         tag.setBoolean("FastTravel", record.hasFastTravel());
-        tag.setString("FastTravelCode", record.getFastTravelWaypointCode());
         tag.setInteger("Dimension", record.getDimensionId());
         tag.setDouble("X", record.getX());
         tag.setDouble("Y", record.getY());
@@ -161,7 +160,13 @@ public final class LostTalesMapMarkerNbtCodec {
             shared.appendTag(entry);
         }
         tag.setTag("SharedPlayers", shared);
-        tag.setBoolean("Active", record.isActive());
+        NBTTagList sharedFellowships = new NBTTagList();
+        for (UUID fellowshipId : record.getSharedFellowshipIds()) {
+            NBTTagCompound entry = new NBTTagCompound();
+            writeUuid(entry, "Fellowship", fellowshipId);
+            sharedFellowships.appendTag(entry);
+        }
+        tag.setTag("SharedFellowships", sharedFellowships);
         tag.setString("GenerationState",
                 record.getGenerationState().getSerializedName());
         tag.setString("GenerationMessage", record.getGenerationMessage());
@@ -208,8 +213,7 @@ public final class LostTalesMapMarkerNbtCodec {
                             .colorName(tag.getString("Color"))
                             .categoryName(tag.getString("Category"))
                             .description(tag.getString("Description"))
-                            .fastTravel(tag.getBoolean("FastTravel"),
-                                    tag.getString("FastTravelCode"))
+                            .fastTravel(tag.getBoolean("FastTravel"))
                             .position(tag.getInteger("Dimension"),
                                     tag.getDouble("X"), tag.getDouble("Y"),
                                     tag.getDouble("Z"))
@@ -235,8 +239,8 @@ public final class LostTalesMapMarkerNbtCodec {
                                                     ? LostTalesMapMarkerVisibility.PRIVATE
                                                     : LostTalesMapMarkerVisibility.PUBLIC))
                             .sharedPlayerIds(readSharedPlayers(tag))
-                            .active(!tag.hasKey("Active")
-                                    || tag.getBoolean("Active"))
+                            .sharedFellowshipIds(
+                                    readSharedFellowships(tag))
                             .generationState(
                                     LostTalesWaystoneGenerationState.forSerializedName(
                                             tag.getString("GenerationState"),
@@ -285,6 +289,32 @@ public final class LostTalesMapMarkerNbtCodec {
             }
         }
         return players;
+    }
+
+    private static Set<UUID> readSharedFellowships(
+            NBTTagCompound tag) {
+        LinkedHashSet<UUID> fellowships =
+                new LinkedHashSet<UUID>();
+        if (!tag.hasKey(
+                "SharedFellowships", Constants.NBT.TAG_LIST)) {
+            return fellowships;
+        }
+        NBTTagList list = tag.getTagList(
+                "SharedFellowships",
+                Constants.NBT.TAG_COMPOUND);
+        int count = Math.min(
+                list.tagCount(),
+                LostTalesMapMarkerRecord
+                        .MAX_SHARED_FELLOWSHIPS);
+        for (int index = 0; index < count; index++) {
+            UUID fellowshipId = readUuid(
+                    list.getCompoundTagAt(index),
+                    "Fellowship");
+            if (fellowshipId != null) {
+                fellowships.add(fellowshipId);
+            }
+        }
+        return fellowships;
     }
 
     private static ArrayList<NBTTagCompound> readQuarantine(
