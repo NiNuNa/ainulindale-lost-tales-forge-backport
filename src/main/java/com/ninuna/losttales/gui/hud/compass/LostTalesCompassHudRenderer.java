@@ -25,13 +25,14 @@ import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
 
 public class LostTalesCompassHudRenderer {
-    public static final ResourceLocation COMPASS_HUD_TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/compasshud.png");
+    public static final ResourceLocation COMPASS_HUD_TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/compass_hud.png");
 
-    public static final int COMPASS_HUD_TEXTURE_WIDTH = 257;
-    public static final int COMPASS_HUD_TEXTURE_HEIGHT = 64;
+    public static final int COMPASS_HUD_TEXTURE_WIDTH = 256;
+    public static final int COMPASS_HUD_TEXTURE_HEIGHT = 30;
     public static final int COMPASS_WIDTH = COMPASS_HUD_TEXTURE_WIDTH;
-    public static final int COMPASS_HEIGHT = 24;
+    public static final int COMPASS_HEIGHT = 22;
     private static final int PLACEMENT_HEIGHT = 42;
+    static final int VERTICAL_ARROW_TEXTURE_V = 23;
 
     public static final int MAP_MARKER_OFFSET_Y = 8;
     public static final int MAP_MARKER_NAME_LABEL_OFFSET_Y = 3;
@@ -113,7 +114,7 @@ public class LostTalesCompassHudRenderer {
         GL11.glDisable(GL11.GL_DEPTH_TEST);
 
         /*
-         * Draw the original compass HUD PNG as a single sprite.  The texture
+         * Draw the compass HUD PNG as a single sprite.  The texture
          * already contains both the soft dark fade and the sharp guide line;
          * forcing linear filtering blurs the line, while alpha testing clips
          * the low-alpha fade pixels.  Temporarily disabling alpha test lets the
@@ -272,7 +273,7 @@ public class LostTalesCompassHudRenderer {
             double deltaY = batch.dy;
             if (Math.abs(deltaY) >= 5.0D) {
                 int u = 0;
-                int v = 26;
+                int v = VERTICAL_ARROW_TEXTURE_V;
                 int w = 5;
                 int h = 3;
                 if (deltaY >= 10.0D) {
