@@ -228,6 +228,11 @@ public final class LostTalesMapMarkerCatalog {
         boolean requiresRegionUnlock = getBoolean(
                 object, "requiresRegionUnlock", true);
         boolean hasWaystone = getBoolean(object, "hasWaystone", false);
+        Integer relevanceRank =
+                LostTalesMapMarkerRelevance.parseJsonRank(object);
+        if (relevanceRank == null) {
+            return null;
+        }
         String structureType = getString(
                 object, "waystoneStructureType", "");
         structureType = normalizeStructureType(structureType, hasWaystone);
@@ -239,7 +244,7 @@ public final class LostTalesMapMarkerCatalog {
                 dimensionId, x, y, z,
                 compassFadeInRadius, discoveryRadius, hidden,
                 discoverable, requiresRegionUnlock, source,
-                hasWaystone, structureType);
+                hasWaystone, structureType, relevanceRank.intValue());
     }
 
     private static String normalizeStructureType(String value,

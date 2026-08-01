@@ -5,27 +5,34 @@ import java.util.Locale;
 import net.minecraft.util.ResourceLocation;
 
 public enum LostTalesCompassMarkerIcon {
-    N(0, 19),
-    NE(19, 19),
-    E(38, 19),
-    SE(57, 19),
-    S(76, 19),
-    SW(95, 19),
-    W(114, 19),
-    NW(133, 19),
     QUEST(0, 0),
-    HOSTILE(19, 0),
-    FORT(0, 38),
-    UNDISCOVERED(38, 0),
-    TAVERN(19, 38),
-    PARTY_PURPLE(133, 0),
-    PARTY_YELLOW(152, 0),
-    PARTY_BLUE(171, 0),
-    PARTY_GREEN(190, 0);
+    HOSTILE(18, 0),
+    UNDISCOVERED(36, 0),
+    N(0, 18),
+    NE(18, 18),
+    E(36, 18),
+    SE(54, 18),
+    S(72, 18),
+    SW(90, 18),
+    W(108, 18),
+    NW(126, 18),
+    TOWN(0, 36),
+    GRAVEYARD(18, 36),
+    FOREST(36, 36),
+    FOUNTAIN(54, 36),
+    PORT(72, 36),
+
+    // Compatibility aliases for existing marker data and party providers.
+    FORT(0, 36),
+    TAVERN(0, 36),
+    PARTY_PURPLE(0, 0),
+    PARTY_YELLOW(0, 0),
+    PARTY_BLUE(0, 0),
+    PARTY_GREEN(0, 0);
 
     public static final ResourceLocation TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/map_markers.png");
-    public static final int TEXTURE_WIDTH = 207;
-    public static final int TEXTURE_HEIGHT = 64;
+    public static final int TEXTURE_WIDTH = 143;
+    public static final int TEXTURE_HEIGHT = 53;
     public static final int WIDTH = 17;
     public static final int HEIGHT = 17;
 
@@ -59,6 +66,11 @@ public enum LostTalesCompassMarkerIcon {
         if ("SOUTH_WEST".equals(normalized) || "SOUTHWEST".equals(normalized)) return SW;
         if ("WEST".equals(normalized)) return W;
         if ("NORTH_WEST".equals(normalized) || "NORTHWEST".equals(normalized)) return NW;
+        if ("CITY".equals(normalized) || "SETTLEMENT".equals(normalized)) return TOWN;
+        if ("GRAVE".equals(normalized) || "CEMETERY".equals(normalized)) return GRAVEYARD;
+        if ("WOODS".equals(normalized)) return FOREST;
+        if ("HARBOUR".equals(normalized) || "HARBOR".equals(normalized)
+                || "DOCK".equals(normalized) || "DOCKS".equals(normalized)) return PORT;
 
         for (LostTalesCompassMarkerIcon icon : values()) {
             if (icon.name().equals(normalized)) {
@@ -68,4 +80,3 @@ public enum LostTalesCompassMarkerIcon {
         return UNDISCOVERED;
     }
 }
-

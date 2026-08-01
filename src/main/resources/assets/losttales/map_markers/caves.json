@@ -3,6 +3,7 @@
     {
       "id": "losttales:mossy_cave",
       "name": "Mossy Cave",
+      "relevance": "very-low",
       "icon": "undiscovered",
       "color": "gray",
       "dimension": "lotr:middle_earth",

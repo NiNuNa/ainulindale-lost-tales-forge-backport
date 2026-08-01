@@ -249,7 +249,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     public void replaceLotrMapGui(GuiOpenEvent event) {
         LostTalesLotrMainMenuMapHook.install(event.gui);
         if (event.gui != null && event.gui.getClass() == LOTRGuiMap.class) {
-            event.gui = new LostTalesLotrMapGui();
+            event.gui = LostTalesLotrMapGui.replace(
+                    (LOTRGuiMap)event.gui);
         } else if (event.gui != null
                 && event.gui.getClass() == GuiInventory.class
                 && Minecraft.getMinecraft().thePlayer != null

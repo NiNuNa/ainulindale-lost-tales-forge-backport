@@ -202,6 +202,10 @@ public final class LostTalesWaystoneSettingsService {
                 || !validRadius(compassRadius, 0.0D)
                 || !validRadius(
                         discoveryRadius, MIN_DISCOVERY_RADIUS)
+                || requested.getPriority()
+                        < LostTalesMapMarkerDefinition.MIN_PRIORITY
+                || requested.getPriority()
+                        > LostTalesMapMarkerDefinition.MAX_PRIORITY
                 || visibility == null) {
             deny(player, "chat.losttales.waystone.invalid_settings");
             return null;
@@ -227,6 +231,7 @@ public final class LostTalesWaystoneSettingsService {
                         requested.isDiscoverable(),
                         requested.requiresRegionUnlock(),
                         record.hasWaystone(), structureType,
+                        requested.getPriority(),
                         visibility);
         try {
             return record.withEditableSettings(normalized);

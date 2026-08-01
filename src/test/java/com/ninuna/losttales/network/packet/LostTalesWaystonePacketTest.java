@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerEditableSettings;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerHeightResolver;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRelevance;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -42,6 +43,8 @@ public final class LostTalesWaystonePacketTest {
                 decoded.getSettings().getY(), 0.0D);
         assertEquals("losttales:glowstone_house",
                 decoded.getSettings().getWaystoneStructureType());
+        assertEquals(LostTalesMapMarkerRelevance.HIGH,
+                decoded.getSettings().getRelevance());
     }
 
     @Test
@@ -77,6 +80,7 @@ public final class LostTalesWaystonePacketTest {
                         UUID.randomUUID()).toBuilder()
                         .sharedFellowshipIds(Collections.singleton(
                                 UUID.randomUUID()))
+                        .priority(73)
                         .build();
         LostTalesWaystoneStatePacket original =
                 new LostTalesWaystoneStatePacket(
@@ -98,6 +102,8 @@ public final class LostTalesWaystonePacketTest {
         assertEquals(record.getDimensionId(),
                 decoded.getMarkerDimensionId());
         assertEquals(1, decoded.getSharedFellowshipCount());
+        assertEquals(LostTalesMapMarkerRelevance.VERY_HIGH,
+                decoded.getRelevance());
     }
 
     @Test
@@ -133,6 +139,7 @@ public final class LostTalesWaystonePacketTest {
                 -8.5D, 220.0D, 32.0D,
                 true, true, true,
                 true, "losttales:glowstone_house",
+                LostTalesMapMarkerRelevance.HIGH,
                 LostTalesMapMarkerVisibility.SHARED);
     }
 }

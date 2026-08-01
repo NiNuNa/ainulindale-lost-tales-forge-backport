@@ -8,6 +8,8 @@ public final class LostTalesMapMarkerDefinition {
     public static final String CATEGORY_POINT_OF_INTEREST = "Point of Interest";
     public static final double AUTOMATIC_Y =
             LostTalesMapMarkerHeightResolver.AUTOMATIC_Y;
+    public static final int MIN_PRIORITY = -1000000;
+    public static final int MAX_PRIORITY = 1000000;
 
     private final String id;
     private final String name;
@@ -33,6 +35,8 @@ public final class LostTalesMapMarkerDefinition {
     private final boolean hasWaystone;
     /** Namespaced structure placer selected if physical generation is enabled. */
     private final String waystoneStructureType;
+    /** Screen-space overlap priority; larger values win. */
+    private final int priority;
 
     public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, int dimensionId, double x, double y, double z, boolean hiddenUntilDiscovered) {
         this(id, name, iconName, colorName, CATEGORY_DEFAULT, false, dimensionId, x, y, z, 128.0D, 8.0D, hiddenUntilDiscovered, hiddenUntilDiscovered);
@@ -87,6 +91,33 @@ public final class LostTalesMapMarkerDefinition {
                                         LostTalesMapMarkerSource source,
                                         boolean hasWaystone,
                                         String waystoneStructureType) {
+        this(id, name, iconName, colorName, categoryName, description,
+                hasFastTravel, dimensionId, x, y, z,
+                compassFadeInRadius, discoveryRadius,
+                hiddenUntilDiscovered, discoverable,
+                requiresRegionUnlock, source, hasWaystone,
+                waystoneStructureType, 0);
+    }
+
+    public LostTalesMapMarkerDefinition(String id, String name,
+                                        String iconName, String colorName,
+                                        String categoryName,
+                                        String description,
+                                        boolean hasFastTravel,
+                                        int dimensionId,
+                                        double x, double y, double z,
+                                        double compassFadeInRadius,
+                                        double discoveryRadius,
+                                        boolean hiddenUntilDiscovered,
+                                        boolean discoverable,
+                                        boolean requiresRegionUnlock,
+                                        LostTalesMapMarkerSource source,
+                                        boolean hasWaystone,
+                                        String waystoneStructureType,
+                                        int priority) {
+        if (priority < MIN_PRIORITY || priority > MAX_PRIORITY) {
+            throw new IllegalArgumentException("marker priority is out of range");
+        }
         this.id = id;
         this.name = name;
         this.iconName = iconName;
@@ -109,6 +140,7 @@ public final class LostTalesMapMarkerDefinition {
         this.hasWaystone = hasWaystone;
         this.waystoneStructureType = waystoneStructureType == null
                 ? "" : waystoneStructureType.trim().toLowerCase();
+        this.priority = priority;
     }
 
     public String getId() {
@@ -209,6 +241,10 @@ public final class LostTalesMapMarkerDefinition {
 
     public String getWaystoneStructureType() {
         return this.waystoneStructureType;
+    }
+
+    public int getPriority() {
+        return this.priority;
     }
 
     public String getShortDescription() {

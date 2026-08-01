@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
@@ -24,8 +25,11 @@ public final class LostTalesQuestSyncPacketTest {
         LostTalesMapMarkerDefinition marker =
                 new LostTalesMapMarkerDefinition(
                         "runtime:camp", "Camp", "camp", "white",
-                        "Camp", false, 0, 12.0D, 64.0D, -7.0D,
-                        128.0D, 8.0D, true, true);
+                        "Camp", "", false, 0,
+                        12.0D, 64.0D, -7.0D,
+                        128.0D, 8.0D, true, true, false,
+                        LostTalesMapMarkerSource.QUEST_DYNAMIC,
+                        false, "", 23);
         LostTalesQuestObjectiveDefinition objective =
                 new LostTalesQuestObjectiveDefinition(
                         "collect", "item", "Collect supplies.", false,
@@ -69,6 +73,8 @@ public final class LostTalesQuestSyncPacketTest {
                 decoded.getPinnedQuestIds());
         assertEquals("runtime:camp", decoded.getPinnedMapMarkerId());
         assertEquals(1, decoded.getDynamicMapMarkers().size());
+        assertEquals(23, decoded.getDynamicMapMarkers().get(0)
+                .getPriority());
         assertEquals(1, decoded.getDynamicQuestDefinitions().size());
     }
 

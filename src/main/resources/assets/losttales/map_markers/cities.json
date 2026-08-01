@@ -3,7 +3,8 @@
     {
       "id": "losttales:test_city_northgate",
       "name": "Northgate Test City",
-      "icon": "fort",
+      "relevance": "high",
+      "icon": "town",
       "color": "orange",
       "dimension": "lotr:middle_earth",
       "x": 512.0,
@@ -21,7 +22,8 @@
     {
       "id": "losttales:test_city_lakewatch",
       "name": "Lakewatch Test City",
-      "icon": "fort",
+      "relevance": "high",
+      "icon": "town",
       "color": "blue",
       "dimension": "lotr:middle_earth",
       "x": -544.0,
@@ -39,7 +41,8 @@
     {
       "id": "losttales:test_city_sunfield",
       "name": "Sunfield Test City",
-      "icon": "tavern",
+      "relevance": "high",
+      "icon": "town",
       "color": "yellow",
       "dimension": "lotr:middle_earth",
       "x": 720.0,

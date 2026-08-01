@@ -40,6 +40,7 @@ public final class LostTalesMapMarkerRecord {
     private final boolean requiresRegionUnlock;
     private final boolean hasWaystone;
     private final String waystoneStructureType;
+    private final int priority;
     private final UUID ownerPlayerId;
     private final LostTalesMapMarkerVisibility visibility;
     private final Set<UUID> sharedPlayerIds;
@@ -84,6 +85,11 @@ public final class LostTalesMapMarkerRecord {
         this.hasWaystone = builder.hasWaystone;
         this.waystoneStructureType = normalizeStructureType(
                 builder.waystoneStructureType, builder.hasWaystone);
+        if (builder.priority < LostTalesMapMarkerDefinition.MIN_PRIORITY
+                || builder.priority > LostTalesMapMarkerDefinition.MAX_PRIORITY) {
+            throw new IllegalArgumentException("marker priority is out of range");
+        }
+        this.priority = builder.priority;
         this.ownerPlayerId = builder.ownerPlayerId;
         if (this.source == LostTalesMapMarkerSource.PLAYER_CREATED
                 && this.ownerPlayerId == null) {
@@ -164,6 +170,7 @@ public final class LostTalesMapMarkerRecord {
                         definition.requiresRegionUnlock())
                 .waystone(definition.hasWaystone(),
                         definition.getWaystoneStructureType())
+                .priority(definition.getPriority())
                 .visibility(LostTalesMapMarkerVisibility.PUBLIC)
                 .build();
     }
@@ -226,7 +233,8 @@ public final class LostTalesMapMarkerRecord {
                 this.compassFadeInRadius, this.discoveryRadius,
                 this.hiddenUntilDiscovered, this.discoverable,
                 this.requiresRegionUnlock, this.source,
-                this.hasWaystone, this.waystoneStructureType);
+                this.hasWaystone, this.waystoneStructureType,
+                this.priority);
     }
 
     public LostTalesMapMarkerRecord withSettings(
@@ -266,6 +274,7 @@ public final class LostTalesMapMarkerRecord {
                         settings.requiresRegionUnlock())
                 .waystone(settings.hasWaystone(),
                         settings.getWaystoneStructureType())
+                .priority(settings.getPriority())
                 .visibility(settings.getVisibility())
                 .revision(this.revision + 1L)
                 .build();
@@ -326,6 +335,7 @@ public final class LostTalesMapMarkerRecord {
     public boolean requiresRegionUnlock() { return this.requiresRegionUnlock; }
     public boolean hasWaystone() { return this.hasWaystone; }
     public String getWaystoneStructureType() { return this.waystoneStructureType; }
+    public int getPriority() { return this.priority; }
     public UUID getOwnerPlayerId() { return this.ownerPlayerId; }
     public LostTalesMapMarkerVisibility getVisibility() { return this.visibility; }
     public Set<UUID> getSharedPlayerIds() { return this.sharedPlayerIds; }
@@ -421,6 +431,7 @@ public final class LostTalesMapMarkerRecord {
         private boolean requiresRegionUnlock;
         private boolean hasWaystone;
         private String waystoneStructureType = "";
+        private int priority;
         private UUID ownerPlayerId;
         private LostTalesMapMarkerVisibility visibility =
                 LostTalesMapMarkerVisibility.PRIVATE;
@@ -462,6 +473,7 @@ public final class LostTalesMapMarkerRecord {
             this.requiresRegionUnlock = record.requiresRegionUnlock;
             this.hasWaystone = record.hasWaystone;
             this.waystoneStructureType = record.waystoneStructureType;
+            this.priority = record.priority;
             this.ownerPlayerId = record.ownerPlayerId;
             this.visibility = record.visibility;
             this.sharedPlayerIds = record.sharedPlayerIds;
@@ -509,6 +521,10 @@ public final class LostTalesMapMarkerRecord {
         public Builder waystone(boolean enabled, String structureType) {
             this.hasWaystone = enabled;
             this.waystoneStructureType = structureType;
+            return this;
+        }
+        public Builder priority(int value) {
+            this.priority = value;
             return this;
         }
         public Builder ownerPlayerId(UUID value) { this.ownerPlayerId = value; return this; }

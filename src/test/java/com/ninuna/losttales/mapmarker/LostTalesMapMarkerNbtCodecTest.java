@@ -36,6 +36,7 @@ public final class LostTalesMapMarkerNbtCodecTest {
                         .sharedFellowshipIds(new LinkedHashSet<UUID>(
                                 Collections.singleton(
                                         sharedFellowship)))
+                        .priority(17)
                         .revision(7L)
                         .build();
         NBTTagCompound encoded = new NBTTagCompound();
@@ -53,6 +54,7 @@ public final class LostTalesMapMarkerNbtCodecTest {
         assertEquals(owner, decoded.getOwnerPlayerId());
         assertEquals(token, decoded.getLinkToken());
         assertEquals(7L, decoded.getRevision());
+        assertEquals(17, decoded.getPriority());
         assertEquals(LostTalesMapMarkerVisibility.SHARED,
                 decoded.getVisibility());
         assertTrue(decoded.getSharedPlayerIds().contains(shared));
@@ -116,6 +118,33 @@ public final class LostTalesMapMarkerNbtCodecTest {
 
         assertEquals("WAYMEET", reread.getRecords()
                 .get(marker.getId()).getLotrWaypointId());
+    }
+
+    @Test
+    public void versionThreeRecordDefaultsPriorityToZero() {
+        LostTalesMapMarkerRecord marker = LostTalesMapMarkerRecord.builder(
+                "losttales:legacy", LostTalesMapMarkerSource.CUSTOM_PRESET)
+                .name("Legacy")
+                .position(100, 1.0D, 64.0D, 2.0D)
+                .visibility(LostTalesMapMarkerVisibility.PUBLIC)
+                .build();
+        NBTTagCompound encoded = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(encoded,
+                Collections.singleton(marker),
+                Collections.<NBTTagCompound>emptyList());
+        encoded.setInteger("DataVersion", 3);
+        NBTTagCompound stored = encoded.getTagList(
+                "Markers", Constants.NBT.TAG_COMPOUND)
+                .getCompoundTagAt(0);
+        stored.setInteger("DataVersion", 3);
+        stored.removeTag("Priority");
+
+        LostTalesMapMarkerNbtCodec.ReadResult result =
+                LostTalesMapMarkerNbtCodec.read(encoded);
+
+        assertTrue(result.wasRepaired());
+        assertEquals(0, result.getRecords().get(marker.getId())
+                .getPriority());
     }
 
     @Test

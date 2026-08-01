@@ -3,7 +3,8 @@
     {
       "id": "losttales:test_town",
       "name": "Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "red",
       "dimension": "lotr:middle_earth",
       "x": 15.0,
@@ -21,7 +22,8 @@
     {
       "id": "losttales:greenway_market",
       "name": "Greenway Market",
-      "icon": "tavern",
+      "relevance": "medium",
+      "icon": "town",
       "color": "yellow",
       "dimension": "lotr:middle_earth",
       "x": 180.0,
@@ -39,7 +41,8 @@
     {
       "id": "losttales:south_road_hamlet",
       "name": "South Road Hamlet",
-      "icon": "fort",
+      "relevance": "low",
+      "icon": "town",
       "color": "green",
       "dimension": "lotr:middle_earth",
       "x": -210.0,

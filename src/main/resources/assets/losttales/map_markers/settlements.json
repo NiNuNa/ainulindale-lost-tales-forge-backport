@@ -3,7 +3,8 @@
     {
       "id": "losttales:riverbend_farmstead",
       "name": "Riverbend Farmstead",
-      "icon": "fort",
+      "relevance": "low",
+      "icon": "town",
       "color": "purple",
       "dimension": "lotr:middle_earth",
       "x": 75.0,

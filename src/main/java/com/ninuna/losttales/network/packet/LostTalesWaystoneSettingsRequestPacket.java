@@ -139,6 +139,7 @@ public final class LostTalesWaystoneSettingsRequestPacket
                 String structureType =
                         LostTalesPacketCodec.readUtf8String(
                                 buffer, MAX_STRUCTURE_ID_BYTES);
+                int priority = buffer.readInt();
                 int visibilityId = buffer.readUnsignedByte();
                 LostTalesMapMarkerVisibility visibility = visibilityId
                         >= LostTalesMapMarkerVisibility.values().length
@@ -152,7 +153,7 @@ public final class LostTalesWaystoneSettingsRequestPacket
                                 compassRadius, discoveryRadius,
                                 hiddenUntilDiscovered, discoverable,
                                 requiresRegionUnlock, hasWaystone,
-                                structureType, visibility);
+                                structureType, priority, visibility);
                 this.targetPlayerName = "";
             } else {
                 this.targetPlayerName =
@@ -206,6 +207,7 @@ public final class LostTalesWaystoneSettingsRequestPacket
             LostTalesPacketCodec.writeUtf8String(
                     buffer, value.getWaystoneStructureType(),
                     MAX_STRUCTURE_ID_BYTES);
+            buffer.writeInt(value.getPriority());
             buffer.writeByte(value.getVisibility().ordinal());
         } else {
             LostTalesPacketCodec.writeUtf8String(
@@ -279,7 +281,13 @@ public final class LostTalesWaystoneSettingsRequestPacket
                 && isFinite(value.getY())
                 && isFinite(value.getZ())
                 && isFinite(value.getCompassFadeInRadius())
-                && isFinite(value.getDiscoveryRadius());
+                && isFinite(value.getDiscoveryRadius())
+                && value.getPriority()
+                        >= com.ninuna.losttales.mapmarker
+                                .LostTalesMapMarkerDefinition.MIN_PRIORITY
+                && value.getPriority()
+                        <= com.ninuna.losttales.mapmarker
+                                .LostTalesMapMarkerDefinition.MAX_PRIORITY;
     }
 
     public static final class Handler implements IMessageHandler<

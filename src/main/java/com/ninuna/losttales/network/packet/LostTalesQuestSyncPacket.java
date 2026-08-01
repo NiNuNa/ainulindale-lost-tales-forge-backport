@@ -2,6 +2,7 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
@@ -221,6 +222,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
                 boolean hidden = buf.readBoolean();
                 boolean discoverable = buf.readBoolean();
                 boolean requiresRegionUnlock = buf.readBoolean();
+                int priority = buf.readInt();
                 if (markerId.length() == 0
                         || !isFinite(x) || !isFinite(y) || !isFinite(z)
                         || !isFinite(compassFadeInRadius)
@@ -235,7 +237,9 @@ public class LostTalesQuestSyncPacket implements IMessage {
                                 markerId, name, icon, color, category, "",
                                 hasFastTravel, dimensionId, x, y, z,
                                 compassFadeInRadius, discoveryRadius, hidden,
-                                discoverable, requiresRegionUnlock));
+                                discoverable, requiresRegionUnlock,
+                                LostTalesMapMarkerSource.QUEST_DYNAMIC,
+                                false, "", priority));
             }
 
             int dynamicQuestCount = LostTalesPacketCodec.readCount(
@@ -322,6 +326,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
             buf.writeBoolean(marker.isHiddenUntilDiscovered());
             buf.writeBoolean(marker.isDiscoverable());
             buf.writeBoolean(marker.requiresRegionUnlock());
+            buf.writeInt(marker.getPriority());
         }
 
         LostTalesPacketCodec.writeCount(buf,

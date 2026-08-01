@@ -181,7 +181,8 @@ public final class LostTalesClientMapMarkerStore {
                 marker.isHiddenUntilDiscovered(),
                 marker.isDiscoverable(),
                 marker.requiresRegionUnlock(),
-                marker.hasWaystone()
+                marker.hasWaystone(),
+                marker.getPriority()
         );
     }
 
@@ -316,8 +317,8 @@ public final class LostTalesClientMapMarkerStore {
     private static List<LostTalesMapMarkerData> createFallbackMarkers() {
         List<LostTalesMapMarkerData> markers = new ArrayList<LostTalesMapMarkerData>();
         int middleEarth = LOTRDimension.MIDDLE_EARTH.dimensionID;
-        markers.add(new LostTalesMapMarkerData("fallback-town", "Town", LostTalesCompassMarkerIcon.FORT.name(), "red", middleEarth, 15.0D, LostTalesMapMarkerDefinition.AUTOMATIC_Y, 15.0D, 160.0D, 10.0D));
-        markers.add(new LostTalesMapMarkerData("fallback-cheese-fort", "Cheese's Fort", LostTalesCompassMarkerIcon.FORT.name(), "white", middleEarth, -180.0D, LostTalesMapMarkerDefinition.AUTOMATIC_Y, -140.0D, 250.0D, 10.0D));
+        markers.add(new LostTalesMapMarkerData("fallback-town", "Town", LostTalesCompassMarkerIcon.TOWN.name(), "red", middleEarth, 15.0D, LostTalesMapMarkerDefinition.AUTOMATIC_Y, 15.0D, 160.0D, 10.0D));
+        markers.add(new LostTalesMapMarkerData("fallback-cheese-fort", "Cheese's Fort", LostTalesCompassMarkerIcon.TOWN.name(), "white", middleEarth, -180.0D, LostTalesMapMarkerDefinition.AUTOMATIC_Y, -140.0D, 250.0D, 10.0D));
         return Collections.unmodifiableList(markers);
     }
 }

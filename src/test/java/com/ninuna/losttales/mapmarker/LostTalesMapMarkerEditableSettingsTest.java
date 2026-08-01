@@ -24,6 +24,7 @@ public final class LostTalesMapMarkerEditableSettingsTest {
                         8.0D, 320.0D, 18.0D,
                         true, true, false,
                         true, "losttales:glowstone_house",
+                        LostTalesMapMarkerRelevance.VERY_HIGH,
                         LostTalesMapMarkerVisibility.SHARED);
 
         LostTalesMapMarkerRecord updated =
@@ -46,6 +47,10 @@ public final class LostTalesMapMarkerEditableSettingsTest {
         assertTrue(updated.hasWaystone());
         assertEquals("losttales:glowstone_house",
                 updated.getWaystoneStructureType());
+        assertEquals(LostTalesMapMarkerRelevance.VERY_HIGH,
+                settings.getRelevance());
+        assertEquals(LostTalesMapMarkerRelevance.VERY_HIGH.getRank(),
+                updated.getPriority());
         assertEquals(original.getRevision() + 1L,
                 updated.getRevision());
     }

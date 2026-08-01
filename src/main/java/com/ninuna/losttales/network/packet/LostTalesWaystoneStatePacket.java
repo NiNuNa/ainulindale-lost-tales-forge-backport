@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerEditableSettings;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRelevance;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -96,6 +97,7 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
             String structureType =
                     LostTalesPacketCodec.readUtf8String(
                             buffer, MAX_STRUCTURE_ID_BYTES);
+            int priority = buffer.readInt();
             int visibilityId = buffer.readUnsignedByte();
             LostTalesMapMarkerVisibility visibility = visibilityId
                     >= LostTalesMapMarkerVisibility.values().length
@@ -108,7 +110,7 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                     compassRadius, discoveryRadius,
                     hiddenUntilDiscovered, discoverable,
                     requiresRegionUnlock, hasWaystone,
-                    structureType, visibility);
+                    structureType, priority, visibility);
             this.sharedPlayerCount = buffer.readInt();
             this.sharedFellowshipCount = buffer.readInt();
             this.canEdit = buffer.readBoolean();
@@ -157,6 +159,7 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(
                 buffer, value.getWaystoneStructureType(),
                 MAX_STRUCTURE_ID_BYTES);
+        buffer.writeInt(value.getPriority());
         buffer.writeByte(value.getVisibility().ordinal());
         buffer.writeInt(this.sharedPlayerCount);
         buffer.writeInt(this.sharedFellowshipCount);
@@ -235,6 +238,10 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     public String getWaystoneStructureType() {
         return this.settings.getWaystoneStructureType();
     }
+    public int getPriority() { return this.settings.getPriority(); }
+    public LostTalesMapMarkerRelevance getRelevance() {
+        return this.settings.getRelevance();
+    }
     public int getSharedPlayerCount() {
         return this.sharedPlayerCount;
     }
@@ -269,7 +276,13 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                 && finiteCoordinate(value.getY())
                 && finiteCoordinate(value.getZ())
                 && finiteRadius(value.getCompassFadeInRadius())
-                && finiteRadius(value.getDiscoveryRadius());
+                && finiteRadius(value.getDiscoveryRadius())
+                && value.getPriority()
+                        >= com.ninuna.losttales.mapmarker
+                                .LostTalesMapMarkerDefinition.MIN_PRIORITY
+                && value.getPriority()
+                        <= com.ninuna.losttales.mapmarker
+                                .LostTalesMapMarkerDefinition.MAX_PRIORITY;
     }
 
     private static boolean finiteCoordinate(double value) {

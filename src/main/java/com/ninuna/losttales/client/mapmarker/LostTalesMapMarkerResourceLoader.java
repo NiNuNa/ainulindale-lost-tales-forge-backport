@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRelevance;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.util.LostTalesDimensionHelper;
 import java.io.IOException;
@@ -119,11 +120,17 @@ final class LostTalesMapMarkerResourceLoader {
                 object, "requiresRegionUnlock", true);
         boolean hasWaystone =
                 getBoolean(object, "hasWaystone", false);
+        Integer relevanceRank =
+                LostTalesMapMarkerRelevance.parseJsonRank(object);
+        if (relevanceRank == null) {
+            return null;
+        }
         return new LostTalesMapMarkerData(id, name, icon, color, category,
                 description, hasFastTravel,
                 dimensionId, x, y, z, compassFadeInRadius,
                 discoveryRadius, hiddenUntilDiscovered, discoverable,
-                requiresRegionUnlock, hasWaystone);
+                requiresRegionUnlock, hasWaystone,
+                relevanceRank.intValue());
     }
 
     private static boolean hasNumber(JsonObject object, String key) {

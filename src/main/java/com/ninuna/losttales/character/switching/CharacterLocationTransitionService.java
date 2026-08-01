@@ -21,6 +21,7 @@ import java.util.List;
 public final class CharacterLocationTransitionService {
 
     private static final int SAFE_Y_SEARCH = 24;
+    private static final int SAFE_HORIZONTAL_SEARCH = 12;
 
     private final VanillaLocationStateComponent component;
 
@@ -96,9 +97,11 @@ public final class CharacterLocationTransitionService {
 
     private void move(EntityPlayerMP player, Target target)
             throws CharacterStateValidationException {
-        double y = target.findSafeGround
-                ? findSafeY(player, target.world, target.x, target.y, target.z)
-                : target.y;
+        SafePosition safe = target.findSafeGround
+                ? findSafePosition(
+                        player, target.world,
+                        target.x, target.y, target.z)
+                : new SafePosition(target.x, target.y, target.z);
         boolean crossDimension = player.dimension
                 != target.world.provider.dimensionId;
         boolean owned = false;
@@ -112,14 +115,17 @@ public final class CharacterLocationTransitionService {
                 }
                 player.mcServer.getConfigurationManager().transferPlayerToDimension(
                         player, target.world.provider.dimensionId,
-                        new FixedTeleporter(target.world, target.x, y, target.z,
+                        new FixedTeleporter(target.world,
+                                safe.x, safe.y, safe.z,
                                 target.yaw, target.pitch));
             } else if (player.playerNetServerHandler != null) {
                 player.playerNetServerHandler.setPlayerLocation(
-                        target.x, y, target.z, target.yaw, target.pitch);
+                        safe.x, safe.y, safe.z,
+                        target.yaw, target.pitch);
             } else {
                 player.setLocationAndAngles(
-                        target.x, y, target.z, target.yaw, target.pitch);
+                        safe.x, safe.y, safe.z,
+                        target.yaw, target.pitch);
             }
             player.motionX = 0.0D;
             player.motionY = 0.0D;
@@ -137,23 +143,81 @@ public final class CharacterLocationTransitionService {
         }
     }
 
-    private static double findSafeY(EntityPlayerMP player,
-                                    WorldServer world,
-                                    double x, double preferredY, double z)
+    private static SafePosition findSafePosition(
+            EntityPlayerMP player, WorldServer world,
+            double x, double preferredY, double z)
             throws CharacterStateValidationException {
-        int base = MathHelper.floor_double(preferredY);
-        for (int distance = 0; distance <= SAFE_Y_SEARCH; distance++) {
-            int above = base + distance;
-            if (isSafe(player, world, x, above, z)) {
-                return above;
+        Double exactY = findSafeY(
+                player, world, x, preferredY, z);
+        if (exactY != null) {
+            return new SafePosition(x, exactY.doubleValue(), z);
+        }
+
+        int originX = MathHelper.floor_double(x);
+        int originZ = MathHelper.floor_double(z);
+        for (int radius = 1; radius <= SAFE_HORIZONTAL_SEARCH; radius++) {
+            for (int offset = -radius; offset <= radius; offset++) {
+                SafePosition north = findSafePositionAtColumn(
+                        player, world, originX + offset,
+                        originZ - radius);
+                if (north != null) {
+                    return north;
+                }
+                SafePosition south = findSafePositionAtColumn(
+                        player, world, originX + offset,
+                        originZ + radius);
+                if (south != null) {
+                    return south;
+                }
             }
-            int below = base - distance;
-            if (distance > 0 && isSafe(player, world, x, below, z)) {
-                return below;
+            for (int offset = -radius + 1;
+                 offset <= radius - 1; offset++) {
+                SafePosition west = findSafePositionAtColumn(
+                        player, world, originX - radius,
+                        originZ + offset);
+                if (west != null) {
+                    return west;
+                }
+                SafePosition east = findSafePositionAtColumn(
+                        player, world, originX + radius,
+                        originZ + offset);
+                if (east != null) {
+                    return east;
+                }
             }
         }
         throw new CharacterStateValidationException(
                 "No safe standing position exists near the starting waypoint");
+    }
+
+    private static SafePosition findSafePositionAtColumn(
+            EntityPlayerMP player, WorldServer world,
+            int blockX, int blockZ) {
+        loadChunk(world, blockX + 0.5D, blockZ + 0.5D);
+        double x = blockX + 0.5D;
+        double z = blockZ + 0.5D;
+        Double y = findSafeY(
+                player, world, x,
+                world.getHeightValue(blockX, blockZ), z);
+        return y == null ? null
+                : new SafePosition(x, y.doubleValue(), z);
+    }
+
+    private static Double findSafeY(
+            EntityPlayerMP player, WorldServer world,
+            double x, double preferredY, double z) {
+        int base = MathHelper.floor_double(preferredY);
+        for (int distance = 0; distance <= SAFE_Y_SEARCH; distance++) {
+            int above = base + distance;
+            if (isSafe(player, world, x, above, z)) {
+                return Double.valueOf(above);
+            }
+            int below = base - distance;
+            if (distance > 0 && isSafe(player, world, x, below, z)) {
+                return Double.valueOf(below);
+            }
+        }
+        return null;
     }
 
     private static boolean isSafe(EntityPlayerMP player, WorldServer world,
@@ -211,6 +275,18 @@ public final class CharacterLocationTransitionService {
             this.yaw = yaw;
             this.pitch = pitch;
             this.findSafeGround = findSafeGround;
+        }
+    }
+
+    private static final class SafePosition {
+        private final double x;
+        private final double y;
+        private final double z;
+
+        private SafePosition(double x, double y, double z) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
         }
     }
 

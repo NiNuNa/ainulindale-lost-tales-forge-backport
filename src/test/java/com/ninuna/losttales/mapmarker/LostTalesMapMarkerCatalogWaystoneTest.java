@@ -17,6 +17,21 @@ import static org.junit.Assert.assertTrue;
 
 public final class LostTalesMapMarkerCatalogWaystoneTest {
     @Test
+    public void relevanceScaleHasExactlyFiveOrderedLevels() {
+        assertEquals(5, LostTalesMapMarkerRelevance.values().length);
+        assertEquals(LostTalesMapMarkerRelevance.VERY_LOW,
+                LostTalesMapMarkerRelevance.values()[0]);
+        assertEquals(LostTalesMapMarkerRelevance.LOW,
+                LostTalesMapMarkerRelevance.values()[1]);
+        assertEquals(LostTalesMapMarkerRelevance.MEDIUM,
+                LostTalesMapMarkerRelevance.values()[2]);
+        assertEquals(LostTalesMapMarkerRelevance.HIGH,
+                LostTalesMapMarkerRelevance.values()[3]);
+        assertEquals(LostTalesMapMarkerRelevance.VERY_HIGH,
+                LostTalesMapMarkerRelevance.values()[4]);
+    }
+
+    @Test
     public void lotrWaypointIdCanBeDerivedFromMarkerId() {
         JsonObject json = markerJson("lotr:waypoint:oatbarton");
         json.remove("lotrWaypointId");
@@ -36,6 +51,46 @@ public final class LostTalesMapMarkerCatalogWaystoneTest {
 
         assertFalse(marker.hasWaystone());
         assertEquals("", marker.getWaystoneStructureType());
+        assertEquals(LostTalesMapMarkerRelevance.MEDIUM.getRank(),
+                marker.getPriority());
+    }
+
+    @Test
+    public void relevanceUsesNamedLevelsAndRejectsInvalidValues() {
+        JsonObject valid = markerJson("losttales:relevance");
+        valid.addProperty("relevance", "very-high");
+        assertEquals(LostTalesMapMarkerRelevance.VERY_HIGH.getRank(),
+                LostTalesMapMarkerCatalog.parseMarker(
+                valid, LostTalesMapMarkerSource.CUSTOM_PRESET)
+                .getPriority());
+        assertEquals(LostTalesMapMarkerRelevance.VERY_HIGH,
+                LostTalesMapMarkerRelevance.fromSerializedName(
+                        "very_high"));
+
+        JsonObject fraction = markerJson("losttales:fraction");
+        fraction.addProperty("relevance", 1.5D);
+        assertNull(LostTalesMapMarkerCatalog.parseMarker(
+                fraction, LostTalesMapMarkerSource.CUSTOM_PRESET));
+
+        JsonObject wrongType = markerJson("losttales:string");
+        wrongType.addProperty("relevance", "extremely_important");
+        assertNull(LostTalesMapMarkerCatalog.parseMarker(
+                wrongType, LostTalesMapMarkerSource.CUSTOM_PRESET));
+    }
+
+    @Test
+    public void transitionalNumericPriorityRemainsReadable() {
+        JsonObject legacy = markerJson("losttales:legacy_priority");
+        legacy.addProperty("priority", 42);
+        assertEquals(42, LostTalesMapMarkerCatalog.parseMarker(
+                legacy, LostTalesMapMarkerSource.CUSTOM_PRESET)
+                .getPriority());
+
+        JsonObject outOfRange = markerJson("losttales:range");
+        outOfRange.addProperty("priority",
+                LostTalesMapMarkerDefinition.MAX_PRIORITY + 1);
+        assertNull(LostTalesMapMarkerCatalog.parseMarker(
+                outOfRange, LostTalesMapMarkerSource.CUSTOM_PRESET));
     }
 
     @Test
@@ -130,6 +185,11 @@ public final class LostTalesMapMarkerCatalogWaystoneTest {
                             marker.has("y"));
                     assertTrue(id + " must explicitly declare hasWaystone",
                             marker.has("hasWaystone"));
+                    assertTrue(id + " must explicitly declare relevance",
+                            marker.has("relevance"));
+                    assertNotNull(id + " must use a known relevance level",
+                            LostTalesMapMarkerRelevance.fromSerializedName(
+                                    marker.get("relevance").getAsString()));
                     boolean hasWaystone =
                             marker.get("hasWaystone").getAsBoolean();
                     if ("lotr_waypoints".equals(file)) {

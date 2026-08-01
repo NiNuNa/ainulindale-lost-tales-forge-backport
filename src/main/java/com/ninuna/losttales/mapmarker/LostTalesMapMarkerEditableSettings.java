@@ -24,6 +24,7 @@ public final class LostTalesMapMarkerEditableSettings {
     private final boolean requiresRegionUnlock;
     private final boolean hasWaystone;
     private final String waystoneStructureType;
+    private final int priority;
     private final LostTalesMapMarkerVisibility visibility;
 
     public LostTalesMapMarkerEditableSettings(
@@ -36,6 +37,29 @@ public final class LostTalesMapMarkerEditableSettings {
             boolean requiresRegionUnlock, boolean hasWaystone,
             String waystoneStructureType,
             LostTalesMapMarkerVisibility visibility) {
+        this(name, iconName, colorName, categoryName, description,
+                hasFastTravel, dimensionId, x, y, z,
+                compassFadeInRadius, discoveryRadius,
+                hiddenUntilDiscovered, discoverable,
+                requiresRegionUnlock, hasWaystone,
+                waystoneStructureType, 0, visibility);
+    }
+
+    public LostTalesMapMarkerEditableSettings(
+            String name, String iconName, String colorName,
+            String categoryName, String description,
+            boolean hasFastTravel,
+            int dimensionId, double x, double y, double z,
+            double compassFadeInRadius, double discoveryRadius,
+            boolean hiddenUntilDiscovered, boolean discoverable,
+            boolean requiresRegionUnlock, boolean hasWaystone,
+            String waystoneStructureType, int priority,
+            LostTalesMapMarkerVisibility visibility) {
+        if (priority < LostTalesMapMarkerDefinition.MIN_PRIORITY
+                || priority > LostTalesMapMarkerDefinition.MAX_PRIORITY) {
+            throw new IllegalArgumentException(
+                    "marker priority is out of range");
+        }
         this.name = value(name);
         this.iconName = value(iconName);
         this.colorName = value(colorName);
@@ -53,7 +77,31 @@ public final class LostTalesMapMarkerEditableSettings {
         this.requiresRegionUnlock = requiresRegionUnlock;
         this.hasWaystone = hasWaystone;
         this.waystoneStructureType = value(waystoneStructureType);
+        this.priority = priority;
         this.visibility = visibility;
+    }
+
+    public LostTalesMapMarkerEditableSettings(
+            String name, String iconName, String colorName,
+            String categoryName, String description,
+            boolean hasFastTravel,
+            int dimensionId, double x, double y, double z,
+            double compassFadeInRadius, double discoveryRadius,
+            boolean hiddenUntilDiscovered, boolean discoverable,
+            boolean requiresRegionUnlock, boolean hasWaystone,
+            String waystoneStructureType,
+            LostTalesMapMarkerRelevance relevance,
+            LostTalesMapMarkerVisibility visibility) {
+        this(name, iconName, colorName, categoryName, description,
+                hasFastTravel, dimensionId, x, y, z,
+                compassFadeInRadius, discoveryRadius,
+                hiddenUntilDiscovered, discoverable,
+                requiresRegionUnlock, hasWaystone,
+                waystoneStructureType,
+                relevance == null
+                        ? LostTalesMapMarkerRelevance.MEDIUM.getRank()
+                        : relevance.getRank(),
+                visibility);
     }
 
     public static LostTalesMapMarkerEditableSettings fromRecord(
@@ -73,6 +121,7 @@ public final class LostTalesMapMarkerEditableSettings {
                 record.isDiscoverable(),
                 record.requiresRegionUnlock(), record.hasWaystone(),
                 record.getWaystoneStructureType(),
+                record.getPriority(),
                 record.getVisibility());
     }
 
@@ -106,6 +155,10 @@ public final class LostTalesMapMarkerEditableSettings {
     public boolean hasWaystone() { return this.hasWaystone; }
     public String getWaystoneStructureType() {
         return this.waystoneStructureType;
+    }
+    public int getPriority() { return this.priority; }
+    public LostTalesMapMarkerRelevance getRelevance() {
+        return LostTalesMapMarkerRelevance.fromRank(this.priority);
     }
     public LostTalesMapMarkerVisibility getVisibility() {
         return this.visibility;

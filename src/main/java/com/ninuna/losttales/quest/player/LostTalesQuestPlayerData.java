@@ -3,6 +3,7 @@ package com.ninuna.losttales.quest.player;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestDefinitionNbt;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
@@ -162,6 +163,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             markerTag.setBoolean("Discoverable", marker.isDiscoverable());
             markerTag.setBoolean("RequiresRegionUnlock",
                     marker.requiresRegionUnlock());
+            markerTag.setInteger("Priority", marker.getPriority());
             dynamicMarkerList.appendTag(markerTag);
         }
         data.setTag("DynamicMapMarkers", dynamicMarkerList);
@@ -525,6 +527,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 marker.getIconName() == null || marker.getIconName().length() == 0 ? "quest" : marker.getIconName(),
                 marker.getColorName() == null || marker.getColorName().length() == 0 ? "white" : marker.getColorName(),
                 marker.getCategoryName() == null || marker.getCategoryName().length() == 0 ? LostTalesMapMarkerDefinition.CATEGORY_DEFAULT : marker.getCategoryName(),
+                marker.getDescription(),
                 marker.hasFastTravel(),
                 marker.getDimensionId(),
                 marker.getX(),
@@ -534,7 +537,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 marker.getDiscoveryRadius(),
                 marker.isHiddenUntilDiscovered(),
                 marker.isDiscoverable(),
-                marker.requiresRegionUnlock()
+                marker.requiresRegionUnlock(),
+                marker.getSource(), marker.hasWaystone(),
+                marker.getWaystoneStructureType(), marker.getPriority()
         );
         LostTalesMapMarkerDefinition old = this.dynamicMapMarkers.put(markerId, normalized);
         boolean discoveredChanged = this.discoveredMarkerIds.add(markerId);
@@ -801,6 +806,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 safe(markerTag.getString("Icon"), "quest"),
                 safe(markerTag.getString("Color"), "white"),
                 safe(markerTag.getString("Category"), LostTalesMapMarkerDefinition.CATEGORY_DEFAULT),
+                "",
                 (markerTag.hasKey("HasFastTravel") ? markerTag.getBoolean("HasFastTravel") : (markerTag.hasKey("Waypoint") && markerTag.getBoolean("Waypoint"))),
                 markerTag.getInteger("DimensionId"),
                 markerTag.getDouble("X"),
@@ -811,7 +817,10 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 !markerTag.hasKey("HiddenUntilDiscovered") || markerTag.getBoolean("HiddenUntilDiscovered"),
                 markerTag.hasKey("IsDiscoverable") ? markerTag.getBoolean("IsDiscoverable") : (markerTag.hasKey("Discoverable") ? markerTag.getBoolean("Discoverable") : (!markerTag.hasKey("HiddenUntilDiscovered") || markerTag.getBoolean("HiddenUntilDiscovered"))),
                 markerTag.hasKey("RequiresRegionUnlock")
-                        && markerTag.getBoolean("RequiresRegionUnlock")
+                        && markerTag.getBoolean("RequiresRegionUnlock"),
+                LostTalesMapMarkerSource.QUEST_DYNAMIC,
+                false, "", markerTag.hasKey("Priority")
+                        ? markerTag.getInteger("Priority") : 0
         );
     }
 
@@ -837,7 +846,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 && left.isHiddenUntilDiscovered() == right.isHiddenUntilDiscovered()
                 && left.isDiscoverable() == right.isDiscoverable()
                 && left.requiresRegionUnlock()
-                == right.requiresRegionUnlock();
+                == right.requiresRegionUnlock()
+                && left.getPriority() == right.getPriority();
     }
 
     private static String safe(String value, String fallback) {

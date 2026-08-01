@@ -3,7 +3,8 @@
     {
       "id": "losttales:cheese_fort",
       "name": "Cheese's Fort",
-      "icon": "fort",
+      "relevance": "high",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -180.0,
@@ -21,7 +22,8 @@
     {
       "id": "losttales:watchtower_ruins",
       "name": "Watchtower Ruins",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "orange",
       "dimension": "lotr:middle_earth",
       "x": 300.0,

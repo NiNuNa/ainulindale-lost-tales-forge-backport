@@ -3,7 +3,8 @@
     {
       "id": "lotr:waypoint:himling",
       "name": "Himling",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -41536.0,
@@ -20,7 +21,8 @@
     {
       "id": "lotr:waypoint:tol_fuin",
       "name": "Tol Fuin",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -57920.0,
@@ -37,7 +39,8 @@
     {
       "id": "lotr:waypoint:tol_morwen",
       "name": "Tol Morwen",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -92480.0,
@@ -54,7 +57,8 @@
     {
       "id": "lotr:waypoint:meneltarma_summit",
       "name": "Meneltarma Summit",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -95424.0,
@@ -71,7 +75,8 @@
     {
       "id": "lotr:waypoint:hobbiton",
       "name": "Hobbiton",
-      "icon": "fort",
+      "relevance": "very-high",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 704.0,
@@ -88,7 +93,8 @@
     {
       "id": "lotr:waypoint:brandywine_bridge",
       "name": "Brandywine Bridge",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 5568.0,
@@ -105,7 +111,8 @@
     {
       "id": "lotr:waypoint:sarn_ford",
       "name": "Sarn Ford",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 9408.0,
@@ -122,7 +129,8 @@
     {
       "id": "lotr:waypoint:longbottom",
       "name": "Longbottom",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 1344.0,
@@ -139,7 +147,8 @@
     {
       "id": "lotr:waypoint:michel_delving",
       "name": "Michel Delving",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -1728.0,
@@ -156,7 +165,8 @@
     {
       "id": "lotr:waypoint:willowbottom",
       "name": "Willowbottom",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 4544.0,
@@ -173,7 +183,8 @@
     {
       "id": "lotr:waypoint:bucklebury",
       "name": "Bucklebury",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 6080.0,
@@ -190,7 +201,8 @@
     {
       "id": "lotr:waypoint:whitfurrows",
       "name": "Whitfurrows",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 4288.0,
@@ -207,7 +219,8 @@
     {
       "id": "lotr:waypoint:frogmorton",
       "name": "Frogmorton",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 2752.0,
@@ -224,7 +237,8 @@
     {
       "id": "lotr:waypoint:oatbarton",
       "name": "Oatbarton",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 1600.0,
@@ -241,7 +255,8 @@
     {
       "id": "lotr:waypoint:scary",
       "name": "Scary",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 3904.0,
@@ -258,7 +273,8 @@
     {
       "id": "lotr:waypoint:needlehole",
       "name": "Needlehole",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -448.0,
@@ -275,7 +291,8 @@
     {
       "id": "lotr:waypoint:little_delving",
       "name": "Little Delving",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -3136.0,
@@ -292,7 +309,8 @@
     {
       "id": "lotr:waypoint:waymeet",
       "name": "Waymeet",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -320.0,
@@ -309,7 +327,8 @@
     {
       "id": "lotr:waypoint:tuckborough",
       "name": "Tuckborough",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 704.0,
@@ -326,7 +345,8 @@
     {
       "id": "lotr:waypoint:nobottle",
       "name": "Nobottle",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -1600.0,
@@ -343,7 +363,8 @@
     {
       "id": "lotr:waypoint:tighfield",
       "name": "Tighfield",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -4032.0,
@@ -360,7 +381,8 @@
     {
       "id": "lotr:waypoint:brockenborings",
       "name": "Brockenborings",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 3008.0,
@@ -377,7 +399,8 @@
     {
       "id": "lotr:waypoint:deephallow",
       "name": "Deephallow",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 5184.0,
@@ -394,7 +417,8 @@
     {
       "id": "lotr:waypoint:stock",
       "name": "Stock",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 5056.0,
@@ -411,7 +435,8 @@
     {
       "id": "lotr:waypoint:bywater",
       "name": "Bywater",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 1344.0,
@@ -428,7 +453,8 @@
     {
       "id": "lotr:waypoint:overhill",
       "name": "Overhill",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 960.0,
@@ -445,7 +471,8 @@
     {
       "id": "lotr:waypoint:haysend",
       "name": "Haysend",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 6208.0,
@@ -462,7 +489,8 @@
     {
       "id": "lotr:waypoint:hay_gate",
       "name": "Hay Gate",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 5952.0,
@@ -479,7 +507,8 @@
     {
       "id": "lotr:waypoint:greenholm",
       "name": "Greenholm",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -6080.0,
@@ -496,7 +525,8 @@
     {
       "id": "lotr:waypoint:withywindle_valley",
       "name": "Withywindle Valley",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 9152.0,
@@ -513,7 +543,8 @@
     {
       "id": "lotr:waypoint:forlond",
       "name": "Forlond",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -36288.0,
@@ -530,7 +561,8 @@
     {
       "id": "lotr:waypoint:harlond",
       "name": "Harlond",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -26176.0,
@@ -547,7 +579,8 @@
     {
       "id": "lotr:waypoint:mithlond_north",
       "name": "Mithlond North",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -17984.0,
@@ -564,7 +597,8 @@
     {
       "id": "lotr:waypoint:mithlond_south",
       "name": "Mithlond South",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -16704.0,
@@ -581,7 +615,8 @@
     {
       "id": "lotr:waypoint:forlindon",
       "name": "Forlindon",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -35520.0,
@@ -598,7 +633,8 @@
     {
       "id": "lotr:waypoint:harlindon",
       "name": "Harlindon",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -25408.0,
@@ -615,7 +651,8 @@
     {
       "id": "lotr:waypoint:tower_hills",
       "name": "Tower Hills",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -12736.0,
@@ -632,7 +669,8 @@
     {
       "id": "lotr:waypoint:amon_ereb",
       "name": "Amon Ereb",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -39616.0,
@@ -649,7 +687,8 @@
     {
       "id": "lotr:waypoint:belegost",
       "name": "Belegost",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -24000.0,
@@ -666,7 +705,8 @@
     {
       "id": "lotr:waypoint:nogrod",
       "name": "Nogrod",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -23488.0,
@@ -683,7 +723,8 @@
     {
       "id": "lotr:waypoint:mount_rerir",
       "name": "Mount Rerir",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -27840.0,
@@ -700,7 +741,8 @@
     {
       "id": "lotr:waypoint:mount_dolmed",
       "name": "Mount Dolmed",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -26944.0,
@@ -717,7 +759,8 @@
     {
       "id": "lotr:waypoint:thorin_halls",
       "name": "Thorin Halls",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -21568.0,
@@ -734,7 +777,8 @@
     {
       "id": "lotr:waypoint:arvedui_mines",
       "name": "Arvedui Mines",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -18752.0,
@@ -751,7 +795,8 @@
     {
       "id": "lotr:waypoint:thrain_halls",
       "name": "Thrain Halls",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -17984.0,
@@ -768,7 +813,8 @@
     {
       "id": "lotr:waypoint:north_downs",
       "name": "North Downs",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 15424.0,
@@ -785,7 +831,8 @@
     {
       "id": "lotr:waypoint:south_downs",
       "name": "South Downs",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 19264.0,
@@ -802,7 +849,8 @@
     {
       "id": "lotr:waypoint:eryn_vorn",
       "name": "Eryn Vorn",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -8000.0,
@@ -819,7 +867,8 @@
     {
       "id": "lotr:waypoint:tharbad",
       "name": "Tharbad",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 21696.0,
@@ -836,7 +885,8 @@
     {
       "id": "lotr:waypoint:fornost",
       "name": "Fornost",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 11200.0,
@@ -853,7 +903,8 @@
     {
       "id": "lotr:waypoint:annuminas",
       "name": "Annuminas",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 576.0,
@@ -870,7 +921,8 @@
     {
       "id": "lotr:waypoint:greenway_crossroads",
       "name": "Greenway Crossroads",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 14144.0,
@@ -887,7 +939,8 @@
     {
       "id": "lotr:waypoint:bree",
       "name": "Bree",
-      "icon": "fort",
+      "relevance": "very-high",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 13504.0,
@@ -904,7 +957,8 @@
     {
       "id": "lotr:waypoint:staddle",
       "name": "Staddle",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 14656.0,
@@ -921,7 +975,8 @@
     {
       "id": "lotr:waypoint:combe",
       "name": "Combe",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 15040.0,
@@ -938,7 +993,8 @@
     {
       "id": "lotr:waypoint:archet",
       "name": "Archet",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 15168.0,
@@ -955,7 +1011,8 @@
     {
       "id": "lotr:waypoint:forsaken_inn",
       "name": "Forsaken Inn",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 17984.0,
@@ -972,7 +1029,8 @@
     {
       "id": "lotr:waypoint:weathertop",
       "name": "Weathertop",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 24128.0,
@@ -989,7 +1047,8 @@
     {
       "id": "lotr:waypoint:last_bridge",
       "name": "Last Bridge",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 35648.0,
@@ -1006,7 +1065,8 @@
     {
       "id": "lotr:waypoint:old_elf_way",
       "name": "Old Elf Way",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 27968.0,
@@ -1023,7 +1083,8 @@
     {
       "id": "lotr:waypoint:rivendell",
       "name": "Rivendell",
-      "icon": "fort",
+      "relevance": "very-high",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 46528.0,
@@ -1040,7 +1101,8 @@
     {
       "id": "lotr:waypoint:ford_bruinen",
       "name": "Ford Bruinen",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 45248.0,
@@ -1057,7 +1119,8 @@
     {
       "id": "lotr:waypoint:the_trollshaws",
       "name": "The Trollshaws",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 41024.0,
@@ -1074,7 +1137,8 @@
     {
       "id": "lotr:waypoint:carn_dum",
       "name": "Carn Dum",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 25664.0,
@@ -1091,7 +1155,8 @@
     {
       "id": "lotr:waypoint:west_gate",
       "name": "West Gate",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 41536.0,
@@ -1108,7 +1173,8 @@
     {
       "id": "lotr:waypoint:ost_in_edhil",
       "name": "Ost In Edhil",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 38720.0,
@@ -1125,7 +1191,8 @@
     {
       "id": "lotr:waypoint:north_dunland",
       "name": "North Dunland",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 33728.0,
@@ -1142,7 +1209,8 @@
     {
       "id": "lotr:waypoint:south_dunland",
       "name": "South Dunland",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 33344.0,
@@ -1159,7 +1227,8 @@
     {
       "id": "lotr:waypoint:fords_of_isen",
       "name": "Fords of Isen",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 37440.0,
@@ -1176,7 +1245,8 @@
     {
       "id": "lotr:waypoint:dwarrowvale",
       "name": "Dwarrowvale",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 34624.0,
@@ -1193,7 +1263,8 @@
     {
       "id": "lotr:waypoint:wulfburg",
       "name": "Wulfburg",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 34240.0,
@@ -1210,7 +1281,8 @@
     {
       "id": "lotr:waypoint:lond_daer",
       "name": "Lond Daer",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 7360.0,
@@ -1227,7 +1299,8 @@
     {
       "id": "lotr:waypoint:enedwaith_road",
       "name": "Enedwaith Road",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 27584.0,
@@ -1244,7 +1317,8 @@
     {
       "id": "lotr:waypoint:mouths_isen",
       "name": "Mouths Isen",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 7872.0,
@@ -1261,7 +1335,8 @@
     {
       "id": "lotr:waypoint:isengard",
       "name": "Isengard",
-      "icon": "fort",
+      "relevance": "very-high",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 37440.0,
@@ -1278,7 +1353,8 @@
     {
       "id": "lotr:waypoint:cape_of_forochel",
       "name": "Cape of Forochel",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": -3008.0,
@@ -1295,7 +1371,8 @@
     {
       "id": "lotr:waypoint:south_forochel",
       "name": "South Forochel",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 1984.0,
@@ -1312,7 +1389,8 @@
     {
       "id": "lotr:waypoint:withered_heath",
       "name": "Withered Heath",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 80832.0,
@@ -1329,7 +1407,8 @@
     {
       "id": "lotr:waypoint:mount_gundabad",
       "name": "Mount Gundabad",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 49344.0,
@@ -1346,7 +1425,8 @@
     {
       "id": "lotr:waypoint:mount_gram",
       "name": "Mount Gram",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 37952.0,
@@ -1363,7 +1443,8 @@
     {
       "id": "lotr:waypoint:high_pass",
       "name": "High Pass",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 52800.0,
@@ -1380,7 +1461,8 @@
     {
       "id": "lotr:waypoint:mount_caradhras",
       "name": "Mount Caradhras",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 45632.0,
@@ -1397,7 +1479,8 @@
     {
       "id": "lotr:waypoint:mount_celebdil",
       "name": "Mount Celebdil",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 44608.0,
@@ -1414,7 +1497,8 @@
     {
       "id": "lotr:waypoint:mount_fanuidhol",
       "name": "Mount Fanuidhol",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 48832.0,
@@ -1431,7 +1515,8 @@
     {
       "id": "lotr:waypoint:mount_methedras",
       "name": "Mount Methedras",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 38592.0,
@@ -1448,7 +1533,8 @@
     {
       "id": "lotr:waypoint:goblin_town",
       "name": "Goblin Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 52544.0,
@@ -1465,7 +1551,8 @@
     {
       "id": "lotr:waypoint:eagles_eyrie",
       "name": "Eagles' Eyrie",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 55872.0,
@@ -1482,7 +1569,8 @@
     {
       "id": "lotr:waypoint:dains_halls",
       "name": "Dain's Halls",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 57920.0,
@@ -1499,7 +1587,8 @@
     {
       "id": "lotr:waypoint:scatha",
       "name": "Scatha",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 67264.0,
@@ -1516,7 +1605,8 @@
     {
       "id": "lotr:waypoint:carrock",
       "name": "Carrock",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 60352.0,
@@ -1533,7 +1623,8 @@
     {
       "id": "lotr:waypoint:old_ford",
       "name": "Old Ford",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 60736.0,
@@ -1550,7 +1641,8 @@
     {
       "id": "lotr:waypoint:gladden_fields",
       "name": "Gladden Fields",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 62016.0,
@@ -1567,7 +1659,8 @@
     {
       "id": "lotr:waypoint:dimrill_dale",
       "name": "Dimrill Dale",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 47040.0,
@@ -1584,7 +1677,8 @@
     {
       "id": "lotr:waypoint:field_of_celebrant",
       "name": "Field of Celebrant",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 60352.0,
@@ -1601,7 +1695,8 @@
     {
       "id": "lotr:waypoint:rauros",
       "name": "Rauros",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 68544.0,
@@ -1618,7 +1713,8 @@
     {
       "id": "lotr:waypoint:beorn",
       "name": "Beorn",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 63040.0,
@@ -1635,7 +1731,8 @@
     {
       "id": "lotr:waypoint:forest_gate",
       "name": "Forest Gate",
-      "icon": "fort",
+      "relevance": "very-low",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 63168.0,
@@ -1652,7 +1749,8 @@
     {
       "id": "lotr:waypoint:framsburg",
       "name": "Framsburg",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 56512.0,
@@ -1669,7 +1767,8 @@
     {
       "id": "lotr:waypoint:anduin_crossroads",
       "name": "Anduin Crossroads",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 60864.0,
@@ -1686,7 +1785,8 @@
     {
       "id": "lotr:waypoint:east_rhovanion_road",
       "name": "East Rhovanion Road",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 69696.0,
@@ -1703,7 +1803,8 @@
     {
       "id": "lotr:waypoint:thranduil_halls",
       "name": "Thranduil's Halls",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 78144.0,
@@ -1720,7 +1821,8 @@
     {
       "id": "lotr:waypoint:dol_guldur",
       "name": "Dol Guldur",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 67776.0,
@@ -1737,7 +1839,8 @@
     {
       "id": "lotr:waypoint:mirkwood_mountains",
       "name": "Mirkwood Mountains",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 79424.0,
@@ -1754,7 +1857,8 @@
     {
       "id": "lotr:waypoint:rhosgobel",
       "name": "Rhosgobel",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 68288.0,
@@ -1771,7 +1875,8 @@
     {
       "id": "lotr:waypoint:enchanted_river",
       "name": "Enchanted River",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 75072.0,
@@ -1788,7 +1893,8 @@
     {
       "id": "lotr:waypoint:river_gate",
       "name": "River Gate",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 85056.0,
@@ -1805,7 +1911,8 @@
     {
       "id": "lotr:waypoint:east_bight",
       "name": "East Bight",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 80320.0,
@@ -1822,7 +1929,8 @@
     {
       "id": "lotr:waypoint:old_rhovanion",
       "name": "Old Rhovanion",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 91456.0,
@@ -1839,7 +1947,8 @@
     {
       "id": "lotr:waypoint:dorwinion_crossroads",
       "name": "Dorwinion Crossroads",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 111424.0,
@@ -1856,7 +1965,8 @@
     {
       "id": "lotr:waypoint:erebor",
       "name": "Erebor",
-      "icon": "fort",
+      "relevance": "very-high",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 83648.0,
@@ -1873,7 +1983,8 @@
     {
       "id": "lotr:waypoint:dale_city",
       "name": "Dale City",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 83776.0,
@@ -1890,7 +2001,8 @@
     {
       "id": "lotr:waypoint:long_lake",
       "name": "Long Lake",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 83392.0,
@@ -1907,7 +2019,8 @@
     {
       "id": "lotr:waypoint:running_ford",
       "name": "Running Ford",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 92736.0,
@@ -1924,7 +2037,8 @@
     {
       "id": "lotr:waypoint:redwater_ford",
       "name": "Redwater Ford",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 107712.0,
@@ -1941,7 +2055,8 @@
     {
       "id": "lotr:waypoint:dale_crossroads",
       "name": "Dale Crossroads",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 96960.0,
@@ -1958,7 +2073,8 @@
     {
       "id": "lotr:waypoint:dale_port",
       "name": "Dale Port",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 108480.0,
@@ -1975,7 +2091,8 @@
     {
       "id": "lotr:waypoint:west_peak",
       "name": "West Peak",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 99648.0,
@@ -1992,7 +2109,8 @@
     {
       "id": "lotr:waypoint:east_peak",
       "name": "East Peak",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 117696.0,
@@ -2009,7 +2127,8 @@
     {
       "id": "lotr:waypoint:caras_galadhon",
       "name": "Caras Galadhon",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 55360.0,
@@ -2026,7 +2145,8 @@
     {
       "id": "lotr:waypoint:cerin_amroth",
       "name": "Cerin Amroth",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 53824.0,
@@ -2043,7 +2163,8 @@
     {
       "id": "lotr:waypoint:nimrodel",
       "name": "Nimrodel",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 49728.0,
@@ -2060,7 +2181,8 @@
     {
       "id": "lotr:waypoint:derndingle",
       "name": "Derndingle",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 45248.0,
@@ -2077,7 +2199,8 @@
     {
       "id": "lotr:waypoint:wellinghall",
       "name": "Wellinghall",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 43968.0,
@@ -2094,7 +2217,8 @@
     {
       "id": "lotr:waypoint:treebeard_hill",
       "name": "Treebeard Hill",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 49984.0,
@@ -2111,7 +2235,8 @@
     {
       "id": "lotr:waypoint:wold",
       "name": "Wold",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 60864.0,
@@ -2128,7 +2253,8 @@
     {
       "id": "lotr:waypoint:edoras",
       "name": "Edoras",
-      "icon": "fort",
+      "relevance": "very-high",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 48704.0,
@@ -2145,7 +2271,8 @@
     {
       "id": "lotr:waypoint:helms_deep",
       "name": "Helm's Deep",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 40768.0,
@@ -2162,7 +2289,8 @@
     {
       "id": "lotr:waypoint:helms_crossroads",
       "name": "Helm's Crossroads",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 41792.0,
@@ -2179,7 +2307,8 @@
     {
       "id": "lotr:waypoint:uruk_highlands",
       "name": "Uruk Highlands",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 41152.0,
@@ -2196,7 +2325,8 @@
     {
       "id": "lotr:waypoint:mering_stream",
       "name": "Mering Stream",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 62656.0,
@@ -2213,7 +2343,8 @@
     {
       "id": "lotr:waypoint:entwade",
       "name": "Entwade",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 54976.0,
@@ -2230,7 +2361,8 @@
     {
       "id": "lotr:waypoint:eastmark",
       "name": "Eastmark",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 60992.0,
@@ -2247,7 +2379,8 @@
     {
       "id": "lotr:waypoint:aldburg",
       "name": "Aldburg",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 52928.0,
@@ -2264,7 +2397,8 @@
     {
       "id": "lotr:waypoint:grimslade",
       "name": "Grimslade",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 43968.0,
@@ -2281,7 +2415,8 @@
     {
       "id": "lotr:waypoint:corsairs_landing",
       "name": "Corsairs' Landing",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 23360.0,
@@ -2298,7 +2433,8 @@
     {
       "id": "lotr:waypoint:freca_hold",
       "name": "Freca Hold",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 37056.0,
@@ -2315,7 +2451,8 @@
     {
       "id": "lotr:waypoint:dunharrow",
       "name": "Dunharrow",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 46784.0,
@@ -2332,7 +2469,8 @@
     {
       "id": "lotr:waypoint:tarlang",
       "name": "Tarlang",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 50624.0,
@@ -2349,7 +2487,8 @@
     {
       "id": "lotr:waypoint:ras_morthil",
       "name": "Ras Morthil",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 4544.0,
@@ -2366,7 +2505,8 @@
     {
       "id": "lotr:waypoint:minas_tirith",
       "name": "Minas Tirith",
-      "icon": "fort",
+      "relevance": "very-high",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 78016.0,
@@ -2383,7 +2523,8 @@
     {
       "id": "lotr:waypoint:cair_andros",
       "name": "Cair Andros",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 79040.0,
@@ -2400,7 +2541,8 @@
     {
       "id": "lotr:waypoint:halifirien",
       "name": "Halifirien",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 63936.0,
@@ -2417,7 +2559,8 @@
     {
       "id": "lotr:waypoint:calenhad",
       "name": "Calenhad",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 66624.0,
@@ -2434,7 +2577,8 @@
     {
       "id": "lotr:waypoint:minrimmon",
       "name": "Minrimmon",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 69184.0,
@@ -2451,7 +2595,8 @@
     {
       "id": "lotr:waypoint:erelas",
       "name": "Erelas",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 71360.0,
@@ -2468,7 +2613,8 @@
     {
       "id": "lotr:waypoint:nardol",
       "name": "Nardol",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 73536.0,
@@ -2485,7 +2631,8 @@
     {
       "id": "lotr:waypoint:eilenach",
       "name": "Eilenach",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 75840.0,
@@ -2502,7 +2649,8 @@
     {
       "id": "lotr:waypoint:amon_din",
       "name": "Amon Din",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 77632.0,
@@ -2519,7 +2667,8 @@
     {
       "id": "lotr:waypoint:osgiliath_west",
       "name": "Osgiliath West",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 79168.0,
@@ -2536,7 +2685,8 @@
     {
       "id": "lotr:waypoint:osgiliath_east",
       "name": "Osgiliath East",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 80064.0,
@@ -2553,7 +2703,8 @@
     {
       "id": "lotr:waypoint:emyn_arnen",
       "name": "Emyn Arnen",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 80320.0,
@@ -2570,7 +2721,8 @@
     {
       "id": "lotr:waypoint:henneth_annun",
       "name": "Henneth Annun",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 81088.0,
@@ -2587,7 +2739,8 @@
     {
       "id": "lotr:waypoint:crossroads_ithilien",
       "name": "Crossroads Ithilien",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 81984.0,
@@ -2604,7 +2757,8 @@
     {
       "id": "lotr:waypoint:north_ithilien",
       "name": "North Ithilien",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 81600.0,
@@ -2621,7 +2775,8 @@
     {
       "id": "lotr:waypoint:crossings_of_poros",
       "name": "Crossings of Poros",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 80960.0,
@@ -2638,7 +2793,8 @@
     {
       "id": "lotr:waypoint:pelargir",
       "name": "Pelargir",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 74304.0,
@@ -2655,7 +2811,8 @@
     {
       "id": "lotr:waypoint:linhir",
       "name": "Linhir",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 61760.0,
@@ -2672,7 +2829,8 @@
     {
       "id": "lotr:waypoint:anduin_mouth",
       "name": "Anduin Mouth",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 59328.0,
@@ -2689,7 +2847,8 @@
     {
       "id": "lotr:waypoint:imloth_melui",
       "name": "Imloth Melui",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 75200.0,
@@ -2706,7 +2865,8 @@
     {
       "id": "lotr:waypoint:crossings_erui",
       "name": "Crossings Erui",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 77120.0,
@@ -2723,7 +2883,8 @@
     {
       "id": "lotr:waypoint:calembel",
       "name": "Calembel",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 54464.0,
@@ -2740,7 +2901,8 @@
     {
       "id": "lotr:waypoint:ethring",
       "name": "Ethring",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 57152.0,
@@ -2757,7 +2919,8 @@
     {
       "id": "lotr:waypoint:erech",
       "name": "Erech",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 48192.0,
@@ -2774,7 +2937,8 @@
     {
       "id": "lotr:waypoint:green_hills",
       "name": "Green Hills",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 30144.0,
@@ -2791,7 +2955,8 @@
     {
       "id": "lotr:waypoint:dol_amroth",
       "name": "Dol Amroth",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 44608.0,
@@ -2808,7 +2973,8 @@
     {
       "id": "lotr:waypoint:edhellond",
       "name": "Edhellond",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 48576.0,
@@ -2825,7 +2991,8 @@
     {
       "id": "lotr:waypoint:tarnost",
       "name": "Tarnost",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 55232.0,
@@ -2842,7 +3009,8 @@
     {
       "id": "lotr:waypoint:tolfalas_island",
       "name": "Tolfalas Island",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 55104.0,
@@ -2859,7 +3027,8 @@
     {
       "id": "lotr:waypoint:amon_hen",
       "name": "Amon Hen",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 67264.0,
@@ -2876,7 +3045,8 @@
     {
       "id": "lotr:waypoint:amon_lhaw",
       "name": "Amon Lhaw",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 72000.0,
@@ -2893,7 +3063,8 @@
     {
       "id": "lotr:waypoint:argonath",
       "name": "Argonath",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 68800.0,
@@ -2910,7 +3081,8 @@
     {
       "id": "lotr:waypoint:north_undeep",
       "name": "North Undeep",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 65216.0,
@@ -2927,7 +3099,8 @@
     {
       "id": "lotr:waypoint:south_undeep",
       "name": "South Undeep",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 67264.0,
@@ -2944,7 +3117,8 @@
     {
       "id": "lotr:waypoint:morannon",
       "name": "Morannon",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 84544.0,
@@ -2961,7 +3135,8 @@
     {
       "id": "lotr:waypoint:udun",
       "name": "Udun",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 84544.0,
@@ -2978,7 +3153,8 @@
     {
       "id": "lotr:waypoint:mount_doom",
       "name": "Mount Doom",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 92608.0,
@@ -2995,7 +3171,8 @@
     {
       "id": "lotr:waypoint:barad_dur",
       "name": "Barad Dur",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 97728.0,
@@ -3012,7 +3189,8 @@
     {
       "id": "lotr:waypoint:minas_morgul",
       "name": "Minas Morgul",
-      "icon": "fort",
+      "relevance": "very-high",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 83392.0,
@@ -3029,7 +3207,8 @@
     {
       "id": "lotr:waypoint:durthang",
       "name": "Durthang",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 83776.0,
@@ -3046,7 +3225,8 @@
     {
       "id": "lotr:waypoint:carach_angren",
       "name": "Carach Angren",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 87488.0,
@@ -3063,7 +3243,8 @@
     {
       "id": "lotr:waypoint:cirith_ungol",
       "name": "Cirith Ungol",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 85696.0,
@@ -3080,7 +3261,8 @@
     {
       "id": "lotr:waypoint:morigost",
       "name": "Morigost",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 95808.0,
@@ -3097,7 +3279,8 @@
     {
       "id": "lotr:waypoint:nargroth",
       "name": "Nargroth",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 106304.0,
@@ -3114,7 +3297,8 @@
     {
       "id": "lotr:waypoint:amon_angren",
       "name": "Amon Angren",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 109248.0,
@@ -3131,7 +3315,8 @@
     {
       "id": "lotr:waypoint:seregost",
       "name": "Seregost",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 111680.0,
@@ -3148,7 +3333,8 @@
     {
       "id": "lotr:waypoint:fellbeasts",
       "name": "Fellbeasts",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 120896.0,
@@ -3165,7 +3351,8 @@
     {
       "id": "lotr:waypoint:eastern_guard",
       "name": "Eastern Guard",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 131904.0,
@@ -3182,7 +3369,8 @@
     {
       "id": "lotr:waypoint:nurnen_northern_shore",
       "name": "Núrnen Northern Shore",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 113472.0,
@@ -3199,7 +3387,8 @@
     {
       "id": "lotr:waypoint:nurnen_southern_shore",
       "name": "Núrnen Southern Shore",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 116288.0,
@@ -3216,7 +3405,8 @@
     {
       "id": "lotr:waypoint:nurnen_western_shore",
       "name": "Núrnen Western Shore",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 107584.0,
@@ -3233,7 +3423,8 @@
     {
       "id": "lotr:waypoint:nurnen_eastern_shore",
       "name": "Núrnen Eastern Shore",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 121408.0,
@@ -3250,7 +3441,8 @@
     {
       "id": "lotr:waypoint:thaurband",
       "name": "Thaurband",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 106688.0,
@@ -3267,7 +3459,8 @@
     {
       "id": "lotr:waypoint:valley_of_spiders",
       "name": "Valley of Spiders",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 89920.0,
@@ -3284,7 +3477,8 @@
     {
       "id": "lotr:waypoint:dorwinion_port",
       "name": "Dorwinion Port",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 124736.0,
@@ -3301,7 +3495,8 @@
     {
       "id": "lotr:waypoint:dorwinion_court",
       "name": "Dorwinion Court",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 121408.0,
@@ -3318,7 +3513,8 @@
     {
       "id": "lotr:waypoint:dorwinion_ford",
       "name": "Dorwinion Ford",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 123712.0,
@@ -3335,7 +3531,8 @@
     {
       "id": "lotr:waypoint:dorwinion_hills",
       "name": "Dorwinion Hills",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 118208.0,
@@ -3352,7 +3549,8 @@
     {
       "id": "lotr:waypoint:rhun_road_way",
       "name": "Rhûn Road Way",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 181568.0,
@@ -3369,7 +3567,8 @@
     {
       "id": "lotr:waypoint:balcaras",
       "name": "Balcaras",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 181952.0,
@@ -3386,7 +3585,8 @@
     {
       "id": "lotr:waypoint:khand_north_road",
       "name": "Khand North Road",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 143680.0,
@@ -3403,7 +3603,8 @@
     {
       "id": "lotr:waypoint:rhun_capital",
       "name": "Rhûn Capital",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 135360.0,
@@ -3420,7 +3621,8 @@
     {
       "id": "lotr:waypoint:khamul_tower",
       "name": "Khamul Tower",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 138048.0,
@@ -3437,7 +3639,8 @@
     {
       "id": "lotr:waypoint:mordor_ford",
       "name": "Mordor Ford",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 131136.0,
@@ -3454,7 +3657,8 @@
     {
       "id": "lotr:waypoint:rhun_north_city",
       "name": "Rhûn North City",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 139968.0,
@@ -3471,7 +3675,8 @@
     {
       "id": "lotr:waypoint:bazylan",
       "name": "Bazylan",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 142272.0,
@@ -3488,7 +3693,8 @@
     {
       "id": "lotr:waypoint:border_town",
       "name": "Border Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 126016.0,
@@ -3505,7 +3711,8 @@
     {
       "id": "lotr:waypoint:rhun_sea_city",
       "name": "Rhûn Sea City",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 131520.0,
@@ -3522,7 +3729,8 @@
     {
       "id": "lotr:waypoint:rhun_north_ford",
       "name": "Rhûn North Ford",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 144960.0,
@@ -3539,7 +3747,8 @@
     {
       "id": "lotr:waypoint:rhun_northeast",
       "name": "Rhûn Northeast",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 158144.0,
@@ -3556,7 +3765,8 @@
     {
       "id": "lotr:waypoint:rhun_south_pass",
       "name": "Rhûn South Pass",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 135616.0,
@@ -3573,7 +3783,8 @@
     {
       "id": "lotr:waypoint:rhun_east_city",
       "name": "Rhûn East City",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 153664.0,
@@ -3590,7 +3801,8 @@
     {
       "id": "lotr:waypoint:rhun_east_town",
       "name": "Rhûn East Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 150208.0,
@@ -3607,7 +3819,8 @@
     {
       "id": "lotr:waypoint:rhun_southeast",
       "name": "Rhûn Southeast",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 139584.0,
@@ -3624,7 +3837,8 @@
     {
       "id": "lotr:waypoint:baraz_dum",
       "name": "Baraz Dum",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 194112.0,
@@ -3641,7 +3855,8 @@
     {
       "id": "lotr:waypoint:crossings_of_harad",
       "name": "Crossings of Harad",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 88768.0,
@@ -3658,7 +3873,8 @@
     {
       "id": "lotr:waypoint:harnen_sea_town",
       "name": "Harnen Sea Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 68288.0,
@@ -3675,7 +3891,8 @@
     {
       "id": "lotr:waypoint:harnen_road_town",
       "name": "Harnen Road Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 90688.0,
@@ -3692,7 +3909,8 @@
     {
       "id": "lotr:waypoint:harnen_black_town",
       "name": "Harnen Black Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 96832.0,
@@ -3709,7 +3927,8 @@
     {
       "id": "lotr:waypoint:crossings_of_lithnen",
       "name": "Crossings of Lithnen",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 93376.0,
@@ -3726,7 +3945,8 @@
     {
       "id": "lotr:waypoint:harnen_river_town",
       "name": "Harnen River Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 81600.0,
@@ -3743,7 +3963,8 @@
     {
       "id": "lotr:waypoint:khand_ford",
       "name": "Khand Ford",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 123968.0,
@@ -3760,7 +3981,8 @@
     {
       "id": "lotr:waypoint:umbar_city",
       "name": "Umbar City",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 51776.0,
@@ -3777,7 +3999,8 @@
     {
       "id": "lotr:waypoint:umbar_gate",
       "name": "Umbar Gate",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 56640.0,
@@ -3794,7 +4017,8 @@
     {
       "id": "lotr:waypoint:gate_herumor",
       "name": "Gate Herumor",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 36800.0,
@@ -3811,7 +4035,8 @@
     {
       "id": "lotr:waypoint:cedar_road",
       "name": "Cedar Road",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 28736.0,
@@ -3828,7 +4053,8 @@
     {
       "id": "lotr:waypoint:fertile_valley",
       "name": "Fertile Valley",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 46016.0,
@@ -3845,7 +4071,8 @@
     {
       "id": "lotr:waypoint:gardens_beruthiel",
       "name": "Gardens Beruthiel",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 55744.0,
@@ -3862,7 +4089,8 @@
     {
       "id": "lotr:waypoint:ain_al_harad",
       "name": "Ain Al Harad",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 58304.0,
@@ -3879,7 +4107,8 @@
     {
       "id": "lotr:waypoint:gate_fuinur",
       "name": "Gate Fuinur",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 52288.0,
@@ -3896,7 +4125,8 @@
     {
       "id": "lotr:waypoint:coast_fortress",
       "name": "Coast Fortress",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 55744.0,
@@ -3913,7 +4143,8 @@
     {
       "id": "lotr:waypoint:sandhill_town",
       "name": "Sandhill Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 59840.0,
@@ -3930,7 +4161,8 @@
     {
       "id": "lotr:waypoint:coast_river_town",
       "name": "Coast River Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 34624.0,
@@ -3947,7 +4179,8 @@
     {
       "id": "lotr:waypoint:coast_city",
       "name": "Coast City",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 45504.0,
@@ -3964,7 +4197,8 @@
     {
       "id": "lotr:waypoint:desert_town",
       "name": "Desert Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 96448.0,
@@ -3981,7 +4215,8 @@
     {
       "id": "lotr:waypoint:south_desert_town",
       "name": "South Desert Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 42432.0,
@@ -3998,7 +4233,8 @@
     {
       "id": "lotr:waypoint:desert_river_town",
       "name": "Desert River Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 48832.0,
@@ -4015,7 +4251,8 @@
     {
       "id": "lotr:waypoint:gulf_of_harad",
       "name": "Gulf of Harad",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 117056.0,
@@ -4032,7 +4269,8 @@
     {
       "id": "lotr:waypoint:gulf_city",
       "name": "Gulf City",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 106304.0,
@@ -4049,7 +4287,8 @@
     {
       "id": "lotr:waypoint:gulf_ford",
       "name": "Gulf Ford",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 112192.0,
@@ -4066,7 +4305,8 @@
     {
       "id": "lotr:waypoint:gulf_trade_town",
       "name": "Gulf Trade Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 112960.0,
@@ -4083,7 +4323,8 @@
     {
       "id": "lotr:waypoint:gulf_north_town",
       "name": "Gulf North Town",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 104512.0,
@@ -4100,7 +4341,8 @@
     {
       "id": "lotr:waypoint:gulf_east_bay",
       "name": "Gulf East Bay",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 156992.0,
@@ -4117,7 +4359,8 @@
     {
       "id": "lotr:waypoint:gulf_east_port",
       "name": "Gulf East Port",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 132800.0,
@@ -4134,7 +4377,8 @@
     {
       "id": "lotr:waypoint:mount_sand",
       "name": "Mount Sand",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 19136.0,
@@ -4151,7 +4395,8 @@
     {
       "id": "lotr:waypoint:mount_green",
       "name": "Mount Green",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 9536.0,
@@ -4168,7 +4413,8 @@
     {
       "id": "lotr:waypoint:mount_thunder",
       "name": "Mount Thunder",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 26816.0,
@@ -4185,7 +4431,8 @@
     {
       "id": "lotr:waypoint:great_plains_north",
       "name": "Great Plains North",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 63808.0,
@@ -4202,7 +4449,8 @@
     {
       "id": "lotr:waypoint:great_plains_south",
       "name": "Great Plains South",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 83520.0,
@@ -4219,7 +4467,8 @@
     {
       "id": "lotr:waypoint:great_plains_west",
       "name": "Great Plains West",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 30528.0,
@@ -4236,7 +4485,8 @@
     {
       "id": "lotr:waypoint:great_plains_east",
       "name": "Great Plains East",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 105920.0,
@@ -4253,7 +4503,8 @@
     {
       "id": "lotr:waypoint:green_valley",
       "name": "Green Valley",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 95680.0,
@@ -4270,7 +4521,8 @@
     {
       "id": "lotr:waypoint:harad_lakes",
       "name": "Harad Lakes",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 123456.0,
@@ -4287,7 +4539,8 @@
     {
       "id": "lotr:waypoint:lake_harad",
       "name": "Lake Harad",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 37184.0,
@@ -4304,7 +4557,8 @@
     {
       "id": "lotr:waypoint:haraduin_mouth",
       "name": "Haraduin Mouth",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 132672.0,
@@ -4321,7 +4575,8 @@
     {
       "id": "lotr:waypoint:isle_mist",
       "name": "Isle Mist",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 92608.0,
@@ -4338,7 +4593,8 @@
     {
       "id": "lotr:waypoint:taurelonde",
       "name": "Taurelonde",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 11712.0,
@@ -4355,7 +4611,8 @@
     {
       "id": "lotr:waypoint:harad_horn",
       "name": "Harad Horn",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 37824.0,
@@ -4372,7 +4629,8 @@
     {
       "id": "lotr:waypoint:town_bones",
       "name": "Town Bones",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 130880.0,
@@ -4389,7 +4647,8 @@
     {
       "id": "lotr:waypoint:haraduin_bridge",
       "name": "Haraduin Bridge",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 103872.0,
@@ -4406,7 +4665,8 @@
     {
       "id": "lotr:waypoint:jungle_city_trade",
       "name": "Jungle City Trade",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 18240.0,
@@ -4423,7 +4683,8 @@
     {
       "id": "lotr:waypoint:jungle_city_old",
       "name": "Jungle City Old",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 35136.0,
@@ -4440,7 +4701,8 @@
     {
       "id": "lotr:waypoint:jungle_city_north",
       "name": "Jungle City North",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 78016.0,
@@ -4457,7 +4719,8 @@
     {
       "id": "lotr:waypoint:jungle_city_east",
       "name": "Jungle City East",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 100416.0,
@@ -4474,7 +4737,8 @@
     {
       "id": "lotr:waypoint:jungle_city_capital",
       "name": "Jungle City Capital",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 73024.0,
@@ -4491,7 +4755,8 @@
     {
       "id": "lotr:waypoint:jungle_city_deep",
       "name": "Jungle City Deep",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 47936.0,
@@ -4508,7 +4773,8 @@
     {
       "id": "lotr:waypoint:jungle_city_watch",
       "name": "Jungle City Watch",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 99904.0,
@@ -4525,7 +4791,8 @@
     {
       "id": "lotr:waypoint:jungle_city_caves",
       "name": "Jungle City Caves",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 57280.0,
@@ -4542,7 +4809,8 @@
     {
       "id": "lotr:waypoint:jungle_city_stone",
       "name": "Jungle City Stone",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 54592.0,
@@ -4559,7 +4827,8 @@
     {
       "id": "lotr:waypoint:jungle_lakes",
       "name": "Jungle Lakes",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 94784.0,
@@ -4576,7 +4845,8 @@
     {
       "id": "lotr:waypoint:troll_island",
       "name": "Troll Island",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 148032.0,
@@ -4593,7 +4863,8 @@
     {
       "id": "lotr:waypoint:black_coast",
       "name": "Black Coast",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 144192.0,
@@ -4610,7 +4881,8 @@
     {
       "id": "lotr:waypoint:blood_river",
       "name": "Blood River",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 139200.0,
@@ -4627,7 +4899,8 @@
     {
       "id": "lotr:waypoint:shadow_point",
       "name": "Shadow Point",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 146240.0,
@@ -4644,7 +4917,8 @@
     {
       "id": "lotr:waypoint:old_jungle_ruin",
       "name": "Old Jungle Ruin",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 131136.0,
@@ -4661,7 +4935,8 @@
     {
       "id": "lotr:waypoint:sun_elves",
       "name": "Ancalitse",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 216896.0,
@@ -4678,7 +4953,8 @@
     {
       "id": "lotr:waypoint:moon_elves",
       "name": "Naldosse",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 97088.0,
@@ -4695,7 +4971,8 @@
     {
       "id": "lotr:waypoint:moon_elves_2",
       "name": "Naldosse East",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 99264.0,
@@ -4712,7 +4989,8 @@
     {
       "id": "lotr:waypoint:odane",
       "name": "Odane",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 297280.0,
@@ -4729,7 +5007,8 @@
     {
       "id": "lotr:waypoint:odane_mountains",
       "name": "Odane Mountains",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 298560.0,
@@ -4746,7 +5025,8 @@
     {
       "id": "lotr:waypoint:odane_port",
       "name": "Odane Port",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 289344.0,
@@ -4763,7 +5043,8 @@
     {
       "id": "lotr:waypoint:odane_eastwatch",
       "name": "Odane Eastwatch",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 303040.0,
@@ -4780,7 +5061,8 @@
     {
       "id": "lotr:waypoint:orocarni",
       "name": "Orocarni",
-      "icon": "fort",
+      "relevance": "medium",
+      "icon": "town",
       "color": "white",
       "dimension": "lotr:middle_earth",
       "x": 205504.0,

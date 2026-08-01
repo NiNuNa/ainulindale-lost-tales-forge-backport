@@ -73,6 +73,7 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
                                 LostTalesMapMarkerSource.CUSTOM_PRESET);
                 boolean hasWaystone = buffer.readBoolean();
                 String structureType = readId(buffer);
+                int priority = buffer.readInt();
                 if (!isFinite(x) || !isFinite(y) || !isFinite(z)
                         || !isFinite(compassRadius)
                         || !isFinite(discoveryRadius)
@@ -86,7 +87,7 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
                         fastTravel, dimensionId,
                         x, y, z, compassRadius, discoveryRadius,
                         hidden, discoverable, requiresRegion,
-                        source, hasWaystone, structureType));
+                        source, hasWaystone, structureType, priority));
             }
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
@@ -123,6 +124,7 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
             writeId(buffer, marker.getSource().getSerializedName());
             buffer.writeBoolean(marker.hasWaystone());
             writeId(buffer, marker.getWaystoneStructureType());
+            buffer.writeInt(marker.getPriority());
         }
         if (buffer.writerIndex() - start > MAX_PACKET_BYTES) {
             throw new IllegalStateException(

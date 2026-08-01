@@ -18,7 +18,7 @@ import net.minecraftforge.common.util.Constants;
 
 /** Versioned, defensive NBT codec for authoritative marker records. */
 public final class LostTalesMapMarkerNbtCodec {
-    public static final int CURRENT_DATA_VERSION = 3;
+    public static final int CURRENT_DATA_VERSION = 4;
     private static final int MAX_RECORDS = 16384;
     private static final int MAX_QUARANTINE = 4096;
 
@@ -150,6 +150,7 @@ public final class LostTalesMapMarkerNbtCodec {
         tag.setBoolean("RequiresRegion", record.requiresRegionUnlock());
         tag.setBoolean("HasWaystone", record.hasWaystone());
         tag.setString("StructureType", record.getWaystoneStructureType());
+        tag.setInteger("Priority", record.getPriority());
         writeUuid(tag, "Owner", record.getOwnerPlayerId());
         tag.setString("Visibility",
                 record.getVisibility().getSerializedName());
@@ -231,6 +232,8 @@ public final class LostTalesMapMarkerNbtCodec {
                                     tag.getBoolean("RequiresRegion"))
                             .waystone(hasWaystone,
                                     tag.getString("StructureType"))
+                            .priority(tag.hasKey("Priority", Constants.NBT.TAG_INT)
+                                    ? tag.getInteger("Priority") : 0)
                             .ownerPlayerId(readUuid(tag, "Owner"))
                             .visibility(
                                     LostTalesMapMarkerVisibility.forSerializedName(

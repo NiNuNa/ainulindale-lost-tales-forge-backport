@@ -10,6 +10,7 @@ import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import com.ninuna.losttales.inventory.container.LostTalesContainerWaystone;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerEditableSettings;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdResolver;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRelevance;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneSettingsRequestPacket;
@@ -37,7 +38,8 @@ public final class LostTalesWaystoneGui extends GuiContainer {
     private static final DecimalFormat NUMBER_FORMAT =
             new DecimalFormat("0.##");
     private static final String[] SELECTABLE_ICONS = {
-        "quest", "hostile", "fort", "undiscovered", "tavern"
+        "quest", "hostile", "undiscovered", "town", "graveyard",
+        "forest", "fountain", "port"
     };
     private static final String[] SELECTABLE_COLORS = {
         "white", "red", "green", "blue", "yellow", "gold",
@@ -55,6 +57,7 @@ public final class LostTalesWaystoneGui extends GuiContainer {
     private final GuiButton[] tabButtons = new GuiButton[PAGE_COUNT];
     private GuiButton visibilityButton;
     private GuiButton fastTravelButton;
+    private GuiButton relevanceButton;
     private GuiButton discoverableButton;
     private GuiButton hiddenButton;
     private GuiButton regionButton;
@@ -74,6 +77,8 @@ public final class LostTalesWaystoneGui extends GuiContainer {
     private boolean selectedDiscoverable;
     private boolean selectedHidden;
     private boolean selectedRequiresRegion;
+    private LostTalesMapMarkerRelevance selectedRelevance =
+            LostTalesMapMarkerRelevance.MEDIUM;
     private boolean shareWithFellowship;
     private int page;
     private String status = "";
@@ -136,6 +141,7 @@ public final class LostTalesWaystoneGui extends GuiContainer {
         this.hiddenButton = button(31, 200, 90, 178);
         this.regionButton = button(32, 12, 116, 178);
         this.fastTravelButton = button(33, 200, 116, 178);
+        this.relevanceButton = button(34, 12, 116, 366);
         this.visibilityButton = button(35, 12, 142, 366);
         this.shareButton = button(
                 36, 126, 100, 116,
@@ -210,6 +216,7 @@ public final class LostTalesWaystoneGui extends GuiContainer {
                 format(latest.getCompassFadeInRadius()));
         this.locationFields[1].setText(
                 format(latest.getDiscoveryRadius()));
+        this.selectedRelevance = latest.getRelevance();
         this.selectedVisibility = latest.getVisibility();
         this.selectedFastTravel = latest.hasFastTravel();
         this.selectedDiscoverable = latest.isDiscoverable();
@@ -236,6 +243,7 @@ public final class LostTalesWaystoneGui extends GuiContainer {
                 editable && this.selectedDiscoverable;
         this.regionButton.enabled = editable;
         this.fastTravelButton.enabled = editable;
+        this.relevanceButton.enabled = editable;
         this.visibilityButton.enabled = editable;
         this.shareButton.enabled = editable;
         this.unshareButton.enabled = editable;
@@ -258,6 +266,7 @@ public final class LostTalesWaystoneGui extends GuiContainer {
         setVisible(this.hiddenButton, this.page == PAGE_RULES);
         setVisible(this.regionButton, this.page == PAGE_RULES);
         setVisible(this.fastTravelButton, this.page == PAGE_RULES);
+        setVisible(this.relevanceButton, this.page == PAGE_LOCATION);
         setVisible(this.visibilityButton, this.page == PAGE_RULES);
         setVisible(this.shareButton, this.page == PAGE_SHARING);
         setVisible(this.unshareButton, this.page == PAGE_SHARING);
@@ -275,6 +284,11 @@ public final class LostTalesWaystoneGui extends GuiContainer {
                 "region", this.selectedRequiresRegion);
         this.fastTravelButton.displayString = toggleLabel(
                 "fast_travel_short", this.selectedFastTravel);
+        this.relevanceButton.displayString = I18n.format(
+                "gui.losttales.waystone.relevance",
+                I18n.format("gui.losttales.waystone.relevance."
+                        + this.selectedRelevance.getSerializedName()
+                                .replace('-', '_')));
         this.visibilityButton.displayString = I18n.format(
                 "gui.losttales.waystone.visibility",
                 I18n.format("gui.losttales.waystone.visibility."
@@ -332,6 +346,8 @@ public final class LostTalesWaystoneGui extends GuiContainer {
                     !this.selectedRequiresRegion;
         } else if (button.id == 33) {
             this.selectedFastTravel = !this.selectedFastTravel;
+        } else if (button.id == 34) {
+            this.selectedRelevance = this.selectedRelevance.next();
         } else if (button.id == 35) {
             cycleVisibility();
         } else if (button.id == 36 || button.id == 37) {
@@ -413,6 +429,7 @@ public final class LostTalesWaystoneGui extends GuiContainer {
                             this.selectedRequiresRegion,
                             this.state.hasWaystone(),
                             this.state.getWaystoneStructureType(),
+                            this.selectedRelevance,
                             this.selectedVisibility);
             LostTalesNetworkHandler.CHANNEL.sendToServer(
                     LostTalesWaystoneSettingsRequestPacket.save(
