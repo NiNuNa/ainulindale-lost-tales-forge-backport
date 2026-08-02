@@ -26,6 +26,8 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
 
     private final Map<String, LostTalesMapMarkerRecord> records =
             new LinkedHashMap<String, LostTalesMapMarkerRecord>();
+    private final Map<String, String> markerIdByCanonicalKey =
+            new LinkedHashMap<String, String>();
     private final Map<String, String> markerIdByLinkedPosition =
             new LinkedHashMap<String, String>();
     private final Map<String, Set<String>> markerIdsByChunk =
@@ -52,6 +54,7 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
     @Override
     public synchronized void readFromNBT(NBTTagCompound compound) {
         this.records.clear();
+        this.markerIdByCanonicalKey.clear();
         this.markerIdByLinkedPosition.clear();
         this.markerIdsByChunk.clear();
         this.maximumDiscoveryRadiusByDimension.clear();
@@ -73,7 +76,8 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
         this.records.putAll(result.getRecords());
         boolean hadStoredRecords = !this.records.isEmpty();
         this.quarantinedEntries.addAll(result.getQuarantineCopy());
-        boolean repaired = alignLinkedMarkerPositions();
+        boolean repaired = deduplicateLogicalRecords();
+        repaired |= alignLinkedMarkerPositions();
         if (compound.hasKey(CATALOG_INITIALIZED,
                 Constants.NBT.TAG_BYTE)) {
             this.catalogInitialized =
@@ -85,8 +89,8 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
             this.catalogInitialized = hadStoredRecords;
             repaired |= hadStoredRecords;
         }
-        repaired |= readLotrTravelIds(compound);
         repaired |= rebuildIndexes();
+        repaired |= readLotrTravelIds(compound);
         if (result.wasRepaired() || repaired) {
             markDirty();
         }
@@ -129,7 +133,8 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
     }
 
     public synchronized LostTalesMapMarkerRecord getRecord(String markerId) {
-        return markerId == null ? null : this.records.get(markerId.trim());
+        String storedId = resolveStoredMarkerId(markerId);
+        return storedId == null ? null : this.records.get(storedId);
     }
 
     public synchronized Collection<LostTalesMapMarkerRecord> getRecords() {
@@ -193,9 +198,15 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
             throw new IllegalArgumentException("record must not be null");
         }
         LostTalesMapMarkerRecord existing =
-                this.records.get(record.getId());
+                getRecord(record.getId());
         if (existing != null
-                && record.getRevision() < existing.getRevision()) {
+                && !existing.getId().equals(record.getId())) {
+            throw new IllegalStateException(
+                    "logical marker identity is already stored as "
+                            + existing.getId());
+        }
+        if (existing != null
+                && record.getRevision() <= existing.getRevision()) {
             throw new IllegalStateException(
                     "marker revision is stale: " + record.getId());
         }
@@ -230,12 +241,12 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
 
     public synchronized boolean removeRecord(String markerId) {
         ensureWritable();
-        String normalized = markerId == null ? "" : markerId.trim();
-        if (normalized.length() == 0
-                || this.records.remove(normalized) == null) {
+        String storedId = resolveStoredMarkerId(markerId);
+        if (storedId == null
+                || this.records.remove(storedId) == null) {
             return false;
         }
-        this.lotrTravelIds.remove(normalized);
+        this.lotrTravelIds.remove(storedId);
         rebuildIndexes();
         markDirty();
         return true;
@@ -251,12 +262,17 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
             return false;
         }
         boolean changed = false;
+        LinkedHashSet<String> canonicalKeys =
+                new LinkedHashSet<String>(
+                        this.markerIdByCanonicalKey.keySet());
         if (definitions != null) {
             for (LostTalesMapMarkerDefinition definition : definitions) {
                 if (definition == null) {
                     continue;
                 }
-                if (!this.records.containsKey(definition.getId())) {
+                String canonicalKey = canonicalKey(definition.getId());
+                if (canonicalKey != null
+                        && canonicalKeys.add(canonicalKey)) {
                     this.records.put(definition.getId(),
                             LostTalesMapMarkerRecord.fromDefinition(
                                     definition));
@@ -283,13 +299,12 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
      */
     public synchronized int getOrCreateLotrTravelId(String markerId) {
         ensureWritable();
-        String normalized = markerId == null ? "" : markerId.trim();
-        if (normalized.length() == 0
-                || !this.records.containsKey(normalized)) {
+        String storedId = resolveStoredMarkerId(markerId);
+        if (storedId == null) {
             throw new IllegalArgumentException(
                     "travel marker is not in the repository");
         }
-        Integer existing = this.lotrTravelIds.get(normalized);
+        Integer existing = this.lotrTravelIds.get(storedId);
         if (existing != null) {
             return existing.intValue();
         }
@@ -304,7 +319,7 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
              candidate <= MAX_LOTR_TRAVEL_ID; candidate++) {
             if (!used[candidate]) {
                 this.lotrTravelIds.put(
-                        normalized, Integer.valueOf(candidate));
+                        storedId, Integer.valueOf(candidate));
                 markDirty();
                 return candidate;
             }
@@ -314,8 +329,9 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
     }
 
     public synchronized int getLotrTravelId(String markerId) {
-        Integer value = markerId == null
-                ? null : this.lotrTravelIds.get(markerId.trim());
+        String storedId = resolveStoredMarkerId(markerId);
+        Integer value = storedId == null
+                ? null : this.lotrTravelIds.get(storedId);
         return value == null ? 0 : value.intValue();
     }
 
@@ -353,6 +369,7 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
             String markerId = entry.hasKey(
                     TRAVEL_MARKER_ID, Constants.NBT.TAG_STRING)
                     ? entry.getString(TRAVEL_MARKER_ID).trim() : "";
+            String storedId = resolveStoredMarkerId(markerId);
             int travelId = entry.hasKey(
                     TRAVEL_ID, Constants.NBT.TAG_INT)
                     ? entry.getInteger(TRAVEL_ID) : 0;
@@ -361,14 +378,49 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
                             > LostTalesMapMarkerRecord.MAX_ID_LENGTH
                     || travelId < MIN_LOTR_TRAVEL_ID
                     || travelId > MAX_LOTR_TRAVEL_ID
-                    || this.lotrTravelIds.containsKey(markerId)
-                    || !this.records.containsKey(markerId)
+                    || storedId == null
+                    || this.lotrTravelIds.containsKey(storedId)
                     || !used.add(Integer.valueOf(travelId))) {
                 repaired = true;
                 continue;
             }
             this.lotrTravelIds.put(
-                    markerId, Integer.valueOf(travelId));
+                    storedId, Integer.valueOf(travelId));
+            if (!storedId.equals(markerId)) {
+                repaired = true;
+            }
+        }
+        return repaired;
+    }
+
+    private boolean deduplicateLogicalRecords() {
+        LinkedHashMap<String, LostTalesMapMarkerRecord> retainedByKey =
+                new LinkedHashMap<String, LostTalesMapMarkerRecord>();
+        boolean repaired = false;
+        for (LostTalesMapMarkerRecord candidate : this.records.values()) {
+            String key = canonicalKey(candidate.getId());
+            LostTalesMapMarkerRecord previous = retainedByKey.get(key);
+            if (previous == null) {
+                retainedByKey.put(key, candidate);
+                continue;
+            }
+            LostTalesMapMarkerRecord retained =
+                    previous.getRevision() >= candidate.getRevision()
+                            ? previous : candidate;
+            LostTalesMapMarkerRecord discarded =
+                    retained == previous ? candidate : previous;
+            retainedByKey.put(key, retained);
+            this.quarantinedEntries.add(quarantineRecord(
+                    "duplicate_logical_marker_id",
+                    discarded, retained.getId()));
+            repaired = true;
+        }
+        if (repaired) {
+            this.records.clear();
+            for (LostTalesMapMarkerRecord record :
+                    retainedByKey.values()) {
+                this.records.put(record.getId(), record);
+            }
         }
         return repaired;
     }
@@ -404,11 +456,25 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
     }
 
     private boolean rebuildIndexes() {
+        this.markerIdByCanonicalKey.clear();
         this.markerIdByLinkedPosition.clear();
         this.markerIdsByChunk.clear();
         this.maximumDiscoveryRadiusByDimension.clear();
         boolean repaired = false;
         for (LostTalesMapMarkerRecord record : this.records.values()) {
+            String canonicalKey = canonicalKey(record.getId());
+            String previousMarkerId =
+                    this.markerIdByCanonicalKey.get(canonicalKey);
+            if (previousMarkerId == null) {
+                this.markerIdByCanonicalKey.put(
+                        canonicalKey, record.getId());
+            } else if (!previousMarkerId.equals(record.getId())) {
+                this.quarantinedEntries.add(quarantineRecord(
+                        "duplicate_logical_marker_id",
+                        record, previousMarkerId));
+                repaired = true;
+                continue;
+            }
             if (record.isLinked()) {
                 String key = linkKey(record.getLinkedDimensionId(),
                         record.getLinkedX(), record.getLinkedY(),
@@ -452,6 +518,23 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
         return repaired;
     }
 
+    private String resolveStoredMarkerId(String markerId) {
+        String key = canonicalKey(markerId);
+        return key == null ? null
+                : this.markerIdByCanonicalKey.get(key);
+    }
+
+    private static String canonicalKey(String markerId) {
+        String normalized = markerId == null ? "" : markerId.trim();
+        if (normalized.length() == 0) {
+            return null;
+        }
+        return LostTalesMapMarkerIdentity.create(
+                normalized,
+                LostTalesMapMarkerIdentity.Authority.WORLD_RECORD)
+                .getCanonicalKey();
+    }
+
     private void ensureWritable() {
         if (this.readOnlyForNewerVersion) {
             throw new IllegalStateException(
@@ -481,6 +564,20 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
         entry.setString("Reason", reason);
         entry.setString("MarkerId", markerId);
         entry.setString("ConflictingMarkerId", conflictingId);
+        return entry;
+    }
+
+    private static NBTTagCompound quarantineRecord(
+            String reason, LostTalesMapMarkerRecord discarded,
+            String retainedMarkerId) {
+        NBTTagCompound entry = quarantine(
+                reason,
+                discarded == null ? "" : discarded.getId(),
+                retainedMarkerId);
+        if (discarded != null) {
+            entry.setTag("OriginalData",
+                    LostTalesMapMarkerNbtCodec.writeRecord(discarded));
+        }
         return entry;
     }
 

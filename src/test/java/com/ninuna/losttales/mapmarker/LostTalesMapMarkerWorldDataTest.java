@@ -4,6 +4,8 @@ import java.util.Collections;
 import java.util.UUID;
 import org.junit.Test;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraftforge.common.util.Constants;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -74,6 +76,123 @@ public final class LostTalesMapMarkerWorldDataTest {
                 restored.getLotrTravelId("losttales:first"));
         assertEquals(second,
                 restored.getLotrTravelId("losttales:second"));
+    }
+
+    @Test
+    public void nativeLotrIdentityIsCanonicalForLookupAndRemoval() {
+        LostTalesMapMarkerWorldData data =
+                new LostTalesMapMarkerWorldData("test");
+        data.seedDefinitions(Collections.singleton(
+                definition("lotr:waypoint:HOBBITON")));
+
+        assertNotNull(data.getRecord(
+                "LOTR:WAYPOINT:hobbiton"));
+        int travelId = data.getOrCreateLotrTravelId(
+                "lotr:waypoint:hobbiton");
+        assertEquals(travelId, data.getLotrTravelId(
+                "LOTR:WAYPOINT:HOBBITON"));
+        assertTrue(data.removeRecord(
+                "LOTR:WAYPOINT:hobbiton"));
+        assertEquals(null, data.getRecord(
+                "lotr:waypoint:HOBBITON"));
+        assertEquals(0, data.getLotrTravelId(
+                "lotr:waypoint:hobbiton"));
+    }
+
+    @Test
+    public void seedingSkipsLogicalLotrDuplicates() {
+        LostTalesMapMarkerWorldData data =
+                new LostTalesMapMarkerWorldData("test");
+
+        data.seedDefinitions(java.util.Arrays.asList(
+                definition("lotr:waypoint:HOBBITON"),
+                definition("LOTR:WAYPOINT:hobbiton")));
+
+        assertEquals(1, data.getRecords().size());
+        assertEquals("lotr:waypoint:HOBBITON",
+                data.getRecord("lotr:waypoint:hobbiton").getId());
+    }
+
+    @Test
+    public void customMarkerIdsRetainCaseSensitiveIdentity() {
+        LostTalesMapMarkerWorldData data =
+                new LostTalesMapMarkerWorldData("test");
+
+        data.seedDefinitions(java.util.Arrays.asList(
+                definition("losttales:Town"),
+                definition("losttales:town")));
+
+        assertEquals(2, data.getRecords().size());
+    }
+
+    @Test
+    public void loadKeepsHighestRevisionLogicalLotrDuplicate() {
+        LostTalesMapMarkerRecord oldRecord =
+                LostTalesMapMarkerRecord.fromDefinition(
+                        definition("lotr:waypoint:HOBBITON"));
+        LostTalesMapMarkerRecord newRecord =
+                LostTalesMapMarkerRecord.fromDefinition(
+                        definition("LOTR:WAYPOINT:hobbiton"))
+                        .toBuilder()
+                        .name("New Hobbiton")
+                        .revision(5L)
+                        .build();
+        NBTTagCompound serialized = new NBTTagCompound();
+        LostTalesMapMarkerNbtCodec.write(
+                serialized,
+                java.util.Arrays.asList(oldRecord, newRecord),
+                Collections.<NBTTagCompound>emptyList());
+        serialized.setBoolean("CatalogInitialized", true);
+
+        LostTalesMapMarkerWorldData restored =
+                new LostTalesMapMarkerWorldData("restored");
+        restored.readFromNBT(serialized);
+
+        assertEquals(1, restored.getRecords().size());
+        assertEquals("New Hobbiton", restored.getRecord(
+                "lotr:waypoint:HOBBITON").getName());
+        assertEquals(1, restored.getQuarantinedEntryCount());
+        NBTTagCompound repaired = new NBTTagCompound();
+        restored.writeToNBT(repaired);
+        NBTTagList quarantine = repaired.getTagList(
+                "Quarantine", Constants.NBT.TAG_COMPOUND);
+        assertTrue(quarantine.getCompoundTagAt(0).hasKey(
+                "OriginalData", Constants.NBT.TAG_COMPOUND));
+        assertEquals("lotr:waypoint:HOBBITON",
+                quarantine.getCompoundTagAt(0)
+                        .getCompoundTag("OriginalData")
+                        .getString("Id"));
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void repositoryRejectsConflictingEqualRevision() {
+        LostTalesMapMarkerWorldData data =
+                new LostTalesMapMarkerWorldData("test");
+        data.seedDefinitions(Collections.singleton(
+                definition("losttales:revision_guard")));
+        LostTalesMapMarkerRecord current = data.getRecord(
+                "losttales:revision_guard");
+
+        data.saveRecord(current.toBuilder()
+                .name("Conflicting write")
+                .revision(current.getRevision())
+                .build());
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void repositoryRejectsLogicalLotrDuplicateWrite() {
+        LostTalesMapMarkerWorldData data =
+                new LostTalesMapMarkerWorldData("test");
+        data.seedDefinitions(Collections.singleton(
+                definition("lotr:waypoint:HOBBITON")));
+        LostTalesMapMarkerRecord duplicate =
+                LostTalesMapMarkerRecord.fromDefinition(
+                        definition("LOTR:WAYPOINT:hobbiton"))
+                        .toBuilder()
+                        .revision(2L)
+                        .build();
+
+        data.saveRecord(duplicate);
     }
 
     @Test

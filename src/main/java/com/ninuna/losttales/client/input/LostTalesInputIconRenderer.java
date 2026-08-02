@@ -37,6 +37,35 @@ public final class LostTalesInputIconRenderer {
         return drawInput(minecraft, Type.MOUSE_WHEEL, 0, x, y, scale);
     }
 
+    public static int measureKeyBinding(
+            Minecraft minecraft, KeyBinding keyBinding, float scale) {
+        int keyCode = keyBinding == null
+                ? Integer.MIN_VALUE : keyBinding.getKeyCode();
+        return measureInput(minecraft,
+                LostTalesInputBinding.getType(keyBinding), keyCode, scale);
+    }
+
+    public static int measureMouseWheel(Minecraft minecraft, float scale) {
+        return measureInput(minecraft, Type.MOUSE_WHEEL, 0, scale);
+    }
+
+    public static int measureInput(
+            Minecraft minecraft, Type type, int keyCode, float scale) {
+        if (minecraft == null || scale <= 0.0F) {
+            return 0;
+        }
+        Sprite sprite = LostTalesInputIconAtlas.findSprite(type, keyCode);
+        if (sprite != null && isTextureAvailable(minecraft)) {
+            return (int)Math.ceil(sprite.getWidth() * scale);
+        }
+        String label = LostTalesInputBinding.getFallbackLabel(type, keyCode);
+        FontRenderer font = minecraft.fontRenderer;
+        int width = font == null ? FALLBACK_MIN_WIDTH
+                : Math.max(FALLBACK_MIN_WIDTH,
+                font.getStringWidth(label) + FALLBACK_HORIZONTAL_PADDING * 2);
+        return (int)Math.ceil(width * scale);
+    }
+
     public static int drawInput(Minecraft minecraft, Type type, int keyCode, float x, float y, float scale) {
         if (minecraft == null || scale <= 0.0F) {
             return 0;

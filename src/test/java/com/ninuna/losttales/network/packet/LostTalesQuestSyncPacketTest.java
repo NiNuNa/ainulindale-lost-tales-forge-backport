@@ -6,6 +6,7 @@ import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
+import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.util.Collections;
@@ -103,5 +104,40 @@ public final class LostTalesQuestSyncPacketTest {
 
         assertTrue(decoded.isMalformed());
         assertTrue(decoded.getCompletedQuestIds().isEmpty());
+    }
+
+    @Test
+    public void playerMarkerIdentitySurvivesSnapshotRoundTrip() {
+        LostTalesQuestPlayerData data =
+                new LostTalesQuestPlayerData();
+        LostTalesMapMarkerDefinition marker =
+                new LostTalesMapMarkerDefinition(
+                        "lotr:waypoint:HOBBITON", "Hobbiton",
+                        "quest", "white", "Quest", "",
+                        false, 100, 1.0D, 64.0D, 2.0D,
+                        128.0D, 8.0D, false, true, false,
+                        LostTalesMapMarkerSource.QUEST_DYNAMIC,
+                        false, "", 7);
+        assertTrue(data.discoverDynamicMarker(marker));
+        assertTrue(data.setPinnedMapMarkerId(
+                "LOTR:WAYPOINT:hobbiton"));
+        LostTalesQuestSyncPacket original =
+                LostTalesQuestSyncPacket.fromPlayerData(data);
+        ByteBuf buffer = Unpooled.buffer();
+        original.toBytes(buffer);
+        LostTalesQuestSyncPacket decoded =
+                new LostTalesQuestSyncPacket();
+
+        decoded.fromBytes(buffer);
+
+        assertFalse(decoded.isMalformed());
+        assertEquals(Collections.singleton(
+                        "lotr:waypoint:HOBBITON"),
+                decoded.getDiscoveredMarkerIds());
+        assertEquals("lotr:waypoint:HOBBITON",
+                decoded.getPinnedMapMarkerId());
+        assertEquals(1, decoded.getDynamicMapMarkers().size());
+        assertEquals("lotr:waypoint:HOBBITON",
+                decoded.getDynamicMapMarkers().get(0).getId());
     }
 }

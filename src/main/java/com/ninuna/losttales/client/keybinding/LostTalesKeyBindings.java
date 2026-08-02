@@ -124,6 +124,10 @@ public class LostTalesKeyBindings {
         return MODIFIER;
     }
 
+    public static KeyBinding getMapLegendKeyBinding() {
+        return MODIFIER;
+    }
+
     public static boolean isModifierKeyDown() {
         return isKeyDown(MODIFIER);
     }
@@ -150,6 +154,14 @@ public class LostTalesKeyBindings {
 
     public static boolean isQuestJournalKey(int keyCode) {
         return isKeyboardKey(QUEST_JOURNAL, keyCode);
+    }
+
+    public static boolean isMapLegendKey(int keyCode) {
+        return isKeyboardKey(MODIFIER, keyCode);
+    }
+
+    public static boolean isMapLegendMouseButton(int mouseButton) {
+        return isMouseButton(MODIFIER, mouseButton);
     }
 
     private static boolean isKeyboardKey(KeyBinding keyBinding, int keyCode) {

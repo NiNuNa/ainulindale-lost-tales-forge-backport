@@ -10,21 +10,34 @@ import java.util.Map;
 /** Pure, deterministic screen-space grouping used by the LOTR map overlay. */
 final class LostTalesMapMarkerGrouping {
     /**
-     * Require substantial artwork overlap before a group forms. Square
-     * bounds made diagonally separated icons merge while they still looked
-     * far apart, so grouping uses a circular visible-footprint estimate.
+     * Group at roughly sixty percent artwork overlap. Square bounds made
+     * diagonally separated icons merge while they still looked far apart, so
+     * grouping uses a circular visible-footprint estimate.
      */
-    static final float VISIBLE_RADIUS_SCALE = 0.25F;
+    static final float VISIBLE_RADIUS_SCALE = 0.40F;
     /** A small release margin prevents single-pixel zoom jitter. */
     static final float SPLIT_GAP = 0.75F;
+    static final float COMPANION_OFFSET_X = 4.0F;
+    static final float COMPANION_OFFSET_Y = -2.0F;
+    private static final float HORIZONTAL_FOOTPRINT_SCALE = 1.20F;
 
     private LostTalesMapMarkerGrouping() {}
 
     static Result group(List<Entry> entries,
                         Map<String, String> previousMembership) {
+        return group(entries, previousMembership,
+                VISIBLE_RADIUS_SCALE, false);
+    }
+
+    static Result group(List<Entry> entries,
+                        Map<String, String> previousMembership,
+                        float visibleRadiusScale,
+                        boolean preservePreviousGroups) {
         if (entries == null || entries.isEmpty()) {
             return Result.empty();
         }
+        final float radiusScale = Math.max(0.0F,
+                Math.min(1.0F, visibleRadiusScale));
         int count = entries.size();
         ArrayList<Integer> ordered = new ArrayList<Integer>(count);
         for (int index = 0; index < count; index++) {
@@ -38,6 +51,15 @@ final class LostTalesMapMarkerGrouping {
                         entries.get(right.intValue()));
             }
         });
+        if (preservePreviousGroups) {
+            return groupAtomicStacks(entries, ordered,
+                    previousMembership, radiusScale);
+        }
+        if (previousMembership != null
+                && !previousMembership.isEmpty()) {
+            return splitPreviousGroups(entries, ordered,
+                    previousMembership, radiusScale);
+        }
 
         boolean[] assigned = new boolean[count];
         ArrayList<Group> groups = new ArrayList<Group>();
@@ -61,7 +83,7 @@ final class LostTalesMapMarkerGrouping {
                 float gap = wereGrouped(
                         anchor.id, other.id, previousMembership)
                         ? SPLIT_GAP : 0.0F;
-                if (overlaps(anchor, other, gap)) {
+                if (overlaps(anchor, other, gap, radiusScale)) {
                     assigned[candidate] = true;
                     members.add(Integer.valueOf(candidate));
                 }
@@ -75,6 +97,186 @@ final class LostTalesMapMarkerGrouping {
             }
         }
         return new Result(groups, membership);
+    }
+
+    /**
+     * Zooming in may split an existing stack, but it must not move a marker
+     * sideways into a different stack. Keeping the previous lineages
+     * independent makes zoom-in the exact inverse of zoom-out merging.
+     */
+    private static Result splitPreviousGroups(
+            List<Entry> entries, List<Integer> ordered,
+            Map<String, String> previousMembership,
+            float radiusScale) {
+        LinkedHashMap<String, ArrayList<Integer>> membersByLineage =
+                new LinkedHashMap<String, ArrayList<Integer>>();
+        for (Integer indexValue : ordered) {
+            Entry entry = entries.get(indexValue.intValue());
+            String key = previousGroupKey(entry.id, previousMembership);
+            ArrayList<Integer> members = membersByLineage.get(key);
+            if (members == null) {
+                members = new ArrayList<Integer>();
+                membersByLineage.put(key, members);
+            }
+            members.add(indexValue);
+        }
+
+        ArrayList<Group> groups = new ArrayList<Group>();
+        LinkedHashMap<String, String> membership =
+                new LinkedHashMap<String, String>();
+        for (ArrayList<Integer> lineage : membersByLineage.values()) {
+            // Partition only inside the previous lineage. A large stack can
+            // therefore peel into smaller child stacks as the map expands,
+            // without any child jumping sideways into a neighbouring stack.
+            boolean[] assigned = new boolean[entries.size()];
+            for (Integer representativeValue : lineage) {
+                int representative = representativeValue.intValue();
+                if (assigned[representative]) {
+                    continue;
+                }
+                assigned[representative] = true;
+                Entry anchor = entries.get(representative);
+                ArrayList<Integer> retained = new ArrayList<Integer>();
+                retained.add(representativeValue);
+                for (Integer memberValue : lineage) {
+                    int member = memberValue.intValue();
+                    if (assigned[member]) {
+                        continue;
+                    }
+                    if (overlaps(anchor, entries.get(member),
+                            SPLIT_GAP, radiusScale)) {
+                        assigned[member] = true;
+                        retained.add(memberValue);
+                    }
+                }
+                addGroup(entries, groups, membership, retained);
+            }
+        }
+        sortGroupsByRepresentative(entries, groups);
+        return new Result(groups, membership);
+    }
+
+    private static void addGroup(
+            List<Entry> entries, List<Group> groups,
+            Map<String, String> membership,
+            ArrayList<Integer> members) {
+        sortByRelevance(entries, members);
+        int representative = members.get(0).intValue();
+        groups.add(new Group(representative, members));
+        if (members.size() <= 1) {
+            return;
+        }
+        String representativeId = entries.get(representative).id;
+        for (Integer member : members) {
+            membership.put(entries.get(member.intValue()).id,
+                    representativeId);
+        }
+    }
+
+    private static void sortGroupsByRepresentative(
+            final List<Entry> entries, List<Group> groups) {
+        Collections.sort(groups, new Comparator<Group>() {
+            @Override
+            public int compare(Group left, Group right) {
+                return LostTalesMapMarkerGrouping.compare(
+                        entries.get(left.representativeIndex),
+                        entries.get(right.representativeIndex));
+            }
+        });
+    }
+
+    private static Result groupAtomicStacks(
+            List<Entry> entries, List<Integer> ordered,
+            Map<String, String> previousMembership,
+            float radiusScale) {
+        LinkedHashMap<String, ArrayList<Integer>> membersByStack =
+                new LinkedHashMap<String, ArrayList<Integer>>();
+        for (Integer indexValue : ordered) {
+            Entry entry = entries.get(indexValue.intValue());
+            String key = previousGroupKey(entry.id, previousMembership);
+            ArrayList<Integer> members = membersByStack.get(key);
+            if (members == null) {
+                members = new ArrayList<Integer>();
+                membersByStack.put(key, members);
+            }
+            members.add(indexValue);
+        }
+
+        ArrayList<AtomicStack> stacks = new ArrayList<AtomicStack>();
+        for (ArrayList<Integer> members : membersByStack.values()) {
+            stacks.add(new AtomicStack(entries, members));
+        }
+        boolean[] assigned = new boolean[stacks.size()];
+        ArrayList<Group> groups = new ArrayList<Group>();
+        LinkedHashMap<String, String> membership =
+                new LinkedHashMap<String, String>();
+        for (int stackIndex = 0; stackIndex < stacks.size(); stackIndex++) {
+            if (assigned[stackIndex]) {
+                continue;
+            }
+            assigned[stackIndex] = true;
+            AtomicStack anchor = stacks.get(stackIndex);
+            ArrayList<Integer> members =
+                    new ArrayList<Integer>(anchor.memberIndices);
+            for (int candidateIndex = 0;
+                 candidateIndex < stacks.size(); candidateIndex++) {
+                if (assigned[candidateIndex]) {
+                    continue;
+                }
+                AtomicStack candidate = stacks.get(candidateIndex);
+                if (stacksOverlap(anchor, candidate, radiusScale)) {
+                    assigned[candidateIndex] = true;
+                    members.addAll(candidate.memberIndices);
+                }
+            }
+            sortByRelevance(entries, members);
+            int representative = members.get(0).intValue();
+            String representativeId = entries.get(representative).id;
+            groups.add(new Group(representative, members));
+            if (members.size() > 1) {
+                for (Integer member : members) {
+                    membership.put(entries.get(member.intValue()).id,
+                            representativeId);
+                }
+            }
+        }
+        return new Result(groups, membership);
+    }
+
+    private static void sortByRelevance(
+            final List<Entry> entries, List<Integer> indices) {
+        Collections.sort(indices, new Comparator<Integer>() {
+            @Override
+            public int compare(Integer left, Integer right) {
+                return LostTalesMapMarkerGrouping.compare(
+                        entries.get(left.intValue()),
+                        entries.get(right.intValue()));
+            }
+        });
+    }
+
+    private static boolean stacksOverlap(
+            AtomicStack first, AtomicStack second,
+            float radiusScale) {
+        for (Entry firstIcon : first.visibleIcons) {
+            for (Entry secondIcon : second.visibleIcons) {
+                if (overlaps(firstIcon, secondIcon,
+                        0.0F, radiusScale)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static String previousGroupKey(
+            String markerId, Map<String, String> previousMembership) {
+        if (markerId == null) {
+            return "";
+        }
+        String group = previousMembership == null
+                ? null : previousMembership.get(markerId);
+        return group == null ? markerId : group;
     }
 
     static Result ungroup(List<Entry> entries) {
@@ -135,7 +337,9 @@ final class LostTalesMapMarkerGrouping {
         return firstGroup != null && firstGroup.equals(membership.get(second));
     }
 
-    private static boolean overlaps(Entry first, Entry second, float gap) {
+    private static boolean overlaps(
+            Entry first, Entry second, float gap,
+            float visibleRadiusScale) {
         float firstX = (first.left + first.right) * 0.5F;
         float firstY = (first.top + first.bottom) * 0.5F;
         float secondX = (second.left + second.right) * 0.5F;
@@ -147,8 +351,9 @@ final class LostTalesMapMarkerGrouping {
                 second.right - second.left,
                 second.bottom - second.top) * 0.5F;
         float threshold = (firstRadius + secondRadius)
-                * VISIBLE_RADIUS_SCALE + gap;
-        float deltaX = firstX - secondX;
+                * visibleRadiusScale + gap;
+        float deltaX = (firstX - secondX)
+                / HORIZONTAL_FOOTPRINT_SCALE;
         float deltaY = firstY - secondY;
         return deltaX * deltaX + deltaY * deltaY
                 <= threshold * threshold;
@@ -168,6 +373,30 @@ final class LostTalesMapMarkerGrouping {
             return name;
         }
         return left.id.compareTo(right.id);
+    }
+
+    private static final class AtomicStack {
+        private final List<Integer> memberIndices;
+        private final List<Entry> visibleIcons;
+
+        private AtomicStack(List<Entry> entries,
+                            List<Integer> memberIndices) {
+            this.memberIndices = Collections.unmodifiableList(
+                    new ArrayList<Integer>(memberIndices));
+            Entry representative = entries.get(
+                    memberIndices.get(0).intValue());
+            ArrayList<Entry> icons = new ArrayList<Entry>(3);
+            icons.add(representative);
+            if (memberIndices.size() > 1) {
+                icons.add(representative.shifted(
+                        -COMPANION_OFFSET_X, COMPANION_OFFSET_Y));
+            }
+            if (memberIndices.size() > 2) {
+                icons.add(representative.shifted(
+                        COMPANION_OFFSET_X, COMPANION_OFFSET_Y));
+            }
+            this.visibleIcons = Collections.unmodifiableList(icons);
+        }
     }
 
     static final class Entry {
@@ -190,6 +419,31 @@ final class LostTalesMapMarkerGrouping {
             this.top = Math.min(top, bottom);
             this.right = Math.max(left, right);
             this.bottom = Math.max(top, bottom);
+        }
+
+        private Entry shifted(float offsetX, float offsetY) {
+            return new Entry(this.id, this.displayName,
+                    this.relevanceRank,
+                    this.left + offsetX, this.top + offsetY,
+                    this.right + offsetX, this.bottom + offsetY);
+        }
+
+        Entry withScaledSpacing(float scale) {
+            if (scale == 1.0F) {
+                return this;
+            }
+            float centerX = (this.left + this.right) * 0.5F;
+            float centerY = (this.top + this.bottom) * 0.5F;
+            float halfWidth = (this.right - this.left) * 0.5F;
+            float halfHeight = (this.bottom - this.top) * 0.5F;
+            float scaledCenterX = centerX * scale;
+            float scaledCenterY = centerY * scale;
+            return new Entry(this.id, this.displayName,
+                    this.relevanceRank,
+                    scaledCenterX - halfWidth,
+                    scaledCenterY - halfHeight,
+                    scaledCenterX + halfWidth,
+                    scaledCenterY + halfHeight);
         }
 
         private static String normalize(String value) {
@@ -216,6 +470,20 @@ final class LostTalesMapMarkerGrouping {
         List<Integer> getMemberIndices() { return this.memberIndices; }
         int size() { return this.memberIndices.size(); }
         String getAdditionalLabel() { return this.additionalLabel; }
+
+        int getCompanionSide(int candidateIndex) {
+            if (this.memberIndices.size() > 1
+                    && this.memberIndices.get(1).intValue()
+                            == candidateIndex) {
+                return -1;
+            }
+            if (this.memberIndices.size() > 2
+                    && this.memberIndices.get(2).intValue()
+                            == candidateIndex) {
+                return 1;
+            }
+            return 0;
+        }
     }
 
     static final class Result {

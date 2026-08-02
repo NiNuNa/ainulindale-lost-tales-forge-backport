@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.quest;
 
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdentity;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -14,6 +15,9 @@ public final class LostTalesClientQuestProgressStore {
     private static final Set<String> COMPLETED_QUESTS = new LinkedHashSet<String>();
     private static final Set<String> FAILED_QUESTS = new LinkedHashSet<String>();
     private static final Set<String> DISCOVERED_MARKERS = new LinkedHashSet<String>();
+    private static final Map<String, String>
+            DISCOVERED_MARKER_IDS_BY_CANONICAL_KEY =
+                    new LinkedHashMap<String, String>();
     private static final Set<String> PINNED_QUESTS = new LinkedHashSet<String>();
     private static String pinnedMapMarkerId = "";
     private static boolean receivedSync;
@@ -45,6 +49,7 @@ public final class LostTalesClientQuestProgressStore {
         COMPLETED_QUESTS.clear();
         FAILED_QUESTS.clear();
         DISCOVERED_MARKERS.clear();
+        DISCOVERED_MARKER_IDS_BY_CANONICAL_KEY.clear();
         PINNED_QUESTS.clear();
         receivedSync = true;
 
@@ -74,9 +79,7 @@ public final class LostTalesClientQuestProgressStore {
 
         if (discoveredMarkerIds != null) {
             for (String markerId : discoveredMarkerIds) {
-                if (markerId != null && markerId.length() > 0) {
-                    DISCOVERED_MARKERS.add(markerId);
-                }
+                addDiscoveredMarkerId(markerId);
             }
         }
 
@@ -87,7 +90,10 @@ public final class LostTalesClientQuestProgressStore {
                 }
             }
         }
-        pinnedMapMarkerId = pinnedMapMarkerIdIn != null && DISCOVERED_MARKERS.contains(pinnedMapMarkerIdIn) ? pinnedMapMarkerIdIn : "";
+        String storedPinnedMarkerId =
+                findDiscoveredMarkerId(pinnedMapMarkerIdIn);
+        pinnedMapMarkerId = storedPinnedMarkerId == null
+                ? "" : storedPinnedMarkerId;
     }
 
     public static synchronized void clear() {
@@ -95,6 +101,7 @@ public final class LostTalesClientQuestProgressStore {
         COMPLETED_QUESTS.clear();
         FAILED_QUESTS.clear();
         DISCOVERED_MARKERS.clear();
+        DISCOVERED_MARKER_IDS_BY_CANONICAL_KEY.clear();
         PINNED_QUESTS.clear();
         pinnedMapMarkerId = "";
         receivedSync = false;
@@ -138,7 +145,7 @@ public final class LostTalesClientQuestProgressStore {
     }
 
     public static synchronized boolean isMarkerDiscovered(String markerId) {
-        return markerId != null && DISCOVERED_MARKERS.contains(markerId);
+        return findDiscoveredMarkerId(markerId) != null;
     }
 
     public static synchronized String getPinnedQuestId() {
@@ -189,11 +196,11 @@ public final class LostTalesClientQuestProgressStore {
     }
 
     public static synchronized boolean isMapMarkerPinned(String markerId) {
-        return markerId != null && markerId.equals(pinnedMapMarkerId);
+        return sameMarkerIdentity(markerId, pinnedMapMarkerId);
     }
 
     public static synchronized boolean hasPinnedMapMarker() {
-        return pinnedMapMarkerId != null && pinnedMapMarkerId.length() > 0 && DISCOVERED_MARKERS.contains(pinnedMapMarkerId);
+        return findDiscoveredMarkerId(pinnedMapMarkerId) != null;
     }
 
     public static synchronized boolean hasAnyState() {
@@ -202,5 +209,41 @@ public final class LostTalesClientQuestProgressStore {
 
     public static synchronized boolean hasReceivedSync() {
         return receivedSync;
+    }
+
+    private static void addDiscoveredMarkerId(String markerId) {
+        String normalized = markerId == null ? "" : markerId.trim();
+        String key = markerCanonicalKey(normalized);
+        if (key.length() == 0
+                || DISCOVERED_MARKER_IDS_BY_CANONICAL_KEY
+                        .containsKey(key)) {
+            return;
+        }
+        DISCOVERED_MARKERS.add(normalized);
+        DISCOVERED_MARKER_IDS_BY_CANONICAL_KEY.put(key, normalized);
+    }
+
+    private static String findDiscoveredMarkerId(String markerId) {
+        String key = markerCanonicalKey(markerId);
+        return key.length() == 0 ? null
+                : DISCOVERED_MARKER_IDS_BY_CANONICAL_KEY.get(key);
+    }
+
+    private static boolean sameMarkerIdentity(
+            String first, String second) {
+        String firstKey = markerCanonicalKey(first);
+        return firstKey.length() > 0
+                && firstKey.equals(markerCanonicalKey(second));
+    }
+
+    private static String markerCanonicalKey(String markerId) {
+        String normalized = markerId == null ? "" : markerId.trim();
+        if (normalized.length() == 0) {
+            return "";
+        }
+        return LostTalesMapMarkerIdentity.create(
+                normalized,
+                LostTalesMapMarkerIdentity.Authority.QUEST_PLAYER)
+                .getCanonicalKey();
     }
 }

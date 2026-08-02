@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.PartyClientRequestManager;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
@@ -9,13 +10,20 @@ import com.ninuna.losttales.network.packet.LostTalesWaystoneTravelRequestPacket;
 import cpw.mods.fml.common.FMLLog;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import lotr.client.LOTRKeyHandler;
 import lotr.client.gui.LOTRGuiMap;
+import lotr.common.LOTRDimension;
+import lotr.common.LOTRLevelData;
+import lotr.common.LOTRPlayerData;
 import lotr.common.fac.LOTRFaction;
 import lotr.common.world.map.LOTRAbstractWaypoint;
 import net.minecraft.client.gui.GuiButton;
+import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
+import org.lwjgl.opengl.GL11;
 
 /**
  * LOTR map screen wrapper used only to intercept the waypoint rendering pass.
@@ -52,10 +60,18 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     private LostTalesMapMarkerData selectedCustomMarker;
     private boolean transientEnemyMarkersRendered;
     private boolean roleplayPlayerHeadsRendered;
+    private boolean mapControlBarRendered;
+    private boolean mapLegendOpen;
+    private int mapLegendScrollIndex;
     private boolean smoothZoomInitialized;
     private float smoothZoomPrevious;
     private float smoothZoomCurrent;
     private float smoothZoomTarget;
+    private List<LOTRAbstractWaypoint> clickableNativeWaypoints =
+            Collections.emptyList();
+    private LostTalesMapFastTravelPrompt fastTravelPrompt;
+    private LostTalesMapMarkerData promptCustomMarker;
+    private LOTRAbstractWaypoint promptNativeWaypoint;
 
     /**
      * Creates the marker-aware map without discarding a mode configured by
@@ -139,7 +155,12 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     @Override
     public void initGui() {
         boolean preserveSmoothZoom = this.smoothZoomInitialized;
+        LostTalesLotrMapLayout.prepareBeforeInit(this);
         super.initGui();
+        if (LostTalesLotrMapLayout.finishInit(this)
+                && this.buttonMenuReturn != null) {
+            this.buttonList.remove(this.buttonMenuReturn);
+        }
         if (!preserveSmoothZoom) {
             initializeSmoothZoom();
         } else if (ensureSmoothZoomReflection()) {
@@ -243,6 +264,13 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     @Override
     public void handleMouseInput() {
         int wheel = Mouse.getEventDWheel();
+        if (this.fastTravelPrompt != null && wheel != 0) {
+            return;
+        }
+        if (wheel != 0 && LostTalesLotrMapLegend.handleMouseWheel(
+                this, getEventMouseX(), getEventMouseY(), wheel)) {
+            return;
+        }
         if (!shouldHandleSmoothZoomWheel(wheel)) {
             super.handleMouseInput();
             return;
@@ -300,8 +328,26 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         }
     }
 
+    private int getEventMouseX() {
+        if (this.mc == null || this.mc.displayWidth <= 0) {
+            return 0;
+        }
+        return Mouse.getEventX() * this.width / this.mc.displayWidth;
+    }
+
+    private int getEventMouseY() {
+        if (this.mc == null || this.mc.displayHeight <= 0) {
+            return 0;
+        }
+        return this.height - Mouse.getEventY() * this.height
+                / this.mc.displayHeight - 1;
+    }
+
     @Override
     protected void actionPerformed(GuiButton button) {
+        if (this.fastTravelPrompt != null) {
+            return;
+        }
         if (this.smoothZoomInitialized && button != null
                 && ensureSmoothZoomReflection()) {
             try {
@@ -418,21 +464,26 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     @Override
     public void renderWaypoints(List<LOTRAbstractWaypoint> waypoints, int pass, int mouseX, int mouseY, boolean drawLabels, boolean includeHidden) {
         if (pass != 0) {
-            super.renderWaypoints(
+            List<LOTRAbstractWaypoint> lotrWaypoints =
                     LostTalesLotrMapMarkerIconOverlay
-                            .getWaypointsForLotrRender(waypoints, pass),
-                    pass, mouseX, mouseY, drawLabels, includeHidden);
+                            .getWaypointsForLotrRender(waypoints, pass);
+            if (pass == 1) {
+                // The overlay invokes LOTR's own full tooltip renderer for
+                // the single delayed hover owner. Passing no waypoints here
+                // prevents the native short hover card from drawing first.
+                super.renderWaypoints(
+                        Collections.<LOTRAbstractWaypoint>emptyList(),
+                        pass, mouseX, mouseY, drawLabels, includeHidden);
+            } else {
+                super.renderWaypoints(
+                        lotrWaypoints, pass, mouseX, mouseY,
+                        drawLabels, includeHidden);
+            }
             if (pass == 1) {
                 LostTalesLotrMapMarkerIconOverlay
-                        .renderMappedWaypointHoverTooltip(
+                        .renderFocusedHoverTooltip(
                                 this, this.selectedCustomMarker,
                                 mouseX, mouseY);
-                LostTalesLotrMapMarkerIconOverlay
-                        .renderLockedMappedMarkerHoverTooltip(
-                                this, this.selectedCustomMarker,
-                                mouseX, mouseY);
-                LostTalesLotrMapMarkerIconOverlay.renderStandaloneMarkerHoverTooltip(this, this.selectedCustomMarker, mouseX, mouseY);
-                LostTalesLotrMapMarkerIconOverlay.renderTransientEnemyMarkerHoverTooltip(this, mouseX, mouseY);
             }
             return;
         }
@@ -440,12 +491,49 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         List<LOTRAbstractWaypoint> baseWaypoints =
                 LostTalesLotrMapMarkerIconOverlay
                         .getWaypointsForLotrRender(waypoints, pass);
+        this.clickableNativeWaypoints = baseWaypoints == null
+                ? Collections.<LOTRAbstractWaypoint>emptyList()
+                : Collections.unmodifiableList(
+                        new ArrayList<LOTRAbstractWaypoint>(baseWaypoints));
         super.renderWaypoints(baseWaypoints, pass, mouseX, mouseY, drawLabels, includeHidden);
         LostTalesLotrMapMarkerIconOverlay.renderGroupedMarkers(
                 this, waypoints, mouseX, mouseY,
                 drawLabels, includeHidden);
         renderTransientEnemyMarkersOnce(mouseX, mouseY, drawLabels);
         renderRoleplayPlayerHeadsOnce(mouseX, mouseY);
+        LostTalesLotrMapMarkerIconOverlay.updateHoverFocus(
+                this, baseWaypoints, mouseX, mouseY, includeHidden);
+        LostTalesLotrMapMarkerIconOverlay
+                .suppressSelectedLotrTooltipForFocusedHover(this);
+        LostTalesLotrMapMarkerIconOverlay.renderHoveredIconForeground(
+                this, mouseX, mouseY, drawLabels);
+        LOTRAbstractWaypoint focusedNative =
+                LostTalesLotrMapMarkerIconOverlay
+                        .getFocusedNativeWaypoint(this);
+        if (focusedNative != null) {
+            float[] transform = LostTalesLotrMapMarkerIconOverlay
+                    .getFocusedNativeIconTransform(this, focusedNative);
+            if (transform != null) {
+                GL11.glPushMatrix();
+                try {
+                    GL11.glTranslatef(
+                            transform[0], transform[1], 0.0F);
+                    GL11.glScalef(
+                            transform[2], transform[2], 1.0F);
+                    GL11.glTranslatef(
+                            -transform[0], -transform[1], 0.0F);
+                    super.renderWaypoints(
+                            Collections.singletonList(focusedNative),
+                            pass, mouseX, mouseY, false, includeHidden);
+                } finally {
+                    GL11.glPopMatrix();
+                }
+            } else {
+                super.renderWaypoints(
+                        Collections.singletonList(focusedNative),
+                        pass, mouseX, mouseY, false, includeHidden);
+            }
+        }
     }
 
     private void renderTransientEnemyMarkersOnce(int mouseX, int mouseY, boolean drawLabels) {
@@ -465,6 +553,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
 
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        LostTalesLotrMapLayout.prepareForDraw(this);
+        this.mapControlBarRendered = false;
         this.transientEnemyMarkersRendered = false;
         this.roleplayPlayerHeadsRendered = false;
         LostTalesLotrMapMarkerIconOverlay
@@ -475,17 +565,56 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                             this.selectedCustomMarker.getId());
             LostTalesLotrMapMarkerIconOverlay.clearLotrSelectedWaypoint(this);
         }
-        super.drawScreen(mouseX, mouseY, partialTicks);
+        LOTRAbstractWaypoint restoredSelection = null;
+        try {
+            super.drawScreen(mouseX, mouseY, partialTicks);
+        } finally {
+            restoredSelection = LostTalesLotrMapMarkerIconOverlay
+                    .restoreSelectedLotrWaypointAfterDraw(this);
+        }
+        LostTalesLotrMapMarkerIconOverlay
+                .renderRestoredSelectedLotrTooltip(
+                        this, restoredSelection, mouseX, mouseY);
+        renderControlBar(false);
         if (this.selectedCustomMarker != null
                 && !LostTalesLotrMapMarkerIconOverlay
                 .renderCustomMarkerSelection(
                         this, this.selectedCustomMarker, mouseX, mouseY)) {
             this.selectedCustomMarker = null;
         }
+        LostTalesLotrMapLegend.render(this, mouseX, mouseY);
+        if (this.fastTravelPrompt != null) {
+            this.fastTravelPrompt.render(
+                    this, mouseX, mouseY, canPlacePromptMarker());
+        }
+    }
+
+    void renderControlBar(boolean force) {
+        if (this.mapControlBarRendered && !force) {
+            return;
+        }
+        this.mapControlBarRendered |=
+                LostTalesLotrMapControlBar.render(this);
     }
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
+        if (this.fastTravelPrompt != null) {
+            handleFastTravelPromptAction(
+                    this.fastTravelPrompt.mouseClicked(
+                            this.width, this.height,
+                            mouseX, mouseY, button,
+                            canPlacePromptMarker()));
+            return;
+        }
+        if (LostTalesKeyBindings.isMapLegendMouseButton(button)) {
+            toggleMapLegend();
+            return;
+        }
+        if (LostTalesLotrMapLegend.handleMouseClick(
+                this, mouseX, mouseY, button)) {
+            return;
+        }
         if (this.mc != null && this.mc.thePlayer != null) {
             PartyStateSnapshot state = ClientPartyStateCache.getSnapshot();
             if (button == 0) {
@@ -507,6 +636,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                         LostTalesLotrMapMarkerIconOverlay
                                 .getMarkerForWaypoint(mappedWaypoint);
                 if (mappedMarker != null) {
+                    if (openCustomFastTravelPrompt(mappedMarker)) {
+                        return;
+                    }
                     this.selectedCustomMarker = mappedMarker;
                     LostTalesLotrMapMarkerIconOverlay
                             .clearLotrSelectedWaypoint(this);
@@ -530,9 +662,22 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                     return;
                 }
                 if (marker != null) {
+                    if (openCustomFastTravelPrompt(marker)) {
+                        return;
+                    }
                     this.selectedCustomMarker = marker;
                     LostTalesLotrMapMarkerIconOverlay
                             .clearLotrSelectedWaypoint(this);
+                    return;
+                }
+                LOTRAbstractWaypoint nativeWaypoint =
+                        LostTalesLotrMapMarkerIconOverlay
+                                .getHoveredNativeWaypoint(
+                                        this,
+                                        this.clickableNativeWaypoints,
+                                        mouseX, mouseY, false);
+                if (nativeWaypoint != null
+                        && openNativeFastTravelPrompt(nativeWaypoint)) {
                     return;
                 }
                 this.selectedCustomMarker = null;
@@ -569,47 +714,204 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                 : null;
     }
 
+    private boolean openCustomFastTravelPrompt(
+            LostTalesMapMarkerData marker) {
+        if (!isCustomFastTravelAvailable(marker)) {
+            return false;
+        }
+        this.fastTravelPrompt = new LostTalesMapFastTravelPrompt(
+                marker.getName());
+        this.promptCustomMarker = marker;
+        this.promptNativeWaypoint = null;
+        this.mapLegendOpen = false;
+        this.selectedCustomMarker = null;
+        LostTalesLotrMapMarkerIconOverlay
+                .clearLotrSelectedWaypoint(this);
+        return true;
+    }
+
+    private boolean openNativeFastTravelPrompt(
+            LOTRAbstractWaypoint waypoint) {
+        if (!isNativeFastTravelAvailable(waypoint)) {
+            return false;
+        }
+        this.fastTravelPrompt = new LostTalesMapFastTravelPrompt(
+                waypoint.getDisplayName());
+        this.promptCustomMarker = null;
+        this.promptNativeWaypoint = waypoint;
+        this.mapLegendOpen = false;
+        this.selectedCustomMarker = null;
+        LostTalesLotrMapMarkerIconOverlay
+                .clearLotrSelectedWaypoint(this);
+        return true;
+    }
+
+    private boolean isCustomFastTravelAvailable(
+            LostTalesMapMarkerData marker) {
+        if (marker == null || !marker.hasFastTravel()
+                || (marker.isDiscoverable()
+                        && !LostTalesClientMapMarkerVisibility
+                                .isDiscovered(marker))
+                || this.mc == null || this.mc.thePlayer == null) {
+            return false;
+        }
+        return LostTalesClientWaystoneTravelContext.get(
+                this.mc.thePlayer.dimension) != null;
+    }
+
+    private boolean isNativeFastTravelAvailable(
+            LOTRAbstractWaypoint waypoint) {
+        if (waypoint == null || this.mc == null
+                || this.mc.thePlayer == null
+                || this.mc.thePlayer.dimension
+                != LOTRDimension.MIDDLE_EARTH.dimensionID) {
+            return false;
+        }
+        try {
+            if (!waypoint.hasPlayerUnlocked(this.mc.thePlayer)) {
+                return false;
+            }
+            LOTRPlayerData playerData = LOTRLevelData.getData(
+                    this.mc.thePlayer);
+            return playerData != null
+                    && playerData.getTimeSinceFT()
+                    >= playerData.getWaypointFTTime(
+                            waypoint, this.mc.thePlayer);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private boolean canPlacePromptMarker() {
+        return this.fastTravelPrompt != null
+                && (this.promptCustomMarker != null
+                        || this.promptNativeWaypoint != null)
+                && hasUsableCharacter(
+                        ClientPartyStateCache.getSnapshot());
+    }
+
+    private void handleFastTravelPromptAction(
+            LostTalesMapFastTravelPrompt.Action action) {
+        if (action == null
+                || action == LostTalesMapFastTravelPrompt.Action.NONE) {
+            return;
+        }
+        LostTalesMapMarkerData customMarker = this.promptCustomMarker;
+        LOTRAbstractWaypoint nativeWaypoint = this.promptNativeWaypoint;
+        if (action == LostTalesMapFastTravelPrompt.Action.NO) {
+            clearFastTravelPrompt();
+            return;
+        }
+        if (action == LostTalesMapFastTravelPrompt.Action.PLACE_MARKER) {
+            placePromptMarker(customMarker, nativeWaypoint);
+            clearFastTravelPrompt();
+            return;
+        }
+        clearFastTravelPrompt();
+        if (customMarker != null
+                && isCustomFastTravelAvailable(customMarker)) {
+            sendWaystoneTravel(customMarker.getId());
+            return;
+        }
+        if (nativeWaypoint != null
+                && isNativeFastTravelAvailable(nativeWaypoint)
+                && LostTalesLotrMapMarkerIconOverlay
+                        .selectLotrWaypoint(this, nativeWaypoint)) {
+            super.keyTyped('\0',
+                    LOTRKeyHandler.keyBindingFastTravel.getKeyCode());
+        }
+    }
+
+    private void placePromptMarker(
+            LostTalesMapMarkerData customMarker,
+            LOTRAbstractWaypoint nativeWaypoint) {
+        PartyStateSnapshot state = ClientPartyStateCache.getSnapshot();
+        if (!hasUsableCharacter(state)) {
+            return;
+        }
+        int dimensionId;
+        double x;
+        double z;
+        if (customMarker != null) {
+            dimensionId = customMarker.getDimensionId();
+            x = customMarker.getX();
+            z = customMarker.getZ();
+        } else if (nativeWaypoint != null) {
+            dimensionId = LOTRDimension.MIDDLE_EARTH.dimensionID;
+            x = nativeWaypoint.getXCoord();
+            z = nativeWaypoint.getZCoord();
+        } else {
+            return;
+        }
+        PartyClientRequestManager.setGoHereMarker(
+                state.getActiveCharacterId(), null, -1L,
+                dimensionId, x, z);
+    }
+
+    private void clearFastTravelPrompt() {
+        this.fastTravelPrompt = null;
+        this.promptCustomMarker = null;
+        this.promptNativeWaypoint = null;
+    }
+
     @Override
     protected void keyTyped(char typedChar, int keyCode) {
-        if (this.selectedCustomMarker != null
-                && keyCode == LOTRKeyHandler.keyBindingFastTravel.getKeyCode()) {
-            if (this.selectedCustomMarker.hasFastTravel()
-                    && (!this.selectedCustomMarker.isDiscoverable()
-                    || LostTalesClientMapMarkerVisibility.isDiscovered(
-                            this.selectedCustomMarker))
-                    && sendWaystoneTravel(
-                            this.selectedCustomMarker.getId())) {
-                return;
-            }
+        if (this.fastTravelPrompt != null) {
+            handleFastTravelPromptAction(
+                    this.fastTravelPrompt.keyTyped(keyCode));
+            return;
+        }
+        if (LostTalesKeyBindings.isMapLegendKey(keyCode)) {
+            toggleMapLegend();
+            return;
+        }
+        if (this.mapLegendOpen && keyCode == Keyboard.KEY_ESCAPE) {
+            this.mapLegendOpen = false;
             return;
         }
         if (keyCode == LOTRKeyHandler.keyBindingFastTravel.getKeyCode()) {
-            LOTRAbstractWaypoint selected =
-                    LostTalesLotrMapMarkerIconOverlay
-                            .getSelectedWaypoint(this);
-            if (LostTalesLotrMapMarkerIconOverlay
-                    .isDeletedMappedWaypoint(selected)) {
-                LostTalesLotrMapMarkerIconOverlay
-                        .clearLotrSelectedWaypoint(this);
-                return;
-            }
-            LostTalesMapMarkerData marker =
-                    LostTalesLotrMapMarkerIconOverlay
-                            .getMarkerForWaypoint(selected);
-            if (marker != null) {
-                if (!marker.hasFastTravel()) {
-                    return;
-                }
-                if (sendWaystoneTravel(marker.getId())) {
-                    return;
-                }
-            }
+            // Travel is confirmed by clicking a destination and choosing Yes.
+            return;
         }
         super.keyTyped(typedChar, keyCode);
     }
 
+    private void toggleMapLegend() {
+        if (!this.mapLegendOpen
+                && !LostTalesLotrMapLayout.isControlBarVisible(this)) {
+            return;
+        }
+        this.mapLegendOpen = !this.mapLegendOpen;
+        if (!this.mapLegendOpen) {
+            this.mapLegendScrollIndex = 0;
+        }
+    }
+
+    boolean isMapLegendOpen() {
+        return this.mapLegendOpen;
+    }
+
+    int getMapLegendScrollIndex() {
+        return this.mapLegendScrollIndex;
+    }
+
+    void setMapLegendScrollIndex(int index) {
+        this.mapLegendScrollIndex = Math.max(0, index);
+    }
+
+    void clearHiddenMapLegendSelection() {
+        if (this.selectedCustomMarker != null
+                && !LostTalesMapLegendRegistry.isMarkerVisible(
+                        this.selectedCustomMarker)) {
+            this.selectedCustomMarker = null;
+        }
+        LostTalesLotrMapMarkerIconOverlay.clearInvalidLotrSelection(this);
+    }
+
     @Override
     public void onGuiClosed() {
+        clearFastTravelPrompt();
+        this.clickableNativeWaypoints = Collections.emptyList();
         LostTalesLotrMapMarkerIconOverlay.clearGrouping(this);
         LostTalesLotrRoadLabelRenderer.clear(this);
         super.onGuiClosed();

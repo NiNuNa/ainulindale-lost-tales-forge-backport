@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.mapmarker;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerHeightResolver;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdResolver;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import net.minecraft.world.World;
 
 /**
@@ -34,6 +35,7 @@ public final class LostTalesMapMarkerData {
     private final boolean requiresRegionUnlock;
     private final boolean hasWaystone;
     private final int priority;
+    private final LostTalesMapMarkerSource source;
 
     public LostTalesMapMarkerData(String id, String name, String iconName, String colorName, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius) {
         this(id, name, iconName, colorName, CATEGORY_DEFAULT, false, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, false, false);
@@ -109,6 +111,28 @@ public final class LostTalesMapMarkerData {
                                   boolean requiresRegionUnlock,
                                   boolean hasWaystone,
                                   int priority) {
+        this(id, name, iconName, colorName, categoryName, description,
+                hasFastTravel, dimensionId, x, y, z,
+                compassFadeInRadius, discoveryRadius,
+                hiddenUntilDiscovered, discoverable,
+                requiresRegionUnlock, hasWaystone, priority,
+                LostTalesMapMarkerSource.CUSTOM_PRESET);
+    }
+
+    public LostTalesMapMarkerData(String id, String name, String iconName,
+                                  String colorName, String categoryName,
+                                  String description,
+                                  boolean hasFastTravel,
+                                  int dimensionId,
+                                  double x, double y, double z,
+                                  double compassFadeInRadius,
+                                  double discoveryRadius,
+                                  boolean hiddenUntilDiscovered,
+                                  boolean discoverable,
+                                  boolean requiresRegionUnlock,
+                                  boolean hasWaystone,
+                                  int priority,
+                                  LostTalesMapMarkerSource source) {
         if (priority < LostTalesMapMarkerDefinition.MIN_PRIORITY
                 || priority > LostTalesMapMarkerDefinition.MAX_PRIORITY) {
             throw new IllegalArgumentException("marker priority is out of range");
@@ -132,6 +156,8 @@ public final class LostTalesMapMarkerData {
         this.requiresRegionUnlock = requiresRegionUnlock;
         this.hasWaystone = hasWaystone;
         this.priority = priority;
+        this.source = source == null
+                ? LostTalesMapMarkerSource.CUSTOM_PRESET : source;
     }
 
 
@@ -238,6 +264,10 @@ public final class LostTalesMapMarkerData {
 
     public int getPriority() {
         return this.priority;
+    }
+
+    public LostTalesMapMarkerSource getSource() {
+        return this.source;
     }
 
     /**

@@ -32,4 +32,26 @@ public final class LostTalesQuestPlayerDataLimitTest {
 
         LostTalesQuestPlayerData.validateCharacterState(questData);
     }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void invalidDynamicMarkerPriorityIsRejected() {
+        NBTTagCompound questData = new NBTTagCompound();
+        questData.setInteger("DataVersion",
+                LostTalesQuestPlayerData.CURRENT_DATA_VERSION);
+        NBTTagCompound marker = new NBTTagCompound();
+        marker.setString("MarkerId", "losttales:invalid_priority");
+        marker.setDouble("X", 1.0D);
+        marker.setDouble("Y", 64.0D);
+        marker.setDouble("Z", 2.0D);
+        marker.setDouble("CompassFadeInRadius", 128.0D);
+        marker.setDouble("DiscoveryRadius", 8.0D);
+        marker.setInteger("Priority",
+                com.ninuna.losttales.mapmarker
+                        .LostTalesMapMarkerDefinition.MAX_PRIORITY + 1);
+        NBTTagList markers = new NBTTagList();
+        markers.appendTag(marker);
+        questData.setTag("DynamicMapMarkers", markers);
+
+        LostTalesQuestPlayerData.validateCharacterState(questData);
+    }
 }

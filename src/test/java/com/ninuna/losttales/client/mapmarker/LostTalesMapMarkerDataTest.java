@@ -48,6 +48,64 @@ public final class LostTalesMapMarkerDataTest {
                         .shouldRenderDecorativeMarker(hidden));
     }
 
+    @Test
+    public void foregroundSelectionUsesDistanceBeforeTiePriority() {
+        assertTrue(LostTalesLotrMapMarkerIconOverlay
+                .isBetterForegroundHit(4.0D, 1, 9.0D, 3));
+        assertFalse(LostTalesLotrMapMarkerIconOverlay
+                .isBetterForegroundHit(9.0D, 3, 4.0D, 1));
+        assertTrue(LostTalesLotrMapMarkerIconOverlay
+                .isBetterForegroundHit(4.0D, 3, 4.0D, 2));
+        assertFalse(LostTalesLotrMapMarkerIconOverlay
+                .isBetterForegroundHit(4.0D, 1, 4.0D, 2));
+    }
+
+    @Test
+    public void edgeCullingWaitsUntilTheWholeStackLeavesTheMap() {
+        assertTrue(LostTalesLotrMapMarkerIconOverlay
+                .markerStackOverlapsMapBounds(
+                        50.0F, -7.9F, 0.0F, 100.0F,
+                        0.0F, 100.0F));
+        assertFalse(LostTalesLotrMapMarkerIconOverlay
+                .markerStackOverlapsMapBounds(
+                        50.0F, -8.1F, 0.0F, 100.0F,
+                        0.0F, 100.0F));
+        assertTrue(LostTalesLotrMapMarkerIconOverlay
+                .markerStackOverlapsMapBounds(
+                        -11.9F, 50.0F, 0.0F, 100.0F,
+                        0.0F, 100.0F));
+        assertFalse(LostTalesLotrMapMarkerIconOverlay
+                .markerStackOverlapsMapBounds(
+                        -12.1F, 50.0F, 0.0F, 100.0F,
+                        0.0F, 100.0F));
+    }
+
+    @Test
+    public void tooltipTranslationRestoresFractionalMarkerMotion() {
+        assertEquals(0.4F,
+                LostTalesLotrMapMarkerIconOverlay.tooltipTranslation(
+                        10.4F, 10.4F), 0.0001F);
+        assertEquals(-0.4F,
+                LostTalesLotrMapMarkerIconOverlay.tooltipTranslation(
+                        10.6F, 10.6F), 0.0001F);
+        assertEquals(0.9F,
+                LostTalesLotrMapMarkerIconOverlay.tooltipTranslation(
+                        10.4F, 10.9F), 0.0001F);
+    }
+
+    @Test
+    public void foregroundIconsShareTheSameHighlightScale() {
+        assertEquals(16.0F,
+                LostTalesLotrMapMarkerIconOverlay.highlightedSize(13.0F),
+                0.0001F);
+        assertEquals(144.0F / 13.0F,
+                LostTalesLotrMapMarkerIconOverlay.highlightedSize(9.0F),
+                0.0001F);
+        assertEquals(64.0F / 13.0F,
+                LostTalesLotrMapMarkerIconOverlay.highlightedSize(4.0F),
+                0.0001F);
+    }
+
     private static LostTalesMapMarkerData marker(boolean hasWaystone) {
         return new LostTalesMapMarkerData(
                 "losttales:test", "Test", "fort", "white",

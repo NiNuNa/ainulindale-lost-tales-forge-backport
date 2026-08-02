@@ -67,7 +67,12 @@ public final class LostTalesWorldQuestMarkerRenderer {
                 }
 
                 boolean pinned = false;
-                boolean activeQuestMarker = activeQuestMarkers.containsKey(marker.getId());
+                String activeQuestLabel =
+                        LostTalesClientQuestMarkerHelper
+                                .getActiveQuestMarkerLabel(
+                                        activeQuestMarkers,
+                                        marker.getId());
+                boolean activeQuestMarker = activeQuestLabel != null;
                 if (!activeQuestMarker) {
                     continue;
                 }
@@ -85,7 +90,8 @@ public final class LostTalesWorldQuestMarkerRenderer {
                     continue;
                 }
 
-                String label = activeQuestMarker ? activeQuestMarkers.get(marker.getId()) : marker.getName();
+                String label = activeQuestMarker
+                        ? activeQuestLabel : marker.getName();
                 renderMarkerLabel(minecraft.fontRenderer, label, marker.getX(), markerY, marker.getZ(), pinned, activeQuestMarker, Math.sqrt(distSq), maxDistance, cameraX, cameraY, cameraZ);
             }
 

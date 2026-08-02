@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.quest;
 
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdentity;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
@@ -23,7 +24,7 @@ import java.util.Set;
 public final class LostTalesClientQuestMarkerHelper {
     private LostTalesClientQuestMarkerHelper() {}
 
-    /** Returns marker id -> display label for every marker referenced by any tracked quest. */
+    /** Returns canonical marker identity -> label for tracked quests. */
     public static Map<String, String> collectActiveQuestMarkerLabels() {
         Map<String, String> labels = new LinkedHashMap<String, String>();
         for (LostTalesQuestProgress progress : LostTalesClientQuestProgressStore.getPinnedQuests()) {
@@ -64,7 +65,15 @@ public final class LostTalesClientQuestMarkerHelper {
     }
 
     public static boolean isActiveQuestMarker(String markerId) {
-        return markerId != null && collectActiveQuestMarkerLabels().containsKey(markerId);
+        return getActiveQuestMarkerLabel(
+                collectActiveQuestMarkerLabels(), markerId) != null;
+    }
+
+    public static String getActiveQuestMarkerLabel(
+            Map<String, String> labels, String markerId) {
+        String key = markerCanonicalKey(markerId);
+        return labels == null || key.length() == 0
+                ? null : labels.get(key);
     }
 
     private static void addQuestDefinitionMarkers(Map<String, String> labels, LostTalesQuestDefinition quest, String label) {
@@ -99,10 +108,22 @@ public final class LostTalesClientQuestMarkerHelper {
     }
 
     private static void putMarkerLabel(Map<String, String> labels, String markerId, String label) {
-        markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
-        if (markerId.length() > 0 && !labels.containsKey(markerId)) {
-            labels.put(markerId, label);
+        String key = markerCanonicalKey(markerId);
+        if (key.length() > 0 && !labels.containsKey(key)) {
+            labels.put(key, label);
         }
+    }
+
+    private static String markerCanonicalKey(String markerId) {
+        String normalized =
+                LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
+        if (normalized.length() == 0) {
+            return "";
+        }
+        return LostTalesMapMarkerIdentity.create(
+                normalized,
+                LostTalesMapMarkerIdentity.Authority.QUEST_PLAYER)
+                .getCanonicalKey();
     }
 
     private static LostTalesQuestStageDefinition getCurrentStage(LostTalesQuestDefinition quest, LostTalesQuestProgress progress) {

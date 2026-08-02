@@ -7,6 +7,7 @@ import com.google.gson.JsonParser;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRelevance;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.util.LostTalesDimensionHelper;
 import java.io.IOException;
@@ -41,12 +42,18 @@ final class LostTalesMapMarkerResourceLoader {
 
         for (String fileName : SHARED_MARKER_FILES) {
             ResourceLocation location = new ResourceLocation(LostTalesMetaData.MOD_ID, "map_markers/" + fileName + ".json");
-            loadFile(resourceManager, location, markers);
+            LostTalesMapMarkerSource source = "lotr_waypoints".equals(fileName)
+                    ? LostTalesMapMarkerSource.LOTR_ADAPTER
+                    : LostTalesMapMarkerSource.CUSTOM_PRESET;
+            loadFile(resourceManager, location, markers, source);
         }
         return markers;
     }
 
-    private static void loadFile(IResourceManager resourceManager, ResourceLocation location, List<LostTalesMapMarkerData> markers) {
+    private static void loadFile(
+            IResourceManager resourceManager, ResourceLocation location,
+            List<LostTalesMapMarkerData> markers,
+            LostTalesMapMarkerSource source) {
         Reader reader = null;
         try {
             IResource resource = resourceManager.getResource(location);
@@ -66,7 +73,8 @@ final class LostTalesMapMarkerResourceLoader {
             for (JsonElement entryElement : array) {
                 if (entryElement == null || !entryElement.isJsonObject()) continue;
 
-                LostTalesMapMarkerData marker = parseMarker(entryElement.getAsJsonObject());
+                LostTalesMapMarkerData marker = parseMarker(
+                        entryElement.getAsJsonObject(), source);
                 if (marker != null) {
                     markers.add(marker);
                 }
@@ -85,7 +93,8 @@ final class LostTalesMapMarkerResourceLoader {
         }
     }
 
-    private static LostTalesMapMarkerData parseMarker(JsonObject object) {
+    private static LostTalesMapMarkerData parseMarker(
+            JsonObject object, LostTalesMapMarkerSource source) {
         String name = getString(object, "name", null);
         if (name == null || name.length() == 0) {
             return null;
@@ -130,7 +139,7 @@ final class LostTalesMapMarkerResourceLoader {
                 dimensionId, x, y, z, compassFadeInRadius,
                 discoveryRadius, hiddenUntilDiscovered, discoverable,
                 requiresRegionUnlock, hasWaystone,
-                relevanceRank.intValue());
+                relevanceRank.intValue(), source);
     }
 
     private static boolean hasNumber(JsonObject object, String key) {

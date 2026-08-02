@@ -60,6 +60,12 @@ public final class LostTalesClassTransformerTest {
     private static final String LOTR_MAP_EDGE_FILL_HOOK_OWNER =
             "com/ninuna/losttales/client/map/"
                     + "LostTalesLotrMapEdgeRenderer";
+    private static final String LOTR_MAP_LAYOUT_HOOK_OWNER =
+            "com/ninuna/losttales/client/mapmarker/"
+                    + "LostTalesLotrMapLayout";
+    private static final String LOTR_MAP_LEGEND_HOOK_OWNER =
+            "com/ninuna/losttales/client/mapmarker/"
+                    + "LostTalesMapLegendRegistry";
 
     @Test
     public void factionBountiesUseRoleplayCharacterUuid() throws Exception {
@@ -188,6 +194,11 @@ public final class LostTalesClassTransformerTest {
                 transformed, "renderPlayers",
                 CLIENT_IDENTITY_HOOK_OWNER,
                 "resolveMapPlayerName"));
+        assertTrue(containsStaticHook(
+                transformed, "renderPlayers",
+                "com/ninuna/losttales/client/mapmarker/"
+                        + "LostTalesLotrMapMarkerIconOverlay",
+                "shouldSuppressNativePlayerRendering"));
     }
 
     @Test
@@ -197,6 +208,40 @@ public final class LostTalesClassTransformerTest {
                 transformed, "renderMapAndOverlay",
                 LOTR_MAP_EDGE_FILL_HOOK_OWNER,
                 "fillClippedMapBackground"));
+    }
+
+    @Test
+    public void lostTalesMapUsesResponsiveFullscreenLayoutHooks()
+            throws Exception {
+        ClassNode transformed = transform("lotr.client.gui.LOTRGuiMap");
+        assertTrue(containsStaticHook(
+                transformed, "setupMapDimensions",
+                LOTR_MAP_LAYOUT_HOOK_OWNER,
+                "applyFullscreenBounds"));
+        assertTrue(containsStaticHook(
+                transformed, "renderGraduatedRects",
+                LOTR_MAP_LAYOUT_HOOK_OWNER,
+                "shouldSuppressMapFrame"));
+        assertTrue(containsStaticHook(
+                transformed, "renderFullscreenSubtitles",
+                LOTR_MAP_LAYOUT_HOOK_OWNER,
+                "beginFullscreenSubtitles"));
+        assertTrue(containsStaticHook(
+                transformed, "renderFullscreenSubtitles",
+                LOTR_MAP_LAYOUT_HOOK_OWNER,
+                "endFullscreenSubtitles"));
+        assertTrue(containsStaticHook(
+                transformed, "renderWaypointTooltip",
+                LOTR_MAP_LAYOUT_HOOK_OWNER,
+                "beginMapTooltip"));
+        assertTrue(containsStaticHook(
+                transformed, "renderWaypointTooltip",
+                LOTR_MAP_LAYOUT_HOOK_OWNER,
+                "endMapTooltip"));
+        assertTrue(containsStaticHook(
+                transformed, "renderMiniQuests",
+                LOTR_MAP_LEGEND_HOOK_OWNER,
+                "shouldRenderLotrMiniQuests"));
     }
 
     @Test

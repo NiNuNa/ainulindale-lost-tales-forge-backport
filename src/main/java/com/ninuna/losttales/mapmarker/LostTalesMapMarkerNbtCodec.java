@@ -127,7 +127,7 @@ public final class LostTalesMapMarkerNbtCodec {
         return ReadResult.success(records, quarantine, repaired);
     }
 
-    private static NBTTagCompound writeRecord(
+    static NBTTagCompound writeRecord(
             LostTalesMapMarkerRecord record) {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setInteger(DATA_VERSION, CURRENT_DATA_VERSION);

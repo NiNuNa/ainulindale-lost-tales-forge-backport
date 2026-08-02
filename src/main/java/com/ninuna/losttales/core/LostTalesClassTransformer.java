@@ -11,6 +11,7 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.InsnList;
+import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.MethodInsnNode;
@@ -60,6 +61,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.accessorySightTransformer.active";
     public static final String ACCESSORY_LOTR_MAP_ACTIVE_PROPERTY =
             "losttales.accessoryLotrMapTransformer.active";
+    public static final String LOTR_MAP_FULLSCREEN_ACTIVE_PROPERTY =
+            "losttales.lotrMapFullscreenTransformer.active";
+    public static final String LOTR_MAP_CONTROL_BAR_ACTIVE_PROPERTY =
+            "losttales.lotrMapControlBarTransformer.active";
+    public static final String LOTR_MAP_MINIQUEST_FILTER_ACTIVE_PROPERTY =
+            "losttales.lotrMapMiniquestFilterTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
@@ -183,6 +190,15 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     private static final String LOTR_MAP_EDGE_FILL_HOOK_OWNER =
             "com/ninuna/losttales/client/map/"
                     + "LostTalesLotrMapEdgeRenderer";
+    private static final String LOTR_MAP_LAYOUT_HOOK_OWNER =
+            "com/ninuna/losttales/client/mapmarker/"
+                    + "LostTalesLotrMapLayout";
+    private static final String LOTR_MAP_LEGEND_HOOK_OWNER =
+            "com/ninuna/losttales/client/mapmarker/"
+                    + "LostTalesMapLegendRegistry";
+    private static final String LOTR_MAP_MARKER_HOOK_OWNER =
+            "com/ninuna/losttales/client/mapmarker/"
+                    + "LostTalesLotrMapMarkerIconOverlay";
 
     @Override
     public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -717,11 +733,25 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             ClassNode owner = read(basicClass);
             boolean changed = false;
             boolean playerNameHookPresent = false;
+            boolean playerRenderHookPresent = false;
             boolean edgeFillHookPresent = false;
+            boolean fullscreenBoundsHookPresent = false;
+            boolean frameSuppressionHookPresent = false;
+            boolean subtitleLayoutHookPresent = false;
+            boolean tooltipLayoutHookPresent = false;
+            boolean miniQuestFilterHookPresent = false;
             for (Object value : owner.methods) {
                 MethodNode method = (MethodNode)value;
                 if ("renderPlayers".equals(method.name)
                         && "(II)V".equals(method.desc)) {
+                    playerRenderHookPresent = containsHook(
+                            method, LOTR_MAP_MARKER_HOOK_OWNER,
+                            "shouldSuppressNativePlayerRendering");
+                    if (!playerRenderHookPresent) {
+                        playerRenderHookPresent =
+                                injectLotrMapPlayerRenderingGuard(method);
+                        changed |= playerRenderHookPresent;
+                    }
                     playerNameHookPresent = containsHook(
                             method, CLIENT_IDENTITY_HOOK_OWNER,
                             "resolveMapPlayerName");
@@ -764,20 +794,142 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         edgeFillHookPresent = injectLotrMapEdgeFill(method);
                         changed |= edgeFillHookPresent;
                     }
+                } else if ("setupMapDimensions".equals(method.name)
+                        && "()V".equals(method.desc)) {
+                    fullscreenBoundsHookPresent = containsHook(
+                            method, LOTR_MAP_LAYOUT_HOOK_OWNER,
+                            "applyFullscreenBounds");
+                    if (!fullscreenBoundsHookPresent) {
+                        fullscreenBoundsHookPresent =
+                                injectLotrMapFullscreenBounds(method);
+                        changed |= fullscreenBoundsHookPresent;
+                    }
+                } else if ("renderGraduatedRects".equals(method.name)
+                        && "(IIIIIII)V".equals(method.desc)) {
+                    frameSuppressionHookPresent = containsHook(
+                            method, LOTR_MAP_LAYOUT_HOOK_OWNER,
+                            "shouldSuppressMapFrame");
+                    if (!frameSuppressionHookPresent) {
+                        frameSuppressionHookPresent =
+                                injectLotrMapFrameSuppression(method);
+                        changed |= frameSuppressionHookPresent;
+                    }
+                } else if ("renderFullscreenSubtitles".equals(method.name)
+                        && "([Ljava/lang/String;)V".equals(method.desc)) {
+                    subtitleLayoutHookPresent = containsHook(
+                            method, LOTR_MAP_LAYOUT_HOOK_OWNER,
+                            "beginFullscreenSubtitles")
+                            && containsHook(
+                            method, LOTR_MAP_LAYOUT_HOOK_OWNER,
+                            "endFullscreenSubtitles");
+                    if (!subtitleLayoutHookPresent) {
+                        subtitleLayoutHookPresent =
+                                injectLotrMapSubtitleLayout(method);
+                        changed |= subtitleLayoutHookPresent;
+                    }
+                } else if ("renderWaypointTooltip".equals(method.name)
+                        && "(Llotr/common/world/map/LOTRAbstractWaypoint;ZII)V"
+                        .equals(method.desc)) {
+                    tooltipLayoutHookPresent = containsHook(
+                            method, LOTR_MAP_LAYOUT_HOOK_OWNER,
+                            "beginMapTooltip")
+                            && containsHook(
+                            method, LOTR_MAP_LAYOUT_HOOK_OWNER,
+                            "endMapTooltip");
+                    if (!tooltipLayoutHookPresent) {
+                        tooltipLayoutHookPresent =
+                                injectLotrMapTooltipLayout(method);
+                        changed |= tooltipLayoutHookPresent;
+                    }
+                } else if ("renderMiniQuests".equals(method.name)
+                        && "(Lnet/minecraft/entity/player/EntityPlayer;II)V"
+                        .equals(method.desc)) {
+                    miniQuestFilterHookPresent = containsHook(
+                            method, LOTR_MAP_LEGEND_HOOK_OWNER,
+                            "shouldRenderLotrMiniQuests");
+                    if (!miniQuestFilterHookPresent) {
+                        miniQuestFilterHookPresent =
+                                injectLotrMapMiniQuestFilter(method);
+                        changed |= miniQuestFilterHookPresent;
+                    }
                 }
             }
             if (!playerNameHookPresent) {
                 warn("Could not patch LOTR map player tooltip names");
             }
+            if (!playerRenderHookPresent) {
+                warn("Could not patch LOTR map player rendering; "
+                        + "native player tooltip motion will remain active");
+            }
             if (!edgeFillHookPresent) {
                 warn("Could not patch LOTR clipped map background");
             }
-            return changed ? write(owner) : basicClass;
+            boolean fullscreenLayoutReady = fullscreenBoundsHookPresent
+                    && frameSuppressionHookPresent
+                    && subtitleLayoutHookPresent;
+            byte[] transformed = changed ? write(owner) : basicClass;
+            if (fullscreenLayoutReady) {
+                System.setProperty(
+                        LOTR_MAP_FULLSCREEN_ACTIVE_PROPERTY, "true");
+            } else {
+                System.clearProperty(LOTR_MAP_FULLSCREEN_ACTIVE_PROPERTY);
+                if (!fullscreenBoundsHookPresent) {
+                    warn("Could not patch LOTR fullscreen map bounds");
+                }
+                if (!frameSuppressionHookPresent) {
+                    warn("Could not patch LOTR map frame rendering");
+                }
+                if (!subtitleLayoutHookPresent) {
+                    warn("Could not patch LOTR fullscreen map subtitles");
+                }
+            }
+            if (fullscreenLayoutReady && tooltipLayoutHookPresent) {
+                System.setProperty(
+                        LOTR_MAP_CONTROL_BAR_ACTIVE_PROPERTY, "true");
+            } else {
+                System.clearProperty(LOTR_MAP_CONTROL_BAR_ACTIVE_PROPERTY);
+                if (!tooltipLayoutHookPresent) {
+                    warn("Could not patch LOTR map tooltip bounds");
+                }
+            }
+            if (miniQuestFilterHookPresent) {
+                System.setProperty(
+                        LOTR_MAP_MINIQUEST_FILTER_ACTIVE_PROPERTY, "true");
+            } else {
+                System.clearProperty(
+                        LOTR_MAP_MINIQUEST_FILTER_ACTIVE_PROPERTY);
+                warn("Could not patch LOTR map miniquest rendering; "
+                        + "native miniquest markers will remain visible");
+            }
+            return transformed;
         } catch (Throwable throwable) {
+            System.clearProperty(LOTR_MAP_FULLSCREEN_ACTIVE_PROPERTY);
+            System.clearProperty(LOTR_MAP_CONTROL_BAR_ACTIVE_PROPERTY);
+            System.clearProperty(
+                    LOTR_MAP_MINIQUEST_FILTER_ACTIVE_PROPERTY);
             warn("Failed to patch LOTR map rendering: "
                     + throwable);
             return basicClass;
         }
+    }
+
+    private static boolean injectLotrMapPlayerRenderingGuard(
+            MethodNode method) {
+        LabelNode renderNativePlayers = new LabelNode();
+        InsnList hook = new InsnList();
+        hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+        hook.add(new MethodInsnNode(
+                Opcodes.INVOKESTATIC,
+                LOTR_MAP_MARKER_HOOK_OWNER,
+                "shouldSuppressNativePlayerRendering",
+                "(Llotr/client/gui/LOTRGuiMap;)Z"));
+        hook.add(new JumpInsnNode(
+                Opcodes.IFEQ, renderNativePlayers));
+        hook.add(new InsnNode(Opcodes.RETURN));
+        hook.add(renderNativePlayers);
+        method.instructions.insert(hook);
+        info("Patched LOTR map player icons with smooth Lost Tales rendering");
+        return true;
     }
 
     private static boolean injectLotrMapEdgeFill(MethodNode method) {
@@ -813,6 +965,150 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return true;
         }
         return false;
+    }
+
+    private static boolean injectLotrMapFullscreenBounds(MethodNode method) {
+        boolean injected = false;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null;) {
+            AbstractInsnNode next = instruction.getNext();
+            if (instruction.getOpcode() == Opcodes.RETURN) {
+                InsnList hook = new InsnList();
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                hook.add(new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        LOTR_MAP_LAYOUT_HOOK_OWNER,
+                        "applyFullscreenBounds",
+                        "(Llotr/client/gui/LOTRGuiMap;)V"));
+                method.instructions.insertBefore(instruction, hook);
+                injected = true;
+            }
+            instruction = next;
+        }
+        if (injected) {
+            info("Patched LOTR map viewport with Lost Tales fullscreen bounds");
+        }
+        return injected;
+    }
+
+    private static boolean injectLotrMapFrameSuppression(MethodNode method) {
+        LabelNode renderFrame = new LabelNode();
+        InsnList hook = new InsnList();
+        hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+        hook.add(new MethodInsnNode(
+                Opcodes.INVOKESTATIC,
+                LOTR_MAP_LAYOUT_HOOK_OWNER,
+                "shouldSuppressMapFrame",
+                "(Llotr/client/gui/LOTRGuiMap;)Z"));
+        hook.add(new JumpInsnNode(Opcodes.IFEQ, renderFrame));
+        hook.add(new InsnNode(Opcodes.RETURN));
+        hook.add(renderFrame);
+        method.instructions.insert(hook);
+        info("Patched LOTR map frame for Lost Tales fullscreen maps");
+        return true;
+    }
+
+    private static boolean injectLotrMapSubtitleLayout(MethodNode method) {
+        boolean beginPresent = containsHook(
+                method, LOTR_MAP_LAYOUT_HOOK_OWNER,
+                "beginFullscreenSubtitles");
+        boolean endPresent = containsHook(
+                method, LOTR_MAP_LAYOUT_HOOK_OWNER,
+                "endFullscreenSubtitles");
+        if (!beginPresent) {
+            InsnList begin = new InsnList();
+            begin.add(new VarInsnNode(Opcodes.ALOAD, 0));
+            begin.add(new MethodInsnNode(
+                    Opcodes.INVOKESTATIC,
+                    LOTR_MAP_LAYOUT_HOOK_OWNER,
+                    "beginFullscreenSubtitles",
+                    "(Llotr/client/gui/LOTRGuiMap;)V"));
+            method.instructions.insert(begin);
+            beginPresent = true;
+        }
+        if (!endPresent) {
+            boolean foundReturn = false;
+            for (AbstractInsnNode instruction = method.instructions.getFirst();
+                 instruction != null;) {
+                AbstractInsnNode next = instruction.getNext();
+                if (instruction.getOpcode() == Opcodes.RETURN) {
+                    method.instructions.insertBefore(
+                            instruction,
+                            new MethodInsnNode(
+                                    Opcodes.INVOKESTATIC,
+                                    LOTR_MAP_LAYOUT_HOOK_OWNER,
+                                    "endFullscreenSubtitles",
+                                    "()V"));
+                    foundReturn = true;
+                }
+                instruction = next;
+            }
+            endPresent = foundReturn;
+        }
+        if (beginPresent && endPresent) {
+            info("Patched LOTR fullscreen subtitle positioning");
+        }
+        return beginPresent && endPresent;
+    }
+
+    private static boolean injectLotrMapTooltipLayout(MethodNode method) {
+        boolean beginPresent = containsHook(
+                method, LOTR_MAP_LAYOUT_HOOK_OWNER,
+                "beginMapTooltip");
+        boolean endPresent = containsHook(
+                method, LOTR_MAP_LAYOUT_HOOK_OWNER,
+                "endMapTooltip");
+        if (!beginPresent) {
+            InsnList begin = new InsnList();
+            begin.add(new VarInsnNode(Opcodes.ALOAD, 0));
+            begin.add(new MethodInsnNode(
+                    Opcodes.INVOKESTATIC,
+                    LOTR_MAP_LAYOUT_HOOK_OWNER,
+                    "beginMapTooltip",
+                    "(Llotr/client/gui/LOTRGuiMap;)V"));
+            method.instructions.insert(begin);
+            beginPresent = true;
+        }
+        if (!endPresent) {
+            boolean foundReturn = false;
+            for (AbstractInsnNode instruction = method.instructions.getFirst();
+                 instruction != null;) {
+                AbstractInsnNode next = instruction.getNext();
+                if (instruction.getOpcode() == Opcodes.RETURN) {
+                    method.instructions.insertBefore(
+                            instruction,
+                            new MethodInsnNode(
+                                    Opcodes.INVOKESTATIC,
+                                    LOTR_MAP_LAYOUT_HOOK_OWNER,
+                                    "endMapTooltip",
+                                    "()V"));
+                    foundReturn = true;
+                }
+                instruction = next;
+            }
+            endPresent = foundReturn;
+        }
+        if (beginPresent && endPresent) {
+            info("Patched LOTR map tooltips for the bottom control bar");
+        }
+        return beginPresent && endPresent;
+    }
+
+    private static boolean injectLotrMapMiniQuestFilter(MethodNode method) {
+        LabelNode renderMiniQuests = new LabelNode();
+        InsnList hook = new InsnList();
+        hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+        hook.add(new MethodInsnNode(
+                Opcodes.INVOKESTATIC,
+                LOTR_MAP_LEGEND_HOOK_OWNER,
+                "shouldRenderLotrMiniQuests",
+                "(Llotr/client/gui/LOTRGuiMap;)Z"));
+        hook.add(new JumpInsnNode(Opcodes.IFNE, renderMiniQuests));
+        hook.add(new InsnNode(Opcodes.RETURN));
+        hook.add(renderMiniQuests);
+        method.instructions.insert(hook);
+        info("Patched LOTR map miniquest rendering with map-only filters");
+        return true;
     }
 
     private static void addStaticIntField(

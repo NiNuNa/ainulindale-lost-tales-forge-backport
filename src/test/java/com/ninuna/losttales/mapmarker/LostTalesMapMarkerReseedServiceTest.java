@@ -53,10 +53,34 @@ public final class LostTalesMapMarkerReseedServiceTest {
                 reseeded.getRevision());
     }
 
+    @Test
+    public void reseedPreservesPersistedNativeLotrIdCasing() {
+        LostTalesMapMarkerRecord existing =
+                LostTalesMapMarkerRecord.fromDefinition(
+                        definition("lotr:waypoint:WAYMEET", "Old",
+                                1.0D, 2.0D));
+
+        LostTalesMapMarkerRecord reseeded =
+                LostTalesMapMarkerReseedService.createRecord(
+                        definition("LOTR:WAYPOINT:waymeet", "Updated",
+                                9.0D, 10.0D),
+                        existing);
+
+        assertEquals("lotr:waypoint:WAYMEET", reseeded.getId());
+        assertEquals("Updated", reseeded.getName());
+        assertEquals(existing.getRevision() + 1L,
+                reseeded.getRevision());
+    }
+
     private static LostTalesMapMarkerDefinition definition(
             String name, double x, double z) {
+        return definition("lotr:waypoint:waymeet", name, x, z);
+    }
+
+    private static LostTalesMapMarkerDefinition definition(
+            String id, String name, double x, double z) {
         return new LostTalesMapMarkerDefinition(
-                "lotr:waypoint:waymeet", name,
+                id, name,
                 "fort", "white", "Town", "",
                 true, 100,
                 x, LostTalesMapMarkerDefinition.AUTOMATIC_Y, z,

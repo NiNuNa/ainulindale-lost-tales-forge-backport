@@ -12,7 +12,6 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import net.minecraft.client.resources.IResourceManager;
 /**
  * Client cache for bundled and server-synced quest definitions.
@@ -104,8 +103,8 @@ public final class LostTalesClientQuestDefinitionStore {
     }
 
     private static void logMissingMarkerWarnings(List<LostTalesQuestDefinition> loadedQuests) {
-        Set<String> knownMarkerIds = LostTalesClientMapMarkerStore.getSharedMarkerIds();
-        if (loadedQuests == null || loadedQuests.isEmpty() || knownMarkerIds.isEmpty()) {
+        if (loadedQuests == null || loadedQuests.isEmpty()
+                || LostTalesClientMapMarkerStore.getAllMarkers().isEmpty()) {
             return;
         }
 
@@ -114,7 +113,7 @@ public final class LostTalesClientQuestDefinitionStore {
                 continue;
             }
             for (String markerId : LostTalesQuestMarkerHelper.collectStaticQuestMarkerIds(quest)) {
-                if (!knownMarkerIds.contains(markerId)) {
+                if (!LostTalesClientMapMarkerStore.hasSharedMarker(markerId)) {
                     FMLLog.warning("[%s] Client quest %s references missing visible map marker id: %s", LostTalesMetaData.MOD_ID, quest.getId(), markerId);
                 }
             }

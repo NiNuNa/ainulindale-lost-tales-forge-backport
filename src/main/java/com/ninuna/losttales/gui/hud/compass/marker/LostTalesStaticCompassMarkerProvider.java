@@ -21,7 +21,6 @@ public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMar
 
         int dimension = minecraft.theWorld.provider.dimensionId;
         List<LostTalesCompassMarker> markers = new ArrayList<LostTalesCompassMarker>();
-        String pinnedMarkerId = LostTalesClientQuestProgressStore.getPinnedMapMarkerId();
         Map<String, String> activeQuestMarkers = LostTalesClientQuestMarkerHelper.collectActiveQuestMarkerLabels();
 
         for (LostTalesMapMarkerData entry : LostTalesClientMapMarkerStore.getSharedMarkers()) {
@@ -31,9 +30,13 @@ public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMar
                 continue;
             }
 
-            boolean activeQuestMarker = activeQuestMarkers.containsKey(entry.getId());
+            String activeQuestLabel = LostTalesClientQuestMarkerHelper
+                    .getActiveQuestMarkerLabel(
+                            activeQuestMarkers, entry.getId());
+            boolean activeQuestMarker = activeQuestLabel != null;
             boolean discovered = LostTalesClientQuestProgressStore.isMarkerDiscovered(entry.getId());
-            boolean pinned = entry.getId() != null && entry.getId().equals(pinnedMarkerId);
+            boolean pinned = LostTalesClientQuestProgressStore
+                    .isMapMarkerPinned(entry.getId());
             boolean undiscovered = entry.isDiscoverable() && !discovered;
 
             if (!LostTalesClientMapMarkerVisibility
@@ -46,7 +49,8 @@ public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMar
                 continue;
             }
 
-            String name = activeQuestMarker ? activeQuestMarkers.get(entry.getId()) : entry.getName();
+            String name = activeQuestMarker
+                    ? activeQuestLabel : entry.getName();
             if (pinned) {
                 name = "Tracked: " + name;
             }

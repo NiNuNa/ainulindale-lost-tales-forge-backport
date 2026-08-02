@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.core.LostTalesClassTransformer;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -58,6 +59,53 @@ public final class LostTalesLotrMapGuiTest {
             zoom = next;
         }
         assertEquals(4.0F, zoom, 0.001F);
+    }
+
+    @Test
+    public void fullscreenBoundsUseTheScaledGuiAndSkipConquestMode()
+            throws Exception {
+        String property = LostTalesClassTransformer
+                .LOTR_MAP_FULLSCREEN_ACTIVE_PROPERTY;
+        String previous = System.getProperty(property);
+        System.setProperty(property, "true");
+        try {
+            LostTalesLotrMapGui gui = allocate(LostTalesLotrMapGui.class);
+            gui.width = 854;
+            gui.height = 480;
+            field("isConquestGrid").setBoolean(gui, false);
+
+            LostTalesLotrMapLayout.applyFullscreenBounds(gui);
+
+            assertEquals(0, field("mapXMin").getInt(null));
+            assertEquals(854, field("mapXMax").getInt(null));
+            assertEquals(0, field("mapYMin").getInt(null));
+            assertEquals(480, field("mapYMax").getInt(null));
+            assertEquals(854, field("mapWidth").getInt(null));
+            assertEquals(480, field("mapHeight").getInt(null));
+            assertEquals(456, LostTalesLotrMapLayout.resolveStatusY(
+                    gui, 480, 20));
+
+            field("isConquestGrid").setBoolean(gui, true);
+            field("mapXMin").setInt(null, 227);
+            field("mapXMax").setInt(null, 627);
+            field("mapYMin").setInt(null, 104);
+            field("mapYMax").setInt(null, 344);
+
+            LostTalesLotrMapLayout.applyFullscreenBounds(gui);
+
+            assertEquals(227, field("mapXMin").getInt(null));
+            assertEquals(627, field("mapXMax").getInt(null));
+            assertEquals(104, field("mapYMin").getInt(null));
+            assertEquals(344, field("mapYMax").getInt(null));
+            assertEquals(354, LostTalesLotrMapLayout.resolveStatusY(
+                    gui, 344, 20));
+        } finally {
+            if (previous == null) {
+                System.clearProperty(property);
+            } else {
+                System.setProperty(property, previous);
+            }
+        }
     }
 
     private static Field field(String name) throws Exception {

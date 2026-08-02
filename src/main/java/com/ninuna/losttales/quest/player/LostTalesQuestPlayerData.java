@@ -3,6 +3,7 @@ package com.ninuna.losttales.quest.player;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdentity;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestDefinitionNbt;
@@ -47,7 +48,11 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     private final Set<String> completedQuests = new LinkedHashSet<String>();
     private final Set<String> failedQuests = new LinkedHashSet<String>();
     private final Set<String> discoveredMarkerIds = new LinkedHashSet<String>();
+    private final Map<String, String> discoveredMarkerIdByCanonicalKey =
+            new LinkedHashMap<String, String>();
     private final Map<String, LostTalesMapMarkerDefinition> dynamicMapMarkers = new LinkedHashMap<String, LostTalesMapMarkerDefinition>();
+    private final Map<String, String> dynamicMarkerIdByCanonicalKey =
+            new LinkedHashMap<String, String>();
     private final Map<String, LostTalesQuestDefinition> dynamicQuestDefinitions = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private final Set<String> pinnedQuestIds = new LinkedHashSet<String>();
     private String pinnedMapMarkerId = "";
@@ -184,7 +189,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.completedQuests.clear();
         this.failedQuests.clear();
         this.discoveredMarkerIds.clear();
+        this.discoveredMarkerIdByCanonicalKey.clear();
         this.dynamicMapMarkers.clear();
+        this.dynamicMarkerIdByCanonicalKey.clear();
         this.dynamicQuestDefinitions.clear();
         this.pinnedQuestIds.clear();
         this.pinnedMapMarkerId = "";
@@ -273,9 +280,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         for (int i = 0; i < markerList.tagCount(); i++) {
             NBTTagCompound markerTag = markerList.getCompoundTagAt(i);
             String markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerTag.getString("MarkerId"));
-            if (markerId.length() > 0) {
-                this.discoveredMarkerIds.add(markerId);
-            }
+            addDiscoveredMarkerId(markerId);
         }
         NBTTagList dynamicQuestList = data.getTagList("DynamicQuestDefinitions", Constants.NBT.TAG_COMPOUND);
         for (int i = 0; i < dynamicQuestList.tagCount(); i++) {
@@ -292,15 +297,17 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         for (int i = 0; i < dynamicMarkerList.tagCount(); i++) {
             LostTalesMapMarkerDefinition marker = readDynamicMarker(dynamicMarkerList.getCompoundTagAt(i));
             if (marker != null) {
-                this.dynamicMapMarkers.put(marker.getId(), marker);
-                this.discoveredMarkerIds.add(marker.getId());
+                addLoadedDynamicMarker(marker);
             }
         }
 
-        this.pinnedMapMarkerId = LostTalesQuestMarkerHelper.normalizeMarkerId(data.getString("PinnedMapMarkerId"));
-        if (!this.discoveredMarkerIds.contains(this.pinnedMapMarkerId)) {
-            this.pinnedMapMarkerId = "";
-        }
+        String requestedPinnedMarkerId =
+                LostTalesQuestMarkerHelper.normalizeMarkerId(
+                        data.getString("PinnedMapMarkerId"));
+        String storedPinnedMarkerId =
+                findDiscoveredMarkerId(requestedPinnedMarkerId);
+        this.pinnedMapMarkerId = storedPinnedMarkerId == null
+                ? "" : storedPinnedMarkerId;
         pruneInvalidReferences();
     }
 
@@ -440,8 +447,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public LostTalesMapMarkerDefinition getDynamicMapMarker(String markerId) {
-        markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
-        return markerId.length() == 0 ? null : this.dynamicMapMarkers.get(markerId);
+        String storedId = findDynamicMarkerId(markerId);
+        return storedId == null ? null
+                : this.dynamicMapMarkers.get(storedId);
     }
 
     public LostTalesQuestProgress getActiveQuest(String questId) {
@@ -506,64 +514,62 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         if (!isWritable()) {
             return false;
         }
-        markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
-        if (markerId.length() == 0) {
-            return false;
-        }
-        return this.discoveredMarkerIds.add(markerId);
+        return addDiscoveredMarkerId(markerId);
     }
 
     public boolean discoverDynamicMarker(LostTalesMapMarkerDefinition marker) {
         if (!isWritable()) {
             return false;
         }
-        if (marker == null || marker.getId() == null || marker.getId().length() == 0) {
+        if (!isValidDynamicMarker(marker)) {
             return false;
         }
-        String markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(marker.getId());
-        LostTalesMapMarkerDefinition normalized = new LostTalesMapMarkerDefinition(
-                markerId,
-                marker.getName() == null || marker.getName().length() == 0 ? markerId : marker.getName(),
-                marker.getIconName() == null || marker.getIconName().length() == 0 ? "quest" : marker.getIconName(),
-                marker.getColorName() == null || marker.getColorName().length() == 0 ? "white" : marker.getColorName(),
-                marker.getCategoryName() == null || marker.getCategoryName().length() == 0 ? LostTalesMapMarkerDefinition.CATEGORY_DEFAULT : marker.getCategoryName(),
-                marker.getDescription(),
-                marker.hasFastTravel(),
-                marker.getDimensionId(),
-                marker.getX(),
-                marker.getY(),
-                marker.getZ(),
-                marker.getCompassFadeInRadius(),
-                marker.getDiscoveryRadius(),
-                marker.isHiddenUntilDiscovered(),
-                marker.isDiscoverable(),
-                marker.requiresRegionUnlock(),
-                marker.getSource(), marker.hasWaystone(),
-                marker.getWaystoneStructureType(), marker.getPriority()
-        );
-        LostTalesMapMarkerDefinition old = this.dynamicMapMarkers.put(markerId, normalized);
-        boolean discoveredChanged = this.discoveredMarkerIds.add(markerId);
+        String requestedId =
+                LostTalesQuestMarkerHelper.normalizeMarkerId(
+                        marker.getId());
+        String key = markerCanonicalKey(requestedId);
+        String storedId = this.dynamicMarkerIdByCanonicalKey.get(key);
+        if (storedId == null) {
+            if (this.dynamicMapMarkers.size() >= MAX_DYNAMIC_MARKERS
+                    || (findDiscoveredMarkerId(requestedId) == null
+                        && this.discoveredMarkerIds.size()
+                                >= MAX_QUEST_ID_HISTORY)) {
+                return false;
+            }
+            storedId = requestedId;
+            this.dynamicMarkerIdByCanonicalKey.put(key, storedId);
+        }
+        LostTalesMapMarkerDefinition normalized =
+                normalizeDynamicMarker(marker, storedId);
+        LostTalesMapMarkerDefinition old =
+                this.dynamicMapMarkers.put(storedId, normalized);
+        boolean discoveredChanged = addDiscoveredMarkerId(storedId);
         return discoveredChanged || !sameMarker(old, normalized);
     }
 
     public boolean isMarkerDiscovered(String markerId) {
-        markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
-        return markerId.length() > 0 && this.discoveredMarkerIds.contains(markerId);
+        return findDiscoveredMarkerId(markerId) != null;
     }
 
     public boolean forgetMarker(String markerId) {
         if (!isWritable()) {
             return false;
         }
-        markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
-        if (markerId.length() == 0) {
+        String key = markerCanonicalKey(markerId);
+        if (key.length() == 0) {
             return false;
         }
-        boolean changed = this.discoveredMarkerIds.remove(markerId);
-        if (this.dynamicMapMarkers.remove(markerId) != null) {
+        String discoveredId =
+                this.discoveredMarkerIdByCanonicalKey.remove(key);
+        boolean changed = discoveredId != null
+                && this.discoveredMarkerIds.remove(discoveredId);
+        String dynamicId =
+                this.dynamicMarkerIdByCanonicalKey.remove(key);
+        if (dynamicId != null
+                && this.dynamicMapMarkers.remove(dynamicId) != null) {
             changed = true;
         }
-        if (markerId.equals(this.pinnedMapMarkerId)) {
+        if (sameMarkerIdentity(markerId, this.pinnedMapMarkerId)) {
             this.pinnedMapMarkerId = "";
             changed = true;
         }
@@ -574,17 +580,20 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         if (!isWritable()) {
             return false;
         }
-        markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
-        if (markerId.length() == 0) {
+        String normalized =
+                LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
+        if (normalized.length() == 0) {
             return clearPinnedMapMarkerId();
         }
-        if (!this.discoveredMarkerIds.contains(markerId)) {
+        String discoveredId = findDiscoveredMarkerId(normalized);
+        if (discoveredId == null) {
             return false;
         }
-        if (markerId.equals(this.pinnedMapMarkerId)) {
+        if (sameMarkerIdentity(discoveredId,
+                this.pinnedMapMarkerId)) {
             return false;
         }
-        this.pinnedMapMarkerId = markerId;
+        this.pinnedMapMarkerId = discoveredId;
         return true;
     }
 
@@ -729,7 +738,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.completedQuests.clear();
         this.failedQuests.clear();
         this.discoveredMarkerIds.clear();
+        this.discoveredMarkerIdByCanonicalKey.clear();
         this.dynamicMapMarkers.clear();
+        this.dynamicMarkerIdByCanonicalKey.clear();
         this.dynamicQuestDefinitions.clear();
         this.pinnedQuestIds.clear();
         this.pinnedMapMarkerId = "";
@@ -753,8 +764,13 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         this.completedQuests.addAll(oldData.completedQuests);
         this.failedQuests.addAll(oldData.failedQuests);
-        this.discoveredMarkerIds.addAll(oldData.discoveredMarkerIds);
-        this.dynamicMapMarkers.putAll(oldData.dynamicMapMarkers);
+        for (String markerId : oldData.discoveredMarkerIds) {
+            addDiscoveredMarkerId(markerId);
+        }
+        for (LostTalesMapMarkerDefinition marker :
+                oldData.dynamicMapMarkers.values()) {
+            addLoadedDynamicMarker(marker);
+        }
         this.dynamicQuestDefinitions.putAll(oldData.dynamicQuestDefinitions);
         LostTalesQuestRegistry.registerRuntimeQuests(this.dynamicQuestDefinitions.values());
         for (String questId : oldData.pinnedQuestIds) {
@@ -762,7 +778,10 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 this.pinnedQuestIds.add(questId);
             }
         }
-        this.pinnedMapMarkerId = oldData.pinnedMapMarkerId != null && this.discoveredMarkerIds.contains(oldData.pinnedMapMarkerId) ? oldData.pinnedMapMarkerId : "";
+        String copiedPinnedMarkerId =
+                findDiscoveredMarkerId(oldData.pinnedMapMarkerId);
+        this.pinnedMapMarkerId = copiedPinnedMarkerId == null
+                ? "" : copiedPinnedMarkerId;
         pruneInvalidReferences();
     }
 
@@ -785,11 +804,131 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             this.pinnedQuestIds.removeAll(invalidPinnedQuests);
             changed = true;
         }
-        if (this.pinnedMapMarkerId != null && this.pinnedMapMarkerId.length() > 0 && !this.discoveredMarkerIds.contains(this.pinnedMapMarkerId) && !LostTalesMapMarkerCatalog.isVisibleByDefault(this.pinnedMapMarkerId)) {
+        if (this.pinnedMapMarkerId != null
+                && this.pinnedMapMarkerId.length() > 0
+                && findDiscoveredMarkerId(
+                        this.pinnedMapMarkerId) == null
+                && !LostTalesMapMarkerCatalog.isVisibleByDefault(
+                        this.pinnedMapMarkerId)) {
             this.pinnedMapMarkerId = "";
             changed = true;
         }
         return changed;
+    }
+
+    private boolean addDiscoveredMarkerId(String markerId) {
+        String normalized =
+                LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
+        String key = markerCanonicalKey(normalized);
+        if (key.length() == 0
+                || this.discoveredMarkerIdByCanonicalKey
+                        .containsKey(key)
+                || this.discoveredMarkerIds.size()
+                        >= MAX_QUEST_ID_HISTORY) {
+            return false;
+        }
+        this.discoveredMarkerIds.add(normalized);
+        this.discoveredMarkerIdByCanonicalKey.put(key, normalized);
+        return true;
+    }
+
+    private boolean addLoadedDynamicMarker(
+            LostTalesMapMarkerDefinition marker) {
+        if (!isValidDynamicMarker(marker)) {
+            return false;
+        }
+        String markerId =
+                LostTalesQuestMarkerHelper.normalizeMarkerId(
+                        marker.getId());
+        String key = markerCanonicalKey(markerId);
+        if (this.dynamicMarkerIdByCanonicalKey.containsKey(key)
+                || this.dynamicMapMarkers.size() >= MAX_DYNAMIC_MARKERS
+                || (findDiscoveredMarkerId(markerId) == null
+                    && this.discoveredMarkerIds.size()
+                            >= MAX_QUEST_ID_HISTORY)) {
+            return false;
+        }
+        LostTalesMapMarkerDefinition normalized =
+                normalizeDynamicMarker(marker, markerId);
+        this.dynamicMapMarkers.put(markerId, normalized);
+        this.dynamicMarkerIdByCanonicalKey.put(key, markerId);
+        addDiscoveredMarkerId(markerId);
+        return true;
+    }
+
+    private String findDiscoveredMarkerId(String markerId) {
+        String key = markerCanonicalKey(markerId);
+        return key.length() == 0 ? null
+                : this.discoveredMarkerIdByCanonicalKey.get(key);
+    }
+
+    private String findDynamicMarkerId(String markerId) {
+        String key = markerCanonicalKey(markerId);
+        return key.length() == 0 ? null
+                : this.dynamicMarkerIdByCanonicalKey.get(key);
+    }
+
+    private static boolean sameMarkerIdentity(
+            String first, String second) {
+        String firstKey = markerCanonicalKey(first);
+        return firstKey.length() > 0
+                && firstKey.equals(markerCanonicalKey(second));
+    }
+
+    private static String markerCanonicalKey(String markerId) {
+        String normalized =
+                LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
+        if (normalized.length() == 0
+                || normalized.length() > MAX_IDENTIFIER_CHARACTERS) {
+            return "";
+        }
+        return LostTalesMapMarkerIdentity.create(
+                normalized,
+                LostTalesMapMarkerIdentity.Authority.QUEST_PLAYER)
+                .getCanonicalKey();
+    }
+
+    private static LostTalesMapMarkerDefinition normalizeDynamicMarker(
+            LostTalesMapMarkerDefinition marker,
+            String persistedMarkerId) {
+        return new LostTalesMapMarkerDefinition(
+                persistedMarkerId,
+                safe(marker.getName(), persistedMarkerId),
+                safe(marker.getIconName(), "quest"),
+                safe(marker.getColorName(), "white"),
+                safe(marker.getCategoryName(),
+                        LostTalesMapMarkerDefinition.CATEGORY_DEFAULT),
+                "",
+                marker.hasFastTravel(), marker.getDimensionId(),
+                marker.getX(), marker.getY(), marker.getZ(),
+                marker.getCompassFadeInRadius(),
+                marker.getDiscoveryRadius(),
+                marker.isHiddenUntilDiscovered(),
+                marker.isDiscoverable(),
+                marker.requiresRegionUnlock(),
+                LostTalesMapMarkerSource.QUEST_DYNAMIC,
+                false, "", marker.getPriority());
+    }
+
+    private static boolean isValidDynamicMarker(
+            LostTalesMapMarkerDefinition marker) {
+        return marker != null
+                && markerCanonicalKey(marker.getId()).length() > 0
+                && safe(marker.getName(), "").length()
+                        <= MAX_NAME_CHARACTERS
+                && safe(marker.getIconName(), "").length()
+                        <= MAX_IDENTIFIER_CHARACTERS
+                && safe(marker.getColorName(), "").length()
+                        <= MAX_IDENTIFIER_CHARACTERS
+                && safe(marker.getCategoryName(), "").length()
+                        <= MAX_NAME_CHARACTERS
+                && isFinite(marker.getX())
+                && isFinite(marker.getY())
+                && isFinite(marker.getZ())
+                && isFinite(marker.getCompassFadeInRadius())
+                && marker.getCompassFadeInRadius() >= 0.0D
+                && isFinite(marker.getDiscoveryRadius())
+                && marker.getDiscoveryRadius() >= 0.0D;
     }
 
     private static LostTalesMapMarkerDefinition readDynamicMarker(NBTTagCompound markerTag) {
@@ -949,9 +1088,13 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         double discoveryRadius = marker.hasKey("DiscoveryRadius")
                 ? marker.getDouble("DiscoveryRadius")
                 : marker.getDouble("UnlockRadius");
+        int priority = marker.hasKey("Priority", Constants.NBT.TAG_INT)
+                ? marker.getInteger("Priority") : 0;
         return isFinite(x) && isFinite(y) && isFinite(z)
                 && isFinite(fadeRadius) && fadeRadius >= 0.0D
-                && isFinite(discoveryRadius) && discoveryRadius >= 0.0D;
+                && isFinite(discoveryRadius) && discoveryRadius >= 0.0D
+                && priority >= LostTalesMapMarkerDefinition.MIN_PRIORITY
+                && priority <= LostTalesMapMarkerDefinition.MAX_PRIORITY;
     }
 
     private static boolean hasCompoundListWithinLimit(

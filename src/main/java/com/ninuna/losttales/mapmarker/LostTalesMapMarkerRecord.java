@@ -151,10 +151,17 @@ public final class LostTalesMapMarkerRecord {
 
     public static LostTalesMapMarkerRecord fromDefinition(
             LostTalesMapMarkerDefinition definition) {
+        return fromDefinition(definition,
+                definition == null ? null : definition.getId());
+    }
+
+    static LostTalesMapMarkerRecord fromDefinition(
+            LostTalesMapMarkerDefinition definition,
+            String persistedMarkerId) {
         if (definition == null) {
             throw new IllegalArgumentException("definition must not be null");
         }
-        return builder(definition.getId(), definition.getSource())
+        return builder(persistedMarkerId, definition.getSource())
                 .name(definition.getName())
                 .iconName(definition.getIconName())
                 .colorName(definition.getColorName())

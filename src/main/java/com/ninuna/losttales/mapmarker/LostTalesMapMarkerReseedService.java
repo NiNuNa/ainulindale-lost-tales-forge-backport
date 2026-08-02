@@ -28,7 +28,10 @@ public final class LostTalesMapMarkerReseedService {
                     "reseed requires a marker definition");
         }
         LostTalesMapMarkerRecord replacement =
-                LostTalesMapMarkerRecord.fromDefinition(definition);
+                LostTalesMapMarkerRecord.fromDefinition(
+                        definition, existing == null
+                                ? definition.getId()
+                                : existing.getId());
         if (existing == null) {
             return replacement;
         }

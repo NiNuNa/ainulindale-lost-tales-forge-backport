@@ -53,6 +53,7 @@ public final class LostTalesConfig {
     public static int hostileCompassMarkerScanRadius = 48;
     public static boolean showHostileMapMarkers = true;
     public static int hostileMapMarkerDisplayRadius = 64;
+    public static String[] hiddenMapLegendCategories = new String[0];
 
     public static int combatMarkerTrackingRadius = 64;
     public static int combatMarkerUpdateIntervalTicks = 10;
@@ -433,6 +434,12 @@ public final class LostTalesConfig {
                     128,
                     "Client display radius in blocks for transient enemy markers on the LOTR main map. The server tracking radius remains authoritative."
             );
+            hiddenMapLegendCategories = config.get(
+                    CATEGORY_CLIENT,
+                    "hiddenMapLegendCategories",
+                    hiddenMapLegendCategories,
+                    "Client-only map legend category IDs that are hidden. Unknown IDs are ignored and new categories remain visible by default."
+            ).getStringList();
 
             combatMarkerTrackingRadius = config.getInt(
                     "trackingRadius",
@@ -1323,6 +1330,8 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "hostileCompassMarkerScanRadius", hostileCompassMarkerScanRadius).set(hostileCompassMarkerScanRadius);
         config.get(CATEGORY_CLIENT, "showHostileMapMarkers", showHostileMapMarkers).set(showHostileMapMarkers);
         config.get(CATEGORY_CLIENT, "hostileMapMarkerDisplayRadius", hostileMapMarkerDisplayRadius).set(hostileMapMarkerDisplayRadius);
+        config.get(CATEGORY_CLIENT, "hiddenMapLegendCategories",
+                hiddenMapLegendCategories).set(hiddenMapLegendCategories);
         config.get(CATEGORY_COMBAT_MARKERS, "trackingRadius", combatMarkerTrackingRadius).set(combatMarkerTrackingRadius);
         config.get(CATEGORY_COMBAT_MARKERS, "updateIntervalTicks", combatMarkerUpdateIntervalTicks).set(combatMarkerUpdateIntervalTicks);
         config.get(CATEGORY_COMBAT_MARKERS, "disengagementGraceTicks", combatMarkerDisengagementGraceTicks).set(combatMarkerDisengagementGraceTicks);
