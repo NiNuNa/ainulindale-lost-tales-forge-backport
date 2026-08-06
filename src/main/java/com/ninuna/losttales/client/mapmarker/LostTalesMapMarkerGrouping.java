@@ -1,246 +1,409 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Pure, deterministic screen-space grouping used by the LOTR map overlay. */
+/**
+ * Pure, deterministic screen-space grouping used by the LOTR map overlay.
+ *
+ * <p>Grouping is decided from the same rectangles the overlay draws. A marker
+ * joins the group it overlaps by {@link #JOIN_OVERLAP_RATIO} of the smaller
+ * artwork's area, and leaves it again below {@link #LEAVE_OVERLAP_RATIO}.
+ * That narrow gap is what stops a marker resting on the threshold from
+ * joining and leaving on alternating frames.</p>
+ *
+ * <p>An existing stack is carried forward as a <em>unit</em> rather than
+ * rebuilt from its markers. A unit keeps the leader it had, loses a member
+ * only when that member falls below the leave threshold against that leader,
+ * and merges into another unit whole. Zooming out therefore only ever brings
+ * stacks together, and zooming in is the only thing that takes one apart —
+ * which is what makes the two directions inverses of each other.</p>
+ *
+ * <p>The fan a group is drawn as — its representative plus up to
+ * {@link #MAX_FAN_MEMBERS} - 1 companions, with the rest condensed into the
+ * "+X more" label — is presentation only and deliberately plays no part in
+ * these decisions. Letting it widen the test kept markers grouped well past
+ * the point where they had visibly separated.</p>
+ *
+ * <p>Overlap alone is not enough: a marker also has to be allowed to share a
+ * stack, which {@link GroupingCategory} decides. Every grouping decision is
+ * therefore one overlap test plus one compatibility test against a real
+ * member of the group, never against the fan or any other render state.</p>
+ */
 final class LostTalesMapMarkerGrouping {
+    /** Overlap of the smaller visible area required to join a group. */
+    static final float JOIN_OVERLAP_RATIO = 0.25F;
     /**
-     * Group at roughly sixty percent artwork overlap. Square bounds made
-     * diagonally separated icons merge while they still looked far apart, so
-     * grouping uses a circular visible-footprint estimate.
+     * Overlap below which a member leaves the group it is already in. Kept
+     * just under {@link #JOIN_OVERLAP_RATIO} so a marker resting on the
+     * threshold cannot join and leave on alternating frames.
      */
-    static final float VISIBLE_RADIUS_SCALE = 0.40F;
-    /** A small release margin prevents single-pixel zoom jitter. */
-    static final float SPLIT_GAP = 0.75F;
-    static final float COMPANION_OFFSET_X = 4.0F;
-    static final float COMPANION_OFFSET_Y = -2.0F;
-    private static final float HORIZONTAL_FOOTPRINT_SCALE = 1.20F;
+    static final float LEAVE_OVERLAP_RATIO = 0.22F;
+    /** Companions are drawn smaller than the marker leading the stack. */
+    static final float COMPANION_SCALE = 0.9F;
+    /** Representative plus the two companions drawn beside it. */
+    static final int MAX_FAN_MEMBERS = 3;
 
     private LostTalesMapMarkerGrouping() {}
 
-    static Result group(List<Entry> entries,
-                        Map<String, String> previousMembership) {
-        return group(entries, previousMembership,
-                VISIBLE_RADIUS_SCALE, false);
-    }
+    /**
+     * Which markers are allowed to share a stack.
+     *
+     * <p>One constant per map-legend filter, so the rule the player toggles
+     * and the rule grouping applies cannot drift apart. Markers only ever
+     * group with their own category, and an unrecognised category groups with
+     * nothing: an unclassified marker draws on its own rather than silently
+     * merging into a stack it may not belong to.</p>
+     *
+     * <p>Hostile icons are drawn by the overlay's separate transient-enemy
+     * pass and never become grouping candidates, so they cannot share a stack
+     * with anything.</p>
+     */
+    enum GroupingCategory {
+        LOCATION("locations", true),
+        PERSONAL_WAYPOINT("personal_waypoints", true),
+        SHARED_WAYPOINT("shared_waypoints", true),
+        PLAYER_WAYSTONE("player_waystones", true),
+        PARTY("party", true),
+        /** Objective markers stay individually readable at every zoom. */
+        QUEST("quests", false),
+        UNKNOWN("", false);
 
-    static Result group(List<Entry> entries,
-                        Map<String, String> previousMembership,
-                        float visibleRadiusScale,
-                        boolean preservePreviousGroups) {
-        if (entries == null || entries.isEmpty()) {
-            return Result.empty();
-        }
-        final float radiusScale = Math.max(0.0F,
-                Math.min(1.0F, visibleRadiusScale));
-        int count = entries.size();
-        ArrayList<Integer> ordered = new ArrayList<Integer>(count);
-        for (int index = 0; index < count; index++) {
-            ordered.add(Integer.valueOf(index));
-        }
-        Collections.sort(ordered, new Comparator<Integer>() {
-            @Override
-            public int compare(Integer left, Integer right) {
-                return LostTalesMapMarkerGrouping.compare(
-                        entries.get(left.intValue()),
-                        entries.get(right.intValue()));
-            }
-        });
-        if (preservePreviousGroups) {
-            return groupAtomicStacks(entries, ordered,
-                    previousMembership, radiusScale);
-        }
-        if (previousMembership != null
-                && !previousMembership.isEmpty()) {
-            return splitPreviousGroups(entries, ordered,
-                    previousMembership, radiusScale);
+        private final String legendCategoryId;
+        private final boolean groupingEligible;
+
+        GroupingCategory(String legendCategoryId,
+                         boolean groupingEligible) {
+            this.legendCategoryId = legendCategoryId;
+            this.groupingEligible = groupingEligible;
         }
 
-        boolean[] assigned = new boolean[count];
-        ArrayList<Group> groups = new ArrayList<Group>();
-        LinkedHashMap<String, String> membership =
-                new LinkedHashMap<String, String>();
-        for (Integer representativeValue : ordered) {
-            int representative = representativeValue.intValue();
-            if (assigned[representative]) {
-                continue;
-            }
-            assigned[representative] = true;
-            Entry anchor = entries.get(representative);
-            ArrayList<Integer> members = new ArrayList<Integer>();
-            members.add(Integer.valueOf(representative));
-            for (Integer candidateValue : ordered) {
-                int candidate = candidateValue.intValue();
-                if (assigned[candidate]) {
-                    continue;
-                }
-                Entry other = entries.get(candidate);
-                float gap = wereGrouped(
-                        anchor.id, other.id, previousMembership)
-                        ? SPLIT_GAP : 0.0F;
-                if (overlaps(anchor, other, gap, radiusScale)) {
-                    assigned[candidate] = true;
-                    members.add(Integer.valueOf(candidate));
+        /** Maps a {@code LostTalesMapLegendRegistry} category id. */
+        static GroupingCategory forLegendCategory(String categoryId) {
+            String normalized = categoryId == null
+                    ? "" : categoryId.trim();
+            if (normalized.length() != 0) {
+                for (GroupingCategory category : values()) {
+                    if (category.legendCategoryId.equals(normalized)) {
+                        return category;
+                    }
                 }
             }
-            groups.add(new Group(representative, members));
-            if (members.size() > 1) {
-                for (Integer member : members) {
-                    membership.put(entries.get(member.intValue()).id,
-                            anchor.id);
-                }
-            }
+            return UNKNOWN;
         }
-        return new Result(groups, membership);
+
+        boolean isGroupingEligible() {
+            return this.groupingEligible;
+        }
+
+        boolean canGroupWith(GroupingCategory other) {
+            return other != null && this.groupingEligible
+                    && other.groupingEligible && this == other;
+        }
     }
 
     /**
-     * Zooming in may split an existing stack, but it must not move a marker
-     * sideways into a different stack. Keeping the previous lineages
-     * independent makes zoom-in the exact inverse of zoom-out merging.
+     * Clusters markers into stacks, in four steps.
+     *
+     * <ol>
+     *   <li>Every marker is placed in the stack it is already part of. This
+     *       is the only step that can take a stack apart, and it does so one
+     *       member at a time, as each falls below the leave threshold against
+     *       that stack's leader.</li>
+     *   <li>Stacks are ordered by their leaders, most relevant first.</li>
+     *   <li>The stacks nothing else already covers become the roots.</li>
+     *   <li>Every remaining stack merges, whole, into the root its leader
+     *       overlaps most.</li>
+     * </ol>
+     *
+     * <p>Because steps 3 and 4 compare leaders and never individual members,
+     * a line of markers each merely touching its neighbour still cannot
+     * collapse onto one end, and a stack sitting between two others joins the
+     * one it is actually on rather than the one that ranks higher. Because
+     * step 4 moves a stack as one, two stacks that meet become one stack
+     * instead of trading members or leaving one behind.</p>
+     *
+     * <p>The previous membership is the only history involved, and it decides
+     * both which markers are already a stack and which threshold applies to
+     * each pair. Every decision is traceable to real, active markers: a fan,
+     * a group anchor, or any other render state plays no part.</p>
      */
-    private static Result splitPreviousGroups(
+    static Result group(List<Entry> entries,
+                        Map<String, String> previousLinks) {
+        if (entries == null || entries.isEmpty()) {
+            return Result.empty();
+        }
+        List<Integer> ordered = sortedIndices(entries);
+        Map<String, Integer> indexById = indexById(entries);
+        Map<String, String> previousLeaders = leadersOf(previousLinks);
+        int[] linkOf = surviveLinks(
+                entries, ordered, indexById, previousLinks);
+        List<Integer> roots = mergeRoots(
+                entries, rootsOf(ordered, linkOf), linkOf, previousLeaders);
+        return buildResult(entries, ordered, roots, linkOf);
+    }
+
+    private static Map<String, Integer> indexById(List<Entry> entries) {
+        Map<String, Integer> indexById = new LinkedHashMap<String, Integer>(
+                Math.max(4, entries.size() * 2));
+        for (int index = 0; index < entries.size(); index++) {
+            indexById.put(entries.get(index).id, Integer.valueOf(index));
+        }
+        return indexById;
+    }
+
+    /**
+     * Keeps every link whose two markers are still overlapping, and breaks
+     * the rest.
+     *
+     * <p>This is the whole leaving rule: a marker is held by the one marker
+     * it came to rest on, and by nothing else. Holding it for as long as it
+     * touched <em>any</em> member of its stack kept markers grouped well past
+     * the point where they had visibly parted, and then released the lot of
+     * them at once when the last of those incidental overlaps gave way.</p>
+     *
+     * <p>A marker whose link has broken becomes a root, and anything still
+     * linked to it comes along, so a stack always comes apart into stacks.</p>
+     */
+    private static int[] surviveLinks(
             List<Entry> entries, List<Integer> ordered,
-            Map<String, String> previousMembership,
-            float radiusScale) {
-        LinkedHashMap<String, ArrayList<Integer>> membersByLineage =
-                new LinkedHashMap<String, ArrayList<Integer>>();
-        for (Integer indexValue : ordered) {
-            Entry entry = entries.get(indexValue.intValue());
-            String key = previousGroupKey(entry.id, previousMembership);
-            ArrayList<Integer> members = membersByLineage.get(key);
-            if (members == null) {
-                members = new ArrayList<Integer>();
-                membersByLineage.put(key, members);
-            }
-            members.add(indexValue);
+            Map<String, Integer> indexById,
+            Map<String, String> previousLinks) {
+        int[] linkOf = new int[entries.size()];
+        Arrays.fill(linkOf, -1);
+        if (previousLinks == null || previousLinks.isEmpty()) {
+            return linkOf;
         }
-
-        ArrayList<Group> groups = new ArrayList<Group>();
-        LinkedHashMap<String, String> membership =
-                new LinkedHashMap<String, String>();
-        for (ArrayList<Integer> lineage : membersByLineage.values()) {
-            // Partition only inside the previous lineage. A large stack can
-            // therefore peel into smaller child stacks as the map expands,
-            // without any child jumping sideways into a neighbouring stack.
-            boolean[] assigned = new boolean[entries.size()];
-            for (Integer representativeValue : lineage) {
-                int representative = representativeValue.intValue();
-                if (assigned[representative]) {
-                    continue;
-                }
-                assigned[representative] = true;
-                Entry anchor = entries.get(representative);
-                ArrayList<Integer> retained = new ArrayList<Integer>();
-                retained.add(representativeValue);
-                for (Integer memberValue : lineage) {
-                    int member = memberValue.intValue();
-                    if (assigned[member]) {
-                        continue;
-                    }
-                    if (overlaps(anchor, entries.get(member),
-                            SPLIT_GAP, radiusScale)) {
-                        assigned[member] = true;
-                        retained.add(memberValue);
-                    }
-                }
-                addGroup(entries, groups, membership, retained);
-            }
-        }
-        sortGroupsByRepresentative(entries, groups);
-        return new Result(groups, membership);
-    }
-
-    private static void addGroup(
-            List<Entry> entries, List<Group> groups,
-            Map<String, String> membership,
-            ArrayList<Integer> members) {
-        sortByRelevance(entries, members);
-        int representative = members.get(0).intValue();
-        groups.add(new Group(representative, members));
-        if (members.size() <= 1) {
-            return;
-        }
-        String representativeId = entries.get(representative).id;
-        for (Integer member : members) {
-            membership.put(entries.get(member.intValue()).id,
-                    representativeId);
-        }
-    }
-
-    private static void sortGroupsByRepresentative(
-            final List<Entry> entries, List<Group> groups) {
-        Collections.sort(groups, new Comparator<Group>() {
-            @Override
-            public int compare(Group left, Group right) {
-                return LostTalesMapMarkerGrouping.compare(
-                        entries.get(left.representativeIndex),
-                        entries.get(right.representativeIndex));
-            }
-        });
-    }
-
-    private static Result groupAtomicStacks(
-            List<Entry> entries, List<Integer> ordered,
-            Map<String, String> previousMembership,
-            float radiusScale) {
-        LinkedHashMap<String, ArrayList<Integer>> membersByStack =
-                new LinkedHashMap<String, ArrayList<Integer>>();
-        for (Integer indexValue : ordered) {
-            Entry entry = entries.get(indexValue.intValue());
-            String key = previousGroupKey(entry.id, previousMembership);
-            ArrayList<Integer> members = membersByStack.get(key);
-            if (members == null) {
-                members = new ArrayList<Integer>();
-                membersByStack.put(key, members);
-            }
-            members.add(indexValue);
-        }
-
-        ArrayList<AtomicStack> stacks = new ArrayList<AtomicStack>();
-        for (ArrayList<Integer> members : membersByStack.values()) {
-            stacks.add(new AtomicStack(entries, members));
-        }
-        boolean[] assigned = new boolean[stacks.size()];
-        ArrayList<Group> groups = new ArrayList<Group>();
-        LinkedHashMap<String, String> membership =
-                new LinkedHashMap<String, String>();
-        for (int stackIndex = 0; stackIndex < stacks.size(); stackIndex++) {
-            if (assigned[stackIndex]) {
+        for (Integer candidateValue : ordered) {
+            int index = candidateValue.intValue();
+            Entry candidate = entries.get(index);
+            String anchorId = previousLinks.get(candidate.id);
+            if (anchorId == null || anchorId.equals(candidate.id)) {
                 continue;
             }
-            assigned[stackIndex] = true;
-            AtomicStack anchor = stacks.get(stackIndex);
-            ArrayList<Integer> members =
-                    new ArrayList<Integer>(anchor.memberIndices);
-            for (int candidateIndex = 0;
-                 candidateIndex < stacks.size(); candidateIndex++) {
-                if (assigned[candidateIndex]) {
-                    continue;
-                }
-                AtomicStack candidate = stacks.get(candidateIndex);
-                if (stacksOverlap(anchor, candidate, radiusScale)) {
-                    assigned[candidateIndex] = true;
-                    members.addAll(candidate.memberIndices);
-                }
+            Integer anchorIndex = indexById.get(anchorId);
+            if (anchorIndex == null) {
+                continue;
             }
-            sortByRelevance(entries, members);
-            int representative = members.get(0).intValue();
-            String representativeId = entries.get(representative).id;
-            groups.add(new Group(representative, members));
-            if (members.size() > 1) {
-                for (Integer member : members) {
-                    membership.put(entries.get(member.intValue()).id,
-                            representativeId);
-                }
+            Entry anchor = entries.get(anchorIndex.intValue());
+            if (candidate.canGroupWith(anchor)
+                    && overlap(anchor, candidate)
+                            >= LEAVE_OVERLAP_RATIO) {
+                linkOf[index] = anchorIndex.intValue();
             }
         }
-        return new Result(groups, membership);
+        return linkOf;
+    }
+
+    /** Markers holding no surviving link, most relevant first. */
+    private static List<Integer> rootsOf(
+            List<Integer> ordered, int[] linkOf) {
+        List<Integer> roots = new ArrayList<Integer>();
+        for (Integer candidateValue : ordered) {
+            if (linkOf[candidateValue.intValue()] < 0) {
+                roots.add(candidateValue);
+            }
+        }
+        return roots;
+    }
+
+    /**
+     * Merges stacks that have come to rest on one another.
+     *
+     * <p>A stack joins another only by its own root landing on that stack's
+     * root — the marker it is actually drawn as. A stack that has swallowed
+     * several others covers the map wherever its markers really are, and
+     * letting it reach that far had stacks that were plainly far apart
+     * swallowing one another.</p>
+     *
+     * <p>The joining root links exactly as any other marker does, so the
+     * merged stack comes apart again along the same seam.</p>
+     *
+     * @return the roots that survived, most relevant first
+     */
+    private static List<Integer> mergeRoots(
+            List<Entry> entries, List<Integer> roots, int[] linkOf,
+            Map<String, String> previousLeaders) {
+        // Which stacks survive is settled before anything is linked, so a
+        // stack can then be handed to the one it is actually sitting on
+        // rather than to whichever happened to be considered first.
+        boolean[] isSettled = new boolean[entries.size()];
+        List<Integer> settled = new ArrayList<Integer>(roots.size());
+        for (Integer rootValue : roots) {
+            Entry root = entries.get(rootValue.intValue());
+            boolean covered = false;
+            for (Integer settledValue : settled) {
+                Entry other = entries.get(settledValue.intValue());
+                if (root.canGroupWith(other)
+                        && overlap(other, root) >= threshold(
+                        other.id, root.id, previousLeaders)) {
+                    covered = true;
+                    break;
+                }
+            }
+            if (!covered) {
+                isSettled[rootValue.intValue()] = true;
+                settled.add(rootValue);
+            }
+        }
+        for (Integer rootValue : roots) {
+            int index = rootValue.intValue();
+            if (isSettled[index]) {
+                continue;
+            }
+            Entry root = entries.get(index);
+            int chosen = -1;
+            float chosenOverlap = 0.0F;
+            for (Integer settledValue : settled) {
+                Entry other = entries.get(settledValue.intValue());
+                if (!root.canGroupWith(other)) {
+                    continue;
+                }
+                float covered = overlap(other, root);
+                // Strictly greater, so an exact tie keeps the more relevant
+                // stack, which settled first.
+                if (covered > chosenOverlap && covered >= threshold(
+                        other.id, root.id, previousLeaders)) {
+                    chosenOverlap = covered;
+                    chosen = settledValue.intValue();
+                }
+            }
+            // A stack is only ever unsettled because a settled one covered
+            // it, so this cannot normally fail. Leading itself is the safe
+            // answer if it ever does: a marker must never fall out of every
+            // stack and stop being drawn.
+            if (chosen < 0) {
+                isSettled[index] = true;
+                settled.add(rootValue);
+            } else {
+                linkOf[index] = chosen;
+            }
+        }
+        return settled;
+    }
+
+    /** The marker leading each marker's stack, from a link map. */
+    private static Map<String, String> leadersOf(
+            Map<String, String> links) {
+        if (links == null || links.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        LinkedHashMap<String, String> leaders =
+                new LinkedHashMap<String, String>(links.size() * 2);
+        for (Map.Entry<String, String> link : links.entrySet()) {
+            String leader = link.getKey();
+            // Bounded walk: a link map is a forest, but never loop on input
+            // that has been through a version this mod did not write.
+            for (int steps = 0; steps < links.size(); steps++) {
+                String next = links.get(leader);
+                if (next == null || next.equals(leader)) {
+                    break;
+                }
+                leader = next;
+            }
+            leaders.put(link.getKey(), leader);
+        }
+        return leaders;
+    }
+
+    private static int rootIndex(int[] linkOf, int index) {
+        int root = index;
+        for (int steps = 0; steps < linkOf.length; steps++) {
+            if (linkOf[root] < 0) {
+                return root;
+            }
+            root = linkOf[root];
+        }
+        return index;
+    }
+
+    /**
+     * A marker already sharing a group with this leader holds on a little
+     * longer than it took to bring them together, so one resting on the
+     * threshold cannot join and leave on alternating frames.
+     */
+    private static float threshold(
+            String leaderId, String candidateId,
+            Map<String, String> previousMembership) {
+        if (previousMembership == null || previousMembership.isEmpty()) {
+            return JOIN_OVERLAP_RATIO;
+        }
+        String candidateGroup = previousMembership.get(candidateId);
+        if (candidateGroup == null) {
+            return JOIN_OVERLAP_RATIO;
+        }
+        return candidateGroup.equals(leaderId)
+                || candidateGroup.equals(previousMembership.get(leaderId))
+                ? LEAVE_OVERLAP_RATIO : JOIN_OVERLAP_RATIO;
+    }
+
+    private static float overlap(Entry first, Entry second) {
+        return overlapRatio(
+                first.left, first.top, first.right, first.bottom,
+                second.left, second.top, second.right, second.bottom);
+    }
+
+    /**
+     * Materialises one stack per root: the root first, then every other
+     * marker hanging off it in relevance order.
+     */
+    private static Result buildResult(
+            List<Entry> entries, List<Integer> ordered,
+            List<Integer> roots, int[] linkOf) {
+        int[] groupOfRoot = new int[entries.size()];
+        Arrays.fill(groupOfRoot, -1);
+        List<List<Integer>> groupMembers =
+                new ArrayList<List<Integer>>(roots.size());
+        for (Integer rootValue : roots) {
+            groupOfRoot[rootValue.intValue()] = groupMembers.size();
+            List<Integer> members = new ArrayList<Integer>();
+            members.add(rootValue);
+            groupMembers.add(members);
+        }
+        for (Integer candidateValue : ordered) {
+            int index = candidateValue.intValue();
+            int root = rootIndex(linkOf, index);
+            if (root == index) {
+                continue;
+            }
+            groupMembers.get(groupOfRoot[root]).add(candidateValue);
+        }
+
+        List<Group> groups = new ArrayList<Group>(groupMembers.size());
+        LinkedHashMap<String, String> links =
+                new LinkedHashMap<String, String>();
+        LinkedHashMap<String, String> membership =
+                new LinkedHashMap<String, String>();
+        for (List<Integer> members : groupMembers) {
+            int representative = members.get(0).intValue();
+            groups.add(new Group(representative, members));
+            if (members.size() <= 1) {
+                continue;
+            }
+            String representativeId = entries.get(representative).id;
+            for (Integer member : members) {
+                int index = member.intValue();
+                int anchor = linkOf[index] < 0 ? index : linkOf[index];
+                links.put(entries.get(index).id,
+                        entries.get(anchor).id);
+                membership.put(entries.get(index).id, representativeId);
+            }
+        }
+        return new Result(groups, links, membership);
+    }
+
+    private static List<Integer> sortedIndices(final List<Entry> entries) {
+        List<Integer> ordered = new ArrayList<Integer>(entries.size());
+        for (int index = 0; index < entries.size(); index++) {
+            ordered.add(Integer.valueOf(index));
+        }
+        sortByRelevance(entries, ordered);
+        return ordered;
     }
 
     private static void sortByRelevance(
@@ -255,30 +418,6 @@ final class LostTalesMapMarkerGrouping {
         });
     }
 
-    private static boolean stacksOverlap(
-            AtomicStack first, AtomicStack second,
-            float radiusScale) {
-        for (Entry firstIcon : first.visibleIcons) {
-            for (Entry secondIcon : second.visibleIcons) {
-                if (overlaps(firstIcon, secondIcon,
-                        0.0F, radiusScale)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private static String previousGroupKey(
-            String markerId, Map<String, String> previousMembership) {
-        if (markerId == null) {
-            return "";
-        }
-        String group = previousMembership == null
-                ? null : previousMembership.get(markerId);
-        return group == null ? markerId : group;
-    }
-
     static Result ungroup(List<Entry> entries) {
         if (entries == null || entries.isEmpty()) {
             return Result.empty();
@@ -288,32 +427,67 @@ final class LostTalesMapMarkerGrouping {
             groups.add(new Group(index,
                     Collections.singletonList(Integer.valueOf(index))));
         }
-        return new Result(groups, Collections.<String, String>emptyMap());
+        return new Result(groups,
+                Collections.<String, String>emptyMap(),
+                Collections.<String, String>emptyMap());
     }
 
     /**
-     * Back-to-front order: low relevance first, then reverse alphabetical.
-     * Drawing in this order leaves the same marker selected by
-     * {@link #compare(Entry, Entry)} visibly on top.
+     * Back-to-front order over whole stacks: low relevance first, then
+     * reverse alphabetical. Drawing in this order leaves the marker selected
+     * by {@link #compare(Entry, Entry)} visibly on top.
+     *
+     * <p>A stack is one item in this order and is ranked by its most relevant
+     * member, not by the marker leading it. Ranking by the leader would sink a
+     * whole fan below a marker one of its own members outranks, and ordering
+     * members individually let unrelated markers be drawn between the sprites
+     * of one fan. A lone marker is a stack of one, so individual markers keep
+     * exactly the order they had.</p>
+     *
+     * @return indices into {@code groups}, least relevant first
      */
-    static List<Integer> bottomToTop(List<Entry> entries) {
-        if (entries == null || entries.isEmpty()) {
+    static List<Integer> groupsBottomToTop(
+            final List<Entry> entries, final List<Group> groups) {
+        if (entries == null || entries.isEmpty()
+                || groups == null || groups.isEmpty()) {
             return Collections.emptyList();
         }
+        final int[] rankedBy = new int[groups.size()];
+        for (int index = 0; index < groups.size(); index++) {
+            rankedBy[index] = mostRelevantMember(
+                    entries, groups.get(index));
+        }
         ArrayList<Integer> ordered =
-                new ArrayList<Integer>(entries.size());
-        for (int index = 0; index < entries.size(); index++) {
+                new ArrayList<Integer>(groups.size());
+        for (int index = 0; index < groups.size(); index++) {
             ordered.add(Integer.valueOf(index));
         }
         Collections.sort(ordered, new Comparator<Integer>() {
             @Override
             public int compare(Integer left, Integer right) {
                 return -LostTalesMapMarkerGrouping.compare(
-                        entries.get(left.intValue()),
-                        entries.get(right.intValue()));
+                        entries.get(rankedBy[left.intValue()]),
+                        entries.get(rankedBy[right.intValue()]));
             }
         });
         return ordered;
+    }
+
+    /**
+     * The member a stack is ranked by. Usually the marker leading it, but a
+     * marker can join a stack led by something it outranks when it overlaps
+     * that one more.
+     */
+    private static int mostRelevantMember(
+            List<Entry> entries, Group group) {
+        int best = group.getRepresentativeIndex();
+        for (Integer memberValue : group.getMemberIndices()) {
+            int member = memberValue.intValue();
+            if (compare(entries.get(member), entries.get(best)) < 0) {
+                best = member;
+            }
+        }
+        return best;
     }
 
     /**
@@ -328,35 +502,30 @@ final class LostTalesMapMarkerGrouping {
                 + (markerPosition - groupAnchor) * clamped;
     }
 
-    private static boolean wereGrouped(String first, String second,
-                                       Map<String, String> membership) {
-        if (membership == null || first == null || second == null) {
-            return false;
+    /**
+     * Intersection area divided by the smaller rectangle's area. Using the
+     * smaller area means a marker joins a wide cluster as soon as the cluster
+     * covers most of the marker, which is what the eye reads as "hidden
+     * behind".
+     */
+    static float overlapRatio(
+            float firstLeft, float firstTop,
+            float firstRight, float firstBottom,
+            float secondLeft, float secondTop,
+            float secondRight, float secondBottom) {
+        float width = Math.min(firstRight, secondRight)
+                - Math.max(firstLeft, secondLeft);
+        float height = Math.min(firstBottom, secondBottom)
+                - Math.max(firstTop, secondTop);
+        if (width <= 0.0F || height <= 0.0F) {
+            return 0.0F;
         }
-        String firstGroup = membership.get(first);
-        return firstGroup != null && firstGroup.equals(membership.get(second));
-    }
-
-    private static boolean overlaps(
-            Entry first, Entry second, float gap,
-            float visibleRadiusScale) {
-        float firstX = (first.left + first.right) * 0.5F;
-        float firstY = (first.top + first.bottom) * 0.5F;
-        float secondX = (second.left + second.right) * 0.5F;
-        float secondY = (second.top + second.bottom) * 0.5F;
-        float firstRadius = Math.min(
-                first.right - first.left,
-                first.bottom - first.top) * 0.5F;
-        float secondRadius = Math.min(
-                second.right - second.left,
-                second.bottom - second.top) * 0.5F;
-        float threshold = (firstRadius + secondRadius)
-                * visibleRadiusScale + gap;
-        float deltaX = (firstX - secondX)
-                / HORIZONTAL_FOOTPRINT_SCALE;
-        float deltaY = firstY - secondY;
-        return deltaX * deltaX + deltaY * deltaY
-                <= threshold * threshold;
+        float firstArea = (firstRight - firstLeft)
+                * (firstBottom - firstTop);
+        float secondArea = (secondRight - secondLeft)
+                * (secondBottom - secondTop);
+        float smaller = Math.min(firstArea, secondArea);
+        return smaller <= 0.0F ? 0.0F : width * height / smaller;
     }
 
     /** Higher relevance, then locale-independent name, then stable ID. */
@@ -375,75 +544,65 @@ final class LostTalesMapMarkerGrouping {
         return left.id.compareTo(right.id);
     }
 
-    private static final class AtomicStack {
-        private final List<Integer> memberIndices;
-        private final List<Entry> visibleIcons;
-
-        private AtomicStack(List<Entry> entries,
-                            List<Integer> memberIndices) {
-            this.memberIndices = Collections.unmodifiableList(
-                    new ArrayList<Integer>(memberIndices));
-            Entry representative = entries.get(
-                    memberIndices.get(0).intValue());
-            ArrayList<Entry> icons = new ArrayList<Entry>(3);
-            icons.add(representative);
-            if (memberIndices.size() > 1) {
-                icons.add(representative.shifted(
-                        -COMPANION_OFFSET_X, COMPANION_OFFSET_Y));
-            }
-            if (memberIndices.size() > 2) {
-                icons.add(representative.shifted(
-                        COMPANION_OFFSET_X, COMPANION_OFFSET_Y));
-            }
-            this.visibleIcons = Collections.unmodifiableList(icons);
-        }
-    }
-
+    /**
+     * One active marker as grouping sees it: a stable identity, the rectangle
+     * its own icon covers on screen, and the category it may share a stack
+     * with. Nothing here describes a fan, a group anchor or any other render
+     * state, so a group can never be mistaken for an extra marker.
+     */
     static final class Entry {
         private final String id;
         private final String displayName;
         private final int relevanceRank;
+        private final GroupingCategory category;
         private final float left;
         private final float top;
         private final float right;
         private final float bottom;
 
         Entry(String id, String displayName, int relevanceRank,
+              GroupingCategory category,
               float left, float top, float right, float bottom) {
             this.id = normalize(id);
             String normalizedName = normalize(displayName);
             this.displayName = normalizedName.length() == 0
                     ? this.id : normalizedName;
             this.relevanceRank = relevanceRank;
+            this.category = category == null
+                    ? GroupingCategory.UNKNOWN : category;
             this.left = Math.min(left, right);
             this.top = Math.min(top, bottom);
             this.right = Math.max(left, right);
             this.bottom = Math.max(top, bottom);
         }
 
-        private Entry shifted(float offsetX, float offsetY) {
-            return new Entry(this.id, this.displayName,
-                    this.relevanceRank,
-                    this.left + offsetX, this.top + offsetY,
-                    this.right + offsetX, this.bottom + offsetY);
+        String getId() {
+            return this.id;
         }
 
-        Entry withScaledSpacing(float scale) {
-            if (scale == 1.0F) {
-                return this;
-            }
-            float centerX = (this.left + this.right) * 0.5F;
-            float centerY = (this.top + this.bottom) * 0.5F;
-            float halfWidth = (this.right - this.left) * 0.5F;
-            float halfHeight = (this.bottom - this.top) * 0.5F;
-            float scaledCenterX = centerX * scale;
-            float scaledCenterY = centerY * scale;
-            return new Entry(this.id, this.displayName,
-                    this.relevanceRank,
-                    scaledCenterX - halfWidth,
-                    scaledCenterY - halfHeight,
-                    scaledCenterX + halfWidth,
-                    scaledCenterY + halfHeight);
+        int getRelevanceRank() {
+            return this.relevanceRank;
+        }
+
+        GroupingCategory getGroupingCategory() {
+            return this.category;
+        }
+
+        float getLeft() {
+            return this.left;
+        }
+
+        float getTop() {
+            return this.top;
+        }
+
+        boolean isGroupingEligible() {
+            return this.category.isGroupingEligible();
+        }
+
+        boolean canGroupWith(Entry other) {
+            return other != null
+                    && this.category.canGroupWith(other.category);
         }
 
         private static String normalize(String value) {
@@ -454,22 +613,21 @@ final class LostTalesMapMarkerGrouping {
     static final class Group {
         private final int representativeIndex;
         private final List<Integer> memberIndices;
-        private final String additionalLabel;
 
         private Group(int representativeIndex, List<Integer> memberIndices) {
             this.representativeIndex = representativeIndex;
             this.memberIndices = Collections.unmodifiableList(
                     new ArrayList<Integer>(memberIndices));
-            int additional = memberIndices.size() - 1;
-            this.additionalLabel = additional > 0
-                    ? "+" + additional + (additional == 1
-                            ? " more" : " more") : "";
         }
 
         int getRepresentativeIndex() { return this.representativeIndex; }
         List<Integer> getMemberIndices() { return this.memberIndices; }
         int size() { return this.memberIndices.size(); }
-        String getAdditionalLabel() { return this.additionalLabel; }
+
+        /** Members the fan cannot show, summarised by the "+X more" label. */
+        int getCondensedMemberCount() {
+            return Math.max(0, this.memberIndices.size() - MAX_FAN_MEMBERS);
+        }
 
         int getCompanionSide(int candidateIndex) {
             if (this.memberIndices.size() > 1
@@ -489,19 +647,34 @@ final class LostTalesMapMarkerGrouping {
     static final class Result {
         private static final Result EMPTY = new Result(
                 Collections.<Group>emptyList(),
+                Collections.<String, String>emptyMap(),
                 Collections.<String, String>emptyMap());
         private final List<Group> groups;
+        private final Map<String, String> links;
         private final Map<String, String> membership;
 
-        private Result(List<Group> groups, Map<String, String> membership) {
+        private Result(List<Group> groups, Map<String, String> links,
+                       Map<String, String> membership) {
             this.groups = Collections.unmodifiableList(
                     new ArrayList<Group>(groups));
+            this.links = Collections.unmodifiableMap(
+                    new LinkedHashMap<String, String>(links));
             this.membership = Collections.unmodifiableMap(
                     new LinkedHashMap<String, String>(membership));
         }
 
         static Result empty() { return EMPTY; }
         List<Group> getGroups() { return this.groups; }
+
+        /**
+         * The one marker each marker came to rest on, which is what holds it
+         * in its stack. A stack's own leader maps to itself. This is what a
+         * later decision must be given back, because it is the only record of
+         * how each stack was actually built.
+         */
+        Map<String, String> getLinks() { return this.links; }
+
+        /** The marker leading each grouped marker's stack. */
         Map<String, String> getMembership() { return this.membership; }
     }
 }

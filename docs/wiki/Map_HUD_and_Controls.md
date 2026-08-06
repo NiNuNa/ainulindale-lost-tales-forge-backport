@@ -46,6 +46,12 @@ Lost Tales adds its overlay to LOTR's Middle-earth map and uses the normal LOTR 
 
 Every bundled LOTR waypoint marker uses the same discovery and visibility rules, including the Sun Elves, Moon Elves, Odane, and Orocarni. Entering the biome associated with a waypoint unlocks its LOTR fast-travel region and reveals the marker on the map. Moving close enough discovers the exact location and stores that state on the server. Added faction waypoints use their territory's existing biome region; Odane uses its generated Odane biome region.
 
+Markers whose icons overlap are drawn as one stack: a leading marker with up to two companions fanned out behind it, and a "+X more" label for anything the fan cannot show. Only markers of the same kind ever share a stack, so a quest objective, a party Go Here marker, a player waystone and a location never merge into each other, and quest markers always stay individually readable.
+
+A marker joins a stack by coming to rest on one particular marker, and that is what holds it: it stays while it still overlaps that marker and leaves the moment it does not, taking anything resting on it along. Zooming back in therefore takes a stack apart in the same order and at the same points that zooming out put it together. Whole stacks merge by their leading markers meeting, so a stack never reaches further than the icon it is drawn as, however many markers it has gathered.
+
+The map zooms smoothly rather than in fixed steps, and grouping follows the icons as they are actually drawn: markers merge at the moment they overlap and separate at the moment they stop, instead of jumping to whatever the next zoom level would have looked like.
+
 `/losttales mapmarker` provides permission-level-2 tools to inspect, discover, forget, track, or untrack markers for testing and administration.
 
 ## Quick loot

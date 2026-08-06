@@ -28,6 +28,8 @@ public final class LostTalesCompassMarkerIconTest {
                     LostTalesCompassMarkerIcon.QUEST,
                     LostTalesCompassMarkerIcon.HOSTILE,
                     LostTalesCompassMarkerIcon.UNDISCOVERED,
+                    LostTalesCompassMarkerIcon.POINT_OF_INTEREST,
+                    LostTalesCompassMarkerIcon.PERSONAL,
                     LostTalesCompassMarkerIcon.N,
                     LostTalesCompassMarkerIcon.NE,
                     LostTalesCompassMarkerIcon.E,
@@ -36,11 +38,15 @@ public final class LostTalesCompassMarkerIconTest {
                     LostTalesCompassMarkerIcon.SW,
                     LostTalesCompassMarkerIcon.W,
                     LostTalesCompassMarkerIcon.NW,
-                    LostTalesCompassMarkerIcon.TOWN,
+                    LostTalesCompassMarkerIcon.SHACK,
                     LostTalesCompassMarkerIcon.GRAVEYARD,
                     LostTalesCompassMarkerIcon.FOREST,
-                    LostTalesCompassMarkerIcon.FOUNTAIN,
-                    LostTalesCompassMarkerIcon.PORT
+                    LostTalesCompassMarkerIcon.MOUNTAINS,
+                    LostTalesCompassMarkerIcon.PORT,
+                    LostTalesCompassMarkerIcon.BIG_PORT,
+                    LostTalesCompassMarkerIcon.BRIDGE,
+                    LostTalesCompassMarkerIcon.SMALL_BRIDGE,
+                    LostTalesCompassMarkerIcon.CAMP
             };
             for (LostTalesCompassMarkerIcon sprite : sprites) {
                 assertTrue(sprite.name() + " extends beyond the atlas",
@@ -49,18 +55,15 @@ public final class LostTalesCompassMarkerIconTest {
                         && sprite.getV()
                                 + LostTalesCompassMarkerIcon.HEIGHT
                                 <= atlas.getHeight());
-                // The supplied atlas currently leaves the fountain slot empty.
-                if (sprite != LostTalesCompassMarkerIcon.FOUNTAIN) {
-                    assertTrue(sprite.name() + " has no visible pixels",
-                            hasVisiblePixel(atlas, sprite));
-                }
+                assertTrue(sprite.name() + " has no visible pixels",
+                        hasVisiblePixel(atlas, sprite));
             }
 
-            // The revised forest silhouette begins with its three-pixel cap;
-            // losing that row makes the tree look clipped in the compass.
+            // The forest silhouette begins with its three-pixel cap one row
+            // into the cell; losing that row makes the tree look clipped.
             assertEquals(3, visiblePixelCountInRow(atlas,
                     LostTalesCompassMarkerIcon.FOREST,
-                    LostTalesCompassMarkerIcon.FOREST.getV()));
+                    LostTalesCompassMarkerIcon.FOREST.getV() + 1));
             assertTrue(hasVisiblePixelInRow(atlas,
                     LostTalesCompassMarkerIcon.FOREST,
                     LostTalesCompassMarkerIcon.FOREST.getV() + 14));
@@ -71,6 +74,21 @@ public final class LostTalesCompassMarkerIconTest {
 
     @Test
     public void iconNamesResolveNewIconsAndLegacyAliases() {
+        assertEquals(LostTalesCompassMarkerIcon.SHACK,
+                LostTalesCompassMarkerIcon.fromName("shack"));
+        assertEquals(LostTalesCompassMarkerIcon.MOUNTAINS,
+                LostTalesCompassMarkerIcon.fromName("mountains"));
+        assertEquals(LostTalesCompassMarkerIcon.BIG_PORT,
+                LostTalesCompassMarkerIcon.fromName("big_port"));
+        assertEquals(LostTalesCompassMarkerIcon.SMALL_BRIDGE,
+                LostTalesCompassMarkerIcon.fromName("small_bridge"));
+        assertEquals(LostTalesCompassMarkerIcon.CAMP,
+                LostTalesCompassMarkerIcon.fromName("camp"));
+        assertEquals(LostTalesCompassMarkerIcon.POINT_OF_INTEREST,
+                LostTalesCompassMarkerIcon.fromName("point_of_interest"));
+        assertEquals(LostTalesCompassMarkerIcon.PERSONAL,
+                LostTalesCompassMarkerIcon.fromName("personal"));
+        // Saved markers still store the retired names.
         assertEquals(LostTalesCompassMarkerIcon.TOWN,
                 LostTalesCompassMarkerIcon.fromName("town"));
         assertEquals(LostTalesCompassMarkerIcon.GRAVEYARD,

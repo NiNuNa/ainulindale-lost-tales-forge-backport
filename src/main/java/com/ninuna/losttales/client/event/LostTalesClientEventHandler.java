@@ -27,6 +27,7 @@ import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneStateStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneTravelContext;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMainMenuMapHook;
+import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapMarkerIconOverlay;
 import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
@@ -98,6 +99,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientQuestDefinitionStore.clearDynamicQuestDefinitions();
         LostTalesClientMapMarkerNotificationStore.clear();
         LostTalesClientMapMarkerStore.clearDynamicMarkers();
+        LostTalesLotrMapMarkerIconOverlay.clearClientState();
         LostTalesClientWaystoneStateStore.clear();
         LostTalesClientWaystoneTravelContext.clear();
         LostTalesClientMobAggroCache.clear();

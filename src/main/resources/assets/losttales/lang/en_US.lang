@@ -556,6 +556,8 @@ quickLootHud.losttales.empty=Empty
 quickLootHud.losttales.drop=Drop
 quickLootHud.losttales.scroll=Scroll Up/Down
 quickLootHud.losttales.plus=+
+# Shown under a map cluster for the members its fan cannot draw
+map.losttales.marker.group_more=+%d more
 characterMenu.title=Character Menu
 gui.losttales.character.settings=Settings
 questJournal.title=Quest Journal

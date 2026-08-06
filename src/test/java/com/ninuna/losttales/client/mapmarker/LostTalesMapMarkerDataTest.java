@@ -70,13 +70,14 @@ public final class LostTalesMapMarkerDataTest {
                 .markerStackOverlapsMapBounds(
                         50.0F, -8.1F, 0.0F, 100.0F,
                         0.0F, 100.0F));
+        // Sideways the fan reaches an extra 115% of the icon's half-width.
         assertTrue(LostTalesLotrMapMarkerIconOverlay
                 .markerStackOverlapsMapBounds(
-                        -11.9F, 50.0F, 0.0F, 100.0F,
+                        -17.1F, 50.0F, 0.0F, 100.0F,
                         0.0F, 100.0F));
         assertFalse(LostTalesLotrMapMarkerIconOverlay
                 .markerStackOverlapsMapBounds(
-                        -12.1F, 50.0F, 0.0F, 100.0F,
+                        -17.3F, 50.0F, 0.0F, 100.0F,
                         0.0F, 100.0F));
     }
 

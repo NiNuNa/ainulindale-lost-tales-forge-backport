@@ -66,6 +66,24 @@ public final class HudPlacementLayoutTest {
     }
 
     @Test
+    public void snappingAnOddWidthPanelLandsOnTheCentreGuideColumn() {
+        // The compass panel is 257 wide, so its own centre is pixel column 128.
+        // The editor draws its vertical guide as a one-pixel column at
+        // screenWidth / 2, and the snapped panel has to put that same column
+        // there — halving the leftover space rounds the wrong way and leaves
+        // the compass ornament one pixel left of the guide.
+        int panelWidth = 257;
+        int screenWidth = 1000;
+
+        HudPlacementLayout.DragResult result =
+                HudPlacementLayout.constrainDrag(
+                        370, 258, panelWidth, 80, screenWidth, 600, 6);
+
+        assertTrue(result.snappedX);
+        assertEquals(screenWidth / 2, result.x + panelWidth / 2);
+    }
+
+    @Test
     public void draggingCannotCrossScreenMargins() {
         HudPlacementLayout.DragResult result =
                 HudPlacementLayout.constrainDrag(

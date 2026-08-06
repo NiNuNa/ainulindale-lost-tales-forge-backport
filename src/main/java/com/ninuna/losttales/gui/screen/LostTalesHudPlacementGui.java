@@ -148,15 +148,42 @@ public class LostTalesHudPlacementGui extends GuiScreen {
     }
 
     private void drawPlacementGrid() {
-        for (int x = 0; x <= this.width; x += GRID_MINOR_SPACING) {
-            int color = x % GRID_MAJOR_SPACING == 0
+        /*
+         * Anchor the grid on the centre guides instead of the top-left corner.
+         * The guides sit at width / 2 and height / 2, which is a multiple of the
+         * grid spacing only by coincidence, so a corner-anchored grid meets the
+         * centre at an arbitrary offset and the two halves do not mirror each
+         * other. Stepping outwards from the centre keeps the cells uniform
+         * around the axes a panel actually snaps to, and leaves any partial cell
+         * at the screen edges where it is harmless.
+         */
+        int centreX = this.width / 2;
+        int centreY = this.height / 2;
+        for (int dx = 0; centreX - dx >= 0 || centreX + dx <= this.width;
+                dx += GRID_MINOR_SPACING) {
+            int color = dx % GRID_MAJOR_SPACING == 0
                     ? 0x305E6875 : 0x183C4652;
-            drawRect(x, 0, x + 1, this.height, color);
+            if (centreX - dx >= 0) {
+                drawRect(centreX - dx, 0,
+                        centreX - dx + 1, this.height, color);
+            }
+            if (dx > 0 && centreX + dx <= this.width) {
+                drawRect(centreX + dx, 0,
+                        centreX + dx + 1, this.height, color);
+            }
         }
-        for (int y = 0; y <= this.height; y += GRID_MINOR_SPACING) {
-            int color = y % GRID_MAJOR_SPACING == 0
+        for (int dy = 0; centreY - dy >= 0 || centreY + dy <= this.height;
+                dy += GRID_MINOR_SPACING) {
+            int color = dy % GRID_MAJOR_SPACING == 0
                     ? 0x305E6875 : 0x183C4652;
-            drawRect(0, y, this.width, y + 1, color);
+            if (centreY - dy >= 0) {
+                drawRect(0, centreY - dy,
+                        this.width, centreY - dy + 1, color);
+            }
+            if (dy > 0 && centreY + dy <= this.height) {
+                drawRect(0, centreY + dy,
+                        this.width, centreY + dy + 1, color);
+            }
         }
         drawRect(this.width / 2, 0,
                 this.width / 2 + 1, this.height, 0x667F8790);

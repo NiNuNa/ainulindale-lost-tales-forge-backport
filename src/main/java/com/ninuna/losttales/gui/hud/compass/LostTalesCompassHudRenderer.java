@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraController;
 import com.ninuna.losttales.client.diagnostics.LostTalesClientDiagnostics;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerBatchBuilder;
@@ -27,12 +28,30 @@ import org.lwjgl.opengl.GL11;
 public class LostTalesCompassHudRenderer {
     public static final ResourceLocation COMPASS_HUD_TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/compass_hud.png");
 
-    public static final int COMPASS_HUD_TEXTURE_WIDTH = 256;
-    public static final int COMPASS_HUD_TEXTURE_HEIGHT = 30;
+    /**
+     * Real pixel size of the bundled sprite.  These are the UV denominators and
+     * must match the PNG exactly, otherwise every u/v in this class addresses
+     * the wrong texel.
+     */
+    public static final int COMPASS_HUD_TEXTURE_WIDTH = 257;
+    public static final int COMPASS_HUD_TEXTURE_HEIGHT = 32;
+
+    /**
+     * The bar art is symmetric about the atlas centre, so the compass is drawn
+     * at its native size and the placement box's centre is also the ornament's
+     * centre — that is what makes the placement editor's centre snap land where
+     * the compass looks centred. LostTalesCompassHudRendererTest asserts that
+     * symmetry, so a re-exported sprite with lopsided padding fails the build
+     * instead of silently drifting off centre.
+     */
     public static final int COMPASS_WIDTH = COMPASS_HUD_TEXTURE_WIDTH;
-    public static final int COMPASS_HEIGHT = 22;
+
+    /** Bar rows plus the centre tick beneath them; row 24 is the blank separator. */
+    public static final int COMPASS_HEIGHT = 24;
     private static final int PLACEMENT_HEIGHT = 42;
-    static final int VERTICAL_ARROW_TEXTURE_V = 23;
+    // Short indicator = one chevron pair (rows 25-27); the tall one adds the
+    // second pair after a blank row, so h=7 spans rows 25-31 to the atlas floor.
+    static final int VERTICAL_ARROW_TEXTURE_V = 25;
 
     public static final int MAP_MARKER_OFFSET_Y = 8;
     public static final int MAP_MARKER_NAME_LABEL_OFFSET_Y = 3;
@@ -40,7 +59,12 @@ public class LostTalesCompassHudRenderer {
     public static final float MAP_MARKER_SCALE_MODIFIER = 0.18F;
     /** Minimum opacity for positioned markers that are still inside their configured distance threshold. */
     public static final float MAP_MARKER_DISTANCE_FADE_IN_FLOOR_ALPHA = 0.4F;
-    public static final float MAP_MARKER_SHADOW_ALPHA = 0.6F;
+    /**
+     * Drop shadows track their element's own opacity. Damping them separately
+     * made textured shadows blend with the sky while label shadows stayed
+     * solid, so the shared backdrop colour rendered as two different colours.
+     */
+    public static final float MAP_MARKER_SHADOW_ALPHA = 1.0F;
     public static final int MAP_MARKER_VERTICAL_ARROW_INDICATOR_OFFSET_X = 2;
     public static final int MAP_MARKER_BEGIN_EDGE_FADE_OUT_OFFSET = 24;
     public static final int MAP_MARKER_BEGIN_CENTER_FOCUS_OFFSET = 26;
@@ -63,6 +87,9 @@ public class LostTalesCompassHudRenderer {
      * marker text below this byte alpha invisible instead of letting it flash.
      */
     private static final int MAP_MARKER_MIN_TEXT_ALPHA = 4;
+    /** Matches the marker icon artwork rather than pure white. */
+    private static final int MAP_MARKER_LABEL_COLOR =
+            LostTalesSkyrimUiStyle.rgb(LostTalesSkyrimUiStyle.HUD_LABEL);
 
     private static final List<LostTalesCompassMarkerProvider> MARKER_PROVIDERS = createMarkerProviders();
     private static String focusedMarkerStateKey;
@@ -100,7 +127,9 @@ public class LostTalesCompassHudRenderer {
                         + MAP_MARKER_DISTANCE_LABEL_OFFSET_Y);
         int compassX = placement.x;
         int compassY = placement.y;
-        int centerX = compassX + COMPASS_WIDTH / 2;
+        // Float: COMPASS_WIDTH is odd, so integer halving would anchor every
+        // marker half a pixel left of the bar's actual centre.
+        float centerX = compassX + COMPASS_WIDTH / 2.0F;
 
         float pxPerDeg = (float) COMPASS_WIDTH / (float) displayRadiusDeg;
         float viewYaw = ThirdPersonCameraController.resolveViewYaw(
@@ -141,7 +170,7 @@ public class LostTalesCompassHudRenderer {
         GL11.glPopMatrix();
     }
 
-    private static void renderMarkers(Minecraft minecraft, int compassY, int centerX, float yawDeg, float pxPerDeg, int visibleDeg, float partialTicks) {
+    private static void renderMarkers(Minecraft minecraft, int compassY, float centerX, float yawDeg, float pxPerDeg, int visibleDeg, float partialTicks) {
         List<LostTalesCompassMarker> markers = collectMarkers(minecraft, partialTicks);
         if (markers.isEmpty()) {
             resetFocusedMarkerState();
@@ -170,7 +199,7 @@ public class LostTalesCompassHudRenderer {
             LostTalesCompassHudRenderHelper.drawTexturedRectWithShadowTinted(
                     minecraft,
                     LostTalesCompassMarkerIcon.TEXTURE,
-                    -LostTalesCompassMarkerIcon.WIDTH / 2.0F,
+                    -LostTalesCompassMarkerIcon.ART_CENTER_X,
                     -LostTalesCompassMarkerIcon.HEIGHT,
                     icon.getU(),
                     icon.getV(),
@@ -259,16 +288,20 @@ public class LostTalesCompassHudRenderer {
             return;
         }
 
-        int color = (alpha << 24) | 0xFFFFFF;
+        int color = (alpha << 24) | MAP_MARKER_LABEL_COLOR;
         int nameY = compassY + COMPASS_HEIGHT + MAP_MARKER_NAME_LABEL_OFFSET_Y;
         int distY = compassY - fontRenderer.FONT_HEIGHT - MAP_MARKER_DISTANCE_LABEL_OFFSET_Y;
 
-        LostTalesCompassHudRenderHelper.drawCenteredString(fontRenderer, marker.getName(), batch.focusedPx, nameY, color, true);
+        // Sub-pixel, exactly like the marker icons: rounding to whole pixels
+        // makes the block visibly step as the compass turns.
+        float labelX = batch.focusedPx;
+
+        LostTalesCompassHudRenderHelper.drawCenteredString(fontRenderer, marker.getName(), labelX, nameY, color, true);
 
         if (marker.isShowDistanceLabel()) {
             double distBlocks = Math.sqrt(batch.dx * batch.dx + batch.dy * batch.dy + batch.dz * batch.dz);
             String distLabel = Math.round(distBlocks) + "m";
-            LostTalesCompassHudRenderHelper.drawCenteredString(fontRenderer, distLabel, batch.focusedPx, distY, color, true);
+            LostTalesCompassHudRenderHelper.drawCenteredString(fontRenderer, distLabel, labelX, distY, color, true);
 
             double deltaY = batch.dy;
             if (Math.abs(deltaY) >= 5.0D) {
@@ -285,12 +318,31 @@ public class LostTalesCompassHudRenderer {
                     u = 6;
                 }
 
-                float arrowX = batch.focusedPx + fontRenderer.getStringWidth(distLabel) / 2.0F + MAP_MARKER_VERTICAL_ARROW_INDICATOR_OFFSET_X;
+                /*
+                 * Offset from the label's ink edge, not from getStringWidth's
+                 * trailing gap. Beyond matching how the labels are centred, it
+                 * keeps this sprite on the same sub-pixel phase as everything
+                 * else on the compass: the icons are drawn at -6.5 from their
+                 * anchor and the labels at -(width-1)/2, both half-integers, so
+                 * a whole-integer offset here left the arrow snapping to the
+                 * pixel grid half a pixel out of step with the label beside it
+                 * - which reads as jitter while its neighbours glide.
+                 */
+                float distLabelInkHalfWidth =
+                        Math.max(0, fontRenderer.getStringWidth(distLabel) - 1) / 2.0F;
+                float arrowX = labelX + distLabelInkHalfWidth
+                        + MAP_MARKER_VERTICAL_ARROW_INDICATOR_OFFSET_X;
+                /*
+                 * Carry the sub-pixel position in the matrix and emit the quad
+                 * at the local origin, which is how the marker icons are drawn.
+                 */
+                GL11.glPushMatrix();
+                GL11.glTranslatef(arrowX, distY, 0.0F);
                 LostTalesCompassHudRenderHelper.drawTexturedRectWithShadow(
                         minecraft,
                         COMPASS_HUD_TEXTURE,
-                        arrowX,
-                        distY,
+                        0.0F,
+                        0.0F,
                         u,
                         v,
                         w,
@@ -300,6 +352,7 @@ public class LostTalesCompassHudRenderer {
                         labelAlphaF,
                         Math.min(MAP_MARKER_SHADOW_ALPHA, labelAlphaF)
                 );
+                GL11.glPopMatrix();
             }
         }
     }

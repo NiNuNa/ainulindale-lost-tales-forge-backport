@@ -29,7 +29,23 @@ public final class LostTalesSkyrimUiStyle {
     public static final int PURPLE = 0xFFCBB3E6;
     public static final int BLACK_SHADOW = 0xC0000000;
 
+    /** Ivory of the map-marker artwork; HUD labels match it so icons and text read as one set. */
+    public static final int HUD_LABEL = 0xFFFCECD1;
+    /**
+     * Shared drop-shadow backdrop for HUD icons, labels, and markers. Vanilla
+     * derives a text shadow from the text colour while textured helpers tend to
+     * use flat black, so the same shadow otherwise comes out in two colours
+     * depending on what drew it. Callers that build their own alpha should mask
+     * with {@link #rgb(int)}.
+     */
+    public static final int HUD_SHADOW = 0xFF2D1E2F;
+
     private LostTalesSkyrimUiStyle() {}
+
+    /** Strips the alpha byte from an ARGB constant so a caller can supply its own. */
+    public static int rgb(int argb) {
+        return argb & 0xFFFFFF;
+    }
 
     public static void drawScreenShade(int width, int height) {
         Gui.drawRect(0, 0, width, height, 0x88000000);

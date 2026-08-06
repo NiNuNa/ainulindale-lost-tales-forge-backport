@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.hud.compass;
 
+import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.OpenGlHelper;
@@ -11,6 +12,14 @@ import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
 
 public final class LostTalesCompassHudRenderHelper {
+
+    /** Backdrop shared by every compass element: marker icons, labels, and height indicators. */
+    private static final int SHADOW_RGB =
+            LostTalesSkyrimUiStyle.rgb(LostTalesSkyrimUiStyle.HUD_SHADOW);
+    private static final float SHADOW_RED = ((SHADOW_RGB >> 16) & 0xFF) / 255.0F;
+    private static final float SHADOW_GREEN = ((SHADOW_RGB >> 8) & 0xFF) / 255.0F;
+    private static final float SHADOW_BLUE = (SHADOW_RGB & 0xFF) / 255.0F;
+
     private LostTalesCompassHudRenderHelper() {}
 
     public static float normalizeViewYaw(float viewYaw) {
@@ -85,7 +94,17 @@ public final class LostTalesCompassHudRenderHelper {
     public static void drawCenteredString(FontRenderer fontRenderer, String text, float x, float y, int color, boolean shadow) {
         if (text == null || text.length() == 0) return;
 
-        float left = x - fontRenderer.getStringWidth(text) / 2.0F;
+        /*
+         * getStringWidth counts the one-pixel gap that follows the last glyph,
+         * so the visible ink is one pixel narrower than the reported width.
+         * Vanilla's x - width / 2 therefore centres the *cell*, leaving the ink
+         * half a pixel left of the anchor. The compass marker icons these
+         * labels hang off are centred on their ink (17 pixels drawn at -8.5),
+         * so match that and centre the ink here too, otherwise every label sits
+         * half a pixel left of the icon it belongs to.
+         */
+        float inkWidth = Math.max(0, fontRenderer.getStringWidth(text) - 1);
+        float left = x - inkWidth / 2.0F;
         drawString(fontRenderer, text, left, y, color, shadow);
     }
 
@@ -100,10 +119,17 @@ public final class LostTalesCompassHudRenderHelper {
         GL11.glPushMatrix();
         GL11.glTranslatef(fracX, fracY, 0.0F);
         if (shadow) {
-            fontRenderer.drawStringWithShadow(text, left, top, color);
-        } else {
-            fontRenderer.drawString(text, left, top, color);
+            /*
+             * Hand-rolled instead of drawStringWithShadow, which hard-codes a
+             * shadow derived from the text colour. Drawing the offset copy
+             * ourselves keeps labels on the same backdrop colour as the
+             * textured icons beside them. The alpha byte is carried over so the
+             * shadow fades with the label.
+             */
+            fontRenderer.drawString(text, left + 1, top + 1,
+                    (color & 0xFF000000) | SHADOW_RGB);
         }
+        fontRenderer.drawString(text, left, top, color);
         GL11.glPopMatrix();
     }
 
@@ -184,7 +210,7 @@ public final class LostTalesCompassHudRenderHelper {
     }
 
     public static void drawTexturedRectWithShadowTinted(Minecraft minecraft, ResourceLocation texture, float x, float y, int u, int v, int width, int height, int textureWidth, int textureHeight, float red, float green, float blue, float alpha, float shadowAlpha) {
-        drawTexturedRectTinted(minecraft, texture, x + 1.0F, y + 1.0F, u, v, width, height, textureWidth, textureHeight, 0.0F, 0.0F, 0.0F, shadowAlpha);
+        drawTexturedRectTinted(minecraft, texture, x + 1.0F, y + 1.0F, u, v, width, height, textureWidth, textureHeight, SHADOW_RED, SHADOW_GREEN, SHADOW_BLUE, shadowAlpha);
         drawTexturedRectTinted(minecraft, texture, x, y, u, v, width, height, textureWidth, textureHeight, red, green, blue, alpha);
     }
 

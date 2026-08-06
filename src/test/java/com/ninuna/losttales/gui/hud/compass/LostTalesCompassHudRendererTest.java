@@ -22,13 +22,13 @@ public final class LostTalesCompassHudRendererTest {
         assertEquals("textures/gui/compass_hud.png",
                 LostTalesCompassHudRenderer.COMPASS_HUD_TEXTURE
                         .getResourcePath());
-        assertEquals(256,
+        assertEquals(257,
                 LostTalesCompassHudRenderer.COMPASS_HUD_TEXTURE_WIDTH);
-        assertEquals(30,
+        assertEquals(32,
                 LostTalesCompassHudRenderer.COMPASS_HUD_TEXTURE_HEIGHT);
-        assertEquals(256, LostTalesCompassHudRenderer.COMPASS_WIDTH);
-        assertEquals(22, LostTalesCompassHudRenderer.COMPASS_HEIGHT);
-        assertEquals(23,
+        assertEquals(257, LostTalesCompassHudRenderer.COMPASS_WIDTH);
+        assertEquals(24, LostTalesCompassHudRenderer.COMPASS_HEIGHT);
+        assertEquals(25,
                 LostTalesCompassHudRenderer.VERTICAL_ARROW_TEXTURE_V);
 
         InputStream stream = LostTalesCompassHudRendererTest.class
@@ -49,9 +49,45 @@ public final class LostTalesCompassHudRendererTest {
             assertTrue(alphaAt(atlas, 2,
                     LostTalesCompassHudRenderer
                             .VERTICAL_ARROW_TEXTURE_V) > 0);
+            assertBarArtIsHorizontallyCentred(atlas);
         } finally {
             stream.close();
         }
+    }
+
+    /**
+     * The compass is drawn at its native size, so the placement box's centre is
+     * the ornament's centre only while the art is symmetric within the atlas.
+     * A re-export with lopsided padding would put the placement editor's centre
+     * snap somewhere the compass does not look centred, which is hard to spot
+     * by eye and easy to catch here.
+     */
+    private static void assertBarArtIsHorizontallyCentred(BufferedImage atlas) {
+        int left = -1;
+        int right = -1;
+        for (int x = 0; x < atlas.getWidth(); x++) {
+            boolean opaque = false;
+            for (int y = 0; y < LostTalesCompassHudRenderer.COMPASS_HEIGHT; y++) {
+                if (alphaAt(atlas, x, y) > 0) {
+                    opaque = true;
+                    break;
+                }
+            }
+            if (opaque) {
+                if (left < 0) {
+                    left = x;
+                }
+                right = x;
+            }
+        }
+
+        assertTrue("compass bar rows contain no opaque pixels", left >= 0);
+        assertEquals(
+                "bar art must be symmetric within the atlas so the placement"
+                        + " centre matches the compass centre; left margin "
+                        + left + " vs right margin "
+                        + (atlas.getWidth() - 1 - right),
+                left, atlas.getWidth() - 1 - right);
     }
 
     @Test

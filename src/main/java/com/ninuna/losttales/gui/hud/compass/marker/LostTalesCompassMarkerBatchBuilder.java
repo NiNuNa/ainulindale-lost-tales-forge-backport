@@ -11,7 +11,7 @@ import net.minecraft.util.MathHelper;
 public final class LostTalesCompassMarkerBatchBuilder {
     private LostTalesCompassMarkerBatchBuilder() {}
 
-    public static LostTalesCompassMarkerBatch build(List<LostTalesCompassMarker> markers, LostTalesCompassHudRenderHelper.PlayerPos playerPos, float yawDeg, float pxPerDeg, int visibleDeg, int centerX, String currentFocusedMarkerStateKey) {
+    public static LostTalesCompassMarkerBatch build(List<LostTalesCompassMarker> markers, LostTalesCompassHudRenderHelper.PlayerPos playerPos, float yawDeg, float pxPerDeg, int visibleDeg, float centerX, String currentFocusedMarkerStateKey) {
         float halfWidth = LostTalesCompassHudRenderer.COMPASS_WIDTH / 2.0F;
         float minX = centerX - halfWidth + LostTalesCompassMarkerIcon.WIDTH / 2.0F;
         float maxX = centerX + halfWidth - LostTalesCompassMarkerIcon.WIDTH / 2.0F;

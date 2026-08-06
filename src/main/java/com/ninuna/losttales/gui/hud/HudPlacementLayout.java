@@ -84,8 +84,13 @@ public final class HudPlacementLayout {
             int snapThreshold) {
         int x = requestedX;
         int y = requestedY;
-        int centeredX = (screenWidth - width) / 2;
-        int centeredY = (screenHeight - height) / 2;
+        // Centre on the same column and row the editor draws its centre guides
+        // on (screenWidth / 2, screenHeight / 2). Halving the leftover space
+        // instead truncates whenever the panel size is odd — the compass is 257
+        // wide — which parks the panel's own centre pixel one column left of
+        // the guide it was just snapped to.
+        int centeredX = screenWidth / 2 - width / 2;
+        int centeredY = screenHeight / 2 - height / 2;
         boolean snappedX = Math.abs(
                 requestedX + width / 2 - screenWidth / 2)
                 <= Math.max(0, snapThreshold);

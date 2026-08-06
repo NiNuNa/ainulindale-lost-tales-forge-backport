@@ -38,13 +38,20 @@ public final class LostTalesInputIconAtlas {
             keyboardSprites.put(Integer.valueOf(letterCodes[i]), new Sprite(i * (GRID_SPRITE_WIDTH + GRID_SPACING), 0, GRID_SPRITE_WIDTH, SPRITE_HEIGHT));
         }
 
-        Sprite alt = new Sprite(0, 14, 20, SPRITE_HEIGHT);
+        // The wide-key row is packed left to right with a one-pixel gap.
+        // Alt is 21 wide, so Shift starts at 22.
+        Sprite alt = new Sprite(0, 14, 21, SPRITE_HEIGHT);
         keyboardSprites.put(Integer.valueOf(Keyboard.KEY_LMENU), alt);
         keyboardSprites.put(Integer.valueOf(Keyboard.KEY_RMENU), alt);
 
-        Sprite shift = new Sprite(21, 14, 29, SPRITE_HEIGHT);
+        Sprite shift = new Sprite(22, 14, 29, SPRITE_HEIGHT);
         keyboardSprites.put(Integer.valueOf(Keyboard.KEY_LSHIFT), shift);
         keyboardSprites.put(Integer.valueOf(Keyboard.KEY_RSHIFT), shift);
+
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_ESCAPE),
+                new Sprite(52, 14, 21, SPRITE_HEIGHT));
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_TAB),
+                new Sprite(74, 14, 21, SPRITE_HEIGHT));
 
         KEYBOARD_SPRITES = Collections.unmodifiableMap(keyboardSprites);
 

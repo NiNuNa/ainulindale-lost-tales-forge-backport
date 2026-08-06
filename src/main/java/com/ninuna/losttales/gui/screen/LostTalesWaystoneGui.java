@@ -38,8 +38,9 @@ public final class LostTalesWaystoneGui extends GuiContainer {
     private static final DecimalFormat NUMBER_FORMAT =
             new DecimalFormat("0.##");
     private static final String[] SELECTABLE_ICONS = {
-        "quest", "hostile", "undiscovered", "town", "graveyard",
-        "forest", "fountain", "port"
+        "quest", "hostile", "undiscovered", "point_of_interest",
+        "personal", "shack", "graveyard", "forest", "mountains",
+        "port", "big_port", "bridge", "small_bridge", "camp"
     };
     private static final String[] SELECTABLE_COLORS = {
         "white", "red", "green", "blue", "yellow", "gold",

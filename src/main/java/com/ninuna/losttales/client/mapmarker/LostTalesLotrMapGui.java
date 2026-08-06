@@ -53,8 +53,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
 
     static final float SMOOTH_ZOOM_MIN = -3.0F;
     static final float SMOOTH_ZOOM_MAX = 4.0F;
-    static final float SMOOTH_ZOOM_WHEEL_INCREMENT = 0.25F;
-    private static final float SMOOTH_ZOOM_EASING = 0.35F;
+    /** One notch of the wheel, in zoom exponent. */
+    static final float SMOOTH_ZOOM_WHEEL_INCREMENT = 0.2F;
+    private static final float SMOOTH_ZOOM_EASING = 0.28F;
     private static final float SMOOTH_ZOOM_SNAP_EPSILON = 0.001F;
 
     private LostTalesMapMarkerData selectedCustomMarker;
