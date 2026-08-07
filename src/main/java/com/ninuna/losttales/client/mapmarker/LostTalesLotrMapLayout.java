@@ -7,8 +7,12 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.lang.reflect.Field;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.List;
 import lotr.client.gui.LOTRGuiMap;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.StatCollector;
+import lotr.client.gui.LOTRGuiMapWidget;
 
 /**
  * Isolates the LOTR v36.15 members needed by the Lost Tales map layout.
@@ -18,6 +22,8 @@ import lotr.client.gui.LOTRGuiMap;
 @SideOnly(Side.CLIENT)
 public final class LostTalesLotrMapLayout {
     private static final int BOTTOM_STATUS_MARGIN = 4;
+    /** LOTR's own operator teleport hint, shown by the control strip instead. */
+    private static final String TELEPORT_SUBTITLE_KEY = "lotr.gui.map.tp";
     private static final int INACTIVE_BOTTOM_TEXT = Integer.MIN_VALUE;
 
     private static final ThreadLocal<ArrayDeque<Integer>> bottomTextBounds =
@@ -39,6 +45,9 @@ public final class LostTalesLotrMapLayout {
     private static Field hasOverlayField;
     private static Field mapWidgetsField;
     private static Field widgetFullScreenField;
+    private static Field widgetZoomInField;
+    private static Field widgetZoomOutField;
+    private static Field widgetAddWaypointField;
     private static boolean reflectionReady;
     private static boolean reflectionFailed;
 
@@ -68,10 +77,17 @@ public final class LostTalesLotrMapLayout {
         try {
             fullscreenField.setBoolean(null, true);
             setFullscreenBounds(gui);
-            Object fullscreenWidget = widgetFullScreenField.get(gui);
             Object widgets = mapWidgetsField.get(null);
-            if (fullscreenWidget != null && widgets instanceof List) {
-                ((List<?>)widgets).remove(fullscreenWidget);
+            if (widgets instanceof List) {
+                // The map is always fullscreen here, zooming is continuous
+                // and driven by the wheel, and waypoints are created from the
+                // Lost Tales popup, so these three widgets have nothing left
+                // to do. LOTR repopulates the list in initGui, which is why
+                // they are dropped again after every one.
+                removeWidget((List<?>)widgets, widgetFullScreenField, gui);
+                removeWidget((List<?>)widgets, widgetZoomInField, gui);
+                removeWidget((List<?>)widgets, widgetZoomOutField, gui);
+                removeWidget((List<?>)widgets, widgetAddWaypointField, gui);
             }
             return true;
         } catch (IllegalAccessException exception) {
@@ -80,6 +96,15 @@ public final class LostTalesLotrMapLayout {
         } catch (RuntimeException exception) {
             markReflectionFailed(exception);
             return false;
+        }
+    }
+
+    private static void removeWidget(
+            List<?> widgets, Field widgetField, LOTRGuiMap gui)
+            throws IllegalAccessException {
+        Object widget = widgetField.get(gui);
+        if (widget != null) {
+            widgets.remove(widget);
         }
     }
 
@@ -108,6 +133,74 @@ public final class LostTalesLotrMapLayout {
         } catch (RuntimeException exception) {
             markReflectionFailed(exception);
         }
+    }
+
+    /**
+     * Removes LOTR's own "/tp" subtitle from the fullscreen map.
+     *
+     * <p>The Lost Tales control strip shows that action as a key icon with a
+     * label, like every other map input. Leaving LOTR's sentence in as well
+     * would say the same thing twice, in two different styles.</p>
+     *
+     * <p>Called from the transformer with the argument LOTR is about to
+     * render, and returns what it should render instead.</p>
+     */
+    public static String[] filterFullscreenSubtitles(String[] lines) {
+        if (lines == null || lines.length == 0
+                || !isFullscreenLayoutActive(
+                        Minecraft.getMinecraft() == null ? null
+                                : asMapGui(Minecraft.getMinecraft()
+                                        .currentScreen))) {
+            return lines;
+        }
+        String template = translate(TELEPORT_SUBTITLE_KEY);
+        if (template.length() == 0) {
+            return lines;
+        }
+        ArrayList<String> kept = new ArrayList<String>(lines.length);
+        for (String line : lines) {
+            if (!matchesTemplate(line, template)) {
+                kept.add(line);
+            }
+        }
+        return kept.size() == lines.length
+                ? lines : kept.toArray(new String[kept.size()]);
+    }
+
+    /**
+     * Whether a rendered line came from a "%s" template.
+     *
+     * <p>The key inside the sentence is whatever the player has bound, so the
+     * line is matched by what surrounds the placeholder rather than by the
+     * whole string. Works in any translation, since both come from the same
+     * language file.</p>
+     */
+    static boolean matchesTemplate(String line, String template) {
+        if (line == null || template == null) {
+            return false;
+        }
+        int placeholder = template.indexOf("%s");
+        if (placeholder < 0) {
+            return line.equals(template);
+        }
+        String prefix = template.substring(0, placeholder);
+        String suffix = template.substring(placeholder + 2);
+        return line.length() >= prefix.length() + suffix.length()
+                && line.startsWith(prefix) && line.endsWith(suffix);
+    }
+
+    private static String translate(String key) {
+        try {
+            String translated = StatCollector.translateToLocal(key);
+            return translated == null || translated.equals(key)
+                    ? "" : translated;
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+    private static LOTRGuiMap asMapGui(Object screen) {
+        return screen instanceof LOTRGuiMap ? (LOTRGuiMap)screen : null;
     }
 
     /** Called from LOTR's border renderer before it draws the framed panel. */
@@ -214,6 +307,47 @@ public final class LostTalesLotrMapLayout {
         }
     }
 
+    /**
+     * Whether one of LOTR's own map widgets is under the pointer.
+     *
+     * <p>The widgets sit inside the map viewport, so a click on one is still a
+     * click "on the map" as far as coordinates are concerned. Callers that act
+     * on empty map — dropping a "go here" marker, for instance — have to
+     * exclude them, and they do it with LOTR's own hit test rather than a
+     * second guess at where the widgets are.</p>
+     */
+    static boolean isPointerOverMapWidget(
+            LOTRGuiMap gui, int mouseX, int mouseY) {
+        if (gui == null || !ensureReflection()) {
+            return false;
+        }
+        try {
+            Object widgets = mapWidgetsField.get(null);
+            if (!(widgets instanceof List)) {
+                return false;
+            }
+            int mapXMin = mapXMinField.getInt(null);
+            int mapYMin = mapYMinField.getInt(null);
+            int mapWidth = mapWidthField.getInt(null);
+            int mapHeight = mapHeightField.getInt(null);
+            for (Object entry : (List<?>)widgets) {
+                if (entry instanceof LOTRGuiMapWidget
+                        && ((LOTRGuiMapWidget)entry).isMouseOver(
+                                mouseX - mapXMin, mouseY - mapYMin,
+                                mapWidth, mapHeight)) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (IllegalAccessException exception) {
+            markReflectionFailed(exception);
+            return false;
+        } catch (RuntimeException exception) {
+            markReflectionFailed(exception);
+            return false;
+        }
+    }
+
     static int resolveStatusY(
             LOTRGuiMap gui, int nativeMapYMax, int panelHeight) {
         if (!isFullscreenLayoutActive(gui)) {
@@ -264,6 +398,9 @@ public final class LostTalesLotrMapLayout {
             hasOverlayField = field(mapClass, "hasOverlay");
             mapWidgetsField = field(mapClass, "mapWidgets");
             widgetFullScreenField = field(mapClass, "widgetFullScreen");
+            widgetZoomInField = field(mapClass, "widgetZoomIn");
+            widgetZoomOutField = field(mapClass, "widgetZoomOut");
+            widgetAddWaypointField = field(mapClass, "widgetAddCWP");
             reflectionReady = true;
             return true;
         } catch (ReflectiveOperationException exception) {

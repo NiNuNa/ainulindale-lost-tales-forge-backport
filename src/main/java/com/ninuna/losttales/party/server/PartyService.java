@@ -6,6 +6,7 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.party.model.Party;
+import com.ninuna.losttales.party.model.PartyPersonalMarkerOwner;
 import com.ninuna.losttales.party.model.PartyColor;
 import com.ninuna.losttales.party.model.PartyGoHereMarker;
 import com.ninuna.losttales.party.model.PartyMember;
@@ -350,14 +351,14 @@ public final class PartyService {
             EntityPlayerMP player, long expectedPartyRevision,
             boolean hasMarkerPosition, int markerDimensionId,
             double markerX, double markerZ) {
-        ActiveCharacterContext active = resolveActiveCharacter(player);
-        if (!active.isValid()) {
-            return PartyOperationResult.failure(active.errorId, null);
+        PersonalMarkerContext owner = resolvePersonalMarkerOwner(player);
+        if (!owner.isValid()) {
+            return PartyOperationResult.failure(owner.errorId, null);
         }
         PartyWorldData partyData = getPartyData(player.worldObj);
-        Party party = partyData == null ? null
-                : partyData.getPartyForCharacter(
-                active.character.getCharacterId());
+        Party party = owner.characterId == null || partyData == null
+                ? null
+                : partyData.getPartyForCharacter(owner.characterId);
         if (player.isDead || !player.isEntityAlive()
                 || !hasMarkerPosition
                 || markerDimensionId != player.dimension
@@ -374,7 +375,7 @@ public final class PartyService {
                     PartyErrorId.MARKER_STORAGE_READ_ONLY, party);
         }
 
-        UUID characterId = active.character.getCharacterId();
+        UUID characterId = owner.ownerId;
         double x = quantizeTrackingCoordinate(markerX);
         double y = quantizeTrackingCoordinate(player.posY);
         double z = quantizeTrackingCoordinate(markerZ);
@@ -405,21 +406,21 @@ public final class PartyService {
 
     public synchronized PartyOperationResult removeGoHereMarker(
             EntityPlayerMP player, long expectedPartyRevision) {
-        ActiveCharacterContext active = resolveActiveCharacter(player);
-        if (!active.isValid()) {
-            return PartyOperationResult.failure(active.errorId, null);
+        PersonalMarkerContext owner = resolvePersonalMarkerOwner(player);
+        if (!owner.isValid()) {
+            return PartyOperationResult.failure(owner.errorId, null);
         }
         PartyWorldData partyData = getPartyData(player.worldObj);
-        Party party = partyData == null ? null
-                : partyData.getPartyForCharacter(
-                active.character.getCharacterId());
+        Party party = owner.characterId == null || partyData == null
+                ? null
+                : partyData.getPartyForCharacter(owner.characterId);
         PartyGoHereMarkerWorldData markerData =
                 getWritableGoHereMarkerData(player.worldObj);
         if (markerData == null) {
             return PartyOperationResult.failure(
                     PartyErrorId.MARKER_STORAGE_READ_ONLY, party);
         }
-        UUID characterId = active.character.getCharacterId();
+        UUID characterId = owner.ownerId;
         PartyGoHereMarker existing = markerData.getMarker(characterId);
         if (existing == null) {
             return PartyOperationResult.success(
@@ -929,6 +930,68 @@ public final class PartyService {
                 action,
                 player == null ? "unknown" : player.getUniqueID(),
                 exception.toString());
+    }
+
+    /**
+     * Resolves who a personal marker belongs to, allowing a player with no
+     * character to own one themselves.
+     *
+     * <p>Only a missing character is forgiven. Every other reason the active
+     * character could not be resolved — unreadable storage, an ambiguous or
+     * stolen character id — is still a refusal, because those say the
+     * request cannot be trusted rather than that there is nobody to own
+     * it.</p>
+     */
+    PersonalMarkerContext resolvePersonalMarkerOwner(
+            EntityPlayerMP player) {
+        ActiveCharacterContext active = resolveActiveCharacter(player);
+        if (active.isValid()) {
+            UUID characterId = active.character.getCharacterId();
+            return PersonalMarkerContext.owned(
+                    PartyPersonalMarkerOwner.resolve(
+                            characterId, player.getUniqueID()),
+                    characterId);
+        }
+        if (active.errorId == PartyErrorId.NO_ACTIVE_CHARACTER
+                && player != null) {
+            UUID ownerId = PartyPersonalMarkerOwner.resolve(
+                    null, player.getUniqueID());
+            if (ownerId != null) {
+                return PersonalMarkerContext.owned(ownerId, null);
+            }
+        }
+        return PersonalMarkerContext.failure(active.errorId);
+    }
+
+    /** Who a personal marker is filed under, and which character if any. */
+    static final class PersonalMarkerContext {
+        final UUID ownerId;
+        final UUID characterId;
+        final PartyErrorId errorId;
+
+        private PersonalMarkerContext(
+                UUID ownerId, UUID characterId, PartyErrorId errorId) {
+            this.ownerId = ownerId;
+            this.characterId = characterId;
+            this.errorId = errorId;
+        }
+
+        private static PersonalMarkerContext owned(
+                UUID ownerId, UUID characterId) {
+            return new PersonalMarkerContext(
+                    ownerId, characterId, PartyErrorId.NONE);
+        }
+
+        private static PersonalMarkerContext failure(PartyErrorId errorId) {
+            return new PersonalMarkerContext(null, null,
+                    errorId == PartyErrorId.NONE
+                            ? PartyErrorId.INTERNAL_ERROR : errorId);
+        }
+
+        boolean isValid() {
+            return this.errorId == PartyErrorId.NONE
+                    && this.ownerId != null;
+        }
     }
 
     static final class ActiveCharacterContext {

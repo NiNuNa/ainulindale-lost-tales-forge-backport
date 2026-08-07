@@ -16,7 +16,11 @@ final class LostTalesMapMarkerRenderedGeometry {
     static final float ICON_SHADOW_OFFSET = 1.0F;
     /** Small GUI-pixel allowance around visible artwork for mouse use. */
     static final float INTERACTION_PADDING = 1.0F;
-    static final float GROUP_LABEL_GAP = 3.0F;
+    /**
+     * Gap between the drawn artwork and a label, used above and below alike
+     * so the name and the "+X more" summary sit the same distance out.
+     */
+    static final float LABEL_GAP = 1.0F;
     /**
      * How far a member may travel out of its fan before it stops counting
      * towards the stack's shape. 0 is gathered on the leader, 1 is fully
@@ -239,21 +243,30 @@ final class LostTalesMapMarkerRenderedGeometry {
             return member;
         }
 
+        /**
+         * Both label anchors are measured off the drawn artwork, one gap
+         * above its top edge and one gap below its bottom edge, so the name
+         * and the summary stay visually balanced whatever the stack is
+         * currently shaped like. The name anchor is where the text's
+         * <em>bottom</em> sits; the summary anchor is where its top sits.
+         */
         private void finish() {
             if (this.representativeMember != null) {
                 this.nameAnchorX =
                         this.representativeMember.centerX;
-                this.nameAnchorY =
-                        this.representativeMember.centerY;
             }
             if (this.visibleBounds.isValid()) {
                 this.interactionBounds.set(this.visibleBounds);
                 this.interactionBounds.expand(INTERACTION_PADDING);
+                this.nameAnchorY =
+                        this.visibleBounds.top - LABEL_GAP;
                 this.statusAnchorX =
                         this.visibleBounds.getCenterX();
                 this.statusAnchorY = this.visibleBounds.bottom
-                        + GROUP_LABEL_GAP;
+                        + LABEL_GAP;
             } else if (this.representativeMember != null) {
+                this.nameAnchorY =
+                        this.representativeMember.centerY;
                 this.statusAnchorX =
                         this.representativeMember.centerX;
                 this.statusAnchorY =
@@ -463,6 +476,17 @@ final class LostTalesMapMarkerRenderedGeometry {
 
         boolean isVisible() {
             return this.visible;
+        }
+
+        /**
+         * Whether the pointer is on this member's own artwork. Marker
+         * ownership is decided per member first and only then per stack, so
+         * the icon drawn on top of a fan wins over the fan behind it.
+         */
+        boolean containsInteractionPoint(float x, float y) {
+            return this.visible
+                    && this.visibleBounds.contains(
+                            x, y, INTERACTION_PADDING);
         }
 
         Bounds getVisibleBounds() {

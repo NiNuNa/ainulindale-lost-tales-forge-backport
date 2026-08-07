@@ -82,19 +82,6 @@ public final class LostTalesMapMarkerDataTest {
     }
 
     @Test
-    public void tooltipTranslationRestoresFractionalMarkerMotion() {
-        assertEquals(0.4F,
-                LostTalesLotrMapMarkerIconOverlay.tooltipTranslation(
-                        10.4F, 10.4F), 0.0001F);
-        assertEquals(-0.4F,
-                LostTalesLotrMapMarkerIconOverlay.tooltipTranslation(
-                        10.6F, 10.6F), 0.0001F);
-        assertEquals(0.9F,
-                LostTalesLotrMapMarkerIconOverlay.tooltipTranslation(
-                        10.4F, 10.9F), 0.0001F);
-    }
-
-    @Test
     public void foregroundIconsShareTheSameHighlightScale() {
         assertEquals(16.0F,
                 LostTalesLotrMapMarkerIconOverlay.highlightedSize(13.0F),

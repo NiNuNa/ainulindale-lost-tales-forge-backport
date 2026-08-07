@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.party;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
 import com.ninuna.losttales.party.model.PartyColor;
+import com.ninuna.losttales.party.server.PartyErrorId;
 import com.ninuna.losttales.party.sync.PartyGoHereMarkerSnapshot;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
 import com.ninuna.losttales.party.sync.PartyTrackingSnapshot;
@@ -140,9 +141,20 @@ public final class ClientPartyTrackingCache {
     private static boolean matchesPartyState(
             PartyTrackingSnapshot tracking,
             PartyStateSnapshot partyState) {
-        if (tracking == null || partyState == null
-                || !partyState.isAvailable()
-                || partyState.getActiveCharacterId() == null
+        if (tracking == null || partyState == null) {
+            return false;
+        }
+        if (!partyState.isAvailable()) {
+            // A player with no character has no party state at all, but they
+            // may still own a personal marker. Nothing else is exposed: the
+            // snapshot must be partyless and addressed to this very player.
+            return partyState.getStateErrorId()
+                    == PartyErrorId.NO_ACTIVE_CHARACTER
+                    && !tracking.hasParty()
+                    && tracking.getActiveCharacterId().equals(
+                            tracking.getOwnerId());
+        }
+        if (partyState.getActiveCharacterId() == null
                 || !tracking.getActiveCharacterId().equals(
                 partyState.getActiveCharacterId())) {
             return false;

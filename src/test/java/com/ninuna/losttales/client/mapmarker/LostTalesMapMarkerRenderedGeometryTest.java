@@ -57,9 +57,11 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
         assertBounds(object.getInteractionBounds(),
                 88.5F, 40.5F, 112.5F, 58.5F);
         assertEquals(100.0F, object.getNameAnchorX(), 0.0F);
-        assertEquals(50.0F, object.getNameAnchorY(), 0.0F);
+        assertEquals(41.5F - LostTalesMapMarkerRenderedGeometry.LABEL_GAP,
+                object.getNameAnchorY(), 0.0F);
         assertEquals(100.5F, object.getStatusAnchorX(), 0.0F);
-        assertEquals(60.5F, object.getStatusAnchorY(), 0.0F);
+        assertEquals(57.5F + LostTalesMapMarkerRenderedGeometry.LABEL_GAP,
+                object.getStatusAnchorY(), 0.0F);
     }
 
     @Test
@@ -231,16 +233,62 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
                 104.0F, 48.0F, 4.0F, -2.0F, 0.72F);
         frame.finishObject(object);
 
-        assertEquals(LostTalesMapMarkerRenderedGeometry.GROUP_LABEL_GAP,
+        assertEquals(LostTalesMapMarkerRenderedGeometry.LABEL_GAP,
                 object.getStatusAnchorY()
                         - object.getVisibleBounds().getBottom(), 0.0F);
         assertEquals(object.getVisibleBounds().getCenterX(),
                 object.getStatusAnchorX(), 0.0F);
         // The summary must clear the artwork and stay clear of the name,
-        // which is drawn above the representative.
+        // which is drawn above the stack.
         assertTrue(object.getStatusAnchorY()
                 > object.getVisibleBounds().getBottom());
         assertTrue(object.getStatusAnchorY() > object.getNameAnchorY());
+    }
+
+    @Test
+    public void bothLabelsSitTheSameDistanceOutsideTheArtwork() {
+        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(
+                new Object(), 1.0F, 2, 3);
+        LostTalesMapMarkerRenderedGeometry.RenderedObject object =
+                frame.beginObject("losttales:a", 0, 5);
+        add(frame, object, 0, "losttales:a",
+                100.0F, 50.0F, 0.0F, 0.0F, 1.0F);
+        add(frame, object, 1, "losttales:b",
+                96.0F, 48.0F, -4.0F, -2.0F, 0.72F);
+        add(frame, object, 2, "losttales:c",
+                104.0F, 48.0F, 4.0F, -2.0F, 0.72F);
+        frame.finishObject(object);
+
+        float above = object.getVisibleBounds().getTop()
+                - object.getNameAnchorY();
+        float below = object.getStatusAnchorY()
+                - object.getVisibleBounds().getBottom();
+        assertEquals(above, below, 0.0F);
+        assertEquals(LostTalesMapMarkerRenderedGeometry.LABEL_GAP,
+                above, 0.0F);
+    }
+
+    @Test
+    public void aLoneMarkerOwnsThePointerOverItsOwnArtworkOnly() {
+        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(
+                new Object(), 1.0F, 2, 2);
+        LostTalesMapMarkerRenderedGeometry.RenderedObject object =
+                frame.beginObject("losttales:a", 0, 2);
+        add(frame, object, 0, "losttales:a",
+                100.0F, 50.0F, 0.0F, 0.0F, 1.0F);
+        add(frame, object, 1, "losttales:b",
+                120.0F, 50.0F, 20.0F, 0.0F, 1.0F);
+        frame.finishObject(object);
+
+        LostTalesMapMarkerRenderedGeometry.Member representative =
+                object.getRepresentativeMember();
+        assertTrue(representative.containsInteractionPoint(
+                100.0F, 50.0F));
+        // The companion is inside the stack's shared hitbox but outside the
+        // leader's own artwork, which is what separates the two claims.
+        assertFalse(representative.containsInteractionPoint(
+                120.0F, 50.0F));
+        assertTrue(object.containsInteractionPoint(120.0F, 50.0F));
     }
 
     @Test

@@ -821,7 +821,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             "beginFullscreenSubtitles")
                             && containsHook(
                             method, LOTR_MAP_LAYOUT_HOOK_OWNER,
-                            "endFullscreenSubtitles");
+                            "endFullscreenSubtitles")
+                            && containsHook(
+                            method, LOTR_MAP_LAYOUT_HOOK_OWNER,
+                            "filterFullscreenSubtitles");
                     if (!subtitleLayoutHookPresent) {
                         subtitleLayoutHookPresent =
                                 injectLotrMapSubtitleLayout(method);
@@ -1015,6 +1018,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         boolean endPresent = containsHook(
                 method, LOTR_MAP_LAYOUT_HOOK_OWNER,
                 "endFullscreenSubtitles");
+        boolean filterPresent = containsHook(
+                method, LOTR_MAP_LAYOUT_HOOK_OWNER,
+                "filterFullscreenSubtitles");
         if (!beginPresent) {
             InsnList begin = new InsnList();
             begin.add(new VarInsnNode(Opcodes.ALOAD, 0));
@@ -1025,6 +1031,20 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     "(Llotr/client/gui/LOTRGuiMap;)V"));
             method.instructions.insert(begin);
             beginPresent = true;
+        }
+        if (!filterPresent) {
+            // Rewrites the varargs parameter itself, so the whole body draws
+            // the filtered lines rather than only the first use of them.
+            InsnList filter = new InsnList();
+            filter.add(new VarInsnNode(Opcodes.ALOAD, 1));
+            filter.add(new MethodInsnNode(
+                    Opcodes.INVOKESTATIC,
+                    LOTR_MAP_LAYOUT_HOOK_OWNER,
+                    "filterFullscreenSubtitles",
+                    "([Ljava/lang/String;)[Ljava/lang/String;"));
+            filter.add(new VarInsnNode(Opcodes.ASTORE, 1));
+            method.instructions.insert(filter);
+            filterPresent = true;
         }
         if (!endPresent) {
             boolean foundReturn = false;
@@ -1045,10 +1065,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             }
             endPresent = foundReturn;
         }
-        if (beginPresent && endPresent) {
+        if (beginPresent && endPresent && filterPresent) {
             info("Patched LOTR fullscreen subtitle positioning");
         }
-        return beginPresent && endPresent;
+        return beginPresent && endPresent && filterPresent;
     }
 
     private static boolean injectLotrMapTooltipLayout(MethodNode method) {

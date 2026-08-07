@@ -568,21 +568,64 @@ public final class LostTalesMapMarkerGroupingTest {
 
     @Test
     public void visibilitySynchronizesGroupTravelWithFade() {
-        assertEquals(20.0F,
-                LostTalesMapMarkerGrouping.transitionCoordinate(
-                        20.0F, 100.0F, 0.0F), 0.0F);
-        assertEquals(60.0F,
-                LostTalesMapMarkerGrouping.transitionCoordinate(
-                        20.0F, 100.0F, 0.5F), 0.0F);
-        assertEquals(100.0F,
-                LostTalesMapMarkerGrouping.transitionCoordinate(
-                        20.0F, 100.0F, 1.0F), 0.0F);
-        assertEquals(20.0F,
-                LostTalesMapMarkerGrouping.transitionCoordinate(
-                        20.0F, 100.0F, -1.0F), 0.0F);
-        assertEquals(100.0F,
-                LostTalesMapMarkerGrouping.transitionCoordinate(
-                        20.0F, 100.0F, 2.0F), 0.0F);
+        // Both ends are exact whatever the curve does in between, and any
+        // visibility outside 0..1 is held at the nearer end.
+        assertPoint(20.0F, 40.0F, transition(
+                20.0F, 40.0F, 100.0F, 40.0F, 0.0F));
+        assertPoint(100.0F, 40.0F, transition(
+                20.0F, 40.0F, 100.0F, 40.0F, 1.0F));
+        assertPoint(20.0F, 40.0F, transition(
+                20.0F, 40.0F, 100.0F, 40.0F, -1.0F));
+        assertPoint(100.0F, 40.0F, transition(
+                20.0F, 40.0F, 100.0F, 40.0F, 2.0F));
+
+        // Halfway along, the marker is halfway between its endpoints and
+        // bowed to one side by the capped arc.
+        float[] middle = transition(
+                20.0F, 40.0F, 100.0F, 40.0F, 0.5F);
+        assertEquals(60.0F, middle[0], 0.0001F);
+        assertEquals(40.0F
+                        + LostTalesMapMarkerGrouping
+                                .TRANSITION_ARC_MAX_PIXELS,
+                middle[1], 0.0001F);
+    }
+
+    @Test
+    public void travelBowsToOneSideWithoutMovingItsEndpoints() {
+        // A short hop bows by a share of its own length rather than the cap,
+        // so nearby markers do not swing further than they travel.
+        float[] middle = transition(
+                0.0F, 0.0F, 10.0F, 0.0F, 0.5F);
+        assertEquals(5.0F, middle[0], 0.0001F);
+        assertEquals(10.0F * LostTalesMapMarkerGrouping
+                        .TRANSITION_ARC_RATIO,
+                middle[1], 0.0001F);
+
+        // The bow closes smoothly and is gone at both ends.
+        assertTrue(Math.abs(transition(
+                0.0F, 0.0F, 10.0F, 0.0F, 0.1F)[1])
+                < Math.abs(middle[1]));
+        assertEquals(0.0F,
+                transition(0.0F, 0.0F, 10.0F, 0.0F, 1.0F)[1], 0.0001F);
+
+        // A marker that is not travelling has no path to bow.
+        assertPoint(7.0F, 7.0F,
+                transition(7.0F, 7.0F, 7.0F, 7.0F, 0.5F));
+    }
+
+    private static float[] transition(
+            float anchorX, float anchorY, float markerX, float markerY,
+            float visibility) {
+        float[] point = new float[2];
+        LostTalesMapMarkerGrouping.transitionPoint(
+                anchorX, anchorY, markerX, markerY, visibility, point);
+        return point;
+    }
+
+    private static void assertPoint(
+            float expectedX, float expectedY, float[] actual) {
+        assertEquals(expectedX, actual[0], 0.0001F);
+        assertEquals(expectedY, actual[1], 0.0001F);
     }
 
     @Test
@@ -758,19 +801,15 @@ public final class LostTalesMapMarkerGroupingTest {
 
     @Test
     public void incompatibleCategoriesNeverShareAGroup() {
-        LostTalesMapMarkerGrouping.GroupingCategory[] categories = {
-                LOCATION, PARTY,
-                LostTalesMapMarkerGrouping.GroupingCategory.PLAYER_WAYSTONE,
-                LostTalesMapMarkerGrouping.GroupingCategory
-                        .PERSONAL_WAYPOINT,
-                LostTalesMapMarkerGrouping.GroupingCategory.SHARED_WAYPOINT
-        };
         for (LostTalesMapMarkerGrouping.GroupingCategory first
-                : categories) {
+                : LostTalesMapMarkerGrouping.GroupingCategory.values()) {
             for (LostTalesMapMarkerGrouping.GroupingCategory second
-                    : categories) {
-                // Stacked at the same point: only a shared category may merge.
-                int expected = first == second ? 1 : 2;
+                    : LostTalesMapMarkerGrouping.GroupingCategory
+                            .values()) {
+                // Stacked at the same point: two markers merge only when
+                // they share a category and that category groups at all.
+                int expected = first == second
+                        && first.isGroupingEligible() ? 1 : 2;
                 assertEquals(first + " with " + second, expected,
                         group(fresh(),
                                 icon("losttales:a", "A", 10, first,
@@ -780,6 +819,21 @@ public final class LostTalesMapMarkerGroupingTest {
                                 .getGroups().size());
             }
         }
+    }
+
+    @Test
+    public void deliberatelyPlacedMarkersStayIndividuallyReadable() {
+        // A player's own waypoints and quest objectives each mean something
+        // different even when they sit on the same spot, so they never
+        // collapse into a stack. Waystones are ordinary map furniture and do.
+        assertFalse(LostTalesMapMarkerGrouping.GroupingCategory
+                .PERSONAL_WAYPOINT.isGroupingEligible());
+        assertFalse(LostTalesMapMarkerGrouping.GroupingCategory
+                .SHARED_WAYPOINT.isGroupingEligible());
+        assertFalse(LostTalesMapMarkerGrouping.GroupingCategory
+                .QUEST.isGroupingEligible());
+        assertTrue(LostTalesMapMarkerGrouping.GroupingCategory
+                .PLAYER_WAYSTONE.isGroupingEligible());
     }
 
     @Test
@@ -1310,11 +1364,12 @@ public final class LostTalesMapMarkerGroupingTest {
             LostTalesLotrMapMarkerIconOverlay.stepMarkerAnimation(
                     state, true, 0.0F, 0.25F);
             float travelled = 1.0F - state.getVisibility();
-            float x = LostTalesMapMarkerGrouping.transitionCoordinate(
-                    100.0F + 9.0F, 100.0F, state.getVisibility());
+            float[] point = transition(100.0F + 9.0F, 100.0F,
+                    100.0F, 100.0F, state.getVisibility());
             assertTrue("the marker overshot its own position",
-                    x >= 100.0F - 0.0001F && x <= 109.0F + 0.0001F);
-            float distance = Math.abs(x - 100.0F);
+                    point[0] >= 100.0F - 0.0001F
+                            && point[0] <= 109.0F + 0.0001F);
+            float distance = Math.abs(point[0] - 100.0F);
             assertTrue("the marker moved away from its destination",
                     distance <= previousDistance + 0.0001F);
             previousDistance = distance;

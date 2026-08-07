@@ -93,16 +93,28 @@ public final class PartyTrackingSyncManager {
                                          boolean force) {
         OnlinePlayerContext receiver = view.onlineByOwner.get(
                 recipient.getUniqueID());
-        if (receiver == null || receiver.activeCharacter == null) {
+        if (receiver == null) {
             return false;
         }
-        UUID activeCharacterId = receiver.activeCharacter.getCharacterId();
-        Party party = view.partyData.getPartyForCharacter(activeCharacterId);
-        PartyTrackingSnapshot content = party == null
-                ? buildSoloContent(recipient.getUniqueID(),
-                receiver.activeCharacter, view)
-                : buildPartyContent(recipient.getUniqueID(),
-                activeCharacterId, party, view);
+        PartyTrackingSnapshot content;
+        if (receiver.activeCharacter == null) {
+            // No character to own a marker, so the player owns it. They are
+            // in no party by definition, and see nothing but their own.
+            content = buildSoloContent(recipient.getUniqueID(),
+                    recipient.getUniqueID(),
+                    recipient.getCommandSenderName(), view);
+        } else {
+            UUID activeCharacterId =
+                    receiver.activeCharacter.getCharacterId();
+            Party party = view.partyData.getPartyForCharacter(
+                    activeCharacterId);
+            content = party == null
+                    ? buildSoloContent(recipient.getUniqueID(),
+                            activeCharacterId,
+                            receiver.activeCharacter.getName(), view)
+                    : buildPartyContent(recipient.getUniqueID(),
+                            activeCharacterId, party, view);
+        }
 
         SentState sent = SENT_STATES.get(recipient.getUniqueID());
         if (sent == null) {
@@ -126,20 +138,26 @@ public final class PartyTrackingSyncManager {
         return true;
     }
 
+    /**
+     * One player, no party: their own marker and nothing else.
+     *
+     * <p>{@code markerOwnerId} is the active character when there is one and
+     * the player themselves when there is not, so a player who has yet to
+     * make a character can still place and see their own marker.</p>
+     */
     private static PartyTrackingSnapshot buildSoloContent(
-            UUID recipientOwnerId, RoleplayCharacter activeCharacter,
-            ServerView view) {
+            UUID recipientOwnerId, UUID markerOwnerId,
+            String ownerName, ServerView view) {
         ArrayList<PartyGoHereMarkerSnapshot> markers =
                 new ArrayList<PartyGoHereMarkerSnapshot>(1);
-        PartyGoHereMarker marker = view.markerData.getMarker(
-                activeCharacter.getCharacterId());
+        PartyGoHereMarker marker =
+                view.markerData.getMarker(markerOwnerId);
         if (marker != null) {
             markers.add(toMarkerSnapshot(
-                    marker, activeCharacter.getName(), PartyColor.GREEN));
+                    marker, ownerName, PartyColor.GREEN));
         }
         return PartyTrackingSnapshot.noParty(
-                recipientOwnerId, 1L,
-                activeCharacter.getCharacterId(), markers);
+                recipientOwnerId, 1L, markerOwnerId, markers);
     }
 
     private static PartyTrackingSnapshot buildPartyContent(

@@ -1,50 +1,80 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Collections;
+import java.util.List;
 import org.junit.Test;
 
 public final class LostTalesLotrMapControlBarTest {
-    @Test
-    public void wideLayoutShowsAllControlLabels() {
-        LostTalesLotrMapControlBar.Layout layout =
-                LostTalesLotrMapControlBar.calculateLayout(
-                        600, 20, 30, 16, 24, 20, 36);
+    /** Four hints, as the map strip carries: close, zoom, legend, waypoint. */
+    private static final int[] HINTS = {20, 16, 20, 20};
 
-        assertTrue(layout.showClose);
-        assertTrue(layout.showCloseLabel);
-        assertTrue(layout.showZoom);
-        assertTrue(layout.showZoomLabel);
-        assertTrue(layout.showLegend);
-        assertTrue(layout.showLegendLabel);
-        assertTrue(layout.leftEnd <= 600 / 3);
+    @Test
+    public void aWideStripShowsEveryHintWithItsLabel() {
+        LostTalesLotrMapControlBar.Layout layout = layout(900);
+
+        assertEquals(HINTS.length, layout.visibleHints);
+        assertTrue(layout.showLabels);
+        assertTrue(layout.leftEnd <= 900 / 2);
     }
 
     @Test
-    public void mediumLayoutKeepsCloseAndLegendWithoutOverlappingCenter() {
-        LostTalesLotrMapControlBar.Layout layout =
-                LostTalesLotrMapControlBar.calculateLayout(
-                        240, 20, 30, 16, 24, 20, 36);
+    public void labelsAreDroppedBeforeAnyHintIs() {
+        LostTalesLotrMapControlBar.Layout layout = layout(240);
 
-        assertTrue(layout.showClose);
-        assertFalse(layout.showCloseLabel);
-        assertFalse(layout.showZoom);
-        assertFalse(layout.showZoomLabel);
-        assertTrue(layout.showLegend);
-        assertFalse(layout.showLegendLabel);
-        assertTrue(layout.leftEnd <= 240 / 3);
+        assertFalse("labels must go first", layout.showLabels);
+        assertEquals("no hint should have been dropped yet",
+                HINTS.length, layout.visibleHints);
+        assertTrue(layout.leftEnd <= 240 / 2);
     }
 
     @Test
-    public void extremelyNarrowLayoutOmitsControlsThatCannotFit() {
+    public void aNarrowStripKeepsTheHintsListedFirst() {
+        LostTalesLotrMapControlBar.Layout layout = layout(120);
+
+        assertTrue(layout.visibleHints > 0);
+        assertTrue(layout.visibleHints < HINTS.length);
+        assertFalse(layout.showLabels);
+        assertTrue(layout.leftEnd <= 120 / 2);
+    }
+
+    @Test
+    public void aStripWithNoRoomAtAllDrawsNothing() {
+        LostTalesLotrMapControlBar.Layout layout = layout(20);
+
+        assertEquals(0, layout.visibleHints);
+        assertFalse(layout.showLabels);
+    }
+
+    @Test
+    public void theStripNeverReachesPastItsHalfOfTheScreen() {
+        for (int width = 0; width <= 1600; width += 17) {
+            LostTalesLotrMapControlBar.Layout layout = layout(width);
+            assertTrue("overflowed at " + width,
+                    layout.leftEnd <= Math.max(6, width / 2));
+        }
+    }
+
+    @Test
+    public void anEmptyStripIsHandledWithoutHints() {
         LostTalesLotrMapControlBar.Layout layout =
                 LostTalesLotrMapControlBar.calculateLayout(
-                        60, 20, 30, 16, 24, 20, 36);
+                        800, Collections
+                                .<LostTalesLotrMapControlBar.Hint>
+                                        emptyList());
 
-        assertFalse(layout.showClose);
-        assertFalse(layout.showZoom);
-        assertFalse(layout.showLegend);
-        assertTrue(layout.leftEnd <= 60 / 3);
+        assertEquals(0, layout.visibleHints);
+        assertFalse(layout.showLabels);
+    }
+
+    private static LostTalesLotrMapControlBar.Layout layout(
+            int screenWidth) {
+        List<LostTalesLotrMapControlBar.Hint> hints =
+                LostTalesLotrMapControlBar.measuredHints(HINTS);
+        return LostTalesLotrMapControlBar.calculateLayout(
+                screenWidth, hints);
     }
 }

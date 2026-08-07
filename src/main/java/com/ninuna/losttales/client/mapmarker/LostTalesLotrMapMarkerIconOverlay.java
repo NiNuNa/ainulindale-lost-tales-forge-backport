@@ -18,9 +18,11 @@ import com.ninuna.losttales.party.sync.PartyTrackedMemberSnapshot;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
 import com.ninuna.losttales.party.sync.PartyTrackingSnapshot;
 import cpw.mods.fml.common.FMLLog;
+import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -67,7 +69,12 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     private static final boolean GROUPING_DEBUG =
             Boolean.getBoolean("losttales.mapmarker.groupingDebug");
     private static final float UNGROUPED_CLOSE_ZOOM_EXP = 3.99F;
-    private static final float GROUPING_FADE_PER_SECOND = 4.0F;
+    /**
+     * How much of a grouping transition one second of real time covers.
+     * Slow enough to read the movement, quick enough that a pan does not
+     * feel like it is dragging the markers behind it.
+     */
+    private static final float GROUPING_FADE_PER_SECOND = 2.6F;
     private static final float GROUPING_ENABLE_ZOOM_EXP = 3.95F;
     private static final float GROUPING_DISABLE_ZOOM_EXP = 3.99F;
     /** Opacity of the fan sprites behind the marker leading a stack. */
@@ -79,6 +86,46 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     /** Localized "+X more" summary for members the fan cannot show. */
     private static final String GROUP_MORE_LANG_KEY =
             "map.losttales.marker.group_more";
+    /**
+     * Marker IDs for the client-only view of a LOTR custom waypoint. LOTR
+     * owns the waypoint itself; these only identify the icon drawn for it.
+     */
+    static final String PERSONAL_WAYPOINT_ID_PREFIX =
+            "lotr_personal_waypoint:";
+    static final String SHARED_WAYPOINT_ID_PREFIX =
+            "lotr_shared_waypoint:";
+    private static final String PERSONAL_WAYPOINT_LANG_KEY =
+            "map.losttales.marker.personal_waypoint";
+    private static final String SHARED_WAYPOINT_LANG_KEY =
+            "map.losttales.marker.shared_waypoint";
+    /**
+     * Map labels reuse the compass HUD's ivory and its shared backdrop
+     * shadow, so marker text reads as one set wherever it is drawn instead of
+     * being white here and ivory on the HUD.
+     */
+    private static final int LABEL_COLOR = LostTalesSkyrimUiStyle.rgb(
+            LostTalesSkyrimUiStyle.HUD_LABEL);
+    private static final int LABEL_SHADOW_COLOR =
+            LostTalesSkyrimUiStyle.rgb(LostTalesSkyrimUiStyle.HUD_SHADOW);
+    /** Labels sit slightly back from the icons so the map stays readable. */
+    private static final float LABEL_OPACITY = 0.8F;
+    /**
+     * The compass HUD's backdrop colour as GL components. Every icon, head
+     * and label on the map is backed with it, so a marker on the map and the
+     * same marker on the compass carry the same shadow instead of one being
+     * flat black and the other tinted.
+     */
+    private static final float[] SHADOW_TINT = {
+            ((LostTalesSkyrimUiStyle.HUD_SHADOW >> 16) & 0xFF) / 255.0F,
+            ((LostTalesSkyrimUiStyle.HUD_SHADOW >> 8) & 0xFF) / 255.0F,
+            (LostTalesSkyrimUiStyle.HUD_SHADOW & 0xFF) / 255.0F
+    };
+    /**
+     * 1.7.10's FontRenderer reads an alpha byte below 4 as "no alpha given"
+     * and forces the text back to full opacity, so a label fading out is
+     * held at this floor rather than allowed to flash.
+     */
+    private static final int MIN_LABEL_TEXT_ALPHA = 4;
     private static final float PLAYER_HEAD_DRAW_SIZE = 9.0F;
     private static final float PLAYER_HEAD_HOVER_DRAW_SIZE =
             highlightedSize(PLAYER_HEAD_DRAW_SIZE);
@@ -102,8 +149,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     private static Field playerLocationProfileField;
     private static Field playerLocationXField;
     private static Field playerLocationZField;
-    private static Method renderWaypointTooltipMethod;
-    private static Method drawFancyRectMethod;
     private static boolean reflectionReady;
     private static boolean reflectionFailed;
     private static long nativeMappingCacheTick = Long.MIN_VALUE;
@@ -142,6 +187,12 @@ public final class LostTalesLotrMapMarkerIconOverlay {
 
         List<LOTRAbstractWaypoint> filtered = new ArrayList<LOTRAbstractWaypoint>(waypoints.size());
         for (LOTRAbstractWaypoint waypoint : waypoints) {
+            if (waypoint instanceof LOTRCustomWaypoint) {
+                // Drawn as a Lost Tales marker instead of LOTR's plain dot,
+                // so it is removed from the native pass like any other icon
+                // this overlay owns.
+                continue;
+            }
             LostTalesMapMarkerData marker = getMappedMarker(waypoint);
             if (marker != null || hasDecorativeMapping(waypoint)) {
                 // Lost Tales owns both the icon and hover hitbox for every
@@ -165,11 +216,14 @@ public final class LostTalesLotrMapMarkerIconOverlay {
      */
     public static void renderGroupedMarkers(
             LOTRGuiMap gui, List<LOTRAbstractWaypoint> waypoints,
+            List<LOTRAbstractWaypoint> nativeWaypoints,
             int mouseX, int mouseY, boolean drawLabels,
             boolean includeHidden) {
         RenderContext context = createRenderContext(gui);
         if (context == null || context.alpha <= 0.0F) {
             groupingFrame = GroupingFrame.empty();
+            updateHoverFocus(gui, nativeWaypoints,
+                    mouseX, mouseY, includeHidden);
             return;
         }
         List<MarkerRenderCandidate> candidates;
@@ -178,6 +232,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                     context, waypoints, includeHidden);
         } catch (Throwable ignored) {
             groupingFrame = GroupingFrame.empty();
+            updateHoverFocus(gui, nativeWaypoints,
+                    mouseX, mouseY, includeHidden);
             return;
         }
         long signature = calculateGroupingSignature(
@@ -221,20 +277,53 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         updateGroupingAnimation(gui, candidates, representatives, result);
         rebuildRenderedGeometry(context, candidates, result,
                 renderedGeometry);
+        // Decided here, against the geometry just built, so the stack left
+        // out below and the stack the foreground pass redraws are the same
+        // one. Deciding it after the draw meant the two disagreed on the
+        // frame a highlight appeared or left, and the stack blinked.
+        updateHoverFocus(gui, nativeWaypoints,
+                mouseX, mouseY, includeHidden);
         if (candidates.isEmpty()) {
             return;
         }
 
         beginIconRender();
         try {
-            // One pass over one sorted list of stacks. Each stack is drawn
-            // whole before the next one starts, so nothing unrelated can be
-            // drawn between the sprites of one fan.
+            // Three passes over one back-to-front list of stacks. Every fan is
+            // drawn before any stack leader, so the markers the player is
+            // meant to read stay above all the background sprites, whichever
+            // stacks they belong to. Labels come last, above both.
             List<LostTalesMapMarkerGrouping.Group> groups =
                     result.getGroups();
+            // The highlighted stack is left out here and redrawn whole and
+            // enlarged by the foreground pass. Drawing it in both places is
+            // what put a second copy of every label on screen.
+            int highlighted = highlightedRepresentativeIndex(context.gui);
             for (Integer orderValue : groupingFrame.groupsBottomToTop) {
-                drawMarkerStack(context, candidates, renderedGeometry,
-                        groups.get(orderValue.intValue()), drawLabels);
+                LostTalesMapMarkerGrouping.Group group =
+                        groups.get(orderValue.intValue());
+                if (group.getRepresentativeIndex() != highlighted) {
+                    drawStackCompanions(context, candidates,
+                            renderedGeometry, group);
+                }
+            }
+            for (Integer orderValue : groupingFrame.groupsBottomToTop) {
+                LostTalesMapMarkerGrouping.Group group =
+                        groups.get(orderValue.intValue());
+                if (group.getRepresentativeIndex() != highlighted) {
+                    drawStackRepresentative(context, candidates,
+                            renderedGeometry, group);
+                }
+            }
+            if (drawLabels && context.labelAlpha > 0.0F) {
+                for (Integer orderValue : groupingFrame.groupsBottomToTop) {
+                    LostTalesMapMarkerGrouping.Group group =
+                            groups.get(orderValue.intValue());
+                    if (group.getRepresentativeIndex() != highlighted) {
+                        drawStackLabels(context, candidates,
+                                renderedGeometry, group);
+                    }
+                }
             }
         } catch (Throwable ignored) {
             // Optional marker grouping must never make the LOTR map unusable.
@@ -244,54 +333,88 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     }
 
     /**
-     * Draws one stack as an indivisible unit: its companions from the back
-     * forward, then the marker leading it, then its labels.
+     * The fan behind one stack, from the back forward.
      *
-     * <p>Members travel into or out of the leader while fading. This is
-     * presentation only — no waypoint, marker or waystone coordinate is ever
-     * modified.</p>
+     * <p>Members are held in relevance order behind the leader, so drawing
+     * them in reverse leaves the most relevant companion nearest the front of
+     * its own fan. Members travel into and out of the leader while fading;
+     * this is presentation only — no waypoint, marker or waystone coordinate
+     * is ever modified.</p>
      */
-    private static void drawMarkerStack(
+    private static void drawStackCompanions(
             RenderContext context,
             List<MarkerRenderCandidate> candidates,
             LostTalesMapMarkerRenderedGeometry.Frame renderedGeometry,
-            LostTalesMapMarkerGrouping.Group group,
-            boolean drawLabels) {
+            LostTalesMapMarkerGrouping.Group group) {
         int representativeIndex = group.getRepresentativeIndex();
         List<Integer> members = group.getMemberIndices();
-        boolean withLabels = drawLabels && context.labelAlpha > 0.0F;
-        // Members are held in relevance order behind the leader, so drawing
-        // them in reverse leaves the leader on top of its own fan.
         for (int position = members.size() - 1; position >= 0; position--) {
             int candidateIndex = members.get(position).intValue();
+            if (candidateIndex == representativeIndex) {
+                continue;
+            }
             LostTalesMapMarkerRenderedGeometry.Member geometry =
                     renderedGeometry.getMemberForCandidate(candidateIndex);
             if (geometry == null || !geometry.isVisible()) {
                 continue;
             }
-            MarkerRenderCandidate candidate =
-                    candidates.get(candidateIndex);
-            if (candidateIndex == representativeIndex) {
-                drawMarkerIcon(context.minecraft, candidate.marker,
-                        geometry.getCenterX(), geometry.getCenterY(),
-                        geometry.getRenderAlpha(), false);
-            } else {
-                drawMarkerIcon(context.minecraft, candidate.marker,
-                        geometry.getCenterX(), geometry.getCenterY(),
-                        geometry.getRenderAlpha(),
-                        ICON_DRAW_SIZE * geometry.getVisualScale());
-                if (withLabels) {
-                    drawLabel(context.fontRenderer,
-                            candidate.displayName,
-                            geometry.getCenterX(), geometry.getCenterY(),
-                            context.labelAlpha
-                                    * geometry.getTransitionVisibility(),
-                            context);
-                }
-            }
+            drawMarkerIcon(context.minecraft,
+                    candidates.get(candidateIndex).marker,
+                    geometry.getCenterX(), geometry.getCenterY(),
+                    geometry.getRenderAlpha(),
+                    ICON_DRAW_SIZE * geometry.getVisualScale());
         }
-        if (!withLabels) {
+    }
+
+    /** The one marker a stack is drawn as, at full size. */
+    private static void drawStackRepresentative(
+            RenderContext context,
+            List<MarkerRenderCandidate> candidates,
+            LostTalesMapMarkerRenderedGeometry.Frame renderedGeometry,
+            LostTalesMapMarkerGrouping.Group group) {
+        int representativeIndex = group.getRepresentativeIndex();
+        LostTalesMapMarkerRenderedGeometry.Member geometry =
+                renderedGeometry.getMemberForCandidate(representativeIndex);
+        if (geometry == null || !geometry.isVisible()) {
             return;
+        }
+        drawMarkerIcon(context.minecraft,
+                candidates.get(representativeIndex).marker,
+                geometry.getCenterX(), geometry.getCenterY(),
+                geometry.getRenderAlpha(), false);
+    }
+
+    /**
+     * Every label one stack owns: a name for each companion on its way back
+     * out, the leader's name above the stack, and the summary of the members
+     * the fan cannot show below it.
+     *
+     * <p>Both stack labels are placed from the shared geometry, one gap
+     * outside the artwork it measured, so neither drifts when the cluster
+     * changes shape.</p>
+     */
+    private static void drawStackLabels(
+            RenderContext context,
+            List<MarkerRenderCandidate> candidates,
+            LostTalesMapMarkerRenderedGeometry.Frame renderedGeometry,
+            LostTalesMapMarkerGrouping.Group group) {
+        int representativeIndex = group.getRepresentativeIndex();
+        List<Integer> members = group.getMemberIndices();
+        for (int position = members.size() - 1; position >= 0; position--) {
+            int candidateIndex = members.get(position).intValue();
+            if (candidateIndex == representativeIndex) {
+                continue;
+            }
+            LostTalesMapMarkerRenderedGeometry.Member geometry =
+                    renderedGeometry.getMemberForCandidate(candidateIndex);
+            if (geometry == null || !geometry.isVisible()) {
+                continue;
+            }
+            drawNameLabel(context,
+                    candidates.get(candidateIndex).displayName,
+                    geometry.getCenterX(), nameLabelAnchorY(geometry),
+                    context.labelAlpha
+                            * geometry.getTransitionVisibility());
         }
         LostTalesMapMarkerRenderedGeometry.RenderedObject object =
                 renderedGeometry.getObjectForCandidate(
@@ -303,28 +426,53 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 || !representativeGeometry.isVisible()) {
             return;
         }
-        // Both labels are placed from the shared geometry: the name above the
-        // representative, the summary below the complete fan, so neither
-        // drifts when the cluster layout changes.
-        drawLabel(context.fontRenderer,
+        drawNameLabel(context,
                 candidates.get(representativeIndex).displayName,
                 object == null ? representativeGeometry.getCenterX()
                         : object.getNameAnchorX(),
-                object == null ? representativeGeometry.getCenterY()
+                object == null
+                        ? nameLabelAnchorY(representativeGeometry)
                         : object.getNameAnchorY(),
                 context.labelAlpha
-                        * representativeGeometry.getTransitionVisibility(),
-                context);
+                        * representativeGeometry.getTransitionVisibility());
         if (object != null && group.getCondensedMemberCount() > 0) {
-            drawGroupLabel(context.fontRenderer,
+            drawMapLabel(context,
                     getCondensedMemberLabel(
                             group.getCondensedMemberCount()),
                     object.getStatusAnchorX(),
                     object.getStatusAnchorY(),
                     context.labelAlpha
-                            * groupLabelFade(group, candidates),
-                    context);
+                            * groupLabelFade(group, candidates));
         }
+    }
+
+    /**
+     * The stack the foreground pass will redraw enlarged, as a candidate
+     * index, or -1 when nothing is highlighted.
+     *
+     * <p>Read from the focus decided at the end of the previous frame, which
+     * is the one the foreground pass is about to act on. Hover is
+     * deliberately delayed before it takes effect, so the two can only
+     * disagree on the single frame a highlight appears or leaves.</p>
+     */
+    private static int highlightedRepresentativeIndex(LOTRGuiMap gui) {
+        HoverCandidate focused = hoverFocusGui == gui
+                ? activeHoverCandidate : null;
+        if (focused == null || focused.kind != HoverKind.MARKER) {
+            return -1;
+        }
+        LostTalesMapMarkerRenderedGeometry.RenderedObject object =
+                groupingFrame.renderedGeometry.getObjectForCandidate(
+                        findCandidateIndexById(
+                                focused.marker.marker.getId()));
+        return object == null ? -1 : object.getRepresentativeIndex();
+    }
+
+    /** The name label's bottom edge, one gap above a marker's own artwork. */
+    private static float nameLabelAnchorY(
+            LostTalesMapMarkerRenderedGeometry.Member member) {
+        return member.getVisibleBounds().getTop()
+                - LostTalesMapMarkerRenderedGeometry.LABEL_GAP;
     }
 
     public static void clearGrouping(LOTRGuiMap gui) {
@@ -556,12 +704,12 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     private static float getGroupingFanStrength(String markerId) {
         MarkerAnimationState state = groupingAnimation.get(markerId);
         return state == null
-                ? 0.0F : smoothStep(clamp01(state.fanStrength));
+                ? 0.0F : easeInOut(clamp01(state.fanStrength));
     }
 
     private static float getGroupingFade(String markerId) {
         MarkerAnimationState state = groupingAnimation.get(markerId);
-        return smoothStep(state == null ? 1.0F : state.visibility);
+        return easeInOut(state == null ? 1.0F : state.visibility);
     }
 
     private static float getGroupingCompanionSlot(String markerId) {
@@ -571,11 +719,24 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         }
         float linear = state.companionSlot;
         float sign = linear < 0.0F ? -1.0F : 1.0F;
-        return sign * smoothStep(Math.abs(linear));
+        return sign * easeInOut(Math.abs(linear));
     }
 
-    private static float smoothStep(float linear) {
-        return linear * linear * (3.0F - 2.0F * linear);
+    /**
+     * Symmetric ease-in-out over the linear, elapsed-time progress each
+     * marker keeps.
+     *
+     * <p>Smootherstep rather than smoothstep: its first and second
+     * derivatives are both zero at either end, so a marker leaves and arrives
+     * without the small visible kick smoothstep gives it. Easing on read
+     * rather than on store is what makes an interruption safe — the stored
+     * progress is continuous, so a reversal picks up from the position
+     * actually on screen.</p>
+     */
+    static float easeInOut(float linear) {
+        float progress = clamp01(linear);
+        return progress * progress * progress
+                * (progress * (progress * 6.0F - 15.0F) + 10.0F);
     }
 
     /**
@@ -623,6 +784,9 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 context.minecraft.displayHeight);
         geometry.begin(context.gui, context.zoomExp,
                 resolution.getScaleFactor(), candidates.size());
+        // One scratch pair for the whole frame; every travelling position is
+        // solved into it and read straight back out.
+        float[] point = new float[2];
         for (LostTalesMapMarkerGrouping.Group group
                 : result.getGroups()) {
             int representativeIndex = group.getRepresentativeIndex();
@@ -639,12 +803,11 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             // Companions hang off wherever the leader is drawn this frame, so
             // the whole stack pans, zooms and settles as one piece. The leader
             // is resolved once, not re-derived through each companion.
-            float anchorX = releasedCoordinate(
-                    representative.marker.getId(),
-                    representative.position.x, true);
-            float anchorY = releasedCoordinate(
-                    representative.marker.getId(),
-                    representative.position.y, false);
+            releasedPosition(representative.marker.getId(),
+                    representative.position.x,
+                    representative.position.y, point);
+            float anchorX = point[0];
+            float anchorY = point[1];
             for (Integer indexValue : group.getMemberIndices()) {
                 int candidateIndex = indexValue.intValue();
                 MarkerRenderCandidate candidate =
@@ -673,12 +836,12 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                     finalX = anchorX;
                     finalY = anchorY;
                 } else {
-                    finalX = LostTalesMapMarkerGrouping
-                            .transitionCoordinate(anchorX + fanOffsetX,
-                                    candidate.position.x, visibility);
-                    finalY = LostTalesMapMarkerGrouping
-                            .transitionCoordinate(anchorY + fanOffsetY,
-                                    candidate.position.y, visibility);
+                    LostTalesMapMarkerGrouping.transitionPoint(
+                            anchorX + fanOffsetX, anchorY + fanOffsetY,
+                            candidate.position.x, candidate.position.y,
+                            visibility, point);
+                    finalX = point[0];
+                    finalY = point[1];
                 }
                 LostTalesCompassMarkerIcon icon =
                         getMarkerIcon(candidate.marker);
@@ -705,22 +868,26 @@ public final class LostTalesLotrMapMarkerIconOverlay {
      *
      * <p>A marker released from a stack keeps travelling from the offset it
      * was last drawn at — its rendered fan position — straight to its own map
-     * position. A marker that was never in a stack, or has arrived, simply
-     * sits at that position.</p>
+     * position, along the same eased, gently curved path a companion uses. A
+     * marker that was never in a stack, or has arrived, simply sits at that
+     * position.</p>
+     *
+     * @param result two floats written with the screen position
      */
-    private static float releasedCoordinate(
-            String markerId, float markerPosition, boolean horizontal) {
+    private static void releasedPosition(
+            String markerId, float markerX, float markerY,
+            float[] result) {
         MarkerAnimationState state = groupingAnimation.get(markerId);
         if (state == null || !state.leavingStack) {
-            return markerPosition;
+            result[0] = markerX;
+            result[1] = markerY;
+            return;
         }
-        float offset = horizontal
-                ? state.exitOffsetX : state.exitOffsetY;
-        // The same eased travel a companion uses, run from the position the
-        // marker was last drawn at rather than from a stack anchor.
-        return LostTalesMapMarkerGrouping.transitionCoordinate(
-                markerPosition + offset, markerPosition,
-                getGroupingFade(markerId));
+        LostTalesMapMarkerGrouping.transitionPoint(
+                markerX + state.exitOffsetX,
+                markerY + state.exitOffsetY,
+                markerX, markerY,
+                getGroupingFade(markerId), result);
     }
 
     private static void recordRenderedOffset(
@@ -736,11 +903,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
      * anchors, so they read the frame's index instead of scanning the
      * candidate list.
      */
-    private static MarkerRenderCandidate findCandidateById(String id) {
-        int index = findCandidateIndexById(id);
-        return index < 0 ? null : groupingFrame.candidates.get(index);
-    }
-
     private static int findCandidateIndexById(String id) {
         return groupingFrame.indexOf(id);
     }
@@ -793,6 +955,12 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         HashSet<String> includedIds = new HashSet<String>();
         if (waypoints != null) {
             for (LOTRAbstractWaypoint waypoint : waypoints) {
+                if (waypoint instanceof LOTRCustomWaypoint) {
+                    addCustomWaypointCandidate(
+                            context, candidates, includedIds,
+                            (LOTRCustomWaypoint)waypoint, includeHidden);
+                    continue;
+                }
                 LostTalesMapMarkerData marker =
                         getReplacementMarker(waypoint);
                 if (marker == null || !shouldRenderReplacementWaypoint(
@@ -811,6 +979,65 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             }
         }
         return candidates;
+    }
+
+    /**
+     * Adds a player's own or a shared waypoint as a Lost Tales marker.
+     *
+     * <p>LOTR still owns the waypoint, its position and its fast travel; this
+     * is the icon, the colour the player chose for it, and a name that reads
+     * as what it is rather than carrying a "(Custom)" suffix.</p>
+     */
+    private static void addCustomWaypointCandidate(
+            RenderContext context,
+            List<MarkerRenderCandidate> candidates,
+            Set<String> includedIds,
+            LOTRCustomWaypoint waypoint, boolean includeHidden) {
+        LostTalesMapMarkerData marker;
+        boolean shared;
+        try {
+            if (!includeHidden
+                    && !isWaypointVisibleInLotrToggles(waypoint)) {
+                return;
+            }
+            shared = waypoint.isShared();
+            marker = createCustomWaypointMarker(waypoint, shared);
+        } catch (Throwable ignored) {
+            // A waypoint LOTR cannot describe is simply not drawn.
+            return;
+        }
+        if (!LostTalesMapLegendRegistry.isMarkerVisible(marker)) {
+            return;
+        }
+        addMarkerCandidate(context, candidates, includedIds,
+                marker, waypoint,
+                StatCollector.translateToLocalFormatted(
+                        shared ? SHARED_WAYPOINT_LANG_KEY
+                                : PERSONAL_WAYPOINT_LANG_KEY,
+                        marker.getName()));
+    }
+
+    private static LostTalesMapMarkerData createCustomWaypointMarker(
+            LOTRCustomWaypoint waypoint, boolean shared) {
+        // The code name is what the player typed. LOTR's display name wraps
+        // it in "(Custom)", which is neither wanted on the label nor a key
+        // the player's chosen colour and note were ever stored under.
+        String name = safeString(waypoint.getCodeName());
+        return new LostTalesMapMarkerData(
+                (shared ? SHARED_WAYPOINT_ID_PREFIX
+                        : PERSONAL_WAYPOINT_ID_PREFIX)
+                        + waypoint.getID(),
+                name,
+                LostTalesCompassMarkerIcon.PERSONAL.name(),
+                LostTalesCustomWaypointStyle.getColor(name, shared),
+                LostTalesMapMarkerData.CATEGORY_POINT_OF_INTEREST,
+                LostTalesCustomWaypointStyle.getNote(name),
+                true,
+                LOTRDimension.MIDDLE_EARTH.dimensionID,
+                waypoint.getXCoord(),
+                waypoint.getYCoordSaved(),
+                waypoint.getZCoord(),
+                0.0D, 0.0D, false, false);
     }
 
     private static void addMarkerCandidate(
@@ -1085,11 +1312,14 @@ public final class LostTalesLotrMapMarkerIconOverlay {
 
     private static void drawRoleplayPlayerHead(
             RenderContext context, RoleplayPlayerHead head, float size) {
-        LostTalesCharacterHeadIconRenderer.drawHead(
+        float offset = LostTalesMapMarkerRenderedGeometry
+                .ICON_SHADOW_OFFSET;
+        LostTalesCharacterHeadIconRenderer.drawTintedHead(
                 context.minecraft, head.ownerId,
-                head.centerX - size * 0.5F + 1.0F,
-                head.centerY - size * 0.5F + 1.0F,
-                size, 0.15F, 0.75F);
+                head.centerX - size * 0.5F + offset,
+                head.centerY - size * 0.5F + offset,
+                size, SHADOW_TINT[0], SHADOW_TINT[1], SHADOW_TINT[2],
+                1.0F);
         LostTalesCharacterHeadIconRenderer.drawHead(
                 context.minecraft, head.ownerId,
                 head.centerX - size * 0.5F,
@@ -1250,11 +1480,14 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     private static void drawFocusedMarkerStack(
             RenderContext context, HoverCandidate focused,
             boolean drawLabels) {
-        int representativeIndex = findCandidateIndexById(
-                focused.marker.marker.getId());
         LostTalesMapMarkerRenderedGeometry.RenderedObject object =
-                groupingFrame.renderedGeometry
-                        .getObjectForCandidate(representativeIndex);
+                groupingFrame.renderedGeometry.getObjectForCandidate(
+                        findCandidateIndexById(
+                                focused.marker.marker.getId()));
+        int representativeIndex = object == null
+                ? -1 : object.getRepresentativeIndex();
+        LostTalesMapMarkerGrouping.Group group =
+                findGroupForRepresentative(representativeIndex);
         if (object != null) {
             // The whole stack grows together: the fan spacing is rebuilt at
             // the hover size, otherwise the enlarged sprites close over each
@@ -1294,12 +1527,13 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                         ? context.alpha * focused.markerFade
                         : representativeGeometry.getRenderAlpha(),
                 true);
-        if (drawLabels && context.labelAlpha > 0.0F) {
-            drawLabel(context.fontRenderer,
-                    focused.marker.displayName,
-                    focused.position.x, focused.position.y,
-                    context.labelAlpha * focused.markerFade,
-                    context);
+        // Only the artwork is highlighted. The labels are drawn by the
+        // ordinary stack pass, at the place and the size they would have had
+        // without a highlight, so hovering does not make the text jump.
+        if (drawLabels && context.labelAlpha > 0.0F
+                && group != null) {
+            drawStackLabels(context, groupingFrame.candidates,
+                    groupingFrame.renderedGeometry, group);
         }
     }
 
@@ -1322,25 +1556,15 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         };
     }
 
-    public static void renderRestoredSelectedLotrTooltip(
-            LOTRGuiMap gui, LOTRAbstractWaypoint selected,
-            int mouseX, int mouseY) {
-        if (gui == null || selected == null) {
-            return;
-        }
-        HoverCandidate focused = hoverFocusGui == gui
-                ? activeHoverCandidate : null;
-        if (focused != null) {
-            return;
-        }
-        RenderContext context = createRenderContext(gui);
-        renderLotrWaypointTooltip(
-                context, selected, true, mouseX, mouseY, null);
-    }
-
+    /**
+     * Draws the tooltip for whatever the pointer is currently on.
+     *
+     * <p>Tooltip visibility follows hover ownership and nothing else. A click
+     * never leaves one behind, so moving off a marker is always enough to
+     * dismiss it.</p>
+     */
     public static void renderFocusedHoverTooltip(
-            LOTRGuiMap gui, LostTalesMapMarkerData selectedMarker,
-            int mouseX, int mouseY) {
+            LOTRGuiMap gui, int mouseX, int mouseY) {
         HoverCandidate focused = hoverFocusGui == gui
                 ? activeHoverCandidate : null;
         if (focused == null) {
@@ -1352,59 +1576,67 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         }
         if (focused.kind == HoverKind.MARKER) {
             LostTalesMapMarkerData marker = focused.marker.marker;
-            if (!sameMarker(marker, selectedMarker)) {
-                renderLotrWaypointTooltip(context,
-                        new LostTalesMarkerWaypoint(marker), true,
-                        mouseX, mouseY, focused.position);
-            }
+            drawTooltip(context, focused.marker.displayName,
+                    LostTalesLotrWaypointText.resolveDescription(
+                            marker, context.minecraft.thePlayer),
+                    focused.position.x,
+                    hoveredArtBottom(context, focused,
+                            getMarkerIcon(marker)));
         } else if (focused.kind == HoverKind.ENEMY) {
-            renderLotrWaypointTooltip(context,
-                    new LostTalesEntityWaypoint(focused.enemy), false,
-                    mouseX, mouseY, focused.position);
+            drawTooltip(context, focused.enemy.name, "",
+                    focused.position.x,
+                    hoveredArtBottom(context, focused,
+                            LostTalesCompassMarkerIcon.HOSTILE));
         } else if (focused.kind == HoverKind.NATIVE) {
-            renderLotrWaypointTooltip(context,
-                    focused.nativeWaypoint, true,
-                    mouseX, mouseY, focused.position);
+            drawNativeWaypointTooltip(context, focused);
         } else if (focused.kind == HoverKind.PLAYER) {
-            renderPlayerTooltip(context, focused.playerHead);
+            drawTooltip(context, focused.playerHead.displayName, "",
+                    focused.playerHead.centerX,
+                    focused.playerHead.centerY
+                            + PLAYER_HEAD_HOVER_DRAW_SIZE * 0.5F);
         }
     }
 
-    private static void renderPlayerTooltip(
-            RenderContext context, RoleplayPlayerHead head) {
-        if (context == null || head == null
-                || head.displayName.length() == 0
-                || context.fontRenderer == null) {
+    private static void drawNativeWaypointTooltip(
+            RenderContext context, HoverCandidate focused) {
+        String title;
+        String body;
+        try {
+            title = safeString(
+                    focused.nativeWaypoint.getDisplayName());
+            body = safeString(focused.nativeWaypoint.getLoreText(
+                    context.minecraft.thePlayer));
+        } catch (Throwable ignored) {
+            // A waypoint LOTR cannot describe still gets a card, just an
+            // empty one, rather than taking the map down with it.
             return;
         }
-        FontRenderer font = context.fontRenderer;
-        int padding = 3;
-        int width = font.getStringWidth(head.displayName) + padding * 2;
-        int height = font.FONT_HEIGHT + padding * 2;
-        int bottom = context.mapYMax - (LostTalesLotrMapLayout
-                .isControlBarVisible(context.gui)
-                ? LostTalesLotrMapControlBar.HEIGHT : 0);
-        float desiredX = Math.max(context.mapXMin + 2.0F,
-                Math.min(context.mapXMax - width - 2.0F,
-                        head.centerX - width * 0.5F));
-        float desiredY = Math.max(context.mapYMin + 2.0F,
-                Math.min(bottom - height - 2.0F,
-                        head.centerY + PLAYER_HEAD_DRAW_SIZE * 0.5F
-                                + 3.0F));
-        int x = Math.round(desiredX);
-        int y = Math.round(desiredY);
-        float translateX = desiredX - x;
-        float translateY = desiredY - y;
-        GL11.glPushMatrix();
-        try {
-            GL11.glTranslatef(translateX, translateY, 0.0F);
-            drawFancyRect(context, x, y, x + width, y + height);
-            font.drawString(
-                    head.displayName, x + padding, y + padding,
-                    0xFFFFFF);
-        } finally {
-            GL11.glPopMatrix();
-        }
+        drawTooltip(context, title, body, focused.position.x,
+                LostTalesMapMarkerRenderedGeometry.artBottom(
+                        focused.position.y,
+                        NATIVE_WAYPOINT_DRAW_SIZE * 0.5F
+                                * NATIVE_WAYPOINT_HOVER_SCALE));
+    }
+
+    /** Bottom edge of the enlarged artwork the pointer is resting on. */
+    private static float hoveredArtBottom(
+            RenderContext context, HoverCandidate focused,
+            LostTalesCompassMarkerIcon icon) {
+        return LostTalesMapMarkerRenderedGeometry.artBottom(
+                focused.position.y,
+                artBelow(icon, ICON_HOVER_DRAW_SIZE));
+    }
+
+    private static void drawTooltip(
+            RenderContext context, String title, String body,
+            float anchorX, float anchorY) {
+        int bottom = context.mapYMax
+                - (LostTalesLotrMapLayout.isControlBarVisible(context.gui)
+                        ? LostTalesLotrMapControlBar.HEIGHT : 0);
+        LostTalesMapMarkerTooltip.render(
+                context.fontRenderer, title, body, anchorX, anchorY,
+                context.mapXMin, context.mapXMax,
+                context.mapYMin, bottom);
     }
 
     private static HoverCandidate chooseBetterHover(
@@ -1484,6 +1716,15 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 createRenderContext(gui), waypoints,
                 mouseX, mouseY, includeHidden);
         return candidate == null ? null : candidate.nativeWaypoint;
+    }
+
+    /**
+     * Gives up hover ownership while a modal map popup owns the pointer, so
+     * no marker tooltip is drawn underneath it and closing the popup cannot
+     * restore a hover the pointer has since left.
+     */
+    public static void suspendHoverFocus(LOTRGuiMap gui) {
+        clearHoverFocus(gui);
     }
 
     private static void clearHoverFocus(LOTRGuiMap gui) {
@@ -1590,11 +1831,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         }
     }
 
-    public static LostTalesMapMarkerData getHoveredStandaloneMarker(
-            LOTRGuiMap gui, int mouseX, int mouseY) {
-        return getHoveredStandaloneMarker(gui, mouseX, mouseY, null);
-    }
-
     /**
      * Returns the marker under the mouse, preferring a requested marker ID
      * when several icons overlap at the same map location.
@@ -1615,22 +1851,60 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         return candidate == null ? null : candidate.marker;
     }
 
-    /** Finds a visible, non-private replacement using its rendered position. */
-    public static LOTRAbstractWaypoint getHoveredMappedWaypoint(
+    /**
+     * The visible, non-private waypoint icon under the pointer, as both the
+     * marker that was drawn and the LOTR waypoint behind it.
+     *
+     * <p>Both halves come from one hit test. Re-deriving the marker from the
+     * waypoint afterwards only works for markers the shared store knows, and
+     * a player's own waypoints are not among them.</p>
+     */
+    public static HoveredWaypoint getHoveredMappedWaypoint(
             LOTRGuiMap gui, int mouseX, int mouseY) {
         MarkerRenderCandidate candidate = getHoveredGroupedCandidate(
                 gui, mouseX, mouseY, null, CandidateKind.MAPPED);
-        return candidate == null ? null : candidate.waypoint;
+        return candidate == null ? null
+                : new HoveredWaypoint(
+                        candidate.marker, candidate.waypoint);
     }
 
+    /** One mapped icon: the marker drawn for it and the waypoint behind it. */
+    public static final class HoveredWaypoint {
+        private final LostTalesMapMarkerData marker;
+        private final LOTRAbstractWaypoint waypoint;
+
+        private HoveredWaypoint(LostTalesMapMarkerData marker,
+                                LOTRAbstractWaypoint waypoint) {
+            this.marker = marker;
+            this.waypoint = waypoint;
+        }
+
+        public LostTalesMapMarkerData getMarker() {
+            return this.marker;
+        }
+
+        public LOTRAbstractWaypoint getWaypoint() {
+            return this.waypoint;
+        }
+    }
+
+    /**
+     * The marker under the pointer, picked the way the stacks are drawn: a
+     * marker leading a stack owns the pointer over any fan behind it, and
+     * between two equal claims the stack drawn nearest the front wins.
+     *
+     * <p>This is the same order the render passes use, so what looks topmost
+     * is what responds.</p>
+     */
     private static MarkerRenderCandidate getHoveredGroupedCandidate(
             LOTRGuiMap gui, int mouseX, int mouseY,
             String preferredMarkerId, CandidateKind kind) {
         if (gui == null || groupingFrame.gui != gui) {
             return null;
         }
-        MarkerRenderCandidate nearest = null;
-        double nearestDistanceSq = Double.MAX_VALUE;
+        MarkerRenderCandidate best = null;
+        int bestTier = 0;
+        int bestDepth = -1;
         LostTalesMapMarkerRenderedGeometry.Frame geometry =
                 groupingFrame.renderedGeometry;
         for (int objectIndex = 0;
@@ -1640,25 +1914,127 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             MarkerRenderCandidate candidate =
                     groupingFrame.candidates.get(
                             object.getRepresentativeIndex());
-            if (!kind.matches(candidate)
-                    // Any visible part of the fan owns the whole cluster, at
-                    // every zoom level and during grouping animations.
-                    || !object.containsInteractionPoint(mouseX, mouseY)) {
+            if (!kind.matches(candidate)) {
                 continue;
             }
-            double distanceSq =
-                    object.distanceSqToVisibleMemberCenter(
-                            mouseX, mouseY);
+            int tier = hitTier(object, mouseX, mouseY);
+            if (tier == 0) {
+                continue;
+            }
             if (preferredMarkerId != null
                     && preferredMarkerId.equals(candidate.marker.getId())) {
                 return candidate;
             }
-            if (distanceSq < nearestDistanceSq) {
-                nearest = candidate;
-                nearestDistanceSq = distanceSq;
+            int depth = groupingFrame.drawDepthOfGroup(objectIndex);
+            if (tier > bestTier
+                    || (tier == bestTier && depth > bestDepth)) {
+                best = candidate;
+                bestTier = tier;
+                bestDepth = depth;
             }
         }
-        return nearest;
+        return best;
+    }
+
+    /** 2 on the marker leading a stack, 1 on its fan, 0 for a miss. */
+    private static int hitTier(
+            LostTalesMapMarkerRenderedGeometry.RenderedObject object,
+            int mouseX, int mouseY) {
+        LostTalesMapMarkerRenderedGeometry.Member representative =
+                object.getRepresentativeMember();
+        if (representative != null
+                && representative.containsInteractionPoint(
+                        mouseX, mouseY)) {
+            return 2;
+        }
+        // Any visible part of the fan still owns the whole cluster, including
+        // the small gaps between its sprites.
+        return object.containsInteractionPoint(mouseX, mouseY) ? 1 : 0;
+    }
+
+    /**
+     * Where to send the camera so the stack under the pointer comes apart.
+     *
+     * <p>Only a marker actually leading a stack of several has a focus
+     * target; a marker standing on its own returns none, so a double click on
+     * it does nothing.</p>
+     *
+     * @return {@code {mapImageX, mapImageY, zoomExp}}, or null
+     */
+    public static float[] resolveGroupFocusTarget(
+            LOTRGuiMap gui, int mouseX, int mouseY, float maxZoomExp) {
+        LostTalesMapMarkerGrouping.Group group =
+                findClusterUnderPointer(gui, mouseX, mouseY);
+        if (group == null) {
+            return null;
+        }
+        List<LostTalesMapMarkerGrouping.Entry> entries =
+                new ArrayList<LostTalesMapMarkerGrouping.Entry>(
+                        group.size());
+        for (Integer memberValue : group.getMemberIndices()) {
+            entries.add(groupingFrame.candidates.get(
+                    memberValue.intValue()).groupingEntry);
+        }
+        // The camera centres on the marker the stack is drawn as, and the
+        // zoom search pushes the other members away from that same point, so
+        // what it measures is what the player sees once the camera arrives.
+        MarkerRenderCandidate representative =
+                groupingFrame.candidates.get(
+                        group.getRepresentativeIndex());
+        return new float[] {
+                (float)LostTalesMapCoordinateHelper.worldToMapImageX(
+                        representative.marker.getX()),
+                (float)LostTalesMapCoordinateHelper.worldToMapImageZ(
+                        representative.marker.getZ()),
+                LostTalesMapGroupFocus.separatingZoomExponent(
+                        entries, groupingFrame.zoomExp, maxZoomExp,
+                        representative.position.x,
+                        representative.position.y)
+        };
+    }
+
+    /**
+     * Whether the pointer is on a marker that is standing in for several.
+     *
+     * <p>A stack is opened before its members are used: it claims the click
+     * so nothing is dropped underneath it, but a member only becomes
+     * actionable once a double click has framed the stack and the markers
+     * stand apart.</p>
+     */
+    public static boolean isClusterUnderPointer(
+            LOTRGuiMap gui, int mouseX, int mouseY) {
+        return findClusterUnderPointer(gui, mouseX, mouseY) != null;
+    }
+
+    /** The stack under the pointer, or null unless it holds several markers. */
+    private static LostTalesMapMarkerGrouping.Group
+    findClusterUnderPointer(LOTRGuiMap gui, int mouseX, int mouseY) {
+        if (gui == null || groupingFrame.gui != gui) {
+            return null;
+        }
+        MarkerRenderCandidate hovered = getHoveredGroupedCandidate(
+                gui, mouseX, mouseY, null, CandidateKind.ANY);
+        if (hovered == null) {
+            return null;
+        }
+        LostTalesMapMarkerGrouping.Group group =
+                findGroupForRepresentative(
+                        findCandidateIndexById(hovered.marker.getId()));
+        return group == null || group.size() <= 1 ? null : group;
+    }
+
+    private static LostTalesMapMarkerGrouping.Group
+    findGroupForRepresentative(int representativeIndex) {
+        if (representativeIndex < 0) {
+            return null;
+        }
+        for (LostTalesMapMarkerGrouping.Group group
+                : groupingFrame.result.getGroups()) {
+            if (group.getRepresentativeIndex() == representativeIndex) {
+                return group;
+            }
+        }
+        return null;
     }
 
     private static LostTalesMapMarkerRenderedGeometry.RenderedObject
@@ -1668,49 +2044,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 representative.marker.getId());
         return groupingFrame.renderedGeometry
                 .getObjectForCandidate(index);
-    }
-
-    public static boolean renderCustomMarkerSelection(
-            LOTRGuiMap gui, LostTalesMapMarkerData marker,
-            int mouseX, int mouseY) {
-        RenderContext context = createRenderContext(gui);
-        if (context == null || marker == null
-                || !isSelectableCustomMarker(marker)
-                || !isGroupedRepresentative(gui, marker)) {
-            return false;
-        }
-
-        ScreenPosition position = null;
-        MarkerRenderCandidate renderedCandidate =
-                findCandidateById(marker.getId());
-        LostTalesMapMarkerRenderedGeometry.RenderedObject object =
-                renderedCandidate == null ? null
-                : getRenderedObject(renderedCandidate);
-        LostTalesMapMarkerRenderedGeometry.Member renderedRepresentative =
-                object == null ? null : object.getRepresentativeMember();
-        if (renderedRepresentative != null) {
-            position = new ScreenPosition(
-                    renderedRepresentative.getCenterX(),
-                    renderedRepresentative.getCenterY());
-        }
-        if (position == null) {
-            position = transformMarker(context, marker);
-        }
-        if (position == null || !isInsideMap(position.x, position.y, context)) {
-            return false;
-        }
-
-        LostTalesMarkerWaypoint tooltipWaypoint = new LostTalesMarkerWaypoint(marker);
-        HoverCandidate focused = hoverFocusGui == gui
-                ? activeHoverCandidate : null;
-        if (focused == null
-                || (focused.kind == HoverKind.MARKER
-                && sameMarker(focused.marker.marker, marker))) {
-            renderLotrWaypointTooltip(
-                    context, tooltipWaypoint, true,
-                    mouseX, mouseY, position);
-        }
-        return true;
     }
 
     public static void clearLotrSelectedWaypoint(LOTRGuiMap gui) {
@@ -1796,19 +2129,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         List<LostTalesMapMarkerData> party =
                 ClientPartyTrackingCache.getMapMarkers();
         return LostTalesClientMapMarkerStore.getMapMarkers(party);
-    }
-
-    private static boolean containsVisibleStandaloneMarker(
-            LostTalesMapMarkerData target) {
-        if (target == null || target.getId() == null) {
-            return false;
-        }
-        for (LostTalesMapMarkerData marker : getVisibleStandaloneMarkers()) {
-            if (sameMarker(marker, target)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static LostTalesMapMarkerData getReplacementMarker(LOTRAbstractWaypoint waypoint) {
@@ -1932,49 +2252,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 && isUndiscoveredButVisible(marker);
     }
 
-    private static boolean isSelectableCustomMarker(
-            LostTalesMapMarkerData marker) {
-        if (isWaypointMappingEligible(marker)
-                && shouldShowLostTalesIcon(marker)
-                && hasNativeWaypointMapping(marker)) {
-            return true;
-        }
-        return shouldRenderStandaloneMarker(marker)
-                && containsVisibleStandaloneMarker(marker);
-    }
-
     private static boolean isVisibilityRegionUnlocked(
             LostTalesMapMarkerData marker) {
         return LostTalesClientMapMarkerVisibility
                 .isUndiscoveredRegionVisible(marker);
-    }
-
-    private static boolean sameMarker(LostTalesMapMarkerData first, LostTalesMapMarkerData second) {
-        if (first == second) {
-            return true;
-        }
-        if (first == null || second == null) {
-            return false;
-        }
-        return safeString(first.getId()).equals(safeString(second.getId()));
-    }
-
-    private static boolean isGroupedRepresentative(
-            LOTRGuiMap gui, LostTalesMapMarkerData marker) {
-        if (gui == null || marker == null || groupingFrame.gui != gui) {
-            return true;
-        }
-        String markerId = safeString(marker.getId());
-        for (LostTalesMapMarkerGrouping.Group group
-                : groupingFrame.result.getGroups()) {
-            MarkerRenderCandidate representative =
-                    groupingFrame.candidates.get(
-                            group.getRepresentativeIndex());
-            if (markerId.equals(representative.marker.getId())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static boolean shouldRenderReplacementWaypoint(
@@ -2323,11 +2604,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         // their artwork instead of being recolored gray or washed out.
         float[] color = LostTalesCompassMarker.parseColor(
                 undiscovered ? "white" : marker.getColorName());
-        // Match Minecraft's one-pixel text shadow without modifying the
-        // configured icon tint itself.
-        drawFixedScreenIcon(minecraft, centerX + 1.0F, centerY + 1.0F,
-                size, icon, 0.0F, 0.0F, 0.0F, alpha * 0.75F);
-        drawFixedScreenIcon(minecraft, centerX, centerY, size, icon,
+        drawIconWithShadow(minecraft, centerX, centerY, size, icon,
                 color[0], color[1], color[2], alpha);
     }
 
@@ -2343,12 +2620,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         float[] color = LostTalesCompassMarker.parseColor(colorName);
         beginIconRender();
         try {
-            drawFixedScreenIcon(
-                    minecraft, centerX + 1.0F, centerY + 1.0F,
-                    ICON_DRAW_SIZE, icon,
-                    0.0F, 0.0F, 0.0F, 0.75F);
-            drawFixedScreenIcon(
-                    minecraft, centerX, centerY,
+            drawIconWithShadow(minecraft, centerX, centerY,
                     ICON_DRAW_SIZE, icon,
                     color[0], color[1], color[2], 1.0F);
         } finally {
@@ -2368,12 +2640,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             color = toLotrSepiaTint(
                     color[0], color[1], color[2]);
         }
-        drawFixedScreenIcon(
-                minecraft, centerX + 1.0F, centerY + 1.0F,
-                ICON_DRAW_SIZE, icon,
-                0.0F, 0.0F, 0.0F, 0.75F);
-        drawFixedScreenIcon(
-                minecraft, centerX, centerY,
+        drawIconWithShadow(minecraft, centerX, centerY,
                 ICON_DRAW_SIZE, icon,
                 color[0], color[1], color[2], 1.0F);
     }
@@ -2403,6 +2670,28 @@ public final class LostTalesLotrMapMarkerIconOverlay {
      * state changes its size. This keeps icons from growing/shrinking when the
      * map is zoomed.</p>
      */
+    /**
+     * Draws marker artwork over its own one-pixel drop shadow.
+     *
+     * <p>The shadow carries the shared HUD backdrop colour rather than flat
+     * black, and it tracks the icon's own opacity so the two never separate
+     * while a marker fades.</p>
+     */
+    private static void drawIconWithShadow(
+            Minecraft minecraft, float centerX, float centerY, float size,
+            LostTalesCompassMarkerIcon icon,
+            float red, float green, float blue, float alpha) {
+        drawFixedScreenIcon(minecraft,
+                centerX + LostTalesMapMarkerRenderedGeometry
+                        .ICON_SHADOW_OFFSET,
+                centerY + LostTalesMapMarkerRenderedGeometry
+                        .ICON_SHADOW_OFFSET,
+                size, icon,
+                SHADOW_TINT[0], SHADOW_TINT[1], SHADOW_TINT[2], alpha);
+        drawFixedScreenIcon(minecraft, centerX, centerY, size, icon,
+                red, green, blue, alpha);
+    }
+
     private static void drawFixedScreenIcon(Minecraft minecraft, float centerX, float centerY, float size, LostTalesCompassMarkerIcon icon, float red, float green, float blue, float alpha) {
         // Anchor the quad so the glyph's ink lands on the marker coordinate.
         // Centring the 17-pixel cell instead left every icon roughly two
@@ -2490,67 +2779,62 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
-    private static void drawLabel(FontRenderer fontRenderer, String label, float screenX, float screenY, float alpha, RenderContext context) {
-        if (fontRenderer == null || label == null || label.length() == 0 || alpha <= 0.0F) {
+    /** Draws a marker name so its bottom edge rests on {@code anchorBottomY}. */
+    private static void drawNameLabel(
+            RenderContext context, String label,
+            float anchorX, float anchorBottomY, float scale) {
+        drawNameLabel(context, label, anchorX, anchorBottomY,
+                scale, LABEL_OPACITY);
+    }
+
+    private static void drawNameLabel(
+            RenderContext context, String label,
+            float anchorX, float anchorBottomY,
+            float scale, float opacity) {
+        if (context.fontRenderer == null) {
             return;
         }
-
-        int textWidth = fontRenderer.getStringWidth(label);
-        float halfWidth = (float) textWidth * alpha / 2.0F;
-        float top = screenY - 15.0F * alpha;
-        float bottom = top + (float) fontRenderer.FONT_HEIGHT * alpha;
-        if (screenX + halfWidth < (float) context.mapXMin
-                || screenX - halfWidth > (float) context.mapXMax
-                || bottom < (float) context.mapYMin
-                || top > (float) context.mapYMax) {
-            return;
-        }
-
-        int alphaInt = Math.max(4, Math.min(255, (int) (alpha * 0.8F * 255.0F)));
-        int color = (alphaInt << 24) | 0x00FFFFFF;
-        int shadowColor = (alphaInt << 24);
-
-        GL11.glPushMatrix();
-        GL11.glTranslatef(screenX, screenY, 0.0F);
-        GL11.glScalef(alpha, alpha, alpha);
-        try {
-            int x = -textWidth / 2;
-            int y = -15;
-            fontRenderer.drawString(label, x + 1, y + 1, shadowColor);
-            fontRenderer.drawString(label, x, y, color);
-        } finally {
-            GL11.glPopMatrix();
-        }
+        drawMapLabel(context, label, anchorX,
+                anchorBottomY - context.fontRenderer.FONT_HEIGHT * scale,
+                scale, opacity);
     }
 
     /**
-     * Draws the cluster summary directly at the supplied anchor, which the
-     * shared geometry already places below the complete fan. Scale and fade
-     * match {@link #drawLabel}, so both lines shrink together while zooming.
+     * Draws a centred map label whose text box starts at {@code topY}.
+     *
+     * <p>Labels shrink with the same zoom fade as the markers they belong to,
+     * so the text is scaled about its anchor and the gap the caller measured
+     * from the artwork stays where it was put.</p>
      */
-    private static void drawGroupLabel(
-            FontRenderer fontRenderer, String label,
-            float anchorX, float anchorY, float alpha,
-            RenderContext context) {
+    private static void drawMapLabel(
+            RenderContext context, String label,
+            float anchorX, float topY, float scale) {
+        drawMapLabel(context, label, anchorX, topY, scale, LABEL_OPACITY);
+    }
+
+    private static void drawMapLabel(
+            RenderContext context, String label,
+            float anchorX, float topY, float scale, float opacity) {
+        FontRenderer fontRenderer = context.fontRenderer;
         if (fontRenderer == null || label == null || label.length() == 0
-                || alpha <= 0.0F) {
+                || scale <= 0.0F || opacity <= 0.0F) {
             return;
         }
-        float scale = alpha;
         int textWidth = fontRenderer.getStringWidth(label);
         float halfWidth = textWidth * scale / 2.0F;
-        float bottom = anchorY + fontRenderer.FONT_HEIGHT * scale;
+        float bottom = topY + fontRenderer.FONT_HEIGHT * scale;
         if (anchorX + halfWidth < context.mapXMin
                 || anchorX - halfWidth > context.mapXMax
-                || bottom < context.mapYMin || anchorY > context.mapYMax) {
+                || bottom < context.mapYMin
+                || topY > context.mapYMax) {
             return;
         }
-        int alphaInt = Math.max(4,
-                Math.min(255, (int)(alpha * 0.8F * 255.0F)));
-        int color = (alphaInt << 24) | 0x00FFFFFF;
-        int shadowColor = alphaInt << 24;
+        int alphaByte = Math.max(MIN_LABEL_TEXT_ALPHA, Math.min(255,
+                (int)(Math.min(1.0F, scale) * opacity * 255.0F)));
+        int color = (alphaByte << 24) | LABEL_COLOR;
+        int shadowColor = (alphaByte << 24) | LABEL_SHADOW_COLOR;
         GL11.glPushMatrix();
-        GL11.glTranslatef(anchorX, anchorY, 0.0F);
+        GL11.glTranslatef(anchorX, topY, 0.0F);
         GL11.glScalef(scale, scale, scale);
         try {
             int x = -textWidth / 2;
@@ -2567,69 +2851,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 Integer.valueOf(condensedMemberCount));
     }
 
-    private static void renderLotrWaypointTooltip(
-            RenderContext context, LOTRAbstractWaypoint waypoint,
-            boolean selected, int mouseX, int mouseY,
-            ScreenPosition desiredAnchor) {
-        if (context == null || waypoint == null
-                || renderWaypointTooltipMethod == null) {
-            return;
-        }
-        float[] translation = getTooltipTranslation(
-                context, waypoint, desiredAnchor);
-        GL11.glPushMatrix();
-        try {
-            if (translation != null) {
-                GL11.glTranslatef(
-                        translation[0], translation[1], 0.0F);
-            }
-            renderWaypointTooltipMethod.invoke(
-                    context.gui, waypoint, Boolean.valueOf(selected),
-                    Integer.valueOf(mouseX), Integer.valueOf(mouseY));
-        } catch (Throwable ignored) {
-            // A changed LOTR tooltip renderer must not break the map.
-        } finally {
-            GL11.glPopMatrix();
-        }
-    }
-
-    private static float[] getTooltipTranslation(
-            RenderContext context, LOTRAbstractWaypoint waypoint,
-            ScreenPosition desiredAnchor) {
-        if (context == null || waypoint == null) {
-            return null;
-        }
-        ScreenPosition internalAnchor = transformWorldCoords(
-                context, waypoint.getXCoord(), waypoint.getZCoord());
-        if (internalAnchor == null) {
-            return null;
-        }
-        ScreenPosition desired = desiredAnchor == null
-                ? internalAnchor : desiredAnchor;
-        return new float[] {
-                tooltipTranslation(internalAnchor.x, desired.x),
-                tooltipTranslation(internalAnchor.y, desired.y)
-        };
-    }
-
-    static float tooltipTranslation(
-            float roundedSource, float desiredPosition) {
-        return desiredPosition - Math.round(roundedSource);
-    }
-
     static float highlightedSize(float normalSize) {
         return normalSize * HIGHLIGHT_SCALE;
-    }
-
-    private static void drawFancyRect(RenderContext context, int x0, int y0, int x1, int y1) {
-        if (context == null || drawFancyRectMethod == null) {
-            return;
-        }
-        try {
-            drawFancyRectMethod.invoke(context.gui, Integer.valueOf(x0), Integer.valueOf(y0), Integer.valueOf(x1), Integer.valueOf(y1));
-        } catch (Throwable ignored) {
-            // Keep the map usable even if LOTR internals change.
-        }
     }
 
     private static String getWaypointDisplayName(LOTRAbstractWaypoint waypoint, LostTalesMapMarkerData marker) {
@@ -2680,8 +2903,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                     .getDeclaredField("posX");
             playerLocationZField = playerLocationClass
                     .getDeclaredField("posZ");
-            renderWaypointTooltipMethod = LOTRGuiMap.class.getDeclaredMethod("renderWaypointTooltip", LOTRAbstractWaypoint.class, boolean.class, int.class, int.class);
-            drawFancyRectMethod = LOTRGuiMap.class.getDeclaredMethod("drawFancyRect", int.class, int.class, int.class, int.class);
             mapXMinField.setAccessible(true);
             mapXMaxField.setAccessible(true);
             mapYMinField.setAccessible(true);
@@ -2697,8 +2918,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             playerLocationProfileField.setAccessible(true);
             playerLocationXField.setAccessible(true);
             playerLocationZField.setAccessible(true);
-            renderWaypointTooltipMethod.setAccessible(true);
-            drawFancyRectMethod.setAccessible(true);
             reflectionReady = true;
             return true;
         } catch (Throwable throwable) {
@@ -2972,6 +3191,13 @@ public final class LostTalesLotrMapMarkerIconOverlay {
          * the committed grouping decision.
          */
         private final List<Integer> groupsBottomToTop;
+        /**
+         * The inverse of {@link #groupsBottomToTop}: how far forward each
+         * stack is drawn. Hit testing reads it so what looks topmost is what
+         * responds. Indices match {@code result.getGroups()}, which is also
+         * the order the rendered geometry records its objects in.
+         */
+        private final int[] drawDepthByGroup;
 
         private GroupingFrame(
                 LOTRGuiMap gui, long signature,
@@ -3005,6 +3231,17 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             this.groupsBottomToTop =
                     LostTalesMapMarkerGrouping.groupsBottomToTop(
                             entries, result.getGroups());
+            this.drawDepthByGroup = new int[result.getGroups().size()];
+            Arrays.fill(this.drawDepthByGroup, -1);
+            for (int depth = 0;
+                 depth < this.groupsBottomToTop.size(); depth++) {
+                int groupIndex =
+                        this.groupsBottomToTop.get(depth).intValue();
+                if (groupIndex >= 0
+                        && groupIndex < this.drawDepthByGroup.length) {
+                    this.drawDepthByGroup[groupIndex] = depth;
+                }
+            }
         }
 
         private int indexOf(String markerId) {
@@ -3013,191 +3250,14 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             return index == null ? -1 : index.intValue();
         }
 
+        /** How far forward a stack is drawn; higher is nearer the front. */
+        private int drawDepthOfGroup(int groupIndex) {
+            return groupIndex < 0
+                    || groupIndex >= this.drawDepthByGroup.length
+                    ? -1 : this.drawDepthByGroup[groupIndex];
+        }
+
         private static GroupingFrame empty() { return EMPTY; }
-    }
-
-    private static final class LostTalesMarkerWaypoint implements LOTRAbstractWaypoint {
-        private final LostTalesMapMarkerData marker;
-        private final int worldX;
-        private final int worldZ;
-        private final double mapImageX;
-        private final double mapImageY;
-        private final int y;
-
-        private LostTalesMarkerWaypoint(LostTalesMapMarkerData marker) {
-            this.marker = marker;
-            this.worldX = Math.round((float) marker.getX());
-            this.worldZ = Math.round((float) marker.getZ());
-            this.mapImageX = LostTalesMapCoordinateHelper
-                    .worldToMapImageX(marker.getX());
-            this.mapImageY = LostTalesMapCoordinateHelper
-                    .worldToMapImageZ(marker.getZ());
-            Minecraft minecraft = Minecraft.getMinecraft();
-            double fallbackY = minecraft == null
-                    || minecraft.thePlayer == null
-                    ? marker.getY() : minecraft.thePlayer.posY;
-            this.y = Math.round((float)marker.getEffectiveY(
-                    minecraft == null ? null : minecraft.theWorld,
-                    fallbackY));
-        }
-
-        @Override
-        public double getX() {
-            return this.mapImageX;
-        }
-
-        @Override
-        public double getY() {
-            return this.mapImageY;
-        }
-
-        @Override
-        public int getXCoord() {
-            return this.worldX;
-        }
-
-        @Override
-        public int getZCoord() {
-            return this.worldZ;
-        }
-
-        @Override
-        public int getYCoord(World world, int x, int z) {
-            return this.y;
-        }
-
-        @Override
-        public int getYCoordSaved() {
-            return this.y;
-        }
-
-        @Override
-        public String getCodeName() {
-            return this.marker.getId();
-        }
-
-        @Override
-        public String getDisplayName() {
-            return getMarkerDisplayName(this.marker);
-        }
-
-        @Override
-        public String getLoreText(EntityPlayer player) {
-            return isUndiscoveredButVisible(this.marker)
-                    ? null
-                    : LostTalesLotrWaypointText.resolveDescription(
-                            this.marker, player);
-        }
-
-        @Override
-        public boolean hasPlayerUnlocked(EntityPlayer player) {
-            return !isUndiscoveredButVisible(this.marker);
-        }
-
-        @Override
-        public LOTRAbstractWaypoint.WaypointLockState getLockState(EntityPlayer player) {
-            return isUndiscoveredButVisible(this.marker)
-                    ? LOTRAbstractWaypoint.WaypointLockState.STANDARD_LOCKED
-                    : LOTRAbstractWaypoint.WaypointLockState.STANDARD_UNLOCKED;
-        }
-
-        @Override
-        public boolean isHidden() {
-            return false;
-        }
-
-        @Override
-        public int getID() {
-            return this.marker.getId() == null ? -1 : -Math.abs(this.marker.getId().hashCode());
-        }
-    }
-
-    /** Temporary adapter used only while LOTR renders an enemy hover tooltip. */
-    private static final class LostTalesEntityWaypoint implements LOTRAbstractWaypoint {
-        private final int entityId;
-        private final String displayName;
-        private final int worldX;
-        private final int worldY;
-        private final int worldZ;
-        private final double mapImageX;
-        private final double mapImageY;
-
-        private LostTalesEntityWaypoint(EnemyMarkerPosition enemy) {
-            this.entityId = enemy.entityId;
-            this.displayName = enemy.name;
-            this.worldX = Math.round((float) enemy.x);
-            this.worldY = Math.round((float) enemy.y);
-            this.worldZ = Math.round((float) enemy.z);
-            this.mapImageX = LostTalesMapCoordinateHelper
-                    .worldToMapImageX(enemy.x);
-            this.mapImageY = LostTalesMapCoordinateHelper
-                    .worldToMapImageZ(enemy.z);
-        }
-
-        @Override
-        public double getX() {
-            return this.mapImageX;
-        }
-
-        @Override
-        public double getY() {
-            return this.mapImageY;
-        }
-
-        @Override
-        public int getXCoord() {
-            return this.worldX;
-        }
-
-        @Override
-        public int getZCoord() {
-            return this.worldZ;
-        }
-
-        @Override
-        public int getYCoord(World world, int x, int z) {
-            return this.worldY;
-        }
-
-        @Override
-        public int getYCoordSaved() {
-            return this.worldY;
-        }
-
-        @Override
-        public String getCodeName() {
-            return "losttales_enemy_" + this.entityId;
-        }
-
-        @Override
-        public String getDisplayName() {
-            return this.displayName;
-        }
-
-        @Override
-        public String getLoreText(EntityPlayer player) {
-            return "";
-        }
-
-        @Override
-        public boolean hasPlayerUnlocked(EntityPlayer player) {
-            return true;
-        }
-
-        @Override
-        public LOTRAbstractWaypoint.WaypointLockState getLockState(EntityPlayer player) {
-            return LOTRAbstractWaypoint.WaypointLockState.STANDARD_UNLOCKED;
-        }
-
-        @Override
-        public boolean isHidden() {
-            return false;
-        }
-
-        @Override
-        public int getID() {
-            return -this.entityId - 1;
-        }
     }
 
     private static final class EnemyMarkerPosition {

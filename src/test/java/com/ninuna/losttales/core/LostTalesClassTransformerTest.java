@@ -231,6 +231,10 @@ public final class LostTalesClassTransformerTest {
                 LOTR_MAP_LAYOUT_HOOK_OWNER,
                 "endFullscreenSubtitles"));
         assertTrue(containsStaticHook(
+                transformed, "renderFullscreenSubtitles",
+                LOTR_MAP_LAYOUT_HOOK_OWNER,
+                "filterFullscreenSubtitles"));
+        assertTrue(containsStaticHook(
                 transformed, "renderWaypointTooltip",
                 LOTR_MAP_LAYOUT_HOOK_OWNER,
                 "beginMapTooltip"));

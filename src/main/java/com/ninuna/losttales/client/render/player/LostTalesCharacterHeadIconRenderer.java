@@ -98,6 +98,30 @@ public final class LostTalesCharacterHeadIconRenderer {
                 CharacterHeadIconLayout.minecraftSkin());
     }
 
+    /**
+     * Draws a head under a full colour tint rather than a grey brightness.
+     *
+     * <p>Drop shadows are not grey: the map and the compass HUD both back
+     * their icons with one shared colour, so a shadow drawn here has to be
+     * able to use it too.</p>
+     */
+    public static boolean drawTintedHead(Minecraft minecraft,
+                                         UUID ownerId,
+                                         float x,
+                                         float y,
+                                         float size,
+                                         float red,
+                                         float green,
+                                         float blue,
+                                         float alpha) {
+        ResolvedHead head = resolveConfiguredHead(ownerId);
+        if (head == null) {
+            head = resolveAccountHead(minecraft, ownerId);
+        }
+        return drawResolvedHead(
+                minecraft, head, x, y, size, red, green, blue, alpha);
+    }
+
     private static boolean drawResolvedHead(Minecraft minecraft,
                                             ResolvedHead head,
                                             float x,
@@ -105,14 +129,29 @@ public final class LostTalesCharacterHeadIconRenderer {
                                             float size,
                                             float brightness,
                                             float alpha) {
+        return drawResolvedHead(minecraft, head, x, y, size,
+                brightness, brightness, brightness, alpha);
+    }
+
+    private static boolean drawResolvedHead(Minecraft minecraft,
+                                            ResolvedHead head,
+                                            float x,
+                                            float y,
+                                            float size,
+                                            float red,
+                                            float green,
+                                            float blue,
+                                            float alpha) {
         if (minecraft == null || head == null || size <= 0.0F
-                || brightness <= 0.0F || alpha <= 0.0F) {
+                || alpha <= 0.0F
+                || (red <= 0.0F && green <= 0.0F && blue <= 0.0F)) {
             return false;
         }
         try {
             minecraft.getTextureManager().bindTexture(head.location);
-            float color = Math.min(1.0F, brightness);
-            GL11.glColor4f(color, color, color, Math.min(1.0F, alpha));
+            GL11.glColor4f(
+                    Math.min(1.0F, red), Math.min(1.0F, green),
+                    Math.min(1.0F, blue), Math.min(1.0F, alpha));
             CharacterHeadIconLayout layout = head.layout;
             drawTexturedQuad(
                     x, y, size, size,

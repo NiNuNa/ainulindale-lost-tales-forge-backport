@@ -6,6 +6,9 @@ import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -14,7 +17,13 @@ import net.minecraft.client.settings.KeyBinding;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
-/** Draws the non-interactive input and status strip over the map. */
+/**
+ * Draws the non-interactive input and status strip over the map.
+ *
+ * <p>Hints are described once and then fitted to whatever width is going. A
+ * narrow screen first drops the labels, then the least important hints, so
+ * the strip degrades instead of overflowing.</p>
+ */
 @SideOnly(Side.CLIENT)
 public final class LostTalesLotrMapControlBar {
     public static final int HEIGHT = 30;
@@ -25,6 +34,10 @@ public final class LostTalesLotrMapControlBar {
     private static final int BACKGROUND = 0xA0000000;
     private static final float INPUT_SCALE = 1.0F;
     private static final float GUI_MODELVIEW_Z = -2000.0F;
+    /** Share of the screen the strip may occupy before it starts dropping. */
+    private static final int WIDTH_DIVISOR = 2;
+    /** LOTR's operator teleport key, which its own subtitle used to name. */
+    private static final int TELEPORT_KEY = Keyboard.KEY_M;
 
     private LostTalesLotrMapControlBar() {
     }
@@ -40,25 +53,8 @@ public final class LostTalesLotrMapControlBar {
             return false;
         }
 
-        String close = I18n.format("gui.losttales.map.control.close");
-        String zoom = I18n.format("gui.losttales.map.control.zoom");
-        String legend = I18n.format("gui.losttales.map.control.legend");
-        int closeIconWidth = LostTalesInputIconRenderer.measureInput(
-                minecraft, Type.KEYBOARD, Keyboard.KEY_ESCAPE, INPUT_SCALE);
-        int zoomIconWidth = LostTalesInputIconRenderer.measureMouseWheel(
-                minecraft, INPUT_SCALE);
-        KeyBinding legendBinding =
-                LostTalesKeyBindings.getMapLegendKeyBinding();
-        int legendIconWidth = LostTalesInputIconRenderer.measureKeyBinding(
-                minecraft, legendBinding, INPUT_SCALE);
-        Layout layout = calculateLayout(
-                gui.width,
-                closeIconWidth,
-                font.getStringWidth(close),
-                zoomIconWidth,
-                font.getStringWidth(zoom),
-                legendIconWidth,
-                font.getStringWidth(legend));
+        List<Hint> hints = collectHints(minecraft, font, gui);
+        Layout layout = calculateLayout(gui.width, hints);
 
         beginUntranslatedRender();
         try {
@@ -66,151 +62,93 @@ public final class LostTalesLotrMapControlBar {
             Gui.drawRect(0, top, gui.width, gui.height, BACKGROUND);
             Gui.drawRect(0, top, gui.width, top + 1,
                     LostTalesSkyrimUiStyle.BORDER_DIM);
-            renderLeftControls(
-                    minecraft, font, top, layout,
-                    close, zoom, legendBinding, legend);
+            drawHints(minecraft, font, top, hints, layout);
         } finally {
             endUntranslatedRender();
         }
         return true;
     }
 
-    private static void renderLeftControls(
+    /**
+     * The strip's hints, in the order they are drawn. Later entries are the
+     * first to go when the space runs out, so the ones a player needs most
+     * are listed first.
+     */
+    private static List<Hint> collectHints(
+            Minecraft minecraft, FontRenderer font,
+            LostTalesLotrMapGui gui) {
+        ArrayList<Hint> hints = new ArrayList<Hint>();
+        hints.add(Hint.key(minecraft, font, Keyboard.KEY_ESCAPE,
+                I18n.format("gui.losttales.map.control.close")));
+        hints.add(Hint.wheel(minecraft, font,
+                I18n.format("gui.losttales.map.control.zoom")));
+        hints.add(Hint.binding(minecraft, font,
+                LostTalesKeyBindings.getMapLegendKeyBinding(),
+                I18n.format("gui.losttales.map.control.legend")));
+        hints.add(Hint.key(minecraft, font,
+                LostTalesLotrMapGui.CREATE_WAYPOINT_KEY,
+                I18n.format("gui.losttales.map.control.waypoint")));
+        if (gui != null && gui.isPlayerOp) {
+            // LOTR's own sentence for this is filtered out of the map, so
+            // the action is named once, in the strip, like every other.
+            hints.add(Hint.key(minecraft, font, TELEPORT_KEY,
+                    I18n.format("gui.losttales.map.control.teleport")));
+        }
+        return hints;
+    }
+
+    private static void drawHints(
             Minecraft minecraft, FontRenderer font, int top,
-            Layout layout, String close, String zoom,
-            KeyBinding legendBinding, String legend) {
+            List<Hint> hints, Layout layout) {
         int inputY = top
                 + (HEIGHT - LostTalesInputIconRenderer.BASE_ICON_HEIGHT) / 2;
         int x = OUTER_PADDING;
-        if (layout.showClose) {
-            x = drawInputHint(
-                    minecraft, font, Type.KEYBOARD, Keyboard.KEY_ESCAPE,
-                    close, x, inputY, layout.showCloseLabel);
-        }
-        if (layout.showZoom) {
-            x += x > OUTER_PADDING ? CONTROL_GAP : 0;
-            x = drawMouseWheelHint(
-                    minecraft, font, zoom,
-                    x, inputY, layout.showZoomLabel);
-        }
-        if (layout.showLegend) {
-            x += x > OUTER_PADDING ? CONTROL_GAP : 0;
-            drawBindingHint(
-                    minecraft, font, legendBinding, legend,
-                    x, inputY, layout.showLegendLabel);
+        for (int index = 0; index < layout.visibleHints; index++) {
+            if (x > OUTER_PADDING) {
+                x += CONTROL_GAP;
+            }
+            x = hints.get(index).draw(
+                    minecraft, font, x, inputY, layout.showLabels);
         }
     }
 
-    private static int drawInputHint(
-            Minecraft minecraft, FontRenderer font,
-            Type type, int keyCode, String label,
-            int x, int y, boolean showLabel) {
-        int width = LostTalesInputIconRenderer.drawInput(
-                minecraft, type, keyCode, x, y, INPUT_SCALE);
-        int end = x + width;
-        if (showLabel) {
-            int textX = end + INPUT_TEXT_GAP;
-            drawHintText(font, label, textX, y);
-            end = textX + font.getStringWidth(label);
+    /**
+     * Fits as many hints as the left half of the strip allows.
+     *
+     * <p>Labels go first and all together, so the strip never shows some
+     * hints named and others not; only then are whole hints dropped from the
+     * end.</p>
+     */
+    static Layout calculateLayout(int screenWidth, List<Hint> hints) {
+        int available = Math.max(0,
+                Math.max(0, screenWidth / WIDTH_DIVISOR) - OUTER_PADDING);
+        if (hints == null || hints.isEmpty()) {
+            return new Layout(0, false, OUTER_PADDING);
         }
-        return end;
+        int labelled = totalWidth(hints, hints.size(), true);
+        if (labelled <= available) {
+            return new Layout(hints.size(), true,
+                    OUTER_PADDING + labelled);
+        }
+        for (int count = hints.size(); count > 0; count--) {
+            int width = totalWidth(hints, count, false);
+            if (width <= available) {
+                return new Layout(count, false, OUTER_PADDING + width);
+            }
+        }
+        return new Layout(0, false, OUTER_PADDING);
     }
 
-    private static int drawMouseWheelHint(
-            Minecraft minecraft, FontRenderer font, String label,
-            int x, int y, boolean showLabel) {
-        int width = LostTalesInputIconRenderer.drawMouseWheel(
-                minecraft, x, y, INPUT_SCALE);
-        int end = x + width;
-        if (showLabel) {
-            int textX = end + INPUT_TEXT_GAP;
-            drawHintText(font, label, textX, y);
-            end = textX + font.getStringWidth(label);
+    private static int totalWidth(
+            List<Hint> hints, int count, boolean withLabels) {
+        int width = 0;
+        for (int index = 0; index < count; index++) {
+            if (index > 0) {
+                width += CONTROL_GAP;
+            }
+            width += hints.get(index).width(withLabels);
         }
-        return end;
-    }
-
-    private static int drawBindingHint(
-            Minecraft minecraft, FontRenderer font, KeyBinding binding,
-            String label, int x, int y, boolean showLabel) {
-        int width = LostTalesInputIconRenderer.drawKeyBinding(
-                minecraft, binding, x, y, INPUT_SCALE);
-        int end = x + width;
-        if (showLabel) {
-            int textX = end + INPUT_TEXT_GAP;
-            drawHintText(font, label, textX, y);
-            end = textX + font.getStringWidth(label);
-        }
-        return end;
-    }
-
-    private static void drawHintText(
-            FontRenderer font, String label, int x, int inputY) {
-        int textY = inputY
-                + (LostTalesInputIconRenderer.BASE_ICON_HEIGHT
-                - font.FONT_HEIGHT) / 2;
-        font.drawStringWithShadow(
-                label, x, textY, LostTalesSkyrimUiStyle.TEXT);
-    }
-
-    static Layout calculateLayout(
-            int screenWidth,
-            int closeIconWidth, int closeLabelWidth,
-            int zoomIconWidth, int zoomLabelWidth,
-            int legendIconWidth, int legendLabelWidth) {
-        int leftLimit = Math.max(0, screenWidth / 3);
-        int available = Math.max(0, leftLimit - OUTER_PADDING);
-        int closeFull = hintWidth(
-                closeIconWidth, closeLabelWidth, true);
-        int zoomFull = hintWidth(
-                zoomIconWidth, zoomLabelWidth, true);
-        int legendFull = hintWidth(
-                legendIconWidth, legendLabelWidth, true);
-
-        if (closeFull + CONTROL_GAP + zoomFull
-                + CONTROL_GAP + legendFull <= available) {
-            return new Layout(true, true, true, true,
-                    true, true,
-                    OUTER_PADDING + closeFull + CONTROL_GAP + zoomFull
-                            + CONTROL_GAP + legendFull);
-        }
-        if (closeFull + CONTROL_GAP + zoomIconWidth
-                + CONTROL_GAP + legendFull <= available) {
-            return new Layout(true, true, true, false,
-                    true, true,
-                    OUTER_PADDING + closeFull + CONTROL_GAP + zoomIconWidth
-                            + CONTROL_GAP + legendFull);
-        }
-        if (closeIconWidth + CONTROL_GAP + zoomIconWidth
-                + CONTROL_GAP + legendIconWidth <= available) {
-            return new Layout(true, false, true, false,
-                    true, false,
-                    OUTER_PADDING + closeIconWidth
-                            + CONTROL_GAP + zoomIconWidth
-                            + CONTROL_GAP + legendIconWidth);
-        }
-        if (closeIconWidth + CONTROL_GAP + legendIconWidth <= available) {
-            return new Layout(true, false, false, false,
-                    true, false,
-                    OUTER_PADDING + closeIconWidth
-                            + CONTROL_GAP + legendIconWidth);
-        }
-        if (legendFull <= available) {
-            return new Layout(false, false, false, false,
-                    true, true, OUTER_PADDING + legendFull);
-        }
-        if (legendIconWidth <= available) {
-            return new Layout(false, false, false, false,
-                    true, false, OUTER_PADDING + legendIconWidth);
-        }
-        return new Layout(false, false, false, false,
-                false, false, OUTER_PADDING);
-    }
-
-    private static int hintWidth(
-            int iconWidth, int labelWidth, boolean showLabel) {
-        return Math.max(0, iconWidth)
-                + (showLabel ? INPUT_TEXT_GAP + Math.max(0, labelWidth) : 0);
+        return width;
     }
 
     private static void beginUntranslatedRender() {
@@ -228,27 +166,107 @@ public final class LostTalesLotrMapControlBar {
         GL11.glPopAttrib();
     }
 
+    /** One input icon and the action it performs. */
+    static final class Hint {
+        private final Type type;
+        private final int keyCode;
+        private final KeyBinding binding;
+        private final boolean wheel;
+        private final String label;
+        private final int iconWidth;
+        private final int labelWidth;
+
+        private Hint(Type type, int keyCode, KeyBinding binding,
+                     boolean wheel, String label,
+                     int iconWidth, int labelWidth) {
+            this.type = type;
+            this.keyCode = keyCode;
+            this.binding = binding;
+            this.wheel = wheel;
+            this.label = label == null ? "" : label;
+            this.iconWidth = Math.max(0, iconWidth);
+            this.labelWidth = Math.max(0, labelWidth);
+        }
+
+        static Hint key(Minecraft minecraft, FontRenderer font,
+                        int keyCode, String label) {
+            return new Hint(Type.KEYBOARD, keyCode, null, false, label,
+                    LostTalesInputIconRenderer.measureInput(
+                            minecraft, Type.KEYBOARD, keyCode,
+                            INPUT_SCALE),
+                    font.getStringWidth(label));
+        }
+
+        static Hint binding(Minecraft minecraft, FontRenderer font,
+                            KeyBinding binding, String label) {
+            return new Hint(Type.KEYBOARD, 0, binding, false, label,
+                    LostTalesInputIconRenderer.measureKeyBinding(
+                            minecraft, binding, INPUT_SCALE),
+                    font.getStringWidth(label));
+        }
+
+        static Hint wheel(Minecraft minecraft, FontRenderer font,
+                          String label) {
+            return new Hint(null, 0, null, true, label,
+                    LostTalesInputIconRenderer.measureMouseWheel(
+                            minecraft, INPUT_SCALE),
+                    font.getStringWidth(label));
+        }
+
+        int width(boolean withLabel) {
+            return this.iconWidth
+                    + (withLabel && this.labelWidth > 0
+                            ? INPUT_TEXT_GAP + this.labelWidth : 0);
+        }
+
+        /** @return the x coordinate just past this hint */
+        int draw(Minecraft minecraft, FontRenderer font,
+                 int x, int inputY, boolean withLabel) {
+            int drawn;
+            if (this.wheel) {
+                drawn = LostTalesInputIconRenderer.drawMouseWheel(
+                        minecraft, x, inputY, INPUT_SCALE);
+            } else if (this.binding != null) {
+                drawn = LostTalesInputIconRenderer.drawKeyBinding(
+                        minecraft, this.binding, x, inputY, INPUT_SCALE);
+            } else {
+                drawn = LostTalesInputIconRenderer.drawInput(
+                        minecraft, this.type, this.keyCode,
+                        x, inputY, INPUT_SCALE);
+            }
+            int end = x + drawn;
+            if (withLabel && this.label.length() > 0) {
+                int textX = end + INPUT_TEXT_GAP;
+                int textY = inputY
+                        + (LostTalesInputIconRenderer.BASE_ICON_HEIGHT
+                                - font.FONT_HEIGHT) / 2;
+                font.drawStringWithShadow(this.label, textX, textY,
+                        LostTalesSkyrimUiStyle.TEXT);
+                end = textX + font.getStringWidth(this.label);
+            }
+            return end;
+        }
+    }
+
     static final class Layout {
-        final boolean showClose;
-        final boolean showCloseLabel;
-        final boolean showZoom;
-        final boolean showZoomLabel;
-        final boolean showLegend;
-        final boolean showLegendLabel;
+        final int visibleHints;
+        final boolean showLabels;
         final int leftEnd;
 
-        private Layout(
-                boolean showClose, boolean showCloseLabel,
-                boolean showZoom, boolean showZoomLabel,
-                boolean showLegend, boolean showLegendLabel,
-                int leftEnd) {
-            this.showClose = showClose;
-            this.showCloseLabel = showCloseLabel;
-            this.showZoom = showZoom;
-            this.showZoomLabel = showZoomLabel;
-            this.showLegend = showLegend;
-            this.showLegendLabel = showLegendLabel;
+        private Layout(int visibleHints, boolean showLabels, int leftEnd) {
+            this.visibleHints = visibleHints;
+            this.showLabels = showLabels;
             this.leftEnd = leftEnd;
         }
+    }
+
+    /** Test seam: hints measured without a running client. */
+    static List<Hint> measuredHints(int... widths) {
+        ArrayList<Hint> hints = new ArrayList<Hint>();
+        for (int width : widths) {
+            hints.add(new Hint(Type.KEYBOARD, 0, null, false, "x",
+                    width, width));
+        }
+        return Collections.unmodifiableList(hints);
     }
 }

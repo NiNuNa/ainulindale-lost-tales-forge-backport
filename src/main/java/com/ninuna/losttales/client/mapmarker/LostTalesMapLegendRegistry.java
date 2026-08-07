@@ -100,6 +100,16 @@ public final class LostTalesMapLegendRegistry {
                 || "Go Here".equalsIgnoreCase(marker.getCategoryName())) {
             return PARTY;
         }
+        // A custom waypoint is drawn as a Lost Tales marker but filtered as
+        // the waypoint it stands for, so one toggle covers both views of it.
+        if (id.startsWith(LostTalesLotrMapMarkerIconOverlay
+                .PERSONAL_WAYPOINT_ID_PREFIX)) {
+            return PERSONAL_WAYPOINTS;
+        }
+        if (id.startsWith(LostTalesLotrMapMarkerIconOverlay
+                .SHARED_WAYPOINT_ID_PREFIX)) {
+            return SHARED_WAYPOINTS;
+        }
         LostTalesMapMarkerSource source = marker.getSource();
         if (source == LostTalesMapMarkerSource.PLAYER_CREATED) {
             return PLAYER_WAYSTONES;

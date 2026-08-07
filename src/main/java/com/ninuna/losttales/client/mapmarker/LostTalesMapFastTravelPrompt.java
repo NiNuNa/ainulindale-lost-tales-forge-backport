@@ -28,17 +28,35 @@ final class LostTalesMapFastTravelPrompt {
     }
 
     private final String destinationName;
+    /**
+     * Localization key explaining why travel is refused, or null while it is
+     * offered. The client only decides what to show; the server re-derives
+     * eligibility for every request it receives.
+     */
+    private final String blockedReasonKey;
 
     LostTalesMapFastTravelPrompt(String destinationName) {
+        this(destinationName, null);
+    }
+
+    LostTalesMapFastTravelPrompt(
+            String destinationName, String blockedReasonKey) {
         String normalized = destinationName == null
                 ? "" : destinationName.trim();
         this.destinationName = normalized.length() == 0
                 ? I18n.format("gui.losttales.map.fast_travel.unknown")
                 : normalized;
+        this.blockedReasonKey =
+                blockedReasonKey == null || blockedReasonKey.length() == 0
+                        ? null : blockedReasonKey;
     }
 
     String getDestinationName() {
         return this.destinationName;
+    }
+
+    boolean isTravelOffered() {
+        return this.blockedReasonKey == null;
     }
 
     void render(LostTalesLotrMapGui gui, int mouseX, int mouseY,
@@ -67,6 +85,18 @@ final class LostTalesMapFastTravelPrompt {
                 layout.y + 14,
                 LostTalesSkyrimUiStyle.TEXT_BRIGHT);
 
+        if (this.blockedReasonKey != null) {
+            String reason = LostTalesSkyrimUiStyle.trimToWidth(
+                    font, I18n.format(this.blockedReasonKey),
+                    Math.max(0, layout.width - CONTENT_PADDING * 2));
+            font.drawStringWithShadow(
+                    reason,
+                    layout.x + (layout.width
+                            - font.getStringWidth(reason)) / 2,
+                    layout.y + 24,
+                    LostTalesSkyrimUiStyle.TEXT_MUTED);
+        }
+
         Gui.drawRect(
                 layout.x + CONTENT_PADDING, layout.y + 35,
                 layout.x + layout.width - CONTENT_PADDING,
@@ -74,7 +104,8 @@ final class LostTalesMapFastTravelPrompt {
                 LostTalesSkyrimUiStyle.BORDER_DIM);
         drawButton(font, layout.yes,
                 I18n.format("gui.losttales.map.fast_travel.yes"),
-                layout.yes.contains(mouseX, mouseY), true);
+                layout.yes.contains(mouseX, mouseY),
+                isTravelOffered());
         drawButton(font, layout.no,
                 I18n.format("gui.losttales.map.fast_travel.no"),
                 layout.no.contains(mouseX, mouseY), true);
@@ -93,7 +124,7 @@ final class LostTalesMapFastTravelPrompt {
         }
         Layout layout = calculateLayout(screenWidth, screenHeight);
         if (layout.yes.contains(mouseX, mouseY)) {
-            return Action.YES;
+            return isTravelOffered() ? Action.YES : Action.NONE;
         }
         if (layout.no.contains(mouseX, mouseY)) {
             return Action.NO;
@@ -113,7 +144,7 @@ final class LostTalesMapFastTravelPrompt {
         if (keyCode == Keyboard.KEY_RETURN
                 || keyCode == Keyboard.KEY_NUMPADENTER
                 || keyCode == Keyboard.KEY_Y) {
-            return Action.YES;
+            return isTravelOffered() ? Action.YES : Action.NONE;
         }
         return Action.NONE;
     }

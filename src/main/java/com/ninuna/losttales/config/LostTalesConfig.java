@@ -54,6 +54,8 @@ public final class LostTalesConfig {
     public static boolean showHostileMapMarkers = true;
     public static int hostileMapMarkerDisplayRadius = 64;
     public static String[] hiddenMapLegendCategories = new String[0];
+    public static String[] customWaypointColors = new String[0];
+    public static String[] customWaypointNotes = new String[0];
 
     public static int combatMarkerTrackingRadius = 64;
     public static int combatMarkerUpdateIntervalTicks = 10;
@@ -439,6 +441,18 @@ public final class LostTalesConfig {
                     "hiddenMapLegendCategories",
                     hiddenMapLegendCategories,
                     "Client-only map legend category IDs that are hidden. Unknown IDs are ignored and new categories remain visible by default."
+            ).getStringList();
+            customWaypointColors = config.get(
+                    CATEGORY_CLIENT,
+                    "customWaypointColors",
+                    customWaypointColors,
+                    "Client-only icon colour per custom waypoint, as name=colour. LOTR stores no colour for its waypoints, so this is presentation only and is not shared with anyone else."
+            ).getStringList();
+            customWaypointNotes = config.get(
+                    CATEGORY_CLIENT,
+                    "customWaypointNotes",
+                    customWaypointNotes,
+                    "Client-only tooltip note per custom waypoint, as name=note. LOTR stores no description for its waypoints, so this is presentation only and is not shared with anyone else."
             ).getStringList();
 
             combatMarkerTrackingRadius = config.getInt(
@@ -1332,6 +1346,10 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "hostileMapMarkerDisplayRadius", hostileMapMarkerDisplayRadius).set(hostileMapMarkerDisplayRadius);
         config.get(CATEGORY_CLIENT, "hiddenMapLegendCategories",
                 hiddenMapLegendCategories).set(hiddenMapLegendCategories);
+        config.get(CATEGORY_CLIENT, "customWaypointColors",
+                customWaypointColors).set(customWaypointColors);
+        config.get(CATEGORY_CLIENT, "customWaypointNotes",
+                customWaypointNotes).set(customWaypointNotes);
         config.get(CATEGORY_COMBAT_MARKERS, "trackingRadius", combatMarkerTrackingRadius).set(combatMarkerTrackingRadius);
         config.get(CATEGORY_COMBAT_MARKERS, "updateIntervalTicks", combatMarkerUpdateIntervalTicks).set(combatMarkerUpdateIntervalTicks);
         config.get(CATEGORY_COMBAT_MARKERS, "disengagementGraceTicks", combatMarkerDisengagementGraceTicks).set(combatMarkerDisengagementGraceTicks);

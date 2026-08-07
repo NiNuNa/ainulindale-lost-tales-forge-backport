@@ -149,12 +149,34 @@ public final class PartyNetworkRequestHandler {
         }
     }
 
+    /** Operations on the requester's own marker, which needs no character. */
+    private static boolean isPersonalMarkerOperation(
+            PartyOperationType operationType) {
+        return operationType == PartyOperationType.SET_GO_HERE_MARKER
+                || operationType
+                        == PartyOperationType.REMOVE_GO_HERE_MARKER;
+    }
+
     private static PartyErrorId validateRequestContext(
             EntityPlayerMP player,
             PartyOperationType operationType,
             UUID expectedActiveCharacterId,
             UUID expectedPartyId) {
         PartyService service = PartyService.getInstance();
+        if (isPersonalMarkerOperation(operationType)) {
+            // A personal marker may be owned by the player when they have no
+            // character, so this operation is checked against whoever the
+            // server says owns it rather than against a character alone.
+            PartyService.PersonalMarkerContext owner =
+                    service.resolvePersonalMarkerOwner(player);
+            if (!owner.isValid()) {
+                return owner.errorId;
+            }
+            return expectedActiveCharacterId != null
+                    && expectedActiveCharacterId.equals(owner.ownerId)
+                    ? PartyErrorId.NONE
+                    : PartyErrorId.ACTIVE_CHARACTER_CHANGED;
+        }
         PartyService.ActiveCharacterContext active =
                 service.resolveActiveCharacter(player);
         if (!active.isValid()) {

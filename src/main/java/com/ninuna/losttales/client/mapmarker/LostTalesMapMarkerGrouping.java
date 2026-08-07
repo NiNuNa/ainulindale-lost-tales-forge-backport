@@ -48,6 +48,14 @@ final class LostTalesMapMarkerGrouping {
     static final float COMPANION_SCALE = 0.9F;
     /** Representative plus the two companions drawn beside it. */
     static final int MAX_FAN_MEMBERS = 3;
+    /**
+     * Sideways bow of a member's travel path, as a share of its own length.
+     * A slight curve makes two markers crossing each other readable as two
+     * separate movements rather than one smear.
+     */
+    static final float TRANSITION_ARC_RATIO = 0.14F;
+    /** Ceiling on that bow, in GUI pixels, so long travels stay restrained. */
+    static final float TRANSITION_ARC_MAX_PIXELS = 4.0F;
 
     private LostTalesMapMarkerGrouping() {}
 
@@ -66,11 +74,15 @@ final class LostTalesMapMarkerGrouping {
      */
     enum GroupingCategory {
         LOCATION("locations", true),
-        PERSONAL_WAYPOINT("personal_waypoints", true),
-        SHARED_WAYPOINT("shared_waypoints", true),
         PLAYER_WAYSTONE("player_waystones", true),
         PARTY("party", true),
-        /** Objective markers stay individually readable at every zoom. */
+        /**
+         * A player places their own waypoints deliberately, often several
+         * close together and each meaning something different, so they stay
+         * individually readable at every zoom — as do objective markers.
+         */
+        PERSONAL_WAYPOINT("personal_waypoints", false),
+        SHARED_WAYPOINT("shared_waypoints", false),
         QUEST("quests", false),
         UNKNOWN("", false);
 
@@ -491,15 +503,66 @@ final class LostTalesMapMarkerGrouping {
     }
 
     /**
-     * Visual-only travel between a group anchor and the marker's real screen
-     * position. The caller supplies the same eased visibility used to fade
-     * the marker, keeping opacity and motion perfectly synchronized.
+     * The same marker as it would be drawn at a different zoom.
+     *
+     * <p>Icons are drawn at a fixed screen size, so zooming moves a marker's
+     * centre away from {@code centerX}/{@code centerY} without changing the
+     * rectangle it covers. That is what lets a candidate zoom be handed to
+     * the real clustering rule instead of being approximated.</p>
      */
-    static float transitionCoordinate(
-            float groupAnchor, float markerPosition, float visibility) {
-        float clamped = Math.max(0.0F, Math.min(1.0F, visibility));
-        return groupAnchor
-                + (markerPosition - groupAnchor) * clamped;
+    static Entry scaledAbout(
+            Entry entry, float centerX, float centerY, float factor) {
+        float halfWidth = (entry.right - entry.left) * 0.5F;
+        float halfHeight = (entry.bottom - entry.top) * 0.5F;
+        float scaledCenterX = centerX
+                + ((entry.left + entry.right) * 0.5F - centerX) * factor;
+        float scaledCenterY = centerY
+                + ((entry.top + entry.bottom) * 0.5F - centerY) * factor;
+        return new Entry(entry.id, entry.displayName,
+                entry.relevanceRank, entry.category,
+                scaledCenterX - halfWidth, scaledCenterY - halfHeight,
+                scaledCenterX + halfWidth, scaledCenterY + halfHeight);
+    }
+
+    /**
+     * Visual-only travel between a group anchor and the marker's real screen
+     * position, bowed gently to one side.
+     *
+     * <p>The caller supplies the same eased visibility used to fade the
+     * marker, so opacity and motion stay synchronized, and both endpoints are
+     * passed in every frame — the position is solved from them rather than
+     * accumulated, so an interrupted or reversed transition simply continues
+     * from wherever it had got to and nothing can drift.</p>
+     *
+     * <p>Both axes are solved together because the curve belongs to the path
+     * rather than to either coordinate: the bow is perpendicular to the
+     * straight line and peaks halfway along it. The travel vector is always
+     * rotated the same way, so the path is deterministic.</p>
+     *
+     * @param result two floats written with the screen position
+     */
+    static void transitionPoint(
+            float anchorX, float anchorY,
+            float markerX, float markerY,
+            float visibility, float[] result) {
+        float eased = Math.max(0.0F, Math.min(1.0F, visibility));
+        float deltaX = markerX - anchorX;
+        float deltaY = markerY - anchorY;
+        float x = anchorX + deltaX * eased;
+        float y = anchorY + deltaY * eased;
+        float length = (float)Math.sqrt(
+                deltaX * deltaX + deltaY * deltaY);
+        if (length > 0.0F) {
+            // 4t(1-t) is one at the midpoint and zero at both ends, so the
+            // bow can never move where the marker starts or finishes.
+            float bow = Math.min(length * TRANSITION_ARC_RATIO,
+                    TRANSITION_ARC_MAX_PIXELS)
+                    * 4.0F * eased * (1.0F - eased);
+            x += -deltaY / length * bow;
+            y += deltaX / length * bow;
+        }
+        result[0] = x;
+        result[1] = y;
     }
 
     /**

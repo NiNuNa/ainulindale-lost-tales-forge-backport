@@ -128,7 +128,7 @@ final class LostTalesLotrMapLegend {
             if (categoryIndex < categories.size()) {
                 LostTalesMapLegendRegistry.toggleCategory(
                         categories.get(categoryIndex).getId());
-                gui.clearHiddenMapLegendSelection();
+                gui.onMapLegendFiltersChanged();
             }
             return true;
         }
