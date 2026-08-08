@@ -732,6 +732,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             LostTalesLotrMapMarkerIconOverlay
                     .restoreSelectedLotrWaypointAfterDraw(this);
         }
+        // Over the map and everything pinned to it, under the strip and the
+        // panels, so it draws the eye towards the middle without dimming
+        // anything the player has to read.
+        renderVignette();
         renderControlBar(false);
         LostTalesLotrMapLegend.render(this, mouseX, mouseY);
         if (this.fastTravelPrompt != null) {
@@ -976,6 +980,25 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     /** How far the map is drawn leaning, 0 flat to 1. */
     float getMapLean() {
         return this.mapLean;
+    }
+
+    /**
+     * The edge shade, over the whole map screen.
+     *
+     * <p>Only on the Lost Tales fullscreen map: LOTR's own windowed map has a
+     * frame of its own and its menu background is a different screen
+     * entirely.</p>
+     */
+    private void renderVignette() {
+        if (!LostTalesLotrMapLayout.isFullscreenLayoutActive(this)) {
+            return;
+        }
+        // The strip only. The legend is a panel that opens and closes over
+        // the map, and measuring the shade against it moved the whole oval
+        // every time it was toggled.
+        int reserved = LostTalesLotrMapLayout.isControlBarVisible(this)
+                ? LostTalesLotrMapControlBar.HEIGHT : 0;
+        LostTalesLotrMapVignette.render(this.width, this.height, reserved);
     }
 
     void renderControlBar(boolean force) {

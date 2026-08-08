@@ -202,7 +202,7 @@ final class LostTalesLotrRoadLabelRenderer {
                         }
                     }
                 } finally {
-                    GL11.glDisable(GL11.GL_SCISSOR_TEST);
+                    endClip();
                 }
             } catch (Throwable ignored) {
                 // Road labels are decorative; the already-rendered roads and
@@ -260,7 +260,8 @@ final class LostTalesLotrRoadLabelRenderer {
                             points.length - 1, pointIndex + tangent)];
                     float angle = uprightAngle(
                             after.x - before.x,
-                            after.z - before.z);
+                            after.z - before.z,
+                            LostTalesLotrMapRotation.degreesOf(this.gui));
                     String key = road.roadName + ':' + roadIndex
                             + ':' + pointIndex;
                     candidates.add(new LabelCandidate(
@@ -304,6 +305,16 @@ final class LostTalesLotrRoadLabelRenderer {
             return selected;
         }
 
+        /**
+         * A road point in screen space, on the sheet as it is actually drawn.
+         *
+         * <p>This repeats LOTR's own map-space conversion because the anchors
+         * are chosen from world coordinates rather than from the points LOTR
+         * happens to be drawing, but the turn and the lean are not repeated
+         * here: the result goes through the same one place that moves every
+         * other position on the map, so a road name cannot come loose from
+         * the road under it.</p>
+         */
         private float[] transform(double worldX, double worldZ) {
             float mapX = (float)(worldX / LOTRGenLayerWorld.scale)
                     + 810.0F;
@@ -313,14 +324,27 @@ final class LostTalesLotrRoadLabelRenderer {
                     + this.mapXMin + this.mapWidth / 2.0F;
             float screenY = (mapY - this.posY) * this.zoomScale
                     + this.mapYMin + this.mapHeight / 2.0F;
-            return new float[] {screenX, screenY};
+            return LostTalesLotrMapRotation.rotate(
+                    new float[] {screenX, screenY}, this.gui);
         }
 
+        /**
+         * Clips the labels to the map viewport without deciding for the rest
+         * of the frame whether clipping is on. LOTR turns the scissor on and
+         * off around passes of its own, and this pass runs inside one of
+         * them, so what was there is saved and given straight back.
+         */
         private void beginClip() {
             ScaledResolution resolution = new ScaledResolution(
                     this.minecraft, this.minecraft.displayWidth,
                     this.minecraft.displayHeight);
             int scale = resolution.getScaleFactor();
+            GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_SCISSOR_BIT
+                    | GL11.GL_DEPTH_BUFFER_BIT);
+            // The last map pass that was still being depth-tested against
+            // whatever the layers before it left in the buffer.
+            GL11.glDisable(GL11.GL_DEPTH_TEST);
+            GL11.glDepthMask(false);
             GL11.glEnable(GL11.GL_SCISSOR_TEST);
             GL11.glScissor(
                     this.mapXMin * scale,
@@ -329,13 +353,17 @@ final class LostTalesLotrRoadLabelRenderer {
                     this.mapHeight * scale);
         }
 
+        private void endClip() {
+            GL11.glPopAttrib();
+        }
+
         private void draw(LabelCandidate candidate,
                           float zoomVisibility, float fade) {
             float alpha = zoomVisibility * 0.8F * fade;
             int alphaInt = Math.max(4,
                     Math.min(255, (int)(alpha * 255.0F)));
             int shadow = alphaInt << 24;
-            int white = shadow | 0x00FFFFFF;
+            int white = shadow | LostTalesLotrMapLabelStyle.LABEL_RGB;
             GL11.glPushMatrix();
             GL11.glTranslatef(candidate.x, candidate.y, 0.0F);
             GL11.glScalef(zoomVisibility, zoomVisibility, zoomVisibility);
@@ -386,6 +414,21 @@ final class LostTalesLotrRoadLabelRenderer {
         Float stored = labelFade.get(key);
         float value = stored == null ? 0.0F : stored.floatValue();
         return value * value * (3.0F - 2.0F * value);
+    }
+
+    /**
+     * The tangent angle of a road on a map that has been turned.
+     *
+     * <p>The turn is added before the name is made readable rather than
+     * after, so a road that a small turn pushes past vertical flips once and
+     * stays the right way up instead of standing on its head.</p>
+     */
+    static float uprightAngle(double dx, double dz, float mapDegrees) {
+        return uprightAngle(
+                dx * Math.cos(Math.toRadians(mapDegrees))
+                        - dz * Math.sin(Math.toRadians(mapDegrees)),
+                dx * Math.sin(Math.toRadians(mapDegrees))
+                        + dz * Math.cos(Math.toRadians(mapDegrees)));
     }
 
     static float uprightAngle(double dx, double dz) {

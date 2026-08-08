@@ -201,6 +201,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     private static final String LOTR_MAP_MARKER_HOOK_OWNER =
             "com/ninuna/losttales/client/mapmarker/"
                     + "LostTalesLotrMapMarkerIconOverlay";
+    private static final String LOTR_MAP_LABEL_STYLE_HOOK_OWNER =
+            "com/ninuna/losttales/client/mapmarker/"
+                    + "LostTalesLotrMapLabelStyle";
+    private static final String MAP_LABEL_DRAW_HOOK_DESC =
+            "(Lnet/minecraft/client/gui/FontRenderer;"
+                    + "Ljava/lang/String;III)I";
     private static final String LOTR_MAP_ROTATION_HOOK_OWNER =
             "com/ninuna/losttales/client/mapmarker/"
                     + "LostTalesLotrMapRotation";
@@ -886,6 +892,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                 injectLotrMapUnrotatedLabels(method);
                         changed |= labelRotationHookPresent;
                     }
+                    if (!containsHook(method,
+                            LOTR_MAP_LABEL_STYLE_HOOK_OWNER,
+                            "drawMapLabel")) {
+                        changed |= restyleLotrMapLabels(method);
+                    }
                 } else if ("transformMapCoords".equals(method.name)
                         && "(FF)[F".equals(method.desc)) {
                     rotationHookPresent = containsHook(
@@ -1096,6 +1107,41 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     "(Llotr/client/gui/LOTRGuiMap;)V"));
             method.instructions.insert(hook);
             info("Patched LOTR map labels to turn with the map sheet");
+        }
+        return injected;
+    }
+
+    /**
+     * Sends LOTR's region names through the mod's own label colour.
+     *
+     * <p>Every string that pass draws is redirected; which of them are
+     * actually restyled is decided at runtime by the colour the base mod
+     * asked for, so a shadow stays a shadow and only plain white becomes the
+     * interface's ivory.</p>
+     */
+    private static boolean restyleLotrMapLabels(MethodNode method) {
+        boolean injected = false;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof MethodInsnNode)) {
+                continue;
+            }
+            MethodInsnNode call = (MethodInsnNode)instruction;
+            if (call.getOpcode() != Opcodes.INVOKEVIRTUAL
+                    || !"net/minecraft/client/gui/FontRenderer"
+                    .equals(call.owner)
+                    || !"drawString".equals(call.name)
+                    || !"(Ljava/lang/String;III)I".equals(call.desc)) {
+                continue;
+            }
+            call.setOpcode(Opcodes.INVOKESTATIC);
+            call.owner = LOTR_MAP_LABEL_STYLE_HOOK_OWNER;
+            call.name = "drawMapLabel";
+            call.desc = MAP_LABEL_DRAW_HOOK_DESC;
+            injected = true;
+        }
+        if (injected) {
+            info("Patched LOTR map region names onto the Lost Tales palette");
         }
         return injected;
     }

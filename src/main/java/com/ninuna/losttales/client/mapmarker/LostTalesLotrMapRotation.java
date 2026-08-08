@@ -28,21 +28,29 @@ public final class LostTalesLotrMapRotation {
     /** Furthest the map may be turned in either direction, in degrees. */
     public static final float MAX_DEGREES = 22.5F;
     /** Horizontal drag, in GUI pixels, that turns the map as far as it goes. */
-    static final float FULL_TURN_DRAG_PIXELS = 900.0F;
+    static final float FULL_TURN_DRAG_PIXELS = 520.0F;
     /**
      * How sharply the map stiffens as it leaves square. Both the turn and the
-     * lean follow {@code 1 - (1 - t)^RESISTANCE_EXPONENT}: the first part of a
-     * drag moves the map freely and the last of it costs an order of magnitude
-     * more movement, so the extremes are places the player leans into rather
-     * than falls through.
+     * lean follow {@code 1 - (1 - t)^RESISTANCE_EXPONENT}, so the drag a
+     * degree costs rises the whole way out: easy off square, noticeably
+     * heavier half way, and heavy enough at the end that the limit is
+     * somewhere the player leans into rather than falls through.
+     *
+     * <p>It was seven, which put nine tenths of the travel in the first
+     * quarter of the drag and made the rest a wall — the map felt both
+     * twitchy and immovable depending on where in the range it was.</p>
      */
-    static final float RESISTANCE_EXPONENT = 7.0F;
+    static final float RESISTANCE_EXPONENT = 3.0F;
     /**
-     * Share of the drag spent at true north before the map begins to turn.
-     * Square is the reading everything else is measured against, so it is
-     * given a detent rather than left as one exact value among thousands.
+     * How near square the map has to be drawn before it is drawn square.
+     *
+     * <p>Small enough that it is a place the map settles rather than a place
+     * it is held: within it the angle eases to nothing, and anything past it
+     * is left exactly as the drag asked for.</p>
      */
-    static final float SNAP_INPUT_SHARE = 0.06F;
+    static final float MAGNET_DEGREES = 2.0F;
+    /** Inside this, the map is simply north-up. */
+    static final float SETTLE_DEGREES = 0.35F;
     /**
      * Horizontal drag that has to accumulate before the map starts turning, so
      * a right click with an unsteady hand is still a right click.
@@ -93,6 +101,8 @@ public final class LostTalesLotrMapRotation {
     private static int unrotatedDepth;
     /** Matrices those passes have pushed and still owe the stack. */
     private static int pushedMatrices;
+    /** Attribute sets they owe it, counted the same way and for the same reason. */
+    private static int pushedAttributes;
     private static final FloatBuffer leanMatrix =
             BufferUtils.createFloatBuffer(16);
 
@@ -112,18 +122,58 @@ public final class LostTalesLotrMapRotation {
     }
 
     /**
-     * How far a lean drag has earned the map, through the same detent and the
-     * same stiffening curve as the turn.
+     * How far a lean drag has earned the map, through the same stiffening
+     * curve as the turn.
+     *
+     * <p>No detent, and none wanted: flat is one end of the lean's range
+     * rather than the middle of it, so a detent there would only mean the
+     * first part of every tilt did nothing.</p>
      */
     static float leanForInput(float input) {
         float clamped = Math.max(0.0F, Math.min(1.0F, input));
-        if (clamped <= SNAP_INPUT_SHARE) {
+        return resist(clamped);
+    }
+
+    /**
+     * The stiffening curve, shared by the turn and the lean.
+     *
+     * <p>Returns how far along its range an input has earned. The gradient is
+     * {@code RESISTANCE_EXPONENT} at the start and nothing at all at the end,
+     * so the resistance the player feels rises smoothly the whole way out
+     * instead of being one number over the range.</p>
+     */
+    static float resist(float advanced) {
+        float clamped = Math.max(0.0F, Math.min(1.0F, advanced));
+        return 1.0F - (float)Math.pow(
+                1.0D - clamped, RESISTANCE_EXPONENT);
+    }
+
+    /**
+     * Settles an angle that is nearly square onto square.
+     *
+     * <p>A magnet rather than a detent. The angle it gives back rises the
+     * whole way through the zone, so any movement the player makes moves the
+     * map and leaving is as immediate as arriving; what the zone does is bend
+     * that rise so the last fraction of a degree costs more than the first,
+     * and give up entirely once the map is within
+     * {@link #SETTLE_DEGREES} of north.</p>
+     *
+     * <p>Continuous at both ends: it hands back exactly
+     * {@link #MAGNET_DEGREES} at the top of the zone and exactly zero at the
+     * bottom, so nothing jumps as the map crosses either.</p>
+     */
+    static float magnetiseDegrees(float degrees) {
+        float magnitude = Math.abs(degrees);
+        if (magnitude <= SETTLE_DEGREES) {
             return 0.0F;
         }
-        float advanced = (clamped - SNAP_INPUT_SHARE)
-                / (1.0F - SNAP_INPUT_SHARE);
-        return 1.0F - (float)Math.pow(
-                1.0D - advanced, RESISTANCE_EXPONENT);
+        if (magnitude >= MAGNET_DEGREES) {
+            return degrees;
+        }
+        float advanced = (magnitude - SETTLE_DEGREES)
+                / (MAGNET_DEGREES - SETTLE_DEGREES);
+        return (degrees < 0.0F ? -1.0F : 1.0F)
+                * MAGNET_DEGREES * advanced * advanced;
     }
 
     static float leanInputPerPixel() {
@@ -145,24 +195,18 @@ public final class LostTalesLotrMapRotation {
     /**
      * The angle a given amount of drag has earned.
      *
-     * <p>Two things shape it. A detent around square: the first small part of
-     * any drag turns nothing, so leaving true north takes a deliberate
-     * movement and coming back to it lands exactly on it rather than near it.
-     * And resistance that grows steeply with the angle: the last couple of
-     * degrees cost roughly nine times the drag the first couple did, so the
-     * limit is somewhere the player leans into rather than falls through.</p>
+     * <p>Two things shape it. Resistance that grows with the angle, so the
+     * map comes off square easily and the last few degrees have to be worked
+     * for. And a magnet at square, small enough that it is somewhere the map
+     * settles rather than somewhere it is caught: the first pixel of any drag
+     * turns the map, and the map turns back to exactly north on its own only
+     * once it is already all but there.</p>
      */
     static float degreesForInput(float input) {
         float clamped = clampInput(input);
-        float magnitude = Math.abs(clamped);
-        if (magnitude <= SNAP_INPUT_SHARE) {
-            return 0.0F;
-        }
-        float advanced = (magnitude - SNAP_INPUT_SHARE)
-                / (1.0F - SNAP_INPUT_SHARE);
-        float eased = 1.0F - (float)Math.pow(
-                1.0D - advanced, RESISTANCE_EXPONENT);
-        return (clamped < 0.0F ? -1.0F : 1.0F) * MAX_DEGREES * eased;
+        float eased = resist(Math.abs(clamped));
+        return magnetiseDegrees(
+                (clamped < 0.0F ? -1.0F : 1.0F) * MAX_DEGREES * eased);
     }
 
     /**
@@ -224,6 +268,9 @@ public final class LostTalesLotrMapRotation {
      */
     public static void beginSheetPass(LOTRGuiMap gui) {
         unrotatedDepth++;
+        if (pushDepthNeutral()) {
+            pushedAttributes++;
+        }
         if (pushSheetTransform(gui)) {
             pushedMatrices++;
         }
@@ -235,6 +282,31 @@ public final class LostTalesLotrMapRotation {
         }
         unrotatedDepth--;
         popSheetMatrix();
+        popSheetAttributes();
+    }
+
+    /**
+     * Takes the pass out of the depth buffer for as long as it runs.
+     *
+     * <p>The map is drawn back to front by the order the calls are made in,
+     * and it shares a depth buffer with everything else on the screen, so a
+     * depth test during it can only throw away layers the order has already
+     * placed correctly. That is what was dropping the region names in and out
+     * as the map moved. The same treatment the map image and the marker
+     * passes already get.</p>
+     *
+     * @return true when the attributes were pushed and must be popped
+     */
+    private static boolean pushDepthNeutral() {
+        try {
+            GL11.glPushAttrib(
+                    GL11.GL_ENABLE_BIT | GL11.GL_DEPTH_BUFFER_BIT);
+            GL11.glDisable(GL11.GL_DEPTH_TEST);
+            GL11.glDepthMask(false);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     /**
@@ -253,6 +325,9 @@ public final class LostTalesLotrMapRotation {
         while (pushedMatrices > 0) {
             popSheetMatrix();
         }
+        while (pushedAttributes > 0) {
+            popSheetAttributes();
+        }
     }
 
     private static void popSheetMatrix() {
@@ -264,6 +339,19 @@ public final class LostTalesLotrMapRotation {
             GL11.glPopMatrix();
         } catch (Throwable ignored) {
             // Nothing useful is left to do about a matrix stack this broken.
+        }
+    }
+
+    private static void popSheetAttributes() {
+        if (pushedAttributes <= 0) {
+            return;
+        }
+        pushedAttributes--;
+        try {
+            GL11.glPopAttrib();
+        } catch (Throwable ignored) {
+            // As with the matrix stack: leaving it counted is what would
+            // make a single failure permanent.
         }
     }
 
@@ -408,6 +496,20 @@ public final class LostTalesLotrMapRotation {
             return 0.0F;
         }
         return -MAX_LEAN * clamped / (viewportHeight * 0.5F);
+    }
+
+    /**
+     * The largest the sheet is ever cut, whatever it is doing.
+     *
+     * <p>What the paper grain is sized to. The grain is one stretched copy of
+     * a texture, so anything that changes the size of what it is stretched
+     * over changes the grain — and the sheet changes size as the map leans.
+     * Cutting the grain to the size the sheet reaches at full lean gives it
+     * one size it keeps at every angle, and one that always covers.</p>
+     */
+    static float maxCoverage(float width, float height) {
+        return (float)Math.sqrt(width * width + height * height)
+                * leanCoverage(1.0F);
     }
 
     /**

@@ -24,19 +24,62 @@ public final class LostTalesLotrMapRotationTest {
 
     /** Square is a detent: a small drag either side of it turns nothing. */
     @Test
-    public void trueNorthHoldsAgainstASmallDrag() {
+    public void trueNorthIsSettledOnRatherThanHeld() {
         assertEquals(0.0F,
                 LostTalesLotrMapRotation.degreesForInput(0.0F), 0.0F);
-        assertEquals(0.0F, LostTalesLotrMapRotation.degreesForInput(
-                LostTalesLotrMapRotation.SNAP_INPUT_SHARE * 0.5F), 0.0F);
-        assertEquals(0.0F, LostTalesLotrMapRotation.degreesForInput(
-                -LostTalesLotrMapRotation.SNAP_INPUT_SHARE * 0.5F), 0.0F);
-        // And past it the map turns, from zero rather than with a jump.
-        float justPast = LostTalesLotrMapRotation.degreesForInput(
-                LostTalesLotrMapRotation.SNAP_INPUT_SHARE + 0.01F);
-        assertTrue(justPast > 0.0F);
-        assertTrue("leaving the detent must not snap to an angle",
-                justPast < 5.0F);
+        // All but square is drawn square, so the map has somewhere to come
+        // to rest instead of stopping a fraction of a degree off it.
+        assertEquals(0.0F, LostTalesLotrMapRotation.magnetiseDegrees(
+                LostTalesLotrMapRotation.SETTLE_DEGREES * 0.5F), 0.0F);
+        assertEquals(0.0F, LostTalesLotrMapRotation.magnetiseDegrees(
+                -LostTalesLotrMapRotation.SETTLE_DEGREES * 0.5F), 0.0F);
+        // Past the magnet the drag is honoured exactly: no zone the player
+        // has to fight their way out of.
+        float past = LostTalesLotrMapRotation.MAGNET_DEGREES + 3.0F;
+        assertEquals(past,
+                LostTalesLotrMapRotation.magnetiseDegrees(past), 0.0F);
+        assertEquals(-past,
+                LostTalesLotrMapRotation.magnetiseDegrees(-past), 0.0F);
+    }
+
+    /**
+     * The magnet must not be a wall. Whatever the player does inside the zone
+     * has to show on screen, and both of its edges have to be seamless, or
+     * the map either sticks at north or jumps as it passes.
+     */
+    @Test
+    public void theMagnetNeverStopsTheMapMoving() {
+        assertEquals("the magnet must hand over exactly where it ends",
+                LostTalesLotrMapRotation.MAGNET_DEGREES,
+                LostTalesLotrMapRotation.magnetiseDegrees(
+                        LostTalesLotrMapRotation.MAGNET_DEGREES), 0.001F);
+        float previous = -1.0F;
+        for (float degrees = LostTalesLotrMapRotation.SETTLE_DEGREES;
+             degrees <= LostTalesLotrMapRotation.MAGNET_DEGREES;
+             degrees += 0.02F) {
+            float settled =
+                    LostTalesLotrMapRotation.magnetiseDegrees(degrees);
+            assertTrue("the magnet turned the map backwards",
+                    settled >= previous);
+            assertTrue("the magnet must pull towards north, not past it",
+                    settled <= degrees + 0.001F);
+            previous = settled;
+        }
+        assertTrue("the map must move at all inside the magnet",
+                previous > 0.0F);
+    }
+
+    /**
+     * The whole point of shrinking the detent: a drag that would have been
+     * swallowed now turns the map.
+     */
+    @Test
+    public void aShortDragOffSquareTurnsTheMap() {
+        float shortDrag = 20.0F * LostTalesLotrMapRotation.inputPerPixel();
+        assertTrue(LostTalesLotrMapRotation.degreesForInput(shortDrag)
+                > 0.0F);
+        assertTrue(LostTalesLotrMapRotation.degreesForInput(-shortDrag)
+                < 0.0F);
     }
 
     @Test
@@ -57,7 +100,9 @@ public final class LostTalesLotrMapRotationTest {
     public void turningGetsHarderTheFurtherItGoes() {
         float step = 0.05F;
         float previousGain = Float.MAX_VALUE;
-        for (float input = LostTalesLotrMapRotation.SNAP_INPUT_SHARE;
+        // From clear of the magnet, which bends the first fraction of a
+        // degree on purpose and is measured by its own tests.
+        for (float input = 0.05F;
              input + step <= 1.0F; input += step) {
             float gain = LostTalesLotrMapRotation.degreesForInput(
                     input + step)
@@ -285,19 +330,47 @@ public final class LostTalesLotrMapRotationTest {
         assertEquals(LostTalesLotrMapRotation.FULL_TURN_DRAG_PIXELS,
                 LostTalesLotrMapRotation.FULL_LEAN_DRAG_PIXELS, 0.0F);
         assertEquals(0.0F,
-                LostTalesLotrMapRotation.leanForInput(
-                        LostTalesLotrMapRotation.SNAP_INPUT_SHARE * 0.5F),
-                0.0F);
+                LostTalesLotrMapRotation.leanForInput(0.0F), 0.0F);
         assertEquals(1.0F,
                 LostTalesLotrMapRotation.leanForInput(1.0F), 0.001F);
+        // Flat is the end of the lean's range, not its middle, so there is
+        // nothing there to settle onto and the first pixel has to tilt.
+        assertTrue(LostTalesLotrMapRotation.leanForInput(
+                4.0F * LostTalesLotrMapRotation.leanInputPerPixel())
+                > 0.0F);
 
-        // The same share of the drag buys the same share of the movement.
+        // The same share of the drag buys the same share of the movement,
+        // clear of the magnet the turn has at north and the lean has not.
         for (float input = 0.1F; input <= 1.0F; input += 0.1F) {
             assertEquals(
                     LostTalesLotrMapRotation.degreesForInput(input)
                             / LostTalesLotrMapRotation.MAX_DEGREES,
                     LostTalesLotrMapRotation.leanForInput(input), 0.001F);
         }
+    }
+
+    /**
+     * The feel the turn is meant to have, measured where a player would feel
+     * it: light off square, heavier half way out, heavy at the end. One
+     * number over the whole range is exactly what it must not be.
+     */
+    @Test
+    public void resistanceRisesInThreeFeelableSteps() {
+        float nearSquare = dragFor(1.5F) - dragFor(0.5F);
+        float halfWay = dragFor(12.0F) - dragFor(11.0F);
+        float nearTheLimit = dragFor(LostTalesLotrMapRotation.MAX_DEGREES)
+                - dragFor(LostTalesLotrMapRotation.MAX_DEGREES - 1.0F);
+
+        assertTrue("coming off square must be easy", nearSquare < 8.0F);
+        assertTrue("half way out must cost noticeably more",
+                halfWay > nearSquare * 1.5F);
+        assertTrue("the limit must be leaned into",
+                nearTheLimit > halfWay * 4.0F);
+        // And a full turn must stay inside one comfortable sweep of the hand
+        // rather than needing the mouse picked up and put down.
+        assertTrue("most of the range must be within one sweep",
+                dragFor(LostTalesLotrMapRotation.MAX_DEGREES - 4.5F)
+                        < 260.0F);
     }
 
     /** The complaint that started it: the stiffening has to be felt. */
@@ -345,4 +418,31 @@ public final class LostTalesLotrMapRotationTest {
         assertEquals(812.5F,
                 LostTalesLotrMapRotation.clampToMapImage(812.5F, 1600), 0.0F);
     }
+
+    /**
+     * The paper grain is one stretched copy cut to this size, so it has to
+     * reach past the sheet at every angle the map can be put in. If it ever
+     * stops doing that the grain runs out before the map does, and raising
+     * the lean is exactly how that would happen.
+     */
+    @Test
+    public void theGrainCoversTheSheetAtEveryLean() {
+        float[] coverage = new float[2];
+        for (int screen = 0; screen < WIDTHS.length; screen++) {
+            float width = WIDTHS[screen];
+            float height = HEIGHTS[screen];
+            float grain = LostTalesLotrMapRotation.maxCoverage(width, height);
+            for (float lean = 0.0F; lean <= 1.0F; lean += 0.05F) {
+                LostTalesLotrMapRotation.rotatedCoverage(
+                        width, height, 22.5F, lean, coverage);
+                assertTrue("grain short of the sheet at lean " + lean,
+                        grain >= coverage[0] - 0.001F
+                                && grain >= coverage[1] - 0.001F);
+            }
+        }
+    }
+
+    /** Ordinary, wide and very wide viewports. */
+    private static final float[] WIDTHS = {854.0F, 960.0F, 1000.0F};
+    private static final float[] HEIGHTS = {480.0F, 540.0F, 409.0F};
 }

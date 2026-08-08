@@ -8,11 +8,17 @@ import lotr.common.world.genlayer.LOTRGenLayerWorld;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.renderer.OpenGlHelper;
+import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL14;
 
 /** Draws the LOTR world texture without its integer-clipped edge jumps. */
 final class LostTalesLotrSmoothMapRenderer {
+    /** LOTR's own weight for the grain, so the map's tone is unchanged. */
+    private static final float GRAIN_ALPHA = 0.2F;
+
     private static Field posXField;
     private static Field posYField;
     private static Field zoomScaleField;
@@ -83,9 +89,19 @@ final class LostTalesLotrSmoothMapRenderer {
                     viewportYMin, viewportYMax, sheeted);
             try {
                 drawMapImage(sepia, alpha, drawOverlay, clip,
-                        mapXMin, mapXMax, mapYMin, mapYMax);
+                        mapXMin, mapXMax, mapYMin, mapYMax,
+                        viewportXMin, viewportXMax,
+                        viewportYMin, viewportYMax);
             } finally {
                 endSheetClipping(sheeted);
+            }
+            // Straight onto the ground, and only on the pass that draws it:
+            // the faction overlay comes through here a second time with its
+            // own alpha, and shading the map twice would double it.
+            if (shouldDrawOpaqueBackground(alpha) && !sepia) {
+                renderAtmosphere(gui, posX, posY, scale,
+                        viewportXMin, viewportXMax,
+                        viewportYMin, viewportYMax);
             }
             return true;
         } catch (Throwable ignored) {
@@ -96,10 +112,48 @@ final class LostTalesLotrSmoothMapRenderer {
     }
 
     /**
-     * Keeps the sheet inside its own frame.
+     * The hour and the clouds, on the Lost Tales map only.
+     *
+     * <p>LOTR's own windowed map and its menu background are left exactly as
+     * the base mod draws them.</p>
+     */
+    private static void renderAtmosphere(
+            LOTRGuiMap gui, float posX, float posY, float scale,
+            int viewportXMin, int viewportXMax,
+            int viewportYMin, int viewportYMax) {
+        if (!(gui instanceof LostTalesLotrMapGui)
+                || !LostTalesLotrMapLayout.isFullscreenLayoutActive(gui)) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.theWorld == null) {
+            return;
+        }
+        LostTalesLotrMapAtmosphere.render(
+                (LostTalesLotrMapGui)gui,
+                minecraft.theWorld.getWorldTime(),
+                minecraft.theWorld.getRainStrength(1.0F),
+                minecraft.theWorld.getWeightedThunderStrength(1.0F),
+                posX, posY, scale,
+                viewportXMin, viewportXMax, viewportYMin, viewportYMax);
+    }
+
+    /**
+     * Keeps the sheet inside its own frame, and out of the depth buffer.
      *
      * <p>A turned or leaning sheet is drawn over a quad larger than the
      * viewport, so a windowed map would otherwise spill past its border.</p>
+     *
+     * <p>Depth is switched off for the same reason the icon passes switch it
+     * off. The screen is drawn back to front by the order the calls are made
+     * in, and the GUI's depth buffer is shared with whatever the HUD left in
+     * it, so a depth test here can only reject layers the order already
+     * placed correctly. Leaning makes that concrete: the lean divides through
+     * a {@code w} that varies down the screen, and any pass drawn at a
+     * non-zero {@code zLevel} under it is divided too, so its depth stops
+     * being one flat value and starts crossing whatever is already in the
+     * buffer part of the way across the map. Both bits are saved and given
+     * back by the surrounding {@code glPopAttrib}.</p>
      */
     private static void beginSheetClipping(
             int viewportXMin, int viewportXMax,
@@ -111,7 +165,10 @@ final class LostTalesLotrSmoothMapRenderer {
         ScaledResolution resolution = new ScaledResolution(minecraft,
                 minecraft.displayWidth, minecraft.displayHeight);
         int scaleFactor = Math.max(1, resolution.getScaleFactor());
-        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_SCISSOR_BIT);
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_SCISSOR_BIT
+                | GL11.GL_DEPTH_BUFFER_BIT);
+        GL11.glDisable(GL11.GL_DEPTH_TEST);
+        GL11.glDepthMask(false);
         GL11.glEnable(GL11.GL_SCISSOR_TEST);
         GL11.glScissor(
                 viewportXMin * scaleFactor,
@@ -132,7 +189,9 @@ final class LostTalesLotrSmoothMapRenderer {
 
     private static void drawMapImage(
             boolean sepia, float alpha, boolean drawOverlay, Clip clip,
-            float mapXMin, float mapXMax, float mapYMin, float mapYMax)
+            float mapXMin, float mapXMax, float mapYMin, float mapYMax,
+            int viewportXMin, int viewportXMax,
+            int viewportYMin, int viewportYMax)
             throws IllegalAccessException {
         // A fixed backing quad replaces the four dynamically rounded edge
         // strips on the opaque base pass. Never repeat it on LOTR's
@@ -183,13 +242,89 @@ final class LostTalesLotrSmoothMapRenderer {
                         GL11.GL_TEXTURE_MAG_FILTER, oldMagFilter);
             }
         }
-        // The paper grain is part of the sheet: the same quad and the same
-        // texture coordinates as the ground, so it turns and leans with it.
         if (drawOverlay && !LOTRConfig.osrsMap) {
-            LOTRTextures.drawMapOverlay(
-                    minecraft == null ? null : minecraft.thePlayer,
-                    mapXMin, mapXMax, mapYMin, mapYMax, 0.0D,
-                    clip.uMin, clip.uMax, clip.vMin, clip.vMax);
+            drawPaperGrain(minecraft, viewportXMin, viewportXMax,
+                    viewportYMin, viewportYMax);
+        }
+    }
+
+    /**
+     * The paper grain the ground is printed on.
+     *
+     * <p>LOTR's own routine takes texture coordinates and ignores them: it
+     * stretches one copy of the grain across whatever rectangle it is given.
+     * So the rectangle is the whole of it, and the rectangle it used to be
+     * given was the sheet — which is cut to the viewport's diagonal so it can
+     * be turned, and widened again so it can lean. The single copy grew and
+     * shrank with the sheet, and that is what made the grain smear as the map
+     * tipped.</p>
+     *
+     * <p>So the quad is cut to the size the sheet reaches at full lean — one
+     * size, whatever angle the map is at — and the texture is repeated across
+     * it at exactly the density LOTR uses: one copy per viewport. Laid flat
+     * and square, the screen shows the middle copy and nothing else, which is
+     * the map the base mod draws; turned or leaned, it reaches into the
+     * neighbours rather than stretching the one.</p>
+     *
+     * <p>The repeat is mirrored. The grain is not a tiling texture and butting
+     * copies against each other drew its edges as a grid across the map;
+     * mirroring makes every join match its neighbour exactly, which for a
+     * noise this fine is the difference between a seam and no seam.</p>
+     */
+    private static void drawPaperGrain(
+            Minecraft minecraft, int viewportXMin, int viewportXMax,
+            int viewportYMin, int viewportYMax) {
+        float viewportWidth = viewportXMax - viewportXMin;
+        float viewportHeight = viewportYMax - viewportYMin;
+        if (minecraft == null || LOTRTextures.overlayTexture == null
+                || !(viewportWidth > 0.0F) || !(viewportHeight > 0.0F)) {
+            return;
+        }
+        float coverage = LostTalesLotrMapRotation.maxCoverage(
+                viewportWidth, viewportHeight);
+        float centerX = (viewportXMin + viewportXMax) * 0.5F;
+        float centerY = (viewportYMin + viewportYMax) * 0.5F;
+        float half = coverage * 0.5F;
+        double halfU = coverage / viewportWidth / 2.0D;
+        double halfV = coverage / viewportHeight / 2.0D;
+
+        minecraft.getTextureManager().bindTexture(
+                LOTRTextures.overlayTexture);
+        int oldWrapS = GL11.glGetTexParameteri(
+                GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S);
+        int oldWrapT = GL11.glGetTexParameteri(
+                GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                GL11.GL_TEXTURE_WRAP_S, GL14.GL_MIRRORED_REPEAT);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                GL11.GL_TEXTURE_WRAP_T, GL14.GL_MIRRORED_REPEAT);
+        GL11.glEnable(GL11.GL_BLEND);
+        OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
+                GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, GRAIN_ALPHA);
+        try {
+            Tessellator tessellator = Tessellator.instance;
+            tessellator.startDrawingQuads();
+            tessellator.addVertexWithUV(centerX - half, centerY + half,
+                    0.0D, 0.5D - halfU, 0.5D + halfV);
+            tessellator.addVertexWithUV(centerX + half, centerY + half,
+                    0.0D, 0.5D + halfU, 0.5D + halfV);
+            tessellator.addVertexWithUV(centerX + half, centerY - half,
+                    0.0D, 0.5D + halfU, 0.5D - halfV);
+            tessellator.addVertexWithUV(centerX - half, centerY - half,
+                    0.0D, 0.5D - halfU, 0.5D - halfV);
+            tessellator.draw();
+        } finally {
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glDisable(GL11.GL_BLEND);
+            // Given straight back: this texture is shared, and a repeating
+            // wrap left behind bleeds wherever it is drawn next.
+            minecraft.getTextureManager().bindTexture(
+                    LOTRTextures.overlayTexture);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                    GL11.GL_TEXTURE_WRAP_S, oldWrapS);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                    GL11.GL_TEXTURE_WRAP_T, oldWrapT);
         }
     }
 

@@ -38,4 +38,38 @@ public final class LostTalesLotrRoadLabelRendererTest {
                 .uprightAngle(-1.0D, 1.0D);
         assertTrue(diagonal >= -90.0F && diagonal <= 90.0F);
     }
+
+    @Test
+    public void roadLabelsTurnWithTheMap() {
+        // A road running due east is drawn along the map's turn, not across
+        // it: the name is ink on the paper and turns with the paper.
+        assertEquals(20.0F,
+                LostTalesLotrRoadLabelRenderer
+                        .uprightAngle(1.0D, 0.0D, 20.0F),
+                0.0001F);
+        assertEquals(-20.0F,
+                LostTalesLotrRoadLabelRenderer
+                        .uprightAngle(1.0D, 0.0D, -20.0F),
+                0.0001F);
+        // A square map leaves the angle exactly where the unturned form put
+        // it, so nothing moves until the map is actually turned.
+        assertEquals(
+                LostTalesLotrRoadLabelRenderer.uprightAngle(-1.0D, 1.0D),
+                LostTalesLotrRoadLabelRenderer
+                        .uprightAngle(-1.0D, 1.0D, 0.0F),
+                0.0001F);
+    }
+
+    @Test
+    public void turnedRoadLabelsStayReadable() {
+        for (float degrees = -22.5F; degrees <= 22.5F; degrees += 2.5F) {
+            for (int step = 0; step < 16; step++) {
+                double radians = Math.PI * step / 8.0D;
+                float angle = LostTalesLotrRoadLabelRenderer.uprightAngle(
+                        Math.cos(radians), Math.sin(radians), degrees);
+                assertTrue("upside down at " + degrees + "/" + step,
+                        angle >= -90.0F && angle <= 90.0F);
+            }
+        }
+    }
 }

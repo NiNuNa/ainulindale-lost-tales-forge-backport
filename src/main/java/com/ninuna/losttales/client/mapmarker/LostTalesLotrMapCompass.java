@@ -42,13 +42,25 @@ public final class LostTalesLotrMapCompass {
             return;
         }
         try {
+            // LOTR draws the rose from its bottom-left corner, 32 texels
+            // square before the scale, so this is its true middle: the
+            // heading turns it about itself and never walks it across the
+            // screen. The map's lean is deliberately not applied — a compass
+            // is an instrument lying on top of the map, not part of it.
             double size = SPRITE_SIZE * scale;
             double centerX = gui.width / 2.0D;
             double bottom = gui.height - reservedBottom(gui)
                     - BOTTOM_MARGIN;
             double centerY = bottom - size / 2.0D;
+            // The rose is drawn nearer than the map it sits on, so without
+            // this it stamps its own depth into a buffer the layers after it
+            // are still being tested against.
+            GL11.glPushAttrib(
+                    GL11.GL_ENABLE_BIT | GL11.GL_DEPTH_BUFFER_BIT);
             GL11.glPushMatrix();
             try {
+                GL11.glDisable(GL11.GL_DEPTH_TEST);
+                GL11.glDepthMask(false);
                 GL11.glTranslated(centerX, centerY, 0.0D);
                 GL11.glRotatef(gui.getMapRotationDegrees(),
                         0.0F, 0.0F, 1.0F);
@@ -57,6 +69,7 @@ public final class LostTalesLotrMapCompass {
                         centerX - size / 2.0D, bottom, z, scale);
             } finally {
                 GL11.glPopMatrix();
+                GL11.glPopAttrib();
             }
         } catch (Throwable ignored) {
             // A compass rose is decoration; never take the map down for it.
