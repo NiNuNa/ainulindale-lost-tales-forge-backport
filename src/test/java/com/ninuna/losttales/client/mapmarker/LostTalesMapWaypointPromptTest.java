@@ -48,9 +48,7 @@ public final class LostTalesMapWaypointPromptTest {
                         854, 480, true);
 
         // What the waypoint can do, above what happens to it.
-        assertEquals(layout.travel.x + layout.travel.width,
-                layout.placeMarker.x);
-        assertTrue(layout.placeMarker.x + layout.placeMarker.width
+        assertTrue(layout.travel.x + layout.travel.width
                 <= layout.x + layout.width);
         assertEquals(layout.confirm.x + layout.confirm.width,
                 layout.delete.x);

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
+import org.lwjgl.opengl.GL11;
 
 /**
  * The hover card the map draws for whatever the pointer owns.
@@ -50,21 +51,33 @@ final class LostTalesMapMarkerTooltip {
                 + lines.size() * font.FONT_HEIGHT
                 + Math.max(0, lines.size() - 1) * LINE_GAP;
 
-        int x = clamp(Math.round(anchorX - width / 2.0F),
+        // Kept fractional. The marker under the card moves by fractions of a
+        // pixel as the map zooms; rounding the card's own position turns that
+        // into a whole-pixel step every few frames, which reads as the card
+        // shaking while the marker slides smoothly beneath it. The card is
+        // laid out at the origin instead and the fraction is carried on the
+        // matrix, so the two move together.
+        float x = clamp(anchorX - width / 2.0F,
                 mapXMin + EDGE_MARGIN, mapXMax - EDGE_MARGIN - width);
-        int y = clamp(Math.round(anchorY) + MARKER_CLEARANCE,
+        float y = clamp(anchorY + MARKER_CLEARANCE,
                 mapYMin + EDGE_MARGIN, mapYMax - EDGE_MARGIN - height);
 
-        LostTalesSkyrimUiStyle.drawPanel(x, y, width, height);
-        int lineY = y + PADDING;
-        for (int index = 0; index < lines.size(); index++) {
-            String line = lines.get(index);
-            font.drawStringWithShadow(line,
-                    x + (width - font.getStringWidth(line)) / 2, lineY,
-                    index == 0
-                            ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
-                            : LostTalesSkyrimUiStyle.TEXT_MUTED);
-            lineY += font.FONT_HEIGHT + LINE_GAP;
+        GL11.glPushMatrix();
+        GL11.glTranslatef(x, y, 0.0F);
+        try {
+            LostTalesSkyrimUiStyle.drawPanel(0, 0, width, height);
+            int lineY = PADDING;
+            for (int index = 0; index < lines.size(); index++) {
+                String line = lines.get(index);
+                font.drawStringWithShadow(line,
+                        (width - font.getStringWidth(line)) / 2, lineY,
+                        index == 0
+                                ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
+                                : LostTalesSkyrimUiStyle.TEXT_MUTED);
+                lineY += font.FONT_HEIGHT + LINE_GAP;
+            }
+        } finally {
+            GL11.glPopMatrix();
         }
     }
 
@@ -88,7 +101,7 @@ final class LostTalesMapMarkerTooltip {
         return lines;
     }
 
-    private static int clamp(int value, int minimum, int maximum) {
+    static float clamp(float value, float minimum, float maximum) {
         // A card wider or taller than the viewport pins to the near edge
         // rather than inverting its bounds.
         return maximum < minimum

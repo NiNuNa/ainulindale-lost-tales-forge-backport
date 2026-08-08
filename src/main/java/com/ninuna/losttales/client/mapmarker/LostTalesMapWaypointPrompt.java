@@ -56,7 +56,6 @@ final class LostTalesMapWaypointPrompt {
         SAVE,
         DELETE,
         TRAVEL,
-        PLACE_MARKER,
         CANCEL
     }
 
@@ -244,10 +243,6 @@ final class LostTalesMapWaypointPrompt {
             drawButton(font, layout.travel,
                     I18n.format("gui.losttales.map.waypoint.travel"),
                     layout.travel.contains(mouseX, mouseY), true);
-            drawButton(font, layout.placeMarker,
-                    I18n.format(
-                            "gui.losttales.map.fast_travel.place_marker"),
-                    layout.placeMarker.contains(mouseX, mouseY), true);
             drawButton(font, layout.delete,
                     I18n.format("gui.losttales.map.waypoint.delete"),
                     layout.delete.contains(mouseX, mouseY), true);
@@ -391,9 +386,6 @@ final class LostTalesMapWaypointPrompt {
             if (layout.travel.contains(mouseX, mouseY)) {
                 return Action.TRAVEL;
             }
-            if (layout.placeMarker.contains(mouseX, mouseY)) {
-                return Action.PLACE_MARKER;
-            }
             if (layout.delete.contains(mouseX, mouseY)) {
                 return Action.DELETE;
             }
@@ -522,8 +514,10 @@ final class LostTalesMapWaypointPrompt {
                 Math.min(SHARE_ROW_HEIGHT * VISIBLE_FELLOWSHIPS,
                         Math.max(0, height - SHARE_TOP)));
 
-        // Editing has five actions, which is more than one row can carry
+        // Editing has four actions, which is more than one row can carry
         // legibly: what the waypoint can do sits above what happens to it.
+        // Dropping the party marker on it is not offered here — travelling to
+        // it opens the popup that already carries that action.
         int lowerY = Math.max(y,
                 y + height - BUTTON_BOTTOM_MARGIN - BUTTON_HEIGHT);
         int lowerHeight = Math.max(0,
@@ -532,12 +526,8 @@ final class LostTalesMapWaypointPrompt {
                 lowerY - BUTTON_ROW_GAP - BUTTON_HEIGHT);
         int upperHeight = editing
                 ? Math.max(0, lowerY - BUTTON_ROW_GAP - upperY) : 0;
-        int half = contentWidth / 2;
         Bounds travel = new Bounds(x + CONTENT_PADDING, upperY,
-                editing ? half : 0, upperHeight);
-        Bounds placeMarker = new Bounds(
-                x + CONTENT_PADDING + half, upperY,
-                editing ? contentWidth - half : 0, upperHeight);
+                editing ? contentWidth : 0, upperHeight);
         int lowerSlots = editing ? 3 : 2;
         int slotWidth = contentWidth / lowerSlots;
         Bounds confirm = new Bounds(x + CONTENT_PADDING, lowerY,
@@ -552,7 +542,7 @@ final class LostTalesMapWaypointPrompt {
                 lowerHeight);
         return new Layout(x, y, width, height, nameField, noteField,
                 swatchRow, swatchWidth, shareRows,
-                travel, placeMarker, confirm, delete, cancel);
+                travel, confirm, delete, cancel);
     }
 
     static final class Layout {
@@ -566,7 +556,6 @@ final class LostTalesMapWaypointPrompt {
         final int swatchWidth;
         final Bounds shareRows;
         final Bounds travel;
-        final Bounds placeMarker;
         final Bounds confirm;
         final Bounds delete;
         final Bounds cancel;
@@ -575,7 +564,7 @@ final class LostTalesMapWaypointPrompt {
                        Bounds nameField, Bounds noteField,
                        Bounds swatchRow,
                        int swatchWidth, Bounds shareRows,
-                       Bounds travel, Bounds placeMarker,
+                       Bounds travel,
                        Bounds confirm, Bounds delete, Bounds cancel) {
             this.x = x;
             this.y = y;
@@ -587,7 +576,6 @@ final class LostTalesMapWaypointPrompt {
             this.swatchWidth = swatchWidth;
             this.shareRows = shareRows;
             this.travel = travel;
-            this.placeMarker = placeMarker;
             this.confirm = confirm;
             this.delete = delete;
             this.cancel = cancel;

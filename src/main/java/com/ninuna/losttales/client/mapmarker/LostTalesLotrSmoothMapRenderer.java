@@ -7,6 +7,7 @@ import lotr.common.LOTRConfig;
 import lotr.common.world.genlayer.LOTRGenLayerWorld;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
 
@@ -39,15 +40,33 @@ final class LostTalesLotrSmoothMapRenderer {
         }
         try {
             float scale = zoomScaleField.getFloat(gui);
-            int mapWidth = mapWidthField.getInt(null);
-            int mapHeight = mapHeightField.getInt(null);
-            int mapXMin = mapXMinField.getInt(null);
-            int mapXMax = mapXMaxField.getInt(null);
-            int mapYMin = mapYMinField.getInt(null);
-            int mapYMax = mapYMaxField.getInt(null);
+            int viewportWidth = mapWidthField.getInt(null);
+            int viewportHeight = mapHeightField.getInt(null);
+            int viewportXMin = mapXMinField.getInt(null);
+            int viewportXMax = mapXMaxField.getInt(null);
+            int viewportYMin = mapYMinField.getInt(null);
+            int viewportYMax = mapYMaxField.getInt(null);
+            float posX = posXField.getFloat(gui);
+            float posY = posYField.getFloat(gui);
+            float degrees = LostTalesLotrMapRotation.degreesOf(gui);
+            // A turned viewport looks at ground beyond its own corners, so the
+            // image is sampled and drawn over the box that covers it and the
+            // rotation is applied to the quad afterwards. The box is kept in
+            // fractions of a pixel: rounding it moved the whole map image a
+            // pixel at a time while the markers on top moved smoothly, which
+            // is most of what made turning look unsteady.
+            float[] coverage = new float[2];
+            LostTalesLotrMapRotation.rotatedCoverage(
+                    viewportWidth, viewportHeight, degrees,
+                    LostTalesLotrMapRotation.leanOf(gui), coverage);
+            float mapXMin = viewportXMin
+                    - (coverage[0] - viewportWidth) * 0.5F;
+            float mapXMax = mapXMin + coverage[0];
+            float mapYMin = viewportYMin
+                    - (coverage[1] - viewportHeight) * 0.5F;
+            float mapYMax = mapYMin + coverage[1];
             Clip clip = calculateClip(
-                    posXField.getFloat(gui), posYField.getFloat(gui),
-                    scale, mapWidth, mapHeight,
+                    posX, posY, scale, coverage[0], coverage[1],
                     LOTRGenLayerWorld.imageWidth,
                     LOTRGenLayerWorld.imageHeight,
                     mapXMin, mapXMax, mapYMin, mapYMax);
@@ -55,59 +74,18 @@ final class LostTalesLotrSmoothMapRenderer {
                 return false;
             }
 
-            // A fixed backing quad replaces the four dynamically rounded edge
-            // strips on the opaque base pass. Never repeat it on LOTR's
-            // translucent faction-overlay pass: an opaque quad there would
-            // cover the red control-zone geometry drawn between the passes.
-            if (shouldDrawOpaqueBackground(alpha)) {
-                Gui.drawRect(mapXMin, mapYMin, mapXMax, mapYMax,
-                        LOTRTextures.getMapOceanColor(sepia));
-            }
-            updateCompatibilityBounds(clip);
-
-            Minecraft minecraft = Minecraft.getMinecraft();
-            ResourceLocation mapTexture = (ResourceLocation)(
-                    (LOTRConfig.osrsMap || sepia)
-                            ? sepiaMapTextureField.get(null)
-                            : mapTextureField.get(null));
-            int oldMinFilter = GL11.GL_NEAREST;
-            int oldMagFilter = GL11.GL_NEAREST;
-            boolean filterChanged = minecraft != null
-                    && mapTexture != null;
-            if (filterChanged) {
-                minecraft.getTextureManager().bindTexture(mapTexture);
-                oldMinFilter = GL11.glGetTexParameteri(
-                        GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER);
-                oldMagFilter = GL11.glGetTexParameteri(
-                        GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER);
-                GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
-                        GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
-                GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
-                        GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
-            }
+            // One matrix for the whole sheet: the image, the paper grain
+            // over it and the region names written on it all go through the
+            // same one, so nothing on the paper can come loose from it.
+            boolean sheeted =
+                    LostTalesLotrMapRotation.pushSheetTransform(gui);
+            beginSheetClipping(viewportXMin, viewportXMax,
+                    viewportYMin, viewportYMax, sheeted);
             try {
-                LOTRTextures.drawMap(
-                        minecraft == null ? null : minecraft.thePlayer,
-                        sepia,
-                        clip.drawnXMin, clip.drawnXMax,
-                        clip.drawnYMin, clip.drawnYMax,
-                        0.0D,
-                        clip.uMin, clip.uMax,
-                        clip.vMin, clip.vMax, alpha);
+                drawMapImage(sepia, alpha, drawOverlay, clip,
+                        mapXMin, mapXMax, mapYMin, mapYMax);
             } finally {
-                if (filterChanged) {
-                    minecraft.getTextureManager().bindTexture(mapTexture);
-                    GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
-                            GL11.GL_TEXTURE_MIN_FILTER, oldMinFilter);
-                    GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
-                            GL11.GL_TEXTURE_MAG_FILTER, oldMagFilter);
-                }
-            }
-            if (drawOverlay && !LOTRConfig.osrsMap) {
-                LOTRTextures.drawMapOverlay(
-                        minecraft == null ? null : minecraft.thePlayer,
-                        mapXMin, mapXMax, mapYMin, mapYMax, 0.0D,
-                        clip.uMin, clip.uMax, clip.vMin, clip.vMax);
+                endSheetClipping(sheeted);
             }
             return true;
         } catch (Throwable ignored) {
@@ -117,14 +95,112 @@ final class LostTalesLotrSmoothMapRenderer {
         }
     }
 
+    /**
+     * Keeps the sheet inside its own frame.
+     *
+     * <p>A turned or leaning sheet is drawn over a quad larger than the
+     * viewport, so a windowed map would otherwise spill past its border.</p>
+     */
+    private static void beginSheetClipping(
+            int viewportXMin, int viewportXMax,
+            int viewportYMin, int viewportYMax, boolean sheeted) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (!sheeted || minecraft == null) {
+            return;
+        }
+        ScaledResolution resolution = new ScaledResolution(minecraft,
+                minecraft.displayWidth, minecraft.displayHeight);
+        int scaleFactor = Math.max(1, resolution.getScaleFactor());
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_SCISSOR_BIT);
+        GL11.glEnable(GL11.GL_SCISSOR_TEST);
+        GL11.glScissor(
+                viewportXMin * scaleFactor,
+                (resolution.getScaledHeight() - viewportYMax) * scaleFactor,
+                Math.max(0, viewportXMax - viewportXMin) * scaleFactor,
+                Math.max(0, viewportYMax - viewportYMin) * scaleFactor);
+    }
+
+    private static void endSheetClipping(boolean sheeted) {
+        if (!sheeted) {
+            return;
+        }
+        if (Minecraft.getMinecraft() != null) {
+            GL11.glPopAttrib();
+        }
+        GL11.glPopMatrix();
+    }
+
+    private static void drawMapImage(
+            boolean sepia, float alpha, boolean drawOverlay, Clip clip,
+            float mapXMin, float mapXMax, float mapYMin, float mapYMax)
+            throws IllegalAccessException {
+        // A fixed backing quad replaces the four dynamically rounded edge
+        // strips on the opaque base pass. Never repeat it on LOTR's
+        // translucent faction-overlay pass: an opaque quad there would
+        // cover the red control-zone geometry drawn between the passes.
+        if (shouldDrawOpaqueBackground(alpha)) {
+            Gui.drawRect((int)Math.floor(mapXMin),
+                    (int)Math.floor(mapYMin),
+                    (int)Math.ceil(mapXMax), (int)Math.ceil(mapYMax),
+                    LOTRTextures.getMapOceanColor(sepia));
+        }
+        updateCompatibilityBounds(clip);
+
+        Minecraft minecraft = Minecraft.getMinecraft();
+        ResourceLocation mapTexture = (ResourceLocation)(
+                (LOTRConfig.osrsMap || sepia)
+                        ? sepiaMapTextureField.get(null)
+                        : mapTextureField.get(null));
+        int oldMinFilter = GL11.GL_NEAREST;
+        int oldMagFilter = GL11.GL_NEAREST;
+        boolean filterChanged = minecraft != null && mapTexture != null;
+        if (filterChanged) {
+            minecraft.getTextureManager().bindTexture(mapTexture);
+            oldMinFilter = GL11.glGetTexParameteri(
+                    GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER);
+            oldMagFilter = GL11.glGetTexParameteri(
+                    GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                    GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                    GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+        }
+        try {
+            LOTRTextures.drawMap(
+                    minecraft == null ? null : minecraft.thePlayer,
+                    sepia,
+                    clip.drawnXMin, clip.drawnXMax,
+                    clip.drawnYMin, clip.drawnYMax,
+                    0.0D,
+                    clip.uMin, clip.uMax,
+                    clip.vMin, clip.vMax, alpha);
+        } finally {
+            if (filterChanged) {
+                minecraft.getTextureManager().bindTexture(mapTexture);
+                GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                        GL11.GL_TEXTURE_MIN_FILTER, oldMinFilter);
+                GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                        GL11.GL_TEXTURE_MAG_FILTER, oldMagFilter);
+            }
+        }
+        // The paper grain is part of the sheet: the same quad and the same
+        // texture coordinates as the ground, so it turns and leans with it.
+        if (drawOverlay && !LOTRConfig.osrsMap) {
+            LOTRTextures.drawMapOverlay(
+                    minecraft == null ? null : minecraft.thePlayer,
+                    mapXMin, mapXMax, mapYMin, mapYMax, 0.0D,
+                    clip.uMin, clip.uMax, clip.vMin, clip.vMax);
+        }
+    }
+
     static Clip calculateClip(
             float posX, float posY, float scale,
-            int mapWidth, int mapHeight,
+            float mapWidth, float mapHeight,
             int imageWidth, int imageHeight,
-            int mapXMin, int mapXMax,
-            int mapYMin, int mapYMax) {
+            float mapXMin, float mapXMax,
+            float mapYMin, float mapYMax) {
         if (!(scale > 0.0F) || imageWidth <= 0 || imageHeight <= 0
-                || mapWidth <= 0 || mapHeight <= 0) {
+                || !(mapWidth > 0.0F) || !(mapHeight > 0.0F)) {
             return null;
         }
         double uMin = (posX - mapWidth / scale / 2.0D) / imageWidth;

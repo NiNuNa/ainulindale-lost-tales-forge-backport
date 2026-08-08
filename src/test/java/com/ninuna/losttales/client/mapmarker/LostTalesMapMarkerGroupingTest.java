@@ -613,6 +613,142 @@ public final class LostTalesMapMarkerGroupingTest {
                 transition(7.0F, 7.0F, 7.0F, 7.0F, 0.5F));
     }
 
+    @Test
+    public void aJoiningMarkerNeverCrossesPastItsOwnSlot() {
+        float anchorX = 100.0F;
+        float markerX = 160.0F;
+        float slotOffsetX = -8.0F;
+        float previous = Float.MAX_VALUE;
+
+        for (int step = 10; step >= 0; step--) {
+            float[] point = companion(anchorX, markerX,
+                    slotOffsetX, step / 10.0F);
+
+            assertTrue("the marker overshot the slot it is heading for",
+                    point[0] >= anchorX + slotOffsetX - 0.0001F);
+            assertTrue("the marker doubled back on its way in",
+                    point[0] <= previous + 0.0001F);
+            previous = point[0];
+        }
+    }
+
+    /**
+     * The reported regression: two stacks meeting measured every member of the
+     * stack that gave way from a different marker on the very next frame, so
+     * its markers teleported into the other fan instead of joining it.
+     */
+    @Test
+    public void amergedStackTravelsToItsNewLeaderRatherThanJumping() {
+        LostTalesLotrMapMarkerIconOverlay.MarkerAnimationState state =
+                settledCompanion(-1.0F);
+        float[] offset = new float[2];
+
+        // Settled behind its own leader, eight pixels to its left.
+        LostTalesLotrMapMarkerIconOverlay.stepStackHandover(
+                state, "losttales:old", -8.0F, 0.0F, 1.0F, offset);
+        assertEquals(-8.0F, offset[0], 0.0001F);
+
+        // Its stack is swallowed: the new leader is sixty pixels away.
+        LostTalesLotrMapMarkerIconOverlay.stepStackHandover(
+                state, "losttales:new", -68.0F, 0.0F, 0.25F, offset);
+        assertTrue("the marker jumped to the new stack",
+                offset[0] > -68.0F + 0.0001F);
+        assertTrue("the marker did not set off at all",
+                offset[0] < -8.0F - 0.0001F);
+
+        float previous = offset[0];
+        for (int frame = 0; frame < 4; frame++) {
+            LostTalesLotrMapMarkerIconOverlay.stepStackHandover(
+                    state, "losttales:new", -68.0F, 0.0F, 0.25F, offset);
+            assertTrue("the travel went backwards",
+                    offset[0] <= previous + 0.0001F);
+            previous = offset[0];
+        }
+        assertEquals("the marker never arrived at its new stack",
+                -68.0F, offset[0], 0.0001F);
+        assertEquals(1.0F, state.getHandoverProgress(), 0.0001F);
+    }
+
+    /** Panning moves a stack and its members together, so it is not a change. */
+    @Test
+    public void followingTheSameStackNeedsNoHandover() {
+        LostTalesLotrMapMarkerIconOverlay.MarkerAnimationState state =
+                settledCompanion(1.0F);
+        float[] offset = new float[2];
+
+        LostTalesLotrMapMarkerIconOverlay.stepStackHandover(
+                state, "losttales:leader", 8.0F, -3.0F, 1.0F, offset);
+        // A zoom changes the distance between the two; the member follows it
+        // exactly rather than easing after it.
+        LostTalesLotrMapMarkerIconOverlay.stepStackHandover(
+                state, "losttales:leader", 12.0F, -4.0F, 0.1F, offset);
+
+        assertEquals(12.0F, offset[0], 0.0001F);
+        assertEquals(-4.0F, offset[1], 0.0001F);
+    }
+
+    @Test
+    public void theFanSlotOnlyOpensAsTheMarkerReachesTheStack() {
+        float anchorX = 100.0F;
+        float markerX = 160.0F;
+        float slotOffsetX = -8.0F;
+
+        // Barely under way: the slot has hardly opened, so the marker is
+        // still travelling towards the leader rather than towards the slot.
+        float[] early = companion(anchorX, markerX, slotOffsetX, 0.9F);
+        assertTrue(early[0] > anchorX + slotOffsetX * 0.2F);
+
+        // Arrived: the marker is standing in its slot beside the leader.
+        assertEquals(anchorX + slotOffsetX,
+                companion(anchorX, markerX, slotOffsetX, 0.0F)[0],
+                0.0001F);
+        // Released: no trace of the slot remains at its own position.
+        assertEquals(markerX,
+                companion(anchorX, markerX, slotOffsetX, 1.0F)[0],
+                0.0001F);
+    }
+
+    /**
+     * A slot exchange is one movement in two directions: the marker taking the
+     * slot comes out of the stack as the marker losing it goes back in, and
+     * neither waits for the other.
+     */
+    @Test
+    public void aSlotExchangeMovesBothMarkersAtOnce() {
+        LostTalesLotrMapMarkerIconOverlay.MarkerAnimationState incoming =
+                LostTalesLotrMapMarkerIconOverlay.MarkerAnimationState
+                        .settled(false, 0.0F);
+        LostTalesLotrMapMarkerIconOverlay.MarkerAnimationState displaced =
+                settledCompanion(-1.0F);
+
+        for (int frame = 0; frame < 3; frame++) {
+            // One shared budget, the same call for both.
+            LostTalesLotrMapMarkerIconOverlay.stepMarkerAnimation(
+                    incoming, false, -1.0F, 0.25F);
+            LostTalesLotrMapMarkerIconOverlay.stepMarkerAnimation(
+                    displaced, false, 0.0F, 0.25F);
+        }
+
+        assertTrue("the marker taking the slot never left the stack",
+                incoming.getCompanionSlot() < -0.0001F);
+        assertTrue("the displaced marker never went back to the stack",
+                displaced.getCompanionSlot() > incoming.getCompanionSlot());
+        // Both are still grouped: neither of them travels to its own map
+        // position during an exchange.
+        assertEquals(0.0F, incoming.getVisibility(), 0.0001F);
+        assertEquals(0.0F, displaced.getVisibility(), 0.0001F);
+    }
+
+    private static float[] companion(
+            float anchorX, float markerX, float slotOffsetX,
+            float visibility) {
+        float[] point = new float[2];
+        LostTalesLotrMapMarkerIconOverlay.companionPoint(
+                anchorX, 100.0F, markerX, 100.0F,
+                slotOffsetX, 0.0F, visibility, point);
+        return point;
+    }
+
     private static float[] transition(
             float anchorX, float anchorY, float markerX, float markerY,
             float visibility) {

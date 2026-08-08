@@ -21,24 +21,28 @@ public final class LostTalesLotrMapControlBarTest {
         assertTrue(layout.leftEnd <= 900 / 2);
     }
 
+    /**
+     * A row of bare keys says which keys do something but not what, so a hint
+     * is given up before every other hint's name is.
+     */
     @Test
-    public void labelsAreDroppedBeforeAnyHintIs() {
+    public void hintsAreDroppedBeforeTheirLabelsAre() {
         LostTalesLotrMapControlBar.Layout layout = layout(240);
 
-        assertFalse("labels must go first", layout.showLabels);
-        assertEquals("no hint should have been dropped yet",
-                HINTS.length, layout.visibleHints);
+        assertTrue("names are worth more than an extra bare key",
+                layout.showLabels);
+        assertTrue(layout.visibleHints > 0);
+        assertTrue(layout.visibleHints < HINTS.length);
         assertTrue(layout.leftEnd <= 240 / 2);
     }
 
     @Test
-    public void aNarrowStripKeepsTheHintsListedFirst() {
-        LostTalesLotrMapControlBar.Layout layout = layout(120);
+    public void aStripTooNarrowForOneNamedHintFallsBackToIcons() {
+        LostTalesLotrMapControlBar.Layout layout = layout(80);
 
         assertTrue(layout.visibleHints > 0);
-        assertTrue(layout.visibleHints < HINTS.length);
         assertFalse(layout.showLabels);
-        assertTrue(layout.leftEnd <= 120 / 2);
+        assertTrue(layout.leftEnd <= 80 / 2);
     }
 
     @Test

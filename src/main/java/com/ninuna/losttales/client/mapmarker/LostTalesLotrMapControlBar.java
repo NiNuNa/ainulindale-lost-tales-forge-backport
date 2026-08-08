@@ -86,6 +86,12 @@ public final class LostTalesLotrMapControlBar {
                 LostTalesKeyBindings.getMapLegendKeyBinding(),
                 I18n.format("gui.losttales.map.control.legend")));
         hints.add(Hint.key(minecraft, font,
+                LostTalesLotrMapGui.FIND_LOCATION_KEY,
+                I18n.format("gui.losttales.map.control.find")));
+        hints.add(Hint.key(minecraft, font,
+                LostTalesLotrMapGui.CURRENT_LOCATION_KEY,
+                I18n.format("gui.losttales.map.control.location")));
+        hints.add(Hint.key(minecraft, font,
                 LostTalesLotrMapGui.CREATE_WAYPOINT_KEY,
                 I18n.format("gui.losttales.map.control.waypoint")));
         if (gui != null && gui.isPlayerOp) {
@@ -115,9 +121,13 @@ public final class LostTalesLotrMapControlBar {
     /**
      * Fits as many hints as the left half of the strip allows.
      *
-     * <p>Labels go first and all together, so the strip never shows some
-     * hints named and others not; only then are whole hints dropped from the
-     * end.</p>
+     * <p>A named key is worth more than an extra unnamed one: a row of bare
+     * key icons tells the player which keys do something but not what, which
+     * is close to telling them nothing. So hints are dropped from the end —
+     * they are collected least-needed-last — for as long as that keeps the
+     * rest named, and only a strip too narrow for even one named hint falls
+     * back to icons alone. Labels are still all-or-nothing, so the strip
+     * never shows some hints named and others not.</p>
      */
     static Layout calculateLayout(int screenWidth, List<Hint> hints) {
         int available = Math.max(0,
@@ -125,10 +135,11 @@ public final class LostTalesLotrMapControlBar {
         if (hints == null || hints.isEmpty()) {
             return new Layout(0, false, OUTER_PADDING);
         }
-        int labelled = totalWidth(hints, hints.size(), true);
-        if (labelled <= available) {
-            return new Layout(hints.size(), true,
-                    OUTER_PADDING + labelled);
+        for (int count = hints.size(); count > 0; count--) {
+            int width = totalWidth(hints, count, true);
+            if (width <= available) {
+                return new Layout(count, true, OUTER_PADDING + width);
+            }
         }
         for (int count = hints.size(); count > 0; count--) {
             int width = totalWidth(hints, count, false);

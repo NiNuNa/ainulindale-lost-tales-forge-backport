@@ -71,10 +71,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     private static final float UNGROUPED_CLOSE_ZOOM_EXP = 3.99F;
     /**
      * How much of a grouping transition one second of real time covers.
-     * Slow enough to read the movement, quick enough that a pan does not
-     * feel like it is dragging the markers behind it.
+     * The stack answers the moment it is decided and then takes its time
+     * getting there: soft rather than snappy, without dragging.
      */
-    private static final float GROUPING_FADE_PER_SECOND = 2.6F;
+    private static final float GROUPING_FADE_PER_SECOND = 3.0F;
     private static final float GROUPING_ENABLE_ZOOM_EXP = 3.95F;
     private static final float GROUPING_DISABLE_ZOOM_EXP = 3.99F;
     /** Opacity of the fan sprites behind the marker leading a stack. */
@@ -133,6 +133,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     private static final float NATIVE_WAYPOINT_HOVER_SCALE =
             highlightedSize(NATIVE_WAYPOINT_DRAW_SIZE)
                     / NATIVE_WAYPOINT_DRAW_SIZE;
+    /** Gap between a selected marker's artwork and the brackets around it. */
+    private static final float SELECTED_FRAME_PADDING = 2.0F;
+    /** Length of each bracket arm, in GUI pixels. */
+    private static final int SELECTED_FRAME_ARM = 3;
     private static Method transformCoordsMethod;
     private static Field mapXMinField;
     private static Field mapXMaxField;
@@ -167,6 +171,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     private static String lastTracedGrouping = "";
     private static LOTRGuiMap groupingFadeGui;
     private static long groupingFadeLastNanos;
+    /** This frame's share of a grouping transition, set once per decision. */
+    private static float groupingAnimationStep = 1.0F;
     private static LOTRGuiMap roleplayPlayerHeadFrameGui;
     private static List<RoleplayPlayerHead> roleplayPlayerHeadFrame =
             Collections.emptyList();
@@ -176,6 +182,9 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     private static HoverCandidate activeHoverCandidate;
     private static LOTRGuiMap suppressedLotrSelectionGui;
     private static LOTRAbstractWaypoint suppressedLotrSelection;
+    private static LOTRGuiMap selectedFrameGui;
+    private static String selectedFrameMarkerId;
+    private static LOTRAbstractWaypoint selectedFrameWaypoint;
 
     private LostTalesLotrMapMarkerIconOverlay() {}
 
@@ -346,11 +355,31 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             List<MarkerRenderCandidate> candidates,
             LostTalesMapMarkerRenderedGeometry.Frame renderedGeometry,
             LostTalesMapMarkerGrouping.Group group) {
+        // The fan sits at the back, in relevance order, and the members
+        // travelling to and from the hidden stack pass in front of it. They
+        // move along the leader's own position, so drawing them behind the
+        // fan slid them out from under sprites they should have crossed.
+        drawStackCompanions(context, candidates, renderedGeometry, group,
+                true);
+        drawStackCompanions(context, candidates, renderedGeometry, group,
+                false);
+    }
+
+    /**
+     * @param fanned true for the members the fan draws in a slot of their
+     *               own, false for the rest, which travel over the leader
+     */
+    private static void drawStackCompanions(
+            RenderContext context,
+            List<MarkerRenderCandidate> candidates,
+            LostTalesMapMarkerRenderedGeometry.Frame renderedGeometry,
+            LostTalesMapMarkerGrouping.Group group, boolean fanned) {
         int representativeIndex = group.getRepresentativeIndex();
         List<Integer> members = group.getMemberIndices();
         for (int position = members.size() - 1; position >= 0; position--) {
             int candidateIndex = members.get(position).intValue();
-            if (candidateIndex == representativeIndex) {
+            if (candidateIndex == representativeIndex
+                    || isFanSlot(position) != fanned) {
                 continue;
             }
             LostTalesMapMarkerRenderedGeometry.Member geometry =
@@ -364,6 +393,11 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                     geometry.getRenderAlpha(),
                     ICON_DRAW_SIZE * geometry.getVisualScale());
         }
+    }
+
+    /** Whether this position in a stack is one the fan draws beside the leader. */
+    private static boolean isFanSlot(int position) {
+        return position < LostTalesMapMarkerGrouping.MAX_FAN_MEMBERS;
     }
 
     /** The one marker a stack is drawn as, at full size. */
@@ -485,6 +519,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         }
         clearHoverFocus(gui);
         clearSuppressedLotrSelection(gui);
+        clearSelectedMarkerFrame(gui);
     }
 
     /**
@@ -638,6 +673,55 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         }
         groupingAnimation.keySet().retainAll(activeIds);
         groupingFadeLastNanos = now;
+        // The geometry pass eases the stack a marker hangs off with the same
+        // budget, so every part of one decision runs on one clock.
+        groupingAnimationStep = step;
+    }
+
+    /**
+     * Follows the stack a member hangs off, easing across a change of stack
+     * rather than jumping to it.
+     *
+     * <p>Two stacks meeting is the common case: every member of the stack that
+     * gives way is suddenly measured from a different marker, and drawn
+     * straight from the live offset it would teleport to whatever it was doing
+     * before. Holding the offset the member was last drawn at and easing to
+     * the new one turns that into the two stacks visibly becoming one.</p>
+     *
+     * <p>Offsets are kept relative to the member's own map position, so
+     * panning does not disturb a handover in progress; only which marker leads
+     * the stack restarts one.</p>
+     *
+     * @param result two floats written with the offset to use this frame
+     */
+    static void stepStackHandover(
+            MarkerAnimationState state, String leaderId,
+            float liveOffsetX, float liveOffsetY, float step,
+            float[] result) {
+        if (state == null) {
+            result[0] = liveOffsetX;
+            result[1] = liveOffsetY;
+            return;
+        }
+        if (!state.hasStack || !safeString(leaderId)
+                .equals(state.stackLeaderId)) {
+            state.handoverFromX = state.hasStack
+                    ? state.stackOffsetX : liveOffsetX;
+            state.handoverFromY = state.hasStack
+                    ? state.stackOffsetY : liveOffsetY;
+            state.handoverProgress = state.hasStack ? 0.0F : 1.0F;
+            state.stackLeaderId = safeString(leaderId);
+            state.hasStack = true;
+        }
+        state.handoverProgress = Math.min(1.0F,
+                state.handoverProgress + Math.max(0.0F, step));
+        float eased = easeInOut(state.handoverProgress);
+        state.stackOffsetX = state.handoverFromX
+                + (liveOffsetX - state.handoverFromX) * eased;
+        state.stackOffsetY = state.handoverFromY
+                + (liveOffsetY - state.handoverFromY) * eased;
+        result[0] = state.stackOffsetX;
+        result[1] = state.stackOffsetY;
     }
 
     /**
@@ -726,17 +810,16 @@ public final class LostTalesLotrMapMarkerIconOverlay {
      * Symmetric ease-in-out over the linear, elapsed-time progress each
      * marker keeps.
      *
-     * <p>Smootherstep rather than smoothstep: its first and second
-     * derivatives are both zero at either end, so a marker leaves and arrives
-     * without the small visible kick smoothstep gives it. Easing on read
-     * rather than on store is what makes an interruption safe — the stored
-     * progress is continuous, so a reversal picks up from the position
-     * actually on screen.</p>
+     * <p>Smoothstep rather than smootherstep. Both leave and arrive at rest,
+     * but smootherstep spends the first tenth of a transition barely moving,
+     * which over a transition this short reads as the stack hesitating before
+     * it answers. Easing on read rather than on store is what makes an
+     * interruption safe — the stored progress is continuous, so a reversal
+     * picks up from the position actually on screen.</p>
      */
     static float easeInOut(float linear) {
         float progress = clamp01(linear);
-        return progress * progress * progress
-                * (progress * (progress * 6.0F - 15.0F) + 10.0F);
+        return progress * progress * (3.0F - 2.0F * progress);
     }
 
     /**
@@ -835,13 +918,31 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 if (isRepresentative) {
                     finalX = anchorX;
                     finalY = anchorY;
+                    // The stack it leads is itself, so a later merge starts
+                    // its handover from where it is standing now.
+                    stepStackHandover(groupingAnimation.get(markerId),
+                            markerId,
+                            anchorX - candidate.position.x,
+                            anchorY - candidate.position.y,
+                            groupingAnimationStep, point);
                 } else {
-                    LostTalesMapMarkerGrouping.transitionPoint(
-                            anchorX + fanOffsetX, anchorY + fanOffsetY,
+                    stepStackHandover(groupingAnimation.get(markerId),
+                            representative.marker.getId(),
+                            anchorX - candidate.position.x,
+                            anchorY - candidate.position.y,
+                            groupingAnimationStep, point);
+                    companionPoint(
+                            candidate.position.x + point[0],
+                            candidate.position.y + point[1],
                             candidate.position.x, candidate.position.y,
-                            visibility, point);
+                            fanOffsetX, fanOffsetY, visibility, point);
                     finalX = point[0];
                     finalY = point[1];
+                    // The fan is only as wide as the marker is gathered, so
+                    // the hover pass spaces the sprites by what is actually
+                    // being drawn rather than by the settled fan.
+                    fanOffsetX *= gatheredShare(visibility);
+                    fanOffsetY *= gatheredShare(visibility);
                 }
                 LostTalesCompassMarkerIcon icon =
                         getMarkerIcon(candidate.marker);
@@ -861,6 +962,38 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             }
             geometry.finishObject(object);
         }
+    }
+
+    /**
+     * Where one member of a stack is drawn, on its way in or out of it.
+     *
+     * <p>The stack is the pile the markers are dealt from: a member travels
+     * between its own map position and the marker leading the stack, and its
+     * fan slot opens out of that pile only as it arrives. A marker joining
+     * therefore comes in over the leader and slides out to its place, and a
+     * marker displaced from a slot folds back onto the pile as the newcomer
+     * emerges from it. Both are stepped by one shared budget, so the swap
+     * reads as an exchange rather than as one marker waiting for the
+     * other.</p>
+     *
+     * @param visibility 0 when gathered on the leader, 1 at its own position
+     * @param result     two floats written with the screen position
+     */
+    static void companionPoint(
+            float anchorX, float anchorY,
+            float markerX, float markerY,
+            float fanOffsetX, float fanOffsetY,
+            float visibility, float[] result) {
+        LostTalesMapMarkerGrouping.transitionPoint(
+                anchorX, anchorY, markerX, markerY, visibility, result);
+        float gathered = gatheredShare(visibility);
+        result[0] += fanOffsetX * gathered;
+        result[1] += fanOffsetY * gathered;
+    }
+
+    /** How much of a member's fan offset applies at this visibility. */
+    static float gatheredShare(float visibility) {
+        return 1.0F - clamp01(visibility);
     }
 
     /**
@@ -1576,8 +1709,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         }
         if (focused.kind == HoverKind.MARKER) {
             LostTalesMapMarkerData marker = focused.marker.marker;
-            drawTooltip(context, focused.marker.displayName,
-                    LostTalesLotrWaypointText.resolveDescription(
+            drawTooltip(context,
+                    LostTalesLotrWaypointText.resolveTitle(
+                            marker, focused.marker.displayName),
+                    LostTalesLotrWaypointText.resolveTooltipBody(
                             marker, context.minecraft.thePlayer),
                     focused.position.x,
                     hoveredArtBottom(context, focused,
@@ -1748,8 +1883,18 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 Math.min(maximum - 6, coordinate));
     }
 
-    /** Returns the world X/Z under a valid, unobstructed LOTR-map click. */
-    public static int[] getMapClickWorldPosition(LOTRGuiMap gui) {
+    /**
+     * Returns the world X/Z under a valid, unobstructed LOTR-map click.
+     *
+     * <p>Whether the click counts at all is still LOTR's decision — it knows
+     * about its own overlays and the conquest grid. Where the click landed is
+     * derived through the shared transform instead of read from LOTR's own
+     * mouse coordinates, because those are worked out without the map's
+     * rotation and would place a marker somewhere the player did not
+     * click.</p>
+     */
+    public static int[] getMapClickWorldPosition(
+            LOTRGuiMap gui, int mouseX, int mouseY) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (gui == null || minecraft == null || minecraft.theWorld == null
                 || minecraft.theWorld.provider.dimensionId
@@ -1763,9 +1908,16 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                     || loadingConquestGridField.getBoolean(gui)) {
                 return null;
             }
+            float[] mapImage = new float[2];
+            if (!LostTalesLotrMapRotation.screenToMapImage(
+                    gui, mouseX, mouseY, mapImage)) {
+                return null;
+            }
             return new int[] {
-                    mouseXCoordField.getInt(gui),
-                    mouseZCoordField.getInt(gui)
+                    LostTalesMapCoordinateHelper.renderedMapImageXToWorld(
+                            mapImage[0]),
+                    LostTalesMapCoordinateHelper.renderedMapImageZToWorld(
+                            mapImage[1])
             };
         } catch (Throwable ignored) {
             return null;
@@ -1982,15 +2134,154 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 groupingFrame.candidates.get(
                         group.getRepresentativeIndex());
         return new float[] {
-                (float)LostTalesMapCoordinateHelper.worldToMapImageX(
+                (float)LostTalesMapCoordinateHelper.worldToRenderedMapImageX(
                         representative.marker.getX()),
-                (float)LostTalesMapCoordinateHelper.worldToMapImageZ(
+                (float)LostTalesMapCoordinateHelper.worldToRenderedMapImageZ(
                         representative.marker.getZ()),
                 LostTalesMapGroupFocus.separatingZoomExponent(
                         entries, groupingFrame.zoomExp, maxZoomExp,
                         representative.position.x,
                         representative.position.y)
         };
+    }
+
+    /**
+     * The map-image position of a destination, from whichever of the two ways
+     * of naming one the caller has.
+     *
+     * <p>Map-image rather than screen coordinates, because this feeds the
+     * camera: where the destination is on screen changes as the camera moves,
+     * where it is on the map does not.</p>
+     *
+     * @return {@code {mapImageX, mapImageY}}, or null
+     */
+    public static float[] resolveMapImagePosition(
+            LostTalesMapMarkerData marker, LOTRAbstractWaypoint waypoint) {
+        double worldX;
+        double worldZ;
+        if (marker != null) {
+            worldX = marker.getX();
+            worldZ = marker.getZ();
+        } else if (waypoint != null) {
+            try {
+                worldX = waypoint.getXCoord();
+                worldZ = waypoint.getZCoord();
+            } catch (Throwable ignored) {
+                return null;
+            }
+        } else {
+            return null;
+        }
+        return new float[] {
+                (float)LostTalesMapCoordinateHelper.worldToRenderedMapImageX(worldX),
+                (float)LostTalesMapCoordinateHelper.worldToRenderedMapImageZ(worldZ)
+        };
+    }
+
+    /**
+     * Marks the destination a map popup is currently asking about.
+     *
+     * <p>Presentation only, and deliberately quiet: corner brackets around the
+     * artwork rather than a glow or a pulse, so the marker still reads as the
+     * marker and the popup keeps the player's attention.</p>
+     */
+    public static void setSelectedMarkerFrame(
+            LOTRGuiMap gui, LostTalesMapMarkerData marker,
+            LOTRAbstractWaypoint waypoint) {
+        selectedFrameGui = gui;
+        selectedFrameMarkerId = marker == null
+                ? null : safeString(marker.getId());
+        selectedFrameWaypoint = marker == null ? waypoint : null;
+    }
+
+    public static void clearSelectedMarkerFrame(LOTRGuiMap gui) {
+        if (gui == null || selectedFrameGui == gui) {
+            selectedFrameGui = null;
+            selectedFrameMarkerId = null;
+            selectedFrameWaypoint = null;
+        }
+    }
+
+    /**
+     * The rectangle around the marker a popup is asking about.
+     *
+     * <p>One answer serves both the brackets drawn on the map and the opening
+     * the popup leaves in its shade, so the marker that is picked out is
+     * exactly the marker that stays lit.</p>
+     *
+     * @param result {@code {x, y, width, height}}
+     * @return false when nothing is selected or it cannot be located
+     */
+    public static boolean getSelectedMarkerFrame(
+            LOTRGuiMap gui, int[] result) {
+        if (gui == null || selectedFrameGui != gui
+                || result == null || result.length < 4) {
+            return false;
+        }
+        RenderContext context = createRenderContext(gui);
+        if (context == null) {
+            return false;
+        }
+        try {
+            float left;
+            float top;
+            float right;
+            float bottom;
+            LostTalesMapMarkerRenderedGeometry.Member member =
+                    selectedFrameMarkerId == null ? null
+                            : groupingFrame.renderedGeometry
+                                    .getMemberForCandidate(
+                                            findCandidateIndexById(
+                                                    selectedFrameMarkerId));
+            if (member != null && member.isVisible()) {
+                LostTalesMapMarkerRenderedGeometry.Bounds bounds =
+                        member.getVisibleBounds();
+                left = bounds.getLeft();
+                top = bounds.getTop();
+                right = bounds.getRight();
+                bottom = bounds.getBottom();
+            } else if (selectedFrameWaypoint != null) {
+                ScreenPosition position = transformWorldCoords(context,
+                        selectedFrameWaypoint.getXCoord(),
+                        selectedFrameWaypoint.getZCoord());
+                if (position == null) {
+                    return false;
+                }
+                float extent = NATIVE_WAYPOINT_DRAW_SIZE;
+                left = position.x - extent;
+                top = position.y - extent;
+                right = position.x + extent;
+                bottom = position.y + extent;
+            } else {
+                return false;
+            }
+            float padding = SELECTED_FRAME_PADDING;
+            result[0] = Math.round(left - padding);
+            result[1] = Math.round(top - padding);
+            result[2] = Math.max(1,
+                    Math.round(right + padding) - result[0]);
+            result[3] = Math.max(1,
+                    Math.round(bottom + padding) - result[1]);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    /** Draws the brackets around whatever {@link #setSelectedMarkerFrame} named. */
+    public static void renderSelectedMarkerFrame(LOTRGuiMap gui) {
+        int[] frame = new int[4];
+        if (!getSelectedMarkerFrame(gui, frame)) {
+            return;
+        }
+        try {
+            LostTalesSkyrimUiStyle.drawSelectionBrackets(
+                    frame[0], frame[1], frame[2], frame[3],
+                    SELECTED_FRAME_ARM,
+                    LostTalesSkyrimUiStyle.BORDER);
+        } catch (Throwable ignored) {
+            // A selection frame is decoration; never take the map down for it.
+        }
     }
 
     /**
@@ -2856,21 +3147,30 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     }
 
     private static String getWaypointDisplayName(LOTRAbstractWaypoint waypoint, LostTalesMapMarkerData marker) {
-        if (isUndiscoveredButVisible(marker)) {
-            return "?";
-        }
-        String displayName = safeString(waypoint.getDisplayName());
-        if (displayName.length() > 0) {
-            return displayName;
-        }
-        if (marker != null && marker.getName() != null && marker.getName().length() > 0) {
+        return LostTalesLotrWaypointText.resolveMapLabel(
+                marker, discoveredWaypointName(waypoint, marker));
+    }
+
+    /**
+     * The bundled marker's own name, falling back to LOTR's only for a
+     * waypoint Lost Tales does not name itself — a player's own waypoint, for
+     * one. The marker definitions are the single source of what a place is
+     * called, so the map and the compass always agree.
+     */
+    private static String discoveredWaypointName(
+            LOTRAbstractWaypoint waypoint, LostTalesMapMarkerData marker) {
+        if (marker != null && marker.getName() != null
+                && marker.getName().length() > 0) {
             return marker.getName();
         }
-        return safeString(waypoint.getCodeName());
+        String displayName = safeString(waypoint.getDisplayName());
+        return displayName.length() > 0
+                ? displayName : safeString(waypoint.getCodeName());
     }
 
     private static String getMarkerDisplayName(LostTalesMapMarkerData marker) {
-        return isUndiscoveredButVisible(marker) ? "?" : marker.getName();
+        return LostTalesLotrWaypointText.resolveMapLabel(
+                marker, marker.getName());
     }
 
     private static boolean ensureReflection() {
@@ -3130,6 +3430,14 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         private float exitOffsetX;
         private float exitOffsetY;
         private boolean leavingStack;
+        /** Which marker's stack this one is currently drawn against. */
+        private String stackLeaderId = "";
+        private boolean hasStack;
+        private float stackOffsetX;
+        private float stackOffsetY;
+        private float handoverFromX;
+        private float handoverFromY;
+        private float handoverProgress = 1.0F;
 
         private void beginExit() {
             this.exitOffsetX = this.hasRenderedOffset
@@ -3151,6 +3459,9 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         float getExitOffsetX() { return this.exitOffsetX; }
         float getExitOffsetY() { return this.exitOffsetY; }
         boolean isLeavingStack() { return this.leavingStack; }
+        float getStackOffsetX() { return this.stackOffsetX; }
+        float getStackOffsetY() { return this.stackOffsetY; }
+        float getHandoverProgress() { return this.handoverProgress; }
     }
 
     private static final class RoleplayPlayerHead {

@@ -201,6 +201,42 @@ public final class LostTalesClassTransformerTest {
                 "shouldSuppressNativePlayerRendering"));
     }
 
+    /**
+     * Everything LOTR draws on the map is positioned through this one method,
+     * so it is the single place the map's rotation is applied. If it moves or
+     * changes shape the map would silently stop turning, taking marker
+     * placement and hit testing out of step with what is drawn.
+     */
+    @Test
+    public void lostTalesMapRotationPatchesLotrsOwnMapSpace()
+            throws Exception {
+        ClassNode transformed = transform("lotr.client.gui.LOTRGuiMap");
+        assertTrue(containsStaticHook(
+                transformed, "transformMapCoords",
+                "com/ninuna/losttales/client/mapmarker/"
+                        + "LostTalesLotrMapRotation",
+                "rotate"));
+        // The region names are painted on the sheet, so they turn and lean
+        // with it; that needs this one pass bracketed.
+        assertTrue(containsStaticHook(
+                transformed, "renderLabels",
+                "com/ninuna/losttales/client/mapmarker/"
+                        + "LostTalesLotrMapRotation",
+                "beginSheetPass"));
+        assertTrue(containsStaticHook(
+                transformed, "renderLabels",
+                "com/ninuna/losttales/client/mapmarker/"
+                        + "LostTalesLotrMapRotation",
+                "endSheetPass"));
+        // The compass rose is moved off the control strip and turned with
+        // the map, by redirecting the one call that draws it.
+        assertTrue(containsStaticHook(
+                transformed, "drawScreen",
+                "com/ninuna/losttales/client/mapmarker/"
+                        + "LostTalesLotrMapCompass",
+                "drawMapCompass"));
+    }
+
     @Test
     public void clippedLotrMapPreviewsUseOceanPadding() throws Exception {
         ClassNode transformed = transform("lotr.client.gui.LOTRGuiMap");

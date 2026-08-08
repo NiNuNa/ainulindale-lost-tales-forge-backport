@@ -794,7 +794,11 @@ public final class PartyService {
         Map<UUID, RoleplayCharacter> characters =
                 new HashMap<UUID, RoleplayCharacter>();
         Set<UUID> ambiguous = new HashSet<UUID>();
+        Set<UUID> rosterOwners = new HashSet<UUID>();
         for (CharacterRoster roster : data.getRosters()) {
+            if (roster.getOwnerId() != null) {
+                rosterOwners.add(roster.getOwnerId());
+            }
             for (RoleplayCharacter character : roster.getCharacters()) {
                 UUID characterId = character.getCharacterId();
                 if (ambiguous.contains(characterId)) {
@@ -808,7 +812,7 @@ public final class PartyService {
                 }
             }
         }
-        return new CharacterIndex(characters, ambiguous);
+        return new CharacterIndex(characters, ambiguous, rosterOwners);
     }
 
     private int countCharacters(CharacterWorldData data, UUID characterId) {
@@ -882,8 +886,12 @@ public final class PartyService {
             if (characters.ambiguousCharacterIds.contains(
                     marker.getOwnerCharacterId())) {
                 reason = "ambiguous_owner_character";
-            } else if (!characters.characters.containsKey(
+            } else if (!characters.hasOwner(
                     marker.getOwnerCharacterId())) {
+                // A marker filed under a player rather than a character is
+                // not an orphan: that is who owns it while no character is
+                // selected. Treating it as one deleted the marker from under
+                // a character-less player a few seconds after they placed it.
                 reason = "missing_owner_character";
             } else if (!DimensionManager.isDimensionRegistered(
                     marker.getDimensionId())) {
@@ -1072,11 +1080,26 @@ public final class PartyService {
     static final class CharacterIndex {
         final Map<UUID, RoleplayCharacter> characters;
         final Set<UUID> ambiguousCharacterIds;
+        /**
+         * The players who own a roster. A personal marker may be filed under
+         * one of these instead of under a character, because a player who has
+         * no character selected owns their marker themselves.
+         */
+        final Set<UUID> rosterOwnerIds;
 
         private CharacterIndex(Map<UUID, RoleplayCharacter> characters,
-                               Set<UUID> ambiguousCharacterIds) {
+                               Set<UUID> ambiguousCharacterIds,
+                               Set<UUID> rosterOwnerIds) {
             this.characters = characters;
             this.ambiguousCharacterIds = ambiguousCharacterIds;
+            this.rosterOwnerIds = rosterOwnerIds;
+        }
+
+        /** Whether a personal marker filed under this id still has an owner. */
+        boolean hasOwner(UUID ownerId) {
+            return ownerId != null
+                    && (this.characters.containsKey(ownerId)
+                            || this.rosterOwnerIds.contains(ownerId));
         }
     }
 }

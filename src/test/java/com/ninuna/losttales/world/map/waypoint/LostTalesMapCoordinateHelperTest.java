@@ -22,6 +22,42 @@ public final class LostTalesMapCoordinateHelperTest {
         assertEquals(worldZ, LOTRWaypoint.mapToWorldZ(mapZ));
     }
 
+    /**
+     * Where the map draws a position is half a cell from where a waypoint
+     * defined at that position is stored, so the two conversions must stay
+     * apart: aiming the camera with the storage one framed the marker
+     * sixty-four blocks off.
+     */
+    @Test
+    public void theRenderedConversionRoundTripsThroughTheMapScreen() {
+        int worldX = 12345;
+        int worldZ = -6789;
+
+        assertEquals(worldX,
+                LostTalesMapCoordinateHelper.renderedMapImageXToWorld(
+                        LostTalesMapCoordinateHelper
+                                .worldToRenderedMapImageX(worldX)));
+        assertEquals(worldZ,
+                LostTalesMapCoordinateHelper.renderedMapImageZToWorld(
+                        LostTalesMapCoordinateHelper
+                                .worldToRenderedMapImageZ(worldZ)));
+    }
+
+    @Test
+    public void theStoredAndDrawnConversionsAreHalfACellApart() {
+        assertNotEquals(
+                LostTalesMapCoordinateHelper.worldToMapImageX(1000.0D),
+                LostTalesMapCoordinateHelper
+                        .worldToRenderedMapImageX(1000.0D),
+                0.0001D);
+        assertEquals(0.5D,
+                LostTalesMapCoordinateHelper
+                        .worldToRenderedMapImageX(1000.0D)
+                        - LostTalesMapCoordinateHelper
+                                .worldToMapImageX(1000.0D),
+                0.0001D);
+    }
+
     @Test
     public void lotrIntegerConversionWouldSnapTheTestMarker() {
         int worldX = 15;

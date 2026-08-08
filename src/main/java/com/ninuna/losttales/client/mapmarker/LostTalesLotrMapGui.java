@@ -3,9 +3,11 @@ package com.ninuna.losttales.client.mapmarker;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
+import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
 import com.ninuna.losttales.client.party.PartyClientRequestManager;
 import com.ninuna.losttales.party.model.PartyPersonalMarkerOwner;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
+import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
 import java.util.UUID;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneTravelRequestPacket;
@@ -61,13 +63,44 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
 
     /** Opens the personal-waypoint editor while the map is on screen. */
     static final int CREATE_WAYPOINT_KEY = Keyboard.KEY_C;
+    /** Takes the camera back to where the player is standing. */
+    static final int CURRENT_LOCATION_KEY = Keyboard.KEY_R;
+    /** Opens the find-a-place popup. */
+    static final int FIND_LOCATION_KEY = Keyboard.KEY_F;
+    /** Held and dragged sideways to turn the map. */
+    static final int ROTATE_MAP_BUTTON = 1;
 
-    static final float SMOOTH_ZOOM_MIN = -3.0F;
-    static final float SMOOTH_ZOOM_MAX = 4.0F;
+    /**
+     * Zoom bounds, a little wider either way than LOTR's own -3..4. Its
+     * integer zoom power is still kept inside its own range; only the eased
+     * exponent this class owns goes further.
+     */
+    static final float SMOOTH_ZOOM_MIN = -3.6F;
+    static final float SMOOTH_ZOOM_MAX = 4.6F;
+    /** LOTR's own zoom power, which its unused internals still read. */
+    private static final int LOTR_ZOOM_POWER_MIN = -3;
+    private static final int LOTR_ZOOM_POWER_MAX = 4;
     /** One notch of the wheel, in zoom exponent. */
-    static final float SMOOTH_ZOOM_WHEEL_INCREMENT = 0.2F;
-    private static final float SMOOTH_ZOOM_EASING = 0.28F;
+    static final float SMOOTH_ZOOM_WHEEL_INCREMENT = 0.12F;
+    private static final float SMOOTH_ZOOM_EASING = 0.2F;
     private static final float SMOOTH_ZOOM_SNAP_EPSILON = 0.001F;
+    /**
+     * Zoom a travel destination is framed at, unless the player is already
+     * looking closer than that. Close enough to read the ground around it,
+     * short of the level where the map stops grouping markers at all.
+     */
+    static final float FAST_TRAVEL_FOCUS_ZOOM_EXP = 2.6F;
+    /**
+     * Zoom the map settles at when asked where the player is or where a
+     * searched place is, unless it is already closer than that.
+     */
+    static final float LOCATION_FOCUS_ZOOM_EXP = 2.6F;
+    /**
+     * The lean runs 0..1 while the shared smoothing works in degrees and
+     * stops within a hundredth of one, so it is scaled into that range and
+     * back rather than given a second easing of its own.
+     */
+    private static final float LEAN_SMOOTHING_SCALE = 90.0F;
 
     private boolean transientEnemyMarkersRendered;
     private boolean roleplayPlayerHeadsRendered;
@@ -82,20 +115,51 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             Collections.emptyList();
     private LostTalesMapFastTravelPrompt fastTravelPrompt;
     private LostTalesMapWaypointPrompt waypointPrompt;
+    private LostTalesMapMoveMarkerPrompt moveMarkerPrompt;
+    private LostTalesMapSearchPrompt searchPrompt;
+    /**
+     * Where the "go here" marker would move to, as {@code {dimension, x, z}},
+     * while that question is on screen. Null when the popup was opened on the
+     * marker itself, which offers only leaving or removing it.
+     */
+    private int[] pendingGoHereDestination;
     /** The waypoint the editor is open on, or null while creating one. */
     private LOTRCustomWaypoint editedWaypoint;
     private LostTalesMapMarkerData promptCustomMarker;
     private LOTRAbstractWaypoint promptNativeWaypoint;
     private final LostTalesMapInputTracker mapInput =
             new LostTalesMapInputTracker();
-    private final LostTalesMapGroupFocus groupFocus =
-            new LostTalesMapGroupFocus();
+    /**
+     * One camera for the whole screen. Framing a stack and framing a travel
+     * destination are the same movement with a different screen anchor, so a
+     * new one always replaces whatever was running rather than fighting it.
+     */
+    private final LostTalesMapCameraFocus cameraFocus =
+            new LostTalesMapCameraFocus();
     /**
      * Set while a left press has landed on empty map. The "go here" marker is
      * only placed if that press comes back up without becoming a drag, so
      * panning the map never drops one.
      */
     private boolean goHerePressPending;
+    /** How far the map is drawn turned; follows the dragged angle. */
+    private float mapRotationDegrees;
+    private float mapRotationTargetDegrees;
+    /** Accumulated horizontal drag, which is what buys the angle. */
+    private float rotationInput;
+    private long rotationLastNanos;
+    /** How far the map is drawn leaning, 0 flat to 1, and its drag. */
+    private float mapLean;
+    private float mapLeanTarget;
+    private float leanInput;
+    private int leanDragLastY;
+    private boolean rotatingMap;
+    private int rotationDragLastX;
+    private float rotationDragTravel;
+    /** Set while a left drag is panning, which a turned map has to redirect. */
+    private boolean panningMap;
+    private int panLastX;
+    private int panLastY;
 
     /**
      * Creates the marker-aware map without discarding a mode configured by
@@ -190,8 +254,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         } else if (ensureSmoothZoomReflection()) {
             try {
                 zoomTicksField.setInt(this, 0);
-                zoomPowerField.setInt(null,
-                        Math.round(this.smoothZoomTarget));
+                zoomPowerField.setInt(null, Math.max(LOTR_ZOOM_POWER_MIN,
+                        Math.min(LOTR_ZOOM_POWER_MAX,
+                                Math.round(this.smoothZoomTarget))));
             } catch (IllegalAccessException exception) {
                 markSmoothZoomReflectionFailed(exception);
                 this.smoothZoomInitialized = false;
@@ -224,26 +289,31 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     /** True while a popup owns the screen and the map must hold still. */
     private boolean isModalOpen() {
         return this.fastTravelPrompt != null
-                || this.waypointPrompt != null;
+                || this.waypointPrompt != null
+                || this.moveMarkerPrompt != null
+                || this.searchPrompt != null;
     }
 
     @Override
     public void updateScreen() {
         float[] camera = new float[
-                LostTalesMapGroupFocus.CAMERA_STATE_SIZE];
+                LostTalesMapCameraFocus.CAMERA_STATE_SIZE];
         boolean frozen = isModalOpen()
-                && LostTalesMapGroupFocus.captureCamera(this, camera);
+                && LostTalesMapCameraFocus.captureCamera(this, camera);
         try {
             super.updateScreen();
         } finally {
             if (frozen) {
                 // LOTR's keyboard movement runs inside its own tick, so the
                 // only way to hold the map is to put back what it moved.
-                LostTalesMapGroupFocus.restoreCamera(this, camera);
+                LostTalesMapCameraFocus.restoreCamera(this, camera);
             }
         }
         if (this.waypointPrompt != null) {
             this.waypointPrompt.updateCursor();
+        }
+        if (this.searchPrompt != null) {
+            this.searchPrompt.updateCursor();
         }
         if (!this.smoothZoomInitialized) {
             return;
@@ -312,6 +382,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         if (isModalOpen() && wheel != 0) {
             if (this.waypointPrompt != null) {
                 this.waypointPrompt.mouseWheel(wheel);
+            }
+            if (this.searchPrompt != null) {
+                this.searchPrompt.mouseWheel(wheel);
             }
             return;
         }
@@ -401,7 +474,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
 
     private void adjustSmoothZoom(float delta) {
         // Zooming by hand takes the camera back from a focus in progress.
-        this.groupFocus.cancel();
+        this.cameraFocus.cancel();
         setSmoothZoomTarget(this.smoothZoomTarget + delta);
     }
 
@@ -435,7 +508,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         }
         this.smoothZoomTarget = adjusted;
         try {
-            zoomPowerField.setInt(null, Math.round(adjusted));
+            zoomPowerField.setInt(null, Math.max(LOTR_ZOOM_POWER_MIN,
+                    Math.min(LOTR_ZOOM_POWER_MAX,
+                            Math.round(adjusted))));
             selectedWaypointField.set(this, null);
         } catch (IllegalAccessException exception) {
             markSmoothZoomReflectionFailed(exception);
@@ -563,6 +638,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                 .suppressSelectedLotrTooltipForFocusedHover(this);
         LostTalesLotrMapMarkerIconOverlay.renderHoveredIconForeground(
                 this, mouseX, mouseY, drawLabels);
+        LostTalesLotrMapMarkerIconOverlay
+                .renderSelectedMarkerFrame(this);
         LOTRAbstractWaypoint focusedNative =
                 LostTalesLotrMapMarkerIconOverlay
                         .getFocusedNativeWaypoint(this);
@@ -615,10 +692,17 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         this.roleplayPlayerHeadsRendered = false;
         LostTalesLotrMapMarkerIconOverlay
                 .clearInvalidLotrSelection(this);
+        long now = System.nanoTime();
+        // A pass that throws part way through cannot leave the map stuck
+        // drawing as though it were square.
+        LostTalesLotrMapRotation.clearSheetPasses();
+        // Before anything reads the angle, so the image, the markers and the
+        // hit tests all use the same one for this frame.
+        advanceMapRotation(now);
         // Ahead of LOTR's own panning so a focus in progress owns the camera
         // for this frame and a drag can take it back on the next one.
-        if (this.groupFocus.advance(this, System.nanoTime())) {
-            applyFocusZoom(this.groupFocus.getCurrentZoomExp());
+        if (this.cameraFocus.advance(this, now)) {
+            applyFocusZoom(this.cameraFocus.getCurrentZoomExp());
         }
         if (isModalOpen()) {
             // LOTR drags from inside its own draw by polling the mouse and
@@ -626,19 +710,24 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             // pointer has not moved is what actually holds the map still;
             // putting the camera back afterwards only hid the movement for
             // one frame and let it snap.
-            LostTalesMapGroupFocus.holdPointer(this, mouseX, mouseY);
+            LostTalesMapCameraFocus.holdPointer(this, mouseX, mouseY);
+        } else {
+            dragRotatedMap(mouseX, mouseY);
         }
         float[] camera = new float[
-                LostTalesMapGroupFocus.CAMERA_STATE_SIZE];
-        boolean frozen = isModalOpen()
-                && LostTalesMapGroupFocus.captureCamera(this, camera);
+                LostTalesMapCameraFocus.CAMERA_STATE_SIZE];
+        boolean captured =
+                LostTalesMapCameraFocus.captureCamera(this, camera);
+        boolean frozen = isModalOpen() && captured;
         try {
             super.drawScreen(mouseX, mouseY, partialTicks);
         } finally {
             if (frozen) {
                 // LOTR drags the map from inside its own draw by polling the
                 // mouse, so the popup's grip on the pointer is not enough.
-                LostTalesMapGroupFocus.restoreCamera(this, camera);
+                LostTalesMapCameraFocus.restoreCamera(this, camera);
+            } else if (captured) {
+                alignCameraMovementWithRotation(camera);
             }
             LostTalesLotrMapMarkerIconOverlay
                     .restoreSelectedLotrWaypointAfterDraw(this);
@@ -654,6 +743,239 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                     this.width, this.height, mouseX, mouseY,
                     getUsedCustomWaypoints(), getMaxCustomWaypoints());
         }
+        if (this.moveMarkerPrompt != null) {
+            this.moveMarkerPrompt.render(
+                    this.width, this.height, mouseX, mouseY);
+        }
+        if (this.searchPrompt != null) {
+            this.searchPrompt.render(
+                    this.width, this.height, mouseX, mouseY);
+        }
+    }
+
+    /**
+     * Takes the camera back to where the player is standing.
+     *
+     * <p>The same movement every other map action uses, aimed at the player's
+     * own position rather than at a marker, so it arrives the same way and can
+     * be interrupted the same way.</p>
+     */
+    private void focusCurrentLocation() {
+        if (this.mc == null || this.mc.thePlayer == null
+                || this.mc.thePlayer.dimension
+                != LOTRDimension.MIDDLE_EARTH.dimensionID) {
+            return;
+        }
+        focusMapPoint(
+                (float)LostTalesMapCoordinateHelper
+                        .worldToRenderedMapImageX(this.mc.thePlayer.posX),
+                (float)LostTalesMapCoordinateHelper
+                        .worldToRenderedMapImageZ(this.mc.thePlayer.posZ));
+    }
+
+    /** Centres the camera on a map-image point at a comfortable zoom. */
+    private void focusMapPoint(float mapImageX, float mapImageY) {
+        this.cameraFocus.focus(this, mapImageX, mapImageY,
+                this.smoothZoomCurrent,
+                clampSmoothZoom(Math.max(this.smoothZoomCurrent,
+                        LOCATION_FOCUS_ZOOM_EXP)),
+                Float.NaN, Float.NaN, System.nanoTime());
+    }
+
+    private void openSearchPrompt() {
+        if (this.mc == null || this.mc.fontRenderer == null) {
+            return;
+        }
+        this.searchPrompt = LostTalesMapSearchPrompt.open(
+                this.mc.fontRenderer, this.width, this.height,
+                LostTalesClientMapMarkerStore.getMapMarkers(
+                        ClientPartyTrackingCache.getMapMarkers()));
+        this.mapLegendOpen = false;
+        LostTalesLotrMapMarkerIconOverlay.suspendHoverFocus(this);
+    }
+
+    private void clearSearchPrompt() {
+        this.searchPrompt = null;
+        this.mapInput.cancelPress();
+        this.goHerePressPending = false;
+        LostTalesLotrMapMarkerIconOverlay.suspendHoverFocus(this);
+    }
+
+    /**
+     * Acts on a place picked out of the find popup: the popup closes and the
+     * camera goes there, exactly as if the player had clicked its stack.
+     */
+    private void handleSearchSelection() {
+        if (this.searchPrompt == null) {
+            return;
+        }
+        LostTalesMapMarkerData marker =
+                this.searchPrompt.takeChosenMarker();
+        if (marker == null) {
+            return;
+        }
+        float[] target = LostTalesLotrMapMarkerIconOverlay
+                .resolveMapImagePosition(marker, null);
+        clearSearchPrompt();
+        if (target != null) {
+            focusMapPoint(target[0], target[1]);
+        }
+    }
+
+    /**
+     * Drags a turned map, in place of LOTR's own panning.
+     *
+     * <p>LOTR moves the camera along the map's axes, which stop being the
+     * screen's axes the moment the map is turned, so a horizontal drag would
+     * slide the ground away at a slant. Turning the movement back is the whole
+     * correction; doing it here rather than after LOTR has drawn is what keeps
+     * the ground under the pointer on the frame the pointer moves.</p>
+     *
+     * <p>LOTR is then told the pointer has not moved, so it does not pan a
+     * second time. Everything else it moves the camera with — the keyboard,
+     * above all — is left to
+     * {@link #alignCameraMovementWithRotation(float[])}.</p>
+     */
+    private void dragRotatedMap(int mouseX, int mouseY) {
+        if (this.mapRotationDegrees == 0.0F || !this.panningMap) {
+            return;
+        }
+        float[] delta = new float[] {
+                mouseX - this.panLastX, mouseY - this.panLastY
+        };
+        this.panLastX = mouseX;
+        this.panLastY = mouseY;
+        float[] camera = new float[
+                LostTalesMapCameraFocus.CAMERA_STATE_SIZE];
+        if (!LostTalesMapCameraFocus.captureCamera(this, camera)) {
+            return;
+        }
+        LostTalesLotrMapRotation.rotateCameraDelta(
+                delta, this.mapRotationDegrees);
+        float zoomScale = (float)Math.pow(2.0D, this.smoothZoomCurrent);
+        float posX = LostTalesLotrMapRotation.clampToMapImage(
+                camera[0] - delta[0] / zoomScale,
+                LostTalesLotrMapRotation.mapImageWidth());
+        float posY = LostTalesLotrMapRotation.clampToMapImage(
+                camera[1] - delta[1] / zoomScale,
+                LostTalesLotrMapRotation.mapImageHeight());
+        camera[0] = posX;
+        camera[1] = posY;
+        camera[2] = posX;
+        camera[3] = posY;
+        LostTalesMapCameraFocus.restoreCamera(this, camera);
+        LostTalesMapCameraFocus.holdPointer(this, mouseX, mouseY);
+    }
+
+    /**
+     * Re-applies the camera movement LOTR just made along the map's own axes.
+     *
+     * <p>What is left after {@link #dragRotatedMap(int, int)} has taken the
+     * drag: the keyboard, which steers by the screen's axes too and would
+     * otherwise walk the map off at a slant.</p>
+     */
+    private void alignCameraMovementWithRotation(float[] before) {
+        if (this.mapRotationDegrees == 0.0F) {
+            return;
+        }
+        float[] after = new float[
+                LostTalesMapCameraFocus.CAMERA_STATE_SIZE];
+        if (!LostTalesMapCameraFocus.captureCamera(this, after)) {
+            return;
+        }
+        float[] delta = new float[] {
+                after[0] - before[0], after[1] - before[1]
+        };
+        if (delta[0] == 0.0F && delta[1] == 0.0F) {
+            return;
+        }
+        LostTalesLotrMapRotation.rotateCameraDelta(
+                delta, this.mapRotationDegrees);
+        float posX = LostTalesLotrMapRotation.clampToMapImage(
+                before[0] + delta[0],
+                LostTalesLotrMapRotation.mapImageWidth());
+        float posY = LostTalesLotrMapRotation.clampToMapImage(
+                before[1] + delta[1],
+                LostTalesLotrMapRotation.mapImageHeight());
+        after[0] = posX;
+        after[1] = posY;
+        after[2] = posX;
+        after[3] = posY;
+        LostTalesMapCameraFocus.restoreCamera(this, after);
+    }
+
+    /**
+     * How far the map is currently drawn turned, in degrees.
+     *
+     * <p>The drawn angle, not the dragged one: everything that has to agree
+     * about where the ground is — the image, the markers, hit testing — reads
+     * this, so they all follow the same smoothed value.</p>
+     */
+    float getMapRotationDegrees() {
+        return this.mapRotationDegrees;
+    }
+
+    /**
+     * Turns the map by a horizontal drag.
+     *
+     * <p>Only the horizontal component counts, so a steep diagonal barely
+     * turns the map while a flat sweep across the screen turns it fully. What
+     * accumulates is the drag itself rather than the angle, because the angle
+     * it buys is not linear — see
+     * {@link LostTalesLotrMapRotation#degreesForInput(float)}. The threshold
+     * is measured against the whole gesture rather than the last frame, so
+     * once the drag has been recognised the map follows the pointer without a
+     * second jump.</p>
+     */
+    private void dragMapRotation(int mouseX, int mouseY) {
+        int delta = mouseX - this.rotationDragLastX;
+        int verticalDelta = mouseY - this.leanDragLastY;
+        this.rotationDragLastX = mouseX;
+        this.leanDragLastY = mouseY;
+        this.rotationDragTravel += Math.abs(delta)
+                + Math.abs(verticalDelta);
+        if (this.rotationDragTravel
+                < LostTalesLotrMapRotation.DRAG_THRESHOLD_PIXELS) {
+            return;
+        }
+        this.rotationInput = LostTalesLotrMapRotation.clampInput(
+                this.rotationInput
+                        + delta * LostTalesLotrMapRotation.inputPerPixel());
+        this.mapRotationTargetDegrees =
+                LostTalesLotrMapRotation.degreesForInput(
+                        this.rotationInput);
+        // Dragging down lowers the eye towards the sheet; dragging back up
+        // lays it flat again. What accumulates is the drag, as with the turn,
+        // because the lean it buys stiffens the same way.
+        this.leanInput = Math.max(0.0F, Math.min(1.0F,
+                this.leanInput + verticalDelta
+                        * LostTalesLotrMapRotation.leanInputPerPixel()));
+        this.mapLeanTarget =
+                LostTalesLotrMapRotation.leanForInput(this.leanInput);
+    }
+
+    /** Follows the dragged angle, once per frame, off elapsed time. */
+    private void advanceMapRotation(long nowNanos) {
+        float elapsed = this.rotationLastNanos == 0L ? 0.0F
+                : Math.min(0.25F,
+                        (nowNanos - this.rotationLastNanos)
+                                / 1000000000.0F);
+        this.rotationLastNanos = nowNanos;
+        this.mapRotationDegrees =
+                LostTalesLotrMapRotation.approachDegrees(
+                        this.mapRotationDegrees,
+                        this.mapRotationTargetDegrees, elapsed);
+        // The lean follows on the same clock, so turning and leaning at once
+        // is one movement rather than two arriving at different times.
+        this.mapLean = LostTalesLotrMapRotation.approachDegrees(
+                this.mapLean * LEAN_SMOOTHING_SCALE,
+                this.mapLeanTarget * LEAN_SMOOTHING_SCALE, elapsed)
+                / LEAN_SMOOTHING_SCALE;
+    }
+
+    /** How far the map is drawn leaning, 0 flat to 1. */
+    float getMapLean() {
+        return this.mapLean;
     }
 
     void renderControlBar(boolean force) {
@@ -690,6 +1012,19 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                             canPlacePromptMarker()));
             return;
         }
+        if (this.moveMarkerPrompt != null) {
+            handleMoveMarkerPromptAction(
+                    this.moveMarkerPrompt.mouseClicked(
+                            this.width, this.height,
+                            mouseX, mouseY, button));
+            return;
+        }
+        if (this.searchPrompt != null) {
+            this.searchPrompt.mouseClicked(
+                    this.width, this.height, mouseX, mouseY, button);
+            handleSearchSelection();
+            return;
+        }
         if (LostTalesKeyBindings.isMapLegendMouseButton(button)) {
             toggleMapLegend();
             return;
@@ -699,6 +1034,20 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             return;
         }
         if (button != 0) {
+            // Both halves have to be in place: the transformer that turns
+            // LOTR's map space, and the Lost Tales renderer that turns the
+            // image to match. With only one, the ground and the markers on it
+            // would disagree.
+            if (button == ROTATE_MAP_BUTTON && this.smoothZoomInitialized
+                    && LostTalesLotrMapRotation.isSupported()) {
+                // The press only arms the gesture. Whether it was a right
+                // click or the start of a turn is decided by what the pointer
+                // does next, so LOTR still sees the click either way.
+                this.rotatingMap = true;
+                this.rotationDragLastX = mouseX;
+                this.leanDragLastY = mouseY;
+                this.rotationDragTravel = 0.0F;
+            }
             super.mouseClicked(mouseX, mouseY, button);
             LostTalesLotrMapMarkerIconOverlay
                     .clearInvalidLotrSelection(this);
@@ -719,7 +1068,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                 && !LostTalesLotrMapLayout.isPointerOverMapWidget(
                         this, mouseX, mouseY)
                 && LostTalesLotrMapMarkerIconOverlay
-                        .getMapClickWorldPosition(this) != null;
+                        .getMapClickWorldPosition(this, mouseX, mouseY)
+                        != null;
         super.mouseClicked(mouseX, mouseY, button);
         LostTalesLotrMapMarkerIconOverlay
                 .clearInvalidLotrSelection(this);
@@ -730,8 +1080,17 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             int mouseX, int mouseY, int button, long timeSinceClick) {
         if (button == 0 && this.mapInput.moved(mouseX, mouseY)) {
             // Taking hold of the map cancels a focus and any pending drop.
-            this.groupFocus.cancel();
+            this.cameraFocus.cancel();
             this.goHerePressPending = false;
+            if (!this.panningMap) {
+                this.panningMap = true;
+                this.panLastX = mouseX;
+                this.panLastY = mouseY;
+            }
+        }
+        if (button == ROTATE_MAP_BUTTON && this.rotatingMap
+                && !isModalOpen()) {
+            dragMapRotation(mouseX, mouseY);
         }
         super.mouseClickMove(mouseX, mouseY, button, timeSinceClick);
     }
@@ -739,12 +1098,17 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     @Override
     protected void mouseMovedOrUp(int mouseX, int mouseY, int which) {
         if (which == 0) {
+            this.panningMap = false;
             boolean click = this.mapInput.releaseAsClick(mouseX, mouseY);
             boolean place = click && this.goHerePressPending;
             this.goHerePressPending = false;
             if (place) {
-                placeGoHereMarkerAtPointer();
+                placeGoHereMarkerAtPointer(mouseX, mouseY);
             }
+        }
+        if (which == ROTATE_MAP_BUTTON) {
+            this.rotatingMap = false;
+            this.rotationDragTravel = 0.0F;
         }
         super.mouseMovedOrUp(mouseX, mouseY, which);
     }
@@ -794,8 +1158,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         if (marker != null) {
             if (localMarkerId != null
                     && localMarkerId.equals(marker.getId())) {
-                PartyClientRequestManager.removeGoHereMarker(
-                        personalMarkerOwnerId(state), null, -1L);
+                // Touching the marker no longer throws it away. Removing it is
+                // one of the answers to the question this opens.
+                openMoveMarkerPrompt(null);
             } else {
                 openFastTravelPrompt(marker, null);
             }
@@ -831,44 +1196,127 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         }
         // Pan and zoom are one movement, so the focus drives the zoom for
         // its whole duration rather than handing it to the wheel easing and
-        // letting the two finish at different moments.
-        this.groupFocus.focus(this, target[0], target[1],
+        // letting the two finish at different moments. A stack is opened at
+        // the middle of the viewport, since nothing is covering it.
+        this.cameraFocus.focus(this, target[0], target[1],
                 this.smoothZoomCurrent,
-                clampSmoothZoom(target[2]), System.nanoTime());
+                clampSmoothZoom(target[2]),
+                Float.NaN, Float.NaN, System.nanoTime());
         return true;
     }
 
-    /** Drops the party marker on a waypoint rather than on empty map. */
-    private void placeGoHereMarkerAt(LOTRAbstractWaypoint waypoint) {
-        UUID ownerId = personalMarkerOwnerId(
-                ClientPartyStateCache.getSnapshot());
-        if (waypoint == null || ownerId == null) {
+    /**
+     * Brings a travel destination to rest above the popup that describes it.
+     *
+     * <p>The same camera the stacks use, given a different anchor: the marker
+     * has to stay visible while the player reads the question about it, so it
+     * is framed in the space the popup leaves rather than at the centre of the
+     * screen, where the popup would sit on top of it.</p>
+     */
+    private void focusFastTravelTarget(
+            LostTalesMapMarkerData marker,
+            LOTRAbstractWaypoint waypoint) {
+        float[] target = LostTalesLotrMapMarkerIconOverlay
+                .resolveMapImagePosition(marker, waypoint);
+        if (target == null) {
             return;
         }
-        PartyClientRequestManager.setGoHereMarker(
-                ownerId, null, -1L,
-                LOTRDimension.MIDDLE_EARTH.dimensionID,
-                waypoint.getXCoord(), waypoint.getZCoord());
+        this.cameraFocus.focus(this, target[0], target[1],
+                this.smoothZoomCurrent,
+                clampSmoothZoom(Math.max(this.smoothZoomCurrent,
+                        FAST_TRAVEL_FOCUS_ZOOM_EXP)),
+                this.width * 0.5F,
+                LostTalesMapFastTravelPrompt.focusAnchorY(
+                        this.width, this.height),
+                System.nanoTime());
     }
 
-    private void placeGoHereMarkerAtPointer() {
-        UUID ownerId = personalMarkerOwnerId(
-                ClientPartyStateCache.getSnapshot());
+    /**
+     * Acts on a click that landed on empty map.
+     *
+     * <p>The first marker is dropped where the player clicked, with nothing to
+     * ask about. Once one exists it is shared with the party and is what
+     * everyone is walking towards, so moving it is asked for rather than
+     * assumed.</p>
+     */
+    private void placeGoHereMarkerAtPointer(int mouseX, int mouseY) {
+        PartyStateSnapshot state = ClientPartyStateCache.getSnapshot();
+        UUID ownerId = personalMarkerOwnerId(state);
         if (this.mc == null || this.mc.thePlayer == null
                 || ownerId == null) {
             return;
         }
         int[] worldPosition = LostTalesLotrMapMarkerIconOverlay
-                .getMapClickWorldPosition(this);
+                .getMapClickWorldPosition(this, mouseX, mouseY);
         if (worldPosition == null) {
+            return;
+        }
+        int[] destination = new int[] {
+                this.mc.thePlayer.dimension,
+                worldPosition[0], worldPosition[1]
+        };
+        if (ClientPartyTrackingCache.hasLocalGoHereMarker(state)) {
+            openMoveMarkerPrompt(destination);
+            return;
+        }
+        sendGoHereMarker(ownerId, destination);
+        LostTalesLotrMapMarkerIconOverlay
+                .clearLotrSelectedWaypoint(this);
+    }
+
+    private void sendGoHereMarker(UUID ownerId, int[] destination) {
+        if (ownerId == null || destination == null
+                || destination.length < 3) {
             return;
         }
         PartyClientRequestManager.setGoHereMarker(
                 ownerId, null, -1L,
-                this.mc.thePlayer.dimension,
-                worldPosition[0], worldPosition[1]);
+                destination[0], destination[1], destination[2]);
+    }
+
+    /**
+     * Asks what should happen to the marker that already exists.
+     *
+     * @param destination the position Move would apply, or null when the
+     *                    question was opened on the marker itself
+     */
+    private void openMoveMarkerPrompt(int[] destination) {
+        this.pendingGoHereDestination = destination;
+        this.moveMarkerPrompt =
+                new LostTalesMapMoveMarkerPrompt(destination != null);
+        this.mapLegendOpen = false;
         LostTalesLotrMapMarkerIconOverlay
                 .clearLotrSelectedWaypoint(this);
+        LostTalesLotrMapMarkerIconOverlay.suspendHoverFocus(this);
+    }
+
+    private void handleMoveMarkerPromptAction(
+            LostTalesMapMoveMarkerPrompt.Action action) {
+        if (action == null
+                || action == LostTalesMapMoveMarkerPrompt.Action.NONE) {
+            return;
+        }
+        int[] destination = this.pendingGoHereDestination;
+        UUID ownerId = personalMarkerOwnerId(
+                ClientPartyStateCache.getSnapshot());
+        clearMoveMarkerPrompt();
+        // Every answer is a request the server re-derives ownership for; the
+        // popup itself owns nothing.
+        if (action == LostTalesMapMoveMarkerPrompt.Action.MOVE) {
+            sendGoHereMarker(ownerId, destination);
+        } else if (action
+                == LostTalesMapMoveMarkerPrompt.Action.REMOVE) {
+            PartyClientRequestManager.removeGoHereMarker(
+                    ownerId, null, -1L);
+        }
+    }
+
+    private void clearMoveMarkerPrompt() {
+        this.moveMarkerPrompt = null;
+        this.pendingGoHereDestination = null;
+        this.mapInput.cancelPress();
+        this.goHerePressPending = false;
+        LostTalesLotrMapMarkerIconOverlay.suspendHoverFocus(this);
     }
 
     /**
@@ -908,8 +1356,13 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         if (!supportsFastTravel(marker, waypoint)) {
             return;
         }
+        // An undiscovered destination is named by the same rule the map label
+        // and the hover card use, so the popup cannot be the one place that
+        // gives it away.
         String name = marker != null
-                ? marker.getName() : waypoint.getDisplayName();
+                ? LostTalesLotrWaypointText.resolveTitle(
+                        marker, marker.getName())
+                : waypoint.getDisplayName();
         this.fastTravelPrompt = new LostTalesMapFastTravelPrompt(
                 name, fastTravelBlockedReason(marker, waypoint));
         this.promptCustomMarker = marker;
@@ -918,6 +1371,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         LostTalesLotrMapMarkerIconOverlay
                 .clearLotrSelectedWaypoint(this);
         LostTalesLotrMapMarkerIconOverlay.suspendHoverFocus(this);
+        LostTalesLotrMapMarkerIconOverlay.setSelectedMarkerFrame(
+                this, marker, waypoint);
+        focusFastTravelTarget(marker, waypoint);
     }
 
     /** Whether this destination is meant to be a fast-travel target at all. */
@@ -1087,7 +1543,11 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             if (custom.isShared()) {
                 return false;
             }
-            name = custom.getDisplayName();
+            // The code name is what the player typed. LOTR's display name
+            // wraps it in "(Custom)", which is not a name they can edit and
+            // is not the key their colour and description are stored under —
+            // editing under it silently saved both somewhere nothing reads.
+            name = custom.getCodeName();
         } catch (Throwable ignored) {
             return false;
         }
@@ -1163,10 +1623,6 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         }
         if (action == LostTalesMapWaypointPrompt.Action.TRAVEL) {
             openFastTravelPrompt(null, waypoint);
-            return;
-        }
-        if (action == LostTalesMapWaypointPrompt.Action.PLACE_MARKER) {
-            placeGoHereMarkerAt(waypoint);
             return;
         }
         if (action == LostTalesMapWaypointPrompt.Action.DELETE) {
@@ -1275,6 +1731,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         this.fastTravelPrompt = null;
         this.promptCustomMarker = null;
         this.promptNativeWaypoint = null;
+        LostTalesLotrMapMarkerIconOverlay
+                .clearSelectedMarkerFrame(this);
         // Nothing the popup covered may come back as hover or as a pending
         // placement once it closes.
         this.mapInput.cancelPress();
@@ -1295,8 +1753,29 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                     this.fastTravelPrompt.keyTyped(keyCode));
             return;
         }
+        if (this.moveMarkerPrompt != null) {
+            handleMoveMarkerPromptAction(
+                    this.moveMarkerPrompt.keyTyped(keyCode));
+            return;
+        }
+        if (this.searchPrompt != null) {
+            if (!this.searchPrompt.keyTyped(typedChar, keyCode)) {
+                clearSearchPrompt();
+                return;
+            }
+            handleSearchSelection();
+            return;
+        }
         if (keyCode == CREATE_WAYPOINT_KEY) {
             openWaypointPrompt();
+            return;
+        }
+        if (keyCode == CURRENT_LOCATION_KEY) {
+            focusCurrentLocation();
+            return;
+        }
+        if (keyCode == FIND_LOCATION_KEY) {
+            openSearchPrompt();
             return;
         }
         if (LostTalesKeyBindings.isMapLegendKey(keyCode)) {
@@ -1350,9 +1829,20 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     public void onGuiClosed() {
         clearFastTravelPrompt();
         clearWaypointPrompt();
+        clearMoveMarkerPrompt();
+        clearSearchPrompt();
         this.mapInput.clear();
-        this.groupFocus.cancel();
+        this.cameraFocus.cancel();
         this.goHerePressPending = false;
+        this.rotatingMap = false;
+        this.panningMap = false;
+        this.mapRotationDegrees = 0.0F;
+        this.mapRotationTargetDegrees = 0.0F;
+        this.rotationInput = 0.0F;
+        this.rotationLastNanos = 0L;
+        this.mapLean = 0.0F;
+        this.mapLeanTarget = 0.0F;
+        this.leanInput = 0.0F;
         this.clickableNativeWaypoints = Collections.emptyList();
         LostTalesLotrMapMarkerIconOverlay.clearGrouping(this);
         LostTalesLotrRoadLabelRenderer.clear(this);

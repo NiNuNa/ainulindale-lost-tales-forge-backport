@@ -74,6 +74,30 @@ public final class LostTalesSkyrimUiStyle {
         drawCorner(x + width - 1, y + height - 1, -1, -1);
     }
 
+    /**
+     * The panel frame's corner brackets on their own, at a caller-chosen arm
+     * length. Used to mark a selected map marker: it reads as the same frame
+     * language as every panel without boxing the artwork in.
+     */
+    public static void drawSelectionBrackets(
+            int x, int y, int width, int height, int arm, int color) {
+        int length = Math.max(1, arm);
+        drawBracket(x, y, 1, 1, length, color);
+        drawBracket(x + width - 1, y, -1, 1, length, color);
+        drawBracket(x, y + height - 1, 1, -1, length, color);
+        drawBracket(x + width - 1, y + height - 1, -1, -1, length, color);
+    }
+
+    private static void drawBracket(
+            int x, int y, int sx, int sy, int arm, int color) {
+        Gui.drawRect(Math.min(x, x + sx * arm), Math.min(y, y + sy),
+                Math.max(x, x + sx * arm) + 1, Math.max(y, y + sy) + 1,
+                color);
+        Gui.drawRect(Math.min(x, x + sx), Math.min(y, y + sy * arm),
+                Math.max(x, x + sx) + 1, Math.max(y, y + sy * arm) + 1,
+                color);
+    }
+
     private static void drawCorner(int x, int y, int sx, int sy) {
         int hx0 = Math.min(x, x + sx * 12);
         int hx1 = Math.max(x, x + sx * 12);

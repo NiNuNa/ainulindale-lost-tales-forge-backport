@@ -67,6 +67,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.lotrMapControlBarTransformer.active";
     public static final String LOTR_MAP_MINIQUEST_FILTER_ACTIVE_PROPERTY =
             "losttales.lotrMapMiniquestFilterTransformer.active";
+    public static final String LOTR_MAP_ROTATION_ACTIVE_PROPERTY =
+            "losttales.lotrMapRotationTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
@@ -199,6 +201,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     private static final String LOTR_MAP_MARKER_HOOK_OWNER =
             "com/ninuna/losttales/client/mapmarker/"
                     + "LostTalesLotrMapMarkerIconOverlay";
+    private static final String LOTR_MAP_ROTATION_HOOK_OWNER =
+            "com/ninuna/losttales/client/mapmarker/"
+                    + "LostTalesLotrMapRotation";
+    private static final String LOTR_MAP_COMPASS_HOOK_OWNER =
+            "com/ninuna/losttales/client/mapmarker/"
+                    + "LostTalesLotrMapCompass";
 
     @Override
     public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -740,6 +748,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             boolean subtitleLayoutHookPresent = false;
             boolean tooltipLayoutHookPresent = false;
             boolean miniQuestFilterHookPresent = false;
+            boolean rotationHookPresent = false;
+            boolean labelRotationHookPresent = false;
+            boolean compassHookPresent = false;
             for (Object value : owner.methods) {
                 MethodNode method = (MethodNode)value;
                 if ("renderPlayers".equals(method.name)
@@ -855,6 +866,36 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                 injectLotrMapMiniQuestFilter(method);
                         changed |= miniQuestFilterHookPresent;
                     }
+                } else if ("drawScreen".equals(method.name)
+                        && "(IIF)V".equals(method.desc)) {
+                    compassHookPresent = containsHook(
+                            method, LOTR_MAP_COMPASS_HOOK_OWNER,
+                            "drawMapCompass");
+                    if (!compassHookPresent) {
+                        compassHookPresent =
+                                injectLotrMapCompass(method);
+                        changed |= compassHookPresent;
+                    }
+                } else if ("renderLabels".equals(method.name)
+                        && "()V".equals(method.desc)) {
+                    labelRotationHookPresent = containsHook(
+                            method, LOTR_MAP_ROTATION_HOOK_OWNER,
+                            "beginSheetPass");
+                    if (!labelRotationHookPresent) {
+                        labelRotationHookPresent =
+                                injectLotrMapUnrotatedLabels(method);
+                        changed |= labelRotationHookPresent;
+                    }
+                } else if ("transformMapCoords".equals(method.name)
+                        && "(FF)[F".equals(method.desc)) {
+                    rotationHookPresent = containsHook(
+                            method, LOTR_MAP_ROTATION_HOOK_OWNER,
+                            "rotate");
+                    if (!rotationHookPresent) {
+                        rotationHookPresent =
+                                injectLotrMapRotation(method);
+                        changed |= rotationHookPresent;
+                    }
                 }
             }
             if (!playerNameHookPresent) {
@@ -866,6 +907,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             }
             if (!edgeFillHookPresent) {
                 warn("Could not patch LOTR clipped map background");
+            }
+            if (!compassHookPresent) {
+                warn("Could not move the LOTR map compass; it will stay in "
+                        + "the corner and will not follow map rotation");
             }
             boolean fullscreenLayoutReady = fullscreenBoundsHookPresent
                     && frameSuppressionHookPresent
@@ -895,6 +940,14 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     warn("Could not patch LOTR map tooltip bounds");
                 }
             }
+            if (rotationHookPresent && labelRotationHookPresent) {
+                System.setProperty(
+                        LOTR_MAP_ROTATION_ACTIVE_PROPERTY, "true");
+            } else {
+                System.clearProperty(LOTR_MAP_ROTATION_ACTIVE_PROPERTY);
+                warn("Could not patch LOTR map coordinates; "
+                        + "map rotation will stay disabled");
+            }
             if (miniQuestFilterHookPresent) {
                 System.setProperty(
                         LOTR_MAP_MINIQUEST_FILTER_ACTIVE_PROPERTY, "true");
@@ -910,6 +963,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             System.clearProperty(LOTR_MAP_CONTROL_BAR_ACTIVE_PROPERTY);
             System.clearProperty(
                     LOTR_MAP_MINIQUEST_FILTER_ACTIVE_PROPERTY);
+            System.clearProperty(LOTR_MAP_ROTATION_ACTIVE_PROPERTY);
             warn("Failed to patch LOTR map rendering: "
                     + throwable);
             return basicClass;
@@ -968,6 +1022,106 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Turns the answer of LOTR's own map-space conversion.
+     *
+     * <p>Every position LOTR draws on the map — roads, waypoints, region
+     * labels, players, quest markers — comes out of this one method, so
+     * rotating what it returns turns the whole map at once and leaves each
+     * sprite and label to be drawn upright at its new place. The alternative,
+     * rotating the projection LOTR draws through, would have tilted all of
+     * that artwork with it.</p>
+     */
+    /**
+     * Puts the map's compass rose where Lost Tales wants it, and lets it turn.
+     *
+     * <p>One call, redirected: LOTR still draws its own sprite through its own
+     * routine, and only the placement and the angle are decided elsewhere.</p>
+     */
+    private static boolean injectLotrMapCompass(MethodNode method) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof MethodInsnNode)) {
+                continue;
+            }
+            MethodInsnNode call = (MethodInsnNode)instruction;
+            if (call.getOpcode() != Opcodes.INVOKESTATIC
+                    || !"lotr/client/LOTRTextures".equals(call.owner)
+                    || !"drawMapCompassBottomLeft".equals(call.name)
+                    || !"(DDDD)V".equals(call.desc)) {
+                continue;
+            }
+            call.owner = LOTR_MAP_COMPASS_HOOK_OWNER;
+            call.name = "drawMapCompass";
+            info("Patched the LOTR map compass onto the Lost Tales strip");
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Draws LOTR's region names as part of the map sheet.
+     *
+     * <p>They are written across the paper rather than pinned to a place on
+     * it, so they have to turn and lean with it, letters and all, instead of
+     * pivoting upright the way a marker's label does. Bracketing the pass is
+     * enough: it is drawn under the sheet's own matrix, and the coordinate
+     * transform stands down for the length of the call so nothing is moved
+     * twice.</p>
+     */
+    private static boolean injectLotrMapUnrotatedLabels(MethodNode method) {
+        boolean injected = false;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null;) {
+            AbstractInsnNode next = instruction.getNext();
+            if (instruction.getOpcode() == Opcodes.RETURN) {
+                method.instructions.insertBefore(instruction,
+                        new MethodInsnNode(
+                                Opcodes.INVOKESTATIC,
+                                LOTR_MAP_ROTATION_HOOK_OWNER,
+                                "endSheetPass", "()V"));
+                injected = true;
+            }
+            instruction = next;
+        }
+        if (injected) {
+            InsnList hook = new InsnList();
+            hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+            hook.add(new MethodInsnNode(
+                    Opcodes.INVOKESTATIC,
+                    LOTR_MAP_ROTATION_HOOK_OWNER,
+                    "beginSheetPass",
+                    "(Llotr/client/gui/LOTRGuiMap;)V"));
+            method.instructions.insert(hook);
+            info("Patched LOTR map labels to turn with the map sheet");
+        }
+        return injected;
+    }
+
+    private static boolean injectLotrMapRotation(MethodNode method) {
+        boolean injected = false;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null;) {
+            AbstractInsnNode next = instruction.getNext();
+            if (instruction.getOpcode() == Opcodes.ARETURN) {
+                InsnList hook = new InsnList();
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                hook.add(new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        LOTR_MAP_ROTATION_HOOK_OWNER,
+                        "rotate",
+                        "([FLlotr/client/gui/LOTRGuiMap;)[F"));
+                method.instructions.insertBefore(instruction, hook);
+                injected = true;
+            }
+            instruction = next;
+        }
+        if (injected) {
+            info("Patched LOTR map coordinates with Lost Tales rotation");
+        }
+        return injected;
     }
 
     private static boolean injectLotrMapFullscreenBounds(MethodNode method) {

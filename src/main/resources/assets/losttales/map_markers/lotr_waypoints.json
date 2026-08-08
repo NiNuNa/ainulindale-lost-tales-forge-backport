@@ -56,7 +56,7 @@
     },
     {
       "id": "lotr:waypoint:meneltarma_summit",
-      "name": "Meneltarma Summit",
+      "name": "Meneltarma",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -578,7 +578,7 @@
     },
     {
       "id": "lotr:waypoint:mithlond_north",
-      "name": "Mithlond North",
+      "name": "North Mithlond",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -596,7 +596,7 @@
     },
     {
       "id": "lotr:waypoint:mithlond_south",
-      "name": "Mithlond South",
+      "name": "South Mithlond",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -650,7 +650,7 @@
     },
     {
       "id": "lotr:waypoint:tower_hills",
-      "name": "Tower Hills",
+      "name": "Elostirion",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -758,7 +758,7 @@
     },
     {
       "id": "lotr:waypoint:thorin_halls",
-      "name": "Thorin Halls",
+      "name": "Thorin's Halls",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -776,7 +776,7 @@
     },
     {
       "id": "lotr:waypoint:arvedui_mines",
-      "name": "Arvedui Mines",
+      "name": "Arvedui's Mines",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -794,7 +794,7 @@
     },
     {
       "id": "lotr:waypoint:thrain_halls",
-      "name": "Thrain Halls",
+      "name": "Thráin's Halls",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -902,7 +902,7 @@
     },
     {
       "id": "lotr:waypoint:annuminas",
-      "name": "Annuminas",
+      "name": "Annúminas",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1064,7 +1064,7 @@
     },
     {
       "id": "lotr:waypoint:old_elf_way",
-      "name": "Old Elf Way",
+      "name": "Old Elven Way",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1100,7 +1100,7 @@
     },
     {
       "id": "lotr:waypoint:ford_bruinen",
-      "name": "Ford Bruinen",
+      "name": "Ford of Bruinen",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1118,7 +1118,7 @@
     },
     {
       "id": "lotr:waypoint:the_trollshaws",
-      "name": "The Trollshaws",
+      "name": "Trollshaws",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1136,7 +1136,7 @@
     },
     {
       "id": "lotr:waypoint:carn_dum",
-      "name": "Carn Dum",
+      "name": "Carn Dûm",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1172,7 +1172,7 @@
     },
     {
       "id": "lotr:waypoint:ost_in_edhil",
-      "name": "Ost In Edhil",
+      "name": "Ost-in-Edhil",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1190,7 +1190,7 @@
     },
     {
       "id": "lotr:waypoint:north_dunland",
-      "name": "North Dunland",
+      "name": "Duneard",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1208,7 +1208,7 @@
     },
     {
       "id": "lotr:waypoint:south_dunland",
-      "name": "South Dunland",
+      "name": "Firwold",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1298,7 +1298,7 @@
     },
     {
       "id": "lotr:waypoint:enedwaith_road",
-      "name": "Enedwaith Road",
+      "name": "Old South Road",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1316,7 +1316,7 @@
     },
     {
       "id": "lotr:waypoint:mouths_isen",
-      "name": "Mouths Isen",
+      "name": "Mouths of Isen",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1568,7 +1568,7 @@
     },
     {
       "id": "lotr:waypoint:dains_halls",
-      "name": "Dain's Halls",
+      "name": "Dáin's Halls",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1586,7 +1586,7 @@
     },
     {
       "id": "lotr:waypoint:scatha",
-      "name": "Scatha",
+      "name": "Scatha's Lair",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1640,7 +1640,7 @@
     },
     {
       "id": "lotr:waypoint:gladden_fields",
-      "name": "Gladden Fields",
+      "name": "Gladden Confluence",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1712,7 +1712,7 @@
     },
     {
       "id": "lotr:waypoint:beorn",
-      "name": "Beorn",
+      "name": "Beorn's Hall",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1766,7 +1766,7 @@
     },
     {
       "id": "lotr:waypoint:anduin_crossroads",
-      "name": "Anduin Crossroads",
+      "name": "Crossroads of Anduin",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1784,7 +1784,7 @@
     },
     {
       "id": "lotr:waypoint:east_rhovanion_road",
-      "name": "East Rhovanion Road",
+      "name": "East Rhovanion Gate",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1838,7 +1838,7 @@
     },
     {
       "id": "lotr:waypoint:mirkwood_mountains",
-      "name": "Mirkwood Mountains",
+      "name": "Mountains of Mirkwood",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -1982,7 +1982,7 @@
     },
     {
       "id": "lotr:waypoint:dale_city",
-      "name": "Dale City",
+      "name": "Dale",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2054,7 +2054,7 @@
     },
     {
       "id": "lotr:waypoint:dale_crossroads",
-      "name": "Dale Crossroads",
+      "name": "Great Dalish Crossroads",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2072,7 +2072,7 @@
     },
     {
       "id": "lotr:waypoint:dale_port",
-      "name": "Dale Port",
+      "name": "Bardhaven",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2162,7 +2162,7 @@
     },
     {
       "id": "lotr:waypoint:nimrodel",
-      "name": "Nimrodel",
+      "name": "House of Nimrodel",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2216,7 +2216,7 @@
     },
     {
       "id": "lotr:waypoint:treebeard_hill",
-      "name": "Treebeard Hill",
+      "name": "Treebeard's Hill",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2234,7 +2234,7 @@
     },
     {
       "id": "lotr:waypoint:wold",
-      "name": "Wold",
+      "name": "Woldhall",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2288,7 +2288,7 @@
     },
     {
       "id": "lotr:waypoint:helms_crossroads",
-      "name": "Helm's Crossroads",
+      "name": "Deeping-coomb",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2414,7 +2414,7 @@
     },
     {
       "id": "lotr:waypoint:corsairs_landing",
-      "name": "Corsairs' Landing",
+      "name": "Corsair's Landing",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2432,7 +2432,7 @@
     },
     {
       "id": "lotr:waypoint:freca_hold",
-      "name": "Freca Hold",
+      "name": "Freca's Hold",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2468,7 +2468,7 @@
     },
     {
       "id": "lotr:waypoint:tarlang",
-      "name": "Tarlang",
+      "name": "Tarlang's Neck",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2576,7 +2576,7 @@
     },
     {
       "id": "lotr:waypoint:minrimmon",
-      "name": "Minrimmon",
+      "name": "Min-Rimmon",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2648,7 +2648,7 @@
     },
     {
       "id": "lotr:waypoint:amon_din",
-      "name": "Amon Din",
+      "name": "Amon Dîn",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2666,7 +2666,7 @@
     },
     {
       "id": "lotr:waypoint:osgiliath_west",
-      "name": "Osgiliath West",
+      "name": "West Osgiliath",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2684,7 +2684,7 @@
     },
     {
       "id": "lotr:waypoint:osgiliath_east",
-      "name": "Osgiliath East",
+      "name": "East Osgiliath",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2720,7 +2720,7 @@
     },
     {
       "id": "lotr:waypoint:henneth_annun",
-      "name": "Henneth Annun",
+      "name": "Henneth Annûn",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2738,7 +2738,7 @@
     },
     {
       "id": "lotr:waypoint:crossroads_ithilien",
-      "name": "Crossroads Ithilien",
+      "name": "Crossroads of the Fallen King",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2828,7 +2828,7 @@
     },
     {
       "id": "lotr:waypoint:anduin_mouth",
-      "name": "Anduin Mouth",
+      "name": "Ethir Anduin",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2864,7 +2864,7 @@
     },
     {
       "id": "lotr:waypoint:crossings_erui",
-      "name": "Crossings Erui",
+      "name": "Crossings of Erui",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -2936,7 +2936,7 @@
     },
     {
       "id": "lotr:waypoint:green_hills",
-      "name": "Green Hills",
+      "name": "Pinnath Gelin",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3008,7 +3008,7 @@
     },
     {
       "id": "lotr:waypoint:tolfalas_island",
-      "name": "Tolfalas Island",
+      "name": "Tolfalas",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3116,7 +3116,7 @@
     },
     {
       "id": "lotr:waypoint:morannon",
-      "name": "Morannon",
+      "name": "Black Gate",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3134,7 +3134,7 @@
     },
     {
       "id": "lotr:waypoint:udun",
-      "name": "Udun",
+      "name": "Valley of Udûn",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3170,7 +3170,7 @@
     },
     {
       "id": "lotr:waypoint:barad_dur",
-      "name": "Barad Dur",
+      "name": "Barad-dûr",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3260,7 +3260,7 @@
     },
     {
       "id": "lotr:waypoint:morigost",
-      "name": "Morigost",
+      "name": "Mornost",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3278,7 +3278,7 @@
     },
     {
       "id": "lotr:waypoint:nargroth",
-      "name": "Nargroth",
+      "name": "Narroth",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3332,7 +3332,7 @@
     },
     {
       "id": "lotr:waypoint:fellbeasts",
-      "name": "Fellbeasts",
+      "name": "Vale of the Fell Beasts",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3368,7 +3368,7 @@
     },
     {
       "id": "lotr:waypoint:nurnen_northern_shore",
-      "name": "Núrnen Northern Shore",
+      "name": "Fornurnen",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3386,7 +3386,7 @@
     },
     {
       "id": "lotr:waypoint:nurnen_southern_shore",
-      "name": "Núrnen Southern Shore",
+      "name": "Harnurnen",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3404,7 +3404,7 @@
     },
     {
       "id": "lotr:waypoint:nurnen_western_shore",
-      "name": "Núrnen Western Shore",
+      "name": "Dunurnen",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3422,7 +3422,7 @@
     },
     {
       "id": "lotr:waypoint:nurnen_eastern_shore",
-      "name": "Núrnen Eastern Shore",
+      "name": "Rhunurnen",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3440,7 +3440,7 @@
     },
     {
       "id": "lotr:waypoint:thaurband",
-      "name": "Thaurband",
+      "name": "Thorband",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3476,7 +3476,7 @@
     },
     {
       "id": "lotr:waypoint:dorwinion_port",
-      "name": "Dorwinion Port",
+      "name": "Mirulond",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3494,7 +3494,7 @@
     },
     {
       "id": "lotr:waypoint:dorwinion_court",
-      "name": "Dorwinion Court",
+      "name": "Vintner Court",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3512,7 +3512,7 @@
     },
     {
       "id": "lotr:waypoint:dorwinion_ford",
-      "name": "Dorwinion Ford",
+      "name": "Golden Ford",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3530,7 +3530,7 @@
     },
     {
       "id": "lotr:waypoint:dorwinion_hills",
-      "name": "Dorwinion Hills",
+      "name": "Amon Gwîn",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3548,7 +3548,7 @@
     },
     {
       "id": "lotr:waypoint:rhun_road_way",
-      "name": "Rhûn Road Way",
+      "name": "Redway",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3566,7 +3566,7 @@
     },
     {
       "id": "lotr:waypoint:balcaras",
-      "name": "Balcaras",
+      "name": "Balcharas",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3584,7 +3584,7 @@
     },
     {
       "id": "lotr:waypoint:khand_north_road",
-      "name": "Khand North Road",
+      "name": "North Khand Road",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3602,7 +3602,7 @@
     },
     {
       "id": "lotr:waypoint:rhun_capital",
-      "name": "Rhûn Capital",
+      "name": "Rhúnost",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3620,7 +3620,7 @@
     },
     {
       "id": "lotr:waypoint:khamul_tower",
-      "name": "Khamul Tower",
+      "name": "Khamûl's Tower",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3638,7 +3638,7 @@
     },
     {
       "id": "lotr:waypoint:mordor_ford",
-      "name": "Mordor Ford",
+      "name": "Ashen Ford",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3656,7 +3656,7 @@
     },
     {
       "id": "lotr:waypoint:rhun_north_city",
-      "name": "Rhûn North City",
+      "name": "Atalak",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3692,7 +3692,7 @@
     },
     {
       "id": "lotr:waypoint:border_town",
-      "name": "Border Town",
+      "name": "Taragal",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3710,7 +3710,7 @@
     },
     {
       "id": "lotr:waypoint:rhun_sea_city",
-      "name": "Rhûn Sea City",
+      "name": "Belrhuk",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3728,7 +3728,7 @@
     },
     {
       "id": "lotr:waypoint:rhun_north_ford",
-      "name": "Rhûn North Ford",
+      "name": "Ford of Forunen",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3746,7 +3746,7 @@
     },
     {
       "id": "lotr:waypoint:rhun_northeast",
-      "name": "Rhûn Northeast",
+      "name": "Northern Marches",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3764,7 +3764,7 @@
     },
     {
       "id": "lotr:waypoint:rhun_south_pass",
-      "name": "Rhûn South Pass",
+      "name": "Pass of Rhúdel",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3782,7 +3782,7 @@
     },
     {
       "id": "lotr:waypoint:rhun_east_city",
-      "name": "Rhûn East City",
+      "name": "Karslan",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3800,7 +3800,7 @@
     },
     {
       "id": "lotr:waypoint:rhun_east_town",
-      "name": "Rhûn East Town",
+      "name": "Karanoda",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3818,7 +3818,7 @@
     },
     {
       "id": "lotr:waypoint:rhun_southeast",
-      "name": "Rhûn Southeast",
+      "name": "Southern Marches",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3836,7 +3836,7 @@
     },
     {
       "id": "lotr:waypoint:baraz_dum",
-      "name": "Baraz Dum",
+      "name": "Baraz-tûm",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3854,7 +3854,7 @@
     },
     {
       "id": "lotr:waypoint:crossings_of_harad",
-      "name": "Crossings of Harad",
+      "name": "Crossings of Harnen",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3872,7 +3872,7 @@
     },
     {
       "id": "lotr:waypoint:harnen_sea_town",
-      "name": "Harnen Sea Town",
+      "name": "Bêlkadar",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3890,7 +3890,7 @@
     },
     {
       "id": "lotr:waypoint:harnen_road_town",
-      "name": "Harnen Road Town",
+      "name": "An-batîna",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3908,7 +3908,7 @@
     },
     {
       "id": "lotr:waypoint:harnen_black_town",
-      "name": "Harnen Black Town",
+      "name": "Ugrî-zadîn",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3944,7 +3944,7 @@
     },
     {
       "id": "lotr:waypoint:harnen_river_town",
-      "name": "Harnen River Town",
+      "name": "Ninzadîn",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3962,7 +3962,7 @@
     },
     {
       "id": "lotr:waypoint:khand_ford",
-      "name": "Khand Ford",
+      "name": "Khandwater Ford",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3980,7 +3980,7 @@
     },
     {
       "id": "lotr:waypoint:umbar_city",
-      "name": "Umbar City",
+      "name": "Umbar",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -3998,7 +3998,7 @@
     },
     {
       "id": "lotr:waypoint:umbar_gate",
-      "name": "Umbar Gate",
+      "name": "Gate of Umbar",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4016,7 +4016,7 @@
     },
     {
       "id": "lotr:waypoint:gate_herumor",
-      "name": "Gate Herumor",
+      "name": "Anât an-Khôrumor",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4034,7 +4034,7 @@
     },
     {
       "id": "lotr:waypoint:cedar_road",
-      "name": "Cedar Road",
+      "name": "Cedar-woods",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4052,7 +4052,7 @@
     },
     {
       "id": "lotr:waypoint:fertile_valley",
-      "name": "Fertile Valley",
+      "name": "Ajtiaz an-Ahâr",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4070,7 +4070,7 @@
     },
     {
       "id": "lotr:waypoint:gardens_beruthiel",
-      "name": "Gardens Beruthiel",
+      "name": "Gardens of Barûphel",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4088,7 +4088,7 @@
     },
     {
       "id": "lotr:waypoint:ain_al_harad",
-      "name": "Ain Al Harad",
+      "name": "Ain an-Ahâr",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4106,7 +4106,7 @@
     },
     {
       "id": "lotr:waypoint:gate_fuinur",
-      "name": "Gate Fuinur",
+      "name": "Anât an-Phôinûr",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4124,7 +4124,7 @@
     },
     {
       "id": "lotr:waypoint:coast_fortress",
-      "name": "Coast Fortress",
+      "name": "Gâth-azrazâin",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4142,7 +4142,7 @@
     },
     {
       "id": "lotr:waypoint:sandhill_town",
-      "name": "Sandhill Town",
+      "name": "Lîpha-tûn",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4160,7 +4160,7 @@
     },
     {
       "id": "lotr:waypoint:coast_river_town",
-      "name": "Coast River Town",
+      "name": "Tawînen",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4178,7 +4178,7 @@
     },
     {
       "id": "lotr:waypoint:coast_city",
-      "name": "Coast City",
+      "name": "Nurêmin",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4196,7 +4196,7 @@
     },
     {
       "id": "lotr:waypoint:desert_town",
-      "name": "Desert Town",
+      "name": "Ijdi-ilel",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4214,7 +4214,7 @@
     },
     {
       "id": "lotr:waypoint:south_desert_town",
-      "name": "South Desert Town",
+      "name": "Izêm-ulzuz",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4232,7 +4232,7 @@
     },
     {
       "id": "lotr:waypoint:desert_river_town",
-      "name": "Desert River Town",
+      "name": "Ayûkaph-amâm",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4250,7 +4250,7 @@
     },
     {
       "id": "lotr:waypoint:gulf_of_harad",
-      "name": "Gulf of Harad",
+      "name": "Arminazûl",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4268,7 +4268,7 @@
     },
     {
       "id": "lotr:waypoint:gulf_city",
-      "name": "Gulf City",
+      "name": "Khôpakadar",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4286,7 +4286,7 @@
     },
     {
       "id": "lotr:waypoint:gulf_ford",
-      "name": "Gulf Ford",
+      "name": "Bridge of Harlanhir",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4304,7 +4304,7 @@
     },
     {
       "id": "lotr:waypoint:gulf_trade_town",
-      "name": "Gulf Trade Town",
+      "name": "Bakrîzad",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4322,7 +4322,7 @@
     },
     {
       "id": "lotr:waypoint:gulf_north_town",
-      "name": "Gulf North Town",
+      "name": "Yaphurushi",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4340,7 +4340,7 @@
     },
     {
       "id": "lotr:waypoint:gulf_east_bay",
-      "name": "Gulf East Bay",
+      "name": "Topaz Bay",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4358,7 +4358,7 @@
     },
     {
       "id": "lotr:waypoint:gulf_east_port",
-      "name": "Gulf East Port",
+      "name": "Ephalôn",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4376,7 +4376,7 @@
     },
     {
       "id": "lotr:waypoint:mount_sand",
-      "name": "Mount Sand",
+      "name": "Mount Athras",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4394,7 +4394,7 @@
     },
     {
       "id": "lotr:waypoint:mount_green",
-      "name": "Mount Green",
+      "name": "Mount Laegras",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4412,7 +4412,7 @@
     },
     {
       "id": "lotr:waypoint:mount_thunder",
-      "name": "Mount Thunder",
+      "name": "Mount Belegwaeras",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4430,7 +4430,7 @@
     },
     {
       "id": "lotr:waypoint:great_plains_north",
-      "name": "Great Plains North",
+      "name": "Hunters' Haunt",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4448,7 +4448,7 @@
     },
     {
       "id": "lotr:waypoint:great_plains_south",
-      "name": "Great Plains South",
+      "name": "Deep Harad",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4466,7 +4466,7 @@
     },
     {
       "id": "lotr:waypoint:great_plains_west",
-      "name": "Great Plains West",
+      "name": "Upper Floodplains",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4484,7 +4484,7 @@
     },
     {
       "id": "lotr:waypoint:great_plains_east",
-      "name": "Great Plains East",
+      "name": "Hill of the Sun",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4502,7 +4502,7 @@
     },
     {
       "id": "lotr:waypoint:green_valley",
-      "name": "Green Valley",
+      "name": "Nan Harnagorath",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4520,7 +4520,7 @@
     },
     {
       "id": "lotr:waypoint:harad_lakes",
-      "name": "Harad Lakes",
+      "name": "Nin Haecharad",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4538,7 +4538,7 @@
     },
     {
       "id": "lotr:waypoint:lake_harad",
-      "name": "Lake Harad",
+      "name": "Chunha",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4556,7 +4556,7 @@
     },
     {
       "id": "lotr:waypoint:haraduin_mouth",
-      "name": "Haraduin Mouth",
+      "name": "Ethir Haraduin",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4574,7 +4574,7 @@
     },
     {
       "id": "lotr:waypoint:isle_mist",
-      "name": "Isle Mist",
+      "name": "Tol Hîth",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4592,7 +4592,7 @@
     },
     {
       "id": "lotr:waypoint:taurelonde",
-      "name": "Taurelonde",
+      "name": "Taurelondë",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4610,7 +4610,7 @@
     },
     {
       "id": "lotr:waypoint:harad_horn",
-      "name": "Harad Horn",
+      "name": "Horn of Harad",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4628,7 +4628,7 @@
     },
     {
       "id": "lotr:waypoint:town_bones",
-      "name": "Town Bones",
+      "name": "Town of Bones",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4646,7 +4646,7 @@
     },
     {
       "id": "lotr:waypoint:haraduin_bridge",
-      "name": "Haraduin Bridge",
+      "name": "Bridge of Haraduin",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4664,7 +4664,7 @@
     },
     {
       "id": "lotr:waypoint:jungle_city_trade",
-      "name": "Jungle City Trade",
+      "name": "Otoch Kâh",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4682,7 +4682,7 @@
     },
     {
       "id": "lotr:waypoint:jungle_city_old",
-      "name": "Jungle City Old",
+      "name": "Ya'ash Kâh",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4700,7 +4700,7 @@
     },
     {
       "id": "lotr:waypoint:jungle_city_north",
-      "name": "Jungle City North",
+      "name": "Shaman Pâh",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4718,7 +4718,7 @@
     },
     {
       "id": "lotr:waypoint:jungle_city_east",
-      "name": "Jungle City East",
+      "name": "Lakin Pâh",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4736,7 +4736,7 @@
     },
     {
       "id": "lotr:waypoint:jungle_city_capital",
-      "name": "Jungle City Capital",
+      "name": "Nohoch Kâh",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4754,7 +4754,7 @@
     },
     {
       "id": "lotr:waypoint:jungle_city_deep",
-      "name": "Jungle City Deep",
+      "name": "Mûmakâh",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4772,7 +4772,7 @@
     },
     {
       "id": "lotr:waypoint:jungle_city_watch",
-      "name": "Jungle City Watch",
+      "name": "Pishan Kâh",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4790,7 +4790,7 @@
     },
     {
       "id": "lotr:waypoint:jungle_city_caves",
-      "name": "Jungle City Caves",
+      "name": "Aktun Kâh",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4808,7 +4808,7 @@
     },
     {
       "id": "lotr:waypoint:jungle_city_stone",
-      "name": "Jungle City Stone",
+      "name": "Tûnich Kâh",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4826,7 +4826,7 @@
     },
     {
       "id": "lotr:waypoint:jungle_lakes",
-      "name": "Jungle Lakes",
+      "name": "Emerald Lakes",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4844,7 +4844,7 @@
     },
     {
       "id": "lotr:waypoint:troll_island",
-      "name": "Troll Island",
+      "name": "Tol Torog",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4862,7 +4862,7 @@
     },
     {
       "id": "lotr:waypoint:black_coast",
-      "name": "Black Coast",
+      "name": "Durfalas",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4880,7 +4880,7 @@
     },
     {
       "id": "lotr:waypoint:blood_river",
-      "name": "Blood River",
+      "name": "Sereghir",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4898,7 +4898,7 @@
     },
     {
       "id": "lotr:waypoint:shadow_point",
-      "name": "Shadow Point",
+      "name": "Hardorogost",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
@@ -4916,7 +4916,7 @@
     },
     {
       "id": "lotr:waypoint:old_jungle_ruin",
-      "name": "Old Jungle Ruin",
+      "name": "Kimen Kâh",
       "relevance": "medium",
       "icon": "town",
       "color": "white",
