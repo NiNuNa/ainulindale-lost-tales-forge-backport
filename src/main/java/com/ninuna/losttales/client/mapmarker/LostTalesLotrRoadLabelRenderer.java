@@ -181,6 +181,19 @@ final class LostTalesLotrRoadLabelRenderer {
             this.mapYMax = mapYMax;
         }
 
+        /**
+         * Draws the road names as part of the sheet.
+         *
+         * <p>A road name is ink on the paper, exactly as a region name is, so
+         * it goes under the same matrix and turns, leans and foreshortens with
+         * the ground. It used to be drawn in screen space with the map's turn
+         * undone by hand, which kept the letters level but let the name swim
+         * away from the road under it the moment the map was tilted.</p>
+         *
+         * <p>Inside the pass the shared coordinate transform stands down — the
+         * matrix is already moving these positions — so everything worked out
+         * here is in the sheet's own flat space.</p>
+         */
         void render() {
             float zoomVisibility = clamp((this.zoomExp + 1.0F) / 4.0F);
             if (zoomVisibility <= 0.0F || !(this.zoomScale > 0.0F)) {
@@ -188,6 +201,7 @@ final class LostTalesLotrRoadLabelRenderer {
                         new HashSet<String>());
                 return;
             }
+            LostTalesLotrMapRotation.beginSheetPass(this.gui);
             try {
                 List<LabelCandidate> candidates = collectCandidates(
                         zoomVisibility);
@@ -207,7 +221,23 @@ final class LostTalesLotrRoadLabelRenderer {
             } catch (Throwable ignored) {
                 // Road labels are decorative; the already-rendered roads and
                 // every other native map feature remain available.
+            } finally {
+                LostTalesLotrMapRotation.endSheetPass();
             }
+        }
+
+        /**
+         * How far past the viewport a name may sit and still be drawn.
+         *
+         * <p>Positions here are on the flat sheet, which is cut larger than
+         * the viewport so a turned or leaning map has ground to show. Culling
+         * against the viewport itself would drop the names that the tilt is
+         * about to bring into view.</p>
+         */
+        private float cullMargin() {
+            return (LostTalesLotrMapRotation.maxCoverage(
+                    this.mapWidth, this.mapHeight)
+                    - Math.min(this.mapWidth, this.mapHeight)) * 0.5F;
         }
 
         private List<LabelCandidate> collectCandidates(
@@ -245,7 +275,7 @@ final class LostTalesLotrRoadLabelRenderer {
                     LOTRRoads.RoadPoint point = points[pointIndex];
                     float[] position = transform(point.x, point.z);
                     float radius = ((float)textWidth + LABEL_PADDING)
-                            * zoomVisibility * 0.55F;
+                            * zoomVisibility * 0.55F + cullMargin();
                     if (position[0] < this.mapXMin - radius
                             || position[0] > this.mapXMax + radius
                             || position[1] < this.mapYMin - radius
@@ -258,10 +288,10 @@ final class LostTalesLotrRoadLabelRenderer {
                             0, pointIndex - tangent)];
                     LOTRRoads.RoadPoint after = points[Math.min(
                             points.length - 1, pointIndex + tangent)];
+                    // No compensation for the map's own turn: the sheet matrix
+                    // carries the name round with the road it names.
                     float angle = uprightAngle(
-                            after.x - before.x,
-                            after.z - before.z,
-                            LostTalesLotrMapRotation.degreesOf(this.gui));
+                            after.x - before.x, after.z - before.z);
                     String key = road.roadName + ':' + roadIndex
                             + ':' + pointIndex;
                     candidates.add(new LabelCandidate(
@@ -306,26 +336,26 @@ final class LostTalesLotrRoadLabelRenderer {
         }
 
         /**
-         * A road point in screen space, on the sheet as it is actually drawn.
+         * A road point on the flat sheet.
          *
          * <p>This repeats LOTR's own map-space conversion because the anchors
          * are chosen from world coordinates rather than from the points LOTR
-         * happens to be drawing, but the turn and the lean are not repeated
-         * here: the result goes through the same one place that moves every
-         * other position on the map, so a road name cannot come loose from
-         * the road under it.</p>
+         * happens to be drawing. The turn and the lean are deliberately not
+         * applied: the whole pass is drawn under the sheet matrix, and doing
+         * both would carry every name twice as far as the road it belongs
+         * to.</p>
          */
         private float[] transform(double worldX, double worldZ) {
             float mapX = (float)(worldX / LOTRGenLayerWorld.scale)
                     + 810.0F;
             float mapY = (float)(worldZ / LOTRGenLayerWorld.scale)
                     + 730.0F;
-            float screenX = (mapX - this.posX) * this.zoomScale
-                    + this.mapXMin + this.mapWidth / 2.0F;
-            float screenY = (mapY - this.posY) * this.zoomScale
-                    + this.mapYMin + this.mapHeight / 2.0F;
-            return LostTalesLotrMapRotation.rotate(
-                    new float[] {screenX, screenY}, this.gui);
+            return new float[] {
+                    (mapX - this.posX) * this.zoomScale
+                            + this.mapXMin + this.mapWidth / 2.0F,
+                    (mapY - this.posY) * this.zoomScale
+                            + this.mapYMin + this.mapHeight / 2.0F
+            };
         }
 
         /**
@@ -417,20 +447,13 @@ final class LostTalesLotrRoadLabelRenderer {
     }
 
     /**
-     * The tangent angle of a road on a map that has been turned.
+     * The tangent angle of a road, folded so the name reads left to right.
      *
-     * <p>The turn is added before the name is made readable rather than
-     * after, so a road that a small turn pushes past vertical flips once and
-     * stays the right way up instead of standing on its head.</p>
+     * <p>Worked out on the flat sheet only. The map's own turn used to be
+     * added here so the letters could be drawn level in screen space; now the
+     * name is drawn on the sheet with everything else, the matrix carries it
+     * round, and adding the turn here as well would count it twice.</p>
      */
-    static float uprightAngle(double dx, double dz, float mapDegrees) {
-        return uprightAngle(
-                dx * Math.cos(Math.toRadians(mapDegrees))
-                        - dz * Math.sin(Math.toRadians(mapDegrees)),
-                dx * Math.sin(Math.toRadians(mapDegrees))
-                        + dz * Math.cos(Math.toRadians(mapDegrees)));
-    }
-
     static float uprightAngle(double dx, double dz) {
         float angle = (float)Math.toDegrees(Math.atan2(dz, dx));
         while (angle > 90.0F) {

@@ -145,27 +145,50 @@ public final class LostTalesLotrMapRotationTest {
     public void leaningSpreadsTheNearEdgeAndDrawsInTheFarOne() {
         float coefficient = LostTalesLotrMapRotation.leanCoefficient(
                 1.0F, 360.0F);
+        float scaleY = LostTalesLotrMapRotation.leanScaleY(1.0F);
         assertTrue("leaning must divide, not multiply", coefficient < 0.0F);
 
         float[] centre = { CENTER_X, CENTER_Y };
         LostTalesLotrMapRotation.applyLean(
-                centre, CENTER_X, CENTER_Y, coefficient);
+                centre, CENTER_X, CENTER_Y, coefficient, scaleY);
         assertEquals(CENTER_X, centre[0], 0.0001F);
         assertEquals(CENTER_Y, centre[1], 0.0001F);
 
         float[] near = { CENTER_X + 100.0F, CENTER_Y + 180.0F };
         LostTalesLotrMapRotation.applyLean(
-                near, CENTER_X, CENTER_Y, coefficient);
+                near, CENTER_X, CENTER_Y, coefficient, scaleY);
         assertTrue("the near corner must spread outward",
                 near[0] > CENTER_X + 100.0F);
         assertTrue(near[1] > CENTER_Y + 180.0F);
 
         float[] far = { CENTER_X + 100.0F, CENTER_Y - 180.0F };
         LostTalesLotrMapRotation.applyLean(
-                far, CENTER_X, CENTER_Y, coefficient);
+                far, CENTER_X, CENTER_Y, coefficient, scaleY);
         assertTrue("the far corner must draw inward",
                 far[0] < CENTER_X + 100.0F);
         assertTrue(far[1] > CENTER_Y - 180.0F);
+    }
+
+    /**
+     * The half of the tilt that was missing: a leaning sheet has to lie down
+     * as well as keystone, or it reads as warped paper rather than as a
+     * surface being looked at from an angle.
+     */
+    @Test
+    public void leaningAlsoLaysTheSheetDown() {
+        assertEquals("a flat map is not foreshortened at all", 1.0F,
+                LostTalesLotrMapRotation.leanScaleY(0.0F), 0.0F);
+        float previous = 1.0F;
+        for (float lean = 0.1F; lean <= 1.0F; lean += 0.1F) {
+            float scaleY = LostTalesLotrMapRotation.leanScaleY(lean);
+            assertTrue("the sheet must recede as the eye drops",
+                    scaleY < previous);
+            assertTrue(scaleY > 0.0F);
+            previous = scaleY;
+        }
+        assertEquals((float)Math.cos(Math.toRadians(
+                        LostTalesLotrMapRotation.MAX_PITCH_DEGREES)),
+                LostTalesLotrMapRotation.leanScaleY(1.0F), 0.0001F);
     }
 
     @Test
@@ -173,15 +196,56 @@ public final class LostTalesLotrMapRotationTest {
         for (float lean = 0.0F; lean <= 1.0F; lean += 0.25F) {
             float coefficient = LostTalesLotrMapRotation.leanCoefficient(
                     lean, 360.0F);
+            float scaleY = LostTalesLotrMapRotation.leanScaleY(lean);
             for (float offset = -170.0F; offset <= 170.0F; offset += 85.0F) {
                 float[] point = { CENTER_X + 60.0F, CENTER_Y + offset };
                 LostTalesLotrMapRotation.applyLean(
-                        point, CENTER_X, CENTER_Y, coefficient);
+                        point, CENTER_X, CENTER_Y, coefficient, scaleY);
                 LostTalesLotrMapRotation.removeLean(
-                        point, CENTER_X, CENTER_Y, coefficient);
+                        point, CENTER_X, CENTER_Y, coefficient, scaleY);
 
                 assertEquals(CENTER_X + 60.0F, point[0], 0.01F);
                 assertEquals(CENTER_Y + offset, point[1], 0.01F);
+            }
+        }
+    }
+
+    /**
+     * What the player actually does: turn and lean at once, then click. The
+     * pointer has to resolve to the ground that was drawn under it, or every
+     * marker on a tilted map is a near miss.
+     */
+    @Test
+    public void turningAndLeaningTogetherStaysExactlyReversible() {
+        for (float degrees = -LostTalesLotrMapRotation.MAX_DEGREES;
+             degrees <= LostTalesLotrMapRotation.MAX_DEGREES;
+             degrees += 11.25F) {
+            for (float lean = 0.0F; lean <= 1.0F; lean += 0.5F) {
+                float coefficient = LostTalesLotrMapRotation.leanCoefficient(
+                        lean, 360.0F);
+                float scaleY = LostTalesLotrMapRotation.leanScaleY(lean);
+                for (float offsetX = -280.0F; offsetX <= 280.0F;
+                     offsetX += 140.0F) {
+                    for (float offsetY = -160.0F; offsetY <= 160.0F;
+                         offsetY += 80.0F) {
+                        float[] point = {
+                                CENTER_X + offsetX, CENTER_Y + offsetY
+                        };
+                        LostTalesLotrMapRotation.rotateAbout(
+                                point, CENTER_X, CENTER_Y, degrees);
+                        LostTalesLotrMapRotation.applyLean(
+                                point, CENTER_X, CENTER_Y,
+                                coefficient, scaleY);
+                        LostTalesLotrMapRotation.removeLean(
+                                point, CENTER_X, CENTER_Y,
+                                coefficient, scaleY);
+                        LostTalesLotrMapRotation.rotateAbout(
+                                point, CENTER_X, CENTER_Y, -degrees);
+
+                        assertEquals(CENTER_X + offsetX, point[0], 0.05F);
+                        assertEquals(CENTER_Y + offsetY, point[1], 0.05F);
+                    }
+                }
             }
         }
     }
@@ -191,13 +255,91 @@ public final class LostTalesLotrMapRotationTest {
         float[] point = { 12.0F, 34.0F };
         LostTalesLotrMapRotation.applyLean(
                 point, CENTER_X, CENTER_Y,
-                LostTalesLotrMapRotation.leanCoefficient(0.0F, 360.0F));
+                LostTalesLotrMapRotation.leanCoefficient(0.0F, 360.0F),
+                LostTalesLotrMapRotation.leanScaleY(0.0F));
 
         assertEquals(12.0F, point[0], 0.0F);
         assertEquals(34.0F, point[1], 0.0F);
         assertEquals(1.0F,
                 LostTalesLotrMapRotation.leanCoverage(0.0F), 0.0F);
         assertTrue(LostTalesLotrMapRotation.leanCoverage(1.0F) > 1.0F);
+    }
+
+    /**
+     * The complaint this was written for: an axis near its limit that is
+     * dragged back towards square has to come back at once. The stiffness is
+     * there to make the limit feel deliberate, not to make leaving it a
+     * chore.
+     */
+    @Test
+    public void reversingATurnIsNotResistedByTheLimit() {
+        float step = LostTalesLotrMapRotation.inputPerPixel();
+        float atSquare = degreesMoved(0.0F, step);
+        float outwardWayOut = degreesMoved(0.5F, step);
+        float inwardWayOut = degreesMoved(0.5F, -step);
+
+        assertTrue("the map must still stiffen on the way out",
+                outwardWayOut < atSquare * 0.5F);
+        assertEquals("coming back must move as freely as leaving square did",
+                atSquare, inwardWayOut, atSquare * 0.05F);
+        assertTrue("reversal must be the immediate direction",
+                inwardWayOut > outwardWayOut * 3.0F);
+    }
+
+    /**
+     * The release is a release, not a slingshot: however far out the map is,
+     * one pixel of drag back towards square may never unwind more than the
+     * whole gesture would.
+     */
+    @Test
+    public void theReleaseIsBoundedRightUpToTheLimit() {
+        float step = LostTalesLotrMapRotation.inputPerPixel();
+        float atSquare = degreesMoved(0.0F, step);
+        for (float input = 0.1F; input <= 1.0F; input += 0.1F) {
+            float inward = degreesMoved(input, -step);
+            assertTrue("the release outran the map at " + input,
+                    inward <= atSquare * 1.1F);
+            assertTrue("the release stalled at " + input, inward > 0.0F);
+        }
+    }
+
+    /** How far one drag actually turns the map, in degrees, before easing. */
+    private static float degreesMoved(float input, float delta) {
+        return Math.abs(
+                LostTalesLotrMapRotation.MAX_DEGREES
+                        * (LostTalesLotrMapRotation.resist(
+                                Math.abs(LostTalesLotrMapRotation
+                                        .advanceInput(input, delta)))
+                        - LostTalesLotrMapRotation.resist(
+                                Math.abs(input))));
+    }
+
+    /** Outward, nothing has changed: the calibrated curve still applies. */
+    @Test
+    public void draggingAwayFromSquareIsUnchanged() {
+        float step = 0.05F;
+        float accumulated = 0.0F;
+        for (int taken = 1; taken <= 20; taken++) {
+            accumulated = LostTalesLotrMapRotation.advanceInput(
+                    accumulated, step);
+            assertEquals(taken * step, accumulated, 0.0001F);
+        }
+        assertEquals("the drag cannot buy more than the whole range",
+                1.0F,
+                LostTalesLotrMapRotation.advanceInput(1.0F, step), 0.0F);
+    }
+
+    /** A reversal that overshoots square keeps paying full price after it. */
+    @Test
+    public void crossingSquareInOneFrameDoesNotCarryTheReleaseAcross() {
+        float crossed = LostTalesLotrMapRotation.advanceInput(0.02F, -0.5F);
+
+        assertTrue("the map must end up the other side of square",
+                crossed < 0.0F);
+        // Everything past square is ordinary outward travel, so it can never
+        // have bought more angle than the same drag would from a standstill.
+        assertTrue("the release must stop at square",
+                crossed >= -0.5F);
     }
 
     @Test

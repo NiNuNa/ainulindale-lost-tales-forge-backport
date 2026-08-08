@@ -48,6 +48,7 @@ public final class LostTalesLotrMapLayout {
     private static Field widgetZoomInField;
     private static Field widgetZoomOutField;
     private static Field widgetAddWaypointField;
+    private static Field widgetSepiaField;
     private static boolean reflectionReady;
     private static boolean reflectionFailed;
 
@@ -81,13 +82,18 @@ public final class LostTalesLotrMapLayout {
             if (widgets instanceof List) {
                 // The map is always fullscreen here, zooming is continuous
                 // and driven by the wheel, and waypoints are created from the
-                // Lost Tales popup, so these three widgets have nothing left
-                // to do. LOTR repopulates the list in initGui, which is why
-                // they are dropped again after every one.
+                // Lost Tales popup, so these widgets have nothing left to do.
+                // The sepia toggle goes with them: the map has one look, and
+                // a control that changes it wholesale does not belong on it.
+                // Only the button is dropped — LOTR's own setting still
+                // decides, and everything the map draws follows it.
+                // LOTR repopulates the list in initGui, which is why they are
+                // dropped again after every one.
                 removeWidget((List<?>)widgets, widgetFullScreenField, gui);
                 removeWidget((List<?>)widgets, widgetZoomInField, gui);
                 removeWidget((List<?>)widgets, widgetZoomOutField, gui);
                 removeWidget((List<?>)widgets, widgetAddWaypointField, gui);
+                removeWidget((List<?>)widgets, widgetSepiaField, gui);
             }
             return true;
         } catch (IllegalAccessException exception) {
@@ -401,6 +407,7 @@ public final class LostTalesLotrMapLayout {
             widgetZoomInField = field(mapClass, "widgetZoomIn");
             widgetZoomOutField = field(mapClass, "widgetZoomOut");
             widgetAddWaypointField = field(mapClass, "widgetAddCWP");
+            widgetSepiaField = field(mapClass, "widgetSepia");
             reflectionReady = true;
             return true;
         } catch (ReflectiveOperationException exception) {

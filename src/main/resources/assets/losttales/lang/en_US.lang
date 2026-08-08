@@ -482,8 +482,6 @@ lotr.dimension.MiddleEarth.north=Northern Wastes
 #   Waypoints
 lotr.waypoint.MOON_ELVES=Naldossë
 lotr.waypoint.MOON_ELVES.info=The hidden refuge of the Ithildhrim in the Forgotten Vale.
-lotr.waypoint.LOSSOTH=Lossoth Lands
-lotr.waypoint.LOSSOTH.info=The frozen homeland of the Lossoth in the far north.
 lotr.waypoint.OROCARNI=Orocarni
 lotr.waypoint.OROCARNI.info=The Red Mountains, homeland of the Orocarni Dwarves.
 lotr.waypoint.ODANE=Odane

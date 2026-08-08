@@ -10,9 +10,6 @@ import org.junit.Test;
 public final class LostTalesLotrMapAtmosphereTest {
     /** The ceiling the shade may never pass, whatever the hour. */
     private static final float MAX_ALPHA = 0.34F;
-    /** The zoom range the map screen allows. */
-    private static final float MIN_ZOOM_EXP = -3.6F;
-    private static final float MAX_ZOOM_EXP = 4.6F;
 
     @Test
     public void daylightLeavesTheMapAlone() {
@@ -142,52 +139,37 @@ public final class LostTalesLotrMapAtmosphereTest {
                 seen.size() > 600);
     }
 
-    @Test
-    public void cloudsFadeOutRatherThanPilingUpWhenZoomedOut() {
-        assertEquals(1.0F,
-                LostTalesLotrMapAtmosphere.cloudCoverage(1), 0.0F);
-        assertEquals(1.0F,
-                LostTalesLotrMapAtmosphere.cloudCoverage(520), 0.0F);
-        assertEquals(0.0F,
-                LostTalesLotrMapAtmosphere.cloudCoverage(700), 0.0F);
-        assertEquals(0.0F,
-                LostTalesLotrMapAtmosphere.cloudCoverage(100000), 0.0F);
-
-        float previous = 1.0F;
-        for (int cells = 520; cells <= 700; cells++) {
-            float coverage =
-                    LostTalesLotrMapAtmosphere.cloudCoverage(cells);
-            assertTrue("clouds came back as the map pulled out",
-                    coverage <= previous + 0.0001F);
-            previous = coverage;
-        }
-    }
-
     /**
-     * Why there were no clouds at all: a cell fixed in map pixels put
-     * thousands of them in view once the map was pulled out to the whole of
-     * Middle-earth, and the sky gave up rather than draw them. At every zoom
-     * the map allows, what is on screen now has to stay inside the cap.
+     * The whole point of the sky's layout: the zoom is not one of its inputs.
+     *
+     * <p>It used to be. Clouds sat on lattices an octave apart and the zoom
+     * chose between them, so pulling the map out shrank every cloud until its
+     * lattice gave up and a coarser one faded in behind it. Now a cloud's cell
+     * and its position come from where the camera is looking and nothing else,
+     * so zooming cannot move one, resize one, or swap it for another.</p>
      */
     @Test
-    public void cloudsSurviveEveryZoomTheMapAllows() {
-        for (float zoomExp = MIN_ZOOM_EXP; zoomExp <= MAX_ZOOM_EXP;
-             zoomExp += 0.2F) {
-            float zoomScale = (float)Math.pow(2.0D, zoomExp);
-            float cell = LostTalesLotrMapAtmosphere.cloudCell(zoomScale);
-            assertTrue("a cell vanished at zoom " + zoomExp, cell > 0.0F);
-            // A wide viewport, turned, which is the most ground the map has
-            // to cover at once.
-            float reach = (float)Math.sqrt(2.0D)
-                    * 1000.0F / zoomScale / 2.0F;
-            long across = (long)Math.ceil(reach * 2.0F / cell) + 3L;
-            long cells = across * across;
-            assertTrue("clouds gave up at zoom " + zoomExp
-                            + " with " + cells + " cells",
-                    LostTalesLotrMapAtmosphere.cloudCoverage(
-                            (int)Math.min(Integer.MAX_VALUE, cells))
-                            > 0.0F);
+    public void theSkyDoesNotDependOnTheZoomAtAll() {
+        float[] positions = { 0.0F, 137.5F, -820.0F, 4096.25F };
+        for (int index = 0; index < positions.length; index++) {
+            float offset =
+                    LostTalesLotrMapAtmosphere.skyOffset(positions[index]);
+            assertEquals("the sky moved when nothing but the zoom had",
+                    offset,
+                    LostTalesLotrMapAtmosphere.skyOffset(positions[index]),
+                    0.0F);
         }
+
+        // And the offset is a straight multiple of the map position, so a
+        // cloud's cell is a fixed region of the world however far out the
+        // map is.
+        float first = LostTalesLotrMapAtmosphere.skyOffset(100.0F)
+                - LostTalesLotrMapAtmosphere.skyOffset(0.0F);
+        float second = LostTalesLotrMapAtmosphere.skyOffset(2100.0F)
+                - LostTalesLotrMapAtmosphere.skyOffset(2000.0F);
+        assertEquals("the sky must pan at one steady rate",
+                first, second, 0.0001F);
+        assertTrue("the sky must move with the map at all", first != 0.0F);
     }
 
     /**
@@ -199,7 +181,7 @@ public final class LostTalesLotrMapAtmosphereTest {
      */
     @Test
     public void cloudsStayOnTheMapHoweverOldTheWorldIs() {
-        float cell = LostTalesLotrMapAtmosphere.cloudCell(1.0F);
+        float cell = 300.0F;
         float wrap = cell * 1024.0F;
         long[] ages = {
                 0L, 24000L, 24000L * 30L, 24000L * 365L,
@@ -217,7 +199,7 @@ public final class LostTalesLotrMapAtmosphereTest {
     /** The sky has to actually move, and to move the same way every time. */
     @Test
     public void theSkyDriftsSteadilyAndRepeatably() {
-        float cell = LostTalesLotrMapAtmosphere.cloudCell(1.0F);
+        float cell = 300.0F;
         float start = LostTalesLotrMapAtmosphere.cloudDrift(1000L, cell);
         assertEquals(start,
                 LostTalesLotrMapAtmosphere.cloudDrift(1000L, cell), 0.0F);
@@ -229,18 +211,44 @@ public final class LostTalesLotrMapAtmosphereTest {
         assertTrue("the sky is racing", minute < 300.0F);
     }
 
-    /** Clouds keep roughly one spacing on screen however far the map is out. */
+    /**
+     * A front rolling in has to read as the sky thickening: the same clouds
+     * darken, in the same order, and fair weather leaves every one of them
+     * alone.
+     */
     @Test
-    public void cloudSpacingStaysSteadyAcrossZoom() {
-        for (float zoomExp = MIN_ZOOM_EXP; zoomExp <= MAX_ZOOM_EXP;
-             zoomExp += 0.2F) {
-            float zoomScale = (float)Math.pow(2.0D, zoomExp);
-            float onScreen = LostTalesLotrMapAtmosphere
-                    .cloudCell(zoomScale) * zoomScale;
-            assertTrue("clouds bunched up at zoom " + zoomExp,
-                    onScreen >= 110.0F);
-            assertTrue("clouds spread too thin at zoom " + zoomExp,
-                    onScreen <= 480.0F);
+    public void weatherDarkensTheSameCloudsInTheSameOrder() {
+        float[] fair = LostTalesLotrMapAtmosphere.resolveWeather(
+                3, -7, 0, 0.0F, 0.0F);
+        assertEquals("fair weather must leave a cloud white",
+                1.0F, fair[0], 0.0001F);
+
+        int darkened = 0;
+        int stillFair = 0;
+        for (int cellX = -8; cellX <= 8; cellX++) {
+            for (int cellY = -8; cellY <= 8; cellY++) {
+                float[] light = LostTalesLotrMapAtmosphere.resolveWeather(
+                        cellX, cellY, 0, 0.3F, 0.0F);
+                float[] heavy = LostTalesLotrMapAtmosphere.resolveWeather(
+                        cellX, cellY, 0, 0.9F, 0.0F);
+                assertTrue("rain lightened a cloud instead of darkening it",
+                        heavy[0] <= light[0] + 0.0001F);
+                if (light[0] < 1.0F) {
+                    darkened++;
+                } else {
+                    stillFair++;
+                }
+            }
         }
+        assertTrue("light rain darkened nothing", darkened > 0);
+        assertTrue("light rain darkened the whole sky", stillFair > darkened);
+
+        // The same cell, asked twice, is the same cloud — nothing here may
+        // depend on the frame or on what was asked before it.
+        assertEquals(
+                LostTalesLotrMapAtmosphere.resolveWeather(
+                        5, 5, 0, 0.5F, 0.2F)[3],
+                LostTalesLotrMapAtmosphere.resolveWeather(
+                        5, 5, 0, 0.5F, 0.2F)[3], 0.0F);
     }
 }

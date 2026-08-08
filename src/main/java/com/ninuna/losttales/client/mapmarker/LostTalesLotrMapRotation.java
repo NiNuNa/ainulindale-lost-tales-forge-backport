@@ -42,6 +42,12 @@ public final class LostTalesLotrMapRotation {
      */
     static final float RESISTANCE_EXPONENT = 3.0F;
     /**
+     * Floor on how flat the resistance curve is allowed to read when a drag
+     * is coming back towards square. Reached only in the last fraction of a
+     * degree, where without it a single pixel would unwind the whole angle.
+     */
+    private static final float MIN_RELEASE_STEEPNESS = 0.05F;
+    /**
      * How near square the map has to be drawn before it is drawn square.
      *
      * <p>Small enough that it is a place the map settles rather than a place
@@ -66,15 +72,26 @@ public final class LostTalesLotrMapRotation {
     /** Below this, in degrees, the drawn angle simply becomes the target. */
     static final float SMOOTHING_EPSILON = 0.01F;
     /**
-     * How far the map may lean away from flat.
+     * How far the eye may drop below straight down, in degrees.
      *
-     * <p>The share by which the near edge grows. It is the same 22.5° the map
-     * may turn through, read as a tilt of the eye rather than of the sheet:
-     * {@code tan(22.5°) / 2}, which is how much nearer the bottom of the map
-     * comes when the eye drops that far. Turning and leaning therefore reach
-     * their limits together and by the same amount.</p>
+     * <p>Further than the map may turn, deliberately. The two used to share a
+     * limit on the grounds that they were one gesture, but a turn past 22.5°
+     * stops reading as a map with north somewhere sensible while a tilt has no
+     * such ceiling — a low eye is just a low eye. Now that the tilt is a real
+     * camera rather than a keystone it holds up this far.</p>
      */
-    static final float MAX_LEAN = 0.21F;
+    static final float MAX_PITCH_DEGREES = 38.0F;
+    /**
+     * The share by which the near edge grows at full lean.
+     *
+     * <p>Not an independent knob: with {@link #MAX_PITCH_DEGREES} it fixes how
+     * far the eye is from the sheet, and that distance is what the whole
+     * projection is built on. Raising it moves the eye closer and makes the
+     * perspective stronger for the same angle.</p>
+     */
+    static final float MAX_LEAN = 0.30F;
+    /** Smallest foreshortening the projection is allowed to divide by. */
+    private static final float MIN_COVERAGE_DIVISOR = 0.05F;
     /**
      * Vertical drag, in GUI pixels, from flat to fully leaned. The same as a
      * full turn takes, and through the same curve, so leaning and turning
@@ -146,6 +163,63 @@ public final class LostTalesLotrMapRotation {
         float clamped = Math.max(0.0F, Math.min(1.0F, advanced));
         return 1.0F - (float)Math.pow(
                 1.0D - clamped, RESISTANCE_EXPONENT);
+    }
+
+    /**
+     * Adds a drag to an axis, with the resistance depending on which way it
+     * is going.
+     *
+     * <p>Moving away from square costs exactly what it always did: the drag
+     * accumulates unchanged and {@link #degreesForInput(float)} turns it into
+     * an angle through a curve that stiffens the whole way out, so the limit
+     * is still somewhere the player leans into.</p>
+     *
+     * <p>Coming back is not a second helping of that. The stiffening is in
+     * the shape of that curve, which means that near the limit an inch of
+     * drag is worth a fraction of a degree — outward, where that is the
+     * point, and inward, where it only reads as the map refusing to
+     * straighten. So an inward drag is divided by the same steepness the
+     * curve has where the map currently is, which cancels it exactly: the map
+     * comes back at one steady rate, the rate it left square at, however far
+     * out it was. The player still feels the wall going out and never feels
+     * it coming back.</p>
+     *
+     * @param current accumulated drag, {@code -1} to {@code 1}
+     * @param delta   this frame's drag, in the same units
+     */
+    static float advanceInput(float current, float delta) {
+        float clamped = clampInput(current);
+        if (delta == 0.0F || Float.isNaN(delta)) {
+            return clamped;
+        }
+        boolean outward = clamped == 0.0F
+                || (delta > 0.0F) == (clamped > 0.0F);
+        if (outward) {
+            return clampInput(clamped + delta);
+        }
+        float released = delta / releaseSteepness(Math.abs(clamped));
+        float advanced = clamped + released;
+        if ((clamped > 0.0F) != (advanced > 0.0F) && advanced != 0.0F) {
+            // Crossing square in one frame: the far side of the crossing is
+            // outward travel and must not keep the release's easier rate.
+            float toSquare = -clamped;
+            float spent = toSquare * releaseSteepness(Math.abs(clamped));
+            return clampInput(delta - spent);
+        }
+        return clampInput(advanced);
+    }
+
+    /**
+     * How steeply {@link #degreesForInput(float)} is rising at a given amount
+     * of accumulated drag, relative to its rate at square.
+     *
+     * <p>Floored, because at the very limit the curve is flat and dividing by
+     * that would let a single pixel throw the map back to square.</p>
+     */
+    private static float releaseSteepness(float advanced) {
+        float clamped = Math.max(0.0F, Math.min(1.0F, advanced));
+        return Math.max(MIN_RELEASE_STEEPNESS, (float)Math.pow(
+                1.0D - clamped, RESISTANCE_EXPONENT - 1.0F));
     }
 
     /**
@@ -378,7 +452,7 @@ public final class LostTalesLotrMapRotation {
                     lean, mapHeightField.getInt(null));
             GL11.glPushMatrix();
             GL11.glTranslatef(centerX, centerY, 0.0F);
-            multiplyLean(coefficient);
+            multiplyLean(coefficient, leanScaleY(lean));
             GL11.glRotatef(degrees, 0.0F, 0.0F, 1.0F);
             GL11.glTranslatef(-centerX, -centerY, 0.0F);
             return true;
@@ -393,12 +467,15 @@ public final class LostTalesLotrMapRotation {
      * <p>Perspective, done the only way a fixed pipeline offers it: the
      * matrix writes a {@code w} that varies with the vertical, and the
      * hardware divides by it. Everything below the middle of the screen is
-     * divided by slightly less than one and spreads outward; everything above
-     * it by slightly more and draws in. Because the divide happens after
-     * rasterisation sets up, the map texture follows it correctly rather than
-     * shearing.</p>
+     * divided by less than one and spreads outward; everything above it by
+     * more and draws in. Because the divide happens after rasterisation sets
+     * up, the map texture follows it correctly rather than shearing.</p>
+     *
+     * <p>The same matrix carries the foreshortening, so the image and every
+     * position on it are laid down and divided by one operation and cannot
+     * disagree about where the sheet is.</p>
      */
-    private static void multiplyLean(float coefficient) {
+    private static void multiplyLean(float coefficient, float scaleY) {
         if (coefficient == 0.0F) {
             return;
         }
@@ -407,7 +484,9 @@ public final class LostTalesLotrMapRotation {
         for (int index = 0; index < 16; index++) {
             matrix.put(index % 5 == 0 ? 1.0F : 0.0F);
         }
-        // Column-major: column 1, row 3 is the w contributed by y.
+        // Column-major: column 1, row 1 is the y contributed by y, and
+        // column 1, row 3 the w it contributes.
+        matrix.put(5, scaleY);
         matrix.put(7, coefficient);
         matrix.flip();
         GL11.glMultMatrix(matrix);
@@ -428,8 +507,9 @@ public final class LostTalesLotrMapRotation {
             rotateAbout(point, centerX, centerY, degrees);
             // The lean is applied last, so it acts on the screen the player
             // is looking at rather than on the map's own axes.
-            applyLean(point, centerX, centerY, leanCoefficient(
-                    lean, mapHeightField.getInt(null)));
+            applyLean(point, centerX, centerY,
+                    leanCoefficient(lean, mapHeightField.getInt(null)),
+                    leanScaleY(lean));
             return point;
         } catch (Throwable ignored) {
             return point;
@@ -481,21 +561,59 @@ public final class LostTalesLotrMapRotation {
                 ? ((LostTalesLotrMapGui)gui).getMapLean() : 0.0F;
     }
 
+    /** How far the eye has dropped, in degrees, for a lean of 0 to 1. */
+    static float pitchDegrees(float lean) {
+        return MAX_PITCH_DEGREES * Math.max(0.0F, Math.min(1.0F, lean));
+    }
+
     /**
-     * The perspective coefficient a lean works out to.
+     * How far the eye is from the sheet, in screen pixels.
+     *
+     * <p>Fixed by {@link #MAX_LEAN}: at full pitch the near edge of the
+     * viewport has to grow by exactly that share, and only one distance does
+     * that. Tied to the viewport rather than to a constant so the same lean
+     * looks the same on every screen.</p>
+     */
+    private static float eyeDistance(float viewportHeight) {
+        return viewportHeight * 0.5F
+                * (float)Math.sin(Math.toRadians(MAX_PITCH_DEGREES))
+                / MAX_LEAN;
+    }
+
+    /**
+     * The perspective coefficient a lean works out to: the {@code w} written
+     * per pixel of screen height.
      *
      * <p>Everything below the middle of the screen is divided by a number
-     * slightly under one and everything above it by slightly over, which
-     * spreads the near edge outward and draws the far edge in. That is the
-     * whole of the effect: one number, applied the same way to the map image
-     * and to every position on it.</p>
+     * under one and everything above it by one over, which spreads the near
+     * edge outward and draws the far edge in.</p>
      */
     static float leanCoefficient(float lean, float viewportHeight) {
         float clamped = Math.max(0.0F, Math.min(1.0F, lean));
         if (clamped <= 0.0F || !(viewportHeight > 0.0F)) {
             return 0.0F;
         }
-        return -MAX_LEAN * clamped / (viewportHeight * 0.5F);
+        return -(float)Math.sin(Math.toRadians(pitchDegrees(clamped)))
+                / eyeDistance(viewportHeight);
+    }
+
+    /**
+     * How much the sheet is squashed towards the horizon by a lean.
+     *
+     * <p>The half of the tilt the map was missing. A perspective divide on its
+     * own keystones the sheet without ever letting it recede, so turning a map
+     * that was leaning read as the reader tilting their head rather than as a
+     * camera moving round an angled surface. Foreshortening by the cosine of
+     * the same angle the divide is built from is what makes the two one
+     * camera: the sheet lies down as the eye drops, and the divide then puts
+     * the near edge nearer.</p>
+     */
+    static float leanScaleY(float lean) {
+        float clamped = Math.max(0.0F, Math.min(1.0F, lean));
+        if (clamped <= 0.0F) {
+            return 1.0F;
+        }
+        return (float)Math.cos(Math.toRadians(pitchDegrees(clamped)));
     }
 
     /**
@@ -515,18 +633,33 @@ public final class LostTalesLotrMapRotation {
     /**
      * How much wider the sheet has to be cut to survive a lean.
      *
-     * <p>The far edge is drawn smaller, so a sheet the size of the viewport
-     * would pull its own top edge into view. Cutting it larger costs nothing
-     * but a slightly bigger quad, and the scissor takes back the rest.</p>
+     * <p>The far edge is both squashed and divided down, so a sheet the size
+     * of the viewport would pull its own top edge into view. This is the
+     * projection read backwards: how far the sheet has to reach for its far
+     * edge to still land on the edge of the screen. Cutting it larger costs
+     * nothing but a slightly bigger quad, and the scissor takes back the
+     * rest.</p>
      */
     static float leanCoverage(float lean) {
         float clamped = Math.max(0.0F, Math.min(1.0F, lean));
-        return 1.0F + 2.0F * MAX_LEAN * clamped;
+        if (clamped <= 0.0F) {
+            return 1.0F;
+        }
+        float squash = leanScaleY(clamped);
+        float spread = MAX_LEAN
+                * (float)Math.sin(Math.toRadians(pitchDegrees(clamped)))
+                / (float)Math.sin(Math.toRadians(MAX_PITCH_DEGREES));
+        return 1.0F / Math.max(MIN_COVERAGE_DIVISOR, squash - spread);
     }
 
-    /** Leans a point that is already in screen space, in place. */
-    static void applyLean(
-            float[] point, float centerX, float centerY, float coefficient) {
+    /**
+     * Projects a point that is already in screen space, in place.
+     *
+     * <p>One camera: the sheet is laid down by {@code scaleY} and then divided
+     * through by how far each part of it has ended up from the eye.</p>
+     */
+    static void applyLean(float[] point, float centerX, float centerY,
+                          float coefficient, float scaleY) {
         if (coefficient == 0.0F) {
             return;
         }
@@ -534,19 +667,29 @@ public final class LostTalesLotrMapRotation {
         float divisor = Math.max(MIN_PERSPECTIVE_DIVISOR,
                 1.0F + coefficient * deltaY);
         point[0] = centerX + (point[0] - centerX) / divisor;
-        point[1] = centerY + deltaY / divisor;
+        point[1] = centerY + deltaY * scaleY / divisor;
     }
 
-    /** Exact inverse of {@link #applyLean}. */
-    static void removeLean(
-            float[] point, float centerX, float centerY, float coefficient) {
+    /**
+     * Exact inverse of {@link #applyLean}.
+     *
+     * <p>Solved rather than iterated: the forward path is a ratio of two
+     * linear functions of the same unknown, so undoing it is one division.
+     * A point past the horizon has no answer at all, which is what the floor
+     * on the denominator stands in for.</p>
+     */
+    static void removeLean(float[] point, float centerX, float centerY,
+                           float coefficient, float scaleY) {
         if (coefficient == 0.0F) {
             return;
         }
-        float leanedY = point[1] - centerY;
-        float denominator = Math.max(MIN_PERSPECTIVE_DIVISOR,
-                1.0F - coefficient * leanedY);
-        float deltaY = leanedY / denominator;
+        float projectedY = point[1] - centerY;
+        float denominator = scaleY - coefficient * projectedY;
+        if (Math.abs(denominator) < MIN_PERSPECTIVE_DIVISOR) {
+            denominator = denominator < 0.0F
+                    ? -MIN_PERSPECTIVE_DIVISOR : MIN_PERSPECTIVE_DIVISOR;
+        }
+        float deltaY = projectedY / denominator;
         float divisor = Math.max(MIN_PERSPECTIVE_DIVISOR,
                 1.0F + coefficient * deltaY);
         point[0] = centerX + (point[0] - centerX) * divisor;
@@ -590,8 +733,10 @@ public final class LostTalesLotrMapRotation {
             result[1] = screenY;
             // Undone in the order it was applied: the lean first, then the
             // turn, so the two stay exact inverses of the forward path.
-            removeLean(result, centerX, centerY, leanCoefficient(
-                    leanOf(gui), mapHeightField.getInt(null)));
+            float lean = leanOf(gui);
+            removeLean(result, centerX, centerY,
+                    leanCoefficient(lean, mapHeightField.getInt(null)),
+                    leanScaleY(lean));
             rotateAbout(result, centerX, centerY, -degreesOf(gui));
             float zoomScale = zoomScaleField.getFloat(gui);
             if (!(zoomScale > 0.0F)) {

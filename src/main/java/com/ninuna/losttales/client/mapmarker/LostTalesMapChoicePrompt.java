@@ -36,6 +36,14 @@ final class LostTalesMapChoicePrompt {
     private static final int ANCHOR_CLEARANCE = 26;
     /** Closest the framed point may come to the edge of the screen. */
     private static final int ANCHOR_SCREEN_MARGIN = 14;
+    /**
+     * The step-to-the-next-place arrows, which sit outside the panel rather
+     * than in the button strip: they move the question rather than answering
+     * it, and a player must never reach for one and hit "Yes".
+     */
+    private static final int STEP_ARROW_WIDTH = 14;
+    private static final int STEP_ARROW_HEIGHT = 22;
+    private static final int STEP_ARROW_GAP = 5;
 
     private LostTalesMapChoicePrompt() {}
 
@@ -185,10 +193,57 @@ final class LostTalesMapChoicePrompt {
         Bounds third = new Bounds(
                 second.x + second.width, buttonY,
                 thirdWidth, buttonHeight);
-        return new Layout(x, y, width, height, first, second, third);
+        int arrowY = y + Math.max(0, (height - STEP_ARROW_HEIGHT) / 2);
+        int arrowHeight = Math.min(STEP_ARROW_HEIGHT, height);
+        // Off the ends of the panel, and only where the screen has room for
+        // them; a narrow screen keeps the panel and loses the arrows, which
+        // the keys can still do.
+        int previousX = x - STEP_ARROW_GAP - STEP_ARROW_WIDTH;
+        int nextX = x + width + STEP_ARROW_GAP;
+        Bounds previous = previousX >= 0
+                ? new Bounds(previousX, arrowY,
+                        STEP_ARROW_WIDTH, arrowHeight)
+                : Bounds.none();
+        Bounds next = nextX + STEP_ARROW_WIDTH <= screenWidth
+                ? new Bounds(nextX, arrowY, STEP_ARROW_WIDTH, arrowHeight)
+                : Bounds.none();
+        return new Layout(x, y, width, height,
+                first, second, third, previous, next);
     }
 
-    /** Panel rectangle and the three action bounds inside it. */
+    /**
+     * Draws one of the step arrows as a plain triangle of rows.
+     *
+     * <p>No artwork: it is two shapes, it has to read at every GUI scale, and
+     * rows of rectangles stay crisp where a stretched sprite would not.</p>
+     *
+     * @param pointLeft which way the arrow points
+     */
+    static void drawStepArrow(
+            Bounds bounds, boolean pointLeft, boolean hovered) {
+        if (bounds.width <= 0 || bounds.height <= 0) {
+            return;
+        }
+        int color = hovered
+                ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
+                : LostTalesSkyrimUiStyle.TEXT_MUTED;
+        int rows = Math.max(1, bounds.height / 2);
+        int centerY = bounds.y + bounds.height / 2;
+        int tipX = pointLeft ? bounds.x + 2 : bounds.x + bounds.width - 3;
+        for (int row = 0; row < rows; row++) {
+            int reach = row * (bounds.width - 5) / Math.max(1, rows - 1);
+            int left = pointLeft ? tipX : tipX - reach;
+            int right = pointLeft ? tipX + reach + 1 : tipX + 1;
+            Gui.drawRect(left, centerY - row, right,
+                    centerY - row + 1, color);
+            if (row > 0) {
+                Gui.drawRect(left, centerY + row, right,
+                        centerY + row + 1, color);
+            }
+        }
+    }
+
+    /** Panel rectangle, the three action bounds and the two step arrows. */
     static final class Layout {
         final int x;
         final int y;
@@ -197,9 +252,12 @@ final class LostTalesMapChoicePrompt {
         final Bounds first;
         final Bounds second;
         final Bounds third;
+        final Bounds previous;
+        final Bounds next;
 
         private Layout(int x, int y, int width, int height,
-                       Bounds first, Bounds second, Bounds third) {
+                       Bounds first, Bounds second, Bounds third,
+                       Bounds previous, Bounds next) {
             this.x = x;
             this.y = y;
             this.width = width;
@@ -207,6 +265,8 @@ final class LostTalesMapChoicePrompt {
             this.first = first;
             this.second = second;
             this.third = third;
+            this.previous = previous;
+            this.next = next;
         }
     }
 
@@ -221,6 +281,11 @@ final class LostTalesMapChoicePrompt {
             this.y = y;
             this.width = Math.max(0, width);
             this.height = Math.max(0, height);
+        }
+
+        /** A control the screen had no room for: drawn nowhere, hit never. */
+        static Bounds none() {
+            return new Bounds(0, 0, 0, 0);
         }
 
         boolean contains(int pointX, int pointY) {

@@ -127,6 +127,19 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     private LOTRCustomWaypoint editedWaypoint;
     private LostTalesMapMarkerData promptCustomMarker;
     private LOTRAbstractWaypoint promptNativeWaypoint;
+    /**
+     * The destinations the open travel popup can be stepped between, in a
+     * fixed order, built when it opened. Null whenever no popup is open.
+     */
+    private LostTalesMapFastTravelCycle fastTravelCycle;
+    /**
+     * Every waypoint LOTR handed the last marker pass, kept so the travel
+     * popup can be moved between destinations without waiting for a frame.
+     * The raw list, before the overlay decides which of them it draws itself.
+     */
+    private List<LOTRAbstractWaypoint> lastRenderedWaypoints =
+            Collections.emptyList();
+    private boolean lastRenderedIncludeHidden;
     private final LostTalesMapInputTracker mapInput =
             new LostTalesMapInputTracker();
     /**
@@ -242,6 +255,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
 
     @Override
     public void initGui() {
+        // Taken here rather than on the first frame, so a resize that runs
+        // initGui again finds it already held and does nothing.
+        LostTalesMapCursor.acquire();
         boolean preserveSmoothZoom = this.smoothZoomInitialized;
         LostTalesLotrMapLayout.prepareBeforeInit(this);
         super.initGui();
@@ -367,13 +383,54 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         LostTalesLotrRoadLabelRenderer.Prepared prepared = labels
                 ? LostTalesLotrRoadLabelRenderer.prepare(this) : null;
         if (prepared == null) {
-            super.renderRoads(labels);
+            renderRoadsWithSharedFade(labels);
             return;
         }
         // Preserve LOTR's pixel-art road dots, but replace only its unstable
         // interval-based names with fixed world anchors and smooth fades.
-        super.renderRoads(false);
+        renderRoadsWithSharedFade(false);
         prepared.render();
+    }
+
+    /**
+     * Draws LOTR's roads with the map's own zoom fade instead of LOTR's.
+     *
+     * <p>LOTR works the road opacity out from {@code zoomExp} inside the
+     * method that draws them, against the zoom range it shipped with — so on
+     * this map the roads faded out with a third of the zoom still to go. The
+     * exponent it reads is the only input to that calculation on this path,
+     * because the label branch that also reads it is never taken here, so it
+     * is set to whatever produces the wanted opacity and put straight back.
+     * Every road dot, its spacing and its clipping stay LOTR's own.</p>
+     */
+    private void renderRoadsWithSharedFade(boolean labels) {
+        if (!this.smoothZoomInitialized || !ensureSmoothZoomReflection()) {
+            super.renderRoads(labels);
+            return;
+        }
+        float actual;
+        try {
+            actual = zoomExpField.getFloat(this);
+            zoomExpField.setFloat(this,
+                    LostTalesMapZoomFade.nativeZoomExpForAlpha(
+                            LostTalesMapZoomFade.alpha(actual,
+                                    SMOOTH_ZOOM_MIN, SMOOTH_ZOOM_MAX)));
+        } catch (IllegalAccessException exception) {
+            markSmoothZoomReflectionFailed(exception);
+            this.smoothZoomInitialized = false;
+            super.renderRoads(labels);
+            return;
+        }
+        try {
+            super.renderRoads(labels);
+        } finally {
+            try {
+                zoomExpField.setFloat(this, actual);
+            } catch (IllegalAccessException exception) {
+                markSmoothZoomReflectionFailed(exception);
+                this.smoothZoomInitialized = false;
+            }
+        }
     }
 
     @Override
@@ -523,6 +580,28 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                 Math.min(SMOOTH_ZOOM_MAX, value));
     }
 
+    /**
+     * How far this map screen can actually be zoomed, which is what anything
+     * fading with the zoom has to measure itself against.
+     *
+     * <p>The Lost Tales map goes wider than LOTR's own screens either way, and
+     * only when its continuous zoom is running. A screen still on LOTR's
+     * integer zoom keeps LOTR's range, so a fade means the same thing on both.
+     * </p>
+     */
+    static float minZoomExpOf(LOTRGuiMap gui) {
+        return hasSmoothZoom(gui) ? SMOOTH_ZOOM_MIN : LOTR_ZOOM_POWER_MIN;
+    }
+
+    static float maxZoomExpOf(LOTRGuiMap gui) {
+        return hasSmoothZoom(gui) ? SMOOTH_ZOOM_MAX : LOTR_ZOOM_POWER_MAX;
+    }
+
+    private static boolean hasSmoothZoom(LOTRGuiMap gui) {
+        return gui instanceof LostTalesLotrMapGui
+                && ((LostTalesLotrMapGui)gui).smoothZoomInitialized;
+    }
+
     static float advanceSmoothZoom(float current, float target) {
         target = clampSmoothZoom(target);
         float difference = target - current;
@@ -615,6 +694,11 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             return;
         }
 
+        this.lastRenderedWaypoints = waypoints == null
+                ? Collections.<LOTRAbstractWaypoint>emptyList()
+                : Collections.unmodifiableList(
+                        new ArrayList<LOTRAbstractWaypoint>(waypoints));
+        this.lastRenderedIncludeHidden = includeHidden;
         List<LOTRAbstractWaypoint> baseWaypoints =
                 LostTalesLotrMapMarkerIconOverlay
                         .getWaypointsForLotrRender(waypoints, pass);
@@ -755,6 +839,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             this.searchPrompt.render(
                     this.width, this.height, mouseX, mouseY);
         }
+        // Last of everything: the pointer is over the map, the popups and the
+        // strip alike, and it is drawn at the very coordinate every hit test
+        // above was resolved against.
+        LostTalesMapCursor.render(this.mc, mouseX, mouseY);
     }
 
     /**
@@ -942,18 +1030,21 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                 < LostTalesLotrMapRotation.DRAG_THRESHOLD_PIXELS) {
             return;
         }
-        this.rotationInput = LostTalesLotrMapRotation.clampInput(
-                this.rotationInput
-                        + delta * LostTalesLotrMapRotation.inputPerPixel());
+        this.rotationInput = LostTalesLotrMapRotation.advanceInput(
+                this.rotationInput,
+                delta * LostTalesLotrMapRotation.inputPerPixel());
         this.mapRotationTargetDegrees =
                 LostTalesLotrMapRotation.degreesForInput(
                         this.rotationInput);
         // Dragging down lowers the eye towards the sheet; dragging back up
         // lays it flat again. What accumulates is the drag, as with the turn,
-        // because the lean it buys stiffens the same way.
-        this.leanInput = Math.max(0.0F, Math.min(1.0F,
-                this.leanInput + verticalDelta
-                        * LostTalesLotrMapRotation.leanInputPerPixel()));
+        // because the lean it buys stiffens the same way — and gives that
+        // stiffness back the same way when the drag reverses.
+        this.leanInput = Math.max(0.0F,
+                LostTalesLotrMapRotation.advanceInput(this.leanInput,
+                        verticalDelta
+                                * LostTalesLotrMapRotation
+                                        .leanInputPerPixel()));
         this.mapLeanTarget =
                 LostTalesLotrMapRotation.leanForInput(this.leanInput);
     }
@@ -1379,6 +1470,19 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         if (!supportsFastTravel(marker, waypoint)) {
             return;
         }
+        this.fastTravelCycle = buildFastTravelCycle(marker, waypoint);
+        showFastTravelPrompt(marker, waypoint);
+    }
+
+    /**
+     * Puts the popup on a destination.
+     *
+     * <p>Everything opening the popup does apart from working out what else it
+     * could be moved to, which is decided once and then stepped through.</p>
+     */
+    private void showFastTravelPrompt(
+            LostTalesMapMarkerData marker,
+            LOTRAbstractWaypoint waypoint) {
         // An undiscovered destination is named by the same rule the map label
         // and the hover card use, so the popup cannot be the one place that
         // gives it away.
@@ -1387,7 +1491,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                         marker, marker.getName())
                 : waypoint.getDisplayName();
         this.fastTravelPrompt = new LostTalesMapFastTravelPrompt(
-                name, fastTravelBlockedReason(marker, waypoint));
+                name, fastTravelBlockedReason(marker, waypoint),
+                this.fastTravelCycle != null
+                        && this.fastTravelCycle.hasAlternatives());
         this.promptCustomMarker = marker;
         this.promptNativeWaypoint = waypoint;
         this.mapLegendOpen = false;
@@ -1397,6 +1503,62 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         LostTalesLotrMapMarkerIconOverlay.setSelectedMarkerFrame(
                 this, marker, waypoint);
         focusFastTravelTarget(marker, waypoint);
+    }
+
+    /**
+     * Orders every other destination around the one that was just clicked.
+     *
+     * <p>Built from the waypoints of the last drawn frame and the markers the
+     * map is showing, so what an arrow key can reach is exactly what a click
+     * could have reached.</p>
+     */
+    private LostTalesMapFastTravelCycle buildFastTravelCycle(
+            LostTalesMapMarkerData marker,
+            LOTRAbstractWaypoint waypoint) {
+        double anchorX;
+        double anchorZ;
+        if (marker != null) {
+            anchorX = marker.getX();
+            anchorZ = marker.getZ();
+        } else {
+            anchorX = waypoint.getXCoord();
+            anchorZ = waypoint.getZCoord();
+        }
+        LostTalesLotrMapMarkerIconOverlay.FastTravelCandidate anchor =
+                LostTalesLotrMapMarkerIconOverlay.FastTravelCandidate.of(
+                        marker, waypoint);
+        return LostTalesMapFastTravelCycle.around(
+                LostTalesLotrMapMarkerIconOverlay
+                        .collectFastTravelCandidates(
+                                this.lastRenderedWaypoints,
+                                this.lastRenderedIncludeHidden,
+                                getLocalGoHereMarkerId(
+                                        ClientPartyStateCache
+                                                .getSnapshot())),
+                anchorX, anchorZ,
+                anchor == null ? null : anchor.getKey());
+    }
+
+    /**
+     * Moves the open popup to the next destination in a direction.
+     *
+     * <p>The popup is replaced in place rather than closed and reopened: the
+     * camera runs on to the new destination, the frame moves with it, and the
+     * order the player is stepping along is left exactly as it was.</p>
+     */
+    private void stepFastTravelPrompt(int direction) {
+        if (this.fastTravelPrompt == null
+                || this.fastTravelCycle == null) {
+            return;
+        }
+        LostTalesLotrMapMarkerIconOverlay.FastTravelCandidate next =
+                this.fastTravelCycle.step(direction);
+        if (next == null) {
+            // Everywhere else has been filtered out or deleted since the
+            // popup opened. Leaving it where it is beats closing it.
+            return;
+        }
+        showFastTravelPrompt(next.getMarker(), next.getWaypoint());
     }
 
     /** Whether this destination is meant to be a fast-travel target at all. */
@@ -1470,6 +1632,14 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             LostTalesMapFastTravelPrompt.Action action) {
         if (action == null
                 || action == LostTalesMapFastTravelPrompt.Action.NONE) {
+            return;
+        }
+        if (action == LostTalesMapFastTravelPrompt.Action.PREVIOUS) {
+            stepFastTravelPrompt(-1);
+            return;
+        }
+        if (action == LostTalesMapFastTravelPrompt.Action.NEXT) {
+            stepFastTravelPrompt(1);
             return;
         }
         LostTalesMapMarkerData customMarker = this.promptCustomMarker;
@@ -1752,6 +1922,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
 
     private void clearFastTravelPrompt() {
         this.fastTravelPrompt = null;
+        this.fastTravelCycle = null;
         this.promptCustomMarker = null;
         this.promptNativeWaypoint = null;
         LostTalesLotrMapMarkerIconOverlay
@@ -1850,6 +2021,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
 
     @Override
     public void onGuiClosed() {
+        LostTalesMapCursor.release();
         clearFastTravelPrompt();
         clearWaypointPrompt();
         clearMoveMarkerPrompt();
@@ -1867,6 +2039,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         this.mapLeanTarget = 0.0F;
         this.leanInput = 0.0F;
         this.clickableNativeWaypoints = Collections.emptyList();
+        this.lastRenderedWaypoints = Collections.emptyList();
         LostTalesLotrMapMarkerIconOverlay.clearGrouping(this);
         LostTalesLotrRoadLabelRenderer.clear(this);
         super.onGuiClosed();

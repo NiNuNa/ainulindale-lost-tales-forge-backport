@@ -38,7 +38,8 @@ public final class LostTalesMapFastTravelPromptTest {
     public void aBlockedDestinationRefusesTravelButStillOffersTheRest() {
         LostTalesMapFastTravelPrompt prompt =
                 new LostTalesMapFastTravelPrompt("Bree",
-                        "gui.losttales.map.fast_travel.blocked.cooldown");
+                        "gui.losttales.map.fast_travel.blocked.cooldown",
+                        false);
         LostTalesMapChoicePrompt.Layout layout =
                 LostTalesMapChoicePrompt.calculateLayout(320, 180);
 
@@ -63,6 +64,67 @@ public final class LostTalesMapFastTravelPromptTest {
         assertEquals(layout.second.x + layout.second.width, layout.third.x);
         assertTrue(layout.third.x + layout.third.width
                 <= layout.x + layout.width);
+    }
+
+    /**
+     * A destination with nowhere to step to must not offer the movement: no
+     * arrows, and the keys that would take them do nothing rather than
+     * reopening the popup on the place it is already showing.
+     */
+    @Test
+    public void aLoneDestinationOffersNoStepping() {
+        LostTalesMapFastTravelPrompt alone =
+                new LostTalesMapFastTravelPrompt("Bree", null, false);
+        LostTalesMapChoicePrompt.Layout layout =
+                LostTalesMapChoicePrompt.calculateLayout(854, 480);
+
+        assertEquals(LostTalesMapFastTravelPrompt.Action.NONE,
+                alone.keyTyped(org.lwjgl.input.Keyboard.KEY_A));
+        assertEquals(LostTalesMapFastTravelPrompt.Action.NONE,
+                alone.keyTyped(org.lwjgl.input.Keyboard.KEY_RIGHT));
+        assertEquals(LostTalesMapFastTravelPrompt.Action.NONE,
+                alone.mouseClicked(854, 480,
+                        layout.next.x + layout.next.width / 2,
+                        layout.next.y + layout.next.height / 2, 0, true));
+    }
+
+    /** Both key pairs and both arrows step, and they agree on which way. */
+    @Test
+    public void everyWayOfSteppingAgreesOnTheDirection() {
+        LostTalesMapFastTravelPrompt prompt =
+                new LostTalesMapFastTravelPrompt("Bree", null, true);
+        LostTalesMapChoicePrompt.Layout layout =
+                LostTalesMapChoicePrompt.calculateLayout(854, 480);
+
+        assertEquals(LostTalesMapFastTravelPrompt.Action.PREVIOUS,
+                prompt.keyTyped(org.lwjgl.input.Keyboard.KEY_LEFT));
+        assertEquals(LostTalesMapFastTravelPrompt.Action.PREVIOUS,
+                prompt.keyTyped(org.lwjgl.input.Keyboard.KEY_A));
+        assertEquals(LostTalesMapFastTravelPrompt.Action.NEXT,
+                prompt.keyTyped(org.lwjgl.input.Keyboard.KEY_RIGHT));
+        assertEquals(LostTalesMapFastTravelPrompt.Action.NEXT,
+                prompt.keyTyped(org.lwjgl.input.Keyboard.KEY_D));
+        assertEquals(LostTalesMapFastTravelPrompt.Action.PREVIOUS,
+                prompt.mouseClicked(854, 480,
+                        layout.previous.x + layout.previous.width / 2,
+                        layout.previous.y + layout.previous.height / 2,
+                        0, true));
+        assertEquals(LostTalesMapFastTravelPrompt.Action.NEXT,
+                prompt.mouseClicked(854, 480,
+                        layout.next.x + layout.next.width / 2,
+                        layout.next.y + layout.next.height / 2, 0, true));
+    }
+
+    /** The arrows may never sit on top of an answer to the question. */
+    @Test
+    public void theStepArrowsStayOutsideThePanel() {
+        LostTalesMapChoicePrompt.Layout layout =
+                LostTalesMapChoicePrompt.calculateLayout(854, 480);
+
+        assertTrue(layout.previous.x + layout.previous.width <= layout.x);
+        assertTrue(layout.next.x >= layout.x + layout.width);
+        assertTrue(layout.previous.x >= 0);
+        assertTrue(layout.next.x + layout.next.width <= 854);
     }
 
     /**

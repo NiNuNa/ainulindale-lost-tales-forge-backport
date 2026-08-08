@@ -21,7 +21,7 @@ The active factions use the normal LOTR alignment and pledge model. Lost Tales d
 
 ## Relations and territory
 
-Selected default relations are registered between new factions and LOTR factions. Control zones use Lost Tales or public LOTR waypoints. Lossoth uses a hidden internal anchor that does not add a map icon, while Orocarni keeps its dedicated waypoint; both use a 175-block zone radius. The Moon Elf map label is centered on its two northern waypoints.
+Selected default relations are registered between new factions and LOTR factions. Control zones use Lost Tales or public LOTR waypoints. Lossoth is anchored on LOTR's own Cape of Forochel — it previously used a Lost Tales waypoint of its own, which sat out in the Sundering Seas — while Orocarni keeps its dedicated waypoint; both use a 175-block zone radius. The Lossoth fast-travel region stays registered even though nothing places a waypoint in it, because a character who has already unlocked it has that name saved and the state adapter rejects a region it cannot resolve. The Moon Elf map label is centered on its two northern waypoints.
 
 Orocarni progression uses Red Mountain Dwarf titles from Stonebearer through Lord or Lady of the Red Mountains. The map regions, relations, ranks, and zones are startup integration data and should be tested whenever the LOTR dependency changes.
 

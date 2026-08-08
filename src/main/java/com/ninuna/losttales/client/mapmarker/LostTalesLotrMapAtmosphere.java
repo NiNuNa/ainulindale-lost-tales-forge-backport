@@ -1,9 +1,13 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.LostTalesMetaData;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
 
 /**
@@ -65,52 +69,78 @@ final class LostTalesLotrMapAtmosphere {
     /** Ceiling once the weather is counted in too. */
     private static final float MAX_TOTAL_ALPHA = 0.42F;
 
+    /** Placeholder cloud artwork: four soft shapes in a row. */
+    private static final ResourceLocation CLOUD_TEXTURE =
+            new ResourceLocation(LostTalesMetaData.MOD_ID,
+                    "textures/gui/map/cloud.png");
+    private static final int CLOUD_VARIANTS = 4;
     /**
-     * How far apart the clouds are seeded, in map-image pixels.
+     * How far apart the clouds sit, in screen pixels, and how wide one is
+     * drawn.
      *
-     * <p>Clouds are placed one to a cell and jittered well past its edges, so
-     * the grid never reads as a grid; what it buys is that only the cells on
-     * screen have to be visited, whatever the map is looking at.</p>
+     * <p>Both are screen measurements, and that is the whole design. Clouds
+     * are one size, always: the zoom does not resize them, does not thin them
+     * out and does not swap one set for another. They used to be sized in map
+     * pixels on lattices an octave apart, which meant that pulling the map out
+     * shrank every cloud until its lattice gave up and a coarser one faded in
+     * behind it — a sky that visibly rebuilt itself on the way past.</p>
+     *
+     * <p>What it costs is that a cloud is no longer a fixed patch of ground.
+     * It is a fixed patch of <em>sky</em>, which pans over the map and is
+     * always the same size to the eye, and which is what looking up actually
+     * gives you.</p>
      */
-    private static final float CLOUD_CELL = 256.0F;
+    private static final float CLOUD_SCREEN_CELL = 96.0F;
     /**
-     * How far apart the clouds should sit on screen, whatever the zoom.
+     * How wide one cloud is drawn.
      *
-     * <p>Cells fixed in map-image pixels put a sensible number of clouds on
-     * screen at one zoom and none at all at another: pulled right out to the
-     * whole of Middle-earth there were thousands of cells in view and the
-     * clouds gave up rather than draw them, which is why there were none.
-     * So the cell doubles as the map pulls out, in steps, and the sky keeps
-     * roughly this spacing at every zoom.</p>
+     * <p>Small enough to be weather over Middle-earth rather than weather the
+     * size of it: at three hundred pixels a single cloud was about as wide as
+     * the whole continent is at full zoom-out, which read as fog on the lens.
+     * Sized against what else stands on the map — a tree is fourteen pixels,
+     * a mountain sixteen — so the sky belongs to the same picture.</p>
      */
-    private static final float CLOUD_SCREEN_SPACING = 230.0F;
-    /** Beyond this many cells on screen the map is too far out for clouds. */
-    private static final int MAX_CLOUD_CELLS = 700;
-    /** Cells at which the clouds have finished fading back in. */
-    private static final int FADE_CLOUD_CELLS = 520;
-    private static final float CLOUD_JITTER = 0.42F;
-    private static final float CLOUD_MIN_RADIUS = 0.18F;
-    private static final float CLOUD_MAX_RADIUS = 0.46F;
-    private static final float CLOUD_ALPHA = 0.30F;
+    private static final float CLOUD_SCREEN_WIDTH = 72.0F;
+    private static final float CLOUD_ASPECT = 0.5F;
+    private static final float CLOUD_JITTER = 0.45F;
     /**
-     * Share of a puff that is solid before it starts fading.
-     *
-     * <p>A puff that fades the whole way from its middle averages a third of
-     * its own weight and reads as nothing at all. A core that holds its
-     * colour and a rim that softens is what makes it a cloud.</p>
+     * Share of cells that have a cloud in them at all. Smaller clouds need a
+     * thinner lattice, or the sky closes into an even overcast.
      */
-    private static final float PUFF_CORE = 0.55F;
+    private static final float CLOUD_DENSITY = 0.45F;
+    /**
+     * Screen pixels the sky moves per map pixel the camera pans.
+     *
+     * <p>Constant, and it has to be: the moment it followed the zoom, the
+     * lattice would be a different set of clouds at every zoom, which is the
+     * thing this layout exists to stop. So the sky keeps its own rate, and
+     * whether it runs ahead of the ground or behind it depends on how far the
+     * map is zoomed — a parallax, which is what a layer above the ground
+     * should do.</p>
+     */
+    private static final float CLOUD_PARALLAX = 2.0F;
     /** Cells the drift wraps after, so long-running worlds keep their sky. */
     private static final float DRIFT_WRAP_CELLS = 1024.0F;
     /**
-     * Map-image pixels a cloud drifts per tick. Slow enough not to pull the
-     * eye, quick enough that a cloud visibly moves while you look at it.
+     * Screen pixels a cloud drifts per tick. Slow enough not to pull the eye,
+     * quick enough that a cloud visibly moves while you look at it.
      */
-    private static final float CLOUD_DRIFT = 0.06F;
-    /** Puffs per formation, so a cloud has a shape rather than being a disc. */
-    private static final int CLOUD_PUFFS = 3;
-    /** Rim points on a puff. Enough that the edge reads as round. */
-    private static final int PUFF_SEGMENTS = 12;
+    private static final float CLOUD_DRIFT = 0.12F;
+    /** Noise channels the sky takes for itself. */
+    private static final int CLOUD_CHANNEL = 64;
+    /**
+     * The weather a cloud can be carrying, as {@code {r, g, b, alpha}}.
+     *
+     * <p>Fair weather is white and thin enough to read the map through. Rain
+     * and thunder are greyer and heavier, which is the whole difference: the
+     * map is a navigation instrument and a storm may not cost it.</p>
+     */
+    private static final float[] FAIR_CLOUD =
+            { 1.0F, 1.0F, 1.0F, 0.26F };
+    private static final float[] RAIN_CLOUD =
+            { 0.63F, 0.66F, 0.72F, 0.36F };
+    private static final float[] THUNDER_CLOUD =
+            { 0.42F, 0.44F, 0.51F, 0.42F };
 
     private LostTalesLotrMapAtmosphere() {
     }
@@ -197,31 +227,21 @@ final class LostTalesLotrMapAtmosphere {
         return (hash >>> 8) / (float)(1 << 24);
     }
 
-    /** How strongly clouds show at a given number of visible cells. */
     /**
-     * The cell the clouds are laid out on at a given zoom, in map pixels.
+     * Where the sky sits over a map position, in its own screen-sized space.
      *
-     * <p>Doubled or halved from the base rather than scaled freely, so the
-     * layout only changes when the map has moved a long way in zoom and the
-     * clouds stay put over the ground everywhere in between.</p>
+     * <p>The one place the sky is tied to the map. It is a straight multiple
+     * of the map coordinate, so a cloud's cell is a fixed region of
+     * Middle-earth however the map is being looked at, and the zoom does not
+     * enter into it at all — which is exactly why zooming can neither move a
+     * cloud, resize it, nor put a different one in its place.</p>
      */
-    static float cloudCell(float zoomScale) {
-        if (!(zoomScale > 0.0F)) {
-            return CLOUD_CELL;
-        }
-        float wanted = CLOUD_SCREEN_SPACING / zoomScale;
-        float cell = CLOUD_CELL;
-        while (cell < wanted && cell < CLOUD_CELL * 4096.0F) {
-            cell *= 2.0F;
-        }
-        while (cell > wanted * 2.0F && cell > CLOUD_CELL / 16.0F) {
-            cell *= 0.5F;
-        }
-        return cell;
+    static float skyOffset(float mapPosition) {
+        return mapPosition * CLOUD_PARALLAX;
     }
 
     /**
-     * How far the sky has drifted, in map pixels.
+     * How far the sky has drifted, in screen pixels.
      *
      * <p>Wrapped to a whole number of cells, and a large one, so a world that
      * has been running for years keeps the same arithmetic precision as one
@@ -239,17 +259,6 @@ final class LostTalesLotrMapAtmosphere {
             wrapped += period;
         }
         return (float)wrapped;
-    }
-
-    static float cloudCoverage(int visibleCells) {
-        if (visibleCells <= FADE_CLOUD_CELLS) {
-            return 1.0F;
-        }
-        if (visibleCells >= MAX_CLOUD_CELLS) {
-            return 0.0F;
-        }
-        return smoothstep(1.0F - (float)(visibleCells - FADE_CLOUD_CELLS)
-                / (MAX_CLOUD_CELLS - FADE_CLOUD_CELLS));
     }
 
     private static float smoothstep(float value) {
@@ -296,12 +305,173 @@ final class LostTalesLotrMapAtmosphere {
                 drawShade(shade, viewportXMin, viewportXMax,
                         viewportYMin, viewportYMax);
             }
-            drawClouds(gui, worldTime, posX, posY, zoomScale,
+            // The shade is a flat fill and the clouds are artwork, so the
+            // texture unit is off for the first and on for the second.
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            drawSky(gui, worldTime, rain, thunder, posX, posY,
                     viewportXMin, viewportXMax, viewportYMin, viewportYMax);
         } finally {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glPopAttrib();
         }
+    }
+
+    /**
+     * Draws the clouds onto the sheet rather than over it.
+     *
+     * <p>They go through the same matrix as the map image, so they turn and
+     * lean with the ground and are foreshortened by it — a cloud is a thing
+     * lying on the map, not a sprite standing on it, and it must never pivot
+     * to face the reader. Which also means the positions handed to it here are
+     * the flat ones: the matrix does the turning, and doing it twice would
+     * carry every cloud off the map.</p>
+     */
+    private static void drawSky(
+            LostTalesLotrMapGui gui, long worldTime,
+            float rain, float thunder, float posX, float posY,
+            int viewportXMin, int viewportXMax,
+            int viewportYMin, int viewportYMax) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.getTextureManager() == null) {
+            return;
+        }
+        boolean sheeted = LostTalesLotrMapRotation.pushSheetTransform(gui);
+        boolean clipped = sheeted && beginViewportClip(
+                viewportXMin, viewportXMax, viewportYMin, viewportYMax);
+        try {
+            minecraft.getTextureManager().bindTexture(CLOUD_TEXTURE);
+            // Smoothed rather than nearest, unlike everything else on this
+            // map: a cloud is the one thing here with no edges, and stepping
+            // its rim into blocks is worse than the map's own pixels are big.
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                    GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                    GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+            Tessellator tessellator = Tessellator.instance;
+            tessellator.startDrawingQuads();
+            try {
+                drawCloudLayer(tessellator, worldTime, rain, thunder,
+                        posX, posY,
+                        viewportXMin, viewportXMax,
+                        viewportYMin, viewportYMax);
+            } finally {
+                // The tessellator is shared with everything else drawn this
+                // frame; left open once, nothing after it draws at all.
+                tessellator.draw();
+            }
+        } finally {
+            if (clipped) {
+                GL11.glPopAttrib();
+            }
+            if (sheeted) {
+                GL11.glPopMatrix();
+            }
+        }
+    }
+
+    /**
+     * The sky: one lattice, one size, at every zoom.
+     *
+     * <p>Laid out in screen pixels and scrolled by where the camera is looking,
+     * so panning carries the sky over the map and zooming does not touch it.
+     * The cells visited are therefore a fixed handful whatever the map is
+     * doing, which is also why there is no budget or cull here to get
+     * wrong.</p>
+     */
+    private static void drawCloudLayer(
+            Tessellator tessellator, long worldTime,
+            float rain, float thunder, float posX, float posY,
+            int viewportXMin, int viewportXMax,
+            int viewportYMin, int viewportYMax) {
+        float drift = cloudDrift(worldTime, CLOUD_SCREEN_CELL);
+        float scrollX = skyOffset(posX) - drift;
+        float scrollY = skyOffset(posY);
+        float centerX = (viewportXMin + viewportXMax) * 0.5F;
+        float centerY = (viewportYMin + viewportYMax) * 0.5F;
+        // A turned or leaning sheet shows past the viewport's own corners, so
+        // the lattice is walked over the box the sheet is actually cut to.
+        float reach = LostTalesLotrMapRotation.maxCoverage(
+                viewportXMax - viewportXMin, viewportYMax - viewportYMin)
+                * 0.5F + CLOUD_SCREEN_WIDTH;
+        int cellXMin = (int)Math.floor((scrollX - reach) / CLOUD_SCREEN_CELL);
+        int cellXMax = (int)Math.ceil((scrollX + reach) / CLOUD_SCREEN_CELL);
+        int cellYMin = (int)Math.floor((scrollY - reach) / CLOUD_SCREEN_CELL);
+        int cellYMax = (int)Math.ceil((scrollY + reach) / CLOUD_SCREEN_CELL);
+        float height = CLOUD_SCREEN_WIDTH * CLOUD_ASPECT;
+        for (int cellX = cellXMin; cellX <= cellXMax; cellX++) {
+            for (int cellY = cellYMin; cellY <= cellYMax; cellY++) {
+                if (cellNoise(cellX, cellY, CLOUD_CHANNEL)
+                        >= CLOUD_DENSITY) {
+                    // A cell without a cloud in it is what stops the sky
+                    // being an even lattice of them.
+                    continue;
+                }
+                float x = (cellX + 0.5F + jitter(cellX, cellY, 1))
+                        * CLOUD_SCREEN_CELL - scrollX + centerX;
+                float y = (cellY + 0.5F + jitter(cellX, cellY, 2))
+                        * CLOUD_SCREEN_CELL - scrollY + centerY;
+                float[] weather = resolveWeather(
+                        cellX, cellY, CLOUD_CHANNEL, rain, thunder);
+                int variant = (int)(cellNoise(
+                        cellX, cellY, CLOUD_CHANNEL + 3) * CLOUD_VARIANTS)
+                        % CLOUD_VARIANTS;
+                drawCloud(tessellator, x, y, height, variant, weather);
+            }
+        }
+    }
+
+    private static float jitter(int cellX, int cellY, int channel) {
+        return (cellNoise(cellX, cellY, CLOUD_CHANNEL + channel) - 0.5F)
+                * 2.0F * CLOUD_JITTER;
+    }
+
+    /** One cloud, as its own frame of the sheet, centred on its cell. */
+    private static void drawCloud(
+            Tessellator tessellator, float centerX, float centerY,
+            float height, int variant, float[] weather) {
+        float halfWidth = CLOUD_SCREEN_WIDTH * 0.5F;
+        float halfHeight = height * 0.5F;
+        double uMin = variant / (double)CLOUD_VARIANTS;
+        double uMax = (variant + 1.0D) / CLOUD_VARIANTS;
+        tessellator.setColorRGBA_F(
+                weather[0], weather[1], weather[2], weather[3]);
+        tessellator.addVertexWithUV(centerX - halfWidth,
+                centerY + halfHeight, 0.0D, uMin, 1.0D);
+        tessellator.addVertexWithUV(centerX + halfWidth,
+                centerY + halfHeight, 0.0D, uMax, 1.0D);
+        tessellator.addVertexWithUV(centerX + halfWidth,
+                centerY - halfHeight, 0.0D, uMax, 0.0D);
+        tessellator.addVertexWithUV(centerX - halfWidth,
+                centerY - halfHeight, 0.0D, uMin, 0.0D);
+    }
+
+    /**
+     * Keeps a leaning sheet inside its own frame.
+     *
+     * <p>Flat and square the clouds cannot reach past the viewport, but the
+     * sheet they are drawn on is cut larger than it so that turning and
+     * leaning have ground to show, and without this the sky would spill over
+     * the panels around the map.</p>
+     */
+    private static boolean beginViewportClip(
+            int viewportXMin, int viewportXMax,
+            int viewportYMin, int viewportYMax) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null) {
+            return false;
+        }
+        ScaledResolution resolution = new ScaledResolution(minecraft,
+                minecraft.displayWidth, minecraft.displayHeight);
+        int scaleFactor = Math.max(1, resolution.getScaleFactor());
+        GL11.glPushAttrib(GL11.GL_SCISSOR_BIT | GL11.GL_ENABLE_BIT);
+        GL11.glEnable(GL11.GL_SCISSOR_TEST);
+        GL11.glScissor(
+                viewportXMin * scaleFactor,
+                (resolution.getScaledHeight() - viewportYMax) * scaleFactor,
+                Math.max(0, viewportXMax - viewportXMin) * scaleFactor,
+                Math.max(0, viewportYMax - viewportYMin) * scaleFactor);
+        return true;
     }
 
     private static void drawShade(float[] shade, int xMin, int xMax,
@@ -317,152 +487,32 @@ final class LostTalesLotrMapAtmosphere {
     }
 
     /**
-     * Clouds, as formations placed on the ground rather than a sheet of noise
-     * pulled across it.
+     * What kind of weather a cloud is carrying, as {@code {r, g, b, a}}.
      *
-     * <p>Each is anchored where the map says it is, so it pans and zooms with
-     * the ground and turns and leans with it — the centres go through the
-     * same one place every other position on the map goes through, and the
-     * shapes themselves stay flat, which is what keeps them from being
-     * sheared into streaks by the lean.</p>
-     */
-    private static void drawClouds(
-            LostTalesLotrMapGui gui, long worldTime,
-            float posX, float posY, float zoomScale,
-            int viewportXMin, int viewportXMax,
-            int viewportYMin, int viewportYMax) {
-        // The map-image box the screen is looking at, widened so a cloud
-        // whose centre is off screen still draws the part that is on it.
-        float cell = cloudCell(zoomScale);
-        float drift = cloudDrift(worldTime, cell);
-        float halfWidth = (viewportXMax - viewportXMin) / zoomScale / 2.0F;
-        float halfHeight = (viewportYMax - viewportYMin) / zoomScale / 2.0F;
-        float margin = CLOUD_MAX_RADIUS * cell * 2.0F;
-        // A turned map looks past its own corners, so the box is grown to the
-        // diagonal rather than the sides.
-        float reach = (float)Math.sqrt(
-                halfWidth * halfWidth + halfHeight * halfHeight);
-        // The cells are visited where the clouds started, not where they have
-        // drifted to, so the window follows them. Looking in the undrifted
-        // place is what emptied the sky: a world a few days old has carried
-        // every cloud thousands of pixels past the cell it came from, and all
-        // of them were being drawn far outside the map.
-        float originX = posX - drift;
-        int cellXMin = (int)Math.floor((originX - reach - margin) / cell);
-        int cellXMax = (int)Math.ceil((originX + reach + margin) / cell);
-        int cellYMin = (int)Math.floor((posY - reach - margin) / cell);
-        int cellYMax = (int)Math.ceil((posY + reach + margin) / cell);
-        long cells = (long)(cellXMax - cellXMin + 1)
-                * (cellYMax - cellYMin + 1);
-        float coverage = cloudCoverage(
-                (int)Math.min(Integer.MAX_VALUE, cells));
-        if (coverage <= 0.002F) {
-            return;
-        }
-        float[] point = new float[2];
-
-        Tessellator tessellator = Tessellator.instance;
-        tessellator.startDrawingQuads();
-        for (int cellX = cellXMin; cellX <= cellXMax; cellX++) {
-            for (int cellY = cellYMin; cellY <= cellYMax; cellY++) {
-                drawFormation(gui, tessellator, cellX, cellY, cell, drift,
-                        posX, posY, zoomScale, coverage, point,
-                        viewportXMin, viewportXMax,
-                        viewportYMin, viewportYMax);
-            }
-        }
-        tessellator.draw();
-    }
-
-    private static void drawFormation(
-            LostTalesLotrMapGui gui, Tessellator tessellator,
-            int cellX, int cellY, float cell, float drift,
-            float posX, float posY, float zoomScale, float coverage,
-            float[] point, int viewportXMin, int viewportXMax,
-            int viewportYMin, int viewportYMax) {
-        // A cell without a cloud in it is what stops the sky being an even
-        // lattice of them.
-        if (cellNoise(cellX, cellY, 0) > 0.62F) {
-            return;
-        }
-        float baseX = (cellX + 0.5F + (cellNoise(cellX, cellY, 1) - 0.5F)
-                * 2.0F * CLOUD_JITTER) * cell + drift;
-        float baseY = (cellY + 0.5F + (cellNoise(cellX, cellY, 2) - 0.5F)
-                * 2.0F * CLOUD_JITTER) * cell;
-        // The size is a share of the cell, so a sky laid out for a zoomed
-        // out map has clouds to match rather than specks.
-        float radius = cell * (CLOUD_MIN_RADIUS + cellNoise(cellX, cellY, 3)
-                * (CLOUD_MAX_RADIUS - CLOUD_MIN_RADIUS));
-        float alpha = CLOUD_ALPHA * coverage
-                * (0.55F + cellNoise(cellX, cellY, 4) * 0.45F);
-        if (alpha <= 0.002F) {
-            return;
-        }
-        for (int puff = 0; puff < CLOUD_PUFFS; puff++) {
-            float offsetX = (cellNoise(cellX, cellY, 5 + puff * 2) - 0.5F)
-                    * radius * 1.5F;
-            float offsetY = (cellNoise(cellX, cellY, 6 + puff * 2) - 0.5F)
-                    * radius * 0.7F;
-            float puffRadius = radius
-                    * (0.55F + cellNoise(cellX, cellY, 11 + puff) * 0.45F);
-            point[0] = (baseX + offsetX - posX) * zoomScale
-                    + (viewportXMin + viewportXMax) * 0.5F;
-            point[1] = (baseY + offsetY - posY) * zoomScale
-                    + (viewportYMin + viewportYMax) * 0.5F;
-            LostTalesLotrMapRotation.rotate(point, gui);
-            float screenRadius = puffRadius * zoomScale;
-            if (point[0] + screenRadius < viewportXMin
-                    || point[0] - screenRadius > viewportXMax
-                    || point[1] + screenRadius < viewportYMin
-                    || point[1] - screenRadius > viewportYMax) {
-                continue;
-            }
-            drawPuff(tessellator, point[0], point[1], screenRadius, alpha);
-        }
-    }
-
-    /**
-     * One soft puff, as a ring of quads that fade to nothing at the rim.
+     * <p>Every cloud has a number of its own, fixed for its cell, and the
+     * world's weather is a threshold against it: as rain sets in, the clouds
+     * whose number falls under its strength darken, one by one and always the
+     * same ones, so a front rolling in reads as the sky thickening rather than
+     * as the whole map changing colour at once. Nothing is simulated and
+     * nothing is remembered between frames.</p>
      *
-     * <p>No texture: a cloud is a shape that has to hold up at any zoom, and
-     * a gradient the hardware interpolates is sharper at every one of them
-     * than a sprite would be.</p>
+     * <p>This is the single seam where a regional layer belongs. Minecraft
+     * keeps one weather state per dimension and LOTR adds none of its own, so
+     * there is nothing available here that could put snow over Forodwaith and
+     * rain over the Shire; when there is — a biome or region sampled from the
+     * cloud's own map position and cached — it is this method that reads it,
+     * and the drawing above does not change. Snow, sand and fog are not
+     * implemented: they would be further entries here.</p>
      */
-    private static void drawPuff(Tessellator tessellator,
-                                 float centerX, float centerY,
-                                 float radius, float alpha) {
-        float core = radius * PUFF_CORE;
-        float lastCoreX = centerX + core;
-        float lastCoreY = centerY;
-        float lastRimX = centerX + radius;
-        float lastRimY = centerY;
-        for (int segment = 1; segment <= PUFF_SEGMENTS; segment++) {
-            double angle = Math.PI * 2.0D * segment / PUFF_SEGMENTS;
-            float cos = (float)Math.cos(angle);
-            float sin = (float)Math.sin(angle);
-            float coreX = centerX + cos * core;
-            float coreY = centerY + sin * core;
-            float rimX = centerX + cos * radius;
-            float rimY = centerY + sin * radius;
-            // Quads throughout rather than a fan, because the pass is already
-            // drawing quads and changing primitive would cost a flush.
-            tessellator.setColorRGBA_F(1.0F, 1.0F, 1.0F, alpha);
-            tessellator.addVertex(centerX, centerY, 0.0D);
-            tessellator.addVertex(lastCoreX, lastCoreY, 0.0D);
-            tessellator.addVertex(coreX, coreY, 0.0D);
-            tessellator.addVertex(centerX, centerY, 0.0D);
-
-            tessellator.setColorRGBA_F(1.0F, 1.0F, 1.0F, alpha);
-            tessellator.addVertex(lastCoreX, lastCoreY, 0.0D);
-            tessellator.addVertex(coreX, coreY, 0.0D);
-            tessellator.setColorRGBA_F(1.0F, 1.0F, 1.0F, 0.0F);
-            tessellator.addVertex(rimX, rimY, 0.0D);
-            tessellator.addVertex(lastRimX, lastRimY, 0.0D);
-
-            lastCoreX = coreX;
-            lastCoreY = coreY;
-            lastRimX = rimX;
-            lastRimY = rimY;
+    static float[] resolveWeather(
+            int cellX, int cellY, int seed, float rain, float thunder) {
+        float wetness = cellNoise(cellX, cellY, seed + 26);
+        if (wetness < Math.max(0.0F, Math.min(1.0F, thunder))) {
+            return THUNDER_CLOUD;
         }
+        if (wetness < Math.max(0.0F, Math.min(1.0F, rain))) {
+            return RAIN_CLOUD;
+        }
+        return FAIR_CLOUD;
     }
 }

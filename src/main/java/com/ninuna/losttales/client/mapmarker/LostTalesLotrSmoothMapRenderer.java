@@ -136,6 +136,14 @@ final class LostTalesLotrSmoothMapRenderer {
                 minecraft.theWorld.getWeightedThunderStrength(1.0F),
                 posX, posY, scale,
                 viewportXMin, viewportXMax, viewportYMin, viewportYMax);
+        // After the sky and before anything a player navigates by: roads,
+        // labels and markers are all drawn later in LOTR's own order, so
+        // decoration can never sit on top of them.
+        LostTalesMapDecorationRenderer.render(
+                (LostTalesLotrMapGui)gui,
+                minecraft.theWorld.getTotalWorldTime(),
+                posX, posY, scale,
+                viewportXMin, viewportXMax, viewportYMin, viewportYMax);
     }
 
     /**

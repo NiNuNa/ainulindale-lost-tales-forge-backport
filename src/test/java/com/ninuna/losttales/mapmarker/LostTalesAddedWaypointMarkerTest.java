@@ -35,13 +35,6 @@ public class LostTalesAddedWaypointMarkerTest {
         for (ELostTalesWaypoint addedWaypoint : ELostTalesWaypoint.values()) {
             LOTRWaypoint waypoint = addedWaypoint.getWaypoint();
             LostTalesMapMarkerDefinition marker = markersByWaypointCode.get(waypoint.getCodeName());
-            if (addedWaypoint == ELostTalesWaypoint.LOSSOTH) {
-                assertTrue("Lossoth control-zone anchor must stay hidden",
-                        waypoint.isHidden());
-                assertNull("Lossoth must not have a visible map marker",
-                        marker);
-                continue;
-            }
             assertNotNull("Missing marker metadata for " + waypoint.getCodeName(), marker);
             assertTrue("Lost Tales waypoint must remain discoverable: " + waypoint.getCodeName(), marker.isDiscoverable());
             assertTrue("Lost Tales waypoint must follow its LOTR region: " + waypoint.getCodeName(), marker.requiresRegionUnlock());
@@ -88,16 +81,27 @@ public class LostTalesAddedWaypointMarkerTest {
                 waypointMarkerCount > 0);
     }
 
+    /**
+     * The Lossoth used to be anchored by a Lost Tales waypoint of their own,
+     * which sat out in the Sundering Seas. Their control zone is LOTR's Cape
+     * of Forochel now, and nothing may put that waypoint back.
+     */
     @Test
-    public void lossothUsesHiddenInternalAnchorWithoutMapMarker() {
+    public void lossothNoLongerHasAWaypointOfItsOwn() {
         LostTalesMapMarkerCatalog.reloadFromClasspath();
         ELostTalesWaypoint.values();
 
         assertNull(LostTalesMapMarkerCatalog.getMarker(
                 "lotr:waypoint:lossoth"));
-        LOTRWaypoint waypoint = LOTRWaypoint.waypointForName("LOSSOTH");
-        assertNotNull(waypoint);
-        assertTrue(waypoint.isHidden());
+        assertNull("the Lossoth anchor waypoint must be gone",
+                LOTRWaypoint.waypointForName("LOSSOTH"));
+        // Its fast-travel region stays registered: a character who unlocked it
+        // has the name saved, and the state adapter rejects a region it cannot
+        // resolve.
+        assertNotNull("the Lossoth region must survive for saved characters",
+                LOTRWaypoint.regionForName("LOSSOTH"));
+        assertNotNull("Cape of Forochel must exist to anchor them instead",
+                LOTRWaypoint.CAPE_OF_FOROCHEL);
     }
 
     private static LOTRWaypoint.Region expectedRegion(

@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lotr.client.gui.LOTRGuiMap;
+import lotr.common.LOTRConfig;
 import lotr.common.LOTRDimension;
 import lotr.common.LOTRLevelData;
 import lotr.common.LOTRPlayerData;
@@ -217,6 +218,213 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             filtered.add(waypoint);
         }
         return filtered;
+    }
+
+    /**
+     * Every destination the travel popup could be moved to, unordered.
+     *
+     * <p>Deliberately built from the same predicates that decide what is drawn
+     * and what a click may reach, rather than from a shorter list of its own:
+     * a destination the player can step onto with an arrow key has to be one
+     * they could have clicked. It is not clipped to the viewport, because
+     * stepping to the next place is exactly how a player reaches one that is
+     * off screen — the camera follows.</p>
+     *
+     * <p>Whether travel is actually allowed right now is not decided here. A
+     * destination on cooldown, or one that needs a waystone, still opens its
+     * popup with the reason on it, the same as when it is clicked; the server
+     * re-derives all of it for the request itself.</p>
+     *
+     * @param excludedMarkerId a marker whose click means something else — the
+     *                         player's own "go here" pin — or null
+     */
+    public static List<FastTravelCandidate> collectFastTravelCandidates(
+            List<LOTRAbstractWaypoint> waypoints, boolean includeHidden,
+            String excludedMarkerId) {
+        ArrayList<FastTravelCandidate> candidates =
+                new ArrayList<FastTravelCandidate>();
+        HashSet<String> seen = new HashSet<String>();
+        if (waypoints != null) {
+            for (LOTRAbstractWaypoint waypoint : waypoints) {
+                addFastTravelWaypoint(candidates, seen, waypoint,
+                        includeHidden, excludedMarkerId);
+            }
+        }
+        for (LostTalesMapMarkerData marker : getVisibleStandaloneMarkers()) {
+            if (shouldRenderStandaloneMarker(marker)) {
+                addFastTravelCandidate(candidates, seen, marker, null,
+                        excludedMarkerId);
+            }
+        }
+        return candidates;
+    }
+
+    private static void addFastTravelWaypoint(
+            List<FastTravelCandidate> candidates, Set<String> seen,
+            LOTRAbstractWaypoint waypoint, boolean includeHidden,
+            String excludedMarkerId) {
+        if (waypoint == null) {
+            return;
+        }
+        if (waypoint instanceof LOTRCustomWaypoint) {
+            LostTalesMapMarkerData marker;
+            try {
+                if (!includeHidden
+                        && !isWaypointVisibleInLotrToggles(waypoint)) {
+                    return;
+                }
+                marker = createCustomWaypointMarker(
+                        (LOTRCustomWaypoint)waypoint,
+                        ((LOTRCustomWaypoint)waypoint).isShared());
+            } catch (Throwable ignored) {
+                // A waypoint LOTR cannot describe is not drawn either.
+                return;
+            }
+            if (LostTalesMapLegendRegistry.isMarkerVisible(marker)) {
+                addFastTravelCandidate(candidates, seen, marker, waypoint,
+                        excludedMarkerId);
+            }
+            return;
+        }
+        LostTalesMapMarkerData mapped = getReplacementMarker(waypoint);
+        if (mapped != null) {
+            if (shouldRenderReplacementWaypoint(
+                    waypoint, mapped, includeHidden)) {
+                addFastTravelCandidate(candidates, seen, mapped, waypoint,
+                        excludedMarkerId);
+            }
+            return;
+        }
+        if (hasDecorativeMapping(waypoint)) {
+            // Drawn as scenery on the map and never clickable.
+            return;
+        }
+        if ((includeHidden || isWaypointVisibleInLotrToggles(waypoint))
+                && LostTalesMapLegendRegistry.isWaypointVisible(waypoint)) {
+            addFastTravelCandidate(candidates, seen, null, waypoint,
+                    excludedMarkerId);
+        }
+    }
+
+    private static void addFastTravelCandidate(
+            List<FastTravelCandidate> candidates, Set<String> seen,
+            LostTalesMapMarkerData marker, LOTRAbstractWaypoint waypoint,
+            String excludedMarkerId) {
+        if (marker != null) {
+            if (!marker.hasFastTravel()
+                    || isLockedMappedMarkerVisible(marker)
+                    || isUndiscoveredButVisible(marker)) {
+                // An undiscovered place is a target on the map and nothing
+                // more: clicking it offers no travel, so nor does stepping
+                // onto it.
+                return;
+            }
+            if (excludedMarkerId != null
+                    && excludedMarkerId.equals(marker.getId())) {
+                return;
+            }
+        } else if (waypoint == null) {
+            return;
+        }
+        FastTravelCandidate candidate =
+                FastTravelCandidate.of(marker, waypoint);
+        if (candidate != null && seen.add(candidate.getKey())) {
+            candidates.add(candidate);
+        }
+    }
+
+    /**
+     * One destination the travel popup may be moved onto.
+     *
+     * <p>Carries where it is so an order can be worked out once, and enough to
+     * reopen the popup on it. Immutable: the list is built when the popup
+     * opens and stepped through afterwards, so nothing in it may drift.</p>
+     */
+    public static final class FastTravelCandidate {
+        private final LostTalesMapMarkerData marker;
+        private final LOTRAbstractWaypoint waypoint;
+        private final String key;
+        private final double worldX;
+        private final double worldZ;
+
+        private FastTravelCandidate(
+                LostTalesMapMarkerData marker, LOTRAbstractWaypoint waypoint,
+                String key, double worldX, double worldZ) {
+            this.marker = marker;
+            this.waypoint = waypoint;
+            this.key = key;
+            this.worldX = worldX;
+            this.worldZ = worldZ;
+        }
+
+        static FastTravelCandidate of(
+                LostTalesMapMarkerData marker,
+                LOTRAbstractWaypoint waypoint) {
+            try {
+                if (marker != null) {
+                    return new FastTravelCandidate(marker, waypoint,
+                            "marker:" + safeString(marker.getId()),
+                            marker.getX(), marker.getZ());
+                }
+                if (waypoint == null) {
+                    return null;
+                }
+                return new FastTravelCandidate(null, waypoint,
+                        "waypoint:" + safeString(waypoint.getCodeName())
+                                + ':' + waypoint.getXCoord()
+                                + ':' + waypoint.getZCoord(),
+                        waypoint.getXCoord(), waypoint.getZCoord());
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+
+        public LostTalesMapMarkerData getMarker() {
+            return this.marker;
+        }
+
+        public LOTRAbstractWaypoint getWaypoint() {
+            return this.waypoint;
+        }
+
+        /** Stable across frames, and the tie-break when two are equidistant. */
+        public String getKey() {
+            return this.key;
+        }
+
+        public double getWorldX() {
+            return this.worldX;
+        }
+
+        public double getWorldZ() {
+            return this.worldZ;
+        }
+
+        /**
+         * Whether this destination is still one the map would draw.
+         *
+         * <p>Checked again as the popup steps onto it, because the list is
+         * built once and a marker can be filtered out, undiscovered no longer,
+         * or deleted while the popup is open.</p>
+         */
+        public boolean isStillEligible() {
+            try {
+                if (this.marker != null) {
+                    return this.marker.hasFastTravel()
+                            && shouldShowLostTalesIcon(this.marker)
+                            && !isUndiscoveredButVisible(this.marker)
+                            && (this.waypoint == null
+                                    || !isDeletedMappedWaypoint(
+                                            this.waypoint));
+                }
+                return this.waypoint != null
+                        && isWaypointVisibleInLotrToggles(this.waypoint)
+                        && LostTalesMapLegendRegistry.isWaypointVisible(
+                                this.waypoint);
+            } catch (Throwable ignored) {
+                return false;
+            }
+        }
     }
 
     /**
@@ -1972,9 +2180,12 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                     continue;
                 }
 
+                float[] tint = toMapTint(
+                        new float[] { 1.0F, 1.0F, 1.0F });
                 drawFixedScreenIcon(context.minecraft,
                         position.x, position.y, ICON_DRAW_SIZE,
-                        LostTalesCompassMarkerIcon.HOSTILE, 1.0F, 1.0F, 1.0F, context.alpha);
+                        LostTalesCompassMarkerIcon.HOSTILE,
+                        tint[0], tint[1], tint[2], context.alpha);
             }
         } catch (Throwable ignored) {
             // Transient markers are visual-only; never break the LOTR map.
@@ -2652,18 +2863,21 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         return ((Float) zoomExpField.get(gui)).floatValue();
     }
 
+    /**
+     * Marker opacity, on the map's shared zoom fade rather than on LOTR's,
+     * which was written for a narrower zoom and put every icon out well
+     * before this map runs out of range.
+     */
     private static float getWaypointAlpha(LOTRGuiMap gui, float zoomExp) {
-        float alpha = (zoomExp + 3.3F) / 2.2F;
-        alpha = Math.min(alpha, 1.0F);
         if (!gui.enableZoomOutWPFading) {
-            alpha = 1.0F;
+            return 1.0F;
         }
-        if (alpha < 0.0F) {
-            alpha = 0.0F;
-        }
-        return alpha;
+        return LostTalesMapZoomFade.alpha(zoomExp,
+                LostTalesLotrMapGui.minZoomExpOf(gui),
+                LostTalesLotrMapGui.maxZoomExpOf(gui));
     }
 
+    /** Labels fade on their own, earlier rule, and keep it. */
     private static float getLabelAlpha(float zoomExp) {
         float alpha = (zoomExp + 1.0F) / 4.0F;
         alpha = Math.min(alpha, 1.0F);
@@ -2893,10 +3107,52 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         LostTalesCompassMarkerIcon icon = getMarkerIcon(marker);
         // White is a neutral texture tint. Undiscovered icons should retain
         // their artwork instead of being recolored gray or washed out.
-        float[] color = LostTalesCompassMarker.parseColor(
-                undiscovered ? "white" : marker.getColorName());
+        float[] color = toMapTint(LostTalesCompassMarker.parseColor(
+                undiscovered ? "white" : marker.getColorName()));
         drawIconWithShadow(minecraft, centerX, centerY, size, icon,
                 color[0], color[1], color[2], alpha);
+    }
+
+    /**
+     * Puts a colour into whatever the map is currently printed in.
+     *
+     * <p>A sepia map is one photograph, not a brown photograph with the
+     * markers still in colour on top of it, and the same red pin that reads as
+     * a landmark on the painted map reads as a mistake on the sepia one. So
+     * every colour drawn onto the map goes through the same conversion LOTR
+     * put the map image itself through.</p>
+     *
+     * <p>Whether the map is sepia is read where LOTR reads it, so the two
+     * cannot disagree — including through the OSRS map, which is drawn from
+     * the sepia texture whatever the setting says.</p>
+     */
+    private static float[] toMapTint(float[] color) {
+        if (color == null || color.length < 3 || !isSepiaMap()) {
+            return color;
+        }
+        return toLotrSepiaTint(color[0], color[1], color[2]);
+    }
+
+    static boolean isSepiaMap() {
+        try {
+            return LOTRConfig.enableSepiaMap || LOTRConfig.osrsMap;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    /** The same conversion, for a packed label colour. */
+    private static int toMapTint(int rgb) {
+        if (!isSepiaMap()) {
+            return rgb;
+        }
+        float[] tinted = toLotrSepiaTint(
+                ((rgb >> 16) & 0xFF) / 255.0F,
+                ((rgb >> 8) & 0xFF) / 255.0F,
+                (rgb & 0xFF) / 255.0F);
+        return (Math.round(tinted[0] * 255.0F) << 16)
+                | (Math.round(tinted[1] * 255.0F) << 8)
+                | Math.round(tinted[2] * 255.0F);
     }
 
     /** Draws the same marker artwork in client editors without map logic. */
@@ -3122,8 +3378,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         }
         int alphaByte = Math.max(MIN_LABEL_TEXT_ALPHA, Math.min(255,
                 (int)(Math.min(1.0F, scale) * opacity * 255.0F)));
-        int color = (alphaByte << 24) | LABEL_COLOR;
-        int shadowColor = (alphaByte << 24) | LABEL_SHADOW_COLOR;
+        int color = (alphaByte << 24) | toMapTint(LABEL_COLOR);
+        int shadowColor = (alphaByte << 24) | toMapTint(LABEL_SHADOW_COLOR);
         GL11.glPushMatrix();
         GL11.glTranslatef(anchorX, topY, 0.0F);
         GL11.glScalef(scale, scale, scale);

@@ -206,8 +206,10 @@ public enum ELostTalesFaction {
                 new LostTalesPair(LOTRWaypoint.MOUNT_RERIR, 125)
         });
 
+        // LOTR's own Cape of Forochel, rather than a Lost Tales waypoint of
+        // our own: the one that was here sat out in the Sundering Seas.
         LOSSOTH.setFactionControlZones( new LostTalesPair[]{
-                new LostTalesPair(ELostTalesWaypoint.LOSSOTH.getWaypoint(), 175)
+                new LostTalesPair(LOTRWaypoint.CAPE_OF_FOROCHEL, 175)
         });
 
         ODANE.setFactionControlZones( new LostTalesPair[]{

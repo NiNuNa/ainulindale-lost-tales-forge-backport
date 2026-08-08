@@ -26,6 +26,8 @@ import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneStateStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneTravelContext;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
+import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
+import com.ninuna.losttales.client.mapmarker.LostTalesMapDecorationRenderer;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMainMenuMapHook;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapMarkerIconOverlay;
 import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
@@ -100,6 +102,9 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientMapMarkerNotificationStore.clear();
         LostTalesClientMapMarkerStore.clearDynamicMarkers();
         LostTalesLotrMapMarkerIconOverlay.clearClientState();
+        // The map image is per-world, so what was learned about where its
+        // water is cannot be carried into the next one.
+        LostTalesMapDecorationRenderer.clearCache();
         LostTalesClientWaystoneStateStore.clear();
         LostTalesClientWaystoneTravelContext.clear();
         LostTalesClientMobAggroCache.clear();
@@ -132,6 +137,19 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     @SubscribeEvent
     public void updateWraithWorldEffect(TickEvent.ClientTickEvent event) {
         WraithWorldVisualEffect.onClientTick(event);
+    }
+
+    /**
+     * The map hides the system pointer while it owns it and gives it back when
+     * it closes. This is what covers the ways a screen can stop being current
+     * without closing tidily — a crash inside its own draw, above all — where
+     * the cost of getting it wrong is a desktop with no pointer on it.
+     */
+    @SubscribeEvent
+    public void releaseMapCursorWhenUnowned(TickEvent.ClientTickEvent event) {
+        if (event != null && event.phase == TickEvent.Phase.END) {
+            LostTalesMapCursor.releaseIfUnowned(Minecraft.getMinecraft());
+        }
     }
 
     @SubscribeEvent

@@ -14,7 +14,11 @@ final class LostTalesMapFastTravelPrompt {
         NONE,
         YES,
         NO,
-        PLACE_MARKER
+        PLACE_MARKER,
+        /** Move the question to the destination before this one. */
+        PREVIOUS,
+        /** And to the one after it. */
+        NEXT
     }
 
     private final String destinationName;
@@ -24,13 +28,20 @@ final class LostTalesMapFastTravelPrompt {
      * eligibility for every request it receives.
      */
     private final String blockedReasonKey;
+    /**
+     * Whether there is anywhere else to step to. With one destination the
+     * arrows are neither drawn nor answer to their keys, so the popup never
+     * offers a movement that does nothing.
+     */
+    private final boolean hasAlternatives;
 
     LostTalesMapFastTravelPrompt(String destinationName) {
-        this(destinationName, null);
+        this(destinationName, null, false);
     }
 
     LostTalesMapFastTravelPrompt(
-            String destinationName, String blockedReasonKey) {
+            String destinationName, String blockedReasonKey,
+            boolean hasAlternatives) {
         String normalized = destinationName == null
                 ? "" : destinationName.trim();
         this.destinationName = normalized.length() == 0
@@ -39,6 +50,7 @@ final class LostTalesMapFastTravelPrompt {
         this.blockedReasonKey =
                 blockedReasonKey == null || blockedReasonKey.length() == 0
                         ? null : blockedReasonKey;
+        this.hasAlternatives = hasAlternatives;
     }
 
     String getDestinationName() {
@@ -91,6 +103,12 @@ final class LostTalesMapFastTravelPrompt {
                         "gui.losttales.map.fast_travel.place_marker"),
                 layout.third.contains(mouseX, mouseY),
                 canPlaceMarker);
+        if (this.hasAlternatives) {
+            LostTalesMapChoicePrompt.drawStepArrow(layout.previous, true,
+                    layout.previous.contains(mouseX, mouseY));
+            LostTalesMapChoicePrompt.drawStepArrow(layout.next, false,
+                    layout.next.contains(mouseX, mouseY));
+        }
     }
 
     Action mouseClicked(int screenWidth, int screenHeight,
@@ -111,6 +129,14 @@ final class LostTalesMapFastTravelPrompt {
         if (canPlaceMarker && layout.third.contains(mouseX, mouseY)) {
             return Action.PLACE_MARKER;
         }
+        if (this.hasAlternatives) {
+            if (layout.previous.contains(mouseX, mouseY)) {
+                return Action.PREVIOUS;
+            }
+            if (layout.next.contains(mouseX, mouseY)) {
+                return Action.NEXT;
+            }
+        }
         return Action.NONE;
     }
 
@@ -123,6 +149,14 @@ final class LostTalesMapFastTravelPrompt {
                 || keyCode == Keyboard.KEY_NUMPADENTER
                 || keyCode == Keyboard.KEY_Y) {
             return isTravelOffered() ? Action.YES : Action.NONE;
+        }
+        // Both the arrows and the movement keys, because the popup has taken
+        // the map's own use of A and D for as long as it is open.
+        if (keyCode == Keyboard.KEY_LEFT || keyCode == Keyboard.KEY_A) {
+            return this.hasAlternatives ? Action.PREVIOUS : Action.NONE;
+        }
+        if (keyCode == Keyboard.KEY_RIGHT || keyCode == Keyboard.KEY_D) {
+            return this.hasAlternatives ? Action.NEXT : Action.NONE;
         }
         return Action.NONE;
     }
