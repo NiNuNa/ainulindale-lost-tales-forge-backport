@@ -9,6 +9,7 @@ import cpw.mods.fml.relauncher.SideOnly;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import lotr.client.LOTRKeyHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -53,9 +54,6 @@ public final class LostTalesLotrMapControlBar {
     private static final int SEPARATOR_INSET = 7;
     /** How many hints belong to the left end, before the rest go right. */
     private static final int LEFT_GROUP_SIZE = 3;
-    /** LOTR's operator teleport key, which its own subtitle used to name. */
-    private static final int TELEPORT_KEY = Keyboard.KEY_M;
-
     private LostTalesLotrMapControlBar() {
     }
 
@@ -133,7 +131,8 @@ public final class LostTalesLotrMapControlBar {
         if (gui != null && gui.isPlayerOp) {
             // LOTR's own sentence for this is filtered out of the map, so
             // the action is named once, in the strip, like every other.
-            hints.add(Hint.key(minecraft, font, TELEPORT_KEY,
+            hints.add(Hint.binding(minecraft, font,
+                    LOTRKeyHandler.keyBindingMapTeleport,
                     I18n.format("gui.losttales.map.control.teleport")));
         }
         return hints;

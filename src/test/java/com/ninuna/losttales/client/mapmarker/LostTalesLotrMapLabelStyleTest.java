@@ -11,6 +11,8 @@ public final class LostTalesLotrMapLabelStyleTest {
     public void plainWhiteBecomesTheInterfacesOwnWhite() {
         assertEquals(OPAQUE | LostTalesLotrMapLabelStyle.LABEL_RGB,
                 LostTalesLotrMapLabelStyle.restyle(OPAQUE | 0xFFFFFF));
+        assertEquals(LostTalesLotrMapLabelStyle.LABEL_RGB,
+                LostTalesLotrMapLabelStyle.restyleMapSubtitle(0xFFFFFF));
     }
 
     /**

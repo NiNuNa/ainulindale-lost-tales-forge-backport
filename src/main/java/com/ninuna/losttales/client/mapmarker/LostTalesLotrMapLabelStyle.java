@@ -37,6 +37,11 @@ public final class LostTalesLotrMapLabelStyle {
         return font.drawString(text, x, y, restyle(colour));
     }
 
+    /** Transformer hook for biome and coordinate text in the map strip. */
+    public static int restyleMapSubtitle(int colour) {
+        return restyle(colour);
+    }
+
     /**
      * Substitutes the interface's ivory for plain white, and leaves anything
      * else exactly as it was.

@@ -121,6 +121,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             ((LostTalesSkyrimUiStyle.HUD_SHADOW >> 8) & 0xFF) / 255.0F,
             (LostTalesSkyrimUiStyle.HUD_SHADOW & 0xFF) / 255.0F
     };
+    private static final float[] WHITE_TINT = { 1.0F, 1.0F, 1.0F };
     /**
      * 1.7.10's FontRenderer reads an alpha byte below 4 as "no alpha given"
      * and forces the text back to full opacity, so a label fading out is
@@ -438,7 +439,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             boolean includeHidden) {
         RenderContext context = createRenderContext(gui);
         if (context == null
-                || !LostTalesMapZoomFade.isInteractive(context.alpha)) {
+                || !LostTalesMapZoomFade.isDrawable(context.alpha)) {
             groupingFrame = GroupingFrame.empty();
             updateHoverFocus(gui, nativeWaypoints,
                     mouseX, mouseY, includeHidden);
@@ -501,10 +502,31 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         // frame a highlight appeared or left, and the stack blinked.
         updateHoverFocus(gui, nativeWaypoints,
                 mouseX, mouseY, includeHidden);
-        if (candidates.isEmpty()) {
+    }
+
+    /**
+     * Draws the grouping frame prepared by {@link #renderGroupedMarkers}.
+     *
+     * <p>LOTR paints its geographical text after the first waypoint pass. The
+     * custom map therefore prepares geometry and hover ownership there, but
+     * composites the artwork in the later waypoint pass. Marker-owned names
+     * and condensed "x more" labels remain in this pass and are deliberately
+     * drawn after their artwork.</p>
+     */
+    public static void renderPreparedGroupedMarkers(
+            LOTRGuiMap gui, boolean drawLabels) {
+        if (groupingFrame.gui != gui || groupingFrame.candidates.isEmpty()) {
             return;
         }
-
+        RenderContext context = createRenderContext(gui);
+        if (context == null
+                || !LostTalesMapZoomFade.isDrawable(context.alpha)) {
+            return;
+        }
+        List<MarkerRenderCandidate> candidates = groupingFrame.candidates;
+        LostTalesMapMarkerGrouping.Result result = groupingFrame.result;
+        LostTalesMapMarkerRenderedGeometry.Frame renderedGeometry =
+                groupingFrame.renderedGeometry;
         beginIconRender();
         try {
             // Three passes over one back-to-front list of stacks. Every fan is
@@ -1526,8 +1548,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
      * portraits. Native markers remain the safe fallback when no appearance
      * is available, and still own tracking and hover text.
      */
-    public static void renderRoleplayPlayerHeads(
-            LOTRGuiMap gui, int mouseX, int mouseY) {
+    public static void prepareRoleplayPlayerHeads(LOTRGuiMap gui) {
         roleplayPlayerHeadFrameGui = gui;
         roleplayPlayerHeadFrame = Collections.emptyList();
         RenderContext context = createRenderContext(gui);
@@ -1537,7 +1558,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         ArrayList<RoleplayPlayerHead> renderedHeads =
                 new ArrayList<RoleplayPlayerHead>();
         roleplayPlayerHeadFrame = renderedHeads;
-        beginIconRender();
         try {
             Set<UUID> renderedOwners = new HashSet<UUID>();
             // LOTR renders the local player outside playerLocations. Cover
@@ -1547,7 +1567,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             UUID localOwnerId = localPlayer == null
                     ? null : localPlayer.getUniqueID();
             if (localPlayer != null && localOwnerId != null) {
-                renderRoleplayPlayerHead(
+                collectRoleplayPlayerHead(
                         context, localOwnerId,
                         ClientRoleplayCharacterIdentityHook
                                 .resolveMapPlayerName(
@@ -1578,7 +1598,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                             || !renderedOwners.add(member.getOwnerId())) {
                         continue;
                     }
-                    renderRoleplayPlayerHead(
+                    collectRoleplayPlayerHead(
                             context, member.getOwnerId(),
                             member.getCharacterName(),
                             tracked.getX(), tracked.getZ(),
@@ -1607,7 +1627,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                         ? (GameProfile)profileValue : null;
                 double worldX = playerLocationXField.getDouble(location);
                 double worldZ = playerLocationZField.getDouble(location);
-                renderRoleplayPlayerHead(
+                collectRoleplayPlayerHead(
                         context, ownerId,
                         ClientRoleplayCharacterIdentityHook
                                 .resolveMapPlayerName(profile),
@@ -1616,6 +1636,26 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             }
         } catch (Throwable ignored) {
             // LOTR internals are compatibility-only; the normal map stays usable.
+        }
+    }
+
+    /** Draws the player portraits collected before LOTR's geographical text. */
+    public static void renderPreparedRoleplayPlayerHeads(LOTRGuiMap gui) {
+        if (roleplayPlayerHeadFrameGui != gui
+                || roleplayPlayerHeadFrame.isEmpty()) {
+            return;
+        }
+        RenderContext context = createRenderContext(gui);
+        if (context == null) {
+            return;
+        }
+        beginIconRender();
+        try {
+            for (RoleplayPlayerHead head : roleplayPlayerHeadFrame) {
+                drawRoleplayPlayerHead(context, head, PLAYER_HEAD_DRAW_SIZE);
+            }
+        } catch (Throwable ignored) {
+            // Portrait rendering is optional compatibility artwork.
         } finally {
             endIconRender();
         }
@@ -1627,7 +1667,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         return gui instanceof LostTalesLotrMapGui && ensureReflection();
     }
 
-    private static void renderRoleplayPlayerHead(
+    private static void collectRoleplayPlayerHead(
             RenderContext context, UUID ownerId,
             String displayName,
             double worldX, double worldZ,
@@ -1649,7 +1689,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         RoleplayPlayerHead head = new RoleplayPlayerHead(
                 ownerId, displayName, centerX, centerY);
         renderedHeads.add(head);
-        drawRoleplayPlayerHead(context, head, PLAYER_HEAD_DRAW_SIZE);
     }
 
     private static void drawRoleplayPlayerHead(
@@ -2120,6 +2159,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                     || loadingConquestGridField.getBoolean(gui)) {
                 return null;
             }
+            if (gui instanceof LostTalesLotrMapGui) {
+                return ((LostTalesLotrMapGui)gui)
+                        .getResolvedCursorWorldPosition(mouseX, mouseY);
+            }
             float[] mapImage = new float[2];
             if (!LostTalesLotrMapRotation.screenToMapImage(
                     gui, mouseX, mouseY, mapImage)) {
@@ -2154,7 +2197,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
 
         RenderContext context = createRenderContext(gui);
         if (context == null
-                || !LostTalesMapZoomFade.isInteractive(context.alpha)) {
+                || !LostTalesMapZoomFade.isDrawable(context.alpha)) {
             return;
         }
 
@@ -2169,6 +2212,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         }
 
         beginIconRender();
+        float[] tint = toMapTint(WHITE_TINT);
         try {
             for (TrackedEnemy trackedEnemy : trackedEnemies) {
                 EnemyMarkerPosition enemy = resolveVisibleTransientEnemy(
@@ -2185,8 +2229,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                     continue;
                 }
 
-                float[] tint = toMapTint(
-                        new float[] { 1.0F, 1.0F, 1.0F });
                 drawFixedScreenIcon(context.minecraft,
                         position.x, position.y, ICON_DRAW_SIZE,
                         LostTalesCompassMarkerIcon.HOSTILE,

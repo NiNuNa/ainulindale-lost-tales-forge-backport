@@ -22,7 +22,7 @@ public final class LostTalesMapLegendRegistryTest {
             ids.add(category.getId());
         }
 
-        assertEquals(6, ids.size());
+        assertEquals(7, ids.size());
         assertTrue(ids.contains(LostTalesMapLegendRegistry.LOCATIONS));
         assertTrue(ids.contains(
                 LostTalesMapLegendRegistry.PERSONAL_WAYPOINTS));
@@ -32,6 +32,7 @@ public final class LostTalesMapLegendRegistryTest {
                 LostTalesMapLegendRegistry.PLAYER_WAYSTONES));
         assertTrue(ids.contains(LostTalesMapLegendRegistry.QUESTS));
         assertTrue(ids.contains(LostTalesMapLegendRegistry.PARTY));
+        assertTrue(ids.contains(LostTalesMapLegendRegistry.LABELS));
         for (String id : ids) {
             assertFalse(id.contains("hostile"));
             assertFalse(id.contains("enemy"));

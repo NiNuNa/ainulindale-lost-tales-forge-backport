@@ -23,7 +23,7 @@ import org.lwjgl.opengl.GL11;
 @SideOnly(Side.CLIENT)
 final class LostTalesLotrMapVignette {
     /** Darkness once the shade has reached its fullest. */
-    static final float EDGE_ALPHA = 0.46F;
+    static final float EDGE_ALPHA = 0.49F;
     /**
      * How far out the shade starts, as a share of the way to the edge.
      *

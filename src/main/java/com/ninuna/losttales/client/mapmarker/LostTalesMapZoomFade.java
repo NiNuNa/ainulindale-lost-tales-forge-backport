@@ -32,16 +32,17 @@ final class LostTalesMapZoomFade {
      * than anyone needs. What the fade has to be pinned to is the zoom a
      * player is at, not the zoom the slider can reach.</p>
      */
-    static final float SOLID_ZOOM_EXP = 1.0F;
+    static final float SOLID_ZOOM_EXP = 3.05F;
     /**
      * And pulled out this far, nothing is drawn at all.
      *
-     * <p>Just before the whole of Middle-earth fits on the screen, which is
-     * where a map full of pins stops being a map. There is deliberately zoom
-     * left below this: the last of the way out is spent looking at the
-     * country, with the fade already finished rather than still running.</p>
+     * <p>This sits immediately inside the map's widest zoom. Markers therefore
+     * remain visible through the useful continental views and finish fading
+     * only as the zoom reaches its true outer limit.</p>
      */
-    static final float CLEAR_ZOOM_EXP = -2.0F;
+    static final float CLEAR_ZOOM_EXP = -3.5F;
+    /** Keeps useful working zooms readable while retaining a long fade. */
+    private static final float FADE_BIAS = 0.3F;
     /**
      * Below this opacity a thing on the map stops answering the pointer.
      *
@@ -57,6 +58,11 @@ final class LostTalesMapZoomFade {
     /** Whether something drawn at this opacity may still be pointed at. */
     static boolean isInteractive(float alpha) {
         return alpha >= INTERACTIVE_ALPHA;
+    }
+
+    /** Rendering continues below the interaction threshold until truly clear. */
+    static boolean isDrawable(float alpha) {
+        return alpha > 0.0F;
     }
 
     /**
@@ -83,7 +89,11 @@ final class LostTalesMapZoomFade {
      * crosses either boundary.</p>
      */
     static float alphaForProgress(float progress) {
-        return smoothstep(progress);
+        float eased = smoothstep(progress);
+        float inverse = 1.0F - eased;
+        float denominator = eased + FADE_BIAS * inverse;
+        return denominator <= 0.0F
+                ? 0.0F : eased / denominator;
     }
 
     static float alpha(float zoomExp) {

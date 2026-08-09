@@ -78,6 +78,13 @@ enum LostTalesMapTerrain implements
         }
     }
 
+    /** Known map land, with rivers retained as part of their surrounding land. */
+    static boolean isLand(int mapX, int mapY) {
+        LOTRBiome biome = biomeAt(mapX, mapY);
+        return biome != null && biome != LOTRBiome.ocean
+                && biome != LOTRBiome.lake;
+    }
+
     private static int treesPerChunk(LOTRBiome biome) {
         try {
             return biome.decorator == null

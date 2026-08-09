@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lotr.client.gui.LOTRGuiMap;
+import lotr.common.LOTRConfig;
 import lotr.common.world.map.LOTRAbstractWaypoint;
 import lotr.common.world.map.LOTRCustomWaypoint;
 import lotr.common.world.map.LOTRWaypoint;
@@ -23,6 +24,7 @@ public final class LostTalesMapLegendRegistry {
     public static final String PLAYER_WAYSTONES = "player_waystones";
     public static final String QUESTS = "quests";
     public static final String PARTY = "party";
+    public static final String LABELS = "labels";
 
     private static final Map<String, LostTalesMapLegendCategory> CATEGORIES =
             new LinkedHashMap<String, LostTalesMapLegendCategory>();
@@ -49,6 +51,9 @@ public final class LostTalesMapLegendRegistry {
         register(new LostTalesMapLegendCategory(
                 PARTY, "gui.losttales.map.legend.party",
                 LostTalesCompassMarkerIcon.QUEST, "blue"));
+        register(new LostTalesMapLegendCategory(
+                LABELS, "gui.losttales.map.legend.labels",
+                LostTalesCompassMarkerIcon.TOWN, "white"));
     }
 
     private LostTalesMapLegendRegistry() {
@@ -74,10 +79,19 @@ public final class LostTalesMapLegendRegistry {
     }
 
     public static boolean isCategoryEnabled(String categoryId) {
+        if (LABELS.equals(LostTalesMapLegendPreferences.normalize(
+                categoryId))) {
+            return LOTRConfig.mapLabels;
+        }
         return LostTalesMapLegendPreferences.isEnabled(categoryId);
     }
 
     static boolean toggleCategory(String categoryId) {
+        if (LABELS.equals(LostTalesMapLegendPreferences.normalize(
+                categoryId))) {
+            LOTRConfig.toggleMapLabels();
+            return LOTRConfig.mapLabels;
+        }
         return LostTalesMapLegendPreferences.toggle(categoryId);
     }
 

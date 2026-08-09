@@ -1166,6 +1166,7 @@ gui.losttales.map.legend.shared_waypoints=Shared Waypoints
 gui.losttales.map.legend.player_waystones=Player Waystones
 gui.losttales.map.legend.quests=Quest Markers
 gui.losttales.map.legend.party=Party Markers
+gui.losttales.map.legend.labels=Map Labels
 chat.losttales.fast_travel.invalid_waystone=The source waystone or destination is no longer valid.
 chat.losttales.fast_travel.unavailable=LOTR fast travel is currently unavailable.
 chat.losttales.fast_travel.unsafe=LOTR could not find a safe destination.

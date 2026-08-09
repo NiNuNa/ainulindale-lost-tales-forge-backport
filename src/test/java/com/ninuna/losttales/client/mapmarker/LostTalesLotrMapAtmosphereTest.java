@@ -115,6 +115,25 @@ public final class LostTalesLotrMapAtmosphereTest {
         }
     }
 
+    @Test
+    public void directionalLightChangesWithTheSkyButStaysSubtle() {
+        assertTrue(LostTalesLotrMapAtmosphere.lightingFor(0L)[3] > 0.0F);
+        assertTrue(LostTalesLotrMapAtmosphere.lightingFor(6000L)[3] > 0.0F);
+        assertTrue(LostTalesLotrMapAtmosphere.lightingFor(18000L)[3] > 0.0F);
+        for (long time = 0L; time <= 24000L; time += 25L) {
+            float[] light = LostTalesLotrMapAtmosphere.lightingFor(time);
+            assertTrue(light[3] >= 0.0F && light[3] <= 0.0651F);
+            assertTrue(light[0] >= 0.0F && light[0] <= 1.0F);
+            assertTrue(light[1] >= 0.0F && light[1] <= 1.0F);
+            assertTrue(light[2] >= 0.0F && light[2] <= 1.0F);
+        }
+        float[] start = LostTalesLotrMapAtmosphere.lightingFor(0L);
+        float[] wrapped = LostTalesLotrMapAtmosphere.lightingFor(24000L);
+        for (int channel = 0; channel < start.length; channel++) {
+            assertEquals(start[channel], wrapped[channel], 0.0001F);
+        }
+    }
+
     /**
      * Clouds are placed by hashing their cell, so every client puts them in
      * the same place without a word being sent about it — and each cell has
@@ -239,6 +258,17 @@ public final class LostTalesLotrMapAtmosphereTest {
         // Nothing outside its range may drive it past its ceiling.
         assertEquals(LostTalesLotrMapAtmosphere.hazeStrength(1.0F, 1.0F),
                 LostTalesLotrMapAtmosphere.hazeStrength(4.0F, 3.0F), 0.0F);
+
+        assertEquals(0.0F,
+                LostTalesLotrMapAtmosphere.focusSoftness(0.0F, 0.0F), 0.0F);
+        assertEquals("the focus plane itself was softened", 0.0F,
+                LostTalesLotrMapAtmosphere.focusSoftness(1.0F, 0.56F), 0.0F);
+        assertTrue("the far edge did not receive subtle depth softness",
+                LostTalesLotrMapAtmosphere.focusSoftness(1.0F, 0.0F) > 0.0F);
+        for (float share = 0.0F; share <= 1.0F; share += 0.01F) {
+            assertTrue(LostTalesLotrMapAtmosphere.focusSoftness(
+                    1.0F, share) <= 0.0381F);
+        }
     }
 
     /**
@@ -280,5 +310,164 @@ public final class LostTalesLotrMapAtmosphereTest {
                         5, 5, 0, 0.5F, 0.2F)[3],
                 LostTalesLotrMapAtmosphere.resolveWeather(
                         5, 5, 0, 0.5F, 0.2F)[3], 0.0F);
+    }
+
+    @Test
+    public void rainFrontIntroducesDropsContinuously() {
+        int partial = 0;
+        for (int cellX = -10; cellX <= 10; cellX++) {
+            for (int cellY = -10; cellY <= 10; cellY++) {
+                assertEquals(0.0F,
+                        LostTalesLotrMapAtmosphere.precipitationStrength(
+                                cellX, cellY, 64, 0.0F, 0.0F), 0.0F);
+                float strength = LostTalesLotrMapAtmosphere
+                        .precipitationStrength(
+                                cellX, cellY, 64, 0.55F, 0.0F);
+                if (strength > 0.0F && strength < 1.0F) {
+                    partial++;
+                }
+            }
+        }
+        assertTrue("rain arrived as a binary shower", partial > 0);
+    }
+
+    @Test
+    public void tiltTurnsFlatRainIntoACloudToGroundFall() {
+        float flat = LostTalesLotrMapAtmosphere.rainFallDistance(
+                10.0F, 30.0F, 0.0F);
+        float halfway = LostTalesLotrMapAtmosphere.rainFallDistance(
+                10.0F, 30.0F, 0.5F);
+        float tilted = LostTalesLotrMapAtmosphere.rainFallDistance(
+                10.0F, 30.0F, 1.0F);
+
+        assertTrue("flat maps still need visible 2D rain", flat > 0.0F);
+        assertTrue(halfway > flat);
+        assertTrue(halfway < tilted);
+        assertEquals(30.0F, tilted, 0.001F);
+    }
+
+    @Test
+    public void rainParticlesAdvanceBetweenWorldTicks() {
+        float first = LostTalesLotrMapAtmosphere.rainPhase(
+                3, -4, 2, 1000.0D);
+        float partial = LostTalesLotrMapAtmosphere.rainPhase(
+                3, -4, 2, 1000.25D);
+
+        assertTrue(first >= 0.0F && first < 1.0F);
+        assertTrue(partial >= 0.0F && partial < 1.0F);
+        assertTrue("drop movement still steps at twenty Hz", first != partial);
+    }
+
+    @Test
+    public void rainArtworkDoesNotShrinkWithTheMapZoom() {
+        assertEquals(LostTalesLotrMapAtmosphere.rainScreenWidth(2.0F),
+                LostTalesLotrMapAtmosphere.rainScreenWidth(80.0F), 0.0F);
+        assertEquals(LostTalesLotrMapAtmosphere.rainScreenLength(2.0F, 0.7F),
+                LostTalesLotrMapAtmosphere.rainScreenLength(80.0F, 0.7F),
+                0.0F);
+        assertTrue(LostTalesLotrMapAtmosphere.rainScreenWidth(2.0F) >= 15.5F);
+
+        float hidden = LostTalesLotrMapAtmosphere.rainVisibility(22.0F);
+        float fading = LostTalesLotrMapAtmosphere.rainVisibility(34.0F);
+        float solid = LostTalesLotrMapAtmosphere.rainVisibility(50.0F);
+        assertEquals("distant rain never finished fading", 0.0F, hidden, 0.0F);
+        assertTrue("rain did not fade smoothly with projected size",
+                fading > hidden && fading < solid);
+        assertEquals("close rain did not become fully visible",
+                1.0F, solid, 0.0F);
+
+        int far = LostTalesLotrMapAtmosphere.rainDropCount(
+                20.0F, 20.0F, 0.0F, 1.0F);
+        int close = LostTalesLotrMapAtmosphere.rainDropCount(
+                120.0F, 120.0F, 0.0F, 1.0F);
+        int storm = LostTalesLotrMapAtmosphere.rainDropCount(
+                120.0F, 120.0F, 1.0F, 1.0F);
+        assertTrue("zooming in diluted a fixed number of drops", close > far);
+        assertTrue("thunder did not increase the rain density", storm > close);
+        assertTrue("close rain escaped its performance cap",
+                LostTalesLotrMapAtmosphere.rainDropCount(
+                        10000.0F, 10000.0F, 1.0F, 1.0F) <= 54);
+        assertEquals("invisible rain still generated drop lanes", 0,
+                LostTalesLotrMapAtmosphere.rainDropCount(
+                        120.0F, 120.0F, 1.0F, 0.0F));
+        assertTrue("fading rain kept its full rendering cost",
+                LostTalesLotrMapAtmosphere.rainDropCount(
+                        120.0F, 120.0F, 0.0F, 0.25F) < close);
+    }
+
+    @Test
+    public void tiltedRainImpactsFillAnOvalInsteadOfAStraightLine() {
+        float depth = LostTalesLotrMapAtmosphere.rainImpactDepth(
+                100.0F, 1.0F);
+        assertTrue("tilted rain had no projected ground depth", depth > 0.0F);
+        assertEquals("flat rain must stay on its two-dimensional layer", 0.0F,
+                LostTalesLotrMapAtmosphere.rainImpactDepth(
+                        100.0F, 0.0F), 0.0F);
+
+        float centre = Math.abs(LostTalesLotrMapAtmosphere.rainImpactOffset(
+                depth, 0.0F, 1.0F));
+        float middle = Math.abs(LostTalesLotrMapAtmosphere.rainImpactOffset(
+                depth, 0.7F, 1.0F));
+        float edge = Math.abs(LostTalesLotrMapAtmosphere.rainImpactOffset(
+                depth, 1.0F, 1.0F));
+        assertTrue("impact depth did not narrow towards the oval edge",
+                centre > middle && middle > edge);
+        assertTrue("different drops still landed on one line",
+                LostTalesLotrMapAtmosphere.rainImpactOffset(
+                        depth, 0.0F, 0.2F)
+                        != LostTalesLotrMapAtmosphere.rainImpactOffset(
+                                depth, 0.0F, 0.8F));
+    }
+
+    @Test
+    public void cloudsFollowLandButMayOverhangACloudWidthPastTheCoast() {
+        LostTalesMapDecorationPlacement.GroundSampler island =
+                new LostTalesMapDecorationPlacement.GroundSampler() {
+                    @Override
+                    public boolean matches(int x, int y) {
+                        return x >= -3 && x <= 3 && y >= -3 && y <= 3;
+                    }
+                };
+
+        assertTrue(LostTalesLotrMapAtmosphere.cloudFootprintTouchesLand(
+                island, 0, 0, 30));
+        assertTrue("a coastal cloud may overhang open water",
+                LostTalesLotrMapAtmosphere.cloudFootprintTouchesLand(
+                        island, 33, 0, 30));
+        assertTrue("open-ocean clouds must be rejected",
+                !LostTalesLotrMapAtmosphere.cloudFootprintTouchesLand(
+                        island, 80, 80, 30));
+        float near = LostTalesLotrMapAtmosphere.cloudLandWeight(
+                island, 6, 0, 30);
+        float middle = LostTalesLotrMapAtmosphere.cloudLandWeight(
+                island, 21, 0, 30);
+        float edge = LostTalesLotrMapAtmosphere.cloudLandWeight(
+                island, 33, 0, 30);
+        assertTrue("cloud density did not thin towards the mask edge",
+                near > middle && middle > edge && edge > 0.0F);
+    }
+
+    @Test
+    public void thunderProducesBriefDeterministicLightning() {
+        assertEquals(0.0F, LostTalesLotrMapAtmosphere.lightningFlash(
+                2, 7, 100.0D, 0.0F), 0.0F);
+        boolean foundFlash = false;
+        for (int cellX = -8; cellX <= 8 && !foundFlash; cellX++) {
+            for (int cellY = -8; cellY <= 8 && !foundFlash; cellY++) {
+                for (double time = 0.0D; time < 220.0D; time += 0.25D) {
+                    float flash = LostTalesLotrMapAtmosphere.lightningFlash(
+                            cellX, cellY, time, 1.0F);
+                    assertTrue(flash >= 0.0F && flash <= 1.0F);
+                    assertEquals(flash,
+                            LostTalesLotrMapAtmosphere.lightningFlash(
+                                    cellX, cellY, time, 1.0F), 0.0F);
+                    if (flash > 0.0F) {
+                        foundFlash = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assertTrue("thunder never produced a lightning flash", foundFlash);
     }
 }

@@ -14,6 +14,7 @@ import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LabelNode;
+import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TypeInsnNode;
@@ -847,6 +848,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                 injectLotrMapSubtitleLayout(method);
                         changed |= subtitleLayoutHookPresent;
                     }
+                    if (!containsHook(method,
+                            LOTR_MAP_LABEL_STYLE_HOOK_OWNER,
+                            "restyleMapSubtitle")) {
+                        changed |= restyleLotrMapSubtitles(method);
+                    }
                 } else if ("renderWaypointTooltip".equals(method.name)
                         && "(Llotr/common/world/map/LOTRAbstractWaypoint;ZII)V"
                         .equals(method.desc)) {
@@ -1142,6 +1148,28 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
         if (injected) {
             info("Patched LOTR map region names onto the Lost Tales palette");
+        }
+        return injected;
+    }
+
+    /** Sends the fullscreen biome and coordinates through the same ivory. */
+    private static boolean restyleLotrMapSubtitles(MethodNode method) {
+        boolean injected = false;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof LdcInsnNode)
+                    || !Integer.valueOf(0x00FFFFFF).equals(
+                            ((LdcInsnNode)instruction).cst)) {
+                continue;
+            }
+            method.instructions.insert(instruction, new MethodInsnNode(
+                    Opcodes.INVOKESTATIC,
+                    LOTR_MAP_LABEL_STYLE_HOOK_OWNER,
+                    "restyleMapSubtitle", "(I)I"));
+            injected = true;
+        }
+        if (injected) {
+            info("Patched LOTR map subtitles onto the Lost Tales palette");
         }
         return injected;
     }

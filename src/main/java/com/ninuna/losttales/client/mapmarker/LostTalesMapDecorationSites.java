@@ -37,7 +37,7 @@ final class LostTalesMapDecorationSites {
      * the frame the map opens, high enough that the map is complete within
      * about a second of it.</p>
      */
-    private static final int CELLS_PER_FRAME = 6000;
+    private static final int CELLS_PER_FRAME = 4500;
     private static final int INITIAL_CAPACITY = 2048;
 
     /** Where each site is, in map pixels, as {@code x, y} pairs. */
@@ -54,6 +54,7 @@ final class LostTalesMapDecorationSites {
     /** The map image the sites were worked out for. */
     private int builtForWidth;
     private int builtForHeight;
+    private final float[] positionScratch = new float[2];
 
     /** What a kind needs to answer "is there one here". */
     interface SiteRule {
@@ -111,13 +112,12 @@ final class LostTalesMapDecorationSites {
         }
         int lastX = (int)Math.ceil(imageWidth / cell);
         int lastY = (int)Math.ceil(imageHeight / cell);
-        float[] position = new float[2];
         for (int visited = 0; visited < CELLS_PER_FRAME; visited++) {
             if (this.cursorY > lastY) {
                 this.complete = true;
                 return;
             }
-            resolve(rule, this.cursorX, this.cursorY, position);
+            resolve(rule, this.cursorX, this.cursorY, this.positionScratch);
             this.cursorX++;
             if (this.cursorX > lastX) {
                 this.cursorX = 0;

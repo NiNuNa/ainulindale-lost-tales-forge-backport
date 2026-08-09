@@ -422,6 +422,23 @@ public final class LostTalesLotrMapRotationTest {
         assertEquals(360.0F, coverage[1], 0.001F);
     }
 
+    @Test
+    public void objectQueriesDoNotWalkAFullDiagonalSquareOnWideScreens() {
+        float[] sheet = new float[2];
+        float[] visible = new float[2];
+        LostTalesLotrMapRotation.rotatedCoverage(
+                2048.0F, 768.0F, 0.0F, 0.6F, sheet);
+        LostTalesLotrMapRotation.visibleCoverage(
+                2048.0F, 768.0F, 0.0F, 0.6F, visible);
+
+        assertTrue("the visible width must still cover the viewport",
+                visible[0] >= 2048.0F);
+        assertTrue("the visible height must still cover the viewport",
+                visible[1] >= 768.0F);
+        assertTrue("an ultrawide viewport still queried a diagonal square",
+                visible[1] < sheet[1] * 0.6F);
+    }
+
     /**
      * The sheet keeps one shape whatever the angle. Cutting it to fit each
      * angle in turn changed its proportions as it went round, and the paper

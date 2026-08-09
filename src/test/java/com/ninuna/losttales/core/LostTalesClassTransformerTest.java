@@ -66,6 +66,9 @@ public final class LostTalesClassTransformerTest {
     private static final String LOTR_MAP_LEGEND_HOOK_OWNER =
             "com/ninuna/losttales/client/mapmarker/"
                     + "LostTalesMapLegendRegistry";
+    private static final String LOTR_MAP_LABEL_STYLE_HOOK_OWNER =
+            "com/ninuna/losttales/client/mapmarker/"
+                    + "LostTalesLotrMapLabelStyle";
 
     @Test
     public void factionBountiesUseRoleplayCharacterUuid() throws Exception {
@@ -270,6 +273,10 @@ public final class LostTalesClassTransformerTest {
                 transformed, "renderFullscreenSubtitles",
                 LOTR_MAP_LAYOUT_HOOK_OWNER,
                 "filterFullscreenSubtitles"));
+        assertTrue(containsStaticHook(
+                transformed, "renderFullscreenSubtitles",
+                LOTR_MAP_LABEL_STYLE_HOOK_OWNER,
+                "restyleMapSubtitle"));
         assertTrue(containsStaticHook(
                 transformed, "renderWaypointTooltip",
                 LOTR_MAP_LAYOUT_HOOK_OWNER,

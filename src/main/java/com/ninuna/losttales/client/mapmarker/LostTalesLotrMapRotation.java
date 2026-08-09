@@ -935,6 +935,25 @@ public final class LostTalesLotrMapRotation {
         result[1] = diagonal;
     }
 
+    /**
+     * Tight conservative bounds for querying objects that will later be
+     * projected individually. Unlike the square sheet allocation, these
+     * bounds need not preserve a texture's aspect ratio.
+     */
+    static void visibleCoverage(
+            float width, float height, float degrees, float lean,
+            float[] result) {
+        if (result == null || result.length < 2) {
+            return;
+        }
+        double radians = Math.toRadians(degrees);
+        float cosine = Math.abs((float)Math.cos(radians));
+        float sine = Math.abs((float)Math.sin(radians));
+        float expansion = leanCoverage(lean);
+        result[0] = (cosine * width + sine * height) * expansion;
+        result[1] = (sine * width + cosine * height) * expansion;
+    }
+
     private static synchronized boolean ensureReflection() {
         if (reflectionReady) {
             return true;

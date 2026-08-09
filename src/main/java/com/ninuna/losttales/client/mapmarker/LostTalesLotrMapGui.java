@@ -30,6 +30,7 @@ import lotr.common.network.LOTRPacketHandler;
 import lotr.common.network.LOTRPacketRenameCWP;
 import lotr.common.network.LOTRPacketShareCWP;
 import lotr.common.world.map.LOTRCustomWaypoint;
+import lotr.common.world.map.LOTRFixedStructures;
 import lotr.common.fac.LOTRFaction;
 import lotr.common.world.map.LOTRAbstractWaypoint;
 import net.minecraft.client.gui.GuiButton;
@@ -102,9 +103,11 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
      */
     private static final float LEAN_SMOOTHING_SCALE = 90.0F;
 
-    private boolean transientEnemyMarkersRendered;
-    private boolean roleplayPlayerHeadsRendered;
+    /** True once the post-label icon compositor has run for this frame. */
+    private boolean finalMapIconsRendered;
     private boolean mapControlBarRendered;
+    /** True once this frame's native road dots were placed below the clouds. */
+    private boolean roadsRenderedBelowClouds;
     private boolean mapLegendOpen;
     private int mapLegendScrollIndex;
     private boolean smoothZoomInitialized;
@@ -117,6 +120,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     private LostTalesMapWaypointPrompt waypointPrompt;
     private LostTalesMapMoveMarkerPrompt moveMarkerPrompt;
     private LostTalesMapSearchPrompt searchPrompt;
+    /** Search result brackets that survive the popup until the next input. */
+    private boolean searchSelectionFrameActive;
     /**
      * Where the "go here" marker would move to, as {@code {dimension, x, z}},
      * while that question is on screen. Null when the popup was opened on the
@@ -149,6 +154,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
      */
     private final LostTalesMapCameraFocus cameraFocus =
             new LostTalesMapCameraFocus();
+    private final LostTalesMapCursorPosition cursorPosition =
+            new LostTalesMapCursorPosition();
     /**
      * Set while a left press has landed on empty map. The "go here" marker is
      * only placed if that press comes back up without becoming a drag, so
@@ -454,6 +461,14 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     public void renderRoads(boolean labels) {
         LostTalesLotrRoadLabelRenderer.Prepared prepared = labels
                 ? LostTalesLotrRoadLabelRenderer.prepare(this) : null;
+        if (this.roadsRenderedBelowClouds) {
+            // The dots were deliberately drawn with the ground layers. Only
+            // their names belong here, above the translucent cloud pass.
+            if (prepared != null) {
+                prepared.render();
+            }
+            return;
+        }
         if (prepared == null) {
             renderRoadsWithSharedFade(labels);
             return;
@@ -462,6 +477,19 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         // interval-based names with fixed world anchors and smooth fades.
         renderRoadsWithSharedFade(false);
         prepared.render();
+    }
+
+    /** Moves LOTR's unchanged road dots into the layer below the clouds. */
+    void renderRoadsBelowClouds() {
+        if (this.roadsRenderedBelowClouds
+                || !LostTalesLotrRoadLabelRenderer.canSeparateLabels()
+                || (!LOTRGuiMap.showWP && !LOTRGuiMap.showCWP)
+                || this.mc == null || this.mc.theWorld == null
+                || !LOTRFixedStructures.hasMapFeatures(this.mc.theWorld)) {
+            return;
+        }
+        renderRoadsWithSharedFade(false);
+        this.roadsRenderedBelowClouds = true;
     }
 
     /**
@@ -515,6 +543,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                 this.searchPrompt.mouseWheel(wheel);
             }
             return;
+        }
+        if (wheel != 0) {
+            clearSearchSelectionFrame();
         }
         if (wheel != 0 && LostTalesLotrMapLegend.handleMouseWheel(
                 this, getEventMouseX(), getEventMouseY(), wheel)) {
@@ -733,15 +764,17 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                 // The overlay invokes LOTR's own full tooltip renderer for
                 // the single delayed hover owner. Passing no waypoints here
                 // prevents the native short hover card from drawing first.
-                super.renderWaypoints(
+                renderWaypointsWithSharedFade(
                         Collections.<LOTRAbstractWaypoint>emptyList(),
                         pass, mouseX, mouseY, drawLabels, includeHidden);
             } else {
-                super.renderWaypoints(
+                renderWaypointsWithSharedFade(
                         lotrWaypoints, pass, mouseX, mouseY,
                         drawLabels, includeHidden);
             }
             if (pass == 1) {
+                renderFinalMapIconsOnce(
+                        mouseX, mouseY, drawLabels, includeHidden);
                 LostTalesLotrMapMarkerIconOverlay
                         .renderFocusedHoverTooltip(this, mouseX, mouseY);
             }
@@ -760,74 +793,127 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                 ? Collections.<LOTRAbstractWaypoint>emptyList()
                 : Collections.unmodifiableList(
                         new ArrayList<LOTRAbstractWaypoint>(baseWaypoints));
-        super.renderWaypoints(baseWaypoints, pass, mouseX, mouseY, drawLabels, includeHidden);
+        // Build all positions and hover state now, but leave the artwork for
+        // LOTR's second waypoint pass. Its geographical labels are drawn
+        // between the two passes and must stay behind map icons.
+        LostTalesLotrMapMarkerIconOverlay
+                .prepareRoleplayPlayerHeads(this);
         // Hover ownership is decided inside this call, against the geometry
         // it has just built, so drawing and highlighting cannot disagree.
         LostTalesLotrMapMarkerIconOverlay.renderGroupedMarkers(
                 this, waypoints, baseWaypoints, mouseX, mouseY,
                 drawLabels, includeHidden);
-        renderTransientEnemyMarkersOnce(mouseX, mouseY, drawLabels);
-        renderRoleplayPlayerHeadsOnce(mouseX, mouseY);
         if (isModalOpen()) {
             // The popup covers the map; nothing behind it may claim hover.
             LostTalesLotrMapMarkerIconOverlay.suspendHoverFocus(this);
         }
         LostTalesLotrMapMarkerIconOverlay
                 .suppressSelectedLotrTooltipForFocusedHover(this);
-        LostTalesLotrMapMarkerIconOverlay.renderHoveredIconForeground(
-                this, mouseX, mouseY, drawLabels);
-        LostTalesLotrMapMarkerIconOverlay
-                .renderSelectedMarkerFrame(this);
-        LOTRAbstractWaypoint focusedNative =
-                LostTalesLotrMapMarkerIconOverlay
-                        .getFocusedNativeWaypoint(this);
-        if (focusedNative != null) {
-            float[] transform = LostTalesLotrMapMarkerIconOverlay
-                    .getFocusedNativeIconTransform(this, focusedNative);
-            if (transform != null) {
-                GL11.glPushMatrix();
-                try {
-                    GL11.glTranslatef(
-                            transform[0], transform[1], 0.0F);
-                    GL11.glScalef(
-                            transform[2], transform[2], 1.0F);
-                    GL11.glTranslatef(
-                            -transform[0], -transform[1], 0.0F);
-                    super.renderWaypoints(
-                            Collections.singletonList(focusedNative),
-                            pass, mouseX, mouseY, false, includeHidden);
-                } finally {
-                    GL11.glPopMatrix();
-                }
-            } else {
-                super.renderWaypoints(
-                        Collections.singletonList(focusedNative),
-                        pass, mouseX, mouseY, false, includeHidden);
+    }
+
+    /**
+     * Draws native LOTR waypoints through the same extended fade as Lost
+     * Tales markers.
+     *
+     * <p>The base method owns the waypoint artwork and its clipping, but it
+     * derives opacity from the old, shorter zoom range. Supplying the native
+     * exponent that represents our desired alpha removes the late faint pop;
+     * restoring the real exponent immediately keeps every other map system on
+     * the smooth zoom.</p>
+     */
+    private void renderWaypointsWithSharedFade(
+            List<LOTRAbstractWaypoint> waypoints, int pass,
+            int mouseX, int mouseY, boolean drawLabels,
+            boolean includeHidden) {
+        if (!this.smoothZoomInitialized || !ensureSmoothZoomReflection()) {
+            super.renderWaypoints(waypoints, pass, mouseX, mouseY,
+                    drawLabels, includeHidden);
+            return;
+        }
+        float actual;
+        try {
+            actual = zoomExpField.getFloat(this);
+            zoomExpField.setFloat(this,
+                    LostTalesMapZoomFade.nativeZoomExpForAlpha(
+                            LostTalesMapZoomFade.alpha(actual)));
+        } catch (IllegalAccessException exception) {
+            markSmoothZoomReflectionFailed(exception);
+            this.smoothZoomInitialized = false;
+            super.renderWaypoints(waypoints, pass, mouseX, mouseY,
+                    drawLabels, includeHidden);
+            return;
+        }
+        try {
+            super.renderWaypoints(waypoints, pass, mouseX, mouseY,
+                    drawLabels, includeHidden);
+        } finally {
+            try {
+                zoomExpField.setFloat(this, actual);
+            } catch (IllegalAccessException exception) {
+                markSmoothZoomReflectionFailed(exception);
+                this.smoothZoomInitialized = false;
             }
         }
     }
 
-    private void renderTransientEnemyMarkersOnce(int mouseX, int mouseY, boolean drawLabels) {
-        if (!this.transientEnemyMarkersRendered) {
-            this.transientEnemyMarkersRendered = true;
-            LostTalesLotrMapMarkerIconOverlay.renderTransientEnemyMarkers(this, mouseX, mouseY, drawLabels);
+    /**
+     * Composites every map icon after LOTR's unrelated place and region text.
+     * The order is the existing relevance ladder: enemies, ordinary/native
+     * markers, then players. Hover emphasis remains the final icon artwork.
+     */
+    private void renderFinalMapIconsOnce(
+            int mouseX, int mouseY, boolean drawLabels,
+            boolean includeHidden) {
+        if (this.finalMapIconsRendered) {
+            return;
         }
-    }
+        this.finalMapIconsRendered = true;
+        LostTalesLotrMapMarkerIconOverlay.renderTransientEnemyMarkers(
+                this, mouseX, mouseY, drawLabels);
+        renderWaypointsWithSharedFade(this.clickableNativeWaypoints, 0,
+                mouseX, mouseY, drawLabels, includeHidden);
+        LostTalesLotrMapMarkerIconOverlay.renderPreparedGroupedMarkers(
+                this, drawLabels);
+        LostTalesLotrMapMarkerIconOverlay
+                .renderPreparedRoleplayPlayerHeads(this);
+        LostTalesLotrMapMarkerIconOverlay.renderHoveredIconForeground(
+                this, mouseX, mouseY, drawLabels);
+        LostTalesLotrMapMarkerIconOverlay.renderSelectedMarkerFrame(this);
 
-    private void renderRoleplayPlayerHeadsOnce(int mouseX, int mouseY) {
-        if (!this.roleplayPlayerHeadsRendered) {
-            this.roleplayPlayerHeadsRendered = true;
-            LostTalesLotrMapMarkerIconOverlay.renderRoleplayPlayerHeads(
-                    this, mouseX, mouseY);
+        LOTRAbstractWaypoint focusedNative =
+                LostTalesLotrMapMarkerIconOverlay
+                        .getFocusedNativeWaypoint(this);
+        if (focusedNative == null) {
+            return;
+        }
+        float[] transform = LostTalesLotrMapMarkerIconOverlay
+                .getFocusedNativeIconTransform(this, focusedNative);
+        if (transform == null) {
+            renderWaypointsWithSharedFade(
+                    Collections.singletonList(focusedNative),
+                    0, mouseX, mouseY, false, includeHidden);
+            return;
+        }
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(transform[0], transform[1], 0.0F);
+            GL11.glScalef(transform[2], transform[2], 1.0F);
+            GL11.glTranslatef(-transform[0], -transform[1], 0.0F);
+            renderWaypointsWithSharedFade(
+                    Collections.singletonList(focusedNative),
+                    0, mouseX, mouseY, false, includeHidden);
+        } finally {
+            GL11.glPopMatrix();
         }
     }
 
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        this.cursorPosition.beginFrame(this, mouseX, mouseY);
         LostTalesLotrMapLayout.prepareForDraw(this);
+        this.roadsRenderedBelowClouds = false;
         this.mapControlBarRendered = false;
-        this.transientEnemyMarkersRendered = false;
-        this.roleplayPlayerHeadsRendered = false;
+        this.finalMapIconsRendered = false;
         LostTalesLotrMapMarkerIconOverlay
                 .clearInvalidLotrSelection(this);
         long now = System.nanoTime();
@@ -963,9 +1049,21 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         float[] target = LostTalesLotrMapMarkerIconOverlay
                 .resolveMapImagePosition(marker, null);
         clearSearchPrompt();
+        LostTalesLotrMapMarkerIconOverlay.setSelectedMarkerFrame(
+                this, marker, null);
+        this.searchSelectionFrameActive = true;
         if (target != null) {
             focusMapPoint(target[0], target[1]);
         }
+    }
+
+    /** Clears only the persistent frame created by Find Location. */
+    private void clearSearchSelectionFrame() {
+        if (!this.searchSelectionFrameActive) {
+            return;
+        }
+        this.searchSelectionFrameActive = false;
+        LostTalesLotrMapMarkerIconOverlay.clearSelectedMarkerFrame(this);
     }
 
     /**
@@ -1193,6 +1291,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             handleSearchSelection();
             return;
         }
+        clearSearchSelectionFrame();
         if (LostTalesKeyBindings.isMapLegendMouseButton(button)) {
             toggleMapLegend();
             return;
@@ -1247,6 +1346,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     protected void mouseClickMove(
             int mouseX, int mouseY, int button, long timeSinceClick) {
         if (button == 0 && this.mapInput.moved(mouseX, mouseY)) {
+            clearSearchSelectionFrame();
             // Taking hold of the map cancels a focus and any pending drop.
             this.cameraFocus.cancel();
             this.goHerePressPending = false;
@@ -1258,6 +1358,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         }
         if (button == ROTATE_MAP_BUTTON && this.rotatingMap
                 && !isModalOpen()) {
+            clearSearchSelectionFrame();
             dragMapRotation(mouseX, mouseY);
         }
         super.mouseClickMove(mouseX, mouseY, button, timeSinceClick);
@@ -2014,6 +2115,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             handleSearchSelection();
             return;
         }
+        clearSearchSelectionFrame();
         if (keyCode == CREATE_WAYPOINT_KEY) {
             openWaypointPrompt();
             return;
@@ -2038,6 +2140,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             // Travel is confirmed by clicking a destination and choosing Yes.
             return;
         }
+        if (keyCode == LOTRKeyHandler.keyBindingMapTeleport.getKeyCode()) {
+            this.cursorPosition.syncNativeCoordinates(this);
+        }
         super.keyTyped(typedChar, keyCode);
     }
 
@@ -2050,6 +2155,14 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         if (!this.mapLegendOpen) {
             this.mapLegendScrollIndex = 0;
         }
+    }
+
+    int[] getResolvedCursorWorldPosition(int mouseX, int mouseY) {
+        return this.cursorPosition.worldPosition(this, mouseX, mouseY);
+    }
+
+    String[] resolveCursorSubtitles(String[] lines) {
+        return this.cursorPosition.resolveSubtitles(this, lines);
     }
 
     boolean isMapLegendOpen() {

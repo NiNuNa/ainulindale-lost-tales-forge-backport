@@ -21,6 +21,16 @@ import cpw.mods.fml.relauncher.SideOnly;
 final class LostTalesMapDecorationPlacement {
     /** Samples taken around each ring. */
     static final int PROBE_SAMPLES = 16;
+    /** Ring directions never change; trigonometry inside every site was hot. */
+    private static final double[] PROBE_COS = new double[PROBE_SAMPLES];
+    private static final double[] PROBE_SIN = new double[PROBE_SAMPLES];
+    static {
+        for (int sample = 0; sample < PROBE_SAMPLES; sample++) {
+            double angle = Math.PI * 2.0D * sample / PROBE_SAMPLES;
+            PROBE_COS[sample] = Math.cos(angle);
+            PROBE_SIN[sample] = Math.sin(angle);
+        }
+    }
     /**
      * How many of a ring's samples have to match.
      *
@@ -86,6 +96,43 @@ final class LostTalesMapDecorationPlacement {
     /** And the most, past which this is open sea rather than a coast. */
     static final int MAX_SHORE_WATER = 13;
 
+    /**
+     * Density multiplier for a wave standing in water near land.
+     *
+     * <p>The point itself must be water. Six progressively wider rings then
+     * look for the nearest land, producing a band outside the coastline rather
+     * than a field across the whole sea. Squaring the distance falloff makes
+     * the outer edge sparse before it reaches zero, so the band has no stamped
+     * cutoff contour.</p>
+     */
+    static float coastalWaterWeight(
+            GroundSampler water, int mapX, int mapY, int radius) {
+        if (water == null || radius <= 0 || !water.matches(mapX, mapY)) {
+            return 0.0F;
+        }
+        final int rings = 6;
+        for (int ring = 1; ring <= rings; ring++) {
+            float probeRadius = radius * ring / (float)rings;
+            int land = 0;
+            for (int sample = 0; sample < PROBE_SAMPLES; sample++) {
+                int probeX = mapX + (int)Math.round(
+                        PROBE_COS[sample] * probeRadius);
+                int probeY = mapY + (int)Math.round(
+                        PROBE_SIN[sample] * probeRadius);
+                if (!water.matches(probeX, probeY)) {
+                    land++;
+                }
+            }
+            if (land > 0) {
+                float nearness = 1.0F - (ring - 0.5F) / rings;
+                float coverage = land / (float)PROBE_SAMPLES;
+                return nearness * nearness
+                        * (0.72F + coverage * 0.28F);
+            }
+        }
+        return 0.0F;
+    }
+
     private static boolean isMostly(
             GroundSampler sampler, int mapX, int mapY, int radius) {
         return countRing(sampler, mapX, mapY, radius)
@@ -96,9 +143,10 @@ final class LostTalesMapDecorationPlacement {
             GroundSampler sampler, int mapX, int mapY, int radius) {
         int matching = 0;
         for (int sample = 0; sample < PROBE_SAMPLES; sample++) {
-            double angle = Math.PI * 2.0D * sample / PROBE_SAMPLES;
-            int probeX = mapX + (int)Math.round(Math.cos(angle) * radius);
-            int probeY = mapY + (int)Math.round(Math.sin(angle) * radius);
+            int probeX = mapX + (int)Math.round(
+                    PROBE_COS[sample] * radius);
+            int probeY = mapY + (int)Math.round(
+                    PROBE_SIN[sample] * radius);
             if (sampler.matches(probeX, probeY)) {
                 matching++;
             }

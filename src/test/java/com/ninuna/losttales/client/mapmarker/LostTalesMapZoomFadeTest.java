@@ -33,9 +33,12 @@ public final class LostTalesMapZoomFadeTest {
                     0.0F, LostTalesMapZoomFade.alpha(zoomExp), 0.0F);
         }
         assertTrue("the solid end must stop short of the closest zoom",
-                SOLID < MAX - 1.0F);
+                SOLID < MAX);
         assertTrue("the clear end must stop short of the widest zoom",
-                CLEAR > MIN + 1.0F);
+                CLEAR > MIN);
+        float share = (SOLID - CLEAR) / (MAX - MIN);
+        assertTrue("the fade should use about four fifths of the zoom",
+                share >= 0.75F && share <= 0.85F);
     }
 
     /**
@@ -51,9 +54,12 @@ public final class LostTalesMapZoomFadeTest {
                 LostTalesMapZoomFade.alpha(0.0F) > 0.6F);
         assertTrue("markers are faded at an ordinary working zoom",
                 LostTalesMapZoomFade.alpha(0.5F) > 0.85F);
-        // And they are properly gone before the map is a continent on screen.
-        assertTrue("markers survive too far out",
-                LostTalesMapZoomFade.alpha(-2.5F) <= 0.0F);
+        assertTrue("markers disappeared at the first wide continental view",
+                LostTalesMapZoomFade.alpha(-2.0F) > 0.25F);
+        assertTrue("markers disappeared with substantial zoom-out remaining",
+                LostTalesMapZoomFade.alpha(-2.5F) > 0.1F);
+        assertTrue("markers remain too strong at the outermost map view",
+                LostTalesMapZoomFade.alpha(-3.25F) < 0.02F);
     }
 
     @Test
@@ -86,8 +92,8 @@ public final class LostTalesMapZoomFadeTest {
         assertEquals(1.0F, LostTalesMapZoomFade.alpha(SOLID), 0.0F);
         assertEquals(0.0F, LostTalesMapZoomFade.alpha(CLEAR), 0.0F);
         assertEquals(1.0F, LostTalesMapZoomFade.alpha(Float.NaN), 0.0F);
-        assertEquals(0.5F,
-                LostTalesMapZoomFade.alpha((SOLID + CLEAR) * 0.5F), 0.0001F);
+        assertTrue(LostTalesMapZoomFade.alpha(
+                (SOLID + CLEAR) * 0.5F) > 0.5F);
     }
 
     /**
@@ -109,6 +115,11 @@ public final class LostTalesMapZoomFadeTest {
                         LostTalesMapZoomFade.alpha((SOLID + CLEAR) * 0.5F)));
         assertTrue(LostTalesMapZoomFade.INTERACTIVE_ALPHA > 0.0F
                 && LostTalesMapZoomFade.INTERACTIVE_ALPHA < 0.2F);
+        float visibleTail = LostTalesMapZoomFade.alpha(-3.1F);
+        assertTrue("the visible tail was cut off with zoom remaining",
+                LostTalesMapZoomFade.isDrawable(visibleTail));
+        assertTrue("the barely visible tail still owned the pointer",
+                !LostTalesMapZoomFade.isInteractive(visibleTail));
     }
 
     /**

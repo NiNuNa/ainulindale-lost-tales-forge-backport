@@ -3,25 +3,21 @@ package com.ninuna.losttales.client.mapmarker;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.Arrays;
-import java.util.Iterator;
-import lotr.common.world.genlayer.LOTRGenLayerWorld;
-import lotr.common.world.map.LOTRRoads;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import org.lwjgl.opengl.GL11;
 
 /**
- * Small things standing on the map: waves, trees, mountains, ships, and
- * travellers walking the roads.
+ * Small things standing on the map: waves, trees, mountains, and ships.
  *
  * <p>Every one of them is a thing in Middle-earth rather than a thing on the
  * screen. Its position is a map position and its size is a map size, so the
  * zoom moves it and grows it exactly as it moves and grows the ground it stands
  * on; nothing here is held at a constant number of screen pixels, and nothing
- * fades because the map was pulled out. What happens instead when the map is
- * pulled out is that the sprites get smaller, as they should, and are dropped
- * once they are too small to be worth the draw.</p>
+ * is held at a constant opacity when the map is pulled out. The sprites shrink
+ * with their ground and smoothly fade only as their projected artwork becomes
+ * too small to read.</p>
  *
  * <p>The one respect in which they are not part of the paper is that they stand
  * up from it. The <em>base</em> goes through the sheet's own projection — pan,
@@ -39,6 +35,8 @@ import org.lwjgl.opengl.GL11;
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesMapDecorationRenderer {
+    private static final float[] VISIBLE_COVERAGE = new float[2];
+    private static final float[] SITE_ANCHOR = new float[2];
     /**
      * A kind of decoration scattered over the ground.
      *
@@ -49,11 +47,14 @@ public final class LostTalesMapDecorationRenderer {
      * not.</p>
      */
     private static final class Scattered {
+        private static final int BROAD = 0;
+        private static final int SHORE = 1;
+        private static final int COASTAL_WATER = 2;
         private final LostTalesMapDecorationSprite sprite;
         private final LostTalesMapTerrain terrain;
         private final int probeRadius;
-        /** True when this kind wants a shore rather than open ground. */
-        private final boolean shore;
+        /** Broad ground, a mixed shore, or a tapered water band off land. */
+        private final int placement;
         /** Lattice spacing, in map pixels. */
         private final float cell;
         private final float density;
@@ -77,13 +78,13 @@ public final class LostTalesMapDecorationRenderer {
 
         private Scattered(LostTalesMapDecorationSprite sprite,
                           LostTalesMapTerrain terrain, int probeRadius,
-                          boolean shore, float cell, float density,
+                          int placement, float cell, float density,
                           float clusterSize, float drift, boolean shadow,
                           int channel) {
             this.sprite = sprite;
             this.terrain = terrain;
             this.probeRadius = probeRadius;
-            this.shore = shore;
+            this.placement = placement;
             this.cell = cell;
             this.density = density;
             this.clusterSize = clusterSize;
@@ -117,42 +118,31 @@ public final class LostTalesMapDecorationRenderer {
         }
 
         private boolean isSite(int mapX, int mapY) {
-            return this.shore
-                    ? LostTalesMapDecorationPlacement.isShoreSite(
-                            this.terrain, mapX, mapY, this.probeRadius)
-                    : LostTalesMapDecorationPlacement.isBroadSite(
-                            this.terrain, mapX, mapY, this.probeRadius);
+            if (this.placement == SHORE) {
+                return LostTalesMapDecorationPlacement.isShoreSite(
+                        this.terrain, mapX, mapY, this.probeRadius);
+            }
+            if (this.placement == COASTAL_WATER) {
+                float weight = LostTalesMapDecorationPlacement
+                        .coastalWaterWeight(
+                                this.terrain, mapX, mapY, this.probeRadius);
+                return weight > 0.0F && LostTalesLotrMapAtmosphere.cellNoise(
+                        mapX, mapY, this.channel + 31) < weight;
+            }
+            return LostTalesMapDecorationPlacement.isBroadSite(
+                    this.terrain, mapX, mapY, this.probeRadius);
         }
     }
 
-    /**
-     * Narrowest a sprite may be drawn, in screen pixels, before it is dropped.
-     *
-     * <p>The only way a decoration ever leaves the map, and the whole of the
-     * rule. It is not faded out for the zoom being anywhere in particular, and
-     * it is not thinned away to save work — it is drawn at whatever size the
-     * ground it stands on is drawn at, and it stops being drawn at the point
-     * where there is nothing left of it to look at. Zooming out and back in
-     * therefore gives the same map back, with the same things in the same
-     * places, rather than a different scatter that faded in on the way.</p>
-     */
-    private static final float MIN_DRAWN_WIDTH = 1.2F;
+    /** Maximum opacity after the projected-size visibility fade is applied. */
     private static final float MAX_ALPHA = 0.9F;
     /** How far a decoration may differ in size from its fellows. */
     private static final float SIZE_VARIATION = 0.16F;
-    /**
-     * Where the light comes from, in map space, as a direction shadows fall
-     * in.
-     *
-     * <p>South-east, so the map is lit from over the reader's left shoulder —
-     * the convention every drawn map uses, and the one that puts the shadow on
-     * the side of the sprite the eye is already looking at rather than hiding
-     * it behind. Fixed rather than taken from the hour: a shadow that swung
-     * round through the day would be a lovely thing on a map you watch and a
-     * confusing one on a map you read.</p>
-     */
-    private static final float LIGHT_X = 0.7071F;
-    private static final float LIGHT_Y = 0.7071F;
+    /** Largest site scale produced by {@link #SIZE_VARIATION}. */
+    private static final float MAX_SITE_SCALE = 1.0F + SIZE_VARIATION;
+    /** The near edge grows by this much at the strongest perspective. */
+    private static final float MAX_PERSPECTIVE_SCALE =
+            1.0F + LostTalesLotrMapRotation.MAX_LEAN;
     /**
      * How far a shadow reaches, as a share of the thing casting it, at a
      * fully dropped eye.
@@ -160,19 +150,18 @@ public final class LostTalesMapDecorationRenderer {
      * <p>Multiplied by how far the eye has actually dropped, so this is the
      * longest it ever gets and a flat map has none at all.</p>
      */
-    private static final float SHADOW_LENGTH = 1.0F;
-    /** And how wide it is cast, slightly narrower than the sprite itself. */
-    private static final float SHADOW_WIDTH = 0.85F;
+    private static final float SHADOW_SHEAR_X = 0.7F;
+    /** Small downward component of the upper-right projection. */
+    private static final float SHADOW_DROP_Y = 0.16F;
     /**
-     * How dark a shadow is at its strongest.
+     * How dark a shadow is.
      *
      * <p>Low, and multiplied by whatever the sprite's own opacity is, so a
      * decoration fading in over a thinning step brings its shadow with it and
-     * the ground never darkens on its own.</p>
+     * the ground never darkens on its own. Tilt moves the silhouette but does
+     * not fade it: at flat it is simply hidden directly behind its caster.</p>
      */
     private static final float SHADOW_ALPHA = 0.3F;
-    /** Shadows are black; everything else is drawn in its own colours. */
-    private static final float SHADOW_LUMINANCE = 0.0F;
     private static final float FULL_LUMINANCE = 1.0F;
     /**
      * How much of the height a fully standing thing would gain it is given.
@@ -183,12 +172,6 @@ public final class LostTalesMapDecorationRenderer {
      * be turned up if it wants to be.</p>
      */
     private static final float STANDING_GAIN = 0.35F;
-    /**
-     * How far the sprite's foot is lifted off its anchor, as a share of its
-     * height, so the artwork sits on the ground rather than being bisected
-     * by it.
-     */
-    private static final float FOOT_LIFT = 0.12F;
     /** Noise channels each kind takes, well clear of the sky's. */
     private static final int CHANNEL_BASE = 4096;
     private static final int CHANNELS_PER_KIND = 64;
@@ -202,19 +185,20 @@ public final class LostTalesMapDecorationRenderer {
      */
     private static final Scattered[] SCATTERED = {
             new Scattered(LostTalesMapDecorationSprite.WAVE,
-                    LostTalesMapTerrain.OPEN_WATER, 2, false,
-                    13.0F, 0.55F, 90.0F, 0.0F, false, CHANNEL_BASE),
+                    LostTalesMapTerrain.OPEN_WATER, 84,
+                    Scattered.COASTAL_WATER,
+                    11.0F, 0.78F, 120.0F, 0.0F, false, CHANNEL_BASE),
             // Forests are the thing trees are for, so they are the densest
             // lattice of the lot, and they clump inside a wood rather than
             // covering it evenly.
             new Scattered(LostTalesMapDecorationSprite.TREE,
-                    LostTalesMapTerrain.FOREST, 2, false,
+                    LostTalesMapTerrain.FOREST, 2, Scattered.BROAD,
                     11.0F, 0.8F, 120.0F, 0.0F, true,
                     CHANNEL_BASE + CHANNELS_PER_KIND),
             // Mountains cluster more broadly still: a range is a long thing,
             // and the terrain it is placed on is already shaped like one.
             new Scattered(LostTalesMapDecorationSprite.MOUNTAIN,
-                    LostTalesMapTerrain.MOUNTAIN, 2, false,
+                    LostTalesMapTerrain.MOUNTAIN, 2, Scattered.BROAD,
                     15.0F, 0.65F, 170.0F, 0.0F, true,
                     CHANNEL_BASE + CHANNELS_PER_KIND * 2),
             // A ship belongs to a coast, a lake or a river, and even there it
@@ -222,7 +206,7 @@ public final class LostTalesMapDecorationRenderer {
             // mostly shore, so the same rule puts a boat on one without
             // needing to know it is a lake.
             new Scattered(LostTalesMapDecorationSprite.SHIP,
-                    LostTalesMapTerrain.NAVIGABLE_WATER, 3, true,
+                    LostTalesMapTerrain.NAVIGABLE_WATER, 3, Scattered.SHORE,
                     30.0F, 0.5F, 240.0F, 6.0F, false,
                     CHANNEL_BASE + CHANNELS_PER_KIND * 3),
             // And once in a long while a lone sail well out in the deep, which
@@ -231,7 +215,7 @@ public final class LostTalesMapDecorationRenderer {
             // Belegaer stays empty ocean with the occasional ship in it rather
             // than a shipping lane.
             new Scattered(LostTalesMapDecorationSprite.SHIP,
-                    LostTalesMapTerrain.OPEN_WATER, 3, false,
+                    LostTalesMapTerrain.OPEN_WATER, 3, Scattered.BROAD,
                     150.0F, 0.1F, 900.0F, 6.0F, false,
                     CHANNEL_BASE + CHANNELS_PER_KIND * 4)
     };
@@ -249,19 +233,6 @@ public final class LostTalesMapDecorationRenderer {
      */
     private static final float SHIP_DRIFT_RADIANS_PER_TICK = 0.0021F;
     private static final float TWO_PI = (float)(Math.PI * 2.0D);
-
-    /** How far along a road a traveller walks per tick, in road points. */
-    private static final float TRAVELLER_SPEED = 0.5F;
-    /**
-     * Road points one traveller is given.
-     *
-     * <p>Deliberately a large number, and deliberately without a minimum: a
-     * traveller is meant to be something noticed on the road to Bree, not the
-     * ordinary state of every track in Eriador. Only roads long enough to be
-     * highways carry anyone at all, and even they carry a handful.</p>
-     */
-    private static final int ROAD_POINTS_PER_TRAVELLER = 2600;
-    private static final int MAX_TRAVELLERS_PER_ROAD = 6;
 
     private LostTalesMapDecorationRenderer() {}
 
@@ -283,6 +254,10 @@ public final class LostTalesMapDecorationRenderer {
         spriteArt = new LostTalesMapDecorationSprite[
                 INITIAL_SPRITE_CAPACITY];
         spriteOrder = new long[INITIAL_SPRITE_CAPACITY];
+        shadowCount = 0;
+        shadowFields = new float[INITIAL_SPRITE_CAPACITY * SHADOW_STRIDE];
+        shadowArt = new LostTalesMapDecorationSprite[
+                INITIAL_SPRITE_CAPACITY];
     }
 
     /**
@@ -307,13 +282,12 @@ public final class LostTalesMapDecorationRenderer {
         // most there could ever be. A turned or leaning map looks past its own
         // corners and needs the wider box; a flat one does not, and giving it
         // the wide box anyway meant visiting four times the cells for nothing.
-        float[] coverage = new float[2];
-        LostTalesLotrMapRotation.rotatedCoverage(
+        LostTalesLotrMapRotation.visibleCoverage(
                 viewportXMax - viewportXMin, viewportYMax - viewportYMin,
                 LostTalesLotrMapRotation.degreesOf(gui),
-                LostTalesLotrMapRotation.leanOf(gui), coverage);
-        float reachX = coverage[0] * 0.5F / zoomScale;
-        float reachY = coverage[1] * 0.5F / zoomScale;
+                LostTalesLotrMapRotation.leanOf(gui), VISIBLE_COVERAGE);
+        float reachX = VISIBLE_COVERAGE[0] * 0.5F / zoomScale;
+        float reachY = VISIBLE_COVERAGE[1] * 0.5F / zoomScale;
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT
                 | GL11.GL_CURRENT_BIT | GL11.GL_DEPTH_BUFFER_BIT
                 | GL11.GL_TEXTURE_BIT);
@@ -332,6 +306,7 @@ public final class LostTalesMapDecorationRenderer {
             // Worked out first and drawn afterwards, because what has to be
             // decided across all of them together is the order.
             spriteCount = 0;
+            shadowCount = 0;
             frameLeanSine = LostTalesLotrMapRotation.leanSine(gui);
             for (int index = 0; index < SCATTERED.length; index++) {
                 collectScattered(gui, SCATTERED[index], worldTime,
@@ -340,16 +315,14 @@ public final class LostTalesMapDecorationRenderer {
                         viewportXMin, viewportXMax,
                         viewportYMin, viewportYMax);
             }
-            collectTravellers(gui, worldTime, posX, posY,
-                    zoomScale, centerX, centerY,
-                    viewportXMin, viewportXMax,
-                    viewportYMin, viewportYMax);
+            flushShadows(minecraft);
             flushSprites(minecraft);
         } catch (Throwable ignored) {
             // Decoration is the least important thing on the map; the map
             // itself and everything a player navigates by are already drawn.
         } finally {
             spriteCount = 0;
+            shadowCount = 0;
             LostTalesLotrMapLayout.endViewportClip(clipped);
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glPopAttrib();
@@ -363,11 +336,12 @@ public final class LostTalesMapDecorationRenderer {
             int viewportXMin, int viewportXMax,
             int viewportYMin, int viewportYMax) {
         float worldWidth = kind.sprite.getWorldWidth();
-        // Too small to say anything about the ground it stands on. The one
-        // way a decoration ever leaves the map: not faded out, not thinned
-        // away, just dropped once it is down to about a pixel — which is the
-        // point at which there is nothing left of it to look at.
-        if (worldWidth * zoomScale < MIN_DRAWN_WIDTH) {
+        // Reject the kind only if even its largest possible near-edge site is
+        // mathematically clear. Testing the average sprite here made the
+        // larger sites enter halfway through their own fade, so one wheel
+        // notch revealed the whole kind at a faint but already-visible alpha.
+        if (kind.sprite.visibilityAlpha(maximumDrawnWidth(
+                worldWidth, zoomScale)) <= 0.0F) {
             return;
         }
         // Where this kind actually stands, worked out once for the world and
@@ -384,7 +358,6 @@ public final class LostTalesMapDecorationRenderer {
         float maxX = posX + reachX + margin;
         float minY = posY - reachY - margin;
         float maxY = posY + reachY + margin;
-        float[] anchor = new float[2];
         int found = sites.getCount();
         for (int index = 0; index < found; index++) {
             float mapX = sites.getX(index);
@@ -396,7 +369,7 @@ public final class LostTalesMapDecorationRenderer {
                     sites.getCellX(index), sites.getCellY(index),
                     mapX, mapY, MAX_ALPHA, worldTime, posX, posY,
                     zoomScale, centerX, centerY,
-                    worldWidth, worldHeight, anchor,
+                    worldWidth, worldHeight, SITE_ANCHOR,
                     viewportXMin, viewportXMax,
                     viewportYMin, viewportYMax);
         }
@@ -500,89 +473,6 @@ public final class LostTalesMapDecorationRenderer {
     }
 
     /**
-     * People and carts moving along LOTR's own roads.
-     *
-     * <p>A traveller is a position along a road worked out from the world
-     * clock, so it walks without anything being stored, moves at the same
-     * moment on every client, and cannot drift out of step. Roads are long, so
-     * how many a road carries follows its length rather than being the same
-     * everywhere — and most roads carry none at all.</p>
-     */
-    private static void collectTravellers(
-            LostTalesLotrMapGui gui, long worldTime,
-            float posX, float posY, float zoomScale,
-            float centerX, float centerY,
-            int viewportXMin, int viewportXMax,
-            int viewportYMin, int viewportYMax) {
-        LostTalesMapDecorationSprite sprite =
-                LostTalesMapDecorationSprite.TRAVELLER;
-        float worldWidth = sprite.getWorldWidth();
-        // They stop for the same reason everything else does: at some zoom a
-        // traveller is smaller than a pixel.
-        if (worldWidth * zoomScale < MIN_DRAWN_WIDTH) {
-            return;
-        }
-        float alpha = MAX_ALPHA;
-        float worldHeight = sprite.getWorldHeight();
-        float[] anchor = new float[2];
-        Iterator roads = LOTRRoads.getAllRoadsForDisplay();
-        int roadIndex = 0;
-        while (roads.hasNext()) {
-            Object next = roads.next();
-            roadIndex++;
-            if (!(next instanceof LOTRRoads)) {
-                continue;
-            }
-            LOTRRoads.RoadPoint[] points = ((LOTRRoads)next).roadPoints;
-            if (points == null || points.length < 2) {
-                continue;
-            }
-            int travellers = Math.min(MAX_TRAVELLERS_PER_ROAD,
-                    points.length / ROAD_POINTS_PER_TRAVELLER);
-            for (int walker = 0; walker < travellers; walker++) {
-                collectTraveller(gui, sprite, points,
-                        roadIndex, walker, travellers, worldTime, alpha,
-                        posX, posY, zoomScale, centerX, centerY,
-                        worldWidth, worldHeight, anchor,
-                        viewportXMin, viewportXMax,
-                        viewportYMin, viewportYMax);
-            }
-        }
-    }
-
-    private static void collectTraveller(
-            LostTalesLotrMapGui gui,
-            LostTalesMapDecorationSprite sprite,
-            LOTRRoads.RoadPoint[] points, int roadIndex, int walker,
-            int travellers, long worldTime, float alpha,
-            float posX, float posY, float zoomScale,
-            float centerX, float centerY, float worldWidth, float worldHeight,
-            float[] anchor, int viewportXMin, int viewportXMax,
-            int viewportYMin, int viewportYMax) {
-        // Spread along the road, and started somewhere of their own, so a
-        // road is not a column of walkers in step.
-        float start = LostTalesLotrMapAtmosphere.cellNoise(
-                roadIndex, walker, CHANNEL_BASE - 1) * points.length;
-        // In double for the same reason the ships are: an old world's tick
-        // count is past the point where a float still resolves single ticks,
-        // and a traveller that advances in jumps of four road points reads as
-        // a stutter.
-        double travelled = start + walker * points.length / (double)travellers
-                + worldTime * (double)TRAVELLER_SPEED;
-        int index = (int)Math.floorMod((long)travelled, points.length);
-        LOTRRoads.RoadPoint point = points[index];
-        float mapX = (float)(point.x / (double)LOTRGenLayerWorld.scale)
-                + 810.0F;
-        float mapY = (float)(point.z / (double)LOTRGenLayerWorld.scale)
-                + 730.0F;
-        collectStanding(gui, sprite, mapX, mapY,
-                sprite.frameAt(worldTime, roadIndex * 7 + walker), alpha,
-                false, 1.0F, true, posX, posY, zoomScale, centerX, centerY,
-                worldWidth, worldHeight, anchor,
-                viewportXMin, viewportXMax, viewportYMin, viewportYMax);
-    }
-
-    /**
      * Works out where and how large one sprite standing on a map position is,
      * and puts it by to be drawn.
      *
@@ -616,18 +506,21 @@ public final class LostTalesMapDecorationRenderer {
         float screenY = anchor[1];
         float drawn = zoomScale * sizeScale * depth;
         float width = worldWidth * drawn;
-        if (width < MIN_DRAWN_WIDTH) {
-            // The far half of a leaning map reaches ground the near half is
-            // nowhere near, and a sprite out there is a speck.
+        float visibility = sprite.visibilityAlpha(width);
+        if (visibility <= 0.0F) {
             return;
         }
         float height = worldHeight * drawn;
-        if (screenX + width < viewportXMin
-                || screenX - width > viewportXMax
-                || screenY + height < viewportYMin
-                || screenY - height > viewportYMax) {
+        float left = screenX - width * 0.5F;
+        float right = left + width;
+        float stretch = standingStretch(sprite);
+        float bottom = screenY + sprite.footOffset(height) * stretch;
+        float top = bottom - height * stretch;
+        if (right < viewportXMin || left > viewportXMax
+                || bottom < viewportYMin || top > viewportYMax) {
             return;
         }
+        alpha *= visibility;
         float uMin = (float)sprite.frameUMin(frame);
         float uMax = (float)sprite.frameUMax(frame);
         if (mirror) {
@@ -641,20 +534,12 @@ public final class LostTalesMapDecorationRenderer {
         // in the order however the map is turned, and the shadow is added
         // first so it lands under its own sprite.
         int order = depthOf(screenY);
-        if (shadow && frameLeanSine > 0.0F) {
-            collectShadow(gui, sprite, mapX, mapY, sizeScale, alpha,
-                    uMin, uMax, order, posX, posY, zoomScale,
-                    centerX, centerY, worldWidth, worldHeight, anchor,
+        if (shadow) {
+            collectShadow(sprite, left, bottom, right, top, alpha,
+                    uMin, uMax,
                     viewportXMin, viewportXMax,
                     viewportYMin, viewportYMax);
         }
-        float left = screenX - width * 0.5F;
-        float right = left + width;
-        // The foot is worked out from the sprite's own height and the top from
-        // the standing one, so growing a mountain lifts its peak and leaves
-        // its base exactly where the ground is.
-        float bottom = screenY + height * FOOT_LIFT;
-        float top = bottom - height * standingStretch(sprite);
         addQuad(sprite, left, bottom, right, bottom, right, top, left, top,
                 alpha, FULL_LUMINANCE, uMin, uMax, order);
     }
@@ -687,83 +572,59 @@ public final class LostTalesMapDecorationRenderer {
     }
 
     /**
-     * The silhouette a decoration lays down on the ground it stands on.
+     * The decoration's own silhouette projected behind it.
      *
-     * <p>Not a shadow cast by a light somewhere off the map. A light has to
-     * pick a compass direction, and a compass direction swings round with the
-     * country every time the map is turned, so the shadows walk about the
-     * sprites. This is the sprite itself folded flat onto the ground, always
-     * to the right of where it stands — one direction, fixed on the screen,
-     * which is the only arrangement that looks deliberate at every angle the
-     * map can be put in.</p>
+     * <p>The bottom edge remains fixed at the visible foot while the top edge
+     * shears right and slightly down. Drawing the same texture through that
+     * quad gives a mountain a triangular shadow and a tree a tree-shaped
+     * shadow instead of approximating either with generic geometry.</p>
      *
-     * <p>Which is why it is only there while the map is tilted. Looking
-     * straight down at something standing up, there is nothing of it lying on
-     * the ground to see; as the eye drops, more and more of it does, so the
-     * fold grows with the lean and is exactly nothing at flat.</p>
+     * <p>The complete silhouette exists throughout the tilt. Looking straight
+     * down, it lies directly behind the decoration and is covered by it. As
+     * the eye drops, the top moves continuously right and down, exposing more
+     * of the same shadow without an opacity threshold or a geometry jump.</p>
      *
-     * <p>It is laid out on the sheet — turned with the map, then leaned with
-     * it — so it foreshortens and squashes towards the horizon with the
-     * country it is lying on, while the sprite above it stays upright. That
-     * difference between the two is the whole effect.</p>
+     * <p>The upright sprite is drawn afterwards. It covers the shared portion
+     * of the silhouettes and leaves only the projected right-hand part visible.</p>
      */
     private static void collectShadow(
-            LostTalesLotrMapGui gui, LostTalesMapDecorationSprite sprite,
-            float mapX, float mapY, float sizeScale, float alpha,
-            float uMin, float uMax, int order, float posX, float posY,
-            float zoomScale, float centerX, float centerY,
-            float worldWidth, float worldHeight,
-            float[] anchor, int viewportXMin, int viewportXMax,
+            LostTalesMapDecorationSprite sprite,
+            float left, float bottom, float right, float top, float alpha,
+            float uMin, float uMax,
+            int viewportXMin, int viewportXMax,
             int viewportYMin, int viewportYMax) {
-        float length = worldHeight * sizeScale * SHADOW_LENGTH
-                * zoomScale * frameLeanSine;
-        if (length < MIN_DRAWN_WIDTH) {
-            return;
-        }
-        float halfWidth = worldWidth * sizeScale * SHADOW_WIDTH
-                * 0.5F * zoomScale;
-        // On the sheet, where a length along the ground is still a length:
-        // the map's turn has been applied and its lean has not.
-        anchor[0] = (mapX - posX) * zoomScale + centerX;
-        anchor[1] = (mapY - posY) * zoomScale + centerY;
-        LostTalesLotrMapRotation.rotateOnly(anchor, gui);
-        float baseX = anchor[0];
-        float baseY = anchor[1];
-        // Folded to the right, always. Away from the reader is where a fold
-        // physically belongs, and it is also directly behind the thing
-        // casting it, which is a shadow you cannot see; to the side it is in
-        // the open. Measured here rather than in map coordinates, so it stays
-        // to the right however far the map is turned instead of swinging
-        // round with the country.
-        //
-        // The artwork lies on its side: its foot stays against the sprite and
-        // its top reaches out, so the width of the drawing becomes the height
-        // of the fold and its height becomes the reach.
-        layFlat(gui, baseX, baseY - halfWidth, anchor, 0);
-        layFlat(gui, baseX, baseY + halfWidth, anchor, 2);
-        layFlat(gui, baseX + length, baseY + halfWidth, anchor, 4);
-        layFlat(gui, baseX + length, baseY - halfWidth, anchor, 6);
+        positionShadowQuad(left, bottom, right, top,
+                frameLeanSine, SHADOW_QUAD);
         if (isOffViewport(SHADOW_QUAD, viewportXMin, viewportXMax,
                 viewportYMin, viewportYMax)) {
             return;
         }
-        addQuad(sprite, SHADOW_QUAD[0], SHADOW_QUAD[1],
+        addShadowQuad(sprite, SHADOW_QUAD[0], SHADOW_QUAD[1],
                 SHADOW_QUAD[2], SHADOW_QUAD[3],
                 SHADOW_QUAD[4], SHADOW_QUAD[5],
                 SHADOW_QUAD[6], SHADOW_QUAD[7],
-                alpha * SHADOW_ALPHA * frameLeanSine, SHADOW_LUMINANCE,
-                uMin, uMax, order);
+                alpha * SHADOW_ALPHA, uMin, uMax);
     }
 
-    /** Leans one corner of a shape lying on the sheet into place. */
-    private static void layFlat(
-            LostTalesLotrMapGui gui, float sheetX, float sheetY,
-            float[] scratch, int corner) {
-        scratch[0] = sheetX;
-        scratch[1] = sheetY;
-        LostTalesLotrMapRotation.leanOnly(scratch, gui);
-        SHADOW_QUAD[corner] = scratch[0];
-        SHADOW_QUAD[corner + 1] = scratch[1];
+    /** Testable geometry seam for the fixed-foot silhouette projection. */
+    static void positionShadowQuad(
+            float left, float bottom, float right, float top,
+            float leanSine, float[] result) {
+        if (result == null || result.length < 8) {
+            return;
+        }
+        float height = Math.max(0.0F, bottom - top);
+        float lean = Math.max(0.0F, Math.min(1.0F, leanSine));
+        float shear = height * SHADOW_SHEAR_X * lean;
+        float drop = height * SHADOW_DROP_Y * lean;
+        result[0] = left;
+        result[1] = bottom;
+        result[2] = right;
+        result[3] = bottom;
+        result[4] = right + shear;
+        result[5] = top + drop;
+        result[6] = left + shear;
+        result[7] = top + drop;
     }
 
     /** Carries one map position onto the screen, through the sheet. */
@@ -808,6 +669,14 @@ public final class LostTalesMapDecorationRenderer {
      * not hand the collector a few thousand arrays to clean up.</p>
      */
     private static final float[] SHADOW_QUAD = new float[8];
+    private static final int INITIAL_SPRITE_CAPACITY = 1024;
+    /** Same field layout as an upright sprite, held in a separate back pass. */
+    private static final int SHADOW_STRIDE = 12;
+    private static float[] shadowFields =
+            new float[INITIAL_SPRITE_CAPACITY * SHADOW_STRIDE];
+    private static LostTalesMapDecorationSprite[] shadowArt =
+            new LostTalesMapDecorationSprite[INITIAL_SPRITE_CAPACITY];
+    private static int shadowCount;
     /**
      * How far the eye has dropped this frame, as a sine.
      *
@@ -816,7 +685,6 @@ public final class LostTalesMapDecorationRenderer {
      * for each of them.</p>
      */
     private static float frameLeanSine;
-    private static final int INITIAL_SPRITE_CAPACITY = 1024;
     /**
      * Most sprites one frame may draw.
      *
@@ -850,6 +718,39 @@ public final class LostTalesMapDecorationRenderer {
     private static final float DEPTH_STEPS_PER_PIXEL = 8.0F;
     private static final float DEPTH_ORIGIN = 32768.0F;
     private static final int MAX_DEPTH = (1 << 21) - 1;
+
+    /** Adds one skewed copy of the decoration artwork to the shadow pass. */
+    private static void addShadowQuad(
+            LostTalesMapDecorationSprite sprite,
+            float x0, float y0, float x1, float y1,
+            float x2, float y2, float x3, float y3, float alpha,
+            float uMin, float uMax) {
+        if (shadowCount >= MAX_SPRITES) {
+            return;
+        }
+        int required = (shadowCount + 1) * SHADOW_STRIDE;
+        if (required > shadowFields.length) {
+            int capacity = Math.min(MAX_SPRITES, shadowArt.length * 2);
+            shadowFields = Arrays.copyOf(shadowFields,
+                    capacity * SHADOW_STRIDE);
+            shadowArt = Arrays.copyOf(shadowArt, capacity);
+        }
+        int field = shadowCount * SHADOW_STRIDE;
+        shadowFields[field] = x0;
+        shadowFields[field + 1] = y0;
+        shadowFields[field + 2] = x1;
+        shadowFields[field + 3] = y1;
+        shadowFields[field + 4] = x2;
+        shadowFields[field + 5] = y2;
+        shadowFields[field + 6] = x3;
+        shadowFields[field + 7] = y3;
+        shadowFields[field + 8] = alpha;
+        shadowFields[field + 9] = 0.0F;
+        shadowFields[field + 10] = uMin;
+        shadowFields[field + 11] = uMax;
+        shadowArt[shadowCount] = sprite;
+        shadowCount++;
+    }
 
     /**
      * Puts one textured quad by, in the order it will be drawn.
@@ -965,20 +866,56 @@ public final class LostTalesMapDecorationRenderer {
         }
     }
 
+    /** Draws every projected silhouette before upright artwork covers it. */
+    private static void flushShadows(Minecraft minecraft) {
+        if (shadowCount <= 0) {
+            return;
+        }
+        Tessellator tessellator = Tessellator.instance;
+        LostTalesMapDecorationSprite bound = null;
+        boolean drawing = false;
+        try {
+            for (int index = 0; index < shadowCount; index++) {
+                LostTalesMapDecorationSprite art = shadowArt[index];
+                if (art != bound) {
+                    if (drawing) {
+                        tessellator.draw();
+                    }
+                    bind(minecraft, art);
+                    bound = art;
+                    tessellator.startDrawingQuads();
+                    drawing = true;
+                }
+                int field = index * SHADOW_STRIDE;
+                emitQuad(tessellator, shadowFields, field);
+            }
+        } finally {
+            if (drawing) {
+                tessellator.draw();
+            }
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        }
+    }
+
     private static void emitQuad(Tessellator tessellator, int field) {
-        double uMin = spriteFields[field + 10];
-        double uMax = spriteFields[field + 11];
-        float luminance = spriteFields[field + 9];
+        emitQuad(tessellator, spriteFields, field);
+    }
+
+    private static void emitQuad(
+            Tessellator tessellator, float[] fields, int field) {
+        double uMin = fields[field + 10];
+        double uMax = fields[field + 11];
+        float luminance = fields[field + 9];
         tessellator.setColorRGBA_F(luminance, luminance, luminance,
-                spriteFields[field + 8]);
-        tessellator.addVertexWithUV(spriteFields[field],
-                spriteFields[field + 1], 0.0D, uMin, 1.0D);
-        tessellator.addVertexWithUV(spriteFields[field + 2],
-                spriteFields[field + 3], 0.0D, uMax, 1.0D);
-        tessellator.addVertexWithUV(spriteFields[field + 4],
-                spriteFields[field + 5], 0.0D, uMax, 0.0D);
-        tessellator.addVertexWithUV(spriteFields[field + 6],
-                spriteFields[field + 7], 0.0D, uMin, 0.0D);
+                fields[field + 8]);
+        tessellator.addVertexWithUV(fields[field],
+                fields[field + 1], 0.0D, uMin, 1.0D);
+        tessellator.addVertexWithUV(fields[field + 2],
+                fields[field + 3], 0.0D, uMax, 1.0D);
+        tessellator.addVertexWithUV(fields[field + 4],
+                fields[field + 5], 0.0D, uMax, 0.0D);
+        tessellator.addVertexWithUV(fields[field + 6],
+                fields[field + 7], 0.0D, uMin, 0.0D);
     }
 
     private static void bind(
@@ -1083,7 +1020,21 @@ public final class LostTalesMapDecorationRenderer {
 
     /** Test seam: whether a kind is drawn at all at a given zoom. */
     static boolean isDrawn(int kind, float zoomScale) {
-        return drawnWidth(kind, zoomScale) >= MIN_DRAWN_WIDTH;
+        return SCATTERED[kind].sprite.visibilityAlpha(maximumDrawnWidth(
+                SCATTERED[kind].sprite.getWorldWidth(), zoomScale)) > 0.0F;
+    }
+
+    /** Test seam: projected-size fade for one scattered kind. */
+    static float visibilityAlpha(int kind, float zoomScale) {
+        return SCATTERED[kind].sprite.visibilityAlpha(
+                drawnWidth(kind, zoomScale));
+    }
+
+    /** Conservative preflight width; individual sites still use exact size. */
+    private static float maximumDrawnWidth(
+            float worldWidth, float zoomScale) {
+        return worldWidth * zoomScale
+                * MAX_SITE_SCALE * MAX_PERSPECTIVE_SCALE;
     }
 
 }

@@ -51,6 +51,10 @@ public final class LostTalesLotrMapLayout {
     private static Field widgetZoomOutField;
     private static Field widgetAddWaypointField;
     private static Field widgetSepiaField;
+    private static Field widgetToggleWaypointsField;
+    private static Field widgetToggleCustomWaypointsField;
+    private static Field widgetToggleHiddenSharedWaypointsField;
+    private static Field widgetLabelsField;
     private static boolean reflectionReady;
     private static boolean reflectionFailed;
 
@@ -96,6 +100,13 @@ public final class LostTalesLotrMapLayout {
                 removeWidget((List<?>)widgets, widgetZoomOutField, gui);
                 removeWidget((List<?>)widgets, widgetAddWaypointField, gui);
                 removeWidget((List<?>)widgets, widgetSepiaField, gui);
+                removeWidget((List<?>)widgets,
+                        widgetToggleWaypointsField, gui);
+                removeWidget((List<?>)widgets,
+                        widgetToggleCustomWaypointsField, gui);
+                removeWidget((List<?>)widgets,
+                        widgetToggleHiddenSharedWaypointsField, gui);
+                removeWidget((List<?>)widgets, widgetLabelsField, gui);
             }
             return true;
         } catch (IllegalAccessException exception) {
@@ -162,17 +173,25 @@ public final class LostTalesLotrMapLayout {
             return lines;
         }
         String template = translate(TELEPORT_SUBTITLE_KEY);
-        if (template.length() == 0) {
-            return lines;
-        }
-        ArrayList<String> kept = new ArrayList<String>(lines.length);
-        for (String line : lines) {
-            if (!matchesTemplate(line, template)) {
-                kept.add(line);
+        String[] filtered = lines;
+        if (template.length() > 0) {
+            ArrayList<String> kept = new ArrayList<String>(lines.length);
+            for (String line : lines) {
+                if (!matchesTemplate(line, template)) {
+                    kept.add(line);
+                }
+            }
+            if (kept.size() != lines.length) {
+                filtered = kept.toArray(new String[kept.size()]);
             }
         }
-        return kept.size() == lines.length
-                ? lines : kept.toArray(new String[kept.size()]);
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft != null
+                && minecraft.currentScreen instanceof LostTalesLotrMapGui) {
+            return ((LostTalesLotrMapGui)minecraft.currentScreen)
+                    .resolveCursorSubtitles(filtered);
+        }
+        return filtered;
     }
 
     /**
@@ -462,6 +481,13 @@ public final class LostTalesLotrMapLayout {
             widgetZoomOutField = field(mapClass, "widgetZoomOut");
             widgetAddWaypointField = field(mapClass, "widgetAddCWP");
             widgetSepiaField = field(mapClass, "widgetSepia");
+            widgetToggleWaypointsField = field(
+                    mapClass, "widgetToggleWPs");
+            widgetToggleCustomWaypointsField = field(
+                    mapClass, "widgetToggleCWPs");
+            widgetToggleHiddenSharedWaypointsField = field(
+                    mapClass, "widgetToggleHiddenSWPs");
+            widgetLabelsField = field(mapClass, "widgetLabels");
             reflectionReady = true;
             return true;
         } catch (ReflectiveOperationException exception) {

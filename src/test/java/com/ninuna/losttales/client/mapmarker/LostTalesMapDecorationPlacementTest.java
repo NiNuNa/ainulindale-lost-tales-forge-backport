@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -171,6 +172,30 @@ public final class LostTalesMapDecorationPlacementTest {
         // And it still has to be standing in water itself.
         assertFalse(LostTalesMapDecorationPlacement.isShoreSite(
                 coast(400), 405, 300, 3));
+    }
+
+    @Test
+    public void wavesFormATaperedBandOutsideTheCoast() {
+        LostTalesMapDecorationPlacement.GroundSampler water = coast(400);
+        float near = LostTalesMapDecorationPlacement.coastalWaterWeight(
+                water, 398, 300, 84);
+        float middle = LostTalesMapDecorationPlacement.coastalWaterWeight(
+                water, 350, 300, 84);
+        float far = LostTalesMapDecorationPlacement.coastalWaterWeight(
+                water, 320, 300, 84);
+        float openSea = LostTalesMapDecorationPlacement.coastalWaterWeight(
+                water, 290, 300, 84);
+
+        assertTrue("waves did not gather outside the shoreline", near > 0.0F);
+        assertTrue("wave density did not taper towards its outer edge",
+                near > middle);
+        assertTrue("the extended outer wave band ended too abruptly",
+                middle > far && far > 0.0F);
+        assertEquals("open ocean still filled with waves",
+                0.0F, openSea, 0.0F);
+        assertEquals("a wave was placed on land", 0.0F,
+                LostTalesMapDecorationPlacement.coastalWaterWeight(
+                        water, 405, 300, 28), 0.0F);
     }
 
     /** Water on one side of a line and land on the other. */
@@ -504,7 +529,41 @@ public final class LostTalesMapDecorationPlacementTest {
                     LostTalesMapDecorationRenderer.isDrawn(kind, 24.0F));
             assertFalse("a sub-pixel decoration must be culled",
                     LostTalesMapDecorationRenderer.isDrawn(kind, 0.02F));
+
+            boolean foundPartial = false;
+            for (float scale = 0.02F; scale <= 1.0F; scale += 0.01F) {
+                float alpha = LostTalesMapDecorationRenderer
+                        .visibilityAlpha(kind, scale);
+                foundPartial |= alpha > 0.0F && alpha < 1.0F;
+            }
+            assertTrue("kind " + kind + " has a hard visibility step",
+                    foundPartial);
         }
+    }
+
+    @Test
+    public void largeLandmarksOutliveSmallSurfaceDetail() {
+        float scale = 0.3F;
+        assertTrue(LostTalesMapDecorationSprite.MOUNTAIN
+                .visibilityAlpha(
+                        LostTalesMapDecorationSprite.MOUNTAIN
+                                .getWorldWidth() * scale)
+                > LostTalesMapDecorationSprite.WAVE.visibilityAlpha(
+                        LostTalesMapDecorationSprite.WAVE
+                                .getWorldWidth() * scale));
+    }
+
+    @Test
+    public void largeNearEdgeSitesAreNotHeldUntilTheAverageSpriteAppears() {
+        int mountainKind = 2;
+        float scale = 0.14F;
+
+        assertEquals("the average mountain should still be fully clear",
+                0.0F, LostTalesMapDecorationRenderer.visibilityAlpha(
+                        mountainKind, scale), 0.0F);
+        assertTrue("the whole-kind preflight would pop larger mountains in",
+                LostTalesMapDecorationRenderer.isDrawn(
+                        mountainKind, scale));
     }
 
     /**
@@ -531,5 +590,52 @@ public final class LostTalesMapDecorationPlacementTest {
             assertTrue(sprites[index].name() + " left its range",
                     standing >= 0.0F && standing <= 1.0F);
         }
+    }
+
+    @Test
+    public void transparentRowsBelowArtworkDoNotLiftItsVisibleFoot() {
+        assertEquals("mountain ink must end exactly at its ground anchor",
+                1.0F,
+                LostTalesMapDecorationSprite.MOUNTAIN.footOffset(16.0F),
+                0.0F);
+        assertEquals("ship ink has two transparent rows below its hull",
+                2.0F,
+                LostTalesMapDecorationSprite.SHIP.footOffset(16.0F),
+                0.0F);
+    }
+
+    @Test
+    public void shadowKeepsItsBaseAndShearsTheActualSpriteToTheRight() {
+        float[] quad = new float[8];
+        LostTalesMapDecorationRenderer.positionShadowQuad(
+                10.0F, 60.0F, 30.0F, 20.0F, 1.0F, quad);
+
+        assertEquals(10.0F, quad[0], 0.0F);
+        assertEquals(60.0F, quad[1], 0.0F);
+        assertEquals(30.0F, quad[2], 0.0F);
+        assertEquals(60.0F, quad[3], 0.0F);
+        assertTrue("the projected top did not reach right", quad[4] > 30.0F);
+        assertTrue("the projected top dropped below its source", quad[5] > 20.0F);
+        assertEquals("projection changed the sprite silhouette's width",
+                20.0F, quad[4] - quad[6], 0.001F);
+    }
+
+    @Test
+    public void shadowStartsBehindItsSpriteAndMovesWithoutASnap() {
+        float[] flat = new float[8];
+        float[] barelyTilted = new float[8];
+        LostTalesMapDecorationRenderer.positionShadowQuad(
+                10.0F, 60.0F, 30.0F, 20.0F, 0.0F, flat);
+        LostTalesMapDecorationRenderer.positionShadowQuad(
+                10.0F, 60.0F, 30.0F, 20.0F, 0.001F, barelyTilted);
+
+        assertArrayEquals(new float[] {
+                10.0F, 60.0F, 30.0F, 60.0F,
+                30.0F, 20.0F, 10.0F, 20.0F
+        }, flat, 0.0F);
+        assertTrue(barelyTilted[4] > flat[4]);
+        assertTrue(barelyTilted[4] - flat[4] < 0.1F);
+        assertTrue(barelyTilted[5] > flat[5]);
+        assertTrue(barelyTilted[5] - flat[5] < 0.1F);
     }
 }

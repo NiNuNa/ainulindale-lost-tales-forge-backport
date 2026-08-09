@@ -26,16 +26,19 @@ import net.minecraft.util.ResourceLocation;
 @SideOnly(Side.CLIENT)
 enum LostTalesMapDecorationSprite {
     /** Placeholder crest, four frames of sixteen by eight. */
-    WAVE("decoration_wave.png", 4, 16, 8, 6, true, 4.6F, 0.0F),
+    WAVE("decoration_wave.png", 4, 16, 8, 6, true,
+            4.6F, 0.0F, 1.8F, 1),
     /**
      * Two drawings of a tree, used as variants rather than as an animation:
      * trees on a map do not sway, and a forest where every tree moved in step
      * read as the paper rippling.
      */
-    TREE("decoration_tree.png", 2, 16, 16, 0, false, 4.0F, 0.5F),
-    MOUNTAIN("decoration_mountain.png", 1, 16, 16, 0, false, 5.6F, 1.0F),
-    SHIP("decoration_ship.png", 2, 16, 16, 11, true, 4.4F, 0.15F),
-    TRAVELLER("decoration_traveller.png", 4, 12, 12, 5, true, 3.0F, 0.3F);
+    TREE("decoration_tree.png", 2, 16, 16, 0, false,
+            4.0F, 0.5F, 1.35F, 1),
+    MOUNTAIN("decoration_mountain.png", 1, 16, 16, 0, false,
+            5.6F, 1.0F, 0.9F, 1),
+    SHIP("decoration_ship.png", 2, 16, 16, 11, true,
+            4.4F, 0.15F, 1.2F, 2);
 
     private final ResourceLocation texture;
     private final int frames;
@@ -49,17 +52,22 @@ enum LostTalesMapDecorationSprite {
     /**
      * How much of what this kind draws is standing up off the ground.
      *
-     * <p>A mountain is all height; a wave is none of it; a tree and a
-     * traveller are somewhere between. It is what decides how much taller the
-     * sprite is drawn as the map tips, and it is a property of what the
-     * artwork depicts rather than of the artwork itself.</p>
+     * <p>A mountain is all height, a wave is none of it, and a tree is between
+     * them. It is what decides how much taller the sprite is drawn as the map
+     * tips, and it is a property of what the artwork depicts rather than of
+     * the artwork itself.</p>
      */
     private final float standing;
+    /** Smallest projected width at which this artwork is still readable. */
+    private final float minimumReadableWidth;
+    /** Transparent pixel rows below the visible foot in every frame. */
+    private final int bottomPaddingPixels;
 
     LostTalesMapDecorationSprite(
             String textureName, int frames, int frameWidth, int frameHeight,
             int ticksPerFrame, boolean animated, float worldWidth,
-            float standing) {
+            float standing, float minimumReadableWidth,
+            int bottomPaddingPixels) {
         this.texture = new ResourceLocation(LostTalesMetaData.MOD_ID,
                 "textures/gui/map/" + textureName);
         this.frames = Math.max(1, frames);
@@ -69,6 +77,10 @@ enum LostTalesMapDecorationSprite {
         this.animated = animated && frames > 1;
         this.worldWidth = Math.max(0.01F, worldWidth);
         this.standing = Math.max(0.0F, Math.min(1.0F, standing));
+        this.minimumReadableWidth = Math.max(
+                0.01F, minimumReadableWidth);
+        this.bottomPaddingPixels = Math.max(
+                0, Math.min(frameHeight - 1, bottomPaddingPixels));
     }
 
     ResourceLocation getTexture() {
@@ -98,6 +110,17 @@ enum LostTalesMapDecorationSprite {
 
     float getStanding() {
         return this.standing;
+    }
+
+    /** Screen-space offset that places visible ink, not transparent padding, on the ground. */
+    float footOffset(float drawnHeight) {
+        return drawnHeight * this.bottomPaddingPixels
+                / (float)this.frameHeight;
+    }
+
+    float visibilityAlpha(float projectedWidth) {
+        return LostTalesMapProjectedVisibility.alpha(
+                projectedWidth, this.minimumReadableWidth);
     }
 
     /**

@@ -50,8 +50,15 @@ final class LostTalesLotrRoadLabelRenderer {
 
     private LostTalesLotrRoadLabelRenderer() {}
 
+    /** Whether road dots and their labels can safely be split into two passes. */
+    static boolean canSeparateLabels() {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        return !LOTRConfig.osrsMap && minecraft != null
+                && minecraft.fontRenderer != null && ensureReflection();
+    }
+
     static Prepared prepare(LOTRGuiMap gui) {
-        if (gui == null || LOTRConfig.osrsMap || !ensureReflection()) {
+        if (gui == null || !canSeparateLabels()) {
             return null;
         }
         Minecraft minecraft = Minecraft.getMinecraft();
