@@ -83,13 +83,17 @@ public final class LostTalesLotrMapRotationTest {
     }
 
     @Test
-    public void aFullDragTurnsTheMapAllTheWayAndNoFurther() {
+    public void theNormalLimitAndElasticLimitAreDistinct() {
         assertEquals(LostTalesLotrMapRotation.MAX_DEGREES,
                 LostTalesLotrMapRotation.degreesForInput(1.0F), 0.001F);
         assertEquals(-LostTalesLotrMapRotation.MAX_DEGREES,
                 LostTalesLotrMapRotation.degreesForInput(-1.0F), 0.001F);
-        assertEquals(LostTalesLotrMapRotation.MAX_DEGREES,
+        assertTrue(LostTalesLotrMapRotation.degreesForInput(1.1F)
+                > LostTalesLotrMapRotation.MAX_DEGREES);
+        assertEquals(LostTalesLotrMapRotation.MAX_VISUAL_DEGREES,
                 LostTalesLotrMapRotation.degreesForInput(4.0F), 0.001F);
+        assertEquals(-LostTalesLotrMapRotation.MAX_VISUAL_DEGREES,
+                LostTalesLotrMapRotation.degreesForInput(-4.0F), 0.001F);
     }
 
     /**
@@ -314,7 +318,7 @@ public final class LostTalesLotrMapRotationTest {
                                 Math.abs(input))));
     }
 
-    /** Outward, nothing has changed: the calibrated curve still applies. */
+    /** The calibrated curve is unchanged until the elastic range begins. */
     @Test
     public void draggingAwayFromSquareIsUnchanged() {
         float step = 0.05F;
@@ -324,9 +328,59 @@ public final class LostTalesLotrMapRotationTest {
                     accumulated, step);
             assertEquals(taken * step, accumulated, 0.0001F);
         }
-        assertEquals("the drag cannot buy more than the whole range",
-                1.0F,
-                LostTalesLotrMapRotation.advanceInput(1.0F, step), 0.0F);
+        assertEquals(1.05F,
+                LostTalesLotrMapRotation.advanceInput(1.0F, step), 0.0001F);
+        assertEquals("elastic input must remain strictly bounded",
+                LostTalesLotrMapRotation.MAX_INPUT,
+                LostTalesLotrMapRotation.advanceInput(
+                        LostTalesLotrMapRotation.MAX_INPUT, step), 0.0F);
+    }
+
+    @Test
+    public void elasticResistanceRisesTowardsTheVisualLimit() {
+        float first = LostTalesLotrMapRotation.degreesForInput(1.06F)
+                - LostTalesLotrMapRotation.degreesForInput(1.0F);
+        float last = LostTalesLotrMapRotation.degreesForInput(
+                LostTalesLotrMapRotation.MAX_INPUT)
+                - LostTalesLotrMapRotation.degreesForInput(
+                        LostTalesLotrMapRotation.MAX_INPUT - 0.06F);
+
+        assertTrue(first > 0.0F);
+        assertTrue("overshoot must get harder towards its bound",
+                last < first);
+    }
+
+    @Test
+    public void normalLimitFlowsDirectlyIntoElasticOvershoot() {
+        float step = 0.01F;
+        float before = LostTalesLotrMapRotation.degreesForInput(1.0F)
+                - LostTalesLotrMapRotation.degreesForInput(1.0F - step);
+        float after = LostTalesLotrMapRotation.degreesForInput(1.0F + step)
+                - LostTalesLotrMapRotation.degreesForInput(1.0F);
+
+        assertTrue("movement stopped at the normal limit", after > 0.0F);
+        assertEquals("the resistance curve changed at the normal limit",
+                before, after, before * 0.03F);
+        assertTrue("resistance must keep rising through overshoot",
+                after < before);
+    }
+
+    @Test
+    public void releasedOvershootReturnsSmoothlyAndFrameIndependently() {
+        float start = LostTalesLotrMapRotation.MAX_INPUT;
+        float oneStep = LostTalesLotrMapRotation.releaseOvershootInput(
+                start, 0.1F);
+        float manySteps = start;
+        for (int step = 0; step < 10; step++) {
+            manySteps = LostTalesLotrMapRotation.releaseOvershootInput(
+                    manySteps, 0.01F);
+        }
+
+        assertTrue(oneStep > LostTalesLotrMapRotation.NORMAL_INPUT_LIMIT);
+        assertTrue(oneStep < start);
+        assertEquals(oneStep, manySteps, 0.0001F);
+        assertEquals(LostTalesLotrMapRotation.NORMAL_INPUT_LIMIT,
+                LostTalesLotrMapRotation.releasedInput(start), 0.0F);
     }
 
     /** A reversal that overshoots square keeps paying full price after it. */
@@ -565,12 +619,15 @@ public final class LostTalesLotrMapRotationTest {
         assertEquals("a full lean must drop the eye exactly that far",
                 LostTalesLotrMapRotation.MAX_ORIENTATION_DEGREES,
                 LostTalesLotrMapRotation.pitchDegrees(1.0F), 0.0001F);
-        // And nothing may put either axis past it, whatever it is handed.
-        assertEquals(LostTalesLotrMapRotation.MAX_ORIENTATION_DEGREES,
+        // Dragging may briefly pass the normal limit, but never its visual
+        // safety bound, and both axes get the same amount of overshoot.
+        assertEquals(LostTalesLotrMapRotation.MAX_VISUAL_DEGREES,
                 LostTalesLotrMapRotation.pitchDegrees(4.0F), 0.0001F);
-        assertEquals(LostTalesLotrMapRotation.MAX_DEGREES,
+        assertEquals(LostTalesLotrMapRotation.MAX_VISUAL_DEGREES,
                 Math.abs(LostTalesLotrMapRotation.degreesForInput(-9.0F)),
                 0.001F);
+        assertEquals(LostTalesLotrMapRotation.MAX_VISUAL_LEAN,
+                LostTalesLotrMapRotation.leanForInput(9.0F), 0.0001F);
     }
 
     /**
@@ -646,7 +703,9 @@ public final class LostTalesLotrMapRotationTest {
             float width = WIDTHS[screen];
             float height = HEIGHTS[screen];
             float grain = LostTalesLotrMapRotation.maxCoverage(width, height);
-            for (float lean = 0.0F; lean <= 1.0F; lean += 0.05F) {
+            for (float lean = 0.0F;
+                 lean <= LostTalesLotrMapRotation.MAX_VISUAL_LEAN;
+                 lean += 0.05F) {
                 LostTalesLotrMapRotation.rotatedCoverage(
                         width, height,
                         LostTalesLotrMapRotation.MAX_DEGREES, lean, coverage);

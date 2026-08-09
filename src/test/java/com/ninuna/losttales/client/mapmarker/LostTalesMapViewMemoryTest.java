@@ -94,10 +94,11 @@ public final class LostTalesMapViewMemoryTest {
         LostTalesMapViewMemory.remember(0.0F, 0.0F, 0.0F, 9.0F, 9.0F);
 
         float degrees = LostTalesLotrMapRotation.degreesForInput(
-                LostTalesLotrMapRotation.clampInput(
+                LostTalesLotrMapRotation.releasedInput(
                         LostTalesMapViewMemory.getRotationInput()));
         float lean = LostTalesLotrMapRotation.leanForInput(
-                LostTalesMapViewMemory.getLeanInput());
+                LostTalesLotrMapRotation.releasedInput(
+                        LostTalesMapViewMemory.getLeanInput()));
 
         assertTrue("a restored turn left the map's limits",
                 Math.abs(degrees)

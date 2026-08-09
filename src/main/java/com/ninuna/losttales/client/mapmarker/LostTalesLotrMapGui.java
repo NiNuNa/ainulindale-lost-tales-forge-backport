@@ -85,6 +85,12 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     static final float SMOOTH_ZOOM_WHEEL_INCREMENT = 0.12F;
     private static final float SMOOTH_ZOOM_EASING = 0.2F;
     private static final float SMOOTH_ZOOM_SNAP_EPSILON = 0.001F;
+    /** Furthest a wheel gesture is allowed to accumulate beyond either cap. */
+    static final float SMOOTH_ZOOM_ELASTIC_INPUT = 0.84F;
+    /** Asymptotic visual travel beyond a normal zoom cap, in exponent units. */
+    static final float SMOOTH_ZOOM_ELASTIC_OVERSHOOT = 0.24F;
+    /** A wheel has been released when it has supplied no events for this long. */
+    static final long SMOOTH_ZOOM_RELEASE_NANOS = 90_000_000L;
     /**
      * Zoom a travel destination is framed at, unless the player is already
      * looking closer than that. Close enough to read the ground around it,
@@ -114,6 +120,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     private float smoothZoomPrevious;
     private float smoothZoomCurrent;
     private float smoothZoomTarget;
+    /** Unresisted wheel position; may temporarily sit outside the real caps. */
+    private float smoothZoomWheelInput;
+    private long smoothZoomLastWheelNanos;
     private List<LOTRAbstractWaypoint> clickableNativeWaypoints =
             Collections.emptyList();
     private LostTalesMapFastTravelPrompt fastTravelPrompt;
@@ -339,13 +348,14 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             // the first frame — and every hit test on it — reads that scale.
             setupZoomVariables(1.0F);
         }
-        this.rotationInput = LostTalesLotrMapRotation.clampInput(
+        this.rotationInput = LostTalesLotrMapRotation.releasedInput(
                 LostTalesMapViewMemory.getRotationInput());
         this.mapRotationTargetDegrees =
                 LostTalesLotrMapRotation.degreesForInput(this.rotationInput);
         this.mapRotationDegrees = this.mapRotationTargetDegrees;
-        this.leanInput = Math.max(0.0F, LostTalesLotrMapRotation.clampInput(
-                LostTalesMapViewMemory.getLeanInput()));
+        this.leanInput = Math.max(0.0F,
+                LostTalesLotrMapRotation.releasedInput(
+                        LostTalesMapViewMemory.getLeanInput()));
         this.mapLeanTarget =
                 LostTalesLotrMapRotation.leanForInput(this.leanInput);
         this.mapLean = this.mapLeanTarget;
@@ -370,6 +380,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             this.smoothZoomPrevious = initial;
             this.smoothZoomCurrent = initial;
             this.smoothZoomTarget = initial;
+            this.smoothZoomWheelInput = initial;
+            this.smoothZoomLastWheelNanos = 0L;
             zoomTicksField.setInt(this, 0);
             this.smoothZoomInitialized = true;
         } catch (IllegalAccessException exception) {
@@ -413,6 +425,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         if (!this.smoothZoomInitialized) {
             return;
         }
+        releaseElasticZoomIfIdle(System.nanoTime());
         this.smoothZoomPrevious = this.smoothZoomCurrent;
         this.smoothZoomCurrent = advanceSmoothZoom(
                 this.smoothZoomCurrent, this.smoothZoomTarget);
@@ -581,7 +594,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         float wheelSteps = Math.max(1.0F,
                 Math.abs((float)wheel) / 120.0F);
         adjustSmoothZoom(Math.signum((float)wheel)
-                * SMOOTH_ZOOM_WHEEL_INCREMENT * wheelSteps);
+                * SMOOTH_ZOOM_WHEEL_INCREMENT * wheelSteps,
+                System.nanoTime());
     }
 
     private boolean shouldHandleSmoothZoomWheel(int wheel) {
@@ -631,10 +645,30 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         super.actionPerformed(button);
     }
 
-    private void adjustSmoothZoom(float delta) {
+    private void adjustSmoothZoom(float delta, long nowNanos) {
         // Zooming by hand takes the camera back from a focus in progress.
         this.cameraFocus.cancel();
-        setSmoothZoomTarget(this.smoothZoomTarget + delta);
+        releaseElasticZoomIfIdle(nowNanos);
+        this.smoothZoomWheelInput = clampElasticZoomInput(
+                this.smoothZoomWheelInput + delta);
+        this.smoothZoomLastWheelNanos = nowNanos;
+        retargetSmoothZoom(elasticZoomTarget(this.smoothZoomWheelInput));
+    }
+
+    /** Returns an untouched wheel overshoot to the real zoom range. */
+    private void releaseElasticZoomIfIdle(long nowNanos) {
+        if (this.smoothZoomLastWheelNanos == 0L
+                || nowNanos - this.smoothZoomLastWheelNanos
+                        < SMOOTH_ZOOM_RELEASE_NANOS) {
+            return;
+        }
+        this.smoothZoomLastWheelNanos = 0L;
+        float released = clampSmoothZoom(this.smoothZoomWheelInput);
+        if (released == this.smoothZoomWheelInput) {
+            return;
+        }
+        this.smoothZoomWheelInput = released;
+        retargetSmoothZoom(released);
     }
 
     /**
@@ -662,6 +696,14 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             return;
         }
         float adjusted = clampSmoothZoom(zoomExp);
+        this.smoothZoomWheelInput = adjusted;
+        this.smoothZoomLastWheelNanos = 0L;
+        retargetSmoothZoom(adjusted);
+    }
+
+    /** Applies either an ordinary target or the temporary elastic visual one. */
+    private void retargetSmoothZoom(float adjusted) {
+        adjusted = clampElasticZoomVisual(adjusted);
         if (adjusted == this.smoothZoomTarget) {
             return;
         }
@@ -682,13 +724,55 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                 Math.min(SMOOTH_ZOOM_MAX, value));
     }
 
+    /** Bounds accumulated wheel travel while leaving room beyond the real cap. */
+    static float clampElasticZoomInput(float value) {
+        return Math.max(SMOOTH_ZOOM_MIN - SMOOTH_ZOOM_ELASTIC_INPUT,
+                Math.min(SMOOTH_ZOOM_MAX + SMOOTH_ZOOM_ELASTIC_INPUT,
+                        value));
+    }
+
+    /** Strict safety bound for the exponent actually handed to the renderer. */
+    static float clampElasticZoomVisual(float value) {
+        return Math.max(SMOOTH_ZOOM_MIN - SMOOTH_ZOOM_ELASTIC_OVERSHOOT,
+                Math.min(SMOOTH_ZOOM_MAX + SMOOTH_ZOOM_ELASTIC_OVERSHOOT,
+                        value));
+    }
+
+    /**
+     * Maps wheel travel through one continuous, increasingly stiff curve.
+     *
+     * <p>The derivative is exactly one where either normal cap is crossed, so
+     * there is no stop before the elastic movement begins. Beyond it the
+     * exponential approaches {@link #SMOOTH_ZOOM_ELASTIC_OVERSHOOT} without
+     * reaching it; every additional wheel step therefore moves the map less
+     * than the one before it.</p>
+     */
+    static float elasticZoomTarget(float wheelInput) {
+        float input = clampElasticZoomInput(wheelInput);
+        if (input > SMOOTH_ZOOM_MAX) {
+            return SMOOTH_ZOOM_MAX + elasticZoomDistance(
+                    input - SMOOTH_ZOOM_MAX);
+        }
+        if (input < SMOOTH_ZOOM_MIN) {
+            return SMOOTH_ZOOM_MIN - elasticZoomDistance(
+                    SMOOTH_ZOOM_MIN - input);
+        }
+        return input;
+    }
+
+    private static float elasticZoomDistance(float excess) {
+        return SMOOTH_ZOOM_ELASTIC_OVERSHOOT
+                * (1.0F - (float)Math.exp(
+                        -excess / SMOOTH_ZOOM_ELASTIC_OVERSHOOT));
+    }
+
     private static boolean hasSmoothZoom(LOTRGuiMap gui) {
         return gui instanceof LostTalesLotrMapGui
                 && ((LostTalesLotrMapGui)gui).smoothZoomInitialized;
     }
 
     static float advanceSmoothZoom(float current, float target) {
-        target = clampSmoothZoom(target);
+        target = clampElasticZoomVisual(target);
         float difference = target - current;
         if (Math.abs(difference) <= SMOOTH_ZOOM_SNAP_EPSILON) {
             return target;
@@ -698,7 +782,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                 || (difference < 0.0F && advanced < target)) {
             return target;
         }
-        return clampSmoothZoom(advanced);
+        return clampElasticZoomVisual(advanced);
     }
 
     private static synchronized boolean ensureSmoothZoomReflection() {
@@ -1208,6 +1292,19 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                         (nowNanos - this.rotationLastNanos)
                                 / 1000000000.0F);
         this.rotationLastNanos = nowNanos;
+        if (!this.rotatingMap) {
+            this.rotationInput =
+                    LostTalesLotrMapRotation.releaseOvershootInput(
+                            this.rotationInput, elapsed);
+            this.leanInput = Math.max(0.0F,
+                    LostTalesLotrMapRotation.releaseOvershootInput(
+                            this.leanInput, elapsed));
+            this.mapRotationTargetDegrees =
+                    LostTalesLotrMapRotation.degreesForInput(
+                            this.rotationInput);
+            this.mapLeanTarget =
+                    LostTalesLotrMapRotation.leanForInput(this.leanInput);
+        }
         this.mapRotationDegrees =
                 LostTalesLotrMapRotation.approachDegrees(
                         this.mapRotationDegrees,
@@ -1220,7 +1317,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                 / LEAN_SMOOTHING_SCALE;
     }
 
-    /** How far the map is drawn leaning, 0 flat to 1. */
+    /** How far the map is drawn leaning; values above one are temporary. */
     float getMapLean() {
         return this.mapLean;
     }
@@ -2234,7 +2331,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             return;
         }
         LostTalesMapViewMemory.remember(camera[2], camera[3],
-                this.smoothZoomCurrent, this.rotationInput, this.leanInput);
+                this.smoothZoomCurrent,
+                LostTalesLotrMapRotation.releasedInput(this.rotationInput),
+                LostTalesLotrMapRotation.releasedInput(this.leanInput));
     }
 
     private boolean sendWaystoneTravel(String destinationMarkerId) {

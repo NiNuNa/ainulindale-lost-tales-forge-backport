@@ -38,26 +38,28 @@ public final class LostTalesLotrMapRotation {
     public static final float MAX_ORIENTATION_DEGREES = 33.75F;
     /** Furthest the map may be turned in either direction, in degrees. */
     public static final float MAX_DEGREES = MAX_ORIENTATION_DEGREES;
-    /** Horizontal drag, in GUI pixels, that turns the map as far as it goes. */
+    /** The ordinary camera range ends at one accumulated drag. */
+    static final float NORMAL_INPUT_LIMIT = 1.0F;
+    /** Extra input accepted only for the temporary elastic overshoot. */
+    static final float MAX_INPUT = 1.36F;
+    /** Rate at which additional drag buys less rotation. */
+    static final float RESISTANCE_RATE = 5.0F;
+    /** Non-zero gradient that carries motion smoothly through the soft cap. */
+    static final float RESISTANCE_GRADIENT_FLOOR = 0.08F;
+    private static final float RESISTANCE_NORMALIZER =
+            (1.0F - (float)Math.exp(-RESISTANCE_RATE))
+                    / RESISTANCE_RATE + RESISTANCE_GRADIENT_FLOOR;
+    /** Strict visual bounds while the player pulls beyond the normal limit. */
+    static final float MAX_VISUAL_LEAN = resistanceShare(MAX_INPUT);
+    static final float MAX_VISUAL_DEGREES =
+            MAX_DEGREES * MAX_VISUAL_LEAN;
+    /** Time constant for an untouched overshoot to return to its normal limit. */
+    static final float OVERSHOOT_RETURN_SECONDS = 0.12F;
+    private static final float OVERSHOOT_RETURN_EPSILON = 0.0005F;
+    /** Horizontal drag, in GUI pixels, that reaches the normal limit. */
     static final float FULL_TURN_DRAG_PIXELS = 520.0F;
-    /**
-     * How sharply the map stiffens as it leaves square. Both the turn and the
-     * lean follow {@code 1 - (1 - t)^RESISTANCE_EXPONENT}, so the drag a
-     * degree costs rises the whole way out: easy off square, noticeably
-     * heavier half way, and heavy enough at the end that the limit is
-     * somewhere the player leans into rather than falls through.
-     *
-     * <p>It was seven, which put nine tenths of the travel in the first
-     * quarter of the drag and made the rest a wall — the map felt both
-     * twitchy and immovable depending on where in the range it was.</p>
-     */
-    static final float RESISTANCE_EXPONENT = 3.0F;
-    /**
-     * Floor on how flat the resistance curve is allowed to read when a drag
-     * is coming back towards square. Reached only in the last fraction of a
-     * degree, where without it a single pixel would unwind the whole angle.
-     */
-    private static final float MIN_RELEASE_STEEPNESS = 0.05F;
+    // The normal and elastic ranges deliberately share one curve. A separate
+    // overshoot curve creates a zero-slope pause where the two meet.
     /**
      * How near square the map has to be drawn before it is drawn square.
      *
@@ -158,32 +160,36 @@ public final class LostTalesLotrMapRotation {
      * first part of every tilt did nothing.</p>
      */
     static float leanForInput(float input) {
-        float clamped = Math.max(0.0F, Math.min(1.0F, input));
+        float clamped = Math.max(0.0F, Math.min(MAX_INPUT, input));
         return resist(clamped);
     }
 
     /**
      * The stiffening curve, shared by the turn and the lean.
      *
-     * <p>Returns how far along its range an input has earned. The gradient is
-     * {@code RESISTANCE_EXPONENT} at the start and nothing at all at the end,
-     * so the resistance the player feels rises smoothly the whole way out
-     * instead of being one number over the range.</p>
+     * <p>Normalized to one at the normal limit but not clamped there. The
+     * exponential continues into the overshoot with the same non-zero slope,
+     * while every additional pixel buys less movement than the last.</p>
      */
     static float resist(float advanced) {
-        float clamped = Math.max(0.0F, Math.min(1.0F, advanced));
-        return 1.0F - (float)Math.pow(
-                1.0D - clamped, RESISTANCE_EXPONENT);
+        float clamped = Math.max(0.0F, Math.min(MAX_INPUT, advanced));
+        return resistanceShare(clamped);
+    }
+
+    private static float resistanceShare(float input) {
+        return ((1.0F - (float)Math.exp(-RESISTANCE_RATE * input))
+                        / RESISTANCE_RATE
+                + RESISTANCE_GRADIENT_FLOOR * input)
+                / RESISTANCE_NORMALIZER;
     }
 
     /**
      * Adds a drag to an axis, with the resistance depending on which way it
      * is going.
      *
-     * <p>Moving away from square costs exactly what it always did: the drag
-     * accumulates unchanged and {@link #degreesForInput(float)} turns it into
-     * an angle through a curve that stiffens the whole way out, so the limit
-     * is still somewhere the player leans into.</p>
+     * <p>Moving away from square accumulates drag unchanged and
+     * {@link #degreesForInput(float)} maps it through one exponential curve.
+     * The normal limit is only a point on that curve, not a handoff.</p>
      *
      * <p>Coming back is not a second helping of that. The stiffening is in
      * the shape of that curve, which means that near the limit an inch of
@@ -195,7 +201,7 @@ public final class LostTalesLotrMapRotation {
      * out it was. The player still feels the wall going out and never feels
      * it coming back.</p>
      *
-     * @param current accumulated drag, {@code -1} to {@code 1}
+     * @param current accumulated drag, bounded by {@link #MAX_INPUT}
      * @param delta   this frame's drag, in the same units
      */
     static float advanceInput(float current, float delta) {
@@ -207,6 +213,20 @@ public final class LostTalesLotrMapRotation {
                 || (delta > 0.0F) == (clamped > 0.0F);
         if (outward) {
             return clampInput(clamped + delta);
+        }
+        float magnitude = Math.abs(clamped);
+        if (magnitude > NORMAL_INPUT_LIMIT) {
+            // The elastic part gives drag back at the same rate it accepted
+            // it. Any remainder continues through the ordinary release curve.
+            float distanceToLimit = magnitude - NORMAL_INPUT_LIMIT;
+            float inward = Math.abs(delta);
+            if (inward <= distanceToLimit) {
+                return clampInput(clamped + delta);
+            }
+            float direction = clamped < 0.0F ? -1.0F : 1.0F;
+            float remainder = inward - distanceToLimit;
+            return advanceInput(direction * NORMAL_INPUT_LIMIT,
+                    -direction * remainder);
         }
         float released = delta / releaseSteepness(Math.abs(clamped));
         float advanced = clamped + released;
@@ -224,13 +244,16 @@ public final class LostTalesLotrMapRotation {
      * How steeply {@link #degreesForInput(float)} is rising at a given amount
      * of accumulated drag, relative to its rate at square.
      *
-     * <p>Floored, because at the very limit the curve is flat and dividing by
-     * that would let a single pixel throw the map back to square.</p>
+     * <p>An exponential's relative gradient is another exponential. Dividing
+     * by it cancels the outward resistance when the player deliberately
+     * drags back towards square.</p>
      */
     private static float releaseSteepness(float advanced) {
-        float clamped = Math.max(0.0F, Math.min(1.0F, advanced));
-        return Math.max(MIN_RELEASE_STEEPNESS, (float)Math.pow(
-                1.0D - clamped, RESISTANCE_EXPONENT - 1.0F));
+        float clamped = Math.max(0.0F,
+                Math.min(NORMAL_INPUT_LIMIT, advanced));
+        return ((float)Math.exp(-RESISTANCE_RATE * clamped)
+                + RESISTANCE_GRADIENT_FLOOR)
+                / (1.0F + RESISTANCE_GRADIENT_FLOOR);
     }
 
     /**
@@ -270,7 +293,35 @@ public final class LostTalesLotrMapRotation {
         if (Float.isNaN(input)) {
             return 0.0F;
         }
-        return Math.max(-1.0F, Math.min(1.0F, input));
+        return Math.max(-MAX_INPUT, Math.min(MAX_INPUT, input));
+    }
+
+    /** Removes the temporary part of an input without changing its direction. */
+    static float releasedInput(float input) {
+        float clamped = clampInput(input);
+        if (Math.abs(clamped) <= NORMAL_INPUT_LIMIT) {
+            return clamped;
+        }
+        return clamped < 0.0F
+                ? -NORMAL_INPUT_LIMIT : NORMAL_INPUT_LIMIT;
+    }
+
+    /**
+     * Eases an untouched overshoot back to the normal camera range.
+     * Elapsed time makes the return independent of render frame rate.
+     */
+    static float releaseOvershootInput(float input, float elapsedSeconds) {
+        float clamped = clampInput(input);
+        float limit = releasedInput(clamped);
+        if (clamped == limit || !(elapsedSeconds > 0.0F)) {
+            return clamped;
+        }
+        float factor = 1.0F - (float)Math.exp(
+                -elapsedSeconds / OVERSHOOT_RETURN_SECONDS);
+        float released = clamped + (limit - clamped)
+                * Math.max(0.0F, Math.min(1.0F, factor));
+        return Math.abs(released - limit) <= OVERSHOOT_RETURN_EPSILON
+                ? limit : released;
     }
 
     static float inputPerPixel() {
@@ -289,9 +340,10 @@ public final class LostTalesLotrMapRotation {
      */
     static float degreesForInput(float input) {
         float clamped = clampInput(input);
-        float eased = resist(Math.abs(clamped));
+        float direction = clamped < 0.0F ? -1.0F : 1.0F;
+        float magnitude = Math.abs(clamped);
         return magnetiseDegrees(
-                (clamped < 0.0F ? -1.0F : 1.0F) * MAX_DEGREES * eased);
+                direction * MAX_DEGREES * resist(magnitude));
     }
 
     /**
@@ -677,9 +729,10 @@ public final class LostTalesLotrMapRotation {
         return (float)Math.sin(Math.toRadians(pitchDegrees(leanOf(gui))));
     }
 
-    /** How far the eye has dropped, in degrees, for a lean of 0 to 1. */
+    /** How far the eye has dropped, including the bounded elastic overshoot. */
     static float pitchDegrees(float lean) {
-        return MAX_PITCH_DEGREES * Math.max(0.0F, Math.min(1.0F, lean));
+        return MAX_PITCH_DEGREES
+                * Math.max(0.0F, Math.min(MAX_VISUAL_LEAN, lean));
     }
 
     /**
@@ -705,7 +758,8 @@ public final class LostTalesLotrMapRotation {
      * edge outward and draws the far edge in.</p>
      */
     static float leanCoefficient(float lean, float viewportHeight) {
-        float clamped = Math.max(0.0F, Math.min(1.0F, lean));
+        float clamped = Math.max(0.0F,
+                Math.min(MAX_VISUAL_LEAN, lean));
         if (clamped <= 0.0F || !(viewportHeight > 0.0F)) {
             return 0.0F;
         }
@@ -725,7 +779,8 @@ public final class LostTalesLotrMapRotation {
      * the near edge nearer.</p>
      */
     static float leanScaleY(float lean) {
-        float clamped = Math.max(0.0F, Math.min(1.0F, lean));
+        float clamped = Math.max(0.0F,
+                Math.min(MAX_VISUAL_LEAN, lean));
         if (clamped <= 0.0F) {
             return 1.0F;
         }
@@ -743,7 +798,7 @@ public final class LostTalesLotrMapRotation {
      */
     static float maxCoverage(float width, float height) {
         return (float)Math.sqrt(width * width + height * height)
-                * leanCoverage(1.0F);
+                * leanCoverage(MAX_VISUAL_LEAN);
     }
 
     /**
@@ -757,7 +812,8 @@ public final class LostTalesLotrMapRotation {
      * rest.</p>
      */
     static float leanCoverage(float lean) {
-        float clamped = Math.max(0.0F, Math.min(1.0F, lean));
+        float clamped = Math.max(0.0F,
+                Math.min(MAX_VISUAL_LEAN, lean));
         if (clamped <= 0.0F) {
             return 1.0F;
         }

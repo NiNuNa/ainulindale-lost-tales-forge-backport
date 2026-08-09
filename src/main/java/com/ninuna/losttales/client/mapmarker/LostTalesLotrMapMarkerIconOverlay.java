@@ -1772,10 +1772,12 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         best = chooseBetterHover(best, findHoveredNativeWaypoint(
                 context, nativeWaypoints, mouseX, mouseY,
                 includeHidden));
+        String candidateKey = best == null ? "" : best.key;
         String activeKey = hoverFocus.update(
-                best == null ? "" : best.key, System.nanoTime());
+                candidateKey, System.nanoTime());
         activeHoverCandidate = best != null
                 && best.key.equals(activeKey) ? best : null;
+        LostTalesMapInteractionSounds.updateHover(gui, activeKey);
     }
 
     /**
@@ -2118,6 +2120,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             hoverFocus.clear();
             hoverFocusGui = null;
             activeHoverCandidate = null;
+            LostTalesMapInteractionSounds.clear(gui);
         }
     }
 

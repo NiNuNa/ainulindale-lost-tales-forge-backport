@@ -503,6 +503,21 @@ public final class LostTalesMapDecorationPlacementTest {
                 LostTalesMapDecorationRenderer.depthOf(-900000.0F) >= 0);
     }
 
+    @Test
+    public void physicalSpritesAreOpaqueButSurfaceDetailsStaySoft() {
+        assertEquals(1.0F,
+                LostTalesMapDecorationRenderer.maximumAlpha(
+                        LostTalesMapDecorationSprite.MOUNTAIN), 0.0F);
+        assertEquals(1.0F,
+                LostTalesMapDecorationRenderer.maximumAlpha(
+                        LostTalesMapDecorationSprite.TREE), 0.0F);
+        assertTrue(LostTalesMapDecorationRenderer.maximumAlpha(
+                LostTalesMapDecorationSprite.WAVE) < 1.0F);
+        assertEquals(1.0F,
+                LostTalesMapDecorationRenderer.maximumAlpha(
+                        LostTalesMapDecorationSprite.SHIP), 0.0F);
+    }
+
     /**
      * The invariant the whole layer is built on: pushing the map closer makes
      * a decoration larger and pulling it out makes it smaller, in proportion,

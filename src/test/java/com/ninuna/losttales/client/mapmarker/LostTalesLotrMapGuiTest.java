@@ -62,6 +62,81 @@ public final class LostTalesLotrMapGuiTest {
     }
 
     @Test
+    public void elasticZoomFlowsThroughBothCapsWithoutADetent() {
+        float epsilon = 0.001F;
+        assertEquals(LostTalesLotrMapGui.SMOOTH_ZOOM_MAX,
+                LostTalesLotrMapGui.elasticZoomTarget(
+                        LostTalesLotrMapGui.SMOOTH_ZOOM_MAX), 0.0F);
+        assertEquals(epsilon,
+                LostTalesLotrMapGui.elasticZoomTarget(
+                        LostTalesLotrMapGui.SMOOTH_ZOOM_MAX + epsilon)
+                        - LostTalesLotrMapGui.SMOOTH_ZOOM_MAX,
+                0.00001F);
+        assertEquals(epsilon,
+                LostTalesLotrMapGui.SMOOTH_ZOOM_MIN
+                        - LostTalesLotrMapGui.elasticZoomTarget(
+                                LostTalesLotrMapGui.SMOOTH_ZOOM_MIN - epsilon),
+                0.00001F);
+    }
+
+    @Test
+    public void elasticZoomResistanceGetsHarderWithEveryWheelStep() {
+        float cap = LostTalesLotrMapGui.SMOOTH_ZOOM_MAX;
+        float step = LostTalesLotrMapGui.SMOOTH_ZOOM_WHEEL_INCREMENT;
+        float first = LostTalesLotrMapGui.elasticZoomTarget(cap + step) - cap;
+        float second = LostTalesLotrMapGui.elasticZoomTarget(cap + step * 2.0F)
+                - LostTalesLotrMapGui.elasticZoomTarget(cap + step);
+        float third = LostTalesLotrMapGui.elasticZoomTarget(cap + step * 3.0F)
+                - LostTalesLotrMapGui.elasticZoomTarget(cap + step * 2.0F);
+
+        assertTrue(first > second);
+        assertTrue(second > third);
+        assertTrue(LostTalesLotrMapGui.elasticZoomTarget(
+                        cap + LostTalesLotrMapGui.SMOOTH_ZOOM_ELASTIC_INPUT)
+                < cap + LostTalesLotrMapGui.SMOOTH_ZOOM_ELASTIC_OVERSHOOT);
+    }
+
+    @Test
+    public void elasticZoomIsSymmetricAndReleasesToTheRealCaps() {
+        float excess = 0.36F;
+        float above = LostTalesLotrMapGui.elasticZoomTarget(
+                LostTalesLotrMapGui.SMOOTH_ZOOM_MAX + excess)
+                - LostTalesLotrMapGui.SMOOTH_ZOOM_MAX;
+        float below = LostTalesLotrMapGui.SMOOTH_ZOOM_MIN
+                - LostTalesLotrMapGui.elasticZoomTarget(
+                        LostTalesLotrMapGui.SMOOTH_ZOOM_MIN - excess);
+
+        assertEquals(above, below, 0.00001F);
+        assertEquals(LostTalesLotrMapGui.SMOOTH_ZOOM_MAX,
+                LostTalesLotrMapGui.clampSmoothZoom(
+                        LostTalesLotrMapGui.SMOOTH_ZOOM_MAX + above), 0.0F);
+        assertEquals(LostTalesLotrMapGui.SMOOTH_ZOOM_MIN,
+                LostTalesLotrMapGui.clampSmoothZoom(
+                        LostTalesLotrMapGui.SMOOTH_ZOOM_MIN - below), 0.0F);
+    }
+
+    @Test
+    public void releasedElasticZoomEasesBackToTheCap() {
+        float cap = LostTalesLotrMapGui.SMOOTH_ZOOM_MAX;
+        float overshoot = LostTalesLotrMapGui.elasticZoomTarget(
+                cap + LostTalesLotrMapGui.SMOOTH_ZOOM_WHEEL_INCREMENT * 3.0F);
+        float zoom = cap;
+        for (int tick = 0; tick < 6; tick++) {
+            zoom = LostTalesLotrMapGui.advanceSmoothZoom(zoom, overshoot);
+        }
+        assertTrue(zoom > cap);
+
+        float previous = zoom;
+        for (int tick = 0; tick < 50; tick++) {
+            zoom = LostTalesLotrMapGui.advanceSmoothZoom(zoom, cap);
+            assertTrue(zoom <= previous);
+            assertTrue(zoom >= cap);
+            previous = zoom;
+        }
+        assertEquals(cap, zoom, 0.001F);
+    }
+
+    @Test
     public void fullscreenBoundsUseTheScaledGuiAndSkipConquestMode()
             throws Exception {
         String property = LostTalesClassTransformer

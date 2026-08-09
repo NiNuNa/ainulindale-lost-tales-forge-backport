@@ -134,15 +134,19 @@ public final class LostTalesMapDecorationRenderer {
         }
     }
 
-    /** Maximum opacity after the projected-size visibility fade is applied. */
-    private static final float MAX_ALPHA = 0.9F;
+    /** Floating details stay slightly translucent over the map artwork. */
+    private static final float FLOATING_MAX_ALPHA = 0.9F;
     /** How far a decoration may differ in size from its fellows. */
     private static final float SIZE_VARIATION = 0.16F;
     /** Largest site scale produced by {@link #SIZE_VARIATION}. */
     private static final float MAX_SITE_SCALE = 1.0F + SIZE_VARIATION;
     /** The near edge grows by this much at the strongest perspective. */
     private static final float MAX_PERSPECTIVE_SCALE =
-            1.0F + LostTalesLotrMapRotation.MAX_LEAN;
+            1.0F / (1.0F - LostTalesLotrMapRotation.MAX_LEAN
+                    * (float)Math.sin(Math.toRadians(
+                            LostTalesLotrMapRotation.MAX_VISUAL_DEGREES))
+                    / (float)Math.sin(Math.toRadians(
+                            LostTalesLotrMapRotation.MAX_DEGREES)));
     /**
      * How far a shadow reaches, as a share of the thing casting it, at a
      * fully dropped eye.
@@ -367,12 +371,22 @@ public final class LostTalesMapDecorationRenderer {
             }
             collectScatteredSite(gui, kind,
                     sites.getCellX(index), sites.getCellY(index),
-                    mapX, mapY, MAX_ALPHA, worldTime, posX, posY,
+                    mapX, mapY, maximumAlpha(kind.sprite),
+                    worldTime, posX, posY,
                     zoomScale, centerX, centerY,
                     worldWidth, worldHeight, SITE_ANCHOR,
                     viewportXMin, viewportXMax,
                     viewportYMin, viewportYMax);
         }
+    }
+
+    /**
+     * Trees and mountains must cover what is behind their solid texels.
+     * Their texture alpha still keeps the deliberately soft silhouette.
+     */
+    static float maximumAlpha(LostTalesMapDecorationSprite sprite) {
+        return sprite != null && sprite.getStanding() > 0.0F
+                ? 1.0F : FLOATING_MAX_ALPHA;
     }
 
     private static int mapImageWidth() {
