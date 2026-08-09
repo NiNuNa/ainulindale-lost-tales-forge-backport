@@ -131,17 +131,57 @@ public final class LostTalesMapDecorationPlacementTest {
     }
 
     /**
-     * A narrower probe is what lets ships onto a river that waves are kept
-     * off, so the radius has to actually change the answer.
+     * A narrower probe accepts narrower water, so the radius has to actually
+     * change the answer.
      */
     @Test
     public void aNarrowerProbeAcceptsNarrowerWater() {
-        assertTrue("a ship could not reach a river",
+        assertTrue("a narrow probe could not reach a river",
                 LostTalesMapDecorationPlacement.isBroadSite(
                         channel(400, 1), 400, 300, 1));
         assertFalse("a single-pixel stream is still too thin for a hull",
                 LostTalesMapDecorationPlacement.isBroadSite(
                         channel(400, 0), 400, 300, 1));
+    }
+
+    /**
+     * Where a ship belongs, which is the opposite question to where a wave
+     * does. A hull in the middle of Belegaer is not a landmark, it is a speck
+     * a thousand miles from anywhere; a hull wants water with a shore in
+     * sight, and a river satisfies that by being mostly bank.
+     *
+     * <p>This is the rule ships are actually placed by. They used to be placed
+     * by the broad-water rule instead, which put them everywhere a wave went
+     * and nowhere a harbour was.</p>
+     */
+    @Test
+    public void shipsWantACoastRatherThanOpenSea() {
+        assertFalse("a ship was moored in the middle of the sea",
+                LostTalesMapDecorationPlacement.isShoreSite(
+                        EVERYWHERE, 400, 300, 3));
+        assertFalse("a ship was moored on dry land",
+                LostTalesMapDecorationPlacement.isShoreSite(
+                        NOWHERE, 400, 300, 3));
+        assertTrue("a ship could not find a coast",
+                LostTalesMapDecorationPlacement.isShoreSite(
+                        coast(400), 399, 300, 3));
+        assertTrue("a ship could not find a river",
+                LostTalesMapDecorationPlacement.isShoreSite(
+                        channel(400, 1), 400, 300, 3));
+        // And it still has to be standing in water itself.
+        assertFalse(LostTalesMapDecorationPlacement.isShoreSite(
+                coast(400), 405, 300, 3));
+    }
+
+    /** Water on one side of a line and land on the other. */
+    private static LostTalesMapDecorationPlacement.GroundSampler coast(
+            final int atX) {
+        return new LostTalesMapDecorationPlacement.GroundSampler() {
+            @Override
+            public boolean matches(int mapX, int mapY) {
+                return mapX < atX;
+            }
+        };
     }
 
     /**
@@ -219,108 +259,113 @@ public final class LostTalesMapDecorationPlacementTest {
     }
 
     /**
-     * Decorations never shrink, so what limits them is crowding — and the
-     * answer to crowding is to draw fewer of them, not to give up on the kind.
-     * Whatever the zoom, the lattice is halved enough times to keep its sites
-     * about the wanted distance apart on screen.
+     * The clustering the map's distributions are built on. Every category
+     * placed as an even scatter of independent points reads as a lattice with
+     * noise on it; what it has to read as is country — dense cores, loose
+     * edges, and stretches with nothing in them.
      */
     @Test
-    public void thinningKeepsOneSpacingAtEveryZoom() {
-        float width = 16.0F;
-        assertEquals("a close map needs no thinning at all", 0,
-                LostTalesMapDecorationRenderer.thinningLevels(80.0F, width));
-
-        int previous = -1;
-        for (float baseSpacing = 64.0F; baseSpacing > 0.005F;
-             baseSpacing *= 0.5F) {
-            int levels = LostTalesMapDecorationRenderer.thinningLevels(
-                    baseSpacing, width);
-            assertTrue("thinning went backwards at " + baseSpacing,
-                    levels >= previous);
-            // Whatever the zoom, the thinned lattice lands near the spacing
-            // it is aiming for rather than collapsing or spreading away.
-            float thinned = baseSpacing * (1 << levels);
-            assertTrue("sites ended up crowded at " + baseSpacing
-                            + ": " + thinned,
-                    thinned >= width || levels >= 10);
-            previous = levels;
+    public void clusteringGivesCrowdedAndEmptyCountryAlike() {
+        int crowded = 0;
+        int bare = 0;
+        int occupied = 0;
+        int cells = 0;
+        for (int cellX = 0; cellX < 90; cellX++) {
+            for (int cellY = 0; cellY < 90; cellY++) {
+                float weight = LostTalesMapDecorationPlacement.clusterWeight(
+                        cellX * CELL, cellY * CELL, CHANNEL, 90.0F);
+                assertTrue("the field left its range", weight >= 0.0F);
+                if (weight > 1.3F) {
+                    crowded++;
+                }
+                if (weight < 0.25F) {
+                    bare++;
+                }
+                cells++;
+                if (LostTalesMapDecorationPlacement.hasClusteredSite(
+                        cellX, cellY, CHANNEL, 0.5F, CELL, 90.0F)) {
+                    occupied++;
+                }
+            }
         }
-        assertTrue("a map pulled far out was never thinned", previous > 0);
+        assertTrue("the map has no crowded country at all", crowded > 200);
+        assertTrue("the map has no empty country at all", bare > 200);
+        // Still a scatter overall rather than one that has emptied the map or
+        // filled it: the clumping redistributes the decorations, it does not
+        // delete them.
+        assertTrue("clustering emptied the map", occupied > cells / 6);
+        assertTrue("clustering filled the map", occupied < cells * 3 / 4);
+
+        // And it is a hash of the position like everything else here, so the
+        // same country is crowded on every client and in every session.
+        assertEquals(
+                LostTalesMapDecorationPlacement.clusterWeight(
+                        512.0F, -64.0F, CHANNEL, 90.0F),
+                LostTalesMapDecorationPlacement.clusterWeight(
+                        512.0F, -64.0F, CHANNEL, 90.0F), 0.0F);
     }
 
     /**
-     * The property that makes thinning acceptable at all: pulling the map out
-     * may remove a decoration but must never move one, so a site that a
-     * coarser level keeps is kept by every finer level too.
+     * A clump has to be broad enough to read as one. Neighbouring cells that
+     * disagree completely are just noise under another name.
      */
     @Test
-    public void thinningOnlyEverRemovesSitesAndNeverMovesThem() {
-        int[] coarse = new int[2];
-        int[] fine = new int[2];
-        for (int cellX = -8; cellX <= 8; cellX++) {
-            for (int cellY = -8; cellY <= 8; cellY++) {
-                for (int level = 1; level <= 5; level++) {
-                    LostTalesMapDecorationPlacement.representative(
-                            cellX, cellY, level, CHANNEL, coarse);
-
-                    // Whichever of this cell's four children it keeps, asked
-                    // the same way the renderer asks while fading them.
-                    int childX = Integer.MIN_VALUE;
-                    int childY = Integer.MIN_VALUE;
-                    for (int x = cellX * 2; x <= cellX * 2 + 1; x++) {
-                        for (int y = cellY * 2; y <= cellY * 2 + 1; y++) {
-                            if (LostTalesMapDecorationPlacement
-                                    .survivesCoarser(x, y, level - 1,
-                                            CHANNEL)) {
-                                childX = x;
-                                childY = y;
-                            }
-                        }
-                    }
-                    assertTrue("a cell kept none of its children",
-                            childX != Integer.MIN_VALUE);
-
-                    LostTalesMapDecorationPlacement.representative(
-                            childX, childY, level - 1, CHANNEL, fine);
-                    assertEquals("a site moved when the map was thinned",
-                            coarse[0], fine[0]);
-                    assertEquals("a site moved when the map was thinned",
-                            coarse[1], fine[1]);
-
-                    // And the site it keeps is one of its own, never a
-                    // neighbour's.
-                    int span = 1 << level;
-                    assertTrue("a coarse cell reached outside itself",
-                            coarse[0] >= cellX * span
-                                    && coarse[0] < (cellX + 1) * span);
-                    assertTrue("a coarse cell reached outside itself",
-                            coarse[1] >= cellY * span
-                                    && coarse[1] < (cellY + 1) * span);
-                }
+    public void clustersAreBroadRatherThanPerCell() {
+        float steepest = 0.0F;
+        for (int cellX = 0; cellX < 60; cellX++) {
+            for (int cellY = 0; cellY < 60; cellY++) {
+                float here = LostTalesMapDecorationPlacement.clusterWeight(
+                        cellX * 10.0F, cellY * 10.0F, CHANNEL, 200.0F);
+                float next = LostTalesMapDecorationPlacement.clusterWeight(
+                        (cellX + 1) * 10.0F, cellY * 10.0F, CHANNEL, 200.0F);
+                steepest = Math.max(steepest, Math.abs(next - here));
             }
         }
+        assertTrue("the field changes too fast to read as country: "
+                + steepest, steepest < 0.5F);
     }
 
-    /** And exactly one child of each cell is the one its parent kept. */
+    /**
+     * Trees do not move. A wood where every tree stepped through the same two
+     * drawings together read as the paper rippling, so the frames of that
+     * sheet are variants to choose between instead.
+     */
     @Test
-    public void everyCellKeepsExactlyOneOfItsChildren() {
-        for (int cellX = -6; cellX <= 6; cellX++) {
-            for (int cellY = -6; cellY <= 6; cellY++) {
-                int survivors = 0;
-                for (int childX = cellX * 2; childX <= cellX * 2 + 1;
-                     childX++) {
-                    for (int childY = cellY * 2; childY <= cellY * 2 + 1;
-                         childY++) {
-                        if (LostTalesMapDecorationPlacement.survivesCoarser(
-                                childX, childY, 0, CHANNEL)) {
-                            survivors++;
-                        }
-                    }
+    public void treesAreStillAndVariedInsteadOfAnimated() {
+        LostTalesMapDecorationSprite tree =
+                LostTalesMapDecorationSprite.TREE;
+        assertFalse("trees must not animate", tree.isAnimated());
+        assertTrue("a wood drawn from one picture repeats visibly",
+                tree.getVariants() >= 2);
+        for (long tick = 0L; tick < 500L; tick += 7L) {
+            assertEquals("a tree moved", 0, tree.frameAt(tick, 3));
+        }
+        assertTrue("mountains must not animate either",
+                !LostTalesMapDecorationSprite.MOUNTAIN.isAnimated());
+
+        // The variation that stands in for artwork the sheets do not have:
+        // a size of each site's own, and half of them turned round.
+        int mirrored = 0;
+        float smallest = Float.MAX_VALUE;
+        float largest = 0.0F;
+        for (int cellX = 0; cellX < 40; cellX++) {
+            for (int cellY = 0; cellY < 40; cellY++) {
+                if (LostTalesMapDecorationPlacement.siteMirror(
+                        cellX, cellY, CHANNEL)) {
+                    mirrored++;
                 }
-                assertEquals("a cell kept the wrong number of children",
-                        1, survivors);
+                float scale = LostTalesMapDecorationPlacement.siteScale(
+                        cellX, cellY, CHANNEL, 0.16F);
+                smallest = Math.min(smallest, scale);
+                largest = Math.max(largest, scale);
             }
         }
+        assertTrue("every site faced the same way",
+                mirrored > 400 && mirrored < 1200);
+        assertTrue("sites must differ in size",
+                largest - smallest > 0.2F);
+        assertTrue("no site may be turned inside out or doubled",
+                smallest > 0.8F && largest < 1.2F);
     }
 
     /** A frame loop that is stable, in range, and not in lockstep everywhere. */
@@ -350,57 +395,141 @@ public final class LostTalesMapDecorationPlacementTest {
     }
 
     /**
-     * The fade has to be what decides whether a decoration is drawn, never
-     * the safety budget behind it.
-     *
-     * <p>This is a regression guard with a bug behind it: the cell window was
-     * being sized for the most ground a fully tilted map could ever show, so
-     * at the very zoom where waves were meant to be at their fullest the
-     * budget tripped and the whole kind vanished. A ceiling that quietly
-     * deletes a feature is worse than no ceiling.</p>
+     * The complaint this was written for: pulling the map out used to thin the
+     * decorations away and pushing it back in used to fade different ones in,
+     * so the same country grew a different forest depending on how you had
+     * arrived at it. Nothing is removed for the zoom any more — a decoration
+     * is drawn until it is too small to see and then it is not.
      */
     @Test
-    public void theBudgetNeverDecidesWhetherADecorationIsDrawn() {
-        float[] viewports = { 854.0F, 1280.0F, 1920.0F };
-        float[] heights = { 480.0F, 720.0F, 1080.0F };
+    public void zoomingNeverSwapsOneScatterForAnother() {
         for (int kind = 0;
              kind < LostTalesMapDecorationRenderer.kindCount(); kind++) {
-            for (int screen = 0; screen < viewports.length; screen++) {
-                for (float zoomExp = -3.6F; zoomExp <= 4.6F;
-                     zoomExp += 0.1F) {
-                    float zoomScale = (float)Math.pow(2.0D, zoomExp);
-                    long cells = LostTalesMapDecorationRenderer
-                            .visitedCells(kind, viewports[screen],
-                                    heights[screen], zoomScale);
-                    assertTrue("kind " + kind + " tripped its budget at zoom "
-                                    + zoomExp + " with " + cells + " cells",
-                            cells <= LostTalesMapDecorationRenderer
-                                    .cellBudget());
-                }
+            assertTrue("kind " + kind + " is missing at the closest zoom",
+                    LostTalesMapDecorationRenderer.isDrawn(
+                            kind, (float)Math.pow(2.0D, 4.6D)));
+            // Zooming out, a kind goes once and stays gone. There is nothing
+            // else that can change which decorations are on the map, because
+            // the zoom is not an input to placement at all.
+            boolean gone = false;
+            for (float zoomExp = 4.6F; zoomExp >= -3.6F; zoomExp -= 0.05F) {
+                boolean drawn = LostTalesMapDecorationRenderer.isDrawn(
+                        kind, (float)Math.pow(2.0D, zoomExp));
+                assertFalse("kind " + kind + " came back at " + zoomExp,
+                        drawn && gone);
+                gone = !drawn;
             }
+            assertTrue("kind " + kind + " is still drawn at the widest zoom",
+                    gone);
         }
     }
 
     /**
-     * Decorations are symbols standing on the map, not scale drawings, so
-     * every kind keeps one size on screen at every zoom.
+     * Decorations stand on Middle-earth, so their size is a Middle-earth size:
+     * the zoom grows and shrinks them exactly as it grows and shrinks the
+     * ground they are standing on.
      */
     @Test
-    public void everyKindHasAFixedScreenSize() {
+    public void everyKindIsSizedInMapPixels() {
         LostTalesMapDecorationSprite[] sprites =
                 LostTalesMapDecorationSprite.values();
         for (int index = 0; index < sprites.length; index++) {
             LostTalesMapDecorationSprite sprite = sprites[index];
             assertTrue(sprite.name() + " has no width",
-                    sprite.getScreenWidth() > 0.0F);
+                    sprite.getWorldWidth() > 0.0F);
             assertTrue(sprite.name() + " has no height",
-                    sprite.getScreenHeight() > 0.0F);
+                    sprite.getWorldHeight() > 0.0F);
             assertTrue(sprite.name() + " has no frames",
                     sprite.getFrames() >= 1);
             assertEquals(sprite.name() + " must cover its whole sheet",
                     1.0D, sprite.frameUMax(sprite.getFrames() - 1), 0.0001D);
             assertEquals(sprite.name() + " must start at its sheet's edge",
                     0.0D, sprite.frameUMin(0), 0.0001D);
+        }
+    }
+
+    /**
+     * What stands in front has to be painted over what stands behind. The
+     * lean is applied last and acts on the screen, so "further away" is
+     * "further up the screen" at every angle the map can be turned to, and
+     * ordering by the sprite's foot is the whole of it.
+     */
+    @Test
+    public void decorationsArePaintedFromTheBackForwards() {
+        int far = LostTalesMapDecorationRenderer.depthOf(20.0F);
+        int middle = LostTalesMapDecorationRenderer.depthOf(140.0F);
+        int near = LostTalesMapDecorationRenderer.depthOf(300.0F);
+        assertTrue("the order must run down the screen",
+                far < middle && middle < near);
+
+        // Sub-pixel differences have to survive, or two sprites a hair apart
+        // swap places from frame to frame and the map shimmers.
+        assertTrue("the order is too coarse to separate close neighbours",
+                LostTalesMapDecorationRenderer.depthOf(140.0F)
+                        < LostTalesMapDecorationRenderer.depthOf(140.3F));
+
+        // A sprite far outside the viewport must not wrap round the order and
+        // come back in front of everything.
+        assertTrue(LostTalesMapDecorationRenderer.depthOf(-900000.0F)
+                <= LostTalesMapDecorationRenderer.depthOf(0.0F));
+        assertTrue(LostTalesMapDecorationRenderer.depthOf(900000.0F)
+                >= LostTalesMapDecorationRenderer.depthOf(0.0F));
+        assertTrue("the order must never go negative",
+                LostTalesMapDecorationRenderer.depthOf(-900000.0F) >= 0);
+    }
+
+    /**
+     * The invariant the whole layer is built on: pushing the map closer makes
+     * a decoration larger and pulling it out makes it smaller, in proportion,
+     * with no compensation anywhere. And what ends a kind is being too small
+     * to draw, not the zoom being at any particular place.
+     */
+    @Test
+    public void zoomingGrowsDecorationsAndCullsThemWhenTiny() {
+        for (int kind = 0;
+             kind < LostTalesMapDecorationRenderer.kindCount(); kind++) {
+            float close = LostTalesMapDecorationRenderer.drawnWidth(
+                    kind, 4.0F);
+            float far = LostTalesMapDecorationRenderer.drawnWidth(
+                    kind, 1.0F);
+            assertEquals("a decoration must scale with the ground",
+                    4.0F, close / far, 0.0001F);
+
+            // Drawn at every zoom where there is something to see, and gone
+            // once there is not. Nothing in between: no fade, and no zoom at
+            // which some of a kind is drawn and the rest is not.
+            assertTrue("kind " + kind + " is missing at a readable size",
+                    LostTalesMapDecorationRenderer.isDrawn(kind, 1.0F));
+            assertTrue("kind " + kind + " is missing zoomed in",
+                    LostTalesMapDecorationRenderer.isDrawn(kind, 24.0F));
+            assertFalse("a sub-pixel decoration must be culled",
+                    LostTalesMapDecorationRenderer.isDrawn(kind, 0.02F));
+        }
+    }
+
+    /**
+     * What is standing up and what is lying down. It decides how much taller a
+     * thing is drawn as the map tips, so it is a statement about what the
+     * artwork depicts rather than about the artwork.
+     */
+    @Test
+    public void howMuchOfEachKindIsStandingUp() {
+        assertEquals("a mountain is all height", 1.0F,
+                LostTalesMapDecorationSprite.MOUNTAIN.getStanding(), 0.0F);
+        assertEquals("a wave is not standing on anything", 0.0F,
+                LostTalesMapDecorationSprite.WAVE.getStanding(), 0.0F);
+        assertTrue("a tree stands, but not like a mountain",
+                LostTalesMapDecorationSprite.TREE.getStanding() > 0.0F
+                        && LostTalesMapDecorationSprite.TREE.getStanding()
+                                < LostTalesMapDecorationSprite.MOUNTAIN
+                                        .getStanding());
+
+        LostTalesMapDecorationSprite[] sprites =
+                LostTalesMapDecorationSprite.values();
+        for (int index = 0; index < sprites.length; index++) {
+            float standing = sprites[index].getStanding();
+            assertTrue(sprites[index].name() + " left its range",
+                    standing >= 0.0F && standing <= 1.0F);
         }
     }
 }

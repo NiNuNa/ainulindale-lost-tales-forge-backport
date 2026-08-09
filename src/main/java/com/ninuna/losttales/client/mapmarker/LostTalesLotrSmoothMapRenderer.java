@@ -129,11 +129,11 @@ final class LostTalesLotrSmoothMapRenderer {
         if (minecraft == null || minecraft.theWorld == null) {
             return;
         }
+        float rain = minecraft.theWorld.getRainStrength(1.0F);
+        float thunder = minecraft.theWorld.getWeightedThunderStrength(1.0F);
+        long worldTime = minecraft.theWorld.getWorldTime();
         LostTalesLotrMapAtmosphere.render(
-                (LostTalesLotrMapGui)gui,
-                minecraft.theWorld.getWorldTime(),
-                minecraft.theWorld.getRainStrength(1.0F),
-                minecraft.theWorld.getWeightedThunderStrength(1.0F),
+                (LostTalesLotrMapGui)gui, worldTime, rain, thunder,
                 posX, posY, scale,
                 viewportXMin, viewportXMax, viewportYMin, viewportYMax);
         // After the sky and before anything a player navigates by: roads,
@@ -143,6 +143,11 @@ final class LostTalesLotrSmoothMapRenderer {
                 (LostTalesLotrMapGui)gui,
                 minecraft.theWorld.getTotalWorldTime(),
                 posX, posY, scale,
+                viewportXMin, viewportXMax, viewportYMin, viewportYMax);
+        // Last of the ground layers: the haze lies over the country and the
+        // things standing on it, and under everything the map is read by.
+        LostTalesLotrMapAtmosphere.renderDistanceHaze(
+                (LostTalesLotrMapGui)gui, worldTime, rain, thunder,
                 viewportXMin, viewportXMax, viewportYMin, viewportYMax);
     }
 

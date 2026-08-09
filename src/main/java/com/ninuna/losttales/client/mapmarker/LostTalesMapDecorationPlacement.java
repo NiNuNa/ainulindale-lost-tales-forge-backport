@@ -117,6 +117,91 @@ final class LostTalesMapDecorationPlacement {
                 cellX, cellY, channel) < density;
     }
 
+    /**
+     * The same question, asked of a lattice that clumps.
+     *
+     * <p>One number per cell gives an even scatter: every part of a forest
+     * grows the same number of trees, every stretch of sea carries the same
+     * number of waves, and the eye reads the regularity long before it reads
+     * the trees. So the density a cell is judged against is itself a slowly
+     * varying field of the map position — dense cores, loose edges, stretches
+     * with nothing in them at all — and the per-cell number then decides
+     * within it.</p>
+     *
+     * <p>Both are hashes of position, so this stays what it was: the same
+     * decorations in the same places on every client, at no cost in storage
+     * and with nothing sent about it.</p>
+     *
+     * @param cell        the lattice's spacing, in map pixels
+     * @param clusterSize how broad a clump is, in map pixels
+     */
+    static boolean hasClusteredSite(int cellX, int cellY, int channel,
+                                    float density, float cell,
+                                    float clusterSize) {
+        float weight = clusterWeight(
+                (cellX + 0.5F) * cell, (cellY + 0.5F) * cell,
+                channel, clusterSize);
+        return hasSite(cellX, cellY, channel,
+                Math.min(1.0F, density * weight));
+    }
+
+    /** Least of its ordinary density a region may be left with. */
+    private static final float MIN_CLUSTER_WEIGHT = 0.04F;
+    /** And the most a core of one may be given. */
+    private static final float MAX_CLUSTER_WEIGHT = 2.0F;
+
+    /**
+     * How much of its ordinary density a part of the map gets.
+     *
+     * <p>Two octaves: a broad one that decides where the country is crowded
+     * and where it is bare, and a finer one that breaks the broad one up so
+     * its clumps are not all the same size. Squared on the way out, which is
+     * what makes the empty stretches genuinely empty rather than merely
+     * thinner — a field used straight reads as an even scatter with a slow
+     * ripple through it.</p>
+     */
+    static float clusterWeight(
+            float mapX, float mapY, int channel, float clusterSize) {
+        if (!(clusterSize > 0.0F)) {
+            return 1.0F;
+        }
+        float broad = valueNoise(
+                mapX / clusterSize, mapY / clusterSize, channel + 11);
+        float fine = valueNoise(
+                mapX / (clusterSize * 0.35F), mapY / (clusterSize * 0.35F),
+                channel + 12);
+        float field = broad * 0.68F + fine * 0.32F;
+        return MIN_CLUSTER_WEIGHT
+                + (MAX_CLUSTER_WEIGHT - MIN_CLUSTER_WEIGHT) * field * field;
+    }
+
+    /** Cell noise smoothed between its lattice points. */
+    private static float valueNoise(float x, float y, int channel) {
+        int cellX = (int)Math.floor(x);
+        int cellY = (int)Math.floor(y);
+        float alongX = smoothstep(x - cellX);
+        float alongY = smoothstep(y - cellY);
+        float top = mix(
+                LostTalesLotrMapAtmosphere.cellNoise(cellX, cellY, channel),
+                LostTalesLotrMapAtmosphere.cellNoise(
+                        cellX + 1, cellY, channel), alongX);
+        float bottom = mix(
+                LostTalesLotrMapAtmosphere.cellNoise(
+                        cellX, cellY + 1, channel),
+                LostTalesLotrMapAtmosphere.cellNoise(
+                        cellX + 1, cellY + 1, channel), alongX);
+        return mix(top, bottom, alongY);
+    }
+
+    private static float smoothstep(float value) {
+        float clamped = Math.max(0.0F, Math.min(1.0F, value));
+        return clamped * clamped * (3.0F - 2.0F * clamped);
+    }
+
+    private static float mix(float from, float to, float amount) {
+        return from + (to - from) * amount;
+    }
+
     /** Where in its cell a site sits, in map pixels. */
     static float siteX(int cellX, int cellY, int channel,
                        float cell, float jitter) {
@@ -139,58 +224,6 @@ final class LostTalesMapDecorationPlacement {
                 cellX, cellY, channel + 3) * 997.0F);
     }
 
-    /**
-     * The site a coarse cell stands for, as {@code {cellX, cellY}} on the base
-     * lattice.
-     *
-     * <p>This is what lets the map thin its decorations out instead of giving
-     * up on them. Pulling the map out packs the lattice tighter on screen
-     * until the artwork would be a solid carpet, so instead of drawing all of
-     * it and fading the lot away, the map draws fewer of them: it walks a
-     * lattice a power of two coarser and asks each coarse cell which one site
-     * inside it to keep.</p>
-     *
-     * <p>The choice is nested, and that is the whole point. A coarse cell
-     * always keeps whichever site one of its own children kept, so a site that
-     * survives at one level survives at every finer level too. Zooming out can
-     * therefore only ever remove decorations — never move the ones that stay,
-     * never resize them, and never put different ones in their place.</p>
-     */
-    static void representative(
-            int coarseX, int coarseY, int levels, int channel, int[] result) {
-        int x = coarseX;
-        int y = coarseY;
-        for (int level = Math.max(0, levels); level > 0; level--) {
-            int quadrant = quadrantAt(x, y, level, channel);
-            x = x * 2 + (quadrant & 1);
-            y = y * 2 + ((quadrant >> 1) & 1);
-        }
-        result[0] = x;
-        result[1] = y;
-    }
-
-    /**
-     * Whether a cell is the one its own parent would have kept.
-     *
-     * <p>A site that would still be there one level coarser is already at
-     * home; one that would not is the detail this level is adding, and is
-     * faded in rather than appearing whole as the map moves.</p>
-     */
-    static boolean survivesCoarser(
-            int cellX, int cellY, int level, int channel) {
-        int parentX = cellX >> 1;
-        int parentY = cellY >> 1;
-        int quadrant = quadrantAt(parentX, parentY, level + 1, channel);
-        return cellX == parentX * 2 + (quadrant & 1)
-                && cellY == parentY * 2 + ((quadrant >> 1) & 1);
-    }
-
-    private static int quadrantAt(
-            int cellX, int cellY, int level, int channel) {
-        return (int)(LostTalesLotrMapAtmosphere.cellNoise(
-                cellX, cellY, channel + 40 + level) * 4.0F) & 3;
-    }
-
     /** Which artwork variant a site uses, where a sprite has several. */
     static int siteVariant(int cellX, int cellY, int channel, int variants) {
         if (variants <= 1) {
@@ -198,6 +231,25 @@ final class LostTalesMapDecorationPlacement {
         }
         return (int)(LostTalesLotrMapAtmosphere.cellNoise(
                 cellX, cellY, channel + 4) * variants) % variants;
+    }
+
+    /**
+     * A size of a site's own, as a multiple of its kind's.
+     *
+     * <p>Modest on purpose. A wood drawn from two pictures still reads as two
+     * pictures however they are arranged; the same two at slightly different
+     * sizes, some of them turned round, read as trees.</p>
+     */
+    static float siteScale(
+            int cellX, int cellY, int channel, float spread) {
+        return 1.0F + (LostTalesLotrMapAtmosphere.cellNoise(
+                cellX, cellY, channel + 5) - 0.5F) * 2.0F * spread;
+    }
+
+    /** Whether a site's artwork is drawn the other way round. */
+    static boolean siteMirror(int cellX, int cellY, int channel) {
+        return LostTalesLotrMapAtmosphere.cellNoise(
+                cellX, cellY, channel + 6) < 0.5F;
     }
 
     private static float offset(

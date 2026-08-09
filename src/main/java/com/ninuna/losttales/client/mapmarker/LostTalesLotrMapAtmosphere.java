@@ -4,7 +4,6 @@ import com.ninuna.losttales.LostTalesMetaData;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.util.ResourceLocation;
@@ -75,59 +74,97 @@ final class LostTalesLotrMapAtmosphere {
                     "textures/gui/map/cloud.png");
     private static final int CLOUD_VARIANTS = 4;
     /**
-     * How far apart the clouds sit, in screen pixels, and how wide one is
-     * drawn.
+     * How far apart the clouds sit and how wide one is, both in map pixels.
      *
-     * <p>Both are screen measurements, and that is the whole design. Clouds
-     * are one size, always: the zoom does not resize them, does not thin them
-     * out and does not swap one set for another. They used to be sized in map
-     * pixels on lattices an octave apart, which meant that pulling the map out
-     * shrank every cloud until its lattice gave up and a coarser one faded in
-     * behind it — a sky that visibly rebuilt itself on the way past.</p>
-     *
-     * <p>What it costs is that a cloud is no longer a fixed patch of ground.
-     * It is a fixed patch of <em>sky</em>, which pans over the map and is
-     * always the same size to the eye, and which is what looking up actually
-     * gives you.</p>
+     * <p>The sky is weather over a stretch of Middle-earth, so it is measured
+     * in Middle-earth: a cloud covers a fixed patch of ground, and the zoom
+     * grows and shrinks it exactly as it grows and shrinks the ground beneath.
+     * Holding it at a constant number of screen pixels instead — which is what
+     * it used to do — made the sky a texture on the window rather than a layer
+     * over the world, and no amount of parallax on top of that reads as
+     * height.</p>
      */
-    private static final float CLOUD_SCREEN_CELL = 96.0F;
-    /**
-     * How wide one cloud is drawn.
-     *
-     * <p>Small enough to be weather over Middle-earth rather than weather the
-     * size of it: at three hundred pixels a single cloud was about as wide as
-     * the whole continent is at full zoom-out, which read as fog on the lens.
-     * Sized against what else stands on the map — a tree is fourteen pixels,
-     * a mountain sixteen — so the sky belongs to the same picture.</p>
-     */
-    private static final float CLOUD_SCREEN_WIDTH = 72.0F;
+    private static final float CLOUD_WORLD_CELL = 34.0F;
+    private static final float CLOUD_WORLD_WIDTH = 22.0F;
     private static final float CLOUD_ASPECT = 0.5F;
     private static final float CLOUD_JITTER = 0.45F;
     /**
-     * Share of cells that have a cloud in them at all. Smaller clouds need a
-     * thinner lattice, or the sky closes into an even overcast.
+     * Share of cells that have a cloud in them at all, before the sky's own
+     * clustering thins some regions out and crowds others.
      */
-    private static final float CLOUD_DENSITY = 0.45F;
+    private static final float CLOUD_DENSITY = 0.5F;
+    /** How broad a bank of cloud is, in map pixels. */
+    private static final float CLOUD_CLUSTER_SIZE = 260.0F;
     /**
-     * Screen pixels the sky moves per map pixel the camera pans.
+     * How much faster than the ground the sky moves across the screen.
      *
-     * <p>Constant, and it has to be: the moment it followed the zoom, the
-     * lattice would be a different set of clouds at every zoom, which is the
-     * thing this layout exists to stop. So the sky keeps its own rate, and
-     * whether it runs ahead of the ground or behind it depends on how far the
-     * map is zoomed — a parallax, which is what a layer above the ground
-     * should do.</p>
+     * <p>The clouds are between the reader and the map, so panning has to
+     * carry them further than it carries the ground: their offset from where
+     * the eye is aimed is magnified by this, which is the whole of the
+     * parallax and is the same effect at every zoom because it is applied to a
+     * map-space offset rather than to a screen-space scroll.</p>
      */
-    private static final float CLOUD_PARALLAX = 2.0F;
+    private static final float CLOUD_PARALLAX = 1.35F;
+    /**
+     * How far above the sheet the sky hangs, in map pixels.
+     *
+     * <p>Only visible once the map is leaned: a layer with height over a
+     * surface seen from an angle stands up from the point it shades, and
+     * without that a cloud on a tilted map sits on the ground like a stain.
+     * Tuned rather than derived from {@link #CLOUD_PARALLAX}, because the
+     * map's eye distance is a screen measurement and this is a world one; the
+     * two describe the same layer from two directions and are meant to be
+     * moved together.</p>
+     */
+    private static final float CLOUD_ALTITUDE = 26.0F;
     /** Cells the drift wraps after, so long-running worlds keep their sky. */
     private static final float DRIFT_WRAP_CELLS = 1024.0F;
     /**
-     * Screen pixels a cloud drifts per tick. Slow enough not to pull the eye,
+     * Map pixels a cloud drifts per tick. Slow enough not to pull the eye,
      * quick enough that a cloud visibly moves while you look at it.
      */
-    private static final float CLOUD_DRIFT = 0.12F;
+    private static final float CLOUD_DRIFT = 0.028F;
+    /**
+     * Narrowest a cloud may be drawn, in screen pixels, before the sky is
+     * dropped.
+     *
+     * <p>The same rule the decorations use, and the only one either of them
+     * has: a layer is dropped once there is nothing left of it to see, and is
+     * never faded for the zoom being where it is.</p>
+     */
+    private static final float MIN_CLOUD_WIDTH = 2.0F;
     /** Noise channels the sky takes for itself. */
     private static final int CLOUD_CHANNEL = 64;
+    /**
+     * The haze the far half of a leaning map washes into.
+     *
+     * <p>Aerial perspective, and the cheapest honest depth cue there is: the
+     * further ground is from the eye, the more air is in the way, and the more
+     * it takes on the colour of that air. The projection already makes the far
+     * edge small; this is what makes it read as <em>far</em> rather than
+     * merely as small.</p>
+     *
+     * <p>Pale parchment by day, and mixed towards whatever the hour and the
+     * weather have made of the sky, so a night map hazes into its own dark
+     * rather than into a band of daylight.</p>
+     */
+    private static final float[] HAZE_COLOUR = { 0.87F, 0.85F, 0.79F };
+    /**
+     * The most the far edge may be washed out, at full lean.
+     *
+     * <p>Bounded well short of hiding anything: the map is a navigation
+     * instrument, and the far edge still has to be a place you can read a
+     * coastline off.</p>
+     */
+    private static final float MAX_HAZE_ALPHA = 0.3F;
+    /**
+     * Bands the gradient is drawn in.
+     *
+     * <p>Vertex colours interpolate in a straight line and the haze does not,
+     * so it is drawn in a few steps and let to interpolate within each. Eight
+     * is past the point where the joins can be seen.</p>
+     */
+    private static final int HAZE_BANDS = 8;
     /**
      * The weather a cloud can be carrying, as {@code {r, g, b, alpha}}.
      *
@@ -228,20 +265,21 @@ final class LostTalesLotrMapAtmosphere {
     }
 
     /**
-     * Where the sky sits over a map position, in its own screen-sized space.
+     * How large the sky is drawn for a given zoom, in screen pixels per map
+     * pixel.
      *
-     * <p>The one place the sky is tied to the map. It is a straight multiple
-     * of the map coordinate, so a cloud's cell is a fixed region of
-     * Middle-earth however the map is being looked at, and the zoom does not
-     * enter into it at all — which is exactly why zooming can neither move a
-     * cloud, resize it, nor put a different one in its place.</p>
+     * <p>The one place the sky is tied to the map. It is the ground's own
+     * scale, magnified by how much nearer the sky is: that single number
+     * carries both halves of the parallax, because it decides how large a
+     * cloud is drawn <em>and</em> how far a pan moves it, and the two cannot
+     * then disagree.</p>
      */
-    static float skyOffset(float mapPosition) {
-        return mapPosition * CLOUD_PARALLAX;
+    static float skyScale(float zoomScale) {
+        return zoomScale * CLOUD_PARALLAX;
     }
 
     /**
-     * How far the sky has drifted, in screen pixels.
+     * How far the sky has drifted, in map pixels.
      *
      * <p>Wrapped to a whole number of cells, and a large one, so a world that
      * has been running for years keeps the same arithmetic precision as one
@@ -309,7 +347,7 @@ final class LostTalesLotrMapAtmosphere {
             // texture unit is off for the first and on for the second.
             GL11.glEnable(GL11.GL_TEXTURE_2D);
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-            drawSky(gui, worldTime, rain, thunder, posX, posY,
+            drawSky(gui, worldTime, rain, thunder, posX, posY, zoomScale,
                     viewportXMin, viewportXMax, viewportYMin, viewportYMax);
         } finally {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
@@ -318,26 +356,26 @@ final class LostTalesLotrMapAtmosphere {
     }
 
     /**
-     * Draws the clouds onto the sheet rather than over it.
+     * Draws the clouds over the sheet rather than onto it.
      *
-     * <p>They go through the same matrix as the map image, so they turn and
-     * lean with the ground and are foreshortened by it — a cloud is a thing
-     * lying on the map, not a sprite standing on it, and it must never pivot
-     * to face the reader. Which also means the positions handed to it here are
-     * the flat ones: the matrix does the turning, and doing it twice would
-     * carry every cloud off the map.</p>
+     * <p>A cloud is not printed on the paper. Its <em>position</em> belongs to
+     * the map and goes through the sheet's own projection — pan, zoom, turn,
+     * lean — but the cloud itself then faces the reader, the way everything
+     * else standing over the map does. Drawing it through the sheet matrix
+     * instead, which is what it used to do, laid it flat on the ground and
+     * sheared it with the lean: weather painted onto Middle-earth rather than
+     * weather above it.</p>
      */
     private static void drawSky(
             LostTalesLotrMapGui gui, long worldTime,
             float rain, float thunder, float posX, float posY,
-            int viewportXMin, int viewportXMax,
+            float zoomScale, int viewportXMin, int viewportXMax,
             int viewportYMin, int viewportYMax) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft == null || minecraft.getTextureManager() == null) {
             return;
         }
-        boolean sheeted = LostTalesLotrMapRotation.pushSheetTransform(gui);
-        boolean clipped = sheeted && beginViewportClip(
+        boolean clipped = LostTalesLotrMapLayout.beginViewportClip(
                 viewportXMin, viewportXMax, viewportYMin, viewportYMax);
         try {
             minecraft.getTextureManager().bindTexture(CLOUD_TEXTURE);
@@ -351,8 +389,8 @@ final class LostTalesLotrMapAtmosphere {
             Tessellator tessellator = Tessellator.instance;
             tessellator.startDrawingQuads();
             try {
-                drawCloudLayer(tessellator, worldTime, rain, thunder,
-                        posX, posY,
+                drawCloudLayer(tessellator, gui, worldTime, rain, thunder,
+                        posX, posY, zoomScale,
                         viewportXMin, viewportXMax,
                         viewportYMin, viewportYMax);
             } finally {
@@ -361,76 +399,124 @@ final class LostTalesLotrMapAtmosphere {
                 tessellator.draw();
             }
         } finally {
-            if (clipped) {
-                GL11.glPopAttrib();
-            }
-            if (sheeted) {
-                GL11.glPopMatrix();
-            }
+            LostTalesLotrMapLayout.endViewportClip(clipped);
         }
     }
 
     /**
-     * The sky: one lattice, one size, at every zoom.
+     * The sky: a lattice over Middle-earth, walked at whatever spacing the
+     * zoom leaves it on screen.
      *
-     * <p>Laid out in screen pixels and scrolled by where the camera is looking,
-     * so panning carries the sky over the map and zooming does not touch it.
-     * The cells visited are therefore a fixed handful whatever the map is
-     * doing, which is also why there is no budget or cull here to get
-     * wrong.</p>
+     * <p>Cells are map positions, so a bank of cloud is over the same stretch
+     * of country every time the map is opened. What the zoom changes is how
+     * large they are drawn and how many of them are worth drawing — the same
+     * two answers everything else standing over the map gets, and for the same
+     * reasons.</p>
      */
     private static void drawCloudLayer(
-            Tessellator tessellator, long worldTime,
+            Tessellator tessellator, LostTalesLotrMapGui gui, long worldTime,
             float rain, float thunder, float posX, float posY,
-            int viewportXMin, int viewportXMax,
+            float zoomScale, int viewportXMin, int viewportXMax,
             int viewportYMin, int viewportYMax) {
-        float drift = cloudDrift(worldTime, CLOUD_SCREEN_CELL);
-        float scrollX = skyOffset(posX) - drift;
-        float scrollY = skyOffset(posY);
+        float scale = skyScale(zoomScale);
+        if (!(scale > 0.0F)
+                || CLOUD_WORLD_WIDTH * scale < MIN_CLOUD_WIDTH) {
+            return;
+        }
+        float drift = cloudDrift(worldTime, CLOUD_WORLD_CELL);
         float centerX = (viewportXMin + viewportXMax) * 0.5F;
         float centerY = (viewportYMin + viewportYMax) * 0.5F;
-        // A turned or leaning sheet shows past the viewport's own corners, so
-        // the lattice is walked over the box the sheet is actually cut to.
-        float reach = LostTalesLotrMapRotation.maxCoverage(
-                viewportXMax - viewportXMin, viewportYMax - viewportYMin)
-                * 0.5F + CLOUD_SCREEN_WIDTH;
-        int cellXMin = (int)Math.floor((scrollX - reach) / CLOUD_SCREEN_CELL);
-        int cellXMax = (int)Math.ceil((scrollX + reach) / CLOUD_SCREEN_CELL);
-        int cellYMin = (int)Math.floor((scrollY - reach) / CLOUD_SCREEN_CELL);
-        int cellYMax = (int)Math.ceil((scrollY + reach) / CLOUD_SCREEN_CELL);
-        float height = CLOUD_SCREEN_WIDTH * CLOUD_ASPECT;
+        // How much sky is on screen now, rather than the most there could ever
+        // be: a turned or leaning sheet reaches past the viewport's corners
+        // and a flat one does not, and giving a flat map the wide box anyway
+        // meant walking several times the cells for nothing.
+        float[] box = new float[2];
+        LostTalesLotrMapRotation.rotatedCoverage(
+                viewportXMax - viewportXMin, viewportYMax - viewportYMin,
+                LostTalesLotrMapRotation.degreesOf(gui),
+                LostTalesLotrMapRotation.leanOf(gui), box);
+        float coverage = Math.max(box[0], box[1]);
+        float reach = coverage * 0.5F / scale + CLOUD_WORLD_WIDTH;
+        float cell = CLOUD_WORLD_CELL;
+        // Only the sky over ground the map image actually has, and read at
+        // where the drift has carried the lattice to. Clamping the map
+        // positions rather than the cells is what keeps that right: the
+        // lattice runs on for ever and the drift walks along it, while
+        // Middle-earth does not.
+        int width = LostTalesLotrMapRotation.mapImageWidth();
+        int height = LostTalesLotrMapRotation.mapImageHeight();
+        float visibleXMin = Math.max(0.0F, posX - reach);
+        float visibleXMax = width > 0
+                ? Math.min(width, posX + reach) : posX + reach;
+        float visibleYMin = Math.max(0.0F, posY - reach);
+        float visibleYMax = height > 0
+                ? Math.min(height, posY + reach) : posY + reach;
+        int cellXMin = (int)Math.floor((visibleXMin + drift) / cell);
+        int cellXMax = (int)Math.ceil((visibleXMax + drift) / cell);
+        int cellYMin = (int)Math.floor(visibleYMin / cell);
+        int cellYMax = (int)Math.ceil(visibleYMax / cell);
+        float lift = CLOUD_ALTITUDE * scale
+                * LostTalesLotrMapRotation.leanSine(gui);
+        float[] anchor = new float[2];
         for (int cellX = cellXMin; cellX <= cellXMax; cellX++) {
             for (int cellY = cellYMin; cellY <= cellYMax; cellY++) {
-                if (cellNoise(cellX, cellY, CLOUD_CHANNEL)
-                        >= CLOUD_DENSITY) {
-                    // A cell without a cloud in it is what stops the sky
-                    // being an even lattice of them.
-                    continue;
-                }
-                float x = (cellX + 0.5F + jitter(cellX, cellY, 1))
-                        * CLOUD_SCREEN_CELL - scrollX + centerX;
-                float y = (cellY + 0.5F + jitter(cellX, cellY, 2))
-                        * CLOUD_SCREEN_CELL - scrollY + centerY;
-                float[] weather = resolveWeather(
-                        cellX, cellY, CLOUD_CHANNEL, rain, thunder);
-                int variant = (int)(cellNoise(
-                        cellX, cellY, CLOUD_CHANNEL + 3) * CLOUD_VARIANTS)
-                        % CLOUD_VARIANTS;
-                drawCloud(tessellator, x, y, height, variant, weather);
+                drawCloudSite(tessellator, gui, cellX, cellY,
+                        rain, thunder, drift, posX, posY, scale, lift,
+                        centerX, centerY, anchor,
+                        viewportXMin, viewportXMax,
+                        viewportYMin, viewportYMax);
             }
         }
     }
 
-    private static float jitter(int cellX, int cellY, int channel) {
-        return (cellNoise(cellX, cellY, CLOUD_CHANNEL + channel) - 0.5F)
-                * 2.0F * CLOUD_JITTER;
+    private static void drawCloudSite(
+            Tessellator tessellator, LostTalesLotrMapGui gui,
+            int cellX, int cellY,
+            float rain, float thunder, float drift, float posX, float posY,
+            float scale, float lift, float centerX, float centerY,
+            float[] anchor,
+            int viewportXMin, int viewportXMax,
+            int viewportYMin, int viewportYMax) {
+        // A cell without a cloud in it is what stops the sky being an even
+        // lattice of them; the clustering is what gives it banks and clear
+        // stretches rather than one steady scatter.
+        if (!LostTalesMapDecorationPlacement.hasClusteredSite(
+                cellX, cellY, CLOUD_CHANNEL, CLOUD_DENSITY,
+                CLOUD_WORLD_CELL, CLOUD_CLUSTER_SIZE)) {
+            return;
+        }
+        float mapX = LostTalesMapDecorationPlacement.siteX(
+                cellX, cellY, CLOUD_CHANNEL, CLOUD_WORLD_CELL,
+                CLOUD_JITTER) - drift;
+        float mapY = LostTalesMapDecorationPlacement.siteY(
+                cellX, cellY, CLOUD_CHANNEL, CLOUD_WORLD_CELL,
+                CLOUD_JITTER);
+        anchor[0] = (mapX - posX) * scale + centerX;
+        anchor[1] = (mapY - posY) * scale + centerY;
+        float depth = LostTalesLotrMapRotation.rotateAndProject(anchor, gui);
+        float width = CLOUD_WORLD_WIDTH * scale * depth;
+        float height = width * CLOUD_ASPECT;
+        if (width < MIN_CLOUD_WIDTH
+                || anchor[0] + width < viewportXMin
+                || anchor[0] - width > viewportXMax
+                || anchor[1] + height < viewportYMin
+                || anchor[1] - height > viewportYMax) {
+            return;
+        }
+        float[] weather = resolveWeather(
+                cellX, cellY, CLOUD_CHANNEL, rain, thunder);
+        int variant = (int)(cellNoise(
+                cellX, cellY, CLOUD_CHANNEL + 3) * CLOUD_VARIANTS)
+                % CLOUD_VARIANTS;
+        drawCloud(tessellator, anchor[0], anchor[1] - lift * depth,
+                width, height, variant, weather);
     }
 
-    /** One cloud, as its own frame of the sheet, centred on its cell. */
+    /** One cloud, as its own frame of the sheet, facing the reader. */
     private static void drawCloud(
             Tessellator tessellator, float centerX, float centerY,
-            float height, int variant, float[] weather) {
-        float halfWidth = CLOUD_SCREEN_WIDTH * 0.5F;
+            float width, float height, int variant, float[] weather) {
+        float halfWidth = width * 0.5F;
         float halfHeight = height * 0.5F;
         double uMin = variant / (double)CLOUD_VARIANTS;
         double uMax = (variant + 1.0D) / CLOUD_VARIANTS;
@@ -447,31 +533,89 @@ final class LostTalesLotrMapAtmosphere {
     }
 
     /**
-     * Keeps a leaning sheet inside its own frame.
+     * How strongly the ground at a screen height is hazed.
      *
-     * <p>Flat and square the clouds cannot reach past the viewport, but the
-     * sheet they are drawn on is cut larger than it so that turning and
-     * leaning have ground to show, and without this the sky would spill over
-     * the panels around the map.</p>
+     * <p>Only the far half of the map, and only while it is leaning. The
+     * lean's own projection divides by a number that runs in a straight line
+     * down the screen, so how far away a piece of ground is runs in a straight
+     * line too — which makes where the haze belongs a question about screen
+     * height and nothing else, whatever the map is turned to.</p>
+     *
+     * @param far how far towards the top of the viewport, 0 at the middle
      */
-    private static boolean beginViewportClip(
+    static float hazeStrength(float lean, float far) {
+        float clampedLean = Math.max(0.0F, Math.min(1.0F, lean));
+        if (clampedLean <= 0.0F || !(far > 0.0F)) {
+            return 0.0F;
+        }
+        return MAX_HAZE_ALPHA * clampedLean
+                * smoothstep(Math.min(1.0F, far));
+    }
+
+    /**
+     * Draws the haze over the far half of a leaning map.
+     *
+     * <p>Over the ground and everything standing on it, and under everything
+     * the player navigates by: roads, region names and markers are all drawn
+     * later and stay as crisp at the far edge as at the near one. Hazing those
+     * too would be more faithful and would cost the map its legs.</p>
+     */
+    static void renderDistanceHaze(
+            LostTalesLotrMapGui gui, long worldTime, float rain, float thunder,
             int viewportXMin, int viewportXMax,
             int viewportYMin, int viewportYMax) {
-        Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft == null) {
-            return false;
+        float lean = LostTalesLotrMapRotation.leanOf(gui);
+        float centerY = (viewportYMin + viewportYMax) * 0.5F;
+        float reach = centerY - viewportYMin;
+        if (lean <= 0.0F || !(reach > 0.0F)
+                || viewportXMax <= viewportXMin) {
+            return;
         }
-        ScaledResolution resolution = new ScaledResolution(minecraft,
-                minecraft.displayWidth, minecraft.displayHeight);
-        int scaleFactor = Math.max(1, resolution.getScaleFactor());
-        GL11.glPushAttrib(GL11.GL_SCISSOR_BIT | GL11.GL_ENABLE_BIT);
-        GL11.glEnable(GL11.GL_SCISSOR_TEST);
-        GL11.glScissor(
-                viewportXMin * scaleFactor,
-                (resolution.getScaledHeight() - viewportYMax) * scaleFactor,
-                Math.max(0, viewportXMax - viewportXMin) * scaleFactor,
-                Math.max(0, viewportYMax - viewportYMin) * scaleFactor);
-        return true;
+        float[] shade = shadeFor(worldTime, rain, thunder);
+        // Mixed towards the hour's own colour by how much of the map that
+        // colour is already responsible for, so the haze belongs to the same
+        // sky the rest of the map is lit by.
+        float towardsNight = Math.min(1.0F, shade[3] / MAX_TOTAL_ALPHA);
+        float red = mix(HAZE_COLOUR[0], shade[0], towardsNight);
+        float green = mix(HAZE_COLOUR[1], shade[1], towardsNight);
+        float blue = mix(HAZE_COLOUR[2], shade[2], towardsNight);
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT
+                | GL11.GL_CURRENT_BIT | GL11.GL_DEPTH_BUFFER_BIT);
+        try {
+            GL11.glDisable(GL11.GL_DEPTH_TEST);
+            GL11.glDepthMask(false);
+            GL11.glDisable(GL11.GL_TEXTURE_2D);
+            GL11.glDisable(GL11.GL_ALPHA_TEST);
+            GL11.glEnable(GL11.GL_BLEND);
+            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
+                    GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+            GL11.glShadeModel(GL11.GL_SMOOTH);
+            Tessellator tessellator = Tessellator.instance;
+            tessellator.startDrawingQuads();
+            try {
+                for (int band = 0; band < HAZE_BANDS; band++) {
+                    float topShare = 1.0F - band / (float)HAZE_BANDS;
+                    float bottomShare =
+                            1.0F - (band + 1) / (float)HAZE_BANDS;
+                    float top = centerY - reach * topShare;
+                    float bottom = centerY - reach * bottomShare;
+                    float topAlpha = hazeStrength(lean, topShare);
+                    float bottomAlpha = hazeStrength(lean, bottomShare);
+                    tessellator.setColorRGBA_F(
+                            red, green, blue, bottomAlpha);
+                    tessellator.addVertex(viewportXMin, bottom, 0.0D);
+                    tessellator.addVertex(viewportXMax, bottom, 0.0D);
+                    tessellator.setColorRGBA_F(red, green, blue, topAlpha);
+                    tessellator.addVertex(viewportXMax, top, 0.0D);
+                    tessellator.addVertex(viewportXMin, top, 0.0D);
+                }
+            } finally {
+                tessellator.draw();
+            }
+        } finally {
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glPopAttrib();
+        }
     }
 
     private static void drawShade(float[] shade, int xMin, int xMax,

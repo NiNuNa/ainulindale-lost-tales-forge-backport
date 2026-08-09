@@ -11,8 +11,10 @@ import java.util.ArrayList;
 import java.util.List;
 import lotr.client.gui.LOTRGuiMap;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.StatCollector;
 import lotr.client.gui.LOTRGuiMapWidget;
+import org.lwjgl.opengl.GL11;
 
 /**
  * Isolates the LOTR v36.15 members needed by the Lost Tales map layout.
@@ -275,6 +277,58 @@ public final class LostTalesLotrMapLayout {
             if (bounds.isEmpty()) {
                 bottomTextBounds.remove();
             }
+        }
+    }
+
+    /**
+     * Confines drawing to the map's own viewport until
+     * {@link #endViewportClip(boolean)}.
+     *
+     * <p>Anything laid out from the sheet reaches past the viewport: the sheet
+     * is cut to the viewport's diagonal so that turning and leaning have
+     * ground to show, and a sprite standing at the edge is drawn as wide as it
+     * is wherever its foot lands. Without the scissor all of that spills over
+     * the panels around the map.</p>
+     *
+     * <p>The scissor is in real framebuffer pixels while the map is laid out
+     * in GUI pixels, hence the resolution's scale factor.</p>
+     *
+     * @return true when the clip was applied and must be given back
+     */
+    static boolean beginViewportClip(
+            int viewportXMin, int viewportXMax,
+            int viewportYMin, int viewportYMax) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null) {
+            return false;
+        }
+        try {
+            ScaledResolution resolution = new ScaledResolution(minecraft,
+                    minecraft.displayWidth, minecraft.displayHeight);
+            int scaleFactor = Math.max(1, resolution.getScaleFactor());
+            GL11.glPushAttrib(GL11.GL_SCISSOR_BIT | GL11.GL_ENABLE_BIT);
+            GL11.glEnable(GL11.GL_SCISSOR_TEST);
+            GL11.glScissor(
+                    viewportXMin * scaleFactor,
+                    (resolution.getScaledHeight() - viewportYMax)
+                            * scaleFactor,
+                    Math.max(0, viewportXMax - viewportXMin) * scaleFactor,
+                    Math.max(0, viewportYMax - viewportYMin) * scaleFactor);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    static void endViewportClip(boolean clipped) {
+        if (!clipped) {
+            return;
+        }
+        try {
+            GL11.glPopAttrib();
+        } catch (Throwable ignored) {
+            // Nothing useful is left to do about an attribute stack this
+            // broken, and throwing here would take the map down with it.
         }
     }
 

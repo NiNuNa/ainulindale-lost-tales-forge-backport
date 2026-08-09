@@ -20,52 +20,74 @@ import cpw.mods.fml.relauncher.SideOnly;
 @SideOnly(Side.CLIENT)
 final class LostTalesMapZoomFade {
     /**
-     * Zoomed in this far through the range, everything is fully drawn.
+     * Zoomed in this far, everything is fully drawn.
      *
-     * <p>Which is to say: once the map is 85% of the way to its closest zoom,
-     * nothing is faded any more, however much further it is pushed.</p>
+     * <p>An exponent rather than a share of the zoom's range, and that is the
+     * whole correction. Measured against the range, "most of the way in" came
+     * out at an exponent of nearly three — a zoom where the screen holds a
+     * few dozen map pixels — so markers were still part-faded through every
+     * zoom anyone actually reads the map at, and were down to a third of their
+     * colour at the one the map opens at. The range is not the map: its far
+     * end is a postage stamp on an empty screen and its near end is closer
+     * than anyone needs. What the fade has to be pinned to is the zoom a
+     * player is at, not the zoom the slider can reach.</p>
      */
-    static final float OPAQUE_PROGRESS = 0.15F;
-    /** And 85% of the way to its furthest zoom, nothing is drawn at all. */
-    static final float CLEAR_PROGRESS = 0.85F;
+    static final float SOLID_ZOOM_EXP = 1.0F;
+    /**
+     * And pulled out this far, nothing is drawn at all.
+     *
+     * <p>Just before the whole of Middle-earth fits on the screen, which is
+     * where a map full of pins stops being a map. There is deliberately zoom
+     * left below this: the last of the way out is spent looking at the
+     * country, with the fade already finished rather than still running.</p>
+     */
+    static final float CLEAR_ZOOM_EXP = -2.0F;
+    /**
+     * Below this opacity a thing on the map stops answering the pointer.
+     *
+     * <p>Hover, selection and clicks belong to what the player can actually
+     * see. Testing against nothing at all leaves a band at the end of the fade
+     * where an icon is a few percent of a colour and still owns the pointer,
+     * which reads as the map catching on something that is not there.</p>
+     */
+    static final float INTERACTIVE_ALPHA = 0.06F;
 
     private LostTalesMapZoomFade() {}
 
-    /**
-     * Where a zoom exponent sits in the map's own range: 0 fully zoomed in,
-     * 1 fully out.
-     */
-    static float progress(
-            float zoomExp, float minZoomExp, float maxZoomExp) {
-        float span = maxZoomExp - minZoomExp;
-        if (!(span > 0.0F) || Float.isNaN(zoomExp)) {
-            return 0.0F;
-        }
-        return clamp((maxZoomExp - zoomExp) / span);
+    /** Whether something drawn at this opacity may still be pointed at. */
+    static boolean isInteractive(float alpha) {
+        return alpha >= INTERACTIVE_ALPHA;
     }
 
     /**
-     * The opacity that progress earns.
+     * How far a zoom exponent is through the fade: 0 gone, 1 fully drawn.
+     *
+     * <p>There is room at both ends on purpose. Pushed in past
+     * {@link #SOLID_ZOOM_EXP} nothing changes however much further it goes,
+     * and pulled out past {@link #CLEAR_ZOOM_EXP} nothing is drawn however
+     * much further it goes; the fade happens between them and nowhere
+     * else.</p>
+     */
+    static float progress(float zoomExp) {
+        float span = SOLID_ZOOM_EXP - CLEAR_ZOOM_EXP;
+        if (!(span > 0.0F) || Float.isNaN(zoomExp)) {
+            return 1.0F;
+        }
+        return clamp((zoomExp - CLEAR_ZOOM_EXP) / span);
+    }
+
+    /**
+     * The opacity a place in the fade earns.
      *
      * <p>Flat at both ends and eased between them, so nothing pops as it
      * crosses either boundary.</p>
      */
     static float alphaForProgress(float progress) {
-        float clamped = clamp(progress);
-        if (clamped <= OPAQUE_PROGRESS) {
-            return 1.0F;
-        }
-        if (clamped >= CLEAR_PROGRESS) {
-            return 0.0F;
-        }
-        float faded = (clamped - OPAQUE_PROGRESS)
-                / (CLEAR_PROGRESS - OPAQUE_PROGRESS);
-        return smoothstep(1.0F - faded);
+        return smoothstep(progress);
     }
 
-    static float alpha(float zoomExp, float minZoomExp, float maxZoomExp) {
-        return alphaForProgress(
-                progress(zoomExp, minZoomExp, maxZoomExp));
+    static float alpha(float zoomExp) {
+        return alphaForProgress(progress(zoomExp));
     }
 
     /**

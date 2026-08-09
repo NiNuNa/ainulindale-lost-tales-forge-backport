@@ -431,7 +431,8 @@ public final class LostTalesLotrMapRotationTest {
     public void aTurnedSheetIsAlwaysTheSameShape() {
         float[] coverage = new float[2];
         float[] previous = null;
-        for (float degrees = -22.5F; degrees <= 22.5F; degrees += 2.5F) {
+        float limit = LostTalesLotrMapRotation.MAX_DEGREES;
+        for (float degrees = -limit; degrees <= limit; degrees += 2.5F) {
             if (Math.abs(degrees) < 0.001F) {
                 continue;
             }
@@ -495,13 +496,18 @@ public final class LostTalesLotrMapRotationTest {
      * The feel the turn is meant to have, measured where a player would feel
      * it: light off square, heavier half way out, heavy at the end. One
      * number over the whole range is exactly what it must not be.
+     *
+     * <p>Measured at shares of the range rather than at fixed angles, because
+     * the shape of the curve is what is being tested and widening the limit
+     * must not be able to make this pass or fail by accident.</p>
      */
     @Test
     public void resistanceRisesInThreeFeelableSteps() {
-        float nearSquare = dragFor(1.5F) - dragFor(0.5F);
-        float halfWay = dragFor(12.0F) - dragFor(11.0F);
+        float step = LostTalesLotrMapRotation.MAX_DEGREES / 22.5F;
+        float nearSquare = dragFor(1.5F * step) - dragFor(0.5F * step);
+        float halfWay = dragFor(12.0F * step) - dragFor(11.0F * step);
         float nearTheLimit = dragFor(LostTalesLotrMapRotation.MAX_DEGREES)
-                - dragFor(LostTalesLotrMapRotation.MAX_DEGREES - 1.0F);
+                - dragFor(LostTalesLotrMapRotation.MAX_DEGREES - step);
 
         assertTrue("coming off square must be easy", nearSquare < 8.0F);
         assertTrue("half way out must cost noticeably more",
@@ -511,19 +517,68 @@ public final class LostTalesLotrMapRotationTest {
         // And a full turn must stay inside one comfortable sweep of the hand
         // rather than needing the mouse picked up and put down.
         assertTrue("most of the range must be within one sweep",
-                dragFor(LostTalesLotrMapRotation.MAX_DEGREES - 4.5F)
+                dragFor(LostTalesLotrMapRotation.MAX_DEGREES - 4.5F * step)
                         < 260.0F);
     }
 
     /** The complaint that started it: the stiffening has to be felt. */
     @Test
     public void theLastDegreesCostFarMoreDragThanTheFirst() {
-        float first = dragFor(2.0F) - dragFor(0.0F);
+        float step = LostTalesLotrMapRotation.MAX_DEGREES / 11.25F;
+        float first = dragFor(step) - dragFor(0.0F);
         float last = dragFor(LostTalesLotrMapRotation.MAX_DEGREES)
-                - dragFor(LostTalesLotrMapRotation.MAX_DEGREES - 2.0F);
+                - dragFor(LostTalesLotrMapRotation.MAX_DEGREES - step);
 
         assertTrue("the last degrees must cost several times the first",
                 last > first * 5.0F);
+    }
+
+    /**
+     * Turning and leaning are one gesture and share one limit, so the map
+     * cannot be tipped dramatically further one way than the other.
+     */
+    @Test
+    public void theTurnAndTheLeanShareOneLimit() {
+        assertEquals(LostTalesLotrMapRotation.MAX_ORIENTATION_DEGREES,
+                LostTalesLotrMapRotation.MAX_DEGREES, 0.0F);
+        assertEquals(LostTalesLotrMapRotation.MAX_ORIENTATION_DEGREES,
+                LostTalesLotrMapRotation.MAX_PITCH_DEGREES, 0.0F);
+        assertEquals(33.75F,
+                LostTalesLotrMapRotation.MAX_ORIENTATION_DEGREES, 0.0F);
+        assertEquals("a full lean must drop the eye exactly that far",
+                LostTalesLotrMapRotation.MAX_ORIENTATION_DEGREES,
+                LostTalesLotrMapRotation.pitchDegrees(1.0F), 0.0001F);
+        // And nothing may put either axis past it, whatever it is handed.
+        assertEquals(LostTalesLotrMapRotation.MAX_ORIENTATION_DEGREES,
+                LostTalesLotrMapRotation.pitchDegrees(4.0F), 0.0001F);
+        assertEquals(LostTalesLotrMapRotation.MAX_DEGREES,
+                Math.abs(LostTalesLotrMapRotation.degreesForInput(-9.0F)),
+                0.001F);
+    }
+
+    /**
+     * A billboard standing on the far half of a leaning map is further from
+     * the eye than one on the near half, and has to be drawn smaller for it.
+     */
+    @Test
+    public void thingsStandingOnALeaningMapRecedeWithIt() {
+        float coefficient = LostTalesLotrMapRotation.leanCoefficient(
+                1.0F, 360.0F);
+        assertEquals("a flat map shrinks nothing", 1.0F,
+                LostTalesLotrMapRotation.perspectiveScale(120.0F, 0.0F),
+                0.0F);
+        assertEquals("the point the eye is aimed at is drawn full size", 1.0F,
+                LostTalesLotrMapRotation.perspectiveScale(0.0F, coefficient),
+                0.0001F);
+
+        float near = LostTalesLotrMapRotation.perspectiveScale(
+                150.0F, coefficient);
+        float far = LostTalesLotrMapRotation.perspectiveScale(
+                -150.0F, coefficient);
+        assertTrue("the near half must be drawn larger", near > 1.0F);
+        assertTrue("the far half must be drawn smaller", far < 1.0F);
+        assertTrue("nothing may be turned inside out by the divide",
+                far > 0.0F);
     }
 
     private static float dragFor(float degrees) {
@@ -576,7 +631,8 @@ public final class LostTalesLotrMapRotationTest {
             float grain = LostTalesLotrMapRotation.maxCoverage(width, height);
             for (float lean = 0.0F; lean <= 1.0F; lean += 0.05F) {
                 LostTalesLotrMapRotation.rotatedCoverage(
-                        width, height, 22.5F, lean, coverage);
+                        width, height,
+                        LostTalesLotrMapRotation.MAX_DEGREES, lean, coverage);
                 assertTrue("grain short of the sheet at lean " + lean,
                         grain >= coverage[0] - 0.001F
                                 && grain >= coverage[1] - 0.001F);

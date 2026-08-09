@@ -437,7 +437,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             int mouseX, int mouseY, boolean drawLabels,
             boolean includeHidden) {
         RenderContext context = createRenderContext(gui);
-        if (context == null || context.alpha <= 0.0F) {
+        if (context == null
+                || !LostTalesMapZoomFade.isInteractive(context.alpha)) {
             groupingFrame = GroupingFrame.empty();
             updateHoverFocus(gui, nativeWaypoints,
                     mouseX, mouseY, includeHidden);
@@ -1672,7 +1673,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             LOTRGuiMap gui, List<LOTRAbstractWaypoint> nativeWaypoints,
             int mouseX, int mouseY, boolean includeHidden) {
         RenderContext context = createRenderContext(gui);
-        if (context == null || context.alpha <= 0.0F) {
+        if (context == null
+                || !LostTalesMapZoomFade.isInteractive(context.alpha)) {
             clearHoverFocus(gui);
             return;
         }
@@ -1794,7 +1796,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             return;
         }
         RenderContext context = createRenderContext(gui);
-        if (context == null || context.alpha <= 0.0F) {
+        if (context == null
+                || !LostTalesMapZoomFade.isInteractive(context.alpha)) {
             return;
         }
         beginIconRender();
@@ -1912,7 +1915,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             return;
         }
         RenderContext context = createRenderContext(gui);
-        if (context == null || context.alpha <= 0.0F) {
+        if (context == null
+                || !LostTalesMapZoomFade.isInteractive(context.alpha)) {
             return;
         }
         if (focused.kind == HoverKind.MARKER) {
@@ -2149,7 +2153,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         }
 
         RenderContext context = createRenderContext(gui);
-        if (context == null || context.alpha <= 0.0F) {
+        if (context == null
+                || !LostTalesMapZoomFade.isInteractive(context.alpha)) {
             return;
         }
 
@@ -2808,7 +2813,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             int mapXMax = mapXMaxField.getInt(null);
             int mapYMin = mapYMinField.getInt(null);
             int mapYMax = mapYMaxField.getInt(null);
-            return new RenderContext(gui, minecraft, minecraft.fontRenderer, zoomExp, alpha, getLabelAlpha(zoomExp), mapXMin, mapXMax, mapYMin, mapYMax);
+            return new RenderContext(gui, minecraft, minecraft.fontRenderer, zoomExp, alpha, getLabelAlpha(gui, zoomExp), mapXMin, mapXMax, mapYMin, mapYMax);
         } catch (Throwable ignored) {
             return null;
         }
@@ -2853,6 +2858,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             if (pos == null || pos.length < 2) {
                 return null;
             }
+            // Exactly where the ground is. A marker was briefly lifted off it
+            // as the map tipped, the way the decorations stand up, and it did
+            // not read as a pin standing in the paper — it read as the pin
+            // having come loose from the place it marks.
             return new ScreenPosition(pos[0], pos[1]);
         } catch (Throwable ignored) {
             return null;
@@ -2867,24 +2876,31 @@ public final class LostTalesLotrMapMarkerIconOverlay {
      * Marker opacity, on the map's shared zoom fade rather than on LOTR's,
      * which was written for a narrower zoom and put every icon out well
      * before this map runs out of range.
+     *
+     * <p>The same number decides whether a marker answers the pointer: every
+     * pass above gives up below
+     * {@link LostTalesMapZoomFade#INTERACTIVE_ALPHA}, so what can be clicked
+     * is what can be seen.</p>
      */
     private static float getWaypointAlpha(LOTRGuiMap gui, float zoomExp) {
         if (!gui.enableZoomOutWPFading) {
             return 1.0F;
         }
-        return LostTalesMapZoomFade.alpha(zoomExp,
-                LostTalesLotrMapGui.minZoomExpOf(gui),
-                LostTalesLotrMapGui.maxZoomExpOf(gui));
+        return LostTalesMapZoomFade.alpha(zoomExp);
     }
 
-    /** Labels fade on their own, earlier rule, and keep it. */
-    private static float getLabelAlpha(float zoomExp) {
-        float alpha = (zoomExp + 1.0F) / 4.0F;
-        alpha = Math.min(alpha, 1.0F);
-        if (alpha < 0.0F) {
-            alpha = 0.0F;
-        }
-        return alpha;
+    /**
+     * A marker's name fades exactly as the marker does.
+     *
+     * <p>It used to keep LOTR's own rule — {@code (zoomExp + 1) / 4} — on the
+     * grounds that a name should go before the thing it names. Against this
+     * map's wider zoom that rule put every label out at an exponent of -1,
+     * which is barely a third of the way out, so names disappeared while the
+     * map was still being read at a perfectly ordinary zoom. A name and its
+     * icon are one thing to the player, and they now fade as one.</p>
+     */
+    private static float getLabelAlpha(LOTRGuiMap gui, float zoomExp) {
+        return LostTalesMapZoomFade.alpha(zoomExp);
     }
 
     private static boolean isInsideMap(float x, float y, RenderContext context) {

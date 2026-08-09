@@ -140,36 +140,32 @@ public final class LostTalesLotrMapAtmosphereTest {
     }
 
     /**
-     * The whole point of the sky's layout: the zoom is not one of its inputs.
+     * Clouds are weather over Middle-earth, so the zoom grows and shrinks them
+     * exactly as it grows and shrinks the ground under them — and it moves
+     * them faster than the ground, because they are between the reader and it.
      *
-     * <p>It used to be. Clouds sat on lattices an octave apart and the zoom
-     * chose between them, so pulling the map out shrank every cloud until its
-     * lattice gave up and a coarser one faded in behind it. Now a cloud's cell
-     * and its position come from where the camera is looking and nothing else,
-     * so zooming cannot move one, resize one, or swap it for another.</p>
+     * <p>They used to be laid out in screen pixels at one fixed size, which
+     * made the sky a texture on the window: no amount of scrolling on top of
+     * that reads as a layer with height.</p>
      */
     @Test
-    public void theSkyDoesNotDependOnTheZoomAtAll() {
-        float[] positions = { 0.0F, 137.5F, -820.0F, 4096.25F };
-        for (int index = 0; index < positions.length; index++) {
-            float offset =
-                    LostTalesLotrMapAtmosphere.skyOffset(positions[index]);
-            assertEquals("the sky moved when nothing but the zoom had",
-                    offset,
-                    LostTalesLotrMapAtmosphere.skyOffset(positions[index]),
-                    0.0F);
-        }
+    public void theSkyIsSizedInTheWorldAndMovesAheadOfIt() {
+        float close = LostTalesLotrMapAtmosphere.skyScale(4.0F);
+        float far = LostTalesLotrMapAtmosphere.skyScale(1.0F);
+        assertTrue("the sky must be drawn at all", far > 0.0F);
+        assertEquals("clouds must scale with the ground, not against it",
+                4.0F, close / far, 0.0001F);
 
-        // And the offset is a straight multiple of the map position, so a
-        // cloud's cell is a fixed region of the world however far out the
-        // map is.
-        float first = LostTalesLotrMapAtmosphere.skyOffset(100.0F)
-                - LostTalesLotrMapAtmosphere.skyOffset(0.0F);
-        float second = LostTalesLotrMapAtmosphere.skyOffset(2100.0F)
-                - LostTalesLotrMapAtmosphere.skyOffset(2000.0F);
-        assertEquals("the sky must pan at one steady rate",
-                first, second, 0.0001F);
-        assertTrue("the sky must move with the map at all", first != 0.0F);
+        // Nearer than the ground, so a pan carries the sky further than it
+        // carries the map: that difference is the parallax.
+        for (float zoomScale = 0.1F; zoomScale <= 16.0F; zoomScale *= 2.0F) {
+            assertTrue("the sky must move ahead of the ground at " + zoomScale,
+                    LostTalesLotrMapAtmosphere.skyScale(zoomScale)
+                            > zoomScale);
+        }
+        assertEquals("the sky must be steady for a given zoom",
+                LostTalesLotrMapAtmosphere.skyScale(2.5F),
+                LostTalesLotrMapAtmosphere.skyScale(2.5F), 0.0F);
     }
 
     /**
@@ -209,6 +205,40 @@ public final class LostTalesLotrMapAtmosphereTest {
                 1000L + 1200L, cell) - start;
         assertTrue("the sky is not moving", minute > 20.0F);
         assertTrue("the sky is racing", minute < 300.0F);
+    }
+
+    /**
+     * The haze is a depth cue and nothing else: a flat map has no far edge to
+     * have one, and however far the map leans the far edge stays a place a
+     * coastline can be read off.
+     */
+    @Test
+    public void theHazeOnlyExistsOnALeaningMapAndNeverHidesIt() {
+        for (float far = 0.0F; far <= 1.0F; far += 0.1F) {
+            assertEquals("a flat map was hazed", 0.0F,
+                    LostTalesLotrMapAtmosphere.hazeStrength(0.0F, far),
+                    0.0F);
+        }
+        assertEquals("the near half must be left alone", 0.0F,
+                LostTalesLotrMapAtmosphere.hazeStrength(1.0F, 0.0F), 0.0F);
+        assertEquals("and so must anything nearer still", 0.0F,
+                LostTalesLotrMapAtmosphere.hazeStrength(1.0F, -0.5F), 0.0F);
+
+        float previous = -1.0F;
+        for (float far = 0.0F; far <= 1.0F; far += 0.05F) {
+            float haze = LostTalesLotrMapAtmosphere.hazeStrength(1.0F, far);
+            assertTrue("the haze came back at " + far, haze >= previous);
+            assertTrue("the map cannot be read at " + far, haze <= 0.35F);
+            previous = haze;
+        }
+        assertTrue("the far edge must actually be hazed", previous > 0.15F);
+
+        // And it comes on with the lean rather than arriving with it.
+        assertTrue(LostTalesLotrMapAtmosphere.hazeStrength(0.4F, 1.0F)
+                < LostTalesLotrMapAtmosphere.hazeStrength(1.0F, 1.0F));
+        // Nothing outside its range may drive it past its ceiling.
+        assertEquals(LostTalesLotrMapAtmosphere.hazeStrength(1.0F, 1.0F),
+                LostTalesLotrMapAtmosphere.hazeStrength(4.0F, 3.0F), 0.0F);
     }
 
     /**

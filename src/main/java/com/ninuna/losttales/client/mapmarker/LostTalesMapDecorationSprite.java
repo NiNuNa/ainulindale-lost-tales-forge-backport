@@ -6,49 +6,69 @@ import cpw.mods.fml.relauncher.SideOnly;
 import net.minecraft.util.ResourceLocation;
 
 /**
- * The animated artwork a map decoration is drawn from.
+ * The artwork a map decoration is drawn from.
  *
- * <p>One entry per kind, describing a sprite sheet of frames laid out in a row.
+ * <p>One entry per kind, describing a sheet of frames laid out in a row.
  * Everything about the artwork lives here — how many frames it has, how large
- * they are, how long each is held, and how large the thing is drawn — so
- * replacing the placeholder drawings with finished ones is a new sheet and the
- * numbers beside it, and touches neither where decorations are placed nor how
- * map coordinates work.</p>
+ * they are, whether the frames are an animation or a set of variants, and how
+ * large the thing is — so replacing the placeholder drawings with finished ones
+ * is a new sheet and the numbers beside it, and touches neither where
+ * decorations are placed nor how map coordinates work.</p>
  *
- * <p>The drawn size is in <em>screen</em> pixels and does not change with zoom,
- * the same way a map marker does not. These are symbols standing on the map
- * saying "forest here", not scale drawings of trees; a tree that grew with the
- * zoom would be a mile across at one end of the range and invisible at the
- * other.</p>
+ * <p>The drawn size is in <em>map</em> pixels, not screen pixels. A tree stands
+ * on a patch of Middle-earth of a certain size and keeps it: pushing the map
+ * closer makes it larger on screen exactly as it makes the ground under it
+ * larger, and pulling the map out makes it smaller until it is not worth
+ * drawing and is culled. Sizing it in screen pixels instead — which is what a
+ * map marker legitimately does — is what makes decorations read as stickers on
+ * the glass rather than as things standing on the map.</p>
  */
 @SideOnly(Side.CLIENT)
 enum LostTalesMapDecorationSprite {
     /** Placeholder crest, four frames of sixteen by eight. */
-    WAVE("decoration_wave.png", 4, 16, 8, 6, 16.0F),
-    TREE("decoration_tree.png", 2, 16, 16, 14, 14.0F),
-    MOUNTAIN("decoration_mountain.png", 1, 16, 16, 20, 16.0F),
-    SHIP("decoration_ship.png", 2, 16, 16, 11, 14.0F),
-    TRAVELLER("decoration_traveller.png", 4, 12, 12, 5, 10.0F);
+    WAVE("decoration_wave.png", 4, 16, 8, 6, true, 4.6F, 0.0F),
+    /**
+     * Two drawings of a tree, used as variants rather than as an animation:
+     * trees on a map do not sway, and a forest where every tree moved in step
+     * read as the paper rippling.
+     */
+    TREE("decoration_tree.png", 2, 16, 16, 0, false, 4.0F, 0.5F),
+    MOUNTAIN("decoration_mountain.png", 1, 16, 16, 0, false, 5.6F, 1.0F),
+    SHIP("decoration_ship.png", 2, 16, 16, 11, true, 4.4F, 0.15F),
+    TRAVELLER("decoration_traveller.png", 4, 12, 12, 5, true, 3.0F, 0.3F);
 
     private final ResourceLocation texture;
     private final int frames;
     private final int frameWidth;
     private final int frameHeight;
-    /** Client ticks a frame is held for. */
+    /** Client ticks a frame is held for, where the frames are an animation. */
     private final int ticksPerFrame;
-    /** How wide the sprite is drawn, in screen pixels, at every zoom. */
-    private final float screenWidth;
+    private final boolean animated;
+    /** How wide the sprite is drawn, in map-image pixels. */
+    private final float worldWidth;
+    /**
+     * How much of what this kind draws is standing up off the ground.
+     *
+     * <p>A mountain is all height; a wave is none of it; a tree and a
+     * traveller are somewhere between. It is what decides how much taller the
+     * sprite is drawn as the map tips, and it is a property of what the
+     * artwork depicts rather than of the artwork itself.</p>
+     */
+    private final float standing;
 
     LostTalesMapDecorationSprite(
             String textureName, int frames, int frameWidth, int frameHeight,
-            int ticksPerFrame, float screenWidth) {
+            int ticksPerFrame, boolean animated, float worldWidth,
+            float standing) {
         this.texture = new ResourceLocation(LostTalesMetaData.MOD_ID,
                 "textures/gui/map/" + textureName);
         this.frames = Math.max(1, frames);
         this.frameWidth = Math.max(1, frameWidth);
         this.frameHeight = Math.max(1, frameHeight);
         this.ticksPerFrame = Math.max(1, ticksPerFrame);
-        this.screenWidth = Math.max(1.0F, screenWidth);
+        this.animated = animated && frames > 1;
+        this.worldWidth = Math.max(0.01F, worldWidth);
+        this.standing = Math.max(0.0F, Math.min(1.0F, standing));
     }
 
     ResourceLocation getTexture() {
@@ -59,12 +79,25 @@ enum LostTalesMapDecorationSprite {
         return this.frames;
     }
 
-    float getScreenWidth() {
-        return this.screenWidth;
+    boolean isAnimated() {
+        return this.animated;
     }
 
-    float getScreenHeight() {
-        return this.screenWidth * this.frameHeight / this.frameWidth;
+    /** How many drawings of this kind there are to choose between. */
+    int getVariants() {
+        return this.animated ? 1 : this.frames;
+    }
+
+    float getWorldWidth() {
+        return this.worldWidth;
+    }
+
+    float getWorldHeight() {
+        return this.worldWidth * this.frameHeight / this.frameWidth;
+    }
+
+    float getStanding() {
+        return this.standing;
     }
 
     /**
@@ -72,9 +105,13 @@ enum LostTalesMapDecorationSprite {
      *
      * <p>Off world time, with a phase of the decoration's own, so a shoreline
      * ripples rather than beating in unison. Both are whole numbers, so this
-     * says the same thing on every client without anything being sent.</p>
+     * says the same thing on every client without anything being sent. A kind
+     * whose frames are variants rather than an animation never moves.</p>
      */
     int frameAt(long worldTime, int phase) {
+        if (!this.animated) {
+            return 0;
+        }
         long frame = Math.floorDiv(worldTime, this.ticksPerFrame)
                 + Math.abs(phase);
         return (int)Math.floorMod(frame, this.frames);

@@ -267,17 +267,89 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         }
         if (!preserveSmoothZoom) {
             initializeSmoothZoom();
+            // Only on a fresh screen. A resize runs initGui again on the same
+            // object, which is already looking where the player left it.
+            restoreRememberedView();
         } else if (ensureSmoothZoomReflection()) {
             try {
                 zoomTicksField.setInt(this, 0);
-                zoomPowerField.setInt(null, Math.max(LOTR_ZOOM_POWER_MIN,
-                        Math.min(LOTR_ZOOM_POWER_MAX,
-                                Math.round(this.smoothZoomTarget))));
+                syncNativeZoomPower();
             } catch (IllegalAccessException exception) {
                 markSmoothZoomReflectionFailed(exception);
                 this.smoothZoomInitialized = false;
             }
         }
+    }
+
+    /**
+     * Puts the map back where it was closed.
+     *
+     * <p>LOTR's own {@code initGui} has just centred the camera on the player
+     * and left the zoom at its last whole level, which is what a player wants
+     * the first time they open the map and never afterwards: closing it to
+     * walk a few paces and opening it again should not cost them their place
+     * on it.</p>
+     *
+     * <p>The camera, the zoom, the turn and the lean are restored together and
+     * without animation — the map is simply already like that — and the drags
+     * that bought the angles are restored with them, so the next turn carries
+     * on from where the last one stopped. The conquest grid is left alone: it
+     * is a different view of the map with a camera of its own.</p>
+     */
+    private void restoreRememberedView() {
+        if (!LostTalesMapViewMemory.isHeld()
+                || !LostTalesLotrMapLayout.isFullscreenLayoutActive(this)) {
+            return;
+        }
+        float[] camera = new float[
+                LostTalesMapCameraFocus.CAMERA_STATE_SIZE];
+        if (LostTalesMapCameraFocus.captureCamera(this, camera)) {
+            float posX = LostTalesLotrMapRotation.clampToMapImage(
+                    LostTalesMapViewMemory.getPosX(),
+                    LostTalesLotrMapRotation.mapImageWidth());
+            float posY = LostTalesLotrMapRotation.clampToMapImage(
+                    LostTalesMapViewMemory.getPosY(),
+                    LostTalesLotrMapRotation.mapImageHeight());
+            camera[0] = posX;
+            camera[1] = posY;
+            camera[2] = posX;
+            camera[3] = posY;
+            // Keyboard momentum is not part of the view: a map that was closed
+            // mid-scroll opens still.
+            camera[4] = 0.0F;
+            camera[5] = 0.0F;
+            LostTalesMapCameraFocus.restoreCamera(this, camera);
+        }
+        applyFocusZoom(LostTalesMapViewMemory.getZoomExp());
+        if (this.smoothZoomInitialized && ensureSmoothZoomReflection()) {
+            try {
+                syncNativeZoomPower();
+            } catch (IllegalAccessException exception) {
+                markSmoothZoomReflectionFailed(exception);
+                this.smoothZoomInitialized = false;
+            }
+            // LOTR worked its scale out from the zoom it had a moment ago, and
+            // the first frame — and every hit test on it — reads that scale.
+            setupZoomVariables(1.0F);
+        }
+        this.rotationInput = LostTalesLotrMapRotation.clampInput(
+                LostTalesMapViewMemory.getRotationInput());
+        this.mapRotationTargetDegrees =
+                LostTalesLotrMapRotation.degreesForInput(this.rotationInput);
+        this.mapRotationDegrees = this.mapRotationTargetDegrees;
+        this.leanInput = Math.max(0.0F, LostTalesLotrMapRotation.clampInput(
+                LostTalesMapViewMemory.getLeanInput()));
+        this.mapLeanTarget =
+                LostTalesLotrMapRotation.leanForInput(this.leanInput);
+        this.mapLean = this.mapLeanTarget;
+        this.rotationLastNanos = 0L;
+    }
+
+    /** Keeps LOTR's own whole-numbered zoom in step with the eased one. */
+    private void syncNativeZoomPower() throws IllegalAccessException {
+        zoomPowerField.setInt(null, Math.max(LOTR_ZOOM_POWER_MIN,
+                Math.min(LOTR_ZOOM_POWER_MAX,
+                        Math.round(this.smoothZoomTarget))));
     }
 
     private void initializeSmoothZoom() {
@@ -413,8 +485,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             actual = zoomExpField.getFloat(this);
             zoomExpField.setFloat(this,
                     LostTalesMapZoomFade.nativeZoomExpForAlpha(
-                            LostTalesMapZoomFade.alpha(actual,
-                                    SMOOTH_ZOOM_MIN, SMOOTH_ZOOM_MAX)));
+                            LostTalesMapZoomFade.alpha(actual)));
         } catch (IllegalAccessException exception) {
             markSmoothZoomReflectionFailed(exception);
             this.smoothZoomInitialized = false;
@@ -578,23 +649,6 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     static float clampSmoothZoom(float value) {
         return Math.max(SMOOTH_ZOOM_MIN,
                 Math.min(SMOOTH_ZOOM_MAX, value));
-    }
-
-    /**
-     * How far this map screen can actually be zoomed, which is what anything
-     * fading with the zoom has to measure itself against.
-     *
-     * <p>The Lost Tales map goes wider than LOTR's own screens either way, and
-     * only when its continuous zoom is running. A screen still on LOTR's
-     * integer zoom keeps LOTR's range, so a fade means the same thing on both.
-     * </p>
-     */
-    static float minZoomExpOf(LOTRGuiMap gui) {
-        return hasSmoothZoom(gui) ? SMOOTH_ZOOM_MIN : LOTR_ZOOM_POWER_MIN;
-    }
-
-    static float maxZoomExpOf(LOTRGuiMap gui) {
-        return hasSmoothZoom(gui) ? SMOOTH_ZOOM_MAX : LOTR_ZOOM_POWER_MAX;
     }
 
     private static boolean hasSmoothZoom(LOTRGuiMap gui) {
@@ -2021,6 +2075,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
 
     @Override
     public void onGuiClosed() {
+        // Before anything below is cleared: what is cleared here is this
+        // screen's state, and the view has to outlive it.
+        rememberView();
         LostTalesMapCursor.release();
         clearFastTravelPrompt();
         clearWaypointPrompt();
@@ -2043,6 +2100,28 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         LostTalesLotrMapMarkerIconOverlay.clearGrouping(this);
         LostTalesLotrRoadLabelRenderer.clear(this);
         super.onGuiClosed();
+    }
+
+    /**
+     * Hands the view to {@link LostTalesMapViewMemory} on the way out.
+     *
+     * <p>The camera is taken as it stands rather than as any movement in
+     * flight meant it to end up, because what is being remembered is what the
+     * player was looking at when they closed the map. The conquest grid is not
+     * remembered: it is not this view.</p>
+     */
+    private void rememberView() {
+        if (!this.smoothZoomInitialized
+                || !LostTalesLotrMapLayout.isFullscreenLayoutActive(this)) {
+            return;
+        }
+        float[] camera = new float[
+                LostTalesMapCameraFocus.CAMERA_STATE_SIZE];
+        if (!LostTalesMapCameraFocus.captureCamera(this, camera)) {
+            return;
+        }
+        LostTalesMapViewMemory.remember(camera[2], camera[3],
+                this.smoothZoomCurrent, this.rotationInput, this.leanInput);
     }
 
     private boolean sendWaystoneTravel(String destinationMarkerId) {

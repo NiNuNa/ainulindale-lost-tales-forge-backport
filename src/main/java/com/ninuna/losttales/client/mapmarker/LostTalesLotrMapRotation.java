@@ -25,8 +25,19 @@ import org.lwjgl.opengl.GL11;
  * compensate for rotation on its own.</p>
  */
 public final class LostTalesLotrMapRotation {
+    /**
+     * Furthest the map may be tipped out of square, in degrees, on either
+     * axis.
+     *
+     * <p>The one number the map's orientation is bounded by. Turning and
+     * leaning are one gesture — the same drag, through the same stiffening
+     * curve — so they are given the same limit and read as one movement
+     * rather than as two axes with different ceilings. Everything that
+     * constrains an angle derives from this rather than repeating it.</p>
+     */
+    public static final float MAX_ORIENTATION_DEGREES = 33.75F;
     /** Furthest the map may be turned in either direction, in degrees. */
-    public static final float MAX_DEGREES = 22.5F;
+    public static final float MAX_DEGREES = MAX_ORIENTATION_DEGREES;
     /** Horizontal drag, in GUI pixels, that turns the map as far as it goes. */
     static final float FULL_TURN_DRAG_PIXELS = 520.0F;
     /**
@@ -74,13 +85,13 @@ public final class LostTalesLotrMapRotation {
     /**
      * How far the eye may drop below straight down, in degrees.
      *
-     * <p>Further than the map may turn, deliberately. The two used to share a
-     * limit on the grounds that they were one gesture, but a turn past 22.5°
-     * stops reading as a map with north somewhere sensible while a tilt has no
-     * such ceiling — a low eye is just a low eye. Now that the tilt is a real
-     * camera rather than a keystone it holds up this far.</p>
+     * <p>The lean's half of {@link #MAX_ORIENTATION_DEGREES}. It was once
+     * further out than the turn on the grounds that a low eye is just a low
+     * eye, but a map that can be tipped a third further than it can be turned
+     * reads as two separate controls; sharing the limit is what makes the
+     * gesture one movement.</p>
      */
-    static final float MAX_PITCH_DEGREES = 38.0F;
+    static final float MAX_PITCH_DEGREES = MAX_ORIENTATION_DEGREES;
     /**
      * The share by which the near edge grows at full lean.
      *
@@ -517,6 +528,100 @@ public final class LostTalesLotrMapRotation {
     }
 
     /**
+     * Projects a point on the sheet and reports how much something standing
+     * there is shrunk by the distance to it.
+     *
+     * <p>The same path as {@link #rotate}, and the answer is the perspective
+     * divide that path already performs. A billboard standing on the far half
+     * of a leaning map is further from the eye than one on the near half, so
+     * it has to be drawn smaller; without this a tilted map reads as an
+     * evenly-lit wall of sprites and loses the depth the projection is there
+     * to give it.</p>
+     *
+     * @return the factor a sprite standing at this point is drawn at
+     */
+    static float rotateAndProject(float[] point, LOTRGuiMap gui) {
+        if (point == null || point.length < 2 || unrotatedDepth > 0) {
+            return 1.0F;
+        }
+        try {
+            float degrees = degreesOf(gui);
+            float lean = leanOf(gui);
+            if ((degrees == 0.0F && lean <= 0.0F) || !ensureReflection()) {
+                return 1.0F;
+            }
+            float centerX = centerX();
+            float centerY = centerY();
+            rotateAbout(point, centerX, centerY, degrees);
+            float coefficient = leanCoefficient(
+                    lean, mapHeightField.getInt(null));
+            // Read before the lean moves the point, because the divide is a
+            // function of where the point is on the sheet, not of where the
+            // projection has put it.
+            float scale = perspectiveScale(point[1] - centerY, coefficient);
+            applyLean(point, centerX, centerY, coefficient, leanScaleY(lean));
+            return scale;
+        } catch (Throwable ignored) {
+            return 1.0F;
+        }
+    }
+
+    /**
+     * Turns a point onto the sheet without laying the sheet down.
+     *
+     * <p>The half-way space, and the only place a shape lying <em>on</em> the
+     * map can be laid out: the map's own turn has been applied, so the sheet's
+     * axes are the screen's, but the lean has not, so a length along the sheet
+     * is still just a length. Offsets are measured here and
+     * {@link #leanOnly} then carries the result the rest of the way.</p>
+     */
+    static void rotateOnly(float[] point, LOTRGuiMap gui) {
+        if (point == null || point.length < 2 || unrotatedDepth > 0) {
+            return;
+        }
+        try {
+            float degrees = degreesOf(gui);
+            if (degrees == 0.0F || !ensureReflection()) {
+                return;
+            }
+            rotateAbout(point, centerX(), centerY(), degrees);
+        } catch (Throwable ignored) {
+            // A point that cannot be turned is left where it was found.
+        }
+    }
+
+    /** Lays the sheet down under a point already turned onto it. */
+    static float leanOnly(float[] point, LOTRGuiMap gui) {
+        if (point == null || point.length < 2 || unrotatedDepth > 0) {
+            return 1.0F;
+        }
+        try {
+            float lean = leanOf(gui);
+            if (lean <= 0.0F || !ensureReflection()) {
+                return 1.0F;
+            }
+            float centerX = centerX();
+            float centerY = centerY();
+            float coefficient = leanCoefficient(
+                    lean, mapHeightField.getInt(null));
+            float scale = perspectiveScale(point[1] - centerY, coefficient);
+            applyLean(point, centerX, centerY, coefficient, leanScaleY(lean));
+            return scale;
+        } catch (Throwable ignored) {
+            return 1.0F;
+        }
+    }
+
+    /** How far away a point on the sheet has ended up, as a drawn scale. */
+    static float perspectiveScale(float deltaY, float coefficient) {
+        if (coefficient == 0.0F) {
+            return 1.0F;
+        }
+        return 1.0F / Math.max(MIN_PERSPECTIVE_DIVISOR,
+                1.0F + coefficient * deltaY);
+    }
+
+    /**
      * The point the map turns about: exactly the one LOTR projects through.
      *
      * <p>Its own conversion adds {@code mapXMin + mapWidth / 2} in integer
@@ -559,6 +664,17 @@ public final class LostTalesLotrMapRotation {
     static float leanOf(LOTRGuiMap gui) {
         return gui instanceof LostTalesLotrMapGui
                 ? ((LostTalesLotrMapGui)gui).getMapLean() : 0.0F;
+    }
+
+    /**
+     * How far the eye has dropped, as a sine.
+     *
+     * <p>What a layer with height over the sheet is lifted by: a thing
+     * standing above the ground stands further up the screen the lower the eye
+     * gets, and is not lifted at all while the map is flat.</p>
+     */
+    static float leanSine(LOTRGuiMap gui) {
+        return (float)Math.sin(Math.toRadians(pitchDegrees(leanOf(gui))));
     }
 
     /** How far the eye has dropped, in degrees, for a lean of 0 to 1. */

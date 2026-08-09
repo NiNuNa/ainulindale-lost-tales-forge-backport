@@ -28,6 +28,7 @@ import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneTravelContex
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapDecorationRenderer;
+import com.ninuna.losttales.client.mapmarker.LostTalesMapViewMemory;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMainMenuMapHook;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapMarkerIconOverlay;
 import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
@@ -103,8 +104,10 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientMapMarkerStore.clearDynamicMarkers();
         LostTalesLotrMapMarkerIconOverlay.clearClientState();
         // The map image is per-world, so what was learned about where its
-        // water is cannot be carried into the next one.
+        // water is cannot be carried into the next one — nor may a view of
+        // one world's map be restored over another's.
         LostTalesMapDecorationRenderer.clearCache();
+        LostTalesMapViewMemory.clear();
         LostTalesClientWaystoneStateStore.clear();
         LostTalesClientWaystoneTravelContext.clear();
         LostTalesClientMobAggroCache.clear();
