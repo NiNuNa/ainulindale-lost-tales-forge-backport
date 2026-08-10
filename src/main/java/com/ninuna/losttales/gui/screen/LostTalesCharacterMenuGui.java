@@ -1,5 +1,7 @@
 package com.ninuna.losttales.gui.screen;
 
+import com.ninuna.losttales.client.input.LostTalesInputBinding.Type;
+import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.config.client.LostTalesConfigGui;
@@ -11,6 +13,7 @@ import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiInventory;
 import net.minecraft.client.resources.I18n;
+import net.minecraft.client.settings.KeyBinding;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
@@ -22,6 +25,12 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
     private static final int OPTION_QUESTS = CharacterMenuSectorResolver.QUESTS;
     private static final int OPTION_ITEMS = CharacterMenuSectorResolver.ITEMS;
     private static final int OPTION_MAP = CharacterMenuSectorResolver.MAP;
+    private static final int FOOTER_X = 12;
+    private static final int FOOTER_RIGHT_RESERVE = 128;
+    private static final int FOOTER_INPUT_TEXT_GAP = 3;
+    private static final int FOOTER_CONTROL_GAP = 12;
+    private static final int FOOTER_ARROW_GAP = 1;
+    private static final float FOOTER_INPUT_SCALE = 1.0F;
 
     private final GuiScreen parent;
     private int hoveredOption = NONE;
@@ -182,14 +191,102 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
     }
 
     private void drawFooterHelp() {
-        String help = "Hover a direction and click to select   "
-                + LostTalesKeyBindings.getQuestJournalKeyDisplayName() + ": quest journal   "
-                + LostTalesKeyBindings.getCharacterMenuKeyDisplayName() + "/Esc: close";
-        int availableWidth = Math.max(0, this.width - 140);
+        if (this.mc == null || this.fontRendererObj == null) {
+            return;
+        }
+        int inputY = this.height - 22;
+        int textY = inputY
+                + (LostTalesInputIconRenderer.BASE_ICON_HEIGHT
+                        - this.fontRendererObj.FONT_HEIGHT) / 2;
+        int available = Math.max(0,
+                this.width - FOOTER_RIGHT_RESERVE - FOOTER_X);
+        boolean showHoverPrefix = footerWidth(true, "Quest Journal")
+                <= available;
+        String questLabel = footerWidth(showHoverPrefix, "Quest Journal")
+                <= available ? "Quest Journal" : "Journal";
+
+        int x = FOOTER_X;
+        if (showHoverPrefix) {
+            x = drawFooterText("Hover or", x, textY)
+                    + FOOTER_INPUT_TEXT_GAP;
+        }
+        x = drawArrowKeys(x, inputY);
+        x = drawFooterText("Select", x + FOOTER_INPUT_TEXT_GAP, textY)
+                + FOOTER_CONTROL_GAP;
+
+        x += LostTalesInputIconRenderer.drawKeyBinding(
+                this.mc, LostTalesKeyBindings.getQuestJournalKeyBinding(),
+                x, inputY, FOOTER_INPUT_SCALE);
+        x = drawFooterText(questLabel,
+                x + FOOTER_INPUT_TEXT_GAP, textY)
+                + FOOTER_CONTROL_GAP;
+
+        x += LostTalesInputIconRenderer.drawKeyBinding(
+                this.mc, LostTalesKeyBindings.getCharacterMenuKeyBinding(),
+                x, inputY, FOOTER_INPUT_SCALE);
+        x = drawFooterText("/", x + 2, textY) + 2;
+        x += LostTalesInputIconRenderer.drawInput(
+                this.mc, Type.KEYBOARD, Keyboard.KEY_ESCAPE,
+                x, inputY, FOOTER_INPUT_SCALE);
+        drawFooterText("Close", x + FOOTER_INPUT_TEXT_GAP, textY);
+    }
+
+    private int footerWidth(boolean includeHoverPrefix, String questLabel) {
+        int width = includeHoverPrefix
+                ? this.fontRendererObj.getStringWidth("Hover or")
+                        + FOOTER_INPUT_TEXT_GAP : 0;
+        int[] arrows = {
+                Keyboard.KEY_UP, Keyboard.KEY_RIGHT,
+                Keyboard.KEY_DOWN, Keyboard.KEY_LEFT
+        };
+        for (int index = 0; index < arrows.length; index++) {
+            if (index > 0) {
+                width += FOOTER_ARROW_GAP;
+            }
+            width += LostTalesInputIconRenderer.measureInput(
+                    this.mc, Type.KEYBOARD, arrows[index],
+                    FOOTER_INPUT_SCALE);
+        }
+        width += FOOTER_INPUT_TEXT_GAP
+                + this.fontRendererObj.getStringWidth("Select")
+                + FOOTER_CONTROL_GAP;
+        width += LostTalesInputIconRenderer.measureKeyBinding(
+                this.mc, LostTalesKeyBindings.getQuestJournalKeyBinding(),
+                FOOTER_INPUT_SCALE);
+        width += FOOTER_INPUT_TEXT_GAP
+                + this.fontRendererObj.getStringWidth(questLabel)
+                + FOOTER_CONTROL_GAP;
+        width += LostTalesInputIconRenderer.measureKeyBinding(
+                this.mc, LostTalesKeyBindings.getCharacterMenuKeyBinding(),
+                FOOTER_INPUT_SCALE);
+        width += 4 + this.fontRendererObj.getStringWidth("/");
+        width += LostTalesInputIconRenderer.measureInput(
+                this.mc, Type.KEYBOARD, Keyboard.KEY_ESCAPE,
+                FOOTER_INPUT_SCALE);
+        return width + FOOTER_INPUT_TEXT_GAP
+                + this.fontRendererObj.getStringWidth("Close");
+    }
+
+    private int drawArrowKeys(int x, int y) {
+        int[] arrows = {
+                Keyboard.KEY_UP, Keyboard.KEY_RIGHT,
+                Keyboard.KEY_DOWN, Keyboard.KEY_LEFT
+        };
+        for (int index = 0; index < arrows.length; index++) {
+            if (index > 0) {
+                x += FOOTER_ARROW_GAP;
+            }
+            x += LostTalesInputIconRenderer.drawInput(
+                    this.mc, Type.KEYBOARD, arrows[index],
+                    x, y, FOOTER_INPUT_SCALE);
+        }
+        return x;
+    }
+
+    private int drawFooterText(String text, int x, int y) {
         this.fontRendererObj.drawStringWithShadow(
-                LostTalesSkyrimUiStyle.trimToWidth(
-                this.fontRendererObj, help, availableWidth),
-                12, this.height - 20, LostTalesSkyrimUiStyle.TEXT_MUTED);
+                text, x, y, LostTalesSkyrimUiStyle.TEXT_MUTED);
+        return x + this.fontRendererObj.getStringWidth(text);
     }
 
     @Override

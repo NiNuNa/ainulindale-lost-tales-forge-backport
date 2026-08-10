@@ -128,6 +128,14 @@ public class LostTalesKeyBindings {
         return MODIFIER;
     }
 
+    public static KeyBinding getCharacterMenuKeyBinding() {
+        return CHARACTER_MENU;
+    }
+
+    public static KeyBinding getQuestJournalKeyBinding() {
+        return QUEST_JOURNAL;
+    }
+
     public static boolean isModifierKeyDown() {
         return isKeyDown(MODIFIER);
     }

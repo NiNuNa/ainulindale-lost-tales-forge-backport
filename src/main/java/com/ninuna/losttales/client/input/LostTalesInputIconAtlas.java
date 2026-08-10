@@ -9,69 +9,97 @@ import java.util.Map;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.input.Keyboard;
 
-/** Static sprite metadata for {@code textures/gui/keyboard_keys.png}. */
+/** Static layered-sprite metadata for {@code keyboard_keys.png}. */
 @SideOnly(Side.CLIENT)
 public final class LostTalesInputIconAtlas {
-    public static final ResourceLocation TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/keyboard_keys.png");
+    public static final ResourceLocation TEXTURE = new ResourceLocation(
+            LostTalesMetaData.MOD_ID, "textures/gui/keyboard_keys.png");
 
     public static final int TEXTURE_WIDTH = 363;
-    public static final int TEXTURE_HEIGHT = 41;
+    public static final int TEXTURE_HEIGHT = 93;
     public static final int SPRITE_HEIGHT = 13;
-    public static final int GRID_SPRITE_WIDTH = 13;
-    public static final int GRID_SPACING = 1;
+    public static final int KEYBOARD_FRAME_COUNT = 3;
+    private static final int FRAME_SPACING = 1;
+    private static final int GLYPH_HEIGHT = 5;
+    private static final int GLYPH_OFFSET_X = 3;
+    /** Idle aperture starts here; each later pose sits one pixel lower. */
+    private static final int GLYPH_OFFSET_Y = 2;
 
     private static final Map<Integer, Sprite> KEYBOARD_SPRITES;
     private static final Map<Integer, Sprite> MOUSE_BUTTON_SPRITES;
-    private static final Sprite MOUSE_WHEEL_SPRITE = new Sprite(0, 28, 16, SPRITE_HEIGHT);
+    private static final Sprite MOUSE_WHEEL_SPRITE =
+            new Sprite(0, 80, 16, SPRITE_HEIGHT);
 
     static {
-        Map<Integer, Sprite> keyboardSprites = new HashMap<Integer, Sprite>();
-        int[] letterCodes = {
-                Keyboard.KEY_A, Keyboard.KEY_B, Keyboard.KEY_C, Keyboard.KEY_D, Keyboard.KEY_E,
-                Keyboard.KEY_F, Keyboard.KEY_G, Keyboard.KEY_H, Keyboard.KEY_I, Keyboard.KEY_J,
-                Keyboard.KEY_K, Keyboard.KEY_L, Keyboard.KEY_M, Keyboard.KEY_N, Keyboard.KEY_O,
-                Keyboard.KEY_P, Keyboard.KEY_Q, Keyboard.KEY_R, Keyboard.KEY_S, Keyboard.KEY_T,
-                Keyboard.KEY_U, Keyboard.KEY_V, Keyboard.KEY_W, Keyboard.KEY_X, Keyboard.KEY_Y,
-                Keyboard.KEY_Z
+        Map<Integer, Sprite> keyboardSprites =
+                new HashMap<Integer, Sprite>();
+
+        // The glyph strip is A-Z, Up, Right, Down, Left. All thirty symbols
+        // are composed over the same three reusable 13-pixel key frames.
+        int[] oneCharacterCodes = {
+                Keyboard.KEY_A, Keyboard.KEY_B, Keyboard.KEY_C,
+                Keyboard.KEY_D, Keyboard.KEY_E, Keyboard.KEY_F,
+                Keyboard.KEY_G, Keyboard.KEY_H, Keyboard.KEY_I,
+                Keyboard.KEY_J, Keyboard.KEY_K, Keyboard.KEY_L,
+                Keyboard.KEY_M, Keyboard.KEY_N, Keyboard.KEY_O,
+                Keyboard.KEY_P, Keyboard.KEY_Q, Keyboard.KEY_R,
+                Keyboard.KEY_S, Keyboard.KEY_T, Keyboard.KEY_U,
+                Keyboard.KEY_V, Keyboard.KEY_W, Keyboard.KEY_X,
+                Keyboard.KEY_Y, Keyboard.KEY_Z,
+                Keyboard.KEY_UP, Keyboard.KEY_RIGHT,
+                Keyboard.KEY_DOWN, Keyboard.KEY_LEFT
         };
-        for (int i = 0; i < letterCodes.length; i++) {
-            keyboardSprites.put(Integer.valueOf(letterCodes[i]), new Sprite(i * (GRID_SPRITE_WIDTH + GRID_SPACING), 0, GRID_SPRITE_WIDTH, SPRITE_HEIGHT));
+        for (int index = 0; index < oneCharacterCodes.length; index++) {
+            keyboardSprites.put(Integer.valueOf(oneCharacterCodes[index]),
+                    layeredSprite(0, 0, 13,
+                            index * 8, 14, 7));
         }
 
-        // The wide-key row is packed left to right with a one-pixel gap.
-        // Alt is 21 wide, so Shift starts at 22.
-        Sprite alt = new Sprite(0, 14, 21, SPRITE_HEIGHT);
+        // Three-letter keys: ALT, ESC, TAB.
+        Sprite alt = layeredSprite(0, 20, 21, 0, 34, 15);
         keyboardSprites.put(Integer.valueOf(Keyboard.KEY_LMENU), alt);
         keyboardSprites.put(Integer.valueOf(Keyboard.KEY_RMENU), alt);
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_ESCAPE),
+                layeredSprite(0, 20, 21, 16, 34, 15));
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_TAB),
+                layeredSprite(0, 20, 21, 32, 34, 15));
 
-        Sprite shift = new Sprite(22, 14, 29, SPRITE_HEIGHT);
+        // Four- and five-letter families each currently have one glyph.
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_CAPITAL),
+                layeredSprite(0, 40, 25, 0, 54, 19));
+        Sprite shift = layeredSprite(0, 60, 29, 0, 74, 23);
         keyboardSprites.put(Integer.valueOf(Keyboard.KEY_LSHIFT), shift);
         keyboardSprites.put(Integer.valueOf(Keyboard.KEY_RSHIFT), shift);
 
-        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_ESCAPE),
-                new Sprite(52, 14, 21, SPRITE_HEIGHT));
-        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_TAB),
-                new Sprite(74, 14, 21, SPRITE_HEIGHT));
-
         KEYBOARD_SPRITES = Collections.unmodifiableMap(keyboardSprites);
 
-        // The current atlas contains a mouse-wheel sprite but no mouse-button sprites.
-        // Add future button sprites here using their zero-based LWJGL button index.
-        MOUSE_BUTTON_SPRITES = Collections.unmodifiableMap(new HashMap<Integer, Sprite>());
+        // The current atlas still has only the static mouse-wheel artwork.
+        MOUSE_BUTTON_SPRITES = Collections.unmodifiableMap(
+                new HashMap<Integer, Sprite>());
     }
 
     private LostTalesInputIconAtlas() {}
 
-    public static Sprite findSprite(LostTalesInputBinding.Type type, int keyCode) {
+    private static Sprite layeredSprite(
+            int frameU, int frameV, int frameWidth,
+            int glyphU, int glyphV, int glyphWidth) {
+        return new Sprite(frameU, frameV, frameWidth, SPRITE_HEIGHT,
+                frameWidth + FRAME_SPACING, KEYBOARD_FRAME_COUNT,
+                glyphU, glyphV, glyphWidth, GLYPH_HEIGHT,
+                GLYPH_OFFSET_X, GLYPH_OFFSET_Y);
+    }
+
+    public static Sprite findSprite(
+            LostTalesInputBinding.Type type, int keyCode) {
         if (type == null) {
             return null;
         }
-
         switch (type) {
             case KEYBOARD:
                 return KEYBOARD_SPRITES.get(Integer.valueOf(keyCode));
             case MOUSE_BUTTON:
-                return MOUSE_BUTTON_SPRITES.get(Integer.valueOf(LostTalesInputBinding.getMouseButtonIndex(keyCode)));
+                return MOUSE_BUTTON_SPRITES.get(Integer.valueOf(
+                        LostTalesInputBinding.getMouseButtonIndex(keyCode)));
             case MOUSE_WHEEL:
                 return MOUSE_WHEEL_SPRITE;
             default:
@@ -80,24 +108,58 @@ public final class LostTalesInputIconAtlas {
     }
 
     public static final class Sprite {
-        private final int u;
-        private final int v;
+        private final int frameU;
+        private final int frameV;
         private final int width;
         private final int height;
+        private final int frameStrideX;
+        private final int frameCount;
+        private final int glyphU;
+        private final int glyphV;
+        private final int glyphWidth;
+        private final int glyphHeight;
+        private final int glyphOffsetX;
+        private final int glyphOffsetY;
 
         private Sprite(int u, int v, int width, int height) {
-            this.u = u;
-            this.v = v;
+            this(u, v, width, height, 0, 1,
+                    0, 0, 0, 0, 0, 0);
+        }
+
+        private Sprite(int frameU, int frameV, int width, int height,
+                       int frameStrideX, int frameCount,
+                       int glyphU, int glyphV,
+                       int glyphWidth, int glyphHeight,
+                       int glyphOffsetX, int glyphOffsetY) {
+            this.frameU = frameU;
+            this.frameV = frameV;
             this.width = width;
             this.height = height;
+            this.frameStrideX = Math.max(0, frameStrideX);
+            this.frameCount = Math.max(1, frameCount);
+            this.glyphU = glyphU;
+            this.glyphV = glyphV;
+            this.glyphWidth = Math.max(0, glyphWidth);
+            this.glyphHeight = Math.max(0, glyphHeight);
+            this.glyphOffsetX = glyphOffsetX;
+            this.glyphOffsetY = glyphOffsetY;
         }
 
         public int getU() {
-            return this.u;
+            return this.frameU;
+        }
+
+        public int getU(int frame) {
+            int bounded = Math.max(0, Math.min(this.frameCount - 1, frame));
+            return this.frameU + bounded * this.frameStrideX;
         }
 
         public int getV() {
-            return this.v;
+            return this.frameV;
+        }
+
+        public int getV(int frame) {
+            return this.frameV;
         }
 
         public int getWidth() {
@@ -106,6 +168,47 @@ public final class LostTalesInputIconAtlas {
 
         public int getHeight() {
             return this.height;
+        }
+
+        public boolean isAnimated() {
+            return this.frameCount > 1;
+        }
+
+        public int getFrameCount() {
+            return this.frameCount;
+        }
+
+        public boolean hasGlyph() {
+            return this.glyphWidth > 0 && this.glyphHeight > 0;
+        }
+
+        public int getGlyphU() {
+            return this.glyphU;
+        }
+
+        public int getGlyphV() {
+            return this.glyphV;
+        }
+
+        public int getGlyphWidth() {
+            return this.glyphWidth;
+        }
+
+        public int getGlyphHeight() {
+            return this.glyphHeight;
+        }
+
+        public int getGlyphOffsetX() {
+            return this.glyphOffsetX;
+        }
+
+        public int getGlyphOffsetY() {
+            return this.glyphOffsetY;
+        }
+
+        public int getGlyphOffsetY(int frame) {
+            int bounded = Math.max(0, Math.min(this.frameCount - 1, frame));
+            return this.glyphOffsetY + bounded;
         }
     }
 }
