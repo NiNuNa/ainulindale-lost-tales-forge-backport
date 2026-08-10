@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
@@ -16,6 +17,8 @@ import net.minecraft.entity.player.EntityPlayer;
  * entry messages are detected locally from the already-discovered marker list.
  */
 public final class LostTalesClientMapMarkerNotificationStore {
+    private static final String DISCOVERY_SOUND =
+            LostTalesMetaData.MOD_ID + ":map_marker.discovery";
     private static final long DISCOVERY_DURATION_MS = 6200L;
     private static final long AREA_DURATION_MS = 2600L;
     private static final long AREA_REPEAT_COOLDOWN_MS = 4500L;
@@ -189,7 +192,7 @@ public final class LostTalesClientMapMarkerNotificationStore {
         }
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft != null && minecraft.thePlayer != null) {
-            minecraft.thePlayer.playSound("random.orb", 0.45F, 1.35F);
+            minecraft.thePlayer.playSound(DISCOVERY_SOUND, 0.45F, 1.0F);
         }
     }
 

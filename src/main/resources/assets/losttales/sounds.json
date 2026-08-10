@@ -52,5 +52,11 @@
             "block/ceramic_place2",
             "block/ceramic_place3"
         ]
+    },
+    "map_marker.discovery": {
+        "category": "player",
+        "sounds": [
+            "map_marker/map_marker_discovered"
+        ]
     }
 }

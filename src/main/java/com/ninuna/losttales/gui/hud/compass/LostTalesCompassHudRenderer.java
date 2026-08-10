@@ -92,6 +92,8 @@ public class LostTalesCompassHudRenderer {
             LostTalesSkyrimUiStyle.rgb(LostTalesSkyrimUiStyle.HUD_LABEL);
 
     private static final List<LostTalesCompassMarkerProvider> MARKER_PROVIDERS = createMarkerProviders();
+    private static final LostTalesCompassHeightIndicatorAnimation HEIGHT_INDICATOR_ANIMATION =
+            new LostTalesCompassHeightIndicatorAnimation();
     private static String focusedMarkerStateKey;
     private static boolean focusedMarkerLabelLatched;
     private static float focusedMarkerLastEffectAlpha;
@@ -260,11 +262,13 @@ public class LostTalesCompassHudRenderer {
         focusedMarkerStateKey = null;
         focusedMarkerLabelLatched = false;
         focusedMarkerLastEffectAlpha = 0.0F;
+        HEIGHT_INDICATOR_ANIMATION.reset();
     }
 
     private static void renderFocusedMarkerLabel(Minecraft minecraft, int compassY, LostTalesCompassMarkerBatchBuilder.LostTalesCompassMarkerBatch batch, float focusedEffectAlpha) {
         LostTalesCompassMarker marker = batch.focusedMarker;
         if (marker == null || focusedEffectAlpha <= 0.0F || marker.getName() == null || marker.getName().length() == 0) {
+            HEIGHT_INDICATOR_ANIMATION.reset();
             return;
         }
 
@@ -285,6 +289,7 @@ public class LostTalesCompassHudRenderer {
          * alpha is in FontRenderer's unsafe legacy-color range.
          */
         if (alpha < MAP_MARKER_MIN_TEXT_ALPHA) {
+            HEIGHT_INDICATOR_ANIMATION.reset();
             return;
         }
 
@@ -298,62 +303,84 @@ public class LostTalesCompassHudRenderer {
 
         LostTalesCompassHudRenderHelper.drawCenteredString(fontRenderer, marker.getName(), labelX, nameY, color, true);
 
-        if (marker.isShowDistanceLabel()) {
-            double distBlocks = Math.sqrt(batch.dx * batch.dx + batch.dy * batch.dy + batch.dz * batch.dz);
-            String distLabel = Math.round(distBlocks) + "m";
-            LostTalesCompassHudRenderHelper.drawCenteredString(fontRenderer, distLabel, labelX, distY, color, true);
+        if (!marker.isShowDistanceLabel()) {
+            HEIGHT_INDICATOR_ANIMATION.reset();
+            return;
+        }
 
-            double deltaY = batch.dy;
-            if (Math.abs(deltaY) >= 5.0D) {
-                int u = 0;
-                int v = VERTICAL_ARROW_TEXTURE_V;
-                int w = 5;
-                int h = 3;
-                if (deltaY >= 10.0D) {
-                    h = 7;
-                } else if (deltaY <= -10.0D) {
-                    u = 6;
-                    h = 7;
-                } else if (deltaY <= -5.0D) {
-                    u = 6;
-                }
+        double distBlocks = Math.sqrt(batch.dx * batch.dx
+                + batch.dy * batch.dy + batch.dz * batch.dz);
+        String distLabel = Math.round(distBlocks) + "m";
+        LostTalesCompassHudRenderHelper.drawCenteredString(
+                fontRenderer, distLabel, labelX, distY, color, true);
 
-                /*
-                 * Offset from the label's ink edge, not from getStringWidth's
-                 * trailing gap. Beyond matching how the labels are centred, it
-                 * keeps this sprite on the same sub-pixel phase as everything
-                 * else on the compass: the icons are drawn at -6.5 from their
-                 * anchor and the labels at -(width-1)/2, both half-integers, so
-                 * a whole-integer offset here left the arrow snapping to the
-                 * pixel grid half a pixel out of step with the label beside it
-                 * - which reads as jitter while its neighbours glide.
-                 */
-                float distLabelInkHalfWidth =
-                        Math.max(0, fontRenderer.getStringWidth(distLabel) - 1) / 2.0F;
-                float arrowX = labelX + distLabelInkHalfWidth
-                        + MAP_MARKER_VERTICAL_ARROW_INDICATOR_OFFSET_X;
-                /*
-                 * Carry the sub-pixel position in the matrix and emit the quad
-                 * at the local origin, which is how the marker icons are drawn.
-                 */
-                GL11.glPushMatrix();
-                GL11.glTranslatef(arrowX, distY, 0.0F);
-                LostTalesCompassHudRenderHelper.drawTexturedRectWithShadow(
-                        minecraft,
-                        COMPASS_HUD_TEXTURE,
-                        0.0F,
-                        0.0F,
-                        u,
-                        v,
-                        w,
-                        h,
-                        COMPASS_HUD_TEXTURE_WIDTH,
-                        COMPASS_HUD_TEXTURE_HEIGHT,
-                        labelAlphaF,
-                        Math.min(MAP_MARKER_SHADOW_ALPHA, labelAlphaF)
-                );
-                GL11.glPopMatrix();
+        double deltaY = batch.dy;
+        if (Math.abs(deltaY) < 5.0D) {
+            HEIGHT_INDICATOR_ANIMATION.reset();
+            return;
+        }
+
+        /*
+         * Offset from the label's ink edge, not from getStringWidth's trailing
+         * gap. This keeps the animated chevrons on the same sub-pixel phase as
+         * the smoothly moving label and marker icon.
+         */
+        float distLabelInkHalfWidth = Math.max(0,
+                fontRenderer.getStringWidth(distLabel) - 1) / 2.0F;
+        float arrowX = labelX + distLabelInkHalfWidth
+                + MAP_MARKER_VERTICAL_ARROW_INDICATOR_OFFSET_X;
+        int tier = Math.abs(deltaY) >= 10.0D ? 2 : 1;
+        int screenDirection = deltaY > 0.0D ? -1 : 1;
+        renderHeightIndicator(minecraft, marker, arrowX, distY,
+                labelAlphaF, screenDirection, tier);
+    }
+
+    private static void renderHeightIndicator(
+            Minecraft minecraft, LostTalesCompassMarker marker,
+            float arrowX, float arrowY, float labelAlpha,
+            int screenDirection, int tier) {
+        final int arrowWidth = 5;
+        final int arrowHeight = 3;
+        final int arrowStrideY = 4;
+        int textureU = screenDirection < 0 ? 0 : 6;
+        String markerKey = LostTalesCompassMarkerBatchBuilder
+                .getFocusStateKey(marker);
+        LostTalesCompassHeightIndicatorAnimation.Frame frame =
+                HEIGHT_INDICATOR_ANIMATION.frame(markerKey,
+                        screenDirection, tier, System.nanoTime());
+
+        for (int index = 0; index < frame.getArrowCount(); index++) {
+            LostTalesCompassHeightIndicatorAnimation.Pose pose =
+                    frame.getPose(index);
+            float alpha = labelAlpha * pose.getAlpha();
+            if (alpha <= 0.001F) {
+                continue;
             }
+
+            float centerY = arrowY + index * arrowStrideY
+                    + arrowHeight * 0.5F + pose.getOffsetY();
+            GL11.glPushMatrix();
+            GL11.glTranslatef(arrowX + arrowWidth * 0.5F,
+                    centerY, 0.0F);
+            GL11.glScalef(pose.getScaleX(), pose.getScaleY(), 1.0F);
+            LostTalesCompassHudRenderHelper.drawTexturedRectWithShadowTinted(
+                    minecraft,
+                    COMPASS_HUD_TEXTURE,
+                    -arrowWidth * 0.5F,
+                    -arrowHeight * 0.5F,
+                    textureU,
+                    VERTICAL_ARROW_TEXTURE_V,
+                    arrowWidth,
+                    arrowHeight,
+                    COMPASS_HUD_TEXTURE_WIDTH,
+                    COMPASS_HUD_TEXTURE_HEIGHT,
+                    pose.getBrightness(),
+                    pose.getBrightness(),
+                    pose.getBrightness(),
+                    alpha,
+                    Math.min(MAP_MARKER_SHADOW_ALPHA, alpha)
+            );
+            GL11.glPopMatrix();
         }
     }
 
