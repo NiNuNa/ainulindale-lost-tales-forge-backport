@@ -23,6 +23,18 @@ public final class ClientChatChannelStateTest {
     }
 
     @Test
+    public void accountOnlyPlayersCanUseOocButNotRoleplayChannels() {
+        assertFalse(ClientChatChannelState.isAvailable(ChatChannel.ALL));
+        assertFalse(ClientChatChannelState.isAvailable(
+                ChatChannel.PROXIMITY));
+        assertTrue(ClientChatChannelState.isAvailable(ChatChannel.OOC));
+        assertEquals(Collections.singletonList(ChatChannel.OOC),
+                ClientChatChannelState.getAvailableChannels());
+        assertEquals(ChatChannel.OOC,
+                ClientChatChannelState.getSelected());
+    }
+
+    @Test
     public void factionAvailabilityTracksTheActiveCharacter() {
         assertFalse(ClientChatChannelState.isAvailable(
                 ChatChannel.FACTION));

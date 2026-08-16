@@ -241,7 +241,14 @@ public final class LostTalesLotrMapLayout {
      */
     public static void beginFullscreenSubtitles(LOTRGuiMap gui) {
         if (gui instanceof LostTalesLotrMapGui) {
-            ((LostTalesLotrMapGui)gui).renderControlBar(false);
+            LostTalesLotrMapGui lostTalesGui =
+                    (LostTalesLotrMapGui)gui;
+            // Native subtitles are the first fixed footer content. Put the
+            // full-screen map effect immediately below them and the complete
+            // moving strip immediately above it, so the strip is a true
+            // overlay while its exposed destination still looks like map.
+            lostTalesGui.renderVignette();
+            lostTalesGui.renderControlBar(false);
         }
         beginBottomReservedBounds(gui, isFullscreenLayoutActive(gui));
     }
@@ -436,13 +443,10 @@ public final class LostTalesLotrMapLayout {
     }
 
     private static int calculateBottomTextMapYMax(LOTRGuiMap gui) {
-        int legendHeight = gui instanceof LostTalesLotrMapGui
-                ? LostTalesLotrMapLegend.getReservedHeight(
-                        (LostTalesLotrMapGui)gui)
-                : 0;
+        // Biome/coordinate subtitles belong to the persistent footer and must
+        // not jump when the independently overlaid legend opens.
         return Math.max(0,
-                gui.height - LostTalesLotrMapControlBar.HEIGHT
-                        - legendHeight);
+                gui.height - LostTalesLotrMapControlBar.HEIGHT);
     }
 
     private static void setFullscreenBounds(LOTRGuiMap gui)

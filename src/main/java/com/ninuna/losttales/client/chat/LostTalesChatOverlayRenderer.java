@@ -9,6 +9,8 @@ import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiNewChat;
+import net.minecraft.client.renderer.OpenGlHelper;
+import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.MathHelper;
@@ -16,9 +18,13 @@ import org.lwjgl.opengl.GL11;
 
 /** Vanilla-compatible chat draw pass with heads and optional time-based entry easing. */
 final class LostTalesChatOverlayRenderer {
+    static final int CHAT_BACKDROP_RGB = 0x000000;
+    private static final float BACKDROP_FADE_START = 0.75F;
     private static final Field DRAWN_LINES = findField("field_146253_i");
     private static final Field SCROLL_POSITION = findField("field_146250_j");
     private static final Field SCROLLED = findField("field_146251_k");
+    private static int lastOffsetX;
+    private static int lastOffsetY;
 
     private LostTalesChatOverlayRenderer() {}
 
@@ -38,6 +44,8 @@ final class LostTalesChatOverlayRenderer {
             drawVanillaCompatible(
                     minecraft, chat, lines, scrollPosition, scrolled,
                     offsetX, offsetY);
+            lastOffsetX = offsetX;
+            lastOffsetY = offsetY;
             return true;
         } catch (IllegalAccessException ignored) {
             return false;
@@ -64,6 +72,18 @@ final class LostTalesChatOverlayRenderer {
 
     static float getEntryDisplacement() {
         return entryDisplacement(0);
+    }
+
+    static float getEntryDisplacement(int scrollPosition) {
+        return entryDisplacement(scrollPosition);
+    }
+
+    static int getLastOffsetX() {
+        return lastOffsetX;
+    }
+
+    static int getLastOffsetY() {
+        return lastOffsetY;
     }
 
     private static void drawVanillaCompatible(
@@ -117,21 +137,17 @@ final class LostTalesChatOverlayRenderer {
                 }
 
                 int y = -index * 9;
-                Gui.drawRect(0, y - 9, unscaledWidth + 4, y,
-                        (alpha / 2 << 24)
-                                | LostTalesChatVisualStyle.SHADOW);
+                drawChatBackdrop(
+                        -2, y - 9, unscaledWidth + 4, y, alpha / 2);
                 GL11.glEnable(GL11.GL_BLEND);
                 IChatComponent component = line.func_151461_a();
-                LostTalesChatMotion.MessageSample motion =
-                        messageMotion(line);
                 GL11.glPushMatrix();
                 GL11.glTranslatef(0.0F, y - 8.0F, 0.0F);
-                GL11.glScalef(motion.scaleX, motion.scaleY, 1.0F);
                 ChatHeadMarker.Data marker = findMarker(component);
                 LostTalesChatVisualStyle.drawFormatted(font,
                         component, marker, 0, 0, alpha);
                 drawHead(minecraft, font, component,
-                        -0.5F + motion.headLagY, alpha);
+                        -0.5F, alpha);
                 GL11.glPopMatrix();
                 GL11.glDisable(GL11.GL_ALPHA_TEST);
             }
@@ -163,6 +179,45 @@ final class LostTalesChatOverlayRenderer {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glEnable(GL11.GL_ALPHA_TEST);
         }
+    }
+
+    static int backdropFadeStart(int width) {
+        return Math.max(0, Math.round(width * BACKDROP_FADE_START));
+    }
+
+    /** Neutral vanilla-black backdrop with a smooth transparent right edge. */
+    private static void drawChatBackdrop(
+            int left, int top, int right, int bottom, int alpha) {
+        int safeAlpha = Math.max(0, Math.min(255, alpha));
+        if (right <= left || bottom <= top || safeAlpha <= 0) {
+            return;
+        }
+        int fadeStart = Math.min(right,
+                left + backdropFadeStart(right - left));
+        Gui.drawRect(left, top, fadeStart, bottom,
+                (safeAlpha << 24) | CHAT_BACKDROP_RGB);
+        if (fadeStart >= right) {
+            return;
+        }
+
+        GL11.glDisable(GL11.GL_TEXTURE_2D);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glDisable(GL11.GL_ALPHA_TEST);
+        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
+        GL11.glShadeModel(GL11.GL_SMOOTH);
+        Tessellator tessellator = Tessellator.instance;
+        tessellator.startDrawingQuads();
+        tessellator.setColorRGBA_I(CHAT_BACKDROP_RGB, 0);
+        tessellator.addVertex(right, bottom, 0.0D);
+        tessellator.addVertex(right, top, 0.0D);
+        tessellator.setColorRGBA_I(CHAT_BACKDROP_RGB, safeAlpha);
+        tessellator.addVertex(fadeStart, top, 0.0D);
+        tessellator.addVertex(fadeStart, bottom, 0.0D);
+        tessellator.draw();
+        GL11.glShadeModel(GL11.GL_FLAT);
+        GL11.glDisable(GL11.GL_BLEND);
+        GL11.glEnable(GL11.GL_ALPHA_TEST);
+        GL11.glEnable(GL11.GL_TEXTURE_2D);
     }
 
     private static void drawHead(Minecraft minecraft, FontRenderer font,
@@ -272,20 +327,6 @@ final class LostTalesChatOverlayRenderer {
                 LostTalesConfig.chatAnimationDurationMillis) * 1000000L;
         return LostTalesChatMotion.message(
                 (System.nanoTime() - started) / (float)duration).opacity;
-    }
-
-    private static LostTalesChatMotion.MessageSample messageMotion(
-            ChatLine line) {
-        if (!LostTalesConfig.enableChatAnimations || line == null
-                || line.getUpdatedCounter()
-                != LostTalesChatPresentation.getLastMessageUpdateCounter()) {
-            return LostTalesChatMotion.message(1.0F);
-        }
-        long started = LostTalesChatPresentation.getLastMessageNanos();
-        long duration = Math.max(1,
-                LostTalesConfig.chatAnimationDurationMillis) * 1000000L;
-        return LostTalesChatMotion.message(started <= 0L ? 1.0F
-                : (System.nanoTime() - started) / (float)duration);
     }
 
     private static Field findField(String name) {

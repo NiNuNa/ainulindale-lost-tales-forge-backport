@@ -1,15 +1,18 @@
 package com.ninuna.losttales.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.Locale;
 
 /** Small stable channel catalogue shared by packet validation and client UI. */
 public enum ChatChannel {
     ALL("all", "All", ChatIdentityType.CHARACTER,
-            ChatRecipientRule.GLOBAL, 0xFFD37F),
+            ChatRecipientRule.GLOBAL,
+            LostTalesColors.rgb(LostTalesColors.GREEN)),
     PROXIMITY("proximity", "Proximity", ChatIdentityType.CHARACTER,
             ChatRecipientRule.PROXIMITY, 0xC8D6C0),
     PARTY("party", "Party", ChatIdentityType.CHARACTER,
-            ChatRecipientRule.PARTY, 0x72D6E8),
+            ChatRecipientRule.PARTY,
+            LostTalesColors.rgb(LostTalesColors.BLUE)),
     FACTION("faction", "Faction", ChatIdentityType.CHARACTER,
             ChatRecipientRule.FACTION, 0xD6C36F),
     OOC("ooc", "OOC", ChatIdentityType.ACCOUNT,

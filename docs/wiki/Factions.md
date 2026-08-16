@@ -1,5 +1,7 @@
 # Factions
 
+![Factions header](./img/header_2.png)
+
 Lost Tales extends LOTR Legacy's faction enum and related catalogues during startup. Active additions receive map information, relations, control zones, ranks, achievements, titles, and starting-character eligibility through the LOTR systems.
 
 ## Active additions

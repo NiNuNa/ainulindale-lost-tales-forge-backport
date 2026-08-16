@@ -1,5 +1,7 @@
 # Playable races
 
+![Playable races header](./img/header_1.png)
+
 Lost Tales provides seven roleplay races. Race choice affects the player model, physical size, eye height, collision box, starting-faction choices, health, movement, and attack damage.
 
 Combat values are normally derived from a representative LOTR Legacy NPC at runtime. The values below are safe fallbacks used when that integration cannot be probed.
@@ -21,4 +23,3 @@ Human, Elf, Dwarf, Orc, Uruk, and Half-troll factions are filtered by their LOTR
 Short and tall races use transformed camera height, hitbox, renderer scale, projectile origin, and mount-aware behavior. If a required transformer fails to apply, Lost Tales logs a warning and falls back safely; visual or hitbox alignment may then be imperfect.
 
 There are no race skill trees, selectable racial powers, or in-game race-changing service. Those are possible future systems, not current features.
-

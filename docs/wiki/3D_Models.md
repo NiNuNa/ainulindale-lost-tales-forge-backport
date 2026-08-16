@@ -1,5 +1,7 @@
 # 3D models
 
+![3D Models header](./img/header_5.png)
+
 Lost Tales initializes Geckolib Unofficial during common startup and registers client renderers separately so a dedicated server never loads Minecraft client classes.
 
 Geckolib resources currently support:
@@ -14,4 +16,3 @@ Geckolib resources currently support:
 Models, textures, and animation JSON files are bundled under the `losttales` resource domain. Block-entity animation state is derived from synchronized tile data. The feature does not replace every player or NPC with a Geckolib model; playable race rendering primarily adapts public LOTR Legacy player-compatible models.
 
 The old documentation described broad animated player and creature systems that were not implemented. Those claims have been removed.
-

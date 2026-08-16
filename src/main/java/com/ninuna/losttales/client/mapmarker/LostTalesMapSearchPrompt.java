@@ -141,72 +141,90 @@ final class LostTalesMapSearchPrompt {
             return;
         }
         FontRenderer font = minecraft.fontRenderer;
+        LostTalesMapPopupAnimation.begin(this);
         Layout layout = calculateLayout(screenWidth, screenHeight);
         refreshResults();
-
-        Gui.drawRect(0, 0, screenWidth, screenHeight, 0x66000000);
-        LostTalesSkyrimUiStyle.drawPanel(
-                layout.x, layout.y, layout.width, layout.height);
-        String title = I18n.format("gui.losttales.map.search.title");
-        font.drawStringWithShadow(title,
-                layout.x + (layout.width
-                        - font.getStringWidth(title)) / 2,
-                layout.y + 5, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
-        LostTalesSkyrimUiStyle.drawPanelSoft(layout.field.x,
-                layout.field.y, layout.field.width, layout.field.height);
-        this.queryField.drawTextBox();
-        if (this.queryField.getText().length() == 0) {
-            font.drawString(
-                    I18n.format("gui.losttales.map.search.hint"),
-                    layout.field.x + 5,
-                    layout.field.y
-                            + (layout.field.height - font.FONT_HEIGHT) / 2
-                            + 1,
-                    LostTalesSkyrimUiStyle.TEXT_DIM);
+        int pivotX = layout.x + layout.width / 2;
+        int pivotY = layout.y + layout.height / 2;
+        int localMouseX = LostTalesMapPopupAnimation.inverseMouseX(
+                this, mouseX, pivotX);
+        int localMouseY = LostTalesMapPopupAnimation.inverseMouseY(
+                this, mouseY, pivotY);
+        LostTalesMapPopupAnimation.pushFixed();
+        try {
+            Gui.drawRect(0, 0, screenWidth, screenHeight, 0x66000000);
+        } finally {
+            LostTalesMapPopupAnimation.pop();
         }
-
-        if (this.results.isEmpty()) {
-            String empty = I18n.format("gui.losttales.map.search.empty");
-            font.drawString(empty,
+        LostTalesMapPopupAnimation.push(this, pivotX, pivotY);
+        try {
+            LostTalesSkyrimUiStyle.drawPanel(
+                    layout.x, layout.y, layout.width, layout.height);
+            String title = I18n.format("gui.losttales.map.search.title");
+            font.drawStringWithShadow(title,
                     layout.x + (layout.width
-                            - font.getStringWidth(empty)) / 2,
-                    layout.rows.y + 4,
-                    LostTalesSkyrimUiStyle.TEXT_MUTED);
-            return;
-        }
-        int rows = Math.min(VISIBLE_ROWS, this.results.size());
-        for (int row = 0; row < rows; row++) {
-            Entry entry = this.results.get(this.scroll + row);
-            Bounds bounds = layout.row(row);
-            boolean hovered = bounds.contains(mouseX, mouseY);
-            if (hovered) {
-                Gui.drawRect(bounds.x, bounds.y,
-                        bounds.x + bounds.width,
-                        bounds.y + bounds.height,
-                        LostTalesSkyrimUiStyle.PANEL_HOVER);
+                            - font.getStringWidth(title)) / 2,
+                    layout.y + 5, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
+            LostTalesSkyrimUiStyle.drawPanelSoft(layout.field.x,
+                    layout.field.y, layout.field.width, layout.field.height);
+            this.queryField.drawTextBox();
+            if (this.queryField.getText().length() == 0) {
+                font.drawString(
+                        I18n.format("gui.losttales.map.search.hint"),
+                        layout.field.x + 5,
+                        layout.field.y
+                                + (layout.field.height - font.FONT_HEIGHT) / 2
+                                + 1,
+                        LostTalesSkyrimUiStyle.TEXT_DIM);
             }
-            // The icon the map draws it with, so a name in the list and a
-            // marker on the map are recognisably the same place.
-            LostTalesLotrMapMarkerIconOverlay.renderEditorIconPreview(
-                    minecraft, entry.marker.getIconName(),
-                    entry.marker.getColorName(),
-                    bounds.x + ICON_COLUMN / 2.0F,
-                    bounds.y + bounds.height / 2.0F);
-            String name = LostTalesSkyrimUiStyle.trimToWidth(
-                    font, entry.name,
-                    Math.max(0, bounds.width - ICON_COLUMN - 4));
-            font.drawString(name, bounds.x + ICON_COLUMN,
-                    bounds.y + (bounds.height - font.FONT_HEIGHT) / 2 + 1,
-                    hovered ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
-                            : LostTalesSkyrimUiStyle.TEXT);
-        }
-        if (this.results.size() > VISIBLE_ROWS) {
-            String more = I18n.format(
-                    "gui.losttales.map.search.more",
-                    Integer.valueOf(this.results.size() - VISIBLE_ROWS));
-            font.drawString(more, layout.x + CONTENT_PADDING,
-                    layout.y + layout.height - 11,
-                    LostTalesSkyrimUiStyle.TEXT_DIM);
+
+            if (this.results.isEmpty()) {
+                String empty = I18n.format(
+                        "gui.losttales.map.search.empty");
+                font.drawString(empty,
+                        layout.x + (layout.width
+                                - font.getStringWidth(empty)) / 2,
+                        layout.rows.y + 4,
+                        LostTalesSkyrimUiStyle.TEXT_MUTED);
+                return;
+            }
+            int rows = Math.min(VISIBLE_ROWS, this.results.size());
+            for (int row = 0; row < rows; row++) {
+                Entry entry = this.results.get(this.scroll + row);
+                Bounds bounds = layout.row(row);
+                boolean hovered = bounds.contains(
+                        localMouseX, localMouseY);
+                if (hovered) {
+                    Gui.drawRect(bounds.x, bounds.y,
+                            bounds.x + bounds.width,
+                            bounds.y + bounds.height,
+                            LostTalesSkyrimUiStyle.PANEL_HOVER);
+                }
+                LostTalesLotrMapMarkerIconOverlay.renderEditorIconPreview(
+                        minecraft, entry.marker.getIconName(),
+                        entry.marker.getColorName(),
+                        bounds.x + ICON_COLUMN / 2.0F,
+                        bounds.y + bounds.height / 2.0F);
+                String name = LostTalesSkyrimUiStyle.trimToWidth(
+                        font, entry.name,
+                        Math.max(0, bounds.width - ICON_COLUMN - 4));
+                font.drawString(name, bounds.x + ICON_COLUMN,
+                        bounds.y
+                                + (bounds.height - font.FONT_HEIGHT) / 2 + 1,
+                        hovered ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
+                                : LostTalesSkyrimUiStyle.TEXT);
+            }
+            if (this.results.size() > VISIBLE_ROWS) {
+                String more = I18n.format(
+                        "gui.losttales.map.search.more",
+                        Integer.valueOf(
+                                this.results.size() - VISIBLE_ROWS));
+                font.drawString(more, layout.x + CONTENT_PADDING,
+                        layout.y + layout.height - 11,
+                        LostTalesSkyrimUiStyle.TEXT_DIM);
+            }
+        } finally {
+            LostTalesMapPopupAnimation.pop();
         }
     }
 
@@ -217,6 +235,12 @@ final class LostTalesMapSearchPrompt {
             return true;
         }
         Layout layout = calculateLayout(screenWidth, screenHeight);
+        int pivotX = layout.x + layout.width / 2;
+        int pivotY = layout.y + layout.height / 2;
+        mouseX = LostTalesMapPopupAnimation.inverseMouseX(
+                this, mouseX, pivotX);
+        mouseY = LostTalesMapPopupAnimation.inverseMouseY(
+                this, mouseY, pivotY);
         this.queryField.mouseClicked(mouseX, mouseY, button);
         refreshResults();
         int rows = Math.min(VISIBLE_ROWS, this.results.size());

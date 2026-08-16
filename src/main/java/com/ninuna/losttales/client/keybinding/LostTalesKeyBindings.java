@@ -8,6 +8,7 @@ import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
 import com.ninuna.losttales.gui.screen.LostTalesCharacterMenuGui;
 import com.ninuna.losttales.gui.screen.LostTalesHudPlacementGui;
 import com.ninuna.losttales.gui.screen.LostTalesQuestJournalGui;
+import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.InputEvent;
@@ -23,6 +24,8 @@ public class LostTalesKeyBindings {
 
     private static final KeyBinding CHARACTER_MENU = new KeyBinding("key.losttales.characterMenu", Keyboard.KEY_CAPITAL, CATEGORY);
     private static final KeyBinding QUEST_JOURNAL = new KeyBinding("key.losttales.questJournal", Keyboard.KEY_J, CATEGORY);
+    private static final KeyBinding MAP = new KeyBinding(
+            "key.losttales.map", Keyboard.KEY_M, CATEGORY);
     private static final KeyBinding TOGGLE_HUD = new KeyBinding("key.losttales.toggleHud", Keyboard.KEY_H, CATEGORY);
     private static final KeyBinding USE = new KeyBinding("key.losttales.use", Keyboard.KEY_R, CATEGORY);
     private static final KeyBinding MODIFIER = new KeyBinding("key.losttales.modifier", Keyboard.KEY_LMENU, CATEGORY);
@@ -34,6 +37,7 @@ public class LostTalesKeyBindings {
     public void register() {
         ClientRegistry.registerKeyBinding(CHARACTER_MENU);
         ClientRegistry.registerKeyBinding(QUEST_JOURNAL);
+        ClientRegistry.registerKeyBinding(MAP);
         ClientRegistry.registerKeyBinding(TOGGLE_HUD);
         ClientRegistry.registerKeyBinding(USE);
         ClientRegistry.registerKeyBinding(MODIFIER);
@@ -63,6 +67,9 @@ public class LostTalesKeyBindings {
         }
         if (QUEST_JOURNAL.isPressed()) {
             minecraft.displayGuiScreen(new LostTalesQuestJournalGui(minecraft.currentScreen));
+        }
+        if (MAP.isPressed() && minecraft.currentScreen == null) {
+            minecraft.displayGuiScreen(new LostTalesLotrMapGui());
         }
         if (TOGGLE_HUD.isPressed()) {
             if (isModifierKeyDown()) {
@@ -136,6 +143,10 @@ public class LostTalesKeyBindings {
         return QUEST_JOURNAL;
     }
 
+    public static KeyBinding getMapKeyBinding() {
+        return MAP;
+    }
+
     public static boolean isModifierKeyDown() {
         return isKeyDown(MODIFIER);
     }
@@ -162,6 +173,14 @@ public class LostTalesKeyBindings {
 
     public static boolean isQuestJournalKey(int keyCode) {
         return isKeyboardKey(QUEST_JOURNAL, keyCode);
+    }
+
+    public static boolean isMapKey(int keyCode) {
+        return isKeyboardKey(MAP, keyCode);
+    }
+
+    public static boolean isMapMouseButton(int mouseButton) {
+        return isMouseButton(MAP, mouseButton);
     }
 
     public static boolean isMapLegendKey(int keyCode) {

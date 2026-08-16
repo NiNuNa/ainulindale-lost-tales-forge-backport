@@ -1,19 +1,22 @@
 package com.ninuna.losttales.gui.screen;
 
-import com.ninuna.losttales.client.input.LostTalesInputBinding.Type;
-import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
+import com.ninuna.losttales.client.gui.animation.LostTalesControlBarAnimation;
+import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar;
+import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar.Hint;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.config.client.LostTalesConfigGui;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileRouterGui;
-import lotr.client.gui.LOTRGuiMap;
+import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiInventory;
 import net.minecraft.client.resources.I18n;
-import net.minecraft.client.settings.KeyBinding;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
@@ -25,12 +28,6 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
     private static final int OPTION_QUESTS = CharacterMenuSectorResolver.QUESTS;
     private static final int OPTION_ITEMS = CharacterMenuSectorResolver.ITEMS;
     private static final int OPTION_MAP = CharacterMenuSectorResolver.MAP;
-    private static final int FOOTER_X = 12;
-    private static final int FOOTER_RIGHT_RESERVE = 128;
-    private static final int FOOTER_INPUT_TEXT_GAP = 3;
-    private static final int FOOTER_CONTROL_GAP = 12;
-    private static final int FOOTER_ARROW_GAP = 1;
-    private static final float FOOTER_INPUT_SCALE = 1.0F;
 
     private final GuiScreen parent;
     private int hoveredOption = NONE;
@@ -70,9 +67,16 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
         drawRadialOption("ITEMS", OPTION_ITEMS, centerX + radius, centerY, centerX + 22, centerY);
         drawRadialOption("MAP", OPTION_MAP, centerX, centerY + radius, centerX, centerY + 22);
         drawCenterOrnament(centerX, centerY);
-        drawFooterHelp();
-
-        super.drawScreen(mouseX, mouseY, partialTicks);
+        drawControlBar();
+        LostTalesControlBarAnimation.pushFixed(this);
+        try {
+            super.drawScreen(
+                    LostTalesControlBarAnimation.fixedMouseX(this, mouseX),
+                    LostTalesControlBarAnimation.fixedMouseY(
+                            this, mouseY), partialTicks);
+        } finally {
+            LostTalesControlBarAnimation.pop();
+        }
     }
 
     private void drawHoverSector(int centerX, int centerY) {
@@ -190,109 +194,34 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
         }
     }
 
-    private void drawFooterHelp() {
+    private void drawControlBar() {
         if (this.mc == null || this.fontRendererObj == null) {
             return;
         }
-        int inputY = this.height - 22;
-        int textY = inputY
-                + (LostTalesInputIconRenderer.BASE_ICON_HEIGHT
-                        - this.fontRendererObj.FONT_HEIGHT) / 2;
-        int available = Math.max(0,
-                this.width - FOOTER_RIGHT_RESERVE - FOOTER_X);
-        boolean showHoverPrefix = footerWidth(true, "Quest Journal")
-                <= available;
-        String questLabel = footerWidth(showHoverPrefix, "Quest Journal")
-                <= available ? "Quest Journal" : "Journal";
-
-        int x = FOOTER_X;
-        if (showHoverPrefix) {
-            x = drawFooterText("Hover or", x, textY)
-                    + FOOTER_INPUT_TEXT_GAP;
-        }
-        x = drawArrowKeys(x, inputY);
-        x = drawFooterText("Select", x + FOOTER_INPUT_TEXT_GAP, textY)
-                + FOOTER_CONTROL_GAP;
-
-        x += LostTalesInputIconRenderer.drawKeyBinding(
-                this.mc, LostTalesKeyBindings.getQuestJournalKeyBinding(),
-                x, inputY, FOOTER_INPUT_SCALE);
-        x = drawFooterText(questLabel,
-                x + FOOTER_INPUT_TEXT_GAP, textY)
-                + FOOTER_CONTROL_GAP;
-
-        x += LostTalesInputIconRenderer.drawKeyBinding(
-                this.mc, LostTalesKeyBindings.getCharacterMenuKeyBinding(),
-                x, inputY, FOOTER_INPUT_SCALE);
-        x = drawFooterText("/", x + 2, textY) + 2;
-        x += LostTalesInputIconRenderer.drawInput(
-                this.mc, Type.KEYBOARD, Keyboard.KEY_ESCAPE,
-                x, inputY, FOOTER_INPUT_SCALE);
-        drawFooterText("Close", x + FOOTER_INPUT_TEXT_GAP, textY);
-    }
-
-    private int footerWidth(boolean includeHoverPrefix, String questLabel) {
-        int width = includeHoverPrefix
-                ? this.fontRendererObj.getStringWidth("Hover or")
-                        + FOOTER_INPUT_TEXT_GAP : 0;
-        int[] arrows = {
-                Keyboard.KEY_UP, Keyboard.KEY_RIGHT,
-                Keyboard.KEY_DOWN, Keyboard.KEY_LEFT
-        };
-        for (int index = 0; index < arrows.length; index++) {
-            if (index > 0) {
-                width += FOOTER_ARROW_GAP;
-            }
-            width += LostTalesInputIconRenderer.measureInput(
-                    this.mc, Type.KEYBOARD, arrows[index],
-                    FOOTER_INPUT_SCALE);
-        }
-        width += FOOTER_INPUT_TEXT_GAP
-                + this.fontRendererObj.getStringWidth("Select")
-                + FOOTER_CONTROL_GAP;
-        width += LostTalesInputIconRenderer.measureKeyBinding(
-                this.mc, LostTalesKeyBindings.getQuestJournalKeyBinding(),
-                FOOTER_INPUT_SCALE);
-        width += FOOTER_INPUT_TEXT_GAP
-                + this.fontRendererObj.getStringWidth(questLabel)
-                + FOOTER_CONTROL_GAP;
-        width += LostTalesInputIconRenderer.measureKeyBinding(
-                this.mc, LostTalesKeyBindings.getCharacterMenuKeyBinding(),
-                FOOTER_INPUT_SCALE);
-        width += 4 + this.fontRendererObj.getStringWidth("/");
-        width += LostTalesInputIconRenderer.measureInput(
-                this.mc, Type.KEYBOARD, Keyboard.KEY_ESCAPE,
-                FOOTER_INPUT_SCALE);
-        return width + FOOTER_INPUT_TEXT_GAP
-                + this.fontRendererObj.getStringWidth("Close");
-    }
-
-    private int drawArrowKeys(int x, int y) {
-        int[] arrows = {
-                Keyboard.KEY_UP, Keyboard.KEY_RIGHT,
-                Keyboard.KEY_DOWN, Keyboard.KEY_LEFT
-        };
-        for (int index = 0; index < arrows.length; index++) {
-            if (index > 0) {
-                x += FOOTER_ARROW_GAP;
-            }
-            x += LostTalesInputIconRenderer.drawInput(
-                    this.mc, Type.KEYBOARD, arrows[index],
-                    x, y, FOOTER_INPUT_SCALE);
-        }
-        return x;
-    }
-
-    private int drawFooterText(String text, int x, int y) {
-        this.fontRendererObj.drawStringWithShadow(
-                text, x, y, LostTalesSkyrimUiStyle.TEXT_MUTED);
-        return x + this.fontRendererObj.getStringWidth(text);
+        List<Hint> hints = new ArrayList<Hint>();
+        hints.add(Hint.keyCluster(this.mc, this.fontRendererObj,
+                new int[] {Keyboard.KEY_UP, Keyboard.KEY_RIGHT,
+                        Keyboard.KEY_DOWN, Keyboard.KEY_LEFT},
+                "Hover or", "Select"));
+        hints.add(Hint.binding(this.mc, this.fontRendererObj,
+                LostTalesKeyBindings.getQuestJournalKeyBinding(),
+                "Quest Journal"));
+        hints.add(Hint.alternative(this.mc, this.fontRendererObj,
+                LostTalesKeyBindings.getCharacterMenuKeyBinding(),
+                Keyboard.KEY_ESCAPE, "Close"));
+        LostTalesControlBar.render(this, this.mc, this.fontRendererObj,
+                this.width, this.height, hints, hints.size(), 116,
+                Collections.<String>emptyList(), true);
     }
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
-        if (isSettingsButtonAt(mouseX, mouseY)) {
-            super.mouseClicked(mouseX, mouseY, button);
+        int controlMouseX = LostTalesControlBarAnimation.fixedMouseX(
+                this, mouseX);
+        int controlMouseY = LostTalesControlBarAnimation.fixedMouseY(
+                this, mouseY);
+        if (isSettingsButtonAt(controlMouseX, controlMouseY)) {
+            super.mouseClicked(controlMouseX, controlMouseY, button);
             return;
         }
         int option = getOptionAt(mouseX, mouseY,
@@ -302,7 +231,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
             openOption(option);
             return;
         }
-        super.mouseClicked(mouseX, mouseY, button);
+        super.mouseClicked(controlMouseX, controlMouseY, button);
     }
 
     private boolean isSettingsButtonAt(int mouseX, int mouseY) {
@@ -347,7 +276,10 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
                 break;
             case OPTION_MAP:
                 try {
-                    this.mc.displayGuiScreen(new LOTRGuiMap());
+                    // Open the final screen directly. Going through the native
+                    // LOTR screen first caused a second GuiOpenEvent and gave
+                    // the tilted map the generic entrance for its first frame.
+                    this.mc.displayGuiScreen(new LostTalesLotrMapGui());
                 } catch (Throwable ignored) {
                     this.mc.displayGuiScreen(new LostTalesCharacterProfileRouterGui(this));
                 }

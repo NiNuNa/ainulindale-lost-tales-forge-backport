@@ -24,6 +24,7 @@ import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
 import com.ninuna.losttales.client.camera.ThirdPersonChargeFeedbackController;
 import com.ninuna.losttales.client.camera.CameraPresetFileStore;
 import com.ninuna.losttales.client.event.LostTalesClientEventHandler;
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationHandler;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
@@ -94,6 +95,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     private LostTalesKeyBindings keyBindings;
     private CharacterClientTaskQueue characterClientTaskQueue;
     private LostTalesChatClientHandler chatClientHandler;
+    private LostTalesGuiAnimationHandler guiAnimationHandler;
 
     @Override
     public void preInit(FMLPreInitializationEvent event) {
@@ -104,6 +106,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         ThirdPersonCameraRuntime.resetSession();
         clientEventHandler = new LostTalesClientEventHandler();
         chatClientHandler = new LostTalesChatClientHandler();
+        guiAnimationHandler = new LostTalesGuiAnimationHandler();
         keyBindings = new LostTalesKeyBindings();
         characterClientTaskQueue = new CharacterClientTaskQueue();
         keyBindings.register();
@@ -111,6 +114,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(keyBindings);
         FMLCommonHandler.instance().bus().register(clientEventHandler);
         FMLCommonHandler.instance().bus().register(characterClientTaskQueue);
+        FMLCommonHandler.instance().bus().register(guiAnimationHandler);
         FMLCommonHandler.instance().bus().register(new LostTalesConfigGuiEventHandler());
         ELostTalesMapLabels.initAndRegisterMapLabels();
 
@@ -123,6 +127,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     public void init(FMLInitializationEvent event) {
         verifyRaceTransformers();
         ((IReloadableResourceManager) Minecraft.getMinecraft().getResourceManager()).registerReloadListener(clientEventHandler);
+        ((IReloadableResourceManager) Minecraft.getMinecraft().getResourceManager()).registerReloadListener(guiAnimationHandler);
 
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityUrn.class, new LostTalesTileEntityRendererUrn());
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityStatue.class, new LostTalesTileEntityRendererStatue());

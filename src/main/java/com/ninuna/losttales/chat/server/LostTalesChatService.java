@@ -8,6 +8,7 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.party.model.Party;
@@ -36,6 +37,12 @@ public final class LostTalesChatService {
         }
 
         RoleplayCharacter character = CharacterActiveResolver.get(sender);
+        if (channel.getIdentityType() == ChatIdentityType.CHARACTER
+                && character == null) {
+            sender.addChatMessage(new ChatComponentTranslation(
+                    "chat.losttales.channel.character_required"));
+            return;
+        }
         Party party = null;
         String factionId = character == null ? ""
                 : LotrCharacterAdapter.normalizeFactionId(
@@ -71,9 +78,11 @@ public final class LostTalesChatService {
                 channel.getIdentityType() == ChatIdentityType.CHARACTER
                         ? presentation.title : "",
                 channel.getIdentityType() == ChatIdentityType.CHARACTER
-                        ? presentation.titleColor : 0xFFFFFF,
+                        ? presentation.titleColor : LostTalesColors.rgb(
+                        LostTalesColors.HUD_LABEL),
                 channel.getIdentityType() == ChatIdentityType.CHARACTER
-                        ? presentation.nameColor : 0xFFFFFF,
+                        ? presentation.nameColor : LostTalesColors.rgb(
+                        LostTalesColors.HUD_LABEL),
                 message, System.currentTimeMillis(),
                 channel.getIdentityType() == ChatIdentityType.CHARACTER
                         && character != null ? character.getSkinId() : "");

@@ -60,10 +60,12 @@ final class LostTalesChatClipboard {
         int visibleLines = Math.min(chat.func_146232_i(), lines.size());
         int width = MathHelper.floor_float(
                 chat.func_146228_f() / chatScale);
+        int scrollPosition =
+                LostTalesChatOverlayRenderer.getScrollPosition(chat);
         return lineIndexAt(rawMouseX, rawMouseY, scaleFactor, chatScale,
                 width, visibleLines, minecraft.fontRenderer.FONT_HEIGHT,
-                LostTalesChatOverlayRenderer.getScrollPosition(chat),
-                entryDisplacement, lines.size());
+                scrollPosition, scrollPosition == 0
+                        ? entryDisplacement : 0.0F, lines.size());
     }
 
     /** Vanilla 1.7.10 hit testing with the visual entry offset removed. */
@@ -92,6 +94,7 @@ final class LostTalesChatClipboard {
     private static String resolveChannelMessage(List<ChatLine> lines,
                                                 int clickedIndex) {
         int counter = lines.get(clickedIndex).getUpdatedCounter();
+        int chatLineId = lines.get(clickedIndex).getChatLineID();
         ChatHeadMarker.Data direct = findMarker(
                 lines.get(clickedIndex).func_151461_a());
         if (direct != null && direct.copyText.length() > 0) {
@@ -101,7 +104,7 @@ final class LostTalesChatClipboard {
             int index = clickedIndex - distance;
             if (index >= 0) {
                 ChatLine line = lines.get(index);
-                if (line.getUpdatedCounter() == counter) {
+                if (sameMessage(line, chatLineId, counter)) {
                     ChatHeadMarker.Data marker = findMarker(
                             line.func_151461_a());
                     if (marker != null && marker.copyText.length() > 0) {
@@ -114,7 +117,7 @@ final class LostTalesChatClipboard {
                 continue;
             }
             ChatLine line = lines.get(index);
-            if (line.getUpdatedCounter() == counter) {
+            if (sameMessage(line, chatLineId, counter)) {
                 ChatHeadMarker.Data marker = findMarker(
                         line.func_151461_a());
                 if (marker != null && marker.copyText.length() > 0) {
@@ -123,6 +126,13 @@ final class LostTalesChatClipboard {
             }
         }
         return "";
+    }
+
+    private static boolean sameMessage(ChatLine line, int chatLineId,
+                                       int updateCounter) {
+        return line != null && (chatLineId != 0
+                ? line.getChatLineID() == chatLineId
+                : line.getUpdatedCounter() == updateCounter);
     }
 
     private static ChatHeadMarker.Data findMarker(

@@ -46,23 +46,36 @@ final class LostTalesMapMoveMarkerPrompt {
             return;
         }
         FontRenderer font = minecraft.fontRenderer;
+        LostTalesMapPopupAnimation.begin(this);
         LostTalesMapChoicePrompt.Layout layout =
                 LostTalesMapChoicePrompt.calculateLayout(
                         screenWidth, screenHeight);
-        LostTalesMapChoicePrompt.renderPanel(font, layout,
-                screenWidth, screenHeight,
-                I18n.format("gui.losttales.map.move_marker.prompt"),
-                null);
-        LostTalesMapChoicePrompt.drawButton(font, layout.first,
-                I18n.format("gui.losttales.map.move_marker.move"),
-                layout.first.contains(mouseX, mouseY),
-                this.hasDestination);
-        LostTalesMapChoicePrompt.drawButton(font, layout.second,
-                I18n.format("gui.losttales.map.move_marker.leave"),
-                layout.second.contains(mouseX, mouseY), true);
-        LostTalesMapChoicePrompt.drawButton(font, layout.third,
-                I18n.format("gui.losttales.map.move_marker.remove"),
-                layout.third.contains(mouseX, mouseY), true);
+        int pivotX = layout.x + layout.width / 2;
+        int pivotY = layout.y + layout.height / 2;
+        int localMouseX = LostTalesMapPopupAnimation.inverseMouseX(
+                this, mouseX, pivotX);
+        int localMouseY = LostTalesMapPopupAnimation.inverseMouseY(
+                this, mouseY, pivotY);
+        LostTalesMapChoicePrompt.renderShadeFixed(
+                screenWidth, screenHeight, null);
+        LostTalesMapPopupAnimation.push(this, pivotX, pivotY);
+        try {
+            LostTalesMapChoicePrompt.renderPanelContents(font, layout,
+                    I18n.format("gui.losttales.map.move_marker.prompt"),
+                    null);
+            LostTalesMapChoicePrompt.drawButton(font, layout.first,
+                    I18n.format("gui.losttales.map.move_marker.move"),
+                    layout.first.contains(localMouseX, localMouseY),
+                    this.hasDestination);
+            LostTalesMapChoicePrompt.drawButton(font, layout.second,
+                    I18n.format("gui.losttales.map.move_marker.leave"),
+                    layout.second.contains(localMouseX, localMouseY), true);
+            LostTalesMapChoicePrompt.drawButton(font, layout.third,
+                    I18n.format("gui.losttales.map.move_marker.remove"),
+                    layout.third.contains(localMouseX, localMouseY), true);
+        } finally {
+            LostTalesMapPopupAnimation.pop();
+        }
     }
 
     Action mouseClicked(int screenWidth, int screenHeight,
@@ -73,6 +86,12 @@ final class LostTalesMapMoveMarkerPrompt {
         LostTalesMapChoicePrompt.Layout layout =
                 LostTalesMapChoicePrompt.calculateLayout(
                         screenWidth, screenHeight);
+        int pivotX = layout.x + layout.width / 2;
+        int pivotY = layout.y + layout.height / 2;
+        mouseX = LostTalesMapPopupAnimation.inverseMouseX(
+                this, mouseX, pivotX);
+        mouseY = LostTalesMapPopupAnimation.inverseMouseY(
+                this, mouseY, pivotY);
         if (layout.first.contains(mouseX, mouseY)) {
             return this.hasDestination ? Action.MOVE : Action.NONE;
         }

@@ -65,13 +65,10 @@ final class LostTalesLotrMapVignette {
     }
 
     /**
-     * @param bottomInset height at the bottom the strip has taken, which the
-     *                    oval is measured against so its lower edge sits on
-     *                    the strip rather than part way up the map
      */
-    static void render(int width, int height, int bottomInset) {
-        float bottom = height - Math.max(0, bottomInset);
-        if (width <= 0 || bottom <= 0.0F) {
+    static void render(int width, int height) {
+        float bottom = height;
+        if (width <= 0 || height <= 0) {
             return;
         }
         float halfWidth = width / 2.0F;

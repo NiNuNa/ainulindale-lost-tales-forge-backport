@@ -66,17 +66,30 @@ final class LostTalesChatVisualStyle {
 
             String rendered;
             int color;
+            Integer explicitColor = ChatColorMarker.decode(part);
             boolean replyIdentity = isReplyIdentity(part);
+            boolean identityBracket = "<".equals(text)
+                    || (identitySeen && text.startsWith(">"));
             if (shadowPass) {
-                rendered = styleCodesOnly(formatting) + text;
+                rendered = styleCodesOnly(formatting)
+                        + removeColorCodes(text);
                 color = SHADOW;
+            } else if (explicitColor != null) {
+                rendered = styleCodesOnly(formatting)
+                        + removeColorCodes(text);
+                color = explicitColor.intValue();
+            } else if (metadata != null && identityBracket) {
+                rendered = styleCodesOnly(formatting)
+                        + removeColorCodes(text);
+                color = metadata.nameColor;
             } else if (metadata != null && replyIdentity) {
-                rendered = styleCodesOnly(formatting) + text;
+                rendered = styleCodesOnly(formatting)
+                        + removeColorCodes(text);
                 color = metadata.nameColor;
             } else if (metadata != null && afterHead
-                    && !identitySeen && marker == null
-                    && text.startsWith("[")) {
-                rendered = styleCodesOnly(formatting) + text;
+                    && !identitySeen && marker == null) {
+                rendered = styleCodesOnly(formatting)
+                        + removeColorCodes(text);
                 color = metadata.titleColor;
             } else {
                 rendered = removeExplicitWhite(formatting + text);
@@ -113,6 +126,35 @@ final class LostTalesChatVisualStyle {
                 kept.append('\u00a7').append(code);
             }
             index++;
+        }
+        return kept.toString();
+    }
+
+    /**
+     * Removes embedded legacy colours and resets while retaining decorative
+     * formatting and visible text. LOTR title display names may contain their
+     * own colour code; allowing it through would override the RGB supplied to
+     * FontRenderer for the remainder of that component, including the custom
+     * shadow pass.
+     */
+    static String removeColorCodes(String text) {
+        if (text == null || text.length() == 0) {
+            return "";
+        }
+        StringBuilder kept = new StringBuilder(text.length());
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            if (character == '\u00a7' && index + 1 < text.length()) {
+                char code = Character.toLowerCase(text.charAt(index + 1));
+                if (code >= 'k' && code <= 'o') {
+                    kept.append(character).append(code);
+                }
+                // FontRenderer treats an unknown section-sign code as white,
+                // so every non-decoration pair must be consumed as well.
+                index++;
+                continue;
+            }
+            kept.append(character);
         }
         return kept.toString();
     }

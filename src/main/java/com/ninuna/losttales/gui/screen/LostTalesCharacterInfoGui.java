@@ -1,5 +1,7 @@
 package com.ninuna.losttales.gui.screen;
 
+import com.ninuna.losttales.client.gui.animation.LostTalesControlBarAnimation;
+import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar;
 import com.ninuna.losttales.client.character.CharacterGuiPreviewLayout;
 import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
@@ -23,11 +25,13 @@ import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.client.renderer.RenderHelper;
+import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
@@ -135,9 +139,32 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
         drawCharacterPanel(leftX + PANEL_PADDING, panelTop + PANEL_PADDING, sideWidth - PANEL_PADDING * 2, panelHeight - PANEL_PADDING * 2);
         drawPlayerModelPanel(modelX + PANEL_PADDING, panelTop + PANEL_PADDING, modelWidth - PANEL_PADDING * 2, panelHeight - PANEL_PADDING * 2, mouseX, mouseY);
         drawQuestPanel(rightX + PANEL_PADDING, panelTop + PANEL_PADDING, sideWidth - PANEL_PADDING * 2, panelHeight - PANEL_PADDING * 2);
-        drawFooterHelp();
+        LostTalesControlBar.render(this, this.mc, this.fontRendererObj,
+                this.width, this.height,
+                Collections.<LostTalesControlBar.Hint>emptyList(),
+                0, 0, Collections.<String>emptyList(), true);
+        LostTalesControlBarAnimation.pushFixed(this);
+        try {
+            drawFooterHelp();
+            super.drawScreen(
+                    LostTalesControlBarAnimation.fixedMouseX(this, mouseX),
+                    LostTalesControlBarAnimation.fixedMouseY(
+                            this, mouseY), partialTicks);
+        } finally {
+            LostTalesControlBarAnimation.pop();
+        }
+    }
 
-        super.drawScreen(mouseX, mouseY, partialTicks);
+    private void drawFooterHelp() {
+        String help = I18n.format(
+                "gui.losttales.character.profile_help",
+                LostTalesKeyBindings.getQuestJournalKeyDisplayName(),
+                LostTalesKeyBindings.getCharacterMenuKeyDisplayName());
+        this.fontRendererObj.drawStringWithShadow(
+                LostTalesSkyrimUiStyle.trimToWidth(
+                        this.fontRendererObj, help, this.width - 180),
+                92, this.height - 22,
+                LostTalesSkyrimUiStyle.HUD_LABEL);
     }
 
     private void drawCharacterPanel(int x, int y, int width, int height) {
@@ -322,6 +349,8 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
     private void drawEntityModel(int x, int y, int scale, float yaw, float pitch, EntityLivingBase entity) {
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         GL11.glEnable(GL11.GL_COLOR_MATERIAL);
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_LIGHTING_BIT
+                | GL11.GL_CURRENT_BIT | GL11.GL_TEXTURE_BIT);
         GL11.glPushMatrix();
 
         float previousRenderYawOffset = entity.renderYawOffset;
@@ -331,8 +360,17 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
         float previousRotationYawHead = entity.rotationYawHead;
         float previousPlayerViewY = RenderManager.instance.playerViewY;
         boolean previousDebugBoundingBox = RenderManager.debugBoundingBox;
+        boolean lightmapTextureEnabled = false;
 
         try {
+            // Entity renderers normally multiply by the entity's world
+            // lightmap value. A GUI portrait is studio-lit instead: keep the
+            // skin texture and standard item lights, but detach it from the
+            // world's day/night brightness.
+            OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
+            lightmapTextureEnabled = GL11.glIsEnabled(GL11.GL_TEXTURE_2D);
+            GL11.glDisable(GL11.GL_TEXTURE_2D);
+            OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
             GL11.glTranslatef((float)x, (float)y, 50.0F);
             GL11.glScalef((float)(-scale), (float)scale, (float)scale);
             GL11.glRotatef(180.0F, 0.0F, 0.0F, 1.0F);
@@ -367,15 +405,16 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
             GL11.glPopMatrix();
             RenderHelper.disableStandardItemLighting();
             GL11.glDisable(GL12.GL_RESCALE_NORMAL);
+            OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
+            if (lightmapTextureEnabled) {
+                GL11.glEnable(GL11.GL_TEXTURE_2D);
+            } else {
+                GL11.glDisable(GL11.GL_TEXTURE_2D);
+            }
+            OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
+            GL11.glPopAttrib();
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         }
-    }
-
-    private void drawFooterHelp() {
-        String help = I18n.format("gui.losttales.character.profile_help",
-                LostTalesKeyBindings.getQuestJournalKeyDisplayName(),
-                LostTalesKeyBindings.getCharacterMenuKeyDisplayName());
-        this.fontRendererObj.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, help, this.width - 180), 92, this.height - 22, LostTalesSkyrimUiStyle.TEXT_MUTED);
     }
 
     private CharacterSummary getActiveCharacter() {
@@ -447,7 +486,10 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
             this.lastDragY = mouseY;
             return;
         }
-        super.mouseClicked(mouseX, mouseY, button);
+        super.mouseClicked(
+                LostTalesControlBarAnimation.fixedMouseX(this, mouseX),
+                LostTalesControlBarAnimation.fixedMouseY(
+                        this, mouseY), button);
     }
 
     @Override

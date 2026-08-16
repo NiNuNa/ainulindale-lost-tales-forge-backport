@@ -15,22 +15,17 @@ public final class LostTalesChatMotionTest {
 
         assertEquals(0.0F, settled.stackOffsetY, EPSILON);
         assertEquals(1.0F, settled.opacity, EPSILON);
-        assertEquals(1.0F, settled.scaleX, EPSILON);
-        assertEquals(1.0F, settled.scaleY, EPSILON);
-        assertEquals(0.0F, settled.headLagY, EPSILON);
     }
 
     @Test
-    public void entryUsesRestrainedSquashStretchAndPortraitOverlap() {
+    public void entryUsesOnlyVerticalMotionAndOpacity() {
         LostTalesChatMotion.MessageSample entering =
                 LostTalesChatMotion.message(0.0F);
 
         assertTrue(entering.stackOffsetY > 0.0F);
         assertEquals(0.0F, entering.opacity, EPSILON);
-        assertTrue(entering.scaleX > 1.0F);
-        assertTrue(entering.scaleY < 1.0F);
-        assertEquals(0.0F, entering.headLagY, EPSILON);
-        assertTrue(LostTalesChatMotion.message(0.18F).headLagY > 0.0F);
+        assertTrue(LostTalesChatMotion.message(0.5F).stackOffsetY
+                < entering.stackOffsetY);
     }
 
     @Test

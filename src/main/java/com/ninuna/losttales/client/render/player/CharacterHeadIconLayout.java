@@ -48,9 +48,13 @@ final class CharacterHeadIconLayout {
                 CharacterRaceRegistry.canonicalizeIdentifier(raceId);
         if (CharacterRaceRegistry.HUMAN.equals(canonicalRace)
                 || CharacterRaceRegistry.ELF.equals(canonicalRace)) {
+            // Their 8x16 outer cuboid starts at the head crown and continues
+            // below the chin. A square portrait represents the actual 8x8
+            // head, so sample the upper eight rows without compressing the
+            // hanging hair into the face.
             return new CharacterHeadIconLayout(
                     64.0F, 8.0F, 8.0F, 8.0F,
-                    OverlayKind.LOTR_EXTENDED, 16.0F);
+                    OverlayKind.LOTR_EXTENDED, 8.0F);
         }
         if (CharacterRaceRegistry.DWARF.equals(canonicalRace)
                 || CharacterRaceRegistry.HOBBIT.equals(canonicalRace)) {

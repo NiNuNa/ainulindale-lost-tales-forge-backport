@@ -1,5 +1,7 @@
 # Ainulindalë: Lost Tales
 
+![Ainulindalë: Lost Tales header](./img/header_6.png)
+
 Ainulindalë: Lost Tales is a Minecraft Forge 1.7.10 mod that extends The Lord of the Rings Mod: Legacy. The backport adds roleplay characters, parties, quests, map and HUD tools, an accessory slot, third-person combat features, and new Middle-earth content.
 
 The current release is `0.1.3`. It targets:

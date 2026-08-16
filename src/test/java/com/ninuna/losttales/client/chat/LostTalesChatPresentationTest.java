@@ -2,15 +2,18 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.UUID;
 import net.minecraft.event.ClickEvent;
+import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 public final class LostTalesChatPresentationTest {
 
@@ -31,6 +34,11 @@ public final class LostTalesChatPresentationTest {
             StringBuilder plainText = new StringBuilder();
             ClickEvent reply = null;
             ChatHeadMarker.Data headMarker = null;
+            EnumChatFormatting identityColor = null;
+            EnumChatFormatting openingBracketColor = null;
+            EnumChatFormatting closingBracketColor = null;
+            Integer openingBracketRgb = null;
+            Integer closingBracketRgb = null;
             for (Object value : message) {
                 IChatComponent part = (IChatComponent)value;
                 plainText.append(part.getUnformattedTextForChat());
@@ -43,18 +51,31 @@ public final class LostTalesChatPresentationTest {
                 }
                 if ("Arathorn".equals(part.getUnformattedTextForChat())) {
                     reply = part.getChatStyle().getChatClickEvent();
+                    identityColor = part.getChatStyle().getColor();
+                } else if ("<".equals(
+                        part.getUnformattedTextForChat())) {
+                    openingBracketColor = part.getChatStyle().getColor();
+                    openingBracketRgb = ChatColorMarker.decode(part);
+                } else if ("> ".equals(
+                        part.getUnformattedTextForChat())) {
+                    closingBracketColor = part.getChatStyle().getColor();
+                    closingBracketRgb = ChatColorMarker.decode(part);
                 }
             }
 
-            assertEquals("All: <  [Ranger] Arathorn> The road is clear.",
+            assertEquals("All: <  Ranger Arathorn> The road is clear.",
                     plainText.toString());
             assertNotNull(reply);
             assertEquals(ClickEvent.Action.SUGGEST_COMMAND,
                     reply.getAction());
             assertEquals("/msg RangerOfTheNorth ", reply.getValue());
+            assertEquals(identityColor, openingBracketColor);
+            assertEquals(identityColor, closingBracketColor);
+            assertEquals(Integer.valueOf(0x336633), openingBracketRgb);
+            assertEquals(Integer.valueOf(0x336633), closingBracketRgb);
             assertNotNull(headMarker);
             // The invisible two-space marker is bold only to reserve ten
-            // pixels for the nine-pixel portrait and a compact final gap.
+            // pixels for the raised portrait and a compact final gap.
             IChatComponent markerComponent = null;
             for (Object value : message) {
                 IChatComponent part = (IChatComponent)value;
@@ -71,6 +92,60 @@ public final class LostTalesChatPresentationTest {
                     headMarker.skinId);
             assertEquals(0x55AA55, headMarker.titleColor);
             assertEquals(0x336633, headMarker.nameColor);
+        } finally {
+            LostTalesConfig.showChatTimestamps = originalTimestamps;
+        }
+    }
+
+    @Test
+    public void timestampIsFollowedByChannelSeparator() {
+        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
+        LostTalesConfig.showChatTimestamps = true;
+        try {
+            LostTalesChatMessagePacket packet =
+                    new LostTalesChatMessagePacket(
+                            ChatChannel.PROXIMITY, UUID.randomUUID(),
+                            "Arathorn", "RangerOfTheNorth", "",
+                            0x55AA55, 0x336633, "Halt.",
+                            123456789L,
+                            "losttales:human_ranger_male_2");
+            StringBuilder plainText = new StringBuilder();
+            for (Object value : LostTalesChatPresentation.build(packet)) {
+                plainText.append(((IChatComponent)value)
+                        .getUnformattedTextForChat());
+            }
+
+            String rendered = plainText.toString();
+            assertTrue(rendered.startsWith("Proximity: ["));
+            assertTrue(rendered.contains("] | <"));
+            assertTrue(rendered.endsWith(
+                    "Arathorn> Halt."));
+        } finally {
+            LostTalesConfig.showChatTimestamps = originalTimestamps;
+        }
+    }
+
+    @Test
+    public void factionChannelUsesTheFactionSnapshotColor() {
+        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
+        LostTalesConfig.showChatTimestamps = false;
+        try {
+            IChatComponent message = LostTalesChatPresentation.build(
+                    new LostTalesChatMessagePacket(
+                            ChatChannel.FACTION, UUID.randomUUID(),
+                            "Amdir", "Player", "",
+                            0x778899, 0x245A32, "Mae govannen.",
+                            123456789L, "losttales:elf_high_male_0"));
+            for (Object value : message) {
+                IChatComponent part = (IChatComponent)value;
+                if ("Faction".equals(
+                        part.getUnformattedTextForChat())) {
+                    assertEquals(Integer.valueOf(0x245A32),
+                            ChatColorMarker.decode(part));
+                    return;
+                }
+            }
+            throw new AssertionError("Faction channel component missing");
         } finally {
             LostTalesConfig.showChatTimestamps = originalTimestamps;
         }
@@ -108,6 +183,27 @@ public final class LostTalesChatPresentationTest {
         assertEquals("\u00a7l\u00a7o",
                 LostTalesChatVisualStyle.styleCodesOnly(
                         "\u00a7f\u00a7l\u00a7a\u00a7o\u00a7r"));
+        assertEquals("\u00a7lFarmer\u00a7o of Bree",
+                LostTalesChatVisualStyle.removeColorCodes(
+                        "\u00a7f\u00a7lFarmer\u00a7r\u00a7o of Bree\u00a7z"));
+    }
+
+    @Test
+    public void chatBackdropStaysBlackAndFadesAfterThreeQuarters() {
+        assertEquals(0x000000,
+                LostTalesChatOverlayRenderer.CHAT_BACKDROP_RGB);
+        assertEquals(75,
+                LostTalesChatOverlayRenderer.backdropFadeStart(100));
+        assertEquals(76,
+                LostTalesChatOverlayRenderer.backdropFadeStart(101));
+    }
+
+    @Test
+    public void allAndPartyUseTheSharedGreenAndBluePalette() {
+        assertEquals(LostTalesColors.rgb(LostTalesColors.GREEN),
+                ChatChannel.ALL.getDisplayColor());
+        assertEquals(LostTalesColors.rgb(LostTalesColors.BLUE),
+                ChatChannel.PARTY.getDisplayColor());
     }
 
     private static ChatHeadMarker.Data markerOf(IChatComponent message) {

@@ -11,9 +11,9 @@ public final class CharacterHeadIconLayoutTest {
     private static final float EPSILON = 0.0001F;
 
     @Test
-    public void humanAndElfUseFullLengthHairAndBeardLayer() {
-        assertExtendedLayout(CharacterRaceRegistry.HUMAN, 16.0F);
-        assertExtendedLayout(CharacterRaceRegistry.ELF, 16.0F);
+    public void humanAndElfKeepHatPixelsAlignedToTheHead() {
+        assertExtendedLayout(CharacterRaceRegistry.HUMAN, 8.0F);
+        assertExtendedLayout(CharacterRaceRegistry.ELF, 8.0F);
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.style;
 
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import java.util.Locale;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -10,44 +11,14 @@ import net.minecraft.client.gui.Gui;
  * translucent charcoal panels, thin ivory rules, muted gold accents, and
  * diamond objective indicators. No external Skyrim assets are copied here.
  */
-public final class LostTalesSkyrimUiStyle {
-    public static final int PANEL_FILL = 0xBC07090C;
-    public static final int PANEL_FILL_SOFT = 0x9007090C;
-    public static final int PANEL_HOVER = 0x4AFFFFFF;
-    public static final int PANEL_SELECTED = 0x642C3440;
-    public static final int BORDER = 0x82D8D1C3;
-    public static final int BORDER_DIM = 0x446D6A63;
-    public static final int TEXT = 0xFFEEE8D8;
-    public static final int TEXT_BRIGHT = 0xFFFFF8EC;
-    public static final int TEXT_MUTED = 0xFF9F9A8D;
-    public static final int TEXT_DIM = 0xFF706D65;
-    public static final int GOLD = 0xFFD8B36A;
-    public static final int GOLD_DARK = 0xFF8E7240;
-    public static final int BLUE = 0xFFAFCFE1;
-    public static final int GREEN = 0xFF9ECA91;
-    public static final int RED = 0xFFC98778;
-    public static final int PURPLE = 0xFFCBB3E6;
-    public static final int BLACK_SHADOW = 0xC0000000;
-
-    /** Ivory of the map-marker artwork; HUD labels match it so icons and text read as one set. */
-    public static final int HUD_LABEL = 0xFFFCECD1;
-    /**
-     * Shared drop-shadow backdrop for HUD icons, labels, and markers. Vanilla
-     * derives a text shadow from the text colour while textured helpers tend to
-     * use flat black, so the same shadow otherwise comes out in two colours
-     * depending on what drew it. Callers that build their own alpha should mask
-     * with {@link #rgb(int)}.
-     */
-    public static final int HUD_SHADOW = 0xFF2D1E2F;
+public final class LostTalesSkyrimUiStyle extends LostTalesColors {
 
     private LostTalesSkyrimUiStyle() {}
 
-    /** Strips the alpha byte from an ARGB constant so a caller can supply its own. */
-    public static int rgb(int argb) {
-        return argb & 0xFFFFFF;
-    }
-
     public static void drawScreenShade(int width, int height) {
+        if (LostTalesGuiAnimations.isManagingBackdrop()) {
+            return;
+        }
         Gui.drawRect(0, 0, width, height, 0x88000000);
         Gui.drawRect(0, 0, width, 28, 0x72000000);
         Gui.drawRect(0, height - 32, width, height, 0x72000000);

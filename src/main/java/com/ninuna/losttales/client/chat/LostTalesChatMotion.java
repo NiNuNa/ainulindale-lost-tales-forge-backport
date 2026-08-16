@@ -7,15 +7,9 @@ final class LostTalesChatMotion {
     static MessageSample message(float progress) {
         float p = clamp(progress);
         float settled = smoothStep(p);
-        float energy = (1.0F - p) * (1.0F - p);
-        float followThrough = (float)Math.sin(p * Math.PI * 3.0D) * energy;
-        float shapePulse = (float)Math.cos(p * Math.PI * 2.5D) * energy;
         return new MessageSample(
-                7.0F * (1.0F - settled) + 0.9F * followThrough,
-                smoothStep(clamp(p / 0.58F)),
-                1.0F + 0.025F * shapePulse,
-                1.0F - 0.035F * shapePulse,
-                0.45F * followThrough);
+                7.0F * (1.0F - settled),
+                smoothStep(clamp(p / 0.58F)));
     }
 
     static float inputOffset(float progress) {
@@ -51,18 +45,10 @@ final class LostTalesChatMotion {
     static final class MessageSample {
         final float stackOffsetY;
         final float opacity;
-        final float scaleX;
-        final float scaleY;
-        final float headLagY;
 
-        private MessageSample(float stackOffsetY, float opacity,
-                              float scaleX, float scaleY,
-                              float headLagY) {
+        private MessageSample(float stackOffsetY, float opacity) {
             this.stackOffsetY = stackOffsetY;
             this.opacity = opacity;
-            this.scaleX = scaleX;
-            this.scaleY = scaleY;
-            this.headLagY = headLagY;
         }
     }
 }

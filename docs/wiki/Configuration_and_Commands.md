@@ -4,7 +4,7 @@
 
 Forge writes the main options to `config/losttales.cfg`. Its categories are:
 
-- `client`: HUD visibility, placement, marker display, quick-loot rows, and quest feedback;
+- `client`: HUD visibility and placement, marker display, chat presentation, GUI animation and blur, quick-loot rows, and quest feedback;
 - `quests`: prerequisites, rewards, permitted start sources, automatic marker discovery, and pinning;
 - `missives`: board generation, notice counts, expiry, and deadlines;
 - `characters`: starting-faction allow and deny lists, switching cooldowns, safety checks, snapshot size, checkpoint rate, and deletion retention;
@@ -15,6 +15,10 @@ Forge writes the main options to `config/losttales.cfg`. Its categories are:
 The optional camera uses `config/losttales-third-person.cfg`. Editable camera-preset JSON files are installed without overwriting user changes under `config/losttales/camera_presets/`.
 
 Use the Forge Mods configuration screen for local display and camera settings. The HUD placement editor provides drag-and-drop positioning for all fixed Lost Tales panels; its values are the same bounded offsets stored in `losttales.cfg`. Server owners should edit authoritative gameplay categories while the server is stopped, then review the generated comments and bounds.
+
+Compatible in-world GUI screens use a restrained foreground fly-in; title and main-menu screens deliberately keep their normal presentation. In-world screens additionally fade a stationary black veil and centered Gaussian blur behind the foreground. Foreground duration, scale, easing, and direction are independently configurable, as are the background toggle, opacity, fade time, always-blur behavior, blur toggle, and blur strength. Lost Tales bottom control bars move as complete strips with a separate, slightly delayed upward entrance. Map legends, finders, editors, and confirmation panels use their own restrained popup entrance. Moving directly from one compatible GUI to another restarts foreground and control motion but preserves a settled in-world backdrop, preventing a second dark/blur fade. Reduced motion removes spatial movement and shortens the foreground transition. Shader or transformer failure falls back to the normal GUI background.
+
+Inventory containers also provide optional smooth stack movement for Shift-click transfers and 1–9 hotbar swaps. Ordinary pickup and drag placement, creative search/repopulation, and bulk sorting stay immediate. `enableSmoothInventoryMovement` is the master toggle and `smoothInventoryAnimationDurationMillis` controls travel time; this is a client-side visual effect and does not modify container contents or server inventory authority.
 
 ## Server commands
 

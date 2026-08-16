@@ -75,39 +75,54 @@ final class LostTalesMapFastTravelPrompt {
             return;
         }
         FontRenderer font = minecraft.fontRenderer;
+        LostTalesMapPopupAnimation.begin(this);
         LostTalesMapChoicePrompt.Layout layout =
                 LostTalesMapChoicePrompt.calculateLayout(
                         gui.width, gui.height);
+        int pivotX = layout.x + layout.width / 2;
+        int pivotY = layout.y + layout.height / 2;
+        int localMouseX = LostTalesMapPopupAnimation.inverseMouseX(
+                this, mouseX, pivotX);
+        int localMouseY = LostTalesMapPopupAnimation.inverseMouseY(
+                this, mouseY, pivotY);
         // The destination keeps its full brightness inside its own frame,
         // so the marker being asked about is the one thing on the map the
         // popup does not dim.
         int[] litArea = new int[4];
-        LostTalesMapChoicePrompt.renderPanel(font, layout,
-                gui.width, gui.height,
-                I18n.format("gui.losttales.map.fast_travel.prompt",
-                        this.destinationName),
-                this.blockedReasonKey == null
-                        ? null : I18n.format(this.blockedReasonKey),
-                LostTalesLotrMapMarkerIconOverlay
-                        .getSelectedMarkerFrame(gui, litArea)
-                        ? litArea : null);
-        LostTalesMapChoicePrompt.drawButton(font, layout.first,
-                I18n.format("gui.losttales.map.fast_travel.yes"),
-                layout.first.contains(mouseX, mouseY),
-                isTravelOffered());
-        LostTalesMapChoicePrompt.drawButton(font, layout.second,
-                I18n.format("gui.losttales.map.fast_travel.no"),
-                layout.second.contains(mouseX, mouseY), true);
-        LostTalesMapChoicePrompt.drawButton(font, layout.third,
-                I18n.format(
-                        "gui.losttales.map.fast_travel.place_marker"),
-                layout.third.contains(mouseX, mouseY),
-                canPlaceMarker);
-        if (this.hasAlternatives) {
-            LostTalesMapChoicePrompt.drawStepArrow(layout.previous, true,
-                    layout.previous.contains(mouseX, mouseY));
-            LostTalesMapChoicePrompt.drawStepArrow(layout.next, false,
-                    layout.next.contains(mouseX, mouseY));
+        int[] visibleArea = LostTalesLotrMapMarkerIconOverlay
+                .getSelectedMarkerFrame(gui, litArea) ? litArea : null;
+        LostTalesMapChoicePrompt.renderShadeFixed(
+                gui.width, gui.height, visibleArea);
+        LostTalesMapPopupAnimation.push(this, pivotX, pivotY);
+        try {
+            LostTalesMapChoicePrompt.renderPanelContents(font, layout,
+                    I18n.format("gui.losttales.map.fast_travel.prompt",
+                            this.destinationName),
+                    this.blockedReasonKey == null
+                            ? null : I18n.format(this.blockedReasonKey));
+            LostTalesMapChoicePrompt.drawButton(font, layout.first,
+                    I18n.format("gui.losttales.map.fast_travel.yes"),
+                    layout.first.contains(localMouseX, localMouseY),
+                    isTravelOffered());
+            LostTalesMapChoicePrompt.drawButton(font, layout.second,
+                    I18n.format("gui.losttales.map.fast_travel.no"),
+                    layout.second.contains(localMouseX, localMouseY), true);
+            LostTalesMapChoicePrompt.drawButton(font, layout.third,
+                    I18n.format(
+                            "gui.losttales.map.fast_travel.place_marker"),
+                    layout.third.contains(localMouseX, localMouseY),
+                    canPlaceMarker);
+            if (this.hasAlternatives) {
+                LostTalesMapChoicePrompt.drawStepArrow(
+                        layout.previous, true,
+                        layout.previous.contains(
+                                localMouseX, localMouseY));
+                LostTalesMapChoicePrompt.drawStepArrow(
+                        layout.next, false,
+                        layout.next.contains(localMouseX, localMouseY));
+            }
+        } finally {
+            LostTalesMapPopupAnimation.pop();
         }
     }
 
@@ -120,6 +135,12 @@ final class LostTalesMapFastTravelPrompt {
         LostTalesMapChoicePrompt.Layout layout =
                 LostTalesMapChoicePrompt.calculateLayout(
                         screenWidth, screenHeight);
+        int pivotX = layout.x + layout.width / 2;
+        int pivotY = layout.y + layout.height / 2;
+        mouseX = LostTalesMapPopupAnimation.inverseMouseX(
+                this, mouseX, pivotX);
+        mouseY = LostTalesMapPopupAnimation.inverseMouseY(
+                this, mouseY, pivotY);
         if (layout.first.contains(mouseX, mouseY)) {
             return isTravelOffered() ? Action.YES : Action.NONE;
         }

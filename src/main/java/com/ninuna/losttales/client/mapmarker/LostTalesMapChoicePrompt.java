@@ -86,7 +86,23 @@ final class LostTalesMapChoicePrompt {
             FontRenderer font, Layout layout, int screenWidth,
             int screenHeight, String title, String subtitle,
             int[] litArea) {
-        drawShade(screenWidth, screenHeight, litArea);
+        renderShadeFixed(screenWidth, screenHeight, litArea);
+        renderPanelContents(font, layout, title, subtitle);
+    }
+
+    static void renderShadeFixed(
+            int screenWidth, int screenHeight, int[] litArea) {
+        LostTalesMapPopupAnimation.pushFixed();
+        try {
+            drawShade(screenWidth, screenHeight, litArea);
+        } finally {
+            LostTalesMapPopupAnimation.pop();
+        }
+    }
+
+    static void renderPanelContents(
+            FontRenderer font, Layout layout,
+            String title, String subtitle) {
         LostTalesSkyrimUiStyle.drawPanel(
                 layout.x, layout.y, layout.width, layout.height);
         int contentWidth = Math.max(0,

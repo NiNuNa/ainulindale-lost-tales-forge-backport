@@ -113,6 +113,22 @@ public final class LostTalesConfig {
     public static int chatInputAnimationDurationMillis = 180;
     public static int chatSelectorAnimationDurationMillis = 140;
 
+    /** Client-only general GUI motion and background preferences. */
+    public static boolean enableGuiAnimations = true;
+    public static int guiAnimationDurationMillis = 220;
+    public static double guiAnimationScale = 1.0D;
+    public static String guiAnimationEasingStyle = "BACK";
+    public static String guiAnimationDirection = "DOWN";
+    public static boolean reducedGuiMotion = false;
+    public static boolean enableGuiBackground = true;
+    public static double guiBackgroundOpacity = 0.65D;
+    public static int guiBackgroundFadeTimeMillis = 150;
+    public static boolean guiAlwaysBlur = false;
+    public static boolean enableGuiBackgroundBlur = true;
+    public static double guiBlurStrength = 4.5D;
+    public static boolean enableSmoothInventoryMovement = true;
+    public static int smoothInventoryAnimationDurationMillis = 140;
+
     public static boolean enableQuestPrerequisites = true;
     public static boolean enableQuestRewards = true;
     public static boolean allowQuestJournalStarts = true;
@@ -769,6 +785,83 @@ public final class LostTalesConfig {
                     1000,
                     "Duration of the upward channel-selector opening animation in milliseconds."
             );
+            enableGuiAnimations = config.getBoolean(
+                    "enableGuiAnimations", CATEGORY_CLIENT,
+                    enableGuiAnimations,
+                    "Apply safe elapsed-time opening transitions to compatible GUI screens."
+            );
+            guiAnimationDurationMillis = config.getInt(
+                    "guiAnimationDurationMillis", CATEGORY_CLIENT,
+                    guiAnimationDurationMillis, 10, 1000,
+                    "Duration of compatible GUI foreground opening animations in milliseconds."
+            );
+            guiAnimationScale = getBoundedDouble(
+                    config, CATEGORY_CLIENT, "guiAnimationScale",
+                    guiAnimationScale, 0.5D, 3.0D,
+                    "Starting scale of the foreground animation. 1.0 keeps pixel art at its native size."
+            );
+            Property guiEasingProperty = config.get(
+                    CATEGORY_CLIENT, "guiAnimationEasingStyle",
+                    guiAnimationEasingStyle,
+                    "Foreground easing style: BACK, CUBIC, or SMOOTH.");
+            guiEasingProperty.setValidValues(new String[] {
+                    "BACK", "CUBIC", "SMOOTH"});
+            guiAnimationEasingStyle = normalizeGuiEasing(
+                    guiEasingProperty.getString());
+            Property guiDirectionProperty = config.get(
+                    CATEGORY_CLIENT, "guiAnimationDirection",
+                    guiAnimationDirection,
+                    "Direction the foreground flies toward its resting position: DOWN, UP, LEFT, RIGHT, or NONE.");
+            guiDirectionProperty.setValidValues(new String[] {
+                    "DOWN", "UP", "LEFT", "RIGHT", "NONE"});
+            guiAnimationDirection = normalizeGuiDirection(
+                    guiDirectionProperty.getString());
+            reducedGuiMotion = config.getBoolean(
+                    "reducedGuiMotion", CATEGORY_CLIENT,
+                    reducedGuiMotion,
+                    "Remove spatial foreground and control-bar movement and shorten the foreground transition."
+            );
+            enableGuiBackground = config.getBoolean(
+                    "enableGuiBackground", CATEGORY_CLIENT,
+                    enableGuiBackground,
+                    "Draw the dark semi-transparent background behind compatible GUIs."
+            );
+            guiBackgroundOpacity = getBoundedDouble(
+                    config, CATEGORY_CLIENT, "guiBackgroundOpacity",
+                    guiBackgroundOpacity, 0.0D, 1.0D,
+                    "Final opacity of the GUI's black background veil."
+            );
+            guiBackgroundFadeTimeMillis = config.getInt(
+                    "guiBackgroundFadeTimeMillis", CATEGORY_CLIENT,
+                    guiBackgroundFadeTimeMillis, 0, 800,
+                    "Duration of the background darkness and blur fade in milliseconds."
+            );
+            guiAlwaysBlur = config.getBoolean(
+                    "guiAlwaysBlur", CATEGORY_CLIENT,
+                    guiAlwaysBlur,
+                    "Blur every compatible in-world GUI background, including screens that opt out by default."
+            );
+            enableGuiBackgroundBlur = config.getBoolean(
+                    "enableGuiBackgroundBlur", CATEGORY_CLIENT,
+                    enableGuiBackgroundBlur,
+                    "Blur the world behind compatible GUIs when legacy framebuffer shaders are available."
+            );
+            guiBlurStrength = getBoundedDouble(
+                    config, CATEGORY_CLIENT, "guiBlurStrength",
+                    guiBlurStrength, 0.0D, 8.0D,
+                    "Background blur radius. Blur failure falls back to the normal GUI background."
+            );
+            enableSmoothInventoryMovement = config.getBoolean(
+                    "enableSmoothInventoryMovement", CATEGORY_CLIENT,
+                    enableSmoothInventoryMovement,
+                    "Animate item stacks smoothly between inventory slots."
+            );
+            smoothInventoryAnimationDurationMillis = config.getInt(
+                    "smoothInventoryAnimationDurationMillis",
+                    CATEGORY_CLIENT,
+                    smoothInventoryAnimationDurationMillis, 40, 600,
+                    "Duration of inventory item movement in milliseconds."
+            );
             playQuestSounds = config.getBoolean(
                     "playQuestSounds",
                     CATEGORY_CLIENT,
@@ -1334,6 +1427,47 @@ public final class LostTalesConfig {
                 "chatSelectorAnimationDurationMillis",
                 chatSelectorAnimationDurationMillis).set(
                 chatSelectorAnimationDurationMillis);
+        config.get(CATEGORY_CLIENT, "enableGuiAnimations",
+                enableGuiAnimations).set(enableGuiAnimations);
+        config.get(CATEGORY_CLIENT, "guiAnimationDurationMillis",
+                guiAnimationDurationMillis).set(
+                guiAnimationDurationMillis);
+        config.get(CATEGORY_CLIENT, "guiAnimationScale",
+                guiAnimationScale).set(guiAnimationScale);
+        Property guiEasingProperty = config.get(
+                CATEGORY_CLIENT, "guiAnimationEasingStyle",
+                guiAnimationEasingStyle);
+        guiEasingProperty.set(guiAnimationEasingStyle);
+        guiEasingProperty.setValidValues(new String[] {
+                "BACK", "CUBIC", "SMOOTH"});
+        Property guiDirectionProperty = config.get(
+                CATEGORY_CLIENT, "guiAnimationDirection",
+                guiAnimationDirection);
+        guiDirectionProperty.set(guiAnimationDirection);
+        guiDirectionProperty.setValidValues(new String[] {
+                "DOWN", "UP", "LEFT", "RIGHT", "NONE"});
+        config.get(CATEGORY_CLIENT, "reducedGuiMotion",
+                reducedGuiMotion).set(reducedGuiMotion);
+        config.get(CATEGORY_CLIENT, "enableGuiBackground",
+                enableGuiBackground).set(enableGuiBackground);
+        config.get(CATEGORY_CLIENT, "guiBackgroundOpacity",
+                guiBackgroundOpacity).set(guiBackgroundOpacity);
+        config.get(CATEGORY_CLIENT, "guiBackgroundFadeTimeMillis",
+                guiBackgroundFadeTimeMillis).set(
+                guiBackgroundFadeTimeMillis);
+        config.get(CATEGORY_CLIENT, "guiAlwaysBlur",
+                guiAlwaysBlur).set(guiAlwaysBlur);
+        config.get(CATEGORY_CLIENT, "enableGuiBackgroundBlur",
+                enableGuiBackgroundBlur).set(enableGuiBackgroundBlur);
+        config.get(CATEGORY_CLIENT, "guiBlurStrength",
+                guiBlurStrength).set(guiBlurStrength);
+        config.get(CATEGORY_CLIENT, "enableSmoothInventoryMovement",
+                enableSmoothInventoryMovement).set(
+                enableSmoothInventoryMovement);
+        config.get(CATEGORY_CLIENT,
+                "smoothInventoryAnimationDurationMillis",
+                smoothInventoryAnimationDurationMillis).set(
+                smoothInventoryAnimationDurationMillis);
         config.get(CATEGORY_RANGED_COMBAT, "chargeTierOneTicks",
                 chargeTierOneTicks).set(chargeTierOneTicks);
         config.get(CATEGORY_RANGED_COMBAT, "chargeTierTwoTicks",
@@ -1582,6 +1716,22 @@ public final class LostTalesConfig {
             return max;
         }
         return value;
+    }
+
+    private static String normalizeGuiEasing(String value) {
+        String normalized = value == null
+                ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
+        return "CUBIC".equals(normalized) || "SMOOTH".equals(normalized)
+                ? normalized : "BACK";
+    }
+
+    private static String normalizeGuiDirection(String value) {
+        String normalized = value == null
+                ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
+        return "UP".equals(normalized) || "LEFT".equals(normalized)
+                || "RIGHT".equals(normalized)
+                || "NONE".equals(normalized)
+                ? normalized : "DOWN";
     }
 
     static double getHudPercent(

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatIdentityType;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.nio.charset.Charset;
 import java.util.Base64;
 import java.util.UUID;
@@ -57,7 +58,9 @@ final class ChatHeadMarker {
                 // Compatibility with chat lines created by the earlier
                 // client-only marker format during the same session.
                 return new Data(senderId, identity == 'A', "",
-                        decodeText(fields[0]), 0xFFFFFF, 0xFFFFFF);
+                        decodeText(fields[0]), LostTalesColors.rgb(
+                        LostTalesColors.HUD_LABEL), LostTalesColors.rgb(
+                        LostTalesColors.HUD_LABEL));
             }
             if (fields.length != 4) {
                 return null;

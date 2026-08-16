@@ -2,6 +2,7 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import lotr.common.LOTRLevelData;
 import lotr.common.LOTRPlayerData;
 import lotr.common.LOTRTitle;
@@ -28,7 +29,8 @@ final class LostTalesChatPresentationResolver {
             title = "";
         }
 
-        int factionColor = 0xFFFFFF;
+        int factionColor = LostTalesColors.rgb(
+                LostTalesColors.HUD_LABEL);
         if (character != null) {
             factionColor = LotrCharacterAdapter.getInstance()
                     .getFactionColor(character.getStartingFactionId(),

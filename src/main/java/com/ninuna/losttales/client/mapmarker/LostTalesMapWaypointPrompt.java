@@ -199,11 +199,25 @@ final class LostTalesMapWaypointPrompt {
             return;
         }
         FontRenderer font = minecraft.fontRenderer;
+        LostTalesMapPopupAnimation.begin(this);
         Layout layout = calculateLayout(
                 screenWidth, screenHeight, this.editing);
-        Gui.drawRect(0, 0, screenWidth, screenHeight, SCREEN_SHADE);
-        LostTalesSkyrimUiStyle.drawPanel(
-                layout.x, layout.y, layout.width, layout.height);
+        int pivotX = layout.x + layout.width / 2;
+        int pivotY = layout.y + layout.height / 2;
+        int localMouseX = LostTalesMapPopupAnimation.inverseMouseX(
+                this, mouseX, pivotX);
+        int localMouseY = LostTalesMapPopupAnimation.inverseMouseY(
+                this, mouseY, pivotY);
+        LostTalesMapPopupAnimation.pushFixed();
+        try {
+            Gui.drawRect(0, 0, screenWidth, screenHeight, SCREEN_SHADE);
+        } finally {
+            LostTalesMapPopupAnimation.pop();
+        }
+        LostTalesMapPopupAnimation.push(this, pivotX, pivotY);
+        try {
+            LostTalesSkyrimUiStyle.drawPanel(
+                    layout.x, layout.y, layout.width, layout.height);
 
         drawCentered(font, layout,
                 I18n.format(this.editing
@@ -228,9 +242,9 @@ final class LostTalesMapWaypointPrompt {
             drawFieldHint(font, layout.noteField,
                     I18n.format("gui.losttales.map.waypoint.note_hint"));
         }
-        drawSwatches(minecraft, layout, mouseX, mouseY);
+        drawSwatches(minecraft, layout, localMouseX, localMouseY);
         if (this.editing) {
-            drawShareTargets(font, layout, mouseX, mouseY);
+            drawShareTargets(font, layout, localMouseX, localMouseY);
         }
 
         boolean confirmable = canConfirm(usedWaypoints < maxWaypoints);
@@ -238,18 +252,22 @@ final class LostTalesMapWaypointPrompt {
                 I18n.format(this.editing
                         ? "gui.losttales.map.waypoint.save"
                         : "gui.losttales.map.waypoint.create"),
-                layout.confirm.contains(mouseX, mouseY), confirmable);
+                layout.confirm.contains(localMouseX, localMouseY),
+                confirmable);
         if (this.editing) {
             drawButton(font, layout.travel,
                     I18n.format("gui.losttales.map.waypoint.travel"),
-                    layout.travel.contains(mouseX, mouseY), true);
+                    layout.travel.contains(localMouseX, localMouseY), true);
             drawButton(font, layout.delete,
                     I18n.format("gui.losttales.map.waypoint.delete"),
-                    layout.delete.contains(mouseX, mouseY), true);
+                    layout.delete.contains(localMouseX, localMouseY), true);
         }
         drawButton(font, layout.cancel,
                 I18n.format("gui.losttales.map.waypoint.cancel"),
-                layout.cancel.contains(mouseX, mouseY), true);
+                layout.cancel.contains(localMouseX, localMouseY), true);
+        } finally {
+            LostTalesMapPopupAnimation.pop();
+        }
     }
 
     /** Placeholder text for an empty field, so its purpose is visible. */
@@ -362,6 +380,12 @@ final class LostTalesMapWaypointPrompt {
         }
         Layout layout = calculateLayout(
                 screenWidth, screenHeight, this.editing);
+        int pivotX = layout.x + layout.width / 2;
+        int pivotY = layout.y + layout.height / 2;
+        mouseX = LostTalesMapPopupAnimation.inverseMouseX(
+                this, mouseX, pivotX);
+        mouseY = LostTalesMapPopupAnimation.inverseMouseY(
+                this, mouseY, pivotY);
         this.nameField.mouseClicked(mouseX, mouseY, button);
         this.noteField.mouseClicked(mouseX, mouseY, button);
         for (int index = 0;

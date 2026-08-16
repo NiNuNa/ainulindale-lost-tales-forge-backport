@@ -1,6 +1,9 @@
 package com.ninuna.losttales.gui.screen;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
+import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar;
+import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar.Hint;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
@@ -14,6 +17,7 @@ import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -40,7 +44,7 @@ import org.lwjgl.opengl.GL11;
 public class LostTalesQuestJournalGui extends GuiScreen {
     private static final int OUTER_PADDING = 16;
     private static final int TOP_BAR_HEIGHT = 38;
-    private static final int FOOTER_HEIGHT = 24;
+    private static final int FOOTER_HEIGHT = LostTalesControlBar.HEIGHT;
     private static final int LEFT_WIDTH = 270;
     private static final int LIST_ROW_HEIGHT = 24;
     private static final int CATEGORY_ROW_HEIGHT = 24;
@@ -97,10 +101,12 @@ public class LostTalesQuestJournalGui extends GuiScreen {
     }
 
     private void drawWorldDimmedBackground() {
-        drawGradientRect(0, 0, this.width, this.height, 0xD0000000, 0xC8000000);
+        if (!LostTalesGuiAnimations.isManagingBackdrop(this)) {
+            drawGradientRect(0, 0, this.width, this.height,
+                    0xD0000000, 0xC8000000);
+        }
         drawRect(0, 0, this.width, 1, LostTalesSkyrimUiStyle.BORDER);
         drawRect(0, TOP_BAR_HEIGHT, this.width, TOP_BAR_HEIGHT + 1, LostTalesSkyrimUiStyle.BORDER);
-        drawRect(0, this.height - FOOTER_HEIGHT, this.width, this.height - FOOTER_HEIGHT + 1, LostTalesSkyrimUiStyle.BORDER_DIM);
     }
 
     private void drawTopBar() {
@@ -643,11 +649,27 @@ public class LostTalesQuestJournalGui extends GuiScreen {
     }
 
     private void drawFooterHelp() {
-        String sync = LostTalesClientQuestProgressStore.hasReceivedSync() ? "Server-synced" : "Waiting for server sync";
-        String help = "Wheel: scroll   Click: select   Double-click/Space/Enter: track   F: filter   "
-                + LostTalesKeyBindings.getQuestJournalKeyDisplayName() + "/Esc: close   "
-                + LostTalesKeyBindings.getCharacterMenuKeyDisplayName() + ": character   " + sync;
-        this.fontRendererObj.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, help, this.width - OUTER_PADDING * 2), OUTER_PADDING, this.height - FOOTER_HEIGHT + 11, LostTalesSkyrimUiStyle.TEXT_MUTED);
+        if (this.mc == null || this.fontRendererObj == null) {
+            return;
+        }
+        List<Hint> hints = new ArrayList<Hint>();
+        hints.add(Hint.wheel(this.mc, this.fontRendererObj, "Scroll"));
+        hints.add(Hint.mouseButton(
+                this.mc, this.fontRendererObj, 0, "Select"));
+        hints.add(Hint.key(this.mc, this.fontRendererObj,
+                Keyboard.KEY_SPACE, "Track"));
+        hints.add(Hint.key(this.mc, this.fontRendererObj,
+                Keyboard.KEY_F, "Filter"));
+        hints.add(Hint.binding(this.mc, this.fontRendererObj,
+                LostTalesKeyBindings.getQuestJournalKeyBinding(), "Close"));
+        hints.add(Hint.binding(this.mc, this.fontRendererObj,
+                LostTalesKeyBindings.getCharacterMenuKeyBinding(),
+                "Character"));
+        String sync = LostTalesClientQuestProgressStore.hasReceivedSync()
+                ? "Server-synced" : "Waiting for sync";
+        LostTalesControlBar.render(this, this.mc, this.fontRendererObj,
+                this.width, this.height, hints, 4, 0,
+                Arrays.asList(sync), true);
     }
 
     private List<LostTalesQuestDefinition> getVisibleQuests() {
@@ -977,6 +999,10 @@ public class LostTalesQuestJournalGui extends GuiScreen {
     public void handleMouseInput() {
         int eventMouseX = Mouse.getEventX() * this.width / this.mc.displayWidth;
         int eventMouseY = this.height - Mouse.getEventY() * this.height / this.mc.displayHeight - 1;
+        eventMouseX = LostTalesGuiAnimations.inverseMouseX(
+                this, eventMouseX);
+        eventMouseY = LostTalesGuiAnimations.inverseMouseY(
+                this, eventMouseY);
         int wheel = Mouse.getEventDWheel();
         if (wheel != 0) {
             int notches = wheel / 120;

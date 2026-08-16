@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
@@ -23,7 +24,7 @@ public final class ClientChatChannelState {
     }
 
     public static synchronized void select(ChatChannel channel) {
-        selected = isAvailable(channel) ? channel : ChatChannel.ALL;
+        selected = isAvailable(channel) ? channel : fallbackChannel();
     }
 
     public static synchronized ChatChannel cycle() {
@@ -45,7 +46,7 @@ public final class ClientChatChannelState {
 
     public static synchronized void ensureAvailable() {
         if (!isAvailable(selected)) {
-            selected = ChatChannel.ALL;
+            selected = fallbackChannel();
         }
     }
 
@@ -53,12 +54,13 @@ public final class ClientChatChannelState {
         if (channel == null) {
             return false;
         }
+        CharacterSummary active = activeCharacter();
+        if (channel.getIdentityType() == ChatIdentityType.CHARACTER
+                && active == null) {
+            return false;
+        }
         if (channel == ChatChannel.FACTION) {
-            CharacterRosterSnapshot roster =
-                    ClientCharacterRosterCache.getSnapshot();
-            CharacterSummary active = roster == null
-                    ? null : roster.getActiveCharacter();
-            return active != null && LotrCharacterAdapter.normalizeFactionId(
+            return LotrCharacterAdapter.normalizeFactionId(
                     active.getStartingFactionId()).length() > 0;
         }
         if (channel != ChatChannel.PARTY) {
@@ -72,7 +74,29 @@ public final class ClientChatChannelState {
                         snapshot.getActiveCharacterId());
     }
 
+    public static synchronized int displayColor(ChatChannel channel) {
+        if (channel != ChatChannel.FACTION) {
+            return channel == null ? 0xFFFFFF : channel.getDisplayColor();
+        }
+        CharacterSummary active = activeCharacter();
+        return active == null ? channel.getDisplayColor()
+                : LotrCharacterAdapter.getInstance().getFactionColor(
+                        active.getStartingFactionId(),
+                        channel.getDisplayColor());
+    }
+
     public static synchronized void clear() {
         selected = ChatChannel.ALL;
+    }
+
+    private static CharacterSummary activeCharacter() {
+        CharacterRosterSnapshot roster =
+                ClientCharacterRosterCache.getSnapshot();
+        return roster == null ? null : roster.getActiveCharacter();
+    }
+
+    private static ChatChannel fallbackChannel() {
+        return isAvailable(ChatChannel.ALL)
+                ? ChatChannel.ALL : ChatChannel.OOC;
     }
 }

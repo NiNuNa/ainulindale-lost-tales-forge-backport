@@ -129,7 +129,10 @@ public final class LostTalesMapCursor {
         int y = mouseY - HOTSPOT_Y;
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT
                 | GL11.GL_CURRENT_BIT | GL11.GL_DEPTH_BUFFER_BIT);
+        GL11.glPushMatrix();
         try {
+            GL11.glLoadIdentity();
+            GL11.glTranslatef(0.0F, 0.0F, -2000.0F);
             GL11.glDisable(GL11.GL_DEPTH_TEST);
             GL11.glDepthMask(false);
             GL11.glEnable(GL11.GL_TEXTURE_2D);
@@ -158,6 +161,7 @@ public final class LostTalesMapCursor {
             release();
         } finally {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glPopMatrix();
             GL11.glPopAttrib();
         }
     }

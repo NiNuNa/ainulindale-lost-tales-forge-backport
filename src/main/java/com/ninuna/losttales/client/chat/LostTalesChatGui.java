@@ -92,6 +92,8 @@ public final class LostTalesChatGui extends GuiChat {
             GL11.glPopMatrix();
         }
         drawCopiedNotice();
+        LostTalesChatHoverCard.draw(this.mc, mouseX, mouseY,
+                this.width, this.height);
     }
 
     @Override
@@ -121,7 +123,8 @@ public final class LostTalesChatGui extends GuiChat {
             }
             setSelectorOpen(false);
         }
-        if (ChatHeadMarker.isMarker(component)) {
+        if (ChatHeadMarker.isMarker(component)
+                || ChatColorMarker.isMarker(component)) {
             return;
         }
         super.mouseClicked(mouseX, adjustedMouseY, button);
@@ -137,7 +140,8 @@ public final class LostTalesChatGui extends GuiChat {
                 hovered ? 0xCC303030 : 0xB0181818);
         drawRect(INDICATOR_X, top, INDICATOR_X + 2,
                 top + INDICATOR_HEIGHT,
-                0xFF000000 | channel.getDisplayColor());
+                0xFF000000
+                        | ClientChatChannelState.displayColor(channel));
         String label = indicatorLabel(channel);
         LostTalesChatVisualStyle.drawPlain(this.fontRendererObj,
                 label, INDICATOR_X + 5, top + 2, 255);
@@ -173,7 +177,8 @@ public final class LostTalesChatGui extends GuiChat {
                     INDICATOR_X + width, optionBottom, background);
             drawRect(INDICATOR_X, optionTop,
                     INDICATOR_X + 2, optionBottom,
-                    (optionAlpha << 24) | channel.getDisplayColor());
+                    (optionAlpha << 24)
+                            | ClientChatChannelState.displayColor(channel));
             int textAlpha = Math.max(4, Math.min(255,
                     Math.round(255.0F * optionProgress)));
             LostTalesChatVisualStyle.drawPlain(this.fontRendererObj,

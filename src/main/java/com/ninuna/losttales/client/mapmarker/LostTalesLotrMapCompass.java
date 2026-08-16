@@ -82,7 +82,7 @@ public final class LostTalesLotrMapCompass {
             return 0;
         }
         return LostTalesLotrMapControlBar.HEIGHT
-                + LostTalesLotrMapLegend.getReservedHeight(gui);
+                + LostTalesLotrMapLegend.getAnimatedReservedHeight(gui);
     }
 
     private static LostTalesLotrMapGui currentMapGui() {

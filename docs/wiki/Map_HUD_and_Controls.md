@@ -8,6 +8,7 @@ Lost Tales adds client displays on top of server-owned quest, party, combat, and
 | --- | --- |
 | Open character menu | Caps Lock |
 | Open quest journal | J |
+| Open / close Middle-earth map | M |
 | Toggle Lost Tales HUD | H |
 | Open HUD placement editor | Left Alt + H |
 | Quick-loot use | R |
@@ -19,7 +20,7 @@ Lost Tales adds client displays on top of server-owned quest, party, combat, and
 | Toggle target lock | Middle mouse |
 | Cycle target left or right | Unbound |
 
-All bindings can be changed in Minecraft's Controls menu. While looking at a supported quick-loot container, hold the Modifier key and use the mouse wheel to change the selected row. Press the Use key to ask the server to remove the selected full stack and drop it above the container.
+All bindings can be changed in Minecraft's Controls menu. The Map binding opens the Lost Tales Middle-earth map from gameplay and closes it from the map screen. While looking at a supported quick-loot container, hold the Modifier key and use the mouse wheel to change the selected row. Press the Use key to ask the server to remove the selected full stack and drop it above the container.
 
 ## HUD
 

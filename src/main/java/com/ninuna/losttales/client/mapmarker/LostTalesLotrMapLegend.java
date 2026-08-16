@@ -24,7 +24,6 @@ final class LostTalesLotrMapLegend {
     private static final int ARROW_WIDTH = 14;
     private static final int ICON_CENTER_Y = 13;
     private static final int LABEL_Y = 28;
-    private static final float GUI_MODELVIEW_Z = -2000.0F;
 
     private LostTalesLotrMapLegend() {
     }
@@ -37,6 +36,16 @@ final class LostTalesLotrMapLegend {
                         LostTalesMapLegendRegistry.getCategories().size(),
                         gui.getMapLegendScrollIndex()).visible
                 ? HEIGHT + GAP_ABOVE_CONTROL_BAR : 0;
+    }
+
+    /** Height followed by fixed overlays while the legend flies into place. */
+    static int getAnimatedReservedHeight(LostTalesLotrMapGui gui) {
+        int target = getReservedHeight(gui);
+        if (target == 0) {
+            return 0;
+        }
+        return Math.round(target * LostTalesMapPopupAnimation.easedProgress(
+                gui.getMapLegendAnimationKey()));
     }
 
     static boolean render(
@@ -60,8 +69,14 @@ final class LostTalesLotrMapLegend {
             return false;
         }
         gui.setMapLegendScrollIndex(layout.firstIndex);
+        int pivotX = layout.panelX + layout.panelWidth / 2;
+        int pivotY = layout.panelY + layout.panelHeight / 2;
+        int localMouseX = LostTalesMapPopupAnimation.inverseMouseX(
+                gui.getMapLegendAnimationKey(), mouseX, pivotX);
+        int localMouseY = LostTalesMapPopupAnimation.inverseMouseY(
+                gui.getMapLegendAnimationKey(), mouseY, pivotY);
 
-        beginUntranslatedRender();
+        beginUntranslatedRender(gui, pivotX, pivotY);
         try {
             LostTalesSkyrimUiStyle.drawPanelSoft(
                     layout.panelX, layout.panelY,
@@ -69,12 +84,12 @@ final class LostTalesLotrMapLegend {
             if (layout.showArrows) {
                 drawArrow(font, layout.leftArrowX, layout.panelY,
                         false, layout.firstIndex > 0,
-                        layout.containsLeftArrow(mouseX, mouseY));
+                        layout.containsLeftArrow(localMouseX, localMouseY));
                 drawArrow(font, layout.rightArrowX, layout.panelY,
                         true,
                         layout.firstIndex + layout.visibleCount
                                 < categories.size(),
-                        layout.containsRightArrow(mouseX, mouseY));
+                        layout.containsRightArrow(localMouseX, localMouseY));
             }
             for (int slot = 0; slot < layout.visibleCount; slot++) {
                 int categoryIndex = layout.firstIndex + slot;
@@ -85,7 +100,7 @@ final class LostTalesLotrMapLegend {
                         categories.get(categoryIndex);
                 int tileX = layout.tileX(slot);
                 boolean hovered = layout.containsTile(
-                        slot, mouseX, mouseY);
+                        slot, localMouseX, localMouseY);
                 drawCategory(
                         minecraft, font, category,
                         tileX, layout.tileY, layout.tileWidth,
@@ -100,7 +115,16 @@ final class LostTalesLotrMapLegend {
     static boolean handleMouseClick(
             LostTalesLotrMapGui gui, int mouseX, int mouseY, int button) {
         Layout layout = currentLayout(gui);
-        if (!layout.visible || !layout.containsPanel(mouseX, mouseY)) {
+        if (!layout.visible) {
+            return false;
+        }
+        int pivotX = layout.panelX + layout.panelWidth / 2;
+        int pivotY = layout.panelY + layout.panelHeight / 2;
+        mouseX = LostTalesMapPopupAnimation.inverseMouseX(
+                gui.getMapLegendAnimationKey(), mouseX, pivotX);
+        mouseY = LostTalesMapPopupAnimation.inverseMouseY(
+                gui.getMapLegendAnimationKey(), mouseY, pivotY);
+        if (!layout.containsPanel(mouseX, mouseY)) {
             return false;
         }
         if (button != 0) {
@@ -139,7 +163,7 @@ final class LostTalesLotrMapLegend {
             LostTalesLotrMapGui gui, int mouseX, int mouseY, int wheel) {
         Layout layout = currentLayout(gui);
         if (wheel == 0 || !layout.visible
-                || !layout.containsPanel(mouseX, mouseY)) {
+                || !containsAnimatedPanel(gui, layout, mouseX, mouseY)) {
             return false;
         }
         if (!layout.showArrows) {
@@ -282,18 +306,30 @@ final class LostTalesLotrMapLegend {
                 panelX + panelWidth - PANEL_PADDING - ARROW_WIDTH);
     }
 
-    private static void beginUntranslatedRender() {
+    private static boolean containsAnimatedPanel(
+            LostTalesLotrMapGui gui, Layout layout,
+            int mouseX, int mouseY) {
+        int pivotX = layout.panelX + layout.panelWidth / 2;
+        int pivotY = layout.panelY + layout.panelHeight / 2;
+        return layout.containsPanel(
+                LostTalesMapPopupAnimation.inverseMouseX(
+                        gui.getMapLegendAnimationKey(), mouseX, pivotX),
+                LostTalesMapPopupAnimation.inverseMouseY(
+                        gui.getMapLegendAnimationKey(), mouseY, pivotY));
+    }
+
+    private static void beginUntranslatedRender(
+            LostTalesLotrMapGui gui, int pivotX, int pivotY) {
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT
                 | GL11.GL_COLOR_BUFFER_BIT
                 | GL11.GL_CURRENT_BIT
                 | GL11.GL_TEXTURE_BIT);
-        GL11.glPushMatrix();
-        GL11.glLoadIdentity();
-        GL11.glTranslatef(0.0F, 0.0F, GUI_MODELVIEW_Z);
+        LostTalesMapPopupAnimation.push(
+                gui.getMapLegendAnimationKey(), pivotX, pivotY);
     }
 
     private static void endUntranslatedRender() {
-        GL11.glPopMatrix();
+        LostTalesMapPopupAnimation.pop();
         GL11.glPopAttrib();
     }
 

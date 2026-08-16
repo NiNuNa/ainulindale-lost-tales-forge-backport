@@ -1,5 +1,7 @@
 # Quests and missives
 
+![Quests header](./img/header_2.png)
+
 Press **J** by default to open the quest journal. Quest state is owned and validated by the server and stored separately for each active roleplay character.
 
 ## Quest model
@@ -44,4 +46,3 @@ Configuration controls notice counts, generation frequency, expiry, and optional
 ## Administration
 
 `/losttales quest` provides operator tools for listing definitions and progress, starting, completing, resetting, abandoning, or pinning quests, issuing starter content, and scanning definitions. These commands require the root command's permission level 2.
-

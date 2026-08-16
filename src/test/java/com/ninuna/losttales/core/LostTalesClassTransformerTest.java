@@ -69,6 +69,12 @@ public final class LostTalesClassTransformerTest {
     private static final String LOTR_MAP_LABEL_STYLE_HOOK_OWNER =
             "com/ninuna/losttales/client/mapmarker/"
                     + "LostTalesLotrMapLabelStyle";
+    private static final String GUI_ANIMATION_HOOK_OWNER =
+            "com/ninuna/losttales/client/gui/animation/"
+                    + "LostTalesGuiAnimationHooks";
+    private static final String SMOOTH_INVENTORY_HOOK_OWNER =
+            "com/ninuna/losttales/client/gui/inventory/"
+                    + "LostTalesSmoothInventoryHooks";
 
     @Test
     public void factionBountiesUseRoleplayCharacterUuid() throws Exception {
@@ -126,6 +132,54 @@ public final class LostTalesClassTransformerTest {
                 transformed, "getMouseOver",
                 THIRD_PERSON_TARGETING_HOOK_OWNER,
                 "resolveMouseOver"));
+    }
+
+    @Test
+    public void guiAnimationTransformsDrawAndInputCoordinates()
+            throws Exception {
+        ClassNode renderer = transform(
+                "net.minecraft.client.renderer.EntityRenderer");
+        assertTrue(containsStaticHook(
+                renderer, "updateCameraAndRender",
+                GUI_ANIMATION_HOOK_OWNER, "drawScreen"));
+
+        ClassNode screen = transform("net.minecraft.client.gui.GuiScreen");
+        assertTrue(containsStaticHook(
+                screen, "handleMouseInput",
+                GUI_ANIMATION_HOOK_OWNER, "inverseMouseX"));
+        assertTrue(containsStaticHook(
+                screen, "handleMouseInput",
+                GUI_ANIMATION_HOOK_OWNER, "inverseMouseY"));
+        assertTrue(containsStaticHook(
+                screen, "drawWorldBackground",
+                GUI_ANIMATION_HOOK_OWNER,
+                "beginVanillaBackground"));
+        assertTrue(containsStaticHook(
+                screen, "drawWorldBackground",
+                GUI_ANIMATION_HOOK_OWNER,
+                "endVanillaBackground"));
+    }
+
+    @Test
+    public void guiContainerUsesSmoothInventoryRenderingHooks()
+            throws Exception {
+        ClassNode container = transform(
+                "net.minecraft.client.gui.inventory.GuiContainer");
+        assertTrue(containsStaticHook(
+                container, "drawScreen",
+                SMOOTH_INVENTORY_HOOK_OWNER, "beginFrame"));
+        assertTrue(containsStaticHook(
+                container, "handleMouseClick",
+                SMOOTH_INVENTORY_HOOK_OWNER,
+                "recordTransferIntent"));
+        assertTrue(containsStaticHook(
+                container, "func_146977_a",
+                SMOOTH_INVENTORY_HOOK_OWNER,
+                "renderItemAndEffectIntoGUI"));
+        assertTrue(containsStaticHook(
+                container, "func_146977_a",
+                SMOOTH_INVENTORY_HOOK_OWNER,
+                "renderItemOverlayIntoGUI"));
     }
 
     @Test

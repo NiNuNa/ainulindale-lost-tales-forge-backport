@@ -1,5 +1,7 @@
 # Roleplay characters
 
+![Roleplay characters header](./img/header_3.png)
+
 Each Minecraft account owns a roster of roleplay characters. The server owns the roster and validates every create, select, edit, delete, restore, and lore-character request.
 
 Press **Caps Lock** by default to open the character menu.

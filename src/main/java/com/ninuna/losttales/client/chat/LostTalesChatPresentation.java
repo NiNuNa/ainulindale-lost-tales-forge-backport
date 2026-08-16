@@ -15,6 +15,7 @@ import net.minecraft.util.IChatComponent;
 public final class LostTalesChatPresentation {
     private static volatile long lastMessageNanos;
     private static volatile int lastMessageUpdateCounter = -1;
+    private static int nextChatLineId = Integer.MIN_VALUE;
 
     private LostTalesChatPresentation() {}
 
@@ -30,7 +31,9 @@ public final class LostTalesChatPresentation {
                     minecraft, packet.getSenderId(),
                     packet.getIdentityName());
         }
-        minecraft.ingameGUI.getChatGUI().printChatMessage(build(packet));
+        minecraft.ingameGUI.getChatGUI()
+                .printChatMessageWithOptionalDeletion(
+                        build(packet), allocateChatLineId());
         lastMessageUpdateCounter =
                 minecraft.ingameGUI.getUpdateCounter();
         lastMessageNanos = System.nanoTime();
@@ -47,23 +50,38 @@ public final class LostTalesChatPresentation {
     public static void clear() {
         lastMessageNanos = 0L;
         lastMessageUpdateCounter = -1;
+        nextChatLineId = Integer.MIN_VALUE;
+    }
+
+    private static int allocateChatLineId() {
+        int allocated = nextChatLineId;
+        nextChatLineId = nextChatLineId == -1
+                ? Integer.MIN_VALUE : nextChatLineId + 1;
+        return allocated;
     }
 
     static IChatComponent build(LostTalesChatMessagePacket packet) {
         ChatChannel channel = packet.getChannel();
         ChatComponentText root = new ChatComponentText("");
-        root.appendSibling(text(channel.getDisplayName(),
-                nearestFormatting(channel.getDisplayColor()), false));
+        int channelColor = channel == ChatChannel.FACTION
+                ? packet.getNameColor() : channel.getDisplayColor();
+        root.appendSibling(ChatColorMarker.apply(
+                text(channel.getDisplayName(),
+                        nearestFormatting(channelColor), false),
+                channelColor));
         root.appendSibling(text(": ", EnumChatFormatting.GRAY, false));
         if (LostTalesConfig.showChatTimestamps) {
             root.appendSibling(text("[" + ChatTimestampFormatter.format(
-                    packet.getTimestampMillis()) + "] ",
+                    packet.getTimestampMillis()) + "] | ",
                     EnumChatFormatting.DARK_GRAY, false));
         }
 
-        root.appendSibling(text("<", EnumChatFormatting.GRAY, false));
-        // Two bold spaces reserve ten pixels: enough for the enlarged
-        // nine-pixel outer layer plus the compact gap seen in the identity
+        root.appendSibling(ChatColorMarker.apply(
+                text("<", nearestFormatting(
+                        packet.getNameColor()), false),
+                packet.getNameColor()));
+        // Two bold spaces reserve ten pixels: enough for the raised
+        // headwear layer plus the compact gap seen in the identity
         // reference, without adding a visible spacer component.
         ChatComponentText marker = text("  ",
                 EnumChatFormatting.WHITE, true);
@@ -77,7 +95,7 @@ public final class LostTalesChatPresentation {
         root.appendSibling(marker);
 
         if (packet.getTitle().length() > 0) {
-            root.appendSibling(text("[" + packet.getTitle() + "] ",
+            root.appendSibling(text(packet.getTitle() + " ",
                     nearestFormatting(packet.getTitleColor()), false));
         }
         ChatComponentText identity = text(packet.getIdentityName(),
@@ -86,7 +104,10 @@ public final class LostTalesChatPresentation {
                 new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
                         "/msg " + packet.getAccountName() + " ")));
         root.appendSibling(identity);
-        root.appendSibling(text("> ", EnumChatFormatting.GRAY, false));
+        root.appendSibling(ChatColorMarker.apply(
+                text("> ", nearestFormatting(
+                        packet.getNameColor()), false),
+                packet.getNameColor()));
         root.appendSibling(text(packet.getMessage(),
                 EnumChatFormatting.WHITE, false));
         return root;

@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
 import com.ninuna.losttales.client.party.PartyClientRequestManager;
@@ -112,9 +113,11 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     /** True once the post-label icon compositor has run for this frame. */
     private boolean finalMapIconsRendered;
     private boolean mapControlBarRendered;
+    private boolean mapVignetteRendered;
     /** True once this frame's native road dots were placed below the clouds. */
     private boolean roadsRenderedBelowClouds;
     private boolean mapLegendOpen;
+    private final Object mapLegendAnimationKey = new Object();
     private int mapLegendScrollIndex;
     private boolean smoothZoomInitialized;
     private float smoothZoomPrevious;
@@ -639,7 +642,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
 
     @Override
     protected void actionPerformed(GuiButton button) {
-        if (isModalOpen()) {
+        if (isModalOpen()
+                || LostTalesGuiAnimations.isContentAnimating(this)) {
             return;
         }
         super.actionPerformed(button);
@@ -887,7 +891,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         LostTalesLotrMapMarkerIconOverlay.renderGroupedMarkers(
                 this, waypoints, baseWaypoints, mouseX, mouseY,
                 drawLabels, includeHidden);
-        if (isModalOpen()) {
+        if (isModalOpen() || LostTalesGuiAnimations.isContentAnimating(this)) {
             // The popup covers the map; nothing behind it may claim hover.
             LostTalesLotrMapMarkerIconOverlay.suspendHoverFocus(this);
         }
@@ -997,6 +1001,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         LostTalesLotrMapLayout.prepareForDraw(this);
         this.roadsRenderedBelowClouds = false;
         this.mapControlBarRendered = false;
+        this.mapVignetteRendered = false;
         this.finalMapIconsRendered = false;
         LostTalesLotrMapMarkerIconOverlay
                 .clearInvalidLotrSelection(this);
@@ -1012,7 +1017,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         if (this.cameraFocus.advance(this, now)) {
             applyFocusZoom(this.cameraFocus.getCurrentZoomExp());
         }
-        if (isModalOpen()) {
+        boolean freezeCamera = isModalOpen()
+                || LostTalesGuiAnimations.isContentAnimating(this);
+        if (freezeCamera) {
             // LOTR drags from inside its own draw by polling the mouse and
             // measuring against the previous frame's pointer. Telling it the
             // pointer has not moved is what actually holds the map still;
@@ -1026,7 +1033,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                 LostTalesMapCameraFocus.CAMERA_STATE_SIZE];
         boolean captured =
                 LostTalesMapCameraFocus.captureCamera(this, camera);
-        boolean frozen = isModalOpen() && captured;
+        boolean frozen = freezeCamera && captured;
         try {
             super.drawScreen(mouseX, mouseY, partialTicks);
         } finally {
@@ -1045,28 +1052,34 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         // anything the player has to read.
         renderVignette();
         renderControlBar(false);
-        LostTalesLotrMapLegend.render(this, mouseX, mouseY);
+        int fixedMouseX = LostTalesGuiAnimations.forwardMouseX(
+                this, mouseX);
+        int fixedMouseY = LostTalesGuiAnimations.forwardMouseY(
+                this, mouseY);
+        LostTalesLotrMapLegend.render(
+                this, fixedMouseX, fixedMouseY);
         if (this.fastTravelPrompt != null) {
             this.fastTravelPrompt.render(
-                    this, mouseX, mouseY, canPlacePromptMarker());
+                    this, fixedMouseX, fixedMouseY,
+                    canPlacePromptMarker());
         }
         if (this.waypointPrompt != null) {
             this.waypointPrompt.render(
-                    this.width, this.height, mouseX, mouseY,
+                    this.width, this.height, fixedMouseX, fixedMouseY,
                     getUsedCustomWaypoints(), getMaxCustomWaypoints());
         }
         if (this.moveMarkerPrompt != null) {
             this.moveMarkerPrompt.render(
-                    this.width, this.height, mouseX, mouseY);
+                    this.width, this.height, fixedMouseX, fixedMouseY);
         }
         if (this.searchPrompt != null) {
             this.searchPrompt.render(
-                    this.width, this.height, mouseX, mouseY);
+                    this.width, this.height, fixedMouseX, fixedMouseY);
         }
         // Last of everything: the pointer is over the map, the popups and the
         // strip alike, and it is drawn at the very coordinate every hit test
         // above was resolved against.
-        LostTalesMapCursor.render(this.mc, mouseX, mouseY);
+        LostTalesMapCursor.render(this.mc, fixedMouseX, fixedMouseY);
     }
 
     /**
@@ -1329,16 +1342,19 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
      * frame of its own and its menu background is a different screen
      * entirely.</p>
      */
-    private void renderVignette() {
+    void renderVignette() {
         if (!LostTalesLotrMapLayout.isFullscreenLayoutActive(this)) {
             return;
         }
-        // The strip only. The legend is a panel that opens and closes over
-        // the map, and measuring the shade against it moved the whole oval
-        // every time it was toggled.
-        int reserved = LostTalesLotrMapLayout.isControlBarVisible(this)
-                ? LostTalesLotrMapControlBar.HEIGHT : 0;
-        LostTalesLotrMapVignette.render(this.width, this.height, reserved);
+        if (this.mapVignetteRendered) {
+            return;
+        }
+        this.mapVignetteRendered = true;
+        // The map and every screen-space effect continue beneath the strip;
+        // the independently animated control bar is an overlay, not a hole in
+        // the map. This also keeps the exposed pixels identical while it flies
+        // in from below.
+        LostTalesLotrMapVignette.render(this.width, this.height);
     }
 
     void renderControlBar(boolean force) {
@@ -1359,11 +1375,19 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
      */
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
+        if (LostTalesKeyBindings.isMapMouseButton(button)) {
+            this.mc.displayGuiScreen(null);
+            return;
+        }
+        int fixedMouseX = LostTalesGuiAnimations.forwardMouseX(
+                this, mouseX);
+        int fixedMouseY = LostTalesGuiAnimations.forwardMouseY(
+                this, mouseY);
         if (this.waypointPrompt != null) {
             handleWaypointPromptAction(
                     this.waypointPrompt.mouseClicked(
                             this.width, this.height,
-                            mouseX, mouseY, button,
+                            fixedMouseX, fixedMouseY, button,
                             isWithinCustomWaypointLimit()));
             return;
         }
@@ -1371,7 +1395,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             handleFastTravelPromptAction(
                     this.fastTravelPrompt.mouseClicked(
                             this.width, this.height,
-                            mouseX, mouseY, button,
+                            fixedMouseX, fixedMouseY, button,
                             canPlacePromptMarker()));
             return;
         }
@@ -1379,12 +1403,13 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             handleMoveMarkerPromptAction(
                     this.moveMarkerPrompt.mouseClicked(
                             this.width, this.height,
-                            mouseX, mouseY, button));
+                            fixedMouseX, fixedMouseY, button));
             return;
         }
         if (this.searchPrompt != null) {
             this.searchPrompt.mouseClicked(
-                    this.width, this.height, mouseX, mouseY, button);
+                    this.width, this.height,
+                    fixedMouseX, fixedMouseY, button);
             handleSearchSelection();
             return;
         }
@@ -1394,7 +1419,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             return;
         }
         if (LostTalesLotrMapLegend.handleMouseClick(
-                this, mouseX, mouseY, button)) {
+                this, fixedMouseX, fixedMouseY, button)) {
             return;
         }
         if (button != 0) {
@@ -2188,6 +2213,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) {
+        if (LostTalesKeyBindings.isMapKey(keyCode)) {
+            this.mc.displayGuiScreen(null);
+            return;
+        }
         if (this.waypointPrompt != null) {
             handleWaypointPromptAction(
                     this.waypointPrompt.keyTyped(typedChar, keyCode,
@@ -2249,6 +2278,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             return;
         }
         this.mapLegendOpen = !this.mapLegendOpen;
+        if (this.mapLegendOpen) {
+            LostTalesMapPopupAnimation.restart(
+                    this.mapLegendAnimationKey);
+        }
         if (!this.mapLegendOpen) {
             this.mapLegendScrollIndex = 0;
         }
@@ -2264,6 +2297,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
 
     boolean isMapLegendOpen() {
         return this.mapLegendOpen;
+    }
+
+    Object getMapLegendAnimationKey() {
+        return this.mapLegendAnimationKey;
     }
 
     int getMapLegendScrollIndex() {

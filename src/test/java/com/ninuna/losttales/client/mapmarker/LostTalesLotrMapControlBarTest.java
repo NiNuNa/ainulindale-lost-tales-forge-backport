@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -16,17 +17,17 @@ public final class LostTalesLotrMapControlBarTest {
 
     @Test
     public void aWideStripShowsEveryHintWithItsLabel() {
-        LostTalesLotrMapControlBar.Layout layout = layout(1200, CALENDAR);
+        LostTalesControlBar.Layout layout = layout(1200, CALENDAR);
 
         assertEquals(HINTS.length, layout.visibleHints());
         assertTrue(layout.showLabels);
-        assertTrue(layout.showCalendar);
+        assertTrue(layout.showStatus);
     }
 
     /** Controls belong at both ends, not stacked against one of them. */
     @Test
     public void hintsAreSplitAcrossBothEndsOfTheStrip() {
-        LostTalesLotrMapControlBar.Layout layout = layout(1200, CALENDAR);
+        LostTalesControlBar.Layout layout = layout(1200, CALENDAR);
 
         assertTrue("nothing was put on the left", layout.leftHints > 0);
         assertTrue("nothing was put on the right", layout.rightHints > 0);
@@ -39,13 +40,13 @@ public final class LostTalesLotrMapControlBarTest {
     @Test
     public void neitherEndReachesIntoTheMiddle() {
         for (int width = 0; width <= 2400; width += 13) {
-            LostTalesLotrMapControlBar.Layout layout = layout(width, CALENDAR);
+            LostTalesControlBar.Layout layout = layout(width, CALENDAR);
             int band = Math.max(0, (width - 180) / 2 - 6);
             assertTrue("the left end overflowed at " + width,
                     groupWidth(layout, 0, layout.leftHints) <= band);
             assertTrue("the right end overflowed at " + width,
                     groupWidth(layout, 3, layout.rightHints)
-                            + layout.calendarWidth() <= band);
+                            + layout.statusWidth() <= band);
         }
     }
 
@@ -55,7 +56,7 @@ public final class LostTalesLotrMapControlBarTest {
      */
     @Test
     public void hintsAreDroppedBeforeTheirLabelsAre() {
-        LostTalesLotrMapControlBar.Layout layout = layout(360, CALENDAR);
+        LostTalesControlBar.Layout layout = layout(360, CALENDAR);
 
         assertTrue("names are worth more than an extra bare key",
                 layout.showLabels);
@@ -65,7 +66,7 @@ public final class LostTalesLotrMapControlBarTest {
 
     @Test
     public void aStripTooNarrowForOneNamedHintFallsBackToIcons() {
-        LostTalesLotrMapControlBar.Layout layout = layout(250, new int[0]);
+        LostTalesControlBar.Layout layout = layout(250, new int[0]);
 
         assertTrue(layout.visibleHints() > 0);
         assertFalse(layout.showLabels);
@@ -73,7 +74,7 @@ public final class LostTalesLotrMapControlBarTest {
 
     @Test
     public void aStripWithNoRoomAtAllDrawsNothing() {
-        LostTalesLotrMapControlBar.Layout layout = layout(20, CALENDAR);
+        LostTalesControlBar.Layout layout = layout(20, CALENDAR);
 
         assertEquals(0, layout.visibleHints());
         assertFalse(layout.showLabels);
@@ -87,10 +88,10 @@ public final class LostTalesLotrMapControlBarTest {
     public void theDateIsGivenUpBeforeAControlIs() {
         boolean sawCalendarDropped = false;
         for (int width = 0; width <= 2400; width += 7) {
-            LostTalesLotrMapControlBar.Layout layout = layout(width, CALENDAR);
-            LostTalesLotrMapControlBar.Layout without =
+            LostTalesControlBar.Layout layout = layout(width, CALENDAR);
+            LostTalesControlBar.Layout without =
                     layout(width, new int[0]);
-            if (layout.rightHints > 0 && !layout.showCalendar) {
+            if (layout.rightHints > 0 && !layout.showStatus) {
                 sawCalendarDropped = true;
             }
             assertEquals("the date cost a control its place at " + width,
@@ -102,11 +103,11 @@ public final class LostTalesLotrMapControlBarTest {
 
     @Test
     public void anEmptyStripIsHandledWithoutHints() {
-        LostTalesLotrMapControlBar.Layout layout =
-                LostTalesLotrMapControlBar.calculateLayout(
+        LostTalesControlBar.Layout layout =
+                LostTalesControlBar.calculateLayout(
                         800, Collections
-                                .<LostTalesLotrMapControlBar.Hint>
-                                        emptyList(), CALENDAR);
+                                .<LostTalesControlBar.Hint>
+                                        emptyList(), 3, 180, CALENDAR);
 
         assertEquals(0, layout.visibleHints());
         assertFalse(layout.showLabels);
@@ -114,7 +115,7 @@ public final class LostTalesLotrMapControlBarTest {
 
     /** Widest each drawn group is, from the same measurements it was fitted on. */
     private static int groupWidth(
-            LostTalesLotrMapControlBar.Layout layout, int from, int count) {
+            LostTalesControlBar.Layout layout, int from, int count) {
         int width = 0;
         for (int index = 0; index < count; index++) {
             if (index > 0) {
@@ -126,11 +127,11 @@ public final class LostTalesLotrMapControlBarTest {
         return width;
     }
 
-    private static LostTalesLotrMapControlBar.Layout layout(
+    private static LostTalesControlBar.Layout layout(
             int screenWidth, int[] calendarWidths) {
-        List<LostTalesLotrMapControlBar.Hint> hints =
-                LostTalesLotrMapControlBar.measuredHints(HINTS);
-        return LostTalesLotrMapControlBar.calculateLayout(
-                screenWidth, hints, calendarWidths);
+        List<LostTalesControlBar.Hint> hints =
+                LostTalesControlBar.measuredHints(HINTS);
+        return LostTalesControlBar.calculateLayout(
+                screenWidth, hints, 3, 180, calendarWidths);
     }
 }

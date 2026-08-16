@@ -70,9 +70,23 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.lotrMapMiniquestFilterTransformer.active";
     public static final String LOTR_MAP_ROTATION_ACTIVE_PROPERTY =
             "losttales.lotrMapRotationTransformer.active";
+    public static final String GUI_ANIMATION_ACTIVE_PROPERTY =
+            "losttales.guiAnimationTransformer.active";
+    public static final String SMOOTH_INVENTORY_ACTIVE_PROPERTY =
+            "losttales.smoothInventoryTransformer.active";
+    private static final String GUI_ANIMATION_DRAW_ACTIVE_PROPERTY =
+            "losttales.guiAnimationDrawTransformer.active";
+    private static final String GUI_ANIMATION_INPUT_ACTIVE_PROPERTY =
+            "losttales.guiAnimationInputTransformer.active";
+    private static final String GUI_ANIMATION_BACKGROUND_ACTIVE_PROPERTY =
+            "losttales.guiAnimationBackgroundTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
+    private static final String GUI_SCREEN =
+            "net.minecraft.client.gui.GuiScreen";
+    private static final String GUI_CONTAINER =
+            "net.minecraft.client.gui.inventory.GuiContainer";
     private static final String MINECRAFT =
             "net.minecraft.client.Minecraft";
     private static final String PLAYER_CONTROLLER =
@@ -214,6 +228,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     private static final String LOTR_MAP_COMPASS_HOOK_OWNER =
             "com/ninuna/losttales/client/mapmarker/"
                     + "LostTalesLotrMapCompass";
+    private static final String GUI_ANIMATION_HOOK_OWNER =
+            "com/ninuna/losttales/client/gui/animation/"
+                    + "LostTalesGuiAnimationHooks";
+    private static final String SMOOTH_INVENTORY_HOOK_OWNER =
+            "com/ninuna/losttales/client/gui/inventory/"
+                    + "LostTalesSmoothInventoryHooks";
 
     @Override
     public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -221,7 +241,14 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return null;
         }
         if (ENTITY_RENDERER.equals(transformedName)) {
-            return transformCamera(basicClass);
+            return transformGuiScreenDraw(transformCamera(basicClass));
+        }
+        if (GUI_SCREEN.equals(transformedName)) {
+            return transformGuiScreenBackground(
+                    transformGuiScreenInput(basicClass));
+        }
+        if (GUI_CONTAINER.equals(transformedName)) {
+            return transformGuiContainer(basicClass);
         }
         if (MINECRAFT.equals(transformedName)) {
             return transformMinecraftPickBlock(basicClass);
@@ -1850,6 +1877,336 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
     }
 
+    /**
+     * Routes EntityRenderer's single screen draw through a coordinate bridge.
+     * The Forge pre/post events still own the GL transform; this only supplies
+     * the inverse pointer position to hover and tooltip logic.
+     */
+    private static byte[] transformGuiScreenDraw(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("updateCameraAndRender".equals(method.name)
+                        || "func_78480_b".equals(method.name))
+                        || !("(F)V".equals(method.desc)
+                        || "(FJ)V".equals(method.desc))) {
+                    continue;
+                }
+                if (containsHook(method, GUI_ANIMATION_HOOK_OWNER,
+                        "drawScreen")) {
+                    activateGuiAnimationPart(
+                            GUI_ANIMATION_DRAW_ACTIVE_PROPERTY);
+                    return basicClass;
+                }
+                for (AbstractInsnNode instruction =
+                     method.instructions.getFirst(); instruction != null;
+                     instruction = instruction.getNext()) {
+                    if (!(instruction instanceof MethodInsnNode)) {
+                        continue;
+                    }
+                    MethodInsnNode call = (MethodInsnNode)instruction;
+                    if (call.getOpcode() != Opcodes.INVOKEVIRTUAL
+                            || !"net/minecraft/client/gui/GuiScreen"
+                            .equals(call.owner)
+                            || !"(IIF)V".equals(call.desc)
+                            || !("drawScreen".equals(call.name)
+                            || "func_73863_a".equals(call.name))) {
+                        continue;
+                    }
+                    call.setOpcode(Opcodes.INVOKESTATIC);
+                    call.owner = GUI_ANIMATION_HOOK_OWNER;
+                    call.name = "drawScreen";
+                    call.desc = "(Lnet/minecraft/client/gui/GuiScreen;IIF)V";
+                    activateGuiAnimationPart(
+                            GUI_ANIMATION_DRAW_ACTIVE_PROPERTY);
+                    info("Patched GUI draw coordinates for animated screens");
+                    return write(owner);
+                }
+            }
+            warn("Could not locate EntityRenderer's GuiScreen draw call; "
+                    + "GUI animation hover coordinates will remain vanilla");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch animated GUI draw coordinates: "
+                    + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Keeps clicks and drag callbacks aligned with the rendered transform. */
+    private static byte[] transformGuiScreenInput(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("handleMouseInput".equals(method.name)
+                        || "func_146274_d".equals(method.name))
+                        || !"()V".equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, GUI_ANIMATION_HOOK_OWNER,
+                        "inverseMouseX")
+                        && containsHook(method, GUI_ANIMATION_HOOK_OWNER,
+                        "inverseMouseY")) {
+                    activateGuiAnimationPart(
+                            GUI_ANIMATION_INPUT_ACTIVE_PROPERTY);
+                    return basicClass;
+                }
+
+                MethodInsnNode buttonCall = null;
+                int olderStore = -1;
+                int newerStore = -1;
+                for (AbstractInsnNode instruction =
+                     method.instructions.getFirst(); instruction != null;
+                     instruction = instruction.getNext()) {
+                    if (instruction.getOpcode() == Opcodes.ISTORE) {
+                        olderStore = newerStore;
+                        newerStore = ((VarInsnNode)instruction).var;
+                    }
+                    if (instruction instanceof MethodInsnNode) {
+                        MethodInsnNode call = (MethodInsnNode)instruction;
+                        if (call.getOpcode() == Opcodes.INVOKESTATIC
+                                && "org/lwjgl/input/Mouse".equals(call.owner)
+                                && "getEventButton".equals(call.name)
+                                && "()I".equals(call.desc)) {
+                            buttonCall = call;
+                            break;
+                        }
+                    }
+                }
+                if (buttonCall == null || olderStore < 0
+                        || newerStore < 0 || olderStore == newerStore) {
+                    continue;
+                }
+
+                InsnList hook = new InsnList();
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                hook.add(new VarInsnNode(Opcodes.ILOAD, olderStore));
+                hook.add(new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        GUI_ANIMATION_HOOK_OWNER,
+                        "inverseMouseX",
+                        "(Lnet/minecraft/client/gui/GuiScreen;I)I"));
+                hook.add(new VarInsnNode(Opcodes.ISTORE, olderStore));
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                hook.add(new VarInsnNode(Opcodes.ILOAD, newerStore));
+                hook.add(new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        GUI_ANIMATION_HOOK_OWNER,
+                        "inverseMouseY",
+                        "(Lnet/minecraft/client/gui/GuiScreen;I)I"));
+                hook.add(new VarInsnNode(Opcodes.ISTORE, newerStore));
+                method.instructions.insertBefore(buttonCall, hook);
+                activateGuiAnimationPart(
+                        GUI_ANIMATION_INPUT_ACTIVE_PROPERTY);
+                info("Patched GuiScreen mouse coordinates for animated screens");
+                return write(owner);
+            }
+            warn("Could not locate GuiScreen#handleMouseInput; GUI animation "
+                    + "click coordinates will remain vanilla");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch animated GUI input coordinates: "
+                    + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Replaces GuiScreen's veil with the handler's stationary fade/blur pass. */
+    private static byte[] transformGuiScreenBackground(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("drawWorldBackground".equals(method.name)
+                        || "func_146270_b".equals(method.name))
+                        || !"(I)V".equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, GUI_ANIMATION_HOOK_OWNER,
+                        "beginVanillaBackground")
+                        && containsHook(method, GUI_ANIMATION_HOOK_OWNER,
+                        "endVanillaBackground")) {
+                    activateGuiAnimationPart(
+                            GUI_ANIMATION_BACKGROUND_ACTIVE_PROPERTY);
+                    return basicClass;
+                }
+                InsnList begin = new InsnList();
+                begin.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                begin.add(new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        GUI_ANIMATION_HOOK_OWNER,
+                        "beginVanillaBackground",
+                        "(Lnet/minecraft/client/gui/GuiScreen;)V"));
+                method.instructions.insert(begin);
+                for (AbstractInsnNode instruction =
+                     method.instructions.getFirst(); instruction != null;
+                     instruction = instruction.getNext()) {
+                    if (instruction.getOpcode() != Opcodes.RETURN) {
+                        continue;
+                    }
+                    method.instructions.insertBefore(
+                            instruction, new MethodInsnNode(
+                            Opcodes.INVOKESTATIC,
+                            GUI_ANIMATION_HOOK_OWNER,
+                            "endVanillaBackground", "()V"));
+                }
+                activateGuiAnimationPart(
+                        GUI_ANIMATION_BACKGROUND_ACTIVE_PROPERTY);
+                info("Patched GuiScreen backdrop for stationary GUI fades");
+                return write(owner);
+            }
+            warn("Could not locate GuiScreen#drawWorldBackground; animated "
+                    + "GUI backdrops will remain attached to the content");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch stationary GUI backdrops: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Routes slot item rendering through the client-side movement animator. */
+    private static byte[] transformGuiContainer(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            boolean framePatched = false;
+            boolean iconPatched = false;
+            boolean overlayPatched = false;
+            boolean intentPatched = false;
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (("handleMouseClick".equals(method.name)
+                        || "func_146984_a".equals(method.name))
+                        && "(Lnet/minecraft/inventory/Slot;III)V"
+                        .equals(method.desc)) {
+                    if (!containsHook(method,
+                            SMOOTH_INVENTORY_HOOK_OWNER,
+                            "recordTransferIntent")) {
+                        InsnList intent = new InsnList();
+                        intent.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                        intent.add(new VarInsnNode(Opcodes.ILOAD, 4));
+                        intent.add(new MethodInsnNode(
+                                Opcodes.INVOKESTATIC,
+                                SMOOTH_INVENTORY_HOOK_OWNER,
+                                "recordTransferIntent",
+                                "(Lnet/minecraft/client/gui/inventory/"
+                                        + "GuiContainer;I)V",
+                                false));
+                        method.instructions.insert(intent);
+                    }
+                    intentPatched = containsHook(method,
+                            SMOOTH_INVENTORY_HOOK_OWNER,
+                            "recordTransferIntent");
+                }
+                if (("drawScreen".equals(method.name)
+                        || "func_73863_a".equals(method.name))
+                        && "(IIF)V".equals(method.desc)) {
+                    if (!containsHook(method,
+                            SMOOTH_INVENTORY_HOOK_OWNER, "beginFrame")) {
+                        InsnList begin = new InsnList();
+                        begin.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                        begin.add(new MethodInsnNode(
+                                Opcodes.INVOKESTATIC,
+                                SMOOTH_INVENTORY_HOOK_OWNER,
+                                "beginFrame",
+                                "(Lnet/minecraft/client/gui/inventory/"
+                                        + "GuiContainer;)V",
+                                false));
+                        method.instructions.insert(begin);
+                    }
+                    framePatched = containsHook(method,
+                            SMOOTH_INVENTORY_HOOK_OWNER, "beginFrame");
+                }
+                if (!("func_146977_a".equals(method.name)
+                        || "drawSlot".equals(method.name))
+                        || !"(Lnet/minecraft/inventory/Slot;)V"
+                        .equals(method.desc)) {
+                    continue;
+                }
+                for (AbstractInsnNode instruction =
+                     method.instructions.getFirst(); instruction != null;) {
+                    AbstractInsnNode next = instruction.getNext();
+                    if (instruction instanceof MethodInsnNode) {
+                        MethodInsnNode call = (MethodInsnNode)instruction;
+                        if (call.getOpcode() == Opcodes.INVOKEVIRTUAL
+                                && "net/minecraft/client/renderer/entity/"
+                                .concat("RenderItem").equals(call.owner)
+                                && "(Lnet/minecraft/client/gui/FontRenderer;"
+                                .concat("Lnet/minecraft/client/renderer/"
+                                        + "texture/TextureManager;"
+                                        + "Lnet/minecraft/item/ItemStack;II)V")
+                                .equals(call.desc)) {
+                            method.instructions.insertBefore(call,
+                                    containerAndSlotLoads());
+                            call.setOpcode(Opcodes.INVOKESTATIC);
+                            call.owner = SMOOTH_INVENTORY_HOOK_OWNER;
+                            call.name = "renderItemAndEffectIntoGUI";
+                            call.desc = "(Lnet/minecraft/client/renderer/"
+                                    + "entity/RenderItem;"
+                                    + "Lnet/minecraft/client/gui/FontRenderer;"
+                                    + "Lnet/minecraft/client/renderer/texture/"
+                                    + "TextureManager;"
+                                    + "Lnet/minecraft/item/ItemStack;II"
+                                    + "Lnet/minecraft/client/gui/inventory/"
+                                    + "GuiContainer;"
+                                    + "Lnet/minecraft/inventory/Slot;)V";
+                            call.itf = false;
+                            iconPatched = true;
+                        } else if (call.getOpcode() == Opcodes.INVOKEVIRTUAL
+                                && "net/minecraft/client/renderer/entity/"
+                                .concat("RenderItem").equals(call.owner)
+                                && "(Lnet/minecraft/client/gui/FontRenderer;"
+                                .concat("Lnet/minecraft/client/renderer/"
+                                        + "texture/TextureManager;"
+                                        + "Lnet/minecraft/item/ItemStack;II"
+                                        + "Ljava/lang/String;)V")
+                                .equals(call.desc)) {
+                            method.instructions.insertBefore(call,
+                                    containerAndSlotLoads());
+                            call.setOpcode(Opcodes.INVOKESTATIC);
+                            call.owner = SMOOTH_INVENTORY_HOOK_OWNER;
+                            call.name = "renderItemOverlayIntoGUI";
+                            call.desc = "(Lnet/minecraft/client/renderer/"
+                                    + "entity/RenderItem;"
+                                    + "Lnet/minecraft/client/gui/FontRenderer;"
+                                    + "Lnet/minecraft/client/renderer/texture/"
+                                    + "TextureManager;"
+                                    + "Lnet/minecraft/item/ItemStack;II"
+                                    + "Ljava/lang/String;"
+                                    + "Lnet/minecraft/client/gui/inventory/"
+                                    + "GuiContainer;"
+                                    + "Lnet/minecraft/inventory/Slot;)V";
+                            call.itf = false;
+                            overlayPatched = true;
+                        }
+                    }
+                    instruction = next;
+                }
+            }
+            if (framePatched && iconPatched && overlayPatched
+                    && intentPatched) {
+                System.setProperty(
+                        SMOOTH_INVENTORY_ACTIVE_PROPERTY, "true");
+                info("Installed smooth inventory item movement hooks");
+                return write(owner);
+            }
+            warn("Could not install all smooth inventory item hooks");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch smooth inventory item rendering: "
+                    + throwable);
+            return basicClass;
+        }
+    }
+
+    private static InsnList containerAndSlotLoads() {
+        InsnList loads = new InsnList();
+        loads.add(new VarInsnNode(Opcodes.ALOAD, 0));
+        loads.add(new VarInsnNode(Opcodes.ALOAD, 1));
+        return loads;
+    }
+
     private static byte[] transformDebugBox(byte[] basicClass) {
         try {
             ClassNode owner = read(basicClass);
@@ -2363,6 +2720,17 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             cursor = cursor.getPrevious();
         }
         return cursor;
+    }
+
+    private static void activateGuiAnimationPart(String property) {
+        System.setProperty(property, "true");
+        if (Boolean.getBoolean(GUI_ANIMATION_DRAW_ACTIVE_PROPERTY)
+                && Boolean.getBoolean(
+                GUI_ANIMATION_INPUT_ACTIVE_PROPERTY)
+                && Boolean.getBoolean(
+                GUI_ANIMATION_BACKGROUND_ACTIVE_PROPERTY)) {
+            System.setProperty(GUI_ANIMATION_ACTIVE_PROPERTY, "true");
+        }
     }
 
     private static void warn(String message) {

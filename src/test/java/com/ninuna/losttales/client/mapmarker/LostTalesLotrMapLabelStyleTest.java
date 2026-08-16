@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
@@ -9,6 +10,8 @@ public final class LostTalesLotrMapLabelStyleTest {
 
     @Test
     public void plainWhiteBecomesTheInterfacesOwnWhite() {
+        assertEquals(LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
+                LostTalesLotrMapLabelStyle.LABEL_RGB);
         assertEquals(OPAQUE | LostTalesLotrMapLabelStyle.LABEL_RGB,
                 LostTalesLotrMapLabelStyle.restyle(OPAQUE | 0xFFFFFF));
         assertEquals(LostTalesLotrMapLabelStyle.LABEL_RGB,

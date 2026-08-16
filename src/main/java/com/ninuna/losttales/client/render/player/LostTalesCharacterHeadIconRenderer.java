@@ -30,8 +30,10 @@ public final class LostTalesCharacterHeadIconRenderer {
 
     private static final ResourceLocation DEFAULT_PLAYER_SKIN =
             new ResourceLocation("textures/entity/steve.png");
-    /** Vanilla's headwear cube is 9 units wide around an 8-unit head. */
-    private static final float OUTER_LAYER_SCALE = 9.0F / 8.0F;
+    /** Slightly raised headwear makes the model's second layer legible at 8px. */
+    private static final float OUTER_LAYER_SCALE = 9.5F / 8.0F;
+    private static final float OUTER_LAYER_DEPTH = 0.55F;
+    private static final float OUTER_LAYER_SHADE = 0.36F;
     private static final Map<UUID, ResourceLocation> ACCOUNT_SKINS =
             new ConcurrentHashMap<UUID, ResourceLocation>();
     private static final Set<UUID> REQUESTED_ACCOUNT_SKINS =
@@ -299,18 +301,24 @@ public final class LostTalesCharacterHeadIconRenderer {
             float outerOffset = (outerSize - size) * 0.5F;
             float outerX = x - outerOffset;
             float outerY = y - outerOffset;
-            if (drawFeatures && layout.getOverlayKind()
-                    == CharacterHeadIconLayout.OverlayKind.MINECRAFT) {
-                drawTexturedQuad(
-                        outerX, outerY, outerSize, outerSize,
-                        40.0F, 8.0F, 8.0F, 8.0F,
-                        64.0F, layout.getImageHeight());
-            } else if (drawFeatures && layout.getOverlayKind()
-                    == CharacterHeadIconLayout.OverlayKind.LOTR_EXTENDED) {
-                drawLotrExtendedOverlay(
-                        outerX, outerY, outerSize,
-                        layout.getExtendedOverlayHeight(),
-                        layout.getImageHeight());
+            if (drawFeatures && (layout.getOverlayKind()
+                    == CharacterHeadIconLayout.OverlayKind.MINECRAFT
+                    || layout.getOverlayKind()
+                    == CharacterHeadIconLayout.OverlayKind.LOTR_EXTENDED)) {
+                // A tinted offset copy provides the missing visual depth of
+                // the model's raised headwear cube without moving its pixels.
+                GL11.glColor4f(
+                        Math.min(1.0F, red) * OUTER_LAYER_SHADE,
+                        Math.min(1.0F, green) * OUTER_LAYER_SHADE,
+                        Math.min(1.0F, blue) * OUTER_LAYER_SHADE,
+                        Math.min(1.0F, alpha) * 0.82F);
+                drawOuterOverlay(layout,
+                        outerX + OUTER_LAYER_DEPTH,
+                        outerY + OUTER_LAYER_DEPTH, outerSize);
+                GL11.glColor4f(
+                        Math.min(1.0F, red), Math.min(1.0F, green),
+                        Math.min(1.0F, blue), Math.min(1.0F, alpha));
+                drawOuterOverlay(layout, outerX, outerY, outerSize);
             } else if (drawFeatures && layout.getOverlayKind()
                     == CharacterHeadIconLayout.OverlayKind.LOTR_ORC_FEATURES) {
                 drawOrcNose(x, y, size, layout.getImageHeight());
@@ -324,6 +332,23 @@ public final class LostTalesCharacterHeadIconRenderer {
             return false;
         } finally {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        }
+    }
+
+    private static void drawOuterOverlay(CharacterHeadIconLayout layout,
+                                         float x,
+                                         float y,
+                                         float size) {
+        if (layout.getOverlayKind()
+                == CharacterHeadIconLayout.OverlayKind.MINECRAFT) {
+            drawTexturedQuad(
+                    x, y, size, size,
+                    40.0F, 8.0F, 8.0F, 8.0F,
+                    64.0F, layout.getImageHeight());
+        } else {
+            drawLotrExtendedOverlay(
+                    x, y, size, layout.getExtendedOverlayHeight(),
+                    layout.getImageHeight());
         }
     }
 
@@ -350,11 +375,10 @@ public final class LostTalesCharacterHeadIconRenderer {
     }
 
     /**
-     * Projects the complete front of LOTR's extended headwear cube into the
-     * portrait. Human/elf cubes are 8x16 while dwarf/hobbit cubes are 8x12;
-     * keeping the source rows contiguous is essential because their lower
-     * rows form the beard. Splitting and overlapping those rows enlarges the
-     * beard over the eyes, especially on dwarf skins.
+     * Projects the configured portrait portion of LOTR's extended headwear
+     * cube. Human and elf portraits use the upper 8x8 head region, preserving
+     * the model's pixel-for-pixel hat alignment; compact dwarf/hobbit layouts
+     * deliberately retain their additional beard rows.
      */
     private static void drawLotrExtendedOverlay(float x,
                                                 float y,
