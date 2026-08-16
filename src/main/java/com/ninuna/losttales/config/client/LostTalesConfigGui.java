@@ -89,6 +89,7 @@ public class LostTalesConfigGui extends GuiConfig {
         List<IConfigElement> missives = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_MISSIVES)).getChildElements();
         List<IConfigElement> combatMarkers = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_COMBAT_MARKERS)).getChildElements();
         List<IConfigElement> party = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_PARTY)).getChildElements();
+        List<IConfigElement> chat = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_CHAT)).getChildElements();
 
         elements.add(group("hud", "losttales.config.category.client.hud", pick(client,
                 "showLostTalesHud", "hudPlacementPreset",
@@ -109,6 +110,14 @@ public class LostTalesConfigGui extends GuiConfig {
                 "questHudMaxObjectives", "questHudMaxTrackedQuests", "questHudObjectiveLineCount",
                 "showQuestHudNotifications", "showWorldQuestMarkers", "showDiscoveredWorldMapMarkers",
                 "worldQuestMarkerMaxDistance", "showQuestChatFeedback", "playQuestSounds")));
+        List<IConfigElement> chatOptions = pick(client,
+                "showTimestamps", "enableChatAnimations",
+                "chatAnimationDurationMillis",
+                "chatInputAnimationDurationMillis",
+                "chatSelectorAnimationDurationMillis");
+        chatOptions.addAll(chat);
+        elements.add(group("chat", "losttales.config.category.chat",
+                chatOptions));
         elements.add(group("questRules", "losttales.config.category.quests.rules", quests));
         elements.add(group("missives", "losttales.config.category.missives", missives));
         elements.add(group("combatMarkers", "losttales.config.category.combatMarkers", combatMarkers));

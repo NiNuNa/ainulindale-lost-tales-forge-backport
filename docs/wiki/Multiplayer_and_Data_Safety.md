@@ -4,7 +4,7 @@ Lost Tales is designed around dedicated-server authority. The client supplies re
 
 ## Networking
 
-The network channel currently registers 31 fixed packet discriminators. Existing discriminator numbers and valid wire layouts are compatibility-sensitive.
+The network channel currently registers 37 fixed packet discriminators (IDs 0-36). Existing discriminator numbers and valid wire layouts are compatibility-sensitive.
 
 Client-to-server requests are scheduled on the server thread and pass through request-type rate limits. Operations check relevant conditions such as dimension, reach, line of sight, lifecycle state, ownership, expected revision, current item, slot range, and active character. Server-to-client packets are decoded with bounded counts, strings, stacks, positions, and numeric values before their work is queued on the client thread.
 
@@ -20,7 +20,7 @@ Character switching uses last-known-good snapshots, durable journals, lifecycle 
 
 ## Visibility and privacy
 
-Party status, location tracking, combat contacts, and One Ring concealment are derived by the server. The client only receives information relevant to its active party and allowed view. Hostile markers represent current server-observed aggression and are not permanent radar data.
+Party status, location tracking, combat contacts, chat recipients, and One Ring concealment are derived by the server. Proximity chat is filtered by dimension and configured distance before delivery, and party chat is sent only to online accounts whose active character is still a validated party member. The client only receives information relevant to its active party and allowed view. Hostile markers represent current server-observed aggression and are not permanent radar data.
 
 ## Deployment guidance
 
@@ -31,4 +31,3 @@ Party status, location tracking, combat contacts, and One Ring concealment are d
 - Test login, death, respawn, dimension travel, character switching, party reconnects, and shutdown recovery in a staging copy before deploying an update.
 
 The automated suite covers packet validation, storage codecs, switching rules, coremod transformations, accessories, parties, quests, maps, and camera math. It does not replace a real multi-client dedicated-server smoke test.
-

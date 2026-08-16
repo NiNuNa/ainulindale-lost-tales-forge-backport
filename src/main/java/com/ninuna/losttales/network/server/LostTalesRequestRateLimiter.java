@@ -31,7 +31,9 @@ public final class LostTalesRequestRateLimiter {
         // Ranged aim is synchronized every two client ticks while active.
         THIRD_PERSON_AIM(70, 5000L),
         WAYSTONE_SETTINGS(20, 5000L),
-        WAYSTONE_TRAVEL(6, 5000L);
+        WAYSTONE_TRAVEL(6, 5000L),
+        // Normal conversation can be fast, but sustained packet floods are bounded.
+        CHAT_MESSAGE(20, 5000L);
 
         private final int maximumRequests;
         private final long windowMillis;

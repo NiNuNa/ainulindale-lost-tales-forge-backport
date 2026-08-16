@@ -14,6 +14,8 @@ import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
+import com.ninuna.losttales.client.chat.LostTalesChatClientHandler;
+import com.ninuna.losttales.client.chat.LostTalesChatPresentation;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraHooks;
 import com.ninuna.losttales.client.camera.ThirdPersonBlockActionHooks;
 import com.ninuna.losttales.client.camera.ThirdPersonEntityActionHooks;
@@ -55,6 +57,7 @@ import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
 import com.ninuna.losttales.accessory.player.AccessoryPlayerData;
@@ -90,6 +93,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     private LostTalesClientEventHandler clientEventHandler;
     private LostTalesKeyBindings keyBindings;
     private CharacterClientTaskQueue characterClientTaskQueue;
+    private LostTalesChatClientHandler chatClientHandler;
 
     @Override
     public void preInit(FMLPreInitializationEvent event) {
@@ -99,6 +103,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                 event.getModConfigurationDirectory());
         ThirdPersonCameraRuntime.resetSession();
         clientEventHandler = new LostTalesClientEventHandler();
+        chatClientHandler = new LostTalesChatClientHandler();
         keyBindings = new LostTalesKeyBindings();
         characterClientTaskQueue = new CharacterClientTaskQueue();
         keyBindings.register();
@@ -396,6 +401,11 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         ClientPartyTrackingCache.accept(packet.getSnapshot());
         ClientPartyTrackingCache.validatePartyState(
                 ClientPartyStateCache.getSnapshot());
+    }
+
+    @Override
+    public void handleChatMessage(LostTalesChatMessagePacket packet) {
+        LostTalesChatPresentation.receive(packet);
     }
 
     @Override

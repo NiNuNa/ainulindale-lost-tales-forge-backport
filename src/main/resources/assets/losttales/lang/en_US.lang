@@ -628,6 +628,9 @@ tile.missive_board.name=Missive Board
 container.losttales.missive_board=Missive Board
 container.losttales.waystone=Waystone
 chat.losttales.waystone.place_failed=The waystone could not create an authoritative marker. The block was returned.
+chat.losttales.channel.party_unavailable=Party chat is unavailable because you are not currently in a valid party.
+chat.losttales.channel.faction_unavailable=Faction chat is unavailable because your active character has no valid faction.
+gui.losttales.chat.copied=Copied to clipboard
 chat.losttales.waystone.break_denied=Only this waystone's owner or a server operator may remove it.
 losttales.config.category.waystones=Waystones
 gui.losttales.missive_board.accept=Accept
@@ -639,6 +642,8 @@ losttales.config.category.combatMarkers.tooltip=Server-authoritative range, upda
 
 losttales.config.category.party=Party Status
 losttales.config.category.party.tooltip=Server-authoritative party health and availability update cadence.
+losttales.config.category.chat=Chat Channels
+losttales.config.category.chat.tooltip=Server proximity routing and client timestamp and animation preferences.
 
 # Party HUD
 gui.losttales.party.hud.status_unavailable=Status unavailable

@@ -16,21 +16,21 @@ import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The map's own pointer, and the only thing that touches the real one.
+ * Lost Tales' GUI pointer, and the only thing that touches the real one.
  *
  * <p>Nothing is grabbed and nothing is moved: the operating system's cursor is
  * replaced with one that has no pixels in it, so the pointer keeps behaving
- * exactly as it did — clicks, drags, hovering and every popup control still
+ * exactly as it did — clicks, drags, hovering and every GUI control still
  * see the same coordinate — and only its appearance changes. Grabbing it
  * instead would centre it and leave the map with no pointer at all.</p>
  *
  * <p>The drawn cursor's tip sits on that same coordinate, so what the player
- * aims at and what the map hit-tests are the same pixel by construction rather
+ * aims at and what the GUI hit-tests are the same pixel by construction rather
  * than by an offset that has to be kept in step.</p>
  *
  * <p>Native cursor state outlives any one screen, so it is owned here alone and
- * given back on every way out: closing the map, another screen taking over,
- * and a frame that failed to draw. A hidden cursor left behind is unusable
+ * given back whenever Minecraft leaves the GUI layer or a frame fails to draw.
+ * A hidden cursor left behind is unusable
  * desktop, not a cosmetic bug.</p>
  */
 @SideOnly(Side.CLIENT)
@@ -61,10 +61,10 @@ public final class LostTalesMapCursor {
     /**
      * Takes the pointer over, if this platform lets it.
      *
-     * <p>A platform that refuses a custom cursor keeps its own, and the map
+     * <p>A platform that refuses a custom cursor keeps its own, and the GUI
      * simply draws nothing over it rather than drawing two pointers.</p>
      */
-    static void acquire() {
+    public static void acquire() {
         if (held || cursorUnavailable) {
             return;
         }
@@ -78,7 +78,7 @@ public final class LostTalesMapCursor {
             cursorUnavailable = true;
             held = false;
             FMLLog.warning(
-                    "[%s] Map cursor disabled; keeping the system pointer (%s)",
+                    "[%s] GUI cursor disabled; keeping the system pointer (%s)",
                     LostTalesMetaData.MOD_ID, throwable.toString());
         }
     }
@@ -98,19 +98,17 @@ public final class LostTalesMapCursor {
     }
 
     /**
-     * Gives the pointer back if the map is no longer the screen holding it.
+     * Gives the pointer back when Minecraft no longer has an open GUI.
      *
-     * <p>The safety net for the ways a screen can stop being current without
-     * closing tidily. Cheap enough to run every client tick, and the only
-     * thing standing between a crash inside the map screen and a desktop with
-     * no pointer.</p>
+     * <p>The safety net for screens that stop being current without closing
+     * tidily. Keeping ownership while one GUI replaces another also avoids a
+     * one-frame native-pointer flash during transitions.</p>
      */
     public static void releaseIfUnowned(Minecraft minecraft) {
         if (!held) {
             return;
         }
-        if (minecraft == null
-                || !(minecraft.currentScreen instanceof LostTalesLotrMapGui)) {
+        if (minecraft == null || minecraft.currentScreen == null) {
             release();
         }
     }
@@ -120,10 +118,9 @@ public final class LostTalesMapCursor {
     }
 
     /**
-     * Draws the pointer, last of everything, at the position the map is
-     * hit-testing against.
+     * Draws the pointer, last of everything, at the GUI's hit-test position.
      */
-    static void render(Minecraft minecraft, int mouseX, int mouseY) {
+    public static void render(Minecraft minecraft, int mouseX, int mouseY) {
         if (!held || minecraft == null
                 || minecraft.getTextureManager() == null) {
             return;

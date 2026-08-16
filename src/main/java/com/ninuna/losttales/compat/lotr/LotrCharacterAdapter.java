@@ -328,6 +328,24 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         }
     }
 
+    /** Resolves the configured character faction to LOTR's readable RGB color. */
+    public synchronized int getFactionColor(String factionId, int fallback) {
+        String normalizedId = normalizeFactionId(factionId);
+        if (normalizedId.length() == 0) {
+            return fallback & 0xFFFFFF;
+        }
+        try {
+            LOTRFaction faction = findFaction(normalizedId);
+            return faction == null
+                    ? fallback & 0xFFFFFF
+                    : faction.getFactionColor() & 0xFFFFFF;
+        } catch (LinkageError error) {
+            return fallback & 0xFFFFFF;
+        } catch (RuntimeException exception) {
+            return fallback & 0xFFFFFF;
+        }
+    }
+
     /**
      * Resolves a stable add-on faction ID to LOTR's live faction object.
      * Package-private so character-state adapters can use the public LOTR API

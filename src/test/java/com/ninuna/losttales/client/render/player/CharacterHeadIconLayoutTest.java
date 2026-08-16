@@ -24,14 +24,18 @@ public final class CharacterHeadIconLayoutTest {
 
     @Test
     public void orcAndUrukDoNotSampleVanillaHeadwearGeometry() {
-        assertBaseOnlyLayout(CharacterRaceRegistry.ORC, 8.0F, 32.0F);
-        assertBaseOnlyLayout(CharacterRaceRegistry.URUK, 8.0F, 32.0F);
+        assertFeatureLayout(CharacterRaceRegistry.ORC, 8.0F, 32.0F,
+                CharacterHeadIconLayout.OverlayKind.LOTR_ORC_FEATURES);
+        assertFeatureLayout(CharacterRaceRegistry.URUK, 8.0F, 32.0F,
+                CharacterHeadIconLayout.OverlayKind.LOTR_ORC_FEATURES);
     }
 
     @Test
     public void halfTrollUsesItsTenPixelHeadFace() {
-        assertBaseOnlyLayout(
-                CharacterRaceRegistry.HALF_TROLL, 10.0F, 64.0F);
+        assertFeatureLayout(CharacterRaceRegistry.HALF_TROLL,
+                10.0F, 64.0F,
+                CharacterHeadIconLayout.OverlayKind
+                        .LOTR_HALF_TROLL_FEATURES);
     }
 
     @Test
@@ -59,13 +63,12 @@ public final class CharacterHeadIconLayoutTest {
                 layout.getExtendedOverlayHeight(), EPSILON);
     }
 
-    private static void assertBaseOnlyLayout(
-            String raceId, float faceSize, float imageHeight) {
+    private static void assertFeatureLayout(
+            String raceId, float faceSize, float imageHeight,
+            CharacterHeadIconLayout.OverlayKind featureKind) {
         CharacterHeadIconLayout layout =
                 CharacterHeadIconLayout.forConfiguredRace(raceId);
-        assertEquals(
-                CharacterHeadIconLayout.OverlayKind.NONE,
-                layout.getOverlayKind());
+        assertEquals(featureKind, layout.getOverlayKind());
         assertEquals(faceSize, layout.getFaceSize(), EPSILON);
         assertEquals(imageHeight, layout.getImageHeight(), EPSILON);
         assertEquals(0.0F, layout.getExtendedOverlayHeight(), EPSILON);

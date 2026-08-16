@@ -19,6 +19,8 @@ import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
+import com.ninuna.losttales.client.chat.ClientChatChannelState;
+import com.ninuna.losttales.client.chat.LostTalesChatPresentation;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.client.gui.LostTalesGuiInventory;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
@@ -38,6 +40,7 @@ import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.client.render.player.LostTalesPlayerCapeRenderHook;
+import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.client.render.renderer.item.LostTalesItemRendererHammer;
 import com.ninuna.losttales.client.render.renderer.item.LostTalesRendererLargeItems;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
@@ -119,6 +122,9 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientPartyStateCache.clear();
         ClientPartyMemberStatusCache.clear();
         ClientPartyTrackingCache.clear();
+        ClientChatChannelState.clear();
+        LostTalesChatPresentation.clear();
+        LostTalesCharacterHeadIconRenderer.clearAccountSkinCache();
         ClientAccessoryEffectCache.clear();
         WraithWorldVisualEffect.reset();
         CharacterClientTaskQueue.clear();
@@ -142,14 +148,9 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         WraithWorldVisualEffect.onClientTick(event);
     }
 
-    /**
-     * The map hides the system pointer while it owns it and gives it back when
-     * it closes. This is what covers the ways a screen can stop being current
-     * without closing tidily — a crash inside its own draw, above all — where
-     * the cost of getting it wrong is a desktop with no pointer on it.
-     */
+    /** Returns the native pointer as soon as Minecraft leaves its GUI layer. */
     @SubscribeEvent
-    public void releaseMapCursorWhenUnowned(TickEvent.ClientTickEvent event) {
+    public void releaseGuiCursorWhenUnowned(TickEvent.ClientTickEvent event) {
         if (event != null && event.phase == TickEvent.Phase.END) {
             LostTalesMapCursor.releaseIfUnowned(Minecraft.getMinecraft());
         }
@@ -298,6 +299,18 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
                 slot.yDisplayPosition = 20;
             }
         }
+    }
+
+    /** Draws the same pointer used by the LOTR map over every other GUI. */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void renderGuiCursor(GuiScreenEvent.DrawScreenEvent.Post event) {
+        if (event == null || event.gui == null
+                || event.gui instanceof LostTalesLotrMapGui) {
+            return;
+        }
+        LostTalesMapCursor.acquire();
+        LostTalesMapCursor.render(
+                Minecraft.getMinecraft(), event.mouseX, event.mouseY);
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)

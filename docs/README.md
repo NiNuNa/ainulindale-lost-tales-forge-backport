@@ -5,6 +5,7 @@ This documentation describes the systems that are implemented in the Minecraft 1
 Start with [the project overview](wiki/Ainulindalë_Lost_Tales.md), then use the pages below for details.
 
 - [Roleplay characters](wiki/RP-Characters.md)
+- [Chat channels](wiki/Chat_Channels.md)
 - [Playable races](wiki/Races.md)
 - [Factions](wiki/Factions.md)
 - [Parties](wiki/Parties.md)

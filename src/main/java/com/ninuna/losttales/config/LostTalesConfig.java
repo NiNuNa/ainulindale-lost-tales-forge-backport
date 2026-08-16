@@ -16,6 +16,7 @@ public final class LostTalesConfig {
     public static final String CATEGORY_CHARACTERS = "characters";
     public static final String CATEGORY_COMBAT_MARKERS = "combat_markers";
     public static final String CATEGORY_PARTY = "party";
+    public static final String CATEGORY_CHAT = "chat";
     public static final String CATEGORY_RANGED_COMBAT = "ranged_combat";
     public static final String CATEGORY_WAYSTONES = "waystones";
 
@@ -102,6 +103,15 @@ public final class LostTalesConfig {
 
     public static boolean showQuestChatFeedback = true;
     public static boolean playQuestSounds = true;
+
+    /** Server-authoritative recipient radius for the Proximity channel. */
+    public static int chatProximityRadius = 64;
+    /** Client-only presentation preferences; neither affects recipients. */
+    public static boolean showChatTimestamps = true;
+    public static boolean enableChatAnimations = true;
+    public static int chatAnimationDurationMillis = 180;
+    public static int chatInputAnimationDurationMillis = 180;
+    public static int chatSelectorAnimationDurationMillis = 140;
 
     public static boolean enableQuestPrerequisites = true;
     public static boolean enableQuestRewards = true;
@@ -715,6 +725,50 @@ public final class LostTalesConfig {
                     showQuestChatFeedback,
                     "Send lightweight chat feedback when quests start, advance, or complete."
             );
+            chatProximityRadius = config.getInt(
+                    "proximityRadius",
+                    CATEGORY_CHAT,
+                    chatProximityRadius,
+                    1,
+                    512,
+                    "Server-authoritative maximum distance in blocks for Proximity chat recipients."
+            );
+            showChatTimestamps = config.getBoolean(
+                    "showTimestamps",
+                    CATEGORY_CLIENT,
+                    showChatTimestamps,
+                    "Show short local-time timestamps on Lost Tales player channel messages."
+            );
+            enableChatAnimations = config.getBoolean(
+                    "enableChatAnimations",
+                    CATEGORY_CLIENT,
+                    enableChatAnimations,
+                    "Use subtle time-based message, input-bar, and channel-selector animations."
+            );
+            chatAnimationDurationMillis = config.getInt(
+                    "chatAnimationDurationMillis",
+                    CATEGORY_CLIENT,
+                    chatAnimationDurationMillis,
+                    60,
+                    1000,
+                    "Duration of player-message entry easing in milliseconds."
+            );
+            chatInputAnimationDurationMillis = config.getInt(
+                    "chatInputAnimationDurationMillis",
+                    CATEGORY_CLIENT,
+                    chatInputAnimationDurationMillis,
+                    60,
+                    1000,
+                    "Duration of the chat input bar's opening animation in milliseconds."
+            );
+            chatSelectorAnimationDurationMillis = config.getInt(
+                    "chatSelectorAnimationDurationMillis",
+                    CATEGORY_CLIENT,
+                    chatSelectorAnimationDurationMillis,
+                    60,
+                    1000,
+                    "Duration of the upward channel-selector opening animation in milliseconds."
+            );
             playQuestSounds = config.getBoolean(
                     "playQuestSounds",
                     CATEGORY_CLIENT,
@@ -1249,6 +1303,8 @@ public final class LostTalesConfig {
         config.getCategory(CATEGORY_CHARACTERS).setLanguageKey("losttales.config.category.characters");
         config.getCategory(CATEGORY_COMBAT_MARKERS).setLanguageKey("losttales.config.category.combatMarkers");
         config.getCategory(CATEGORY_PARTY).setLanguageKey("losttales.config.category.party");
+        config.getCategory(CATEGORY_CHAT).setLanguageKey(
+                "losttales.config.category.chat");
         config.getCategory(CATEGORY_RANGED_COMBAT).setLanguageKey(
                 "losttales.config.category.rangedCombat");
         config.getCategory(CATEGORY_WAYSTONES).setLanguageKey(
@@ -1262,6 +1318,22 @@ public final class LostTalesConfig {
 
         config.get(CATEGORY_RANGED_COMBAT, "enableChargeTiers",
                 enableChargeTiers).set(enableChargeTiers);
+        config.get(CATEGORY_CHAT, "proximityRadius",
+                chatProximityRadius).set(chatProximityRadius);
+        config.get(CATEGORY_CLIENT, "showTimestamps",
+                showChatTimestamps).set(showChatTimestamps);
+        config.get(CATEGORY_CLIENT, "enableChatAnimations",
+                enableChatAnimations).set(enableChatAnimations);
+        config.get(CATEGORY_CLIENT, "chatAnimationDurationMillis",
+                chatAnimationDurationMillis).set(
+                chatAnimationDurationMillis);
+        config.get(CATEGORY_CLIENT, "chatInputAnimationDurationMillis",
+                chatInputAnimationDurationMillis).set(
+                chatInputAnimationDurationMillis);
+        config.get(CATEGORY_CLIENT,
+                "chatSelectorAnimationDurationMillis",
+                chatSelectorAnimationDurationMillis).set(
+                chatSelectorAnimationDurationMillis);
         config.get(CATEGORY_RANGED_COMBAT, "chargeTierOneTicks",
                 chargeTierOneTicks).set(chargeTierOneTicks);
         config.get(CATEGORY_RANGED_COMBAT, "chargeTierTwoTicks",

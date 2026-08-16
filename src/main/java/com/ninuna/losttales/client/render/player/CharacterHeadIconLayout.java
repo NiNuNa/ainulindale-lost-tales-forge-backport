@@ -11,7 +11,9 @@ final class CharacterHeadIconLayout {
     enum OverlayKind {
         NONE,
         MINECRAFT,
-        LOTR_EXTENDED
+        LOTR_EXTENDED,
+        LOTR_ORC_FEATURES,
+        LOTR_HALF_TROLL_FEATURES
     }
 
     private final float imageHeight;
@@ -61,10 +63,16 @@ final class CharacterHeadIconLayout {
             // head. Its inherited headwear cube is intentionally hidden.
             return new CharacterHeadIconLayout(
                     64.0F, 10.0F, 10.0F, 10.0F,
-                    OverlayKind.NONE, 0.0F);
+                    OverlayKind.LOTR_HALF_TROLL_FEATURES, 0.0F);
         }
-        // Orc and Uruk details are part of the 64x32 base face. Applying the
-        // vanilla hat region would sample unrelated model geometry.
+        if (CharacterRaceRegistry.ORC.equals(canonicalRace)
+                || CharacterRaceRegistry.URUK.equals(canonicalRace)) {
+            // Their ModelOrc nose is a separate child cuboid; the normal
+            // Minecraft hat region contains unrelated body geometry.
+            return new CharacterHeadIconLayout(
+                    32.0F, 8.0F, 8.0F, 8.0F,
+                    OverlayKind.LOTR_ORC_FEATURES, 0.0F);
+        }
         return new CharacterHeadIconLayout(
                 32.0F, 8.0F, 8.0F, 8.0F,
                 OverlayKind.NONE, 0.0F);

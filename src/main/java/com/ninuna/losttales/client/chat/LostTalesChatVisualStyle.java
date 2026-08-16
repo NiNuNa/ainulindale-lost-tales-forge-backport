@@ -1,0 +1,119 @@
+package com.ninuna.losttales.client.chat;
+
+import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.event.ClickEvent;
+import net.minecraft.util.IChatComponent;
+
+/** Lost Tales' ivory text and plum-black shadow treatment for chat. */
+final class LostTalesChatVisualStyle {
+    static final int IVORY = LostTalesSkyrimUiStyle.rgb(
+            LostTalesSkyrimUiStyle.HUD_LABEL);
+    static final int SHADOW = LostTalesSkyrimUiStyle.rgb(
+            LostTalesSkyrimUiStyle.HUD_SHADOW);
+
+    private LostTalesChatVisualStyle() {}
+
+    static void drawFormatted(FontRenderer font, IChatComponent line,
+                              ChatHeadMarker.Data metadata,
+                              int x, int y, int alpha) {
+        if (font == null || line == null || alpha <= 3) {
+            return;
+        }
+        drawComponentPass(font, line, metadata,
+                x + 1, y + 1, alpha, true);
+        drawComponentPass(font, line, metadata,
+                x, y, alpha, false);
+    }
+
+    static void drawPlain(FontRenderer font, String text,
+                          int x, int y, int alpha) {
+        if (font == null || text == null || alpha <= 3) {
+            return;
+        }
+        font.drawString(text, x + 1, y + 1,
+                argb(SHADOW, alpha));
+        font.drawString(text, x, y, argb(IVORY, alpha));
+    }
+
+    static int argb(int rgb, int alpha) {
+        return (Math.max(0, Math.min(255, alpha)) << 24)
+                | (rgb & 0xFFFFFF);
+    }
+
+    private static String removeExplicitWhite(String text) {
+        return text.replace("\u00a7f", "").replace("\u00a7F", "");
+    }
+
+    private static void drawComponentPass(
+            FontRenderer font, IChatComponent line,
+            ChatHeadMarker.Data metadata, int x, int y,
+            int alpha, boolean shadowPass) {
+        int cursor = x;
+        boolean afterHead = false;
+        boolean identitySeen = false;
+        for (Object value : line) {
+            if (!(value instanceof IChatComponent)) {
+                continue;
+            }
+            IChatComponent part = (IChatComponent)value;
+            String text = part.getUnformattedTextForChat();
+            String formatting = part.getChatStyle().getFormattingCode();
+            ChatHeadMarker.Data marker = ChatHeadMarker.decode(part);
+            if (marker != null) {
+                afterHead = true;
+            }
+
+            String rendered;
+            int color;
+            boolean replyIdentity = isReplyIdentity(part);
+            if (shadowPass) {
+                rendered = styleCodesOnly(formatting) + text;
+                color = SHADOW;
+            } else if (metadata != null && replyIdentity) {
+                rendered = styleCodesOnly(formatting) + text;
+                color = metadata.nameColor;
+            } else if (metadata != null && afterHead
+                    && !identitySeen && marker == null
+                    && text.startsWith("[")) {
+                rendered = styleCodesOnly(formatting) + text;
+                color = metadata.titleColor;
+            } else {
+                rendered = removeExplicitWhite(formatting + text);
+                color = IVORY;
+            }
+            font.drawString(rendered, cursor, y, argb(color, alpha));
+            cursor += font.getStringWidth(formatting + text);
+            identitySeen |= replyIdentity;
+        }
+    }
+
+    private static boolean isReplyIdentity(IChatComponent part) {
+        ClickEvent click = part == null || part.getChatStyle() == null
+                ? null : part.getChatStyle().getChatClickEvent();
+        return click != null
+                && click.getAction() == ClickEvent.Action.SUGGEST_COMMAND
+                && click.getValue() != null
+                && click.getValue().startsWith("/msg ");
+    }
+
+    /** Removes colour/reset codes but keeps bold/italic decorations and width. */
+    static String styleCodesOnly(String formatting) {
+        if (formatting == null || formatting.length() == 0) {
+            return "";
+        }
+        StringBuilder kept = new StringBuilder(formatting.length());
+        for (int index = 0; index + 1 < formatting.length(); index++) {
+            if (formatting.charAt(index) != '\u00a7') {
+                continue;
+            }
+            char code = Character.toLowerCase(
+                    formatting.charAt(index + 1));
+            if (code >= 'k' && code <= 'o') {
+                kept.append('\u00a7').append(code);
+            }
+            index++;
+        }
+        return kept.toString();
+    }
+}

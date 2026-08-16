@@ -52,6 +52,7 @@ import com.ninuna.losttales.network.packet.LostTalesMapMarkerSnapshotPacket;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
 import com.ninuna.losttales.network.packet.AccessoryEffectSyncPacket;
@@ -268,6 +269,8 @@ public class LostTalesCommonProxy {
     public void handlePartyMemberStatusSync(PartyMemberStatusSyncPacket packet) {}
 
     public void handlePartyTrackingSync(PartyTrackingSyncPacket packet) {}
+
+    public void handleChatMessage(LostTalesChatMessagePacket packet) {}
 
     public void onServerStarting(FMLServerStartingEvent event) {
         CharacterLifecycleStateTracker.markServerStarting();

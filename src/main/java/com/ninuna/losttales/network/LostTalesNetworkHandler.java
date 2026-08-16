@@ -17,6 +17,8 @@ import com.ninuna.losttales.network.packet.LostTalesThirdPersonAimPacket;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneSettingsRequestPacket;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneTravelRequestPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
 import com.ninuna.losttales.network.packet.AccessoryEffectSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPacket;
@@ -65,6 +67,7 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesThirdPersonAimPacket.Handler.class, LostTalesThirdPersonAimPacket.class, 27, Side.SERVER);
         CHANNEL.registerMessage(LostTalesWaystoneSettingsRequestPacket.Handler.class, LostTalesWaystoneSettingsRequestPacket.class, 32, Side.SERVER);
         CHANNEL.registerMessage(LostTalesWaystoneTravelRequestPacket.Handler.class, LostTalesWaystoneTravelRequestPacket.class, 34, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesChatSendPacket.Handler.class, LostTalesChatSendPacket.class, 35, Side.SERVER);
 
         // Server -> client snapshots. These are registered from the common proxy so a
         // dedicated server also knows the packet discriminators when it sends them.
@@ -88,5 +91,6 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(AccessoryEffectSyncPacket.Handler.class, AccessoryEffectSyncPacket.class, 30, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesMapMarkerSnapshotPacket.Handler.class, LostTalesMapMarkerSnapshotPacket.class, 31, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesWaystoneStatePacket.Handler.class, LostTalesWaystoneStatePacket.class, 33, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesChatMessagePacket.Handler.class, LostTalesChatMessagePacket.class, 36, Side.CLIENT);
     }
 }
