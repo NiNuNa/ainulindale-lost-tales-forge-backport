@@ -6,6 +6,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.Random;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
@@ -192,7 +193,13 @@ public final class LostTalesClientMapMarkerNotificationStore {
         }
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft != null && minecraft.thePlayer != null) {
-            minecraft.thePlayer.playSound(DISCOVERY_SOUND, 0.45F, 1.0F);
+            Random random = minecraft.theWorld == null
+                    ? null : minecraft.theWorld.rand;
+            float volume = random == null
+                    ? 0.45F : 0.43F + random.nextFloat() * 0.04F;
+            float pitch = random == null
+                    ? 1.0F : 0.97F + random.nextFloat() * 0.06F;
+            minecraft.thePlayer.playSound(DISCOVERY_SOUND, volume, pitch);
         }
     }
 

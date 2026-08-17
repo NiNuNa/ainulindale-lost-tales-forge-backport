@@ -2,61 +2,62 @@
     "plushie.squeak": {
         "category": "neutral",
         "sounds": [
-            "plushie/squeak",
-            "plushie/squeak2",
-            "plushie/squeak3",
-            "plushie/squeak4",
-            "plushie/squeak5"
+            "plushie/squeak_1",
+            "plushie/squeak_2",
+            "plushie/squeak_3",
+            "plushie/squeak_4",
+            "plushie/squeak_5"
         ]
     },
     "break.ceramic": {
         "category": "block",
         "sounds": [
-            "block/ceramic_break",
-            "block/ceramic_break2",
-            "block/ceramic_break3"
+            "block/ceramic_break_1",
+            "block/ceramic_break_2",
+            "block/ceramic_break_3"
         ]
     },
     "step.ceramic": {
         "category": "block",
         "sounds": [
-            "block/ceramic_step"
+            "block/ceramic_step_1"
         ]
     },
     "place.ceramic": {
         "category": "block",
         "sounds": [
-            "block/ceramic_place",
-            "block/ceramic_place2",
-            "block/ceramic_place3"
+            "block/ceramic_place_1",
+            "block/ceramic_place_2",
+            "block/ceramic_place_3"
         ]
     },
     "break.clay": {
         "category": "block",
         "sounds": [
-            "block/ceramic_break",
-            "block/ceramic_break2",
-            "block/ceramic_break3"
+            "block/ceramic_break_1",
+            "block/ceramic_break_2",
+            "block/ceramic_break_3"
         ]
     },
     "step.clay": {
         "category": "block",
         "sounds": [
-            "block/ceramic_step"
+            "block/ceramic_step_1"
         ]
     },
     "place.clay": {
         "category": "block",
         "sounds": [
-            "block/ceramic_place",
-            "block/ceramic_place2",
-            "block/ceramic_place3"
+            "block/ceramic_place_1",
+            "block/ceramic_place_2",
+            "block/ceramic_place_3"
         ]
     },
     "map_marker.discovery": {
         "category": "player",
         "sounds": [
-            "map_marker/map_marker_discovered"
+            "map_marker/waystone_discovery_chime_1",
+            "map_marker/waystone_discovery_chime_2"
         ]
     }
 }

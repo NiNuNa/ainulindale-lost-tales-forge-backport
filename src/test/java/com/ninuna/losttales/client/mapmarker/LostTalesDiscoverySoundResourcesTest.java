@@ -13,11 +13,14 @@ import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 
 public final class LostTalesDiscoverySoundResourcesTest {
-    private static final String DISCOVERY_SOUND =
-            "map_marker/map_marker_discovered";
+    private static final String[] DISCOVERY_SOUNDS = {
+            "map_marker/waystone_discovery_chime_1",
+            "map_marker/waystone_discovery_chime_2"
+    };
 
     @Test
-    public void discoveryEventUsesTheDedicatedDiscoverySound() throws Exception {
+    public void discoveryEventRandomizesBetweenTwoDedicatedSounds()
+            throws Exception {
         InputStream input = getClass().getResourceAsStream(
                 "/assets/losttales/sounds.json");
         assertNotNull(input);
@@ -29,25 +32,30 @@ public final class LostTalesDiscoverySoundResourcesTest {
             assertEquals("player", event.get("category").getAsString());
 
             JsonArray sounds = event.getAsJsonArray("sounds");
-            assertEquals(1, sounds.size());
-            assertEquals(DISCOVERY_SOUND, sounds.get(0).getAsString());
+            assertEquals(DISCOVERY_SOUNDS.length, sounds.size());
+            for (int i = 0; i < DISCOVERY_SOUNDS.length; i++) {
+                assertEquals(DISCOVERY_SOUNDS[i],
+                        sounds.get(i).getAsString());
+            }
         } finally {
             reader.close();
         }
     }
 
     @Test
-    public void discoverySoundIsBundledAsOggVorbis() throws Exception {
-        InputStream input = getClass().getResourceAsStream(
-                "/assets/losttales/sounds/" + DISCOVERY_SOUND + ".ogg");
-        assertNotNull("Missing discovery sound: " + DISCOVERY_SOUND, input);
-        try {
-            assertEquals('O', input.read());
-            assertEquals('g', input.read());
-            assertEquals('g', input.read());
-            assertEquals('S', input.read());
-        } finally {
-            input.close();
+    public void discoverySoundsAreBundledAsOggVorbis() throws Exception {
+        for (String sound : DISCOVERY_SOUNDS) {
+            InputStream input = getClass().getResourceAsStream(
+                    "/assets/losttales/sounds/" + sound + ".ogg");
+            assertNotNull("Missing discovery sound: " + sound, input);
+            try {
+                assertEquals('O', input.read());
+                assertEquals('g', input.read());
+                assertEquals('g', input.read());
+                assertEquals('S', input.read());
+            } finally {
+                input.close();
+            }
         }
     }
 }
