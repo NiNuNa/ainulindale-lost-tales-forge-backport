@@ -8,10 +8,32 @@ import static org.junit.Assert.assertTrue;
 import java.lang.reflect.Field;
 import lotr.client.gui.LOTRGuiMap;
 import lotr.common.fac.LOTRFaction;
+import lotr.common.world.genlayer.LOTRGenLayerWorld;
 import org.junit.Test;
 import sun.misc.Unsafe;
 
 public final class LostTalesLotrMapGuiTest {
+    @Test
+    public void zoomLimitsFitTheMapAndFillTheCloseTerrainView() {
+        int terrainDiameterBlocks =
+                (LostTalesMapTerrainCache.MAX_CAPTURE_RADIUS_CHUNKS * 2 + 1)
+                        * LostTalesMapTerrainCache.TILE_WIDTH;
+        float closeTerrainPixels = terrainDiameterBlocks
+                * (float)Math.pow(2.0D,
+                        LostTalesLotrMapGui.SMOOTH_ZOOM_MAX)
+                / LOTRGenLayerWorld.scale;
+        float closeBlockPixels = closeTerrainPixels / terrainDiameterBlocks;
+
+        assertTrue("the close terrain cache remains too small on screen",
+                closeTerrainPixels >= 2480.0F);
+        assertTrue("the close terrain cache is excessively magnified",
+                closeTerrainPixels <= 2540.0F);
+        assertEquals("the widest view should remain regional",
+                -2.25F, LostTalesLotrMapGui.SMOOTH_ZOOM_MIN, 0.0F);
+        assertEquals("maximum zoom must retain the bounded 3x3 terrain LOD",
+                3, LostTalesMapTerrainRenderer.sampleStep(closeBlockPixels));
+    }
+
     @Test
     public void factionControlZoneModeSurvivesReplacement()
             throws Exception {

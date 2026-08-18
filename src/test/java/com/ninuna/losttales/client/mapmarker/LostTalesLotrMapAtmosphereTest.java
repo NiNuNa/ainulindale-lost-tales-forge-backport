@@ -181,10 +181,26 @@ public final class LostTalesLotrMapAtmosphereTest {
             assertTrue("the sky must move ahead of the ground at " + zoomScale,
                     LostTalesLotrMapAtmosphere.skyScale(zoomScale)
                             > zoomScale);
+            assertTrue("the low cloud layer has excessive parallax at "
+                            + zoomScale,
+                    LostTalesLotrMapAtmosphere.skyScale(zoomScale)
+                            <= zoomScale * 1.05F);
         }
         assertEquals("the sky must be steady for a given zoom",
                 LostTalesLotrMapAtmosphere.skyScale(2.5F),
                 LostTalesLotrMapAtmosphere.skyScale(2.5F), 0.0F);
+    }
+
+    @Test
+    public void cloudShadowsStaySubtleAndGainDepthWithLean() {
+        float flat = LostTalesLotrMapAtmosphere.cloudShadowAlpha(0.26F, 0.0F);
+        float leaned = LostTalesLotrMapAtmosphere.cloudShadowAlpha(0.26F, 1.0F);
+        float storm = LostTalesLotrMapAtmosphere.cloudShadowAlpha(0.42F, 1.0F);
+
+        assertTrue(flat > 0.0F);
+        assertTrue(leaned > flat);
+        assertTrue(storm >= leaned);
+        assertTrue("cloud shadows must not hide ground detail", storm < 0.1F);
     }
 
     /**
@@ -336,6 +352,8 @@ public final class LostTalesLotrMapAtmosphereTest {
         float flat = LostTalesLotrMapAtmosphere.rainFallDistance(
                 10.0F, 30.0F, 0.0F);
         float halfway = LostTalesLotrMapAtmosphere.rainFallDistance(
+                10.0F, 30.0F, 0.175F);
+        float aligned = LostTalesLotrMapAtmosphere.rainFallDistance(
                 10.0F, 30.0F, 0.5F);
         float tilted = LostTalesLotrMapAtmosphere.rainFallDistance(
                 10.0F, 30.0F, 1.0F);
@@ -343,7 +361,13 @@ public final class LostTalesLotrMapAtmosphereTest {
         assertTrue("flat maps still need visible 2D rain", flat > 0.0F);
         assertTrue(halfway > flat);
         assertTrue(halfway < tilted);
+        assertEquals("rain should reach its shadow at ordinary lean",
+                30.0F, aligned, 0.001F);
         assertEquals(30.0F, tilted, 0.001F);
+        assertEquals(0.0F,
+                LostTalesLotrMapAtmosphere.rainGroundAlignment(0.0F), 0.0F);
+        assertEquals(1.0F,
+                LostTalesLotrMapAtmosphere.rainGroundAlignment(0.5F), 0.0F);
     }
 
     @Test

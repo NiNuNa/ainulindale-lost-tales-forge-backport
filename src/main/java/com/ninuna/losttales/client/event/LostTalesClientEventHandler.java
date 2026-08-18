@@ -30,6 +30,8 @@ import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneTravelContex
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapDecorationRenderer;
+import com.ninuna.losttales.client.mapmarker.LostTalesMapTerrainCache;
+import com.ninuna.losttales.client.mapmarker.LostTalesMapTerrainRenderer;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapViewMemory;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMainMenuMapHook;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapMarkerIconOverlay;
@@ -91,6 +93,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
 
     @Override
     public void onResourceManagerReload(IResourceManager resManager) {
+        LostTalesMapTerrainRenderer.clear();
         WraithWorldVisualEffect.onResourceManagerReload();
         LostTalesInputIconRenderer.onResourceManagerReload(resManager);
         LostTalesMapOverlay.applyClientMap();
@@ -110,6 +113,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         // water is cannot be carried into the next one — nor may a view of
         // one world's map be restored over another's.
         LostTalesMapDecorationRenderer.clearCache();
+        LostTalesMapTerrainCache.clear();
+        LostTalesMapTerrainRenderer.clear();
         LostTalesMapViewMemory.clear();
         LostTalesClientWaystoneStateStore.clear();
         LostTalesClientWaystoneTravelContext.clear();
@@ -136,6 +141,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     @SubscribeEvent
     public void onClientWorldUnload(WorldEvent.Unload event) {
         if (event != null && event.world != null && event.world.isRemote) {
+            LostTalesMapTerrainCache.clear();
+            LostTalesMapTerrainRenderer.clear();
             LostTalesClientMobAggroCache.clear();
             ClientPartyTrackingCache.clear();
             ThirdPersonCameraRuntime.resetSession();

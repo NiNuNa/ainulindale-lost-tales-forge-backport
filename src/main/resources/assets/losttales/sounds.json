@@ -59,5 +59,11 @@
             "map_marker/waystone_discovery_chime_1",
             "map_marker/waystone_discovery_chime_2"
         ]
+    },
+    "map_marker.hover": {
+        "category": "master",
+        "sounds": [
+            "map_marker/marker_hover"
+        ]
     }
 }

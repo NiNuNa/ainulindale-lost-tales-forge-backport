@@ -94,30 +94,14 @@ public final class LostTalesLotrMapRotation {
      * gesture one movement.</p>
      */
     static final float MAX_PITCH_DEGREES = MAX_ORIENTATION_DEGREES;
-    /**
-     * The share by which the near edge grows at full lean.
-     *
-     * <p>Not an independent knob: with {@link #MAX_PITCH_DEGREES} it fixes how
-     * far the eye is from the sheet, and that distance is what the whole
-     * projection is built on. Raising it moves the eye closer and makes the
-     * perspective stronger for the same angle.</p>
-     */
-    static final float MAX_LEAN = 0.30F;
-    /** Smallest foreshortening the projection is allowed to divide by. */
-    private static final float MIN_COVERAGE_DIVISOR = 0.05F;
+    /** Smallest safe orthographic scale when inverting the map pitch. */
+    private static final float MIN_ORTHOGRAPHIC_SCALE = 0.05F;
     /**
      * Vertical drag, in GUI pixels, from flat to fully leaned. The same as a
      * full turn takes, and through the same curve, so leaning and turning
      * cost the player the same movement and feel like one gesture.
      */
     static final float FULL_LEAN_DRAG_PIXELS = FULL_TURN_DRAG_PIXELS;
-    /**
-     * Floor on the perspective divisor. Only reachable well outside the
-     * viewport, and it keeps a point that far out from being turned inside
-     * out by a division through zero.
-     */
-    private static final float MIN_PERSPECTIVE_DIVISOR = 0.2F;
-
     private static Field mapXMinField;
     private static Field mapYMinField;
     private static Field mapWidthField;
@@ -511,11 +495,9 @@ public final class LostTalesLotrMapRotation {
         try {
             float centerX = centerX();
             float centerY = centerY();
-            float coefficient = leanCoefficient(
-                    lean, mapHeightField.getInt(null));
             GL11.glPushMatrix();
             GL11.glTranslatef(centerX, centerY, 0.0F);
-            multiplyLean(coefficient, leanScaleY(lean));
+            multiplyLean(lean);
             GL11.glRotatef(degrees, 0.0F, 0.0F, 1.0F);
             GL11.glTranslatef(-centerX, -centerY, 0.0F);
             return true;
@@ -527,30 +509,32 @@ public final class LostTalesLotrMapRotation {
     /**
      * Multiplies in the lean.
      *
-     * <p>Perspective, done the only way a fixed pipeline offers it: the
-     * matrix writes a {@code w} that varies with the vertical, and the
-     * hardware divides by it. Everything below the middle of the screen is
-     * divided by less than one and spreads outward; everything above it by
-     * more and draws in. Because the divide happens after rasterisation sets
-     * up, the map texture follows it correctly rather than shearing.</p>
-     *
-     * <p>The same matrix carries the foreshortening, so the image and every
-     * position on it are laid down and divided by one operation and cannot
-     * disagree about where the sheet is.</p>
+     * <p>This is an orthographic pitch around the screen's horizontal axis.
+     * Parallel features therefore remain parallel instead of leaning towards
+     * a central vanishing point. The matrix carries both ground
+     * foreshortening and elevation: terrain height moves upward on screen and
+     * into depth, so the same lean that lays down the printed map exposes the
+     * sides of close terrain.</p>
      */
-    private static void multiplyLean(float coefficient, float scaleY) {
-        if (coefficient == 0.0F) {
+    private static void multiplyLean(float lean) {
+        if (!(lean > 0.0F)) {
             return;
         }
+        float radians = (float)Math.toRadians(pitchDegrees(lean));
+        float cosine = (float)Math.cos(radians);
+        float sine = (float)Math.sin(radians);
         FloatBuffer matrix = leanMatrix;
         matrix.clear();
         for (int index = 0; index < 16; index++) {
             matrix.put(index % 5 == 0 ? 1.0F : 0.0F);
         }
-        // Column-major: column 1, row 1 is the y contributed by y, and
-        // column 1, row 3 the w it contributes.
-        matrix.put(5, scaleY);
-        matrix.put(7, coefficient);
+        // Column-major rotation in the GUI's y/z plane. Positive terrain z
+        // is height, so it moves toward the top of the screen as the eye
+        // drops while ground farther down the map moves deeper.
+        matrix.put(5, cosine);
+        matrix.put(6, sine);
+        matrix.put(9, -sine);
+        matrix.put(10, cosine);
         matrix.flip();
         GL11.glMultMatrix(matrix);
     }
@@ -570,9 +554,7 @@ public final class LostTalesLotrMapRotation {
             rotateAbout(point, centerX, centerY, degrees);
             // The lean is applied last, so it acts on the screen the player
             // is looking at rather than on the map's own axes.
-            applyLean(point, centerX, centerY,
-                    leanCoefficient(lean, mapHeightField.getInt(null)),
-                    leanScaleY(lean));
+            applyLean(point, centerX, centerY, leanScaleY(lean));
             return point;
         } catch (Throwable ignored) {
             return point;
@@ -580,15 +562,11 @@ public final class LostTalesLotrMapRotation {
     }
 
     /**
-     * Projects a point on the sheet and reports how much something standing
-     * there is shrunk by the distance to it.
+     * Projects a point on the sheet through the orthographic map camera.
      *
-     * <p>The same path as {@link #rotate}, and the answer is the perspective
-     * divide that path already performs. A billboard standing on the far half
-     * of a leaning map is further from the eye than one on the near half, so
-     * it has to be drawn smaller; without this a tilted map reads as an
-     * evenly-lit wall of sprites and loses the depth the projection is there
-     * to give it.</p>
+     * <p>The returned scale remains one: distance does not resize objects in
+     * an orthographic view. This keeps trees and other vertical features
+     * parallel across the screen.</p>
      *
      * @return the factor a sprite standing at this point is drawn at
      */
@@ -605,14 +583,8 @@ public final class LostTalesLotrMapRotation {
             float centerX = centerX();
             float centerY = centerY();
             rotateAbout(point, centerX, centerY, degrees);
-            float coefficient = leanCoefficient(
-                    lean, mapHeightField.getInt(null));
-            // Read before the lean moves the point, because the divide is a
-            // function of where the point is on the sheet, not of where the
-            // projection has put it.
-            float scale = perspectiveScale(point[1] - centerY, coefficient);
-            applyLean(point, centerX, centerY, coefficient, leanScaleY(lean));
-            return scale;
+            applyLean(point, centerX, centerY, leanScaleY(lean));
+            return 1.0F;
         } catch (Throwable ignored) {
             return 1.0F;
         }
@@ -654,23 +626,11 @@ public final class LostTalesLotrMapRotation {
             }
             float centerX = centerX();
             float centerY = centerY();
-            float coefficient = leanCoefficient(
-                    lean, mapHeightField.getInt(null));
-            float scale = perspectiveScale(point[1] - centerY, coefficient);
-            applyLean(point, centerX, centerY, coefficient, leanScaleY(lean));
-            return scale;
+            applyLean(point, centerX, centerY, leanScaleY(lean));
+            return 1.0F;
         } catch (Throwable ignored) {
             return 1.0F;
         }
-    }
-
-    /** How far away a point on the sheet has ended up, as a drawn scale. */
-    static float perspectiveScale(float deltaY, float coefficient) {
-        if (coefficient == 0.0F) {
-            return 1.0F;
-        }
-        return 1.0F / Math.max(MIN_PERSPECTIVE_DIVISOR,
-                1.0F + coefficient * deltaY);
     }
 
     /**
@@ -736,47 +696,11 @@ public final class LostTalesLotrMapRotation {
     }
 
     /**
-     * How far the eye is from the sheet, in screen pixels.
-     *
-     * <p>Fixed by {@link #MAX_LEAN}: at full pitch the near edge of the
-     * viewport has to grow by exactly that share, and only one distance does
-     * that. Tied to the viewport rather than to a constant so the same lean
-     * looks the same on every screen.</p>
-     */
-    private static float eyeDistance(float viewportHeight) {
-        return viewportHeight * 0.5F
-                * (float)Math.sin(Math.toRadians(MAX_PITCH_DEGREES))
-                / MAX_LEAN;
-    }
-
-    /**
-     * The perspective coefficient a lean works out to: the {@code w} written
-     * per pixel of screen height.
-     *
-     * <p>Everything below the middle of the screen is divided by a number
-     * under one and everything above it by one over, which spreads the near
-     * edge outward and draws the far edge in.</p>
-     */
-    static float leanCoefficient(float lean, float viewportHeight) {
-        float clamped = Math.max(0.0F,
-                Math.min(MAX_VISUAL_LEAN, lean));
-        if (clamped <= 0.0F || !(viewportHeight > 0.0F)) {
-            return 0.0F;
-        }
-        return -(float)Math.sin(Math.toRadians(pitchDegrees(clamped)))
-                / eyeDistance(viewportHeight);
-    }
-
-    /**
      * How much the sheet is squashed towards the horizon by a lean.
      *
-     * <p>The half of the tilt the map was missing. A perspective divide on its
-     * own keystones the sheet without ever letting it recede, so turning a map
-     * that was leaning read as the reader tilting their head rather than as a
-     * camera moving round an angled surface. Foreshortening by the cosine of
-     * the same angle the divide is built from is what makes the two one
-     * camera: the sheet lies down as the eye drops, and the divide then puts
-     * the near edge nearer.</p>
+     * <p>The cosine of the same pitch used by the y/z matrix. Because this is
+     * orthographic there is no position-dependent scale: the whole sheet
+     * recedes evenly and parallel features stay parallel.</p>
      */
     static float leanScaleY(float lean) {
         float clamped = Math.max(0.0F,
@@ -790,11 +714,9 @@ public final class LostTalesLotrMapRotation {
     /**
      * The largest the sheet is ever cut, whatever it is doing.
      *
-     * <p>What the paper grain is sized to. The grain is one stretched copy of
-     * a texture, so anything that changes the size of what it is stretched
-     * over changes the grain — and the sheet changes size as the map leans.
-     * Cutting the grain to the size the sheet reaches at full lean gives it
-     * one size it keeps at every angle, and one that always covers.</p>
+     * <p>Used by conservative screen-space culling for sheet-attached labels.
+     * Procedural noise uses the map texture's own coordinates and no longer
+     * needs an independent coverage quad.</p>
      */
     static float maxCoverage(float width, float height) {
         return (float)Math.sqrt(width * width + height * height)
@@ -802,14 +724,11 @@ public final class LostTalesLotrMapRotation {
     }
 
     /**
-     * How much wider the sheet has to be cut to survive a lean.
+     * How much taller the source sheet has to be cut to survive a lean.
      *
-     * <p>The far edge is both squashed and divided down, so a sheet the size
-     * of the viewport would pull its own top edge into view. This is the
-     * projection read backwards: how far the sheet has to reach for its far
-     * edge to still land on the edge of the screen. Cutting it larger costs
-     * nothing but a slightly bigger quad, and the scissor takes back the
-     * rest.</p>
+     * <p>Orthographic pitch only foreshortens the vertical axis, so its exact
+     * inverse is enough. The surrounding scissor takes back the extra source
+     * area after rotation.</p>
      */
     static float leanCoverage(float lean) {
         float clamped = Math.max(0.0F,
@@ -817,55 +736,33 @@ public final class LostTalesLotrMapRotation {
         if (clamped <= 0.0F) {
             return 1.0F;
         }
-        float squash = leanScaleY(clamped);
-        float spread = MAX_LEAN
-                * (float)Math.sin(Math.toRadians(pitchDegrees(clamped)))
-                / (float)Math.sin(Math.toRadians(MAX_PITCH_DEGREES));
-        return 1.0F / Math.max(MIN_COVERAGE_DIVISOR, squash - spread);
+        return 1.0F / Math.max(MIN_ORTHOGRAPHIC_SCALE,
+                leanScaleY(clamped));
     }
 
     /**
      * Projects a point that is already in screen space, in place.
      *
-     * <p>One camera: the sheet is laid down by {@code scaleY} and then divided
-     * through by how far each part of it has ended up from the eye.</p>
+     * <p>One orthographic camera: the sheet is laid down by {@code scaleY}
+     * without moving either horizontal edge toward a vanishing point.</p>
      */
     static void applyLean(float[] point, float centerX, float centerY,
-                          float coefficient, float scaleY) {
-        if (coefficient == 0.0F) {
-            return;
-        }
+                          float scaleY) {
         float deltaY = point[1] - centerY;
-        float divisor = Math.max(MIN_PERSPECTIVE_DIVISOR,
-                1.0F + coefficient * deltaY);
-        point[0] = centerX + (point[0] - centerX) / divisor;
-        point[1] = centerY + deltaY * scaleY / divisor;
+        point[1] = centerY + deltaY * scaleY;
     }
 
     /**
      * Exact inverse of {@link #applyLean}.
      *
-     * <p>Solved rather than iterated: the forward path is a ratio of two
-     * linear functions of the same unknown, so undoing it is one division.
-     * A point past the horizon has no answer at all, which is what the floor
-     * on the denominator stands in for.</p>
+     * <p>The orthographic forward path is one bounded multiplication, so its
+     * inverse is one division.</p>
      */
     static void removeLean(float[] point, float centerX, float centerY,
-                           float coefficient, float scaleY) {
-        if (coefficient == 0.0F) {
-            return;
-        }
+                           float scaleY) {
         float projectedY = point[1] - centerY;
-        float denominator = scaleY - coefficient * projectedY;
-        if (Math.abs(denominator) < MIN_PERSPECTIVE_DIVISOR) {
-            denominator = denominator < 0.0F
-                    ? -MIN_PERSPECTIVE_DIVISOR : MIN_PERSPECTIVE_DIVISOR;
-        }
-        float deltaY = projectedY / denominator;
-        float divisor = Math.max(MIN_PERSPECTIVE_DIVISOR,
-                1.0F + coefficient * deltaY);
-        point[0] = centerX + (point[0] - centerX) * divisor;
-        point[1] = centerY + deltaY;
+        point[1] = centerY + projectedY
+                / Math.max(MIN_ORTHOGRAPHIC_SCALE, scaleY);
     }
 
     /** Rotates {@code point} about a centre, in place, by degrees. */
@@ -906,9 +803,7 @@ public final class LostTalesLotrMapRotation {
             // Undone in the order it was applied: the lean first, then the
             // turn, so the two stay exact inverses of the forward path.
             float lean = leanOf(gui);
-            removeLean(result, centerX, centerY,
-                    leanCoefficient(lean, mapHeightField.getInt(null)),
-                    leanScaleY(lean));
+            removeLean(result, centerX, centerY, leanScaleY(lean));
             rotateAbout(result, centerX, centerY, -degreesOf(gui));
             float zoomScale = zoomScaleField.getFloat(gui);
             if (!(zoomScale > 0.0F)) {
@@ -982,9 +877,8 @@ public final class LostTalesLotrMapRotation {
             return;
         }
         // One square, cut to the viewport's diagonal, whatever the angle.
-        // Sizing the sheet to each angle in turn changed its proportions as
-        // it went round, and the paper grain printed on it stretched and
-        // settled with them; a sheet that is always the same shape cannot.
+        // Sizing the sheet to each angle in turn changes its proportions as
+        // it turns; keeping one shape prevents visible coverage shifts.
         float diagonal = (float)Math.sqrt(
                 width * width + height * height) * leanCoverage(lean);
         result[0] = diagonal;

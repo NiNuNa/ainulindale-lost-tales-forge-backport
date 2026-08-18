@@ -53,7 +53,7 @@ public final class LostTalesInputIconAtlasTest {
     }
 
     @Test
-    public void oneCharacterGlyphsFollowLettersThenArrowOrder() {
+    public void singleGlyphsFollowLettersArrowsThenDigitOrder() {
         int[] codes = {
                 Keyboard.KEY_A, Keyboard.KEY_B, Keyboard.KEY_C,
                 Keyboard.KEY_D, Keyboard.KEY_E, Keyboard.KEY_F,
@@ -65,7 +65,11 @@ public final class LostTalesInputIconAtlasTest {
                 Keyboard.KEY_V, Keyboard.KEY_W, Keyboard.KEY_X,
                 Keyboard.KEY_Y, Keyboard.KEY_Z,
                 Keyboard.KEY_UP, Keyboard.KEY_RIGHT,
-                Keyboard.KEY_DOWN, Keyboard.KEY_LEFT
+                Keyboard.KEY_DOWN, Keyboard.KEY_LEFT,
+                Keyboard.KEY_0, Keyboard.KEY_1, Keyboard.KEY_2,
+                Keyboard.KEY_3, Keyboard.KEY_4, Keyboard.KEY_5,
+                Keyboard.KEY_6, Keyboard.KEY_7, Keyboard.KEY_8,
+                Keyboard.KEY_9
         };
         for (int index = 0; index < codes.length; index++) {
             Sprite sprite = LostTalesInputIconAtlas.findSprite(
@@ -84,7 +88,10 @@ public final class LostTalesInputIconAtlasTest {
         assertWordKey(Keyboard.KEY_ESCAPE, 21, 20, 16, 34, 15, 22);
         assertWordKey(Keyboard.KEY_TAB, 21, 20, 32, 34, 15, 22);
         assertWordKey(Keyboard.KEY_CAPITAL, 25, 40, 0, 54, 19, 26);
+        assertWordKey(Keyboard.KEY_LCONTROL, 25, 40, 20, 54, 19, 26);
+        assertWordKey(Keyboard.KEY_RCONTROL, 25, 40, 20, 54, 19, 26);
         assertWordKey(Keyboard.KEY_LSHIFT, 29, 60, 0, 74, 23, 30);
+        assertWordKey(Keyboard.KEY_SPACE, 29, 60, 24, 74, 23, 30);
     }
 
     @Test

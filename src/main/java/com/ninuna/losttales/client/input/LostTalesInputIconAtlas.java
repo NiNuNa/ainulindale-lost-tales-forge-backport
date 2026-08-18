@@ -34,9 +34,9 @@ public final class LostTalesInputIconAtlas {
         Map<Integer, Sprite> keyboardSprites =
                 new HashMap<Integer, Sprite>();
 
-        // The glyph strip is A-Z, Up, Right, Down, Left. All thirty symbols
-        // are composed over the same three reusable 13-pixel key frames.
-        int[] oneCharacterCodes = {
+        // The glyph strip is A-Z, Up, Right, Down, Left, then 0-9. All forty
+        // symbols are composed over the same three reusable 13-pixel frames.
+        int[] singleGlyphCodes = {
                 Keyboard.KEY_A, Keyboard.KEY_B, Keyboard.KEY_C,
                 Keyboard.KEY_D, Keyboard.KEY_E, Keyboard.KEY_F,
                 Keyboard.KEY_G, Keyboard.KEY_H, Keyboard.KEY_I,
@@ -47,10 +47,14 @@ public final class LostTalesInputIconAtlas {
                 Keyboard.KEY_V, Keyboard.KEY_W, Keyboard.KEY_X,
                 Keyboard.KEY_Y, Keyboard.KEY_Z,
                 Keyboard.KEY_UP, Keyboard.KEY_RIGHT,
-                Keyboard.KEY_DOWN, Keyboard.KEY_LEFT
+                Keyboard.KEY_DOWN, Keyboard.KEY_LEFT,
+                Keyboard.KEY_0, Keyboard.KEY_1, Keyboard.KEY_2,
+                Keyboard.KEY_3, Keyboard.KEY_4, Keyboard.KEY_5,
+                Keyboard.KEY_6, Keyboard.KEY_7, Keyboard.KEY_8,
+                Keyboard.KEY_9
         };
-        for (int index = 0; index < oneCharacterCodes.length; index++) {
-            keyboardSprites.put(Integer.valueOf(oneCharacterCodes[index]),
+        for (int index = 0; index < singleGlyphCodes.length; index++) {
+            keyboardSprites.put(Integer.valueOf(singleGlyphCodes[index]),
                     layeredSprite(0, 0, 13,
                             index * 8, 14, 7));
         }
@@ -64,12 +68,19 @@ public final class LostTalesInputIconAtlas {
         keyboardSprites.put(Integer.valueOf(Keyboard.KEY_TAB),
                 layeredSprite(0, 20, 21, 32, 34, 15));
 
-        // Four- and five-letter families each currently have one glyph.
+        // Four-letter keys: CAPS and CTRL.
         keyboardSprites.put(Integer.valueOf(Keyboard.KEY_CAPITAL),
                 layeredSprite(0, 40, 25, 0, 54, 19));
+        Sprite control = layeredSprite(0, 40, 25, 20, 54, 19);
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_LCONTROL), control);
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_RCONTROL), control);
+
+        // Five-letter keys: SHIFT and SPACE.
         Sprite shift = layeredSprite(0, 60, 29, 0, 74, 23);
         keyboardSprites.put(Integer.valueOf(Keyboard.KEY_LSHIFT), shift);
         keyboardSprites.put(Integer.valueOf(Keyboard.KEY_RSHIFT), shift);
+        keyboardSprites.put(Integer.valueOf(Keyboard.KEY_SPACE),
+                layeredSprite(0, 60, 29, 24, 74, 23));
 
         KEYBOARD_SPRITES = Collections.unmodifiableMap(keyboardSprites);
 

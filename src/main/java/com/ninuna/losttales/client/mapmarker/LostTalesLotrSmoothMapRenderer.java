@@ -10,15 +10,18 @@ import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL14;
 
 /** Draws the LOTR world texture without its integer-clipped edge jumps. */
 final class LostTalesLotrSmoothMapRenderer {
     private static final float[] SHEET_COVERAGE = new float[2];
-    /** LOTR's own weight for the grain, so the map's tone is unchanged. */
-    private static final float GRAIN_ALPHA = 0.2F;
+    /** One generated texel covers one native map-image pixel. */
+    static final int NOISE_TILE_SIZE = 256;
+    /** Comparable to LOTR's paper wash, but quiet enough to preserve colour. */
+    static final float NOISE_OPACITY = 0.10F;
 
     private static Field posXField;
     private static Field posYField;
@@ -37,6 +40,10 @@ final class LostTalesLotrSmoothMapRenderer {
     private static Field sepiaMapTextureField;
     private static boolean reflectionReady;
     private static boolean reflectionFailed;
+    private static DynamicTexture proceduralNoiseTexture;
+    private static ResourceLocation proceduralNoiseLocation;
+    private static TextureManager proceduralNoiseOwner;
+    private static boolean proceduralNoiseUnavailable;
 
     private LostTalesLotrSmoothMapRenderer() {}
 
@@ -81,7 +88,7 @@ final class LostTalesLotrSmoothMapRenderer {
                 return false;
             }
 
-            // One matrix for the whole sheet: the image, the paper grain
+            // One matrix for the whole sheet: the image, the fine noise
             // over it and the region names written on it all go through the
             // same one, so nothing on the paper can come loose from it.
             boolean sheeted =
@@ -89,20 +96,29 @@ final class LostTalesLotrSmoothMapRenderer {
             beginSheetClipping(viewportXMin, viewportXMax,
                     viewportYMin, viewportYMax, sheeted);
             try {
-                drawMapImage(sepia, alpha, drawOverlay, clip,
+                drawMapImage(sepia, alpha, drawOverlay,
+                        posX, posY, scale, clip,
                         mapXMin, mapXMax, mapYMin, mapYMax,
                         viewportXMin, viewportXMax,
                         viewportYMin, viewportYMax);
+                if (shouldDrawOpaqueBackground(alpha)) {
+                    LostTalesMapTerrainRenderer.render(
+                            gui, sepia || LOTRConfig.osrsMap,
+                            scale, posX, posY,
+                            mapXMin, mapXMax, mapYMin, mapYMax,
+                            viewportXMin, viewportXMax,
+                            viewportYMin, viewportYMax);
+                }
             } finally {
                 endSheetClipping(sheeted);
             }
             // Straight onto the ground, and only on the pass that draws it:
             // the faction overlay comes through here a second time with its
             // own alpha, and shading the map twice would double it.
-            if (shouldDrawOpaqueBackground(alpha) && !sepia) {
+            if (shouldDrawOpaqueBackground(alpha)) {
                 renderAtmosphere(gui, posX, posY, scale,
                         viewportXMin, viewportXMax,
-                        viewportYMin, viewportYMax);
+                        viewportYMin, viewportYMax, !sepia);
             }
             return true;
         } catch (Throwable ignored) {
@@ -121,7 +137,8 @@ final class LostTalesLotrSmoothMapRenderer {
     private static void renderAtmosphere(
             LOTRGuiMap gui, float posX, float posY, float scale,
             int viewportXMin, int viewportXMax,
-            int viewportYMin, int viewportYMax) {
+            int viewportYMin, int viewportYMax,
+            boolean drawWeatherLayers) {
         if (!(gui instanceof LostTalesLotrMapGui)
                 || !LostTalesLotrMapLayout.isFullscreenLayoutActive(gui)) {
             return;
@@ -143,6 +160,17 @@ final class LostTalesLotrSmoothMapRenderer {
         }
         long worldTime = minecraft.theWorld.getWorldTime();
         LostTalesLotrMapAtmosphere.render(
+                (LostTalesLotrMapGui)gui, worldTime, rain, thunder,
+                posX, posY, scale,
+                viewportXMin, viewportXMax, viewportYMin, viewportYMax);
+        // Lighting is independent of the chosen LOTR map palette. Keeping
+        // this return after the light pass prevents sepia mode from silently
+        // freezing at a flat shade while retaining its established lack of
+        // decorative weather layers.
+        if (!drawWeatherLayers) {
+            return;
+        }
+        LostTalesLotrMapAtmosphere.renderCloudShadows(
                 (LostTalesLotrMapGui)gui, worldTime, rain, thunder,
                 posX, posY, scale,
                 viewportXMin, viewportXMax, viewportYMin, viewportYMax);
@@ -181,12 +209,10 @@ final class LostTalesLotrSmoothMapRenderer {
      * off. The screen is drawn back to front by the order the calls are made
      * in, and the GUI's depth buffer is shared with whatever the HUD left in
      * it, so a depth test here can only reject layers the order already
-     * placed correctly. Leaning makes that concrete: the lean divides through
-     * a {@code w} that varies down the screen, and any pass drawn at a
-     * non-zero {@code zLevel} under it is divided too, so its depth stops
-     * being one flat value and starts crossing whatever is already in the
-     * buffer part of the way across the map. Both bits are saved and given
-     * back by the surrounding {@code glPopAttrib}.</p>
+     * placed correctly. The close terrain temporarily enables and clears its
+     * own depth inside this bracket; all ordinary sheet and UI passes remain
+     * explicitly order-driven. Both bits are saved and given back by the
+     * surrounding {@code glPopAttrib}.</p>
      */
     private static void beginSheetClipping(
             int viewportXMin, int viewportXMax,
@@ -221,7 +247,8 @@ final class LostTalesLotrSmoothMapRenderer {
     }
 
     private static void drawMapImage(
-            boolean sepia, float alpha, boolean drawOverlay, Clip clip,
+            boolean sepia, float alpha, boolean drawOverlay,
+            float posX, float posY, float scale, Clip clip,
             float mapXMin, float mapXMax, float mapYMin, float mapYMax,
             int viewportXMin, int viewportXMax,
             int viewportYMin, int viewportYMax)
@@ -276,89 +303,209 @@ final class LostTalesLotrSmoothMapRenderer {
             }
         }
         if (drawOverlay && !LOTRConfig.osrsMap) {
-            drawPaperGrain(minecraft, viewportXMin, viewportXMax,
-                    viewportYMin, viewportYMax);
+            drawProceduralNoise(minecraft, posX, posY, scale,
+                    mapXMin, mapXMax, mapYMin, mapYMax);
         }
     }
 
     /**
-     * The paper grain the ground is printed on.
+     * Fine deterministic colour variation over the otherwise flat map fills.
      *
-     * <p>LOTR's own routine takes texture coordinates and ignores them: it
-     * stretches one copy of the grain across whatever rectangle it is given.
-     * So the rectangle is the whole of it, and the rectangle it used to be
-     * given was the sheet — which is cut to the viewport's diagonal so it can
-     * be turned, and widened again so it can lean. The single copy grew and
-     * shrank with the sheet, and that is what made the grain smear as the map
-     * tipped.</p>
-     *
-     * <p>So the quad is cut to the size the sheet reaches at full lean — one
-     * size, whatever angle the map is at — and the texture is repeated across
-     * it at exactly the density LOTR uses: one copy per viewport. Laid flat
-     * and square, the screen shows the middle copy and nothing else, which is
-     * the map the base mod draws; turned or leaned, it reaches into the
-     * neighbours rather than stretching the one.</p>
-     *
-     * <p>The repeat is mirrored. The grain is not a tiling texture and butting
-     * copies against each other drew its edges as a grid across the map;
-     * mirroring makes every join match its neighbour exactly, which for a
-     * noise this fine is the difference between a seam and no seam.</p>
+     * <p>The small texture is generated once from several seamless fields of
+     * different sizes. Broad cloudy value changes keep it organic while a
+     * little fine variation retains the pixel-art finish. It repeats in
+     * native map-image coordinates, so zoom changes the grain with the map
+     * and no stretched 256-pixel image edge can appear.</p>
      */
-    private static void drawPaperGrain(
-            Minecraft minecraft, int viewportXMin, int viewportXMax,
-            int viewportYMin, int viewportYMax) {
-        float viewportWidth = viewportXMax - viewportXMin;
-        float viewportHeight = viewportYMax - viewportYMin;
-        if (minecraft == null || LOTRTextures.overlayTexture == null
-                || !(viewportWidth > 0.0F) || !(viewportHeight > 0.0F)) {
+    private static void drawProceduralNoise(
+            Minecraft minecraft,
+            float posX, float posY, float scale,
+            float mapXMin, float mapXMax,
+            float mapYMin, float mapYMax) {
+        if (minecraft == null || proceduralNoiseUnavailable
+                || !(scale > 0.0F)
+                || !(mapXMax > mapXMin)
+                || !(mapYMax > mapYMin)) {
             return;
         }
-        float coverage = LostTalesLotrMapRotation.maxCoverage(
-                viewportWidth, viewportHeight);
-        float centerX = (viewportXMin + viewportXMax) * 0.5F;
-        float centerY = (viewportYMin + viewportYMax) * 0.5F;
-        float half = coverage * 0.5F;
-        double halfU = coverage / viewportWidth / 2.0D;
-        double halfV = coverage / viewportHeight / 2.0D;
-
-        minecraft.getTextureManager().bindTexture(
-                LOTRTextures.overlayTexture);
-        int oldWrapS = GL11.glGetTexParameteri(
-                GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S);
-        int oldWrapT = GL11.glGetTexParameteri(
-                GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
-                GL11.GL_TEXTURE_WRAP_S, GL14.GL_MIRRORED_REPEAT);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
-                GL11.GL_TEXTURE_WRAP_T, GL14.GL_MIRRORED_REPEAT);
-        GL11.glEnable(GL11.GL_BLEND);
-        OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
-                GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, GRAIN_ALPHA);
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT
+                | GL11.GL_CURRENT_BIT | GL11.GL_TEXTURE_BIT);
         try {
+            ResourceLocation noise = ensureProceduralNoise(minecraft);
+            if (noise == null) {
+                return;
+            }
+            minecraft.getTextureManager().bindTexture(noise);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                    GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                    GL11.GL_TEXTURE_WRAP_T, GL11.GL_REPEAT);
+            // Average fine noise while zoomed out, but retain authored pixel
+            // edges once a map texel is large enough to inspect.
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                    GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                    GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
+            // GUI rendering commonly leaves the legacy alpha test enabled.
+            // Its default cutoff rejected most of the deliberately subtle
+            // flecks before blending, making the generated texture vanish.
+            GL11.glDisable(GL11.GL_ALPHA_TEST);
+            GL11.glEnable(GL11.GL_BLEND);
+            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
+                    GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, NOISE_OPACITY);
+            double halfMapWidth = (mapXMax - mapXMin) / scale * 0.5D;
+            double halfMapHeight = (mapYMax - mapYMin) / scale * 0.5D;
+            double uMin = noiseTextureCoordinate(posX - halfMapWidth);
+            double uMax = noiseTextureCoordinate(posX + halfMapWidth);
+            double vMin = noiseTextureCoordinate(posY - halfMapHeight);
+            double vMax = noiseTextureCoordinate(posY + halfMapHeight);
             Tessellator tessellator = Tessellator.instance;
             tessellator.startDrawingQuads();
-            tessellator.addVertexWithUV(centerX - half, centerY + half,
-                    0.0D, 0.5D - halfU, 0.5D + halfV);
-            tessellator.addVertexWithUV(centerX + half, centerY + half,
-                    0.0D, 0.5D + halfU, 0.5D + halfV);
-            tessellator.addVertexWithUV(centerX + half, centerY - half,
-                    0.0D, 0.5D + halfU, 0.5D - halfV);
-            tessellator.addVertexWithUV(centerX - half, centerY - half,
-                    0.0D, 0.5D - halfU, 0.5D - halfV);
+            tessellator.addVertexWithUV(mapXMin, mapYMax,
+                    0.0D, uMin, vMax);
+            tessellator.addVertexWithUV(mapXMax, mapYMax,
+                    0.0D, uMax, vMax);
+            tessellator.addVertexWithUV(mapXMax, mapYMin,
+                    0.0D, uMax, vMin);
+            tessellator.addVertexWithUV(mapXMin, mapYMin,
+                    0.0D, uMin, vMin);
             tessellator.draw();
+        } catch (Throwable ignored) {
+            // The map is still fully usable without cosmetic noise. Do not
+            // let a driver-specific dynamic-texture failure disable its
+            // background renderer or retry the allocation every frame.
+            proceduralNoiseUnavailable = true;
         } finally {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-            GL11.glDisable(GL11.GL_BLEND);
-            // Given straight back: this texture is shared, and a repeating
-            // wrap left behind bleeds wherever it is drawn next.
-            minecraft.getTextureManager().bindTexture(
-                    LOTRTextures.overlayTexture);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
-                    GL11.GL_TEXTURE_WRAP_S, oldWrapS);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
-                    GL11.GL_TEXTURE_WRAP_T, oldWrapT);
+            GL11.glPopAttrib();
         }
+    }
+
+    private static ResourceLocation ensureProceduralNoise(
+            Minecraft minecraft) {
+        TextureManager manager = minecraft == null
+                ? null : minecraft.getTextureManager();
+        if (manager == null) {
+            return null;
+        }
+        if (proceduralNoiseTexture != null
+                && proceduralNoiseLocation != null
+                && proceduralNoiseOwner == manager) {
+            return proceduralNoiseLocation;
+        }
+        DynamicTexture texture = new DynamicTexture(
+                NOISE_TILE_SIZE, NOISE_TILE_SIZE);
+        fillProceduralNoise(texture.getTextureData(),
+                NOISE_TILE_SIZE, NOISE_TILE_SIZE);
+        texture.updateDynamicTexture();
+        proceduralNoiseLocation = manager.getDynamicTextureLocation(
+                "losttales_map_noise", texture);
+        proceduralNoiseTexture = texture;
+        proceduralNoiseOwner = manager;
+        return proceduralNoiseLocation;
+    }
+
+    static void fillProceduralNoise(
+            int[] pixels, int width, int height) {
+        if (pixels == null || width <= 0 || height <= 0
+                || pixels.length < width * height) {
+            throw new IllegalArgumentException(
+                    "Procedural map noise buffer is too small");
+        }
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                pixels[y * width + x] = proceduralNoisePixel(
+                        x, y, width, height);
+            }
+        }
+    }
+
+    /** Stable seamless cloudy grain assembled without a source texture. */
+    static int proceduralNoisePixel(int x, int y) {
+        return proceduralNoisePixel(
+                x, y, NOISE_TILE_SIZE, NOISE_TILE_SIZE);
+    }
+
+    private static int proceduralNoisePixel(
+            int x, int y, int width, int height) {
+        float value = periodicValueNoise(x, y, width, height, 64, 11)
+                * 0.48F
+                + periodicValueNoise(x, y, width, height, 32, 29) * 0.28F
+                + periodicValueNoise(x, y, width, height, 16, 47) * 0.16F
+                + periodicValueNoise(x, y, width, height, 8, 71) * 0.08F;
+        int fineHash = noiseHash(
+                positiveModulo(x, width),
+                positiveModulo(y, height), 101);
+        float fine = ((fineHash >>> 8) & 255) / 255.0F - 0.5F;
+        int gray = Math.round(158.0F + (value - 0.5F) * 178.0F
+                + fine * 5.0F);
+        gray = Math.max(72, Math.min(224, gray));
+        // A few values per small range read as authored pixel texture rather
+        // than full-colour photographic noise when inspected up close.
+        gray = gray / 3 * 3;
+        return 0xFF000000 | gray << 16 | gray << 8 | gray;
+    }
+
+    private static float periodicValueNoise(
+            int x, int y, int width, int height,
+            int period, int seed) {
+        int cellsX = Math.max(1, width / period);
+        int cellsY = Math.max(1, height / period);
+        float gridX = x / (float)period;
+        float gridY = y / (float)period;
+        int cellX = (int)Math.floor(gridX);
+        int cellY = (int)Math.floor(gridY);
+        float blendX = smoothstep(gridX - cellX);
+        float blendY = smoothstep(gridY - cellY);
+        float northWest = latticeValue(
+                cellX, cellY, cellsX, cellsY, seed);
+        float northEast = latticeValue(
+                cellX + 1, cellY, cellsX, cellsY, seed);
+        float southWest = latticeValue(
+                cellX, cellY + 1, cellsX, cellsY, seed);
+        float southEast = latticeValue(
+                cellX + 1, cellY + 1, cellsX, cellsY, seed);
+        float north = mix(northWest, northEast, blendX);
+        float south = mix(southWest, southEast, blendX);
+        return mix(north, south, blendY);
+    }
+
+    private static float latticeValue(
+            int x, int y, int cellsX, int cellsY, int seed) {
+        int hash = noiseHash(
+                positiveModulo(x, cellsX),
+                positiveModulo(y, cellsY), seed);
+        return (hash & 65535) / 65535.0F;
+    }
+
+    private static int noiseHash(int x, int y, int seed) {
+        int hash = x * 0x1F1F1F1F ^ y * 0x5F356495
+                ^ seed * 0x6D2B79F5;
+        hash ^= hash >>> 15;
+        hash *= 0x2C1B3C6D;
+        hash ^= hash >>> 12;
+        hash *= 0x297A2D39;
+        hash ^= hash >>> 15;
+        return hash;
+    }
+
+    private static int positiveModulo(int value, int modulus) {
+        int remainder = value % modulus;
+        return remainder < 0 ? remainder + modulus : remainder;
+    }
+
+    private static float smoothstep(float value) {
+        return value * value * (3.0F - 2.0F * value);
+    }
+
+    private static float mix(float first, float second, float amount) {
+        return first + (second - first) * amount;
+    }
+
+    static double noiseTextureCoordinate(double mapImageCoordinate) {
+        return mapImageCoordinate / NOISE_TILE_SIZE;
     }
 
     static Clip calculateClip(

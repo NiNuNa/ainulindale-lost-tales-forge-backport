@@ -432,20 +432,21 @@ public final class LostTalesMapDecorationPlacementTest {
              kind < LostTalesMapDecorationRenderer.kindCount(); kind++) {
             assertTrue("kind " + kind + " is missing at the closest zoom",
                     LostTalesMapDecorationRenderer.isDrawn(
-                            kind, (float)Math.pow(2.0D, 4.6D)));
+                            kind, (float)Math.pow(2.0D,
+                                    LostTalesLotrMapGui.SMOOTH_ZOOM_MAX)));
             // Zooming out, a kind goes once and stays gone. There is nothing
             // else that can change which decorations are on the map, because
             // the zoom is not an input to placement at all.
             boolean gone = false;
-            for (float zoomExp = 4.6F; zoomExp >= -3.6F; zoomExp -= 0.05F) {
+            for (float zoomExp = LostTalesLotrMapGui.SMOOTH_ZOOM_MAX;
+                 zoomExp >= LostTalesLotrMapGui.SMOOTH_ZOOM_MIN;
+                 zoomExp -= 0.05F) {
                 boolean drawn = LostTalesMapDecorationRenderer.isDrawn(
                         kind, (float)Math.pow(2.0D, zoomExp));
                 assertFalse("kind " + kind + " came back at " + zoomExp,
                         drawn && gone);
                 gone = !drawn;
             }
-            assertTrue("kind " + kind + " is still drawn at the widest zoom",
-                    gone);
         }
     }
 

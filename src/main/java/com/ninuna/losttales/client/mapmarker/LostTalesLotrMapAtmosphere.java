@@ -26,6 +26,9 @@ final class LostTalesLotrMapAtmosphere {
     private static final int TICKS_PER_DAY = 24000;
     private static final float[] CLOUD_COVERAGE = new float[2];
     private static final float[] CLOUD_ANCHOR = new float[2];
+    private static final float[] CLOUD_GROUND_ANCHOR = new float[2];
+    private static final float[] CLOUD_SHADOW_POINT = new float[2];
+    private static final float[] CLOUD_SHADOW_CORNERS = new float[8];
     /** Per-frame reuse of the expensive five-ring cloud land-mask answer. */
     private static final int CLOUD_LAND_CACHE_SLOTS = 1 << 14;
     private static final int CLOUD_LAND_CACHE_MASK =
@@ -37,6 +40,7 @@ final class LostTalesLotrMapAtmosphere {
     private static final int[] CLOUD_LAND_CACHE_FRAMES =
             new int[CLOUD_LAND_CACHE_SLOTS];
     private static int cloudLandCacheFrame = 1;
+    private static boolean cloudLandCachePrepared;
     private static final int CLOUD_LAND_SAMPLES = 12;
     private static final double[] CLOUD_LAND_COS =
             new double[CLOUD_LAND_SAMPLES];
@@ -151,7 +155,7 @@ final class LostTalesLotrMapAtmosphere {
      * parallax and is the same effect at every zoom because it is applied to a
      * map-space offset rather than to a screen-space scroll.</p>
      */
-    private static final float CLOUD_PARALLAX = 1.35F;
+    private static final float CLOUD_PARALLAX = 1.04F;
     /**
      * How far above the sheet the sky hangs, in map pixels.
      *
@@ -163,7 +167,9 @@ final class LostTalesLotrMapAtmosphere {
      * two describe the same layer from two directions and are meant to be
      * moved together.</p>
      */
-    private static final float CLOUD_ALTITUDE = 26.0F;
+    private static final float CLOUD_ALTITUDE = 14.0F;
+    private static final float CLOUD_SHADOW_FLAT_ALPHA = 0.018F;
+    private static final float CLOUD_SHADOW_LEAN_ALPHA = 0.075F;
     /** Cells the drift wraps after, so long-running worlds keep their sky. */
     private static final float DRIFT_WRAP_CELLS = 1024.0F;
     /**
@@ -178,8 +184,8 @@ final class LostTalesLotrMapAtmosphere {
     private static final float CLOUD_MIN_READABLE_WIDTH = 2.0F;
     private static final float CLOUD_MIN_SIZE = 0.72F;
     private static final float CLOUD_MAX_SIZE = 1.35F;
-    private static final float CLOUD_MIN_LAYER = 0.92F;
-    private static final float CLOUD_MAX_LAYER = 1.12F;
+    private static final float CLOUD_MIN_LAYER = 0.99F;
+    private static final float CLOUD_MAX_LAYER = 1.01F;
     /** Local motion around the shared drift, in map pixels. */
     private static final float CLOUD_SWAY_REACH = 8.0F;
     private static final float CLOUD_SWAY_MIN_SPEED = 0.00055F;
@@ -207,6 +213,8 @@ final class LostTalesLotrMapAtmosphere {
     private static final float RAIN_MAX_SPEED = 0.082F;
     private static final float RAIN_FLAT_REACH_MULTIPLIER = 1.8F;
     private static final float RAIN_MIN_FLAT_REACH = 8.0F;
+    /** By this lean, rain terminates at its projected ground footprint. */
+    private static final float RAIN_GROUND_ALIGNMENT_LEAN = 0.35F;
     private static final float RAIN_ALPHA = 0.90F;
     /** Vertical radius of the projected ground footprint at full lean. */
     private static final float RAIN_IMPACT_DEPTH = 0.32F;
@@ -220,6 +228,7 @@ final class LostTalesLotrMapAtmosphere {
     private static final int RAIN_FALL_PASS = 1;
     private static final int RAIN_SPLASH_PASS = 2;
     private static final int LIGHTNING_PASS = 3;
+    private static final int CLOUD_SHADOW_PASS = 4;
     /** Cloud centres this close to known land may overhang its coast. */
     private static final int CLOUD_LAND_MARGIN = 30;
     private static final int LIGHTNING_SEGMENTS = 6;
@@ -507,6 +516,9 @@ final class LostTalesLotrMapAtmosphere {
         if (!(zoomScale > 0.0F)) {
             return;
         }
+        if (!cloudLandCachePrepared) {
+            beginCloudLandCacheFrame();
+        }
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT
                 | GL11.GL_CURRENT_BIT | GL11.GL_DEPTH_BUFFER_BIT
                 | GL11.GL_LIGHTING_BIT | GL11.GL_TEXTURE_BIT);
@@ -523,6 +535,65 @@ final class LostTalesLotrMapAtmosphere {
             drawSky(gui, worldTime, rain, thunder, posX, posY, zoomScale,
                     viewportXMin, viewportXMax,
                     viewportYMin, viewportYMax);
+        } finally {
+            cloudLandCachePrepared = false;
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glPopAttrib();
+        }
+    }
+
+    /** Draws a restrained cloud footprint on the ground below map artwork. */
+    static void renderCloudShadows(
+            LostTalesLotrMapGui gui, long worldTime,
+            float rain, float thunder,
+            float posX, float posY, float zoomScale,
+            int viewportXMin, int viewportXMax,
+            int viewportYMin, int viewportYMax) {
+        if (!(zoomScale > 0.0F)) {
+            return;
+        }
+        beginCloudLandCacheFrame();
+        cloudLandCachePrepared = true;
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT
+                | GL11.GL_CURRENT_BIT | GL11.GL_DEPTH_BUFFER_BIT
+                | GL11.GL_LIGHTING_BIT | GL11.GL_TEXTURE_BIT);
+        try {
+            GL11.glDisable(GL11.GL_DEPTH_TEST);
+            GL11.glDepthMask(false);
+            GL11.glDisable(GL11.GL_CULL_FACE);
+            GL11.glDisable(GL11.GL_ALPHA_TEST);
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
+            GL11.glEnable(GL11.GL_BLEND);
+            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
+                    GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+            Minecraft minecraft = Minecraft.getMinecraft();
+            if (minecraft == null || minecraft.getTextureManager() == null) {
+                return;
+            }
+            minecraft.getTextureManager().bindTexture(CLOUD_TEXTURE);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                    GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
+                    GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+            boolean clipped = LostTalesLotrMapLayout.beginViewportClip(
+                    viewportXMin, viewportXMax,
+                    viewportYMin, viewportYMax);
+            try {
+                Tessellator tessellator = Tessellator.instance;
+                tessellator.startDrawingQuads();
+                try {
+                    drawCloudLayer(tessellator, gui, worldTime,
+                            animationTicks(), rain, thunder,
+                            posX, posY, zoomScale,
+                            viewportXMin, viewportXMax,
+                            viewportYMin, viewportYMax,
+                            CLOUD_SHADOW_PASS);
+                } finally {
+                    tessellator.draw();
+                }
+            } finally {
+                LostTalesLotrMapLayout.endViewportClip(clipped);
+            }
         } finally {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glPopAttrib();
@@ -554,7 +625,6 @@ final class LostTalesLotrMapAtmosphere {
         try {
             Tessellator tessellator = Tessellator.instance;
             double animationTime = animationTicks();
-            beginCloudLandCacheFrame();
             if (rain > 0.0F || thunder > 0.0F) {
                 GL11.glEnable(GL11.GL_TEXTURE_2D);
                 minecraft.getTextureManager().bindTexture(
@@ -651,6 +721,8 @@ final class LostTalesLotrMapAtmosphere {
             float zoomScale, int viewportXMin, int viewportXMax,
             int viewportYMin, int viewportYMax, int pass) {
         float scale = skyScale(zoomScale);
+        float coverageScale = pass == CLOUD_SHADOW_PASS
+                ? zoomScale : scale * CLOUD_MIN_LAYER;
         float minimumReadableWidth = pass == RAIN_FALL_PASS
                 || pass == RAIN_SPLASH_PASS
                 ? RAIN_MIN_READABLE_CLOUD_WIDTH
@@ -673,10 +745,10 @@ final class LostTalesLotrMapAtmosphere {
                 LostTalesLotrMapRotation.degreesOf(gui),
                 LostTalesLotrMapRotation.leanOf(gui), CLOUD_COVERAGE);
         float reachX = CLOUD_COVERAGE[0] * 0.5F
-                / (scale * CLOUD_MIN_LAYER)
+                / coverageScale
                 + CLOUD_WORLD_WIDTH * CLOUD_MAX_SIZE + CLOUD_SWAY_REACH;
         float reachY = CLOUD_COVERAGE[1] * 0.5F
-                / (scale * CLOUD_MIN_LAYER)
+                / coverageScale
                 + CLOUD_WORLD_WIDTH * CLOUD_MAX_SIZE + CLOUD_SWAY_REACH;
         float cell = CLOUD_WORLD_CELL;
         // The sky continues beyond the map image. Stopping the lattice at
@@ -696,7 +768,7 @@ final class LostTalesLotrMapAtmosphere {
                 drawCloudSite(tessellator, gui, cellX, cellY,
                         rain, thunder, worldTime, animationTime,
                         drift, posX, posY,
-                        scale, leanSine,
+                        scale, zoomScale, leanSine,
                         centerX, centerY, CLOUD_ANCHOR,
                         viewportXMin, viewportXMax,
                         viewportYMin, viewportYMax, pass);
@@ -709,7 +781,8 @@ final class LostTalesLotrMapAtmosphere {
             int cellX, int cellY,
             float rain, float thunder, long worldTime, double animationTime,
             float drift, float posX, float posY,
-            float scale, float leanSine, float centerX, float centerY,
+            float scale, float groundScale, float leanSine,
+            float centerX, float centerY,
             float[] anchor,
             int viewportXMin, int viewportXMax,
             int viewportYMin, int viewportYMax, int pass) {
@@ -747,9 +820,17 @@ final class LostTalesLotrMapAtmosphere {
         float localScale = scale * layer;
         anchor[0] = (mapX - posX) * localScale + centerX;
         anchor[1] = (mapY - posY) * localScale + centerY;
+        CLOUD_GROUND_ANCHOR[0] = (mapX - posX) * groundScale + centerX;
+        CLOUD_GROUND_ANCHOR[1] = (mapY - posY) * groundScale + centerY;
+        float groundX = CLOUD_GROUND_ANCHOR[0];
+        float groundY = CLOUD_GROUND_ANCHOR[1];
+        LostTalesLotrMapRotation.rotateAndProject(
+                CLOUD_GROUND_ANCHOR, gui);
         float depth = LostTalesLotrMapRotation.rotateAndProject(anchor, gui);
         float width = CLOUD_WORLD_WIDTH * localScale * size * depth;
         float height = width * CLOUD_ASPECT;
+        float groundWidth = CLOUD_WORLD_WIDTH * groundScale * size;
+        float groundHeight = groundWidth * CLOUD_ASPECT;
         float visibility = LostTalesMapProjectedVisibility.alpha(
                 width, CLOUD_MIN_READABLE_WIDTH);
         float screenY = anchor[1]
@@ -757,25 +838,62 @@ final class LostTalesLotrMapAtmosphere {
         if (visibility <= 0.0F) {
             return;
         }
+        if (pass == CLOUD_SHADOW_PASS) {
+            // A conservative square remains valid after the map rotates;
+            // using the unrotated half-height could clip a corner shadow.
+            float groundCullRadius = groundWidth * 0.65F;
+            if (CLOUD_GROUND_ANCHOR[0] + groundCullRadius < viewportXMin
+                    || CLOUD_GROUND_ANCHOR[0]
+                            - groundCullRadius > viewportXMax
+                    || CLOUD_GROUND_ANCHOR[1]
+                            + groundCullRadius < viewportYMin
+                    || CLOUD_GROUND_ANCHOR[1]
+                            - groundCullRadius > viewportYMax) {
+                return;
+            }
+            int variant = (int)(cellNoise(
+                    cellX, cellY, CLOUD_CHANNEL + 3) * CLOUD_VARIANTS)
+                    % CLOUD_VARIANTS;
+            float[] weather = resolveWeather(
+                    cellX, cellY, CLOUD_CHANNEL, rain, thunder);
+            drawCloudShadow(tessellator, gui,
+                    groundX, groundY,
+                    groundWidth, groundHeight, variant,
+                    cloudShadowAlpha(weather[3],
+                            LostTalesLotrMapRotation.leanOf(gui))
+                            * visibility);
+            return;
+        }
         float rainTop = screenY + height * 0.12F;
         float fallDistance = rainFallDistance(
-                height, anchor[1] - rainTop, leanSine);
+                height, CLOUD_GROUND_ANCHOR[1] - rainTop, leanSine);
         if (pass == RAIN_FALL_PASS || pass == RAIN_SPLASH_PASS) {
             float rainVisibility = rainVisibility(width);
             float impactDepth = rainImpactDepth(height, leanSine);
             float precipitation = precipitationStrength(
                     cellX, cellY, CLOUD_CHANNEL, rain, thunder);
+            float rainHalfWidth = Math.max(width, groundWidth) * 0.5F;
+            float rainMinX = Math.min(
+                    anchor[0], CLOUD_GROUND_ANCHOR[0]) - rainHalfWidth;
+            float rainMaxX = Math.max(
+                    anchor[0], CLOUD_GROUND_ANCHOR[0]) + rainHalfWidth;
             if (rainVisibility <= 0.0F || precipitation <= 0.0F
-                    || anchor[0] + width * 0.5F < viewportXMin
-                    || anchor[0] - width * 0.5F > viewportXMax) {
+                    || rainMaxX < viewportXMin
+                    || rainMinX > viewportXMax) {
                 return;
             }
             if (rainTop + fallDistance + impactDepth < viewportYMin
                     || rainTop > viewportYMax) {
                 return;
             }
+            float rainAlignment = rainGroundAlignment(leanSine);
+            float rainImpactX = mix(
+                    anchor[0], CLOUD_GROUND_ANCHOR[0], rainAlignment);
+            float rainImpactWidth = mix(
+                    width, groundWidth, rainAlignment);
             drawRain(tessellator, cellX, cellY, animationTime,
-                    anchor[0], rainTop, width, height, fallDistance,
+                    anchor[0], rainImpactX, rainTop,
+                    width, rainImpactWidth, height, fallDistance,
                     leanSine, precipitation, thunder, rainVisibility,
                     pass == RAIN_SPLASH_PASS);
             return;
@@ -940,9 +1058,13 @@ final class LostTalesLotrMapAtmosphere {
         float height = Math.max(0.0F, cloudHeight);
         float flat = Math.max(RAIN_MIN_FLAT_REACH,
                 height * RAIN_FLAT_REACH_MULTIPLIER);
-        float projected = Math.max(height * 0.6F,
-                Math.max(0.0F, cloudToGround));
-        return mix(flat, projected, smoothstep(clamp01(leanSine)));
+        float projected = Math.max(0.0F, cloudToGround);
+        return mix(flat, projected, rainGroundAlignment(leanSine));
+    }
+
+    static float rainGroundAlignment(float leanSine) {
+        return smoothstep(clamp01(
+                leanSine / RAIN_GROUND_ALIGNMENT_LEAN));
     }
 
     /** Stable, smoothly advancing phase of one drop in a cloud. */
@@ -1022,8 +1144,10 @@ final class LostTalesLotrMapAtmosphere {
     /** Animated screen-facing rain emitted over one cloud's footprint. */
     private static void drawRain(
             Tessellator tessellator, int cellX, int cellY,
-            double animationTime, float centerX, float topY,
-            float cloudWidth, float cloudHeight, float fallDistance,
+            double animationTime,
+            float centerX, float impactCenterX, float topY,
+            float cloudWidth, float impactWidth,
+            float cloudHeight, float fallDistance,
             float leanSine, float precipitation, float thunder,
             float visibility,
             boolean splashPass) {
@@ -1044,7 +1168,10 @@ final class LostTalesLotrMapAtmosphere {
             float offset = cellNoise(
                     cellX, cellY, CLOUD_CHANNEL + 140 + drop);
             float normalizedX = (offset - 0.5F) * 2.0F;
-            float x = centerX + normalizedX * cloudWidth * 0.41F;
+            float topX = centerX
+                    + normalizedX * cloudWidth * 0.41F;
+            float impactX = impactCenterX
+                    + normalizedX * impactWidth * 0.41F;
             float impactOffset = rainImpactOffset(
                     rainImpactDepth(cloudHeight, lean), normalizedX,
                     cellNoise(cellX, cellY,
@@ -1062,7 +1189,8 @@ final class LostTalesLotrMapAtmosphere {
                 }
                 float splash = (phase - RAIN_FALL_PHASE_END)
                         / (1.0F - RAIN_FALL_PHASE_END);
-                drawRainSplash(tessellator, x, topY + dropFallDistance,
+                drawRainSplash(tessellator, impactX,
+                        topY + dropFallDistance,
                         baseWidth, splash, splashMix,
                         precipitation * readableVisibility, frame);
                 continue;
@@ -1091,11 +1219,16 @@ final class LostTalesLotrMapAtmosphere {
             }
             float width = baseWidth
                     * (1.0F + fallPhase * lean * 0.28F);
+            float x = mix(topX, impactX, fallPhase);
+            float endPhase = dropFallDistance <= 0.0F
+                    ? fallPhase : Math.min(1.0F,
+                            fallPhase + length / dropFallDistance);
+            float bottomX = mix(topX, impactX, endPhase) - slant;
             tessellator.setColorRGBA_F(1.0F, 1.0F, 1.0F, alpha);
             addRainTextureQuad(tessellator,
                     x, y, x + width, y,
-                    x - slant + width, y + length,
-                    x - slant, y + length);
+                    bottomX + width, y + length,
+                    bottomX, y + length);
         }
     }
 
@@ -1247,6 +1380,51 @@ final class LostTalesLotrMapAtmosphere {
 
     private static float clamp01(float value) {
         return Math.max(0.0F, Math.min(1.0F, value));
+    }
+
+    static float cloudShadowAlpha(float cloudAlpha, float lean) {
+        float leanAmount = smoothstep(clamp01(lean));
+        float weatherWeight = 0.72F + 0.28F
+                * clamp01(cloudAlpha / THUNDER_CLOUD[3]);
+        return (CLOUD_SHADOW_FLAT_ALPHA
+                + CLOUD_SHADOW_LEAN_ALPHA * leanAmount) * weatherWeight;
+    }
+
+    /** One cloud-shaped shadow projected through the map's ground transform. */
+    private static void drawCloudShadow(
+            Tessellator tessellator, LostTalesLotrMapGui gui,
+            float centerX, float centerY,
+            float width, float height, int variant, float alpha) {
+        float halfWidth = width * 0.5F;
+        float halfHeight = height * 0.5F;
+        projectShadowCorner(gui, centerX - halfWidth,
+                centerY + halfHeight, 0);
+        projectShadowCorner(gui, centerX + halfWidth,
+                centerY + halfHeight, 2);
+        projectShadowCorner(gui, centerX + halfWidth,
+                centerY - halfHeight, 4);
+        projectShadowCorner(gui, centerX - halfWidth,
+                centerY - halfHeight, 6);
+        double uMin = variant / (double)CLOUD_VARIANTS;
+        double uMax = (variant + 1.0D) / CLOUD_VARIANTS;
+        tessellator.setColorRGBA_F(0.0F, 0.0F, 0.0F, alpha);
+        tessellator.addVertexWithUV(CLOUD_SHADOW_CORNERS[0],
+                CLOUD_SHADOW_CORNERS[1], 0.0D, uMin, 1.0D);
+        tessellator.addVertexWithUV(CLOUD_SHADOW_CORNERS[2],
+                CLOUD_SHADOW_CORNERS[3], 0.0D, uMax, 1.0D);
+        tessellator.addVertexWithUV(CLOUD_SHADOW_CORNERS[4],
+                CLOUD_SHADOW_CORNERS[5], 0.0D, uMax, 0.0D);
+        tessellator.addVertexWithUV(CLOUD_SHADOW_CORNERS[6],
+                CLOUD_SHADOW_CORNERS[7], 0.0D, uMin, 0.0D);
+    }
+
+    private static void projectShadowCorner(
+            LostTalesLotrMapGui gui, float x, float y, int output) {
+        CLOUD_SHADOW_POINT[0] = x;
+        CLOUD_SHADOW_POINT[1] = y;
+        LostTalesLotrMapRotation.rotate(CLOUD_SHADOW_POINT, gui);
+        CLOUD_SHADOW_CORNERS[output] = CLOUD_SHADOW_POINT[0];
+        CLOUD_SHADOW_CORNERS[output + 1] = CLOUD_SHADOW_POINT[1];
     }
 
     /** One cloud, as its own frame of the sheet, facing the reader. */

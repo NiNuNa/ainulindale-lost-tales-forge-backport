@@ -6,6 +6,8 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
 import com.ninuna.losttales.client.party.PartyClientRequestManager;
+import com.ninuna.losttales.gui.screen.LostTalesCharacterMenuGui;
+import com.ninuna.losttales.gui.screen.LostTalesQuestJournalGui;
 import com.ninuna.losttales.party.model.PartyPersonalMarkerOwner;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
@@ -34,6 +36,7 @@ import lotr.common.world.map.LOTRCustomWaypoint;
 import lotr.common.world.map.LOTRFixedStructures;
 import lotr.common.fac.LOTRFaction;
 import lotr.common.world.map.LOTRAbstractWaypoint;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -73,12 +76,14 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
     static final int ROTATE_MAP_BUTTON = 1;
 
     /**
-     * Zoom bounds, a little wider either way than LOTR's own -3..4. Its
-     * integer zoom power is still kept inside its own range; only the eased
-     * exponent this class owns goes further.
+     * Zoom bounds around the useful regional printed-map view and beyond
+     * LOTR's native close cap. At the close cap the bounded 33x33 client
+     * terrain region is roughly 2510 GUI pixels across. LOTR's integer zoom
+     * power remains inside its native range; only this class's eased exponent
+     * goes further.
      */
-    static final float SMOOTH_ZOOM_MIN = -3.6F;
-    static final float SMOOTH_ZOOM_MAX = 4.6F;
+    static final float SMOOTH_ZOOM_MIN = -2.25F;
+    static final float SMOOTH_ZOOM_MAX = 9.25F;
     /** LOTR's own zoom power, which its unused internals still read. */
     private static final int LOTR_ZOOM_POWER_MIN = -3;
     private static final int LOTR_ZOOM_POWER_MAX = 4;
@@ -206,6 +211,18 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         LostTalesLotrMapGui replacement = new LostTalesLotrMapGui();
         return copyInitialMode(original, replacement)
                 ? replacement : original;
+    }
+
+    /**
+     * Opens every ordinary map through LOTR's native screen and the one
+     * GuiOpenEvent replacement seam. This keeps keybind, menu, and in-world
+     * entry paths from initializing subtly different map instances.
+     */
+    public static void open() {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft != null) {
+            minecraft.displayGuiScreen(new LOTRGuiMap());
+        }
     }
 
     static boolean copyInitialMode(
@@ -432,6 +449,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         this.smoothZoomPrevious = this.smoothZoomCurrent;
         this.smoothZoomCurrent = advanceSmoothZoom(
                 this.smoothZoomCurrent, this.smoothZoomTarget);
+        LostTalesMapTerrainCache.update(this.mc, this.smoothZoomCurrent);
     }
 
     @Override
@@ -914,8 +932,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             int mouseX, int mouseY, boolean drawLabels,
             boolean includeHidden) {
         if (!this.smoothZoomInitialized || !ensureSmoothZoomReflection()) {
-            super.renderWaypoints(waypoints, pass, mouseX, mouseY,
-                    drawLabels, includeHidden);
+            renderNativeWaypointsWithSmoothAlpha(waypoints, pass,
+                    mouseX, mouseY, drawLabels, includeHidden);
             return;
         }
         float actual;
@@ -927,13 +945,13 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         } catch (IllegalAccessException exception) {
             markSmoothZoomReflectionFailed(exception);
             this.smoothZoomInitialized = false;
-            super.renderWaypoints(waypoints, pass, mouseX, mouseY,
-                    drawLabels, includeHidden);
+            renderNativeWaypointsWithSmoothAlpha(waypoints, pass,
+                    mouseX, mouseY, drawLabels, includeHidden);
             return;
         }
         try {
-            super.renderWaypoints(waypoints, pass, mouseX, mouseY,
-                    drawLabels, includeHidden);
+            renderNativeWaypointsWithSmoothAlpha(waypoints, pass,
+                    mouseX, mouseY, drawLabels, includeHidden);
         } finally {
             try {
                 zoomExpField.setFloat(this, actual);
@@ -941,6 +959,32 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
                 markSmoothZoomReflectionFailed(exception);
                 this.smoothZoomInitialized = false;
             }
+        }
+    }
+
+    /**
+     * Lets every non-zero waypoint texel participate in the blended fade.
+     *
+     * <p>LOTR multiplies its icon texture by the zoom opacity but leaves the
+     * surrounding GUI alpha test untouched. At low opacity that test removes
+     * the icon's softer backdrop before its opaque foreground. The native
+     * pass already enables normal alpha blending, so temporarily disabling
+     * alpha testing makes the complete sprite fade as one image. Both enable
+     * and colour-buffer state are restored for later map and UI rendering.</p>
+     */
+    private void renderNativeWaypointsWithSmoothAlpha(
+            List<LOTRAbstractWaypoint> waypoints, int pass,
+            int mouseX, int mouseY, boolean drawLabels,
+            boolean includeHidden) {
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT);
+        try {
+            if (pass == 0) {
+                GL11.glDisable(GL11.GL_ALPHA_TEST);
+            }
+            super.renderWaypoints(waypoints, pass, mouseX, mouseY,
+                    drawLabels, includeHidden);
+        } finally {
+            GL11.glPopAttrib();
         }
     }
 
@@ -2242,6 +2286,14 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
             return;
         }
         clearSearchSelectionFrame();
+        if (LostTalesKeyBindings.isCharacterMenuKey(keyCode)) {
+            this.mc.displayGuiScreen(new LostTalesCharacterMenuGui(this));
+            return;
+        }
+        if (LostTalesKeyBindings.isQuestJournalKey(keyCode)) {
+            this.mc.displayGuiScreen(new LostTalesQuestJournalGui(this));
+            return;
+        }
         if (keyCode == CREATE_WAYPOINT_KEY) {
             openWaypointPrompt();
             return;

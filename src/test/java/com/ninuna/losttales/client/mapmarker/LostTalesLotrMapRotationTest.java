@@ -141,42 +141,35 @@ public final class LostTalesLotrMapRotationTest {
         assertEquals(slow, stepped, 0.05F);
     }
 
-    /**
-     * The lean: the near edge spreads out, the far edge draws in, and the
-     * middle of the screen — where the eye is aimed — does not move.
-     */
+    /** Orthographic pitch foreshortens without a central vanishing point. */
     @Test
-    public void leaningSpreadsTheNearEdgeAndDrawsInTheFarOne() {
-        float coefficient = LostTalesLotrMapRotation.leanCoefficient(
-                1.0F, 360.0F);
+    public void leaningKeepsParallelFeaturesParallel() {
         float scaleY = LostTalesLotrMapRotation.leanScaleY(1.0F);
-        assertTrue("leaning must divide, not multiply", coefficient < 0.0F);
 
         float[] centre = { CENTER_X, CENTER_Y };
         LostTalesLotrMapRotation.applyLean(
-                centre, CENTER_X, CENTER_Y, coefficient, scaleY);
+                centre, CENTER_X, CENTER_Y, scaleY);
         assertEquals(CENTER_X, centre[0], 0.0001F);
         assertEquals(CENTER_Y, centre[1], 0.0001F);
 
         float[] near = { CENTER_X + 100.0F, CENTER_Y + 180.0F };
         LostTalesLotrMapRotation.applyLean(
-                near, CENTER_X, CENTER_Y, coefficient, scaleY);
-        assertTrue("the near corner must spread outward",
-                near[0] > CENTER_X + 100.0F);
-        assertTrue(near[1] > CENTER_Y + 180.0F);
+                near, CENTER_X, CENTER_Y, scaleY);
+        assertEquals(CENTER_X + 100.0F, near[0], 0.0001F);
+        assertEquals(180.0F * scaleY,
+                near[1] - CENTER_Y, 0.0001F);
 
         float[] far = { CENTER_X + 100.0F, CENTER_Y - 180.0F };
         LostTalesLotrMapRotation.applyLean(
-                far, CENTER_X, CENTER_Y, coefficient, scaleY);
-        assertTrue("the far corner must draw inward",
-                far[0] < CENTER_X + 100.0F);
-        assertTrue(far[1] > CENTER_Y - 180.0F);
+                far, CENTER_X, CENTER_Y, scaleY);
+        assertEquals(CENTER_X + 100.0F, far[0], 0.0001F);
+        assertEquals(-180.0F * scaleY,
+                far[1] - CENTER_Y, 0.0001F);
     }
 
     /**
-     * The half of the tilt that was missing: a leaning sheet has to lie down
-     * as well as keystone, or it reads as warped paper rather than as a
-     * surface being looked at from an angle.
+     * A leaning sheet has to lie down as the eye drops, while orthographic
+     * projection keeps both horizontal edges at the same scale.
      */
     @Test
     public void leaningAlsoLaysTheSheetDown() {
@@ -198,15 +191,13 @@ public final class LostTalesLotrMapRotationTest {
     @Test
     public void aLeanIsExactlyUndoable() {
         for (float lean = 0.0F; lean <= 1.0F; lean += 0.25F) {
-            float coefficient = LostTalesLotrMapRotation.leanCoefficient(
-                    lean, 360.0F);
             float scaleY = LostTalesLotrMapRotation.leanScaleY(lean);
             for (float offset = -170.0F; offset <= 170.0F; offset += 85.0F) {
                 float[] point = { CENTER_X + 60.0F, CENTER_Y + offset };
                 LostTalesLotrMapRotation.applyLean(
-                        point, CENTER_X, CENTER_Y, coefficient, scaleY);
+                        point, CENTER_X, CENTER_Y, scaleY);
                 LostTalesLotrMapRotation.removeLean(
-                        point, CENTER_X, CENTER_Y, coefficient, scaleY);
+                        point, CENTER_X, CENTER_Y, scaleY);
 
                 assertEquals(CENTER_X + 60.0F, point[0], 0.01F);
                 assertEquals(CENTER_Y + offset, point[1], 0.01F);
@@ -222,11 +213,9 @@ public final class LostTalesLotrMapRotationTest {
     @Test
     public void turningAndLeaningTogetherStaysExactlyReversible() {
         for (float degrees = -LostTalesLotrMapRotation.MAX_DEGREES;
-             degrees <= LostTalesLotrMapRotation.MAX_DEGREES;
+            degrees <= LostTalesLotrMapRotation.MAX_DEGREES;
              degrees += 11.25F) {
             for (float lean = 0.0F; lean <= 1.0F; lean += 0.5F) {
-                float coefficient = LostTalesLotrMapRotation.leanCoefficient(
-                        lean, 360.0F);
                 float scaleY = LostTalesLotrMapRotation.leanScaleY(lean);
                 for (float offsetX = -280.0F; offsetX <= 280.0F;
                      offsetX += 140.0F) {
@@ -238,11 +227,9 @@ public final class LostTalesLotrMapRotationTest {
                         LostTalesLotrMapRotation.rotateAbout(
                                 point, CENTER_X, CENTER_Y, degrees);
                         LostTalesLotrMapRotation.applyLean(
-                                point, CENTER_X, CENTER_Y,
-                                coefficient, scaleY);
+                                point, CENTER_X, CENTER_Y, scaleY);
                         LostTalesLotrMapRotation.removeLean(
-                                point, CENTER_X, CENTER_Y,
-                                coefficient, scaleY);
+                                point, CENTER_X, CENTER_Y, scaleY);
                         LostTalesLotrMapRotation.rotateAbout(
                                 point, CENTER_X, CENTER_Y, -degrees);
 
@@ -259,7 +246,6 @@ public final class LostTalesLotrMapRotationTest {
         float[] point = { 12.0F, 34.0F };
         LostTalesLotrMapRotation.applyLean(
                 point, CENTER_X, CENTER_Y,
-                LostTalesLotrMapRotation.leanCoefficient(0.0F, 360.0F),
                 LostTalesLotrMapRotation.leanScaleY(0.0F));
 
         assertEquals(12.0F, point[0], 0.0F);
@@ -495,8 +481,7 @@ public final class LostTalesLotrMapRotationTest {
 
     /**
      * The sheet keeps one shape whatever the angle. Cutting it to fit each
-     * angle in turn changed its proportions as it went round, and the paper
-     * grain printed on it stretched and settled along with them.
+     * angle in turn changes its proportions as it turns.
      */
     @Test
     public void aTurnedSheetIsAlwaysTheSameShape() {
@@ -630,29 +615,22 @@ public final class LostTalesLotrMapRotationTest {
                 LostTalesLotrMapRotation.leanForInput(9.0F), 0.0001F);
     }
 
-    /**
-     * A billboard standing on the far half of a leaning map is further from
-     * the eye than one on the near half, and has to be drawn smaller for it.
-     */
+    /** Equal features remain equal-sized anywhere in an orthographic view. */
     @Test
-    public void thingsStandingOnALeaningMapRecedeWithIt() {
-        float coefficient = LostTalesLotrMapRotation.leanCoefficient(
-                1.0F, 360.0F);
-        assertEquals("a flat map shrinks nothing", 1.0F,
-                LostTalesLotrMapRotation.perspectiveScale(120.0F, 0.0F),
-                0.0F);
-        assertEquals("the point the eye is aimed at is drawn full size", 1.0F,
-                LostTalesLotrMapRotation.perspectiveScale(0.0F, coefficient),
-                0.0001F);
+    public void orthographicPitchDoesNotResizeEitherHalf() {
+        float scaleY = LostTalesLotrMapRotation.leanScaleY(1.0F);
+        float[] near = { CENTER_X + 120.0F, CENTER_Y + 150.0F };
+        float[] far = { CENTER_X + 120.0F, CENTER_Y - 150.0F };
 
-        float near = LostTalesLotrMapRotation.perspectiveScale(
-                150.0F, coefficient);
-        float far = LostTalesLotrMapRotation.perspectiveScale(
-                -150.0F, coefficient);
-        assertTrue("the near half must be drawn larger", near > 1.0F);
-        assertTrue("the far half must be drawn smaller", far < 1.0F);
-        assertTrue("nothing may be turned inside out by the divide",
-                far > 0.0F);
+        LostTalesLotrMapRotation.applyLean(
+                near, CENTER_X, CENTER_Y, scaleY);
+        LostTalesLotrMapRotation.applyLean(
+                far, CENTER_X, CENTER_Y, scaleY);
+
+        assertEquals(CENTER_X + 120.0F, near[0], 0.0F);
+        assertEquals(CENTER_X + 120.0F, far[0], 0.0F);
+        assertEquals(near[1] - CENTER_Y,
+                CENTER_Y - far[1], 0.0001F);
     }
 
     private static float dragFor(float degrees) {
@@ -690,28 +668,23 @@ public final class LostTalesLotrMapRotationTest {
                 LostTalesLotrMapRotation.clampToMapImage(812.5F, 1600), 0.0F);
     }
 
-    /**
-     * The paper grain is one stretched copy cut to this size, so it has to
-     * reach past the sheet at every angle the map can be put in. If it ever
-     * stops doing that the grain runs out before the map does, and raising
-     * the lean is exactly how that would happen.
-     */
+    /** The maximum source coverage must bound every rotated sheet. */
     @Test
-    public void theGrainCoversTheSheetAtEveryLean() {
+    public void maximumCoverageBoundsTheSheetAtEveryLean() {
         float[] coverage = new float[2];
         for (int screen = 0; screen < WIDTHS.length; screen++) {
             float width = WIDTHS[screen];
             float height = HEIGHTS[screen];
-            float grain = LostTalesLotrMapRotation.maxCoverage(width, height);
+            float maximum = LostTalesLotrMapRotation.maxCoverage(width, height);
             for (float lean = 0.0F;
                  lean <= LostTalesLotrMapRotation.MAX_VISUAL_LEAN;
                  lean += 0.05F) {
                 LostTalesLotrMapRotation.rotatedCoverage(
                         width, height,
                         LostTalesLotrMapRotation.MAX_DEGREES, lean, coverage);
-                assertTrue("grain short of the sheet at lean " + lean,
-                        grain >= coverage[0] - 0.001F
-                                && grain >= coverage[1] - 0.001F);
+                assertTrue("maximum short of the sheet at lean " + lean,
+                        maximum >= coverage[0] - 0.001F
+                                && maximum >= coverage[1] - 0.001F);
             }
         }
     }

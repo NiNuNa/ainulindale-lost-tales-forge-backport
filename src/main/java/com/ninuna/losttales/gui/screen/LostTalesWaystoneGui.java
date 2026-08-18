@@ -330,7 +330,7 @@ public final class LostTalesWaystoneGui extends GuiContainer {
                     this.mc.thePlayer.dimension,
                     this.waystone.xCoord, this.waystone.yCoord,
                     this.waystone.zCoord, this.state.getMarkerId());
-            this.mc.displayGuiScreen(new LostTalesLotrMapGui());
+            LostTalesLotrMapGui.open();
             return;
         } else if (this.state == null || !this.state.canEdit()) {
             return;

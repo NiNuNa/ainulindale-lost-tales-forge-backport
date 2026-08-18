@@ -35,7 +35,6 @@ import org.lwjgl.opengl.GL11;
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesMapCursor {
-    /** Placeholder artwork, meant to be replaced by the final sprite. */
     private static final ResourceLocation TEXTURE = new ResourceLocation(
             LostTalesMetaData.MOD_ID, "textures/gui/map_cursor.png");
     /**
@@ -43,7 +42,8 @@ public final class LostTalesMapCursor {
      * interface at every resolution and GUI scale, and its pixels line up with
      * everything else drawn on the map.
      */
-    private static final int SIZE = 16;
+    static final int WIDTH = 7;
+    static final int HEIGHT = 10;
     /**
      * Where the sprite's point is, within the sprite. The arrow is drawn from
      * its own tip, so this is the origin; a replacement sprite whose point is
@@ -149,10 +149,10 @@ public final class LostTalesMapCursor {
                     GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
             Tessellator tessellator = Tessellator.instance;
             tessellator.startDrawingQuads();
-            tessellator.addVertexWithUV(x, y + SIZE, 0.0D, 0.0D, 1.0D);
+            tessellator.addVertexWithUV(x, y + HEIGHT, 0.0D, 0.0D, 1.0D);
             tessellator.addVertexWithUV(
-                    x + SIZE, y + SIZE, 0.0D, 1.0D, 1.0D);
-            tessellator.addVertexWithUV(x + SIZE, y, 0.0D, 1.0D, 0.0D);
+                    x + WIDTH, y + HEIGHT, 0.0D, 1.0D, 1.0D);
+            tessellator.addVertexWithUV(x + WIDTH, y, 0.0D, 1.0D, 0.0D);
             tessellator.addVertexWithUV(x, y, 0.0D, 0.0D, 0.0D);
             tessellator.draw();
         } catch (Throwable ignored) {

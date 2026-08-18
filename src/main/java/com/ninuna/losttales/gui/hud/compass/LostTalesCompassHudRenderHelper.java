@@ -210,8 +210,17 @@ public final class LostTalesCompassHudRenderHelper {
     }
 
     public static void drawTexturedRectWithShadowTinted(Minecraft minecraft, ResourceLocation texture, float x, float y, int u, int v, int width, int height, int textureWidth, int textureHeight, float red, float green, float blue, float alpha, float shadowAlpha) {
-        drawTexturedRectTinted(minecraft, texture, x + 1.0F, y + 1.0F, u, v, width, height, textureWidth, textureHeight, SHADOW_RED, SHADOW_GREEN, SHADOW_BLUE, shadowAlpha);
-        drawTexturedRectTinted(minecraft, texture, x, y, u, v, width, height, textureWidth, textureHeight, red, green, blue, alpha);
+        // Marker and indicator sprites contain translucent backdrop pixels.
+        // Blend those pixels instead of letting the legacy GUI alpha test
+        // remove them before the foreground as the whole sprite fades.
+        drawTexturedRectTintedAdvanced(minecraft, texture,
+                x + 1.0F, y + 1.0F, u, v, width, height,
+                textureWidth, textureHeight,
+                SHADOW_RED, SHADOW_GREEN, SHADOW_BLUE, shadowAlpha, true);
+        drawTexturedRectTintedAdvanced(minecraft, texture,
+                x, y, u, v, width, height,
+                textureWidth, textureHeight,
+                red, green, blue, alpha, true);
     }
 
     /**

@@ -69,7 +69,7 @@ public class LostTalesKeyBindings {
             minecraft.displayGuiScreen(new LostTalesQuestJournalGui(minecraft.currentScreen));
         }
         if (MAP.isPressed() && minecraft.currentScreen == null) {
-            minecraft.displayGuiScreen(new LostTalesLotrMapGui());
+            LostTalesLotrMapGui.open();
         }
         if (TOGGLE_HUD.isPressed()) {
             if (isModifierKeyDown()) {

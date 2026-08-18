@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.client.gui.animation.LostTalesControlBarAnimation;
 import com.ninuna.losttales.core.LostTalesClassTransformer;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.relauncher.Side;
@@ -33,6 +34,14 @@ public final class LostTalesLotrMapLayout {
                 @Override
                 protected ArrayDeque<Integer> initialValue() {
                     return new ArrayDeque<Integer>();
+                }
+            };
+    private static final ThreadLocal<ArrayDeque<Boolean>>
+            subtitleControlTransforms =
+            new ThreadLocal<ArrayDeque<Boolean>>() {
+                @Override
+                protected ArrayDeque<Boolean> initialValue() {
+                    return new ArrayDeque<Boolean>();
                 }
             };
 
@@ -250,6 +259,20 @@ public final class LostTalesLotrMapLayout {
             lostTalesGui.renderVignette();
             lostTalesGui.renderControlBar(false);
         }
+        boolean transformed = false;
+        if (isControlBarVisible(gui)) {
+            try {
+                // Biome and coordinate lines are visually inside the strip,
+                // so they must leave the parent GUI transform and follow the
+                // strip's independently delayed motion as one unit.
+                LostTalesControlBarAnimation.pushFixed(gui);
+                transformed = true;
+            } catch (Throwable ignored) {
+                transformed = false;
+            }
+        }
+        subtitleControlTransforms.get().push(
+                Boolean.valueOf(transformed));
         beginBottomReservedBounds(gui, isFullscreenLayoutActive(gui));
     }
 
@@ -283,6 +306,24 @@ public final class LostTalesLotrMapLayout {
     /** Restores the real viewport after LOTR finishes drawing subtitles. */
     public static void endFullscreenSubtitles() {
         endBottomReservedBounds();
+        ArrayDeque<Boolean> transforms =
+                subtitleControlTransforms.get();
+        if (transforms.isEmpty()) {
+            return;
+        }
+        boolean transformed = transforms.pop().booleanValue();
+        try {
+            if (transformed) {
+                LostTalesControlBarAnimation.pop();
+            }
+        } catch (Throwable ignored) {
+            // Preserve the native subtitle pass if the matrix stack was
+            // already broken by another renderer.
+        } finally {
+            if (transforms.isEmpty()) {
+                subtitleControlTransforms.remove();
+            }
+        }
     }
 
     private static void endBottomReservedBounds() {

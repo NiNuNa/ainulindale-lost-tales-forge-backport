@@ -276,10 +276,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
                 break;
             case OPTION_MAP:
                 try {
-                    // Open the final screen directly. Going through the native
-                    // LOTR screen first caused a second GuiOpenEvent and gave
-                    // the tilted map the generic entrance for its first frame.
-                    this.mc.displayGuiScreen(new LostTalesLotrMapGui());
+                    LostTalesLotrMapGui.open();
                 } catch (Throwable ignored) {
                     this.mc.displayGuiScreen(new LostTalesCharacterProfileRouterGui(this));
                 }

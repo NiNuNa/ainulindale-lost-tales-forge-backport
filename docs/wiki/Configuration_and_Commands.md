@@ -4,7 +4,7 @@
 
 Forge writes the main options to `config/losttales.cfg`. Its categories are:
 
-- `client`: HUD visibility and placement, marker display, chat presentation, GUI animation and blur, quick-loot rows, and quest feedback;
+- `client`: HUD visibility and placement, marker display, close-map terrain transition zooms, chat presentation, GUI animation and blur, quick-loot rows, and quest feedback;
 - `quests`: prerequisites, rewards, permitted start sources, automatic marker discovery, and pinning;
 - `missives`: board generation, notice counts, expiry, and deadlines;
 - `characters`: starting-faction allow and deny lists, switching cooldowns, safety checks, snapshot size, checkpoint rate, and deletion retention;

@@ -6,60 +6,44 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public final class LostTalesMapZoomFadeTest {
-    /** The map's own zoom limits, which the fade sits well inside. */
+    /** The map's own zoom limits around the proportional marker fade. */
     private static final float MIN = LostTalesLotrMapGui.SMOOTH_ZOOM_MIN;
     private static final float MAX = LostTalesLotrMapGui.SMOOTH_ZOOM_MAX;
-    private static final float SOLID = LostTalesMapZoomFade.SOLID_ZOOM_EXP;
-    private static final float CLEAR = LostTalesMapZoomFade.CLEAR_ZOOM_EXP;
+    private static final float SOLID = LostTalesMapZoomFade.solidZoomExp();
+    private static final float CLEAR = LostTalesMapZoomFade.clearZoomExp();
 
     /**
-     * Solid over a stretch of the zoom, gone over another, and a fade between
-     * — with room to spare at both ends, so neither pushing in nor pulling out
-     * ends with icons still half there.
+     * Close views are solid and the final one percent of zoom-out is clear.
      */
     @Test
-    public void thereIsRoomAtBothEndsWhereNothingChanges() {
+    public void closeViewsAreSolidAndTheRegionalWideViewIsClear() {
         assertEquals("zoomed right in, everything is solid", 1.0F,
                 LostTalesMapZoomFade.alpha(MAX), 0.0F);
-        assertEquals("pulled right out, nothing is drawn", 0.0F,
-                LostTalesMapZoomFade.alpha(MIN), 0.0F);
+        assertEquals("the regional wide view retained map markers",
+                0.0F, LostTalesMapZoomFade.alpha(MIN), 0.0F);
 
         for (float zoomExp = SOLID; zoomExp <= MAX; zoomExp += 0.1F) {
             assertEquals("a marker faded while pushed in past the boundary",
                     1.0F, LostTalesMapZoomFade.alpha(zoomExp), 0.0F);
         }
-        for (float zoomExp = MIN; zoomExp <= CLEAR; zoomExp += 0.1F) {
-            assertEquals("a marker showed while pulled out past the boundary",
-                    0.0F, LostTalesMapZoomFade.alpha(zoomExp), 0.0F);
-        }
         assertTrue("the solid end must stop short of the closest zoom",
                 SOLID < MAX);
-        assertTrue("the clear end must stop short of the widest zoom",
+        assertTrue("the clear boundary must leave a final empty plateau",
                 CLEAR > MIN);
-        float share = (SOLID - CLEAR) / (MAX - MIN);
-        assertTrue("the fade should use about four fifths of the zoom",
-                share >= 0.75F && share <= 0.85F);
     }
 
-    /**
-     * The bug this was written for: the fade used to be measured as a share of
-     * the zoom's whole range, and that range runs from a postage stamp on an
-     * empty screen to closer than anyone needs. "Most of the way in" came out
-     * at an exponent of nearly three, so at the zoom the map opens at every
-     * marker was down to about a third of its colour.
-     */
     @Test
-    public void theOrdinaryZoomsAreNotSpentHalfFaded() {
-        assertTrue("markers are faded at the zoom the map opens at",
-                LostTalesMapZoomFade.alpha(0.0F) > 0.6F);
-        assertTrue("markers are faded at an ordinary working zoom",
-                LostTalesMapZoomFade.alpha(0.5F) > 0.85F);
-        assertTrue("markers disappeared at the first wide continental view",
-                LostTalesMapZoomFade.alpha(-2.0F) > 0.25F);
-        assertTrue("markers disappeared with substantial zoom-out remaining",
-                LostTalesMapZoomFade.alpha(-2.5F) > 0.1F);
-        assertTrue("markers remain too strong at the outermost map view",
-                LostTalesMapZoomFade.alpha(-3.25F) < 0.02F);
+    public void theFadeUsesSeventyFiveAndNinetyNinePercentOfCurrentTravel() {
+        float span = MAX - MIN;
+        assertEquals(MAX - span * 0.75F, SOLID, 0.0001F);
+        assertEquals(MAX - span * 0.99F, CLEAR, 0.0001F);
+        assertEquals(1.0F, LostTalesMapZoomFade.alpha(SOLID), 0.0F);
+        assertEquals(0.0F, LostTalesMapZoomFade.alpha(CLEAR), 0.0F);
+        float middle = MAX - span * 0.87F;
+        assertTrue("the middle of the fade is already clear",
+                LostTalesMapZoomFade.alpha(middle) > 0.0F);
+        assertTrue("the middle of the fade is still solid",
+                LostTalesMapZoomFade.alpha(middle) < 1.0F);
     }
 
     @Test
@@ -72,7 +56,9 @@ public final class LostTalesMapZoomFadeTest {
             assertTrue(alpha >= 0.0F && alpha <= 1.0F);
             previous = alpha;
         }
-        assertEquals("the fade never finished", 0.0F, previous, 0.0F);
+        assertTrue("the fade changed after reaching the configured wide view",
+                Math.abs(LostTalesMapZoomFade.alpha(MIN) - previous)
+                        < 0.02F);
         // Nothing steps: the ends are flat and the middle is eased.
         float last = LostTalesMapZoomFade.alpha(MAX);
         for (float zoomExp = MAX; zoomExp >= MIN; zoomExp -= 0.02F) {
@@ -115,7 +101,7 @@ public final class LostTalesMapZoomFadeTest {
                         LostTalesMapZoomFade.alpha((SOLID + CLEAR) * 0.5F)));
         assertTrue(LostTalesMapZoomFade.INTERACTIVE_ALPHA > 0.0F
                 && LostTalesMapZoomFade.INTERACTIVE_ALPHA < 0.2F);
-        float visibleTail = LostTalesMapZoomFade.alpha(-3.1F);
+        float visibleTail = LostTalesMapZoomFade.alpha(CLEAR + 0.08F);
         assertTrue("the visible tail was cut off with zoom remaining",
                 LostTalesMapZoomFade.isDrawable(visibleTail));
         assertTrue("the barely visible tail still owned the pointer",

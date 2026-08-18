@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.client.gui.animation.LostTalesControlBarAnimation;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import lotr.client.LOTRTextures;
@@ -42,6 +43,11 @@ public final class LostTalesLotrMapCompass {
             return;
         }
         try {
+            boolean fixedToControlBar =
+                    LostTalesLotrMapLayout.isControlBarVisible(gui);
+            if (fixedToControlBar) {
+                LostTalesControlBarAnimation.pushFixed(gui);
+            }
             // LOTR draws the rose from its bottom-left corner, 32 texels
             // square before the scale, so this is its true middle: the
             // heading turns it about itself and never walks it across the
@@ -55,21 +61,27 @@ public final class LostTalesLotrMapCompass {
             // The rose is drawn nearer than the map it sits on, so without
             // this it stamps its own depth into a buffer the layers after it
             // are still being tested against.
-            GL11.glPushAttrib(
-                    GL11.GL_ENABLE_BIT | GL11.GL_DEPTH_BUFFER_BIT);
-            GL11.glPushMatrix();
             try {
-                GL11.glDisable(GL11.GL_DEPTH_TEST);
-                GL11.glDepthMask(false);
-                GL11.glTranslated(centerX, centerY, 0.0D);
-                GL11.glRotatef(gui.getMapRotationDegrees(),
-                        0.0F, 0.0F, 1.0F);
-                GL11.glTranslated(-centerX, -centerY, 0.0D);
-                LOTRTextures.drawMapCompassBottomLeft(
-                        centerX - size / 2.0D, bottom, z, scale);
+                GL11.glPushAttrib(
+                        GL11.GL_ENABLE_BIT | GL11.GL_DEPTH_BUFFER_BIT);
+                GL11.glPushMatrix();
+                try {
+                    GL11.glDisable(GL11.GL_DEPTH_TEST);
+                    GL11.glDepthMask(false);
+                    GL11.glTranslated(centerX, centerY, 0.0D);
+                    GL11.glRotatef(gui.getMapRotationDegrees(),
+                            0.0F, 0.0F, 1.0F);
+                    GL11.glTranslated(-centerX, -centerY, 0.0D);
+                    LOTRTextures.drawMapCompassBottomLeft(
+                            centerX - size / 2.0D, bottom, z, scale);
+                } finally {
+                    GL11.glPopMatrix();
+                    GL11.glPopAttrib();
+                }
             } finally {
-                GL11.glPopMatrix();
-                GL11.glPopAttrib();
+                if (fixedToControlBar) {
+                    LostTalesControlBarAnimation.pop();
+                }
             }
         } catch (Throwable ignored) {
             // A compass rose is decoration; never take the map down for it.

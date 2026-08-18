@@ -6,41 +6,19 @@ import cpw.mods.fml.relauncher.SideOnly;
 /**
  * How far out the map has to be pulled before a thing drawn on it gives up.
  *
- * <p>One rule, in one place, expressed against how far through its own range
- * the zoom is rather than against any particular exponent. LOTR's own fade was
- * written for its {@code -3..4} zoom and reached nothing at {@code -3.3}; this
- * map goes further out than that, so anything still using those numbers
- * disappeared while there was map left to pull out of. Reading the extrema
- * instead of the numbers means widening the zoom again cannot repeat that.</p>
+ * <p>One rule, in one place, expressed as shares of the map's current zoom
+ * travel. The close and wide limits have both changed as the map evolved, so
+ * the fade follows those limits: solid through seventy-five percent of the
+ * outward journey, fading until ninety-nine percent, and clear for the last
+ * one percent.</p>
  *
- * <p>Only for things that share this fade — roads and the marker icons. Labels
- * fade on a rule of their own, on purpose: a name has to go long before the
- * thing it names does, or the map turns into a wall of text.</p>
+ * <p>Roads, marker icons, and their names all consume this same opacity so
+ * the map does not present half of a location at either boundary.</p>
  */
 @SideOnly(Side.CLIENT)
 final class LostTalesMapZoomFade {
-    /**
-     * Zoomed in this far, everything is fully drawn.
-     *
-     * <p>An exponent rather than a share of the zoom's range, and that is the
-     * whole correction. Measured against the range, "most of the way in" came
-     * out at an exponent of nearly three — a zoom where the screen holds a
-     * few dozen map pixels — so markers were still part-faded through every
-     * zoom anyone actually reads the map at, and were down to a third of their
-     * colour at the one the map opens at. The range is not the map: its far
-     * end is a postage stamp on an empty screen and its near end is closer
-     * than anyone needs. What the fade has to be pinned to is the zoom a
-     * player is at, not the zoom the slider can reach.</p>
-     */
-    static final float SOLID_ZOOM_EXP = 3.05F;
-    /**
-     * And pulled out this far, nothing is drawn at all.
-     *
-     * <p>This sits immediately inside the map's widest zoom. Markers therefore
-     * remain visible through the useful continental views and finish fading
-     * only as the zoom reaches its true outer limit.</p>
-     */
-    static final float CLEAR_ZOOM_EXP = -3.5F;
+    static final float SOLID_OUTWARD_FRACTION = 0.75F;
+    static final float CLEAR_OUTWARD_FRACTION = 0.99F;
     /** Keeps useful working zooms readable while retaining a long fade. */
     private static final float FADE_BIAS = 0.3F;
     /**
@@ -69,17 +47,32 @@ final class LostTalesMapZoomFade {
      * How far a zoom exponent is through the fade: 0 gone, 1 fully drawn.
      *
      * <p>There is room at both ends on purpose. Pushed in past
-     * {@link #SOLID_ZOOM_EXP} nothing changes however much further it goes,
-     * and pulled out past {@link #CLEAR_ZOOM_EXP} nothing is drawn however
-     * much further it goes; the fade happens between them and nowhere
-     * else.</p>
+     * {@link #solidZoomExp()} nothing changes however much further it goes,
+     * and pulled out past {@link #clearZoomExp()} nothing is drawn however
+     * much further it goes; the fade happens between them and nowhere else.</p>
      */
     static float progress(float zoomExp) {
-        float span = SOLID_ZOOM_EXP - CLEAR_ZOOM_EXP;
+        float solid = solidZoomExp();
+        float clear = clearZoomExp();
+        float span = solid - clear;
         if (!(span > 0.0F) || Float.isNaN(zoomExp)) {
             return 1.0F;
         }
-        return clamp((zoomExp - CLEAR_ZOOM_EXP) / span);
+        return clamp((zoomExp - clear) / span);
+    }
+
+    static float solidZoomExp() {
+        return zoomExpAtOutwardFraction(SOLID_OUTWARD_FRACTION);
+    }
+
+    static float clearZoomExp() {
+        return zoomExpAtOutwardFraction(CLEAR_OUTWARD_FRACTION);
+    }
+
+    private static float zoomExpAtOutwardFraction(float fraction) {
+        float close = LostTalesLotrMapGui.SMOOTH_ZOOM_MAX;
+        float wide = LostTalesLotrMapGui.SMOOTH_ZOOM_MIN;
+        return close - (close - wide) * clamp(fraction);
     }
 
     /**

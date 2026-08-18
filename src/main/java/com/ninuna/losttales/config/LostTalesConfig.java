@@ -54,6 +54,8 @@ public final class LostTalesConfig {
     public static int hostileCompassMarkerScanRadius = 48;
     public static boolean showHostileMapMarkers = true;
     public static int hostileMapMarkerDisplayRadius = 64;
+    public static double closeMapTerrainTransitionStartZoom = 4.0D;
+    public static double closeMapTerrainTransitionEndZoom = 4.6D;
     public static String[] hiddenMapLegendCategories = new String[0];
     public static String[] customWaypointColors = new String[0];
     public static String[] customWaypointNotes = new String[0];
@@ -462,6 +464,29 @@ public final class LostTalesConfig {
                     128,
                     "Client display radius in blocks for transient enemy markers on the LOTR main map. The server tracking radius remains authoritative."
             );
+            closeMapTerrainTransitionStartZoom = getBoundedDouble(
+                    config, CATEGORY_CLIENT,
+                    "closeMapTerrainTransitionStartZoom",
+                    closeMapTerrainTransitionStartZoom,
+                    -2.25D, 9.20D,
+                    "Zoom exponent where the close-map terrain transition begins. The ordinary LOTR map remains fully visible at and below this value."
+            );
+            closeMapTerrainTransitionEndZoom = getBoundedDouble(
+                    config, CATEGORY_CLIENT,
+                    "closeMapTerrainTransitionEndZoom",
+                    closeMapTerrainTransitionEndZoom,
+                    -2.2D, 9.25D,
+                    "Zoom exponent where prepared close-map terrain may fully replace the ordinary LOTR map. Must be greater than closeMapTerrainTransitionStartZoom."
+            );
+            if (closeMapTerrainTransitionEndZoom
+                    <= closeMapTerrainTransitionStartZoom) {
+                closeMapTerrainTransitionEndZoom = Math.min(9.25D,
+                        closeMapTerrainTransitionStartZoom + 0.05D);
+                config.get(CATEGORY_CLIENT,
+                        "closeMapTerrainTransitionEndZoom",
+                        closeMapTerrainTransitionEndZoom).set(
+                        closeMapTerrainTransitionEndZoom);
+            }
             hiddenMapLegendCategories = config.get(
                     CATEGORY_CLIENT,
                     "hiddenMapLegendCategories",
@@ -1550,6 +1575,12 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "hostileCompassMarkerScanRadius", hostileCompassMarkerScanRadius).set(hostileCompassMarkerScanRadius);
         config.get(CATEGORY_CLIENT, "showHostileMapMarkers", showHostileMapMarkers).set(showHostileMapMarkers);
         config.get(CATEGORY_CLIENT, "hostileMapMarkerDisplayRadius", hostileMapMarkerDisplayRadius).set(hostileMapMarkerDisplayRadius);
+        config.get(CATEGORY_CLIENT, "closeMapTerrainTransitionStartZoom",
+                closeMapTerrainTransitionStartZoom).set(
+                closeMapTerrainTransitionStartZoom);
+        config.get(CATEGORY_CLIENT, "closeMapTerrainTransitionEndZoom",
+                closeMapTerrainTransitionEndZoom).set(
+                closeMapTerrainTransitionEndZoom);
         config.get(CATEGORY_CLIENT, "hiddenMapLegendCategories",
                 hiddenMapLegendCategories).set(hiddenMapLegendCategories);
         config.get(CATEGORY_CLIENT, "customWaypointColors",

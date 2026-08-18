@@ -140,13 +140,6 @@ public final class LostTalesMapDecorationRenderer {
     private static final float SIZE_VARIATION = 0.16F;
     /** Largest site scale produced by {@link #SIZE_VARIATION}. */
     private static final float MAX_SITE_SCALE = 1.0F + SIZE_VARIATION;
-    /** The near edge grows by this much at the strongest perspective. */
-    private static final float MAX_PERSPECTIVE_SCALE =
-            1.0F / (1.0F - LostTalesLotrMapRotation.MAX_LEAN
-                    * (float)Math.sin(Math.toRadians(
-                            LostTalesLotrMapRotation.MAX_VISUAL_DEGREES))
-                    / (float)Math.sin(Math.toRadians(
-                            LostTalesLotrMapRotation.MAX_DEGREES)));
     /**
      * How far a shadow reaches, as a share of the thing casting it, at a
      * fully dropped eye.
@@ -495,8 +488,9 @@ public final class LostTalesMapDecorationRenderer {
      * is standing on, and the projection says how far away that ground ended
      * up. The sprite is then laid out square to the screen at a size that is
      * its map size carried through that projection — which is what makes it
-     * stand on the map rather than lie on it, and what makes the far half of a
-     * leaning map recede instead of reading as a wall.</p>
+     * stand on the map rather than lie on it. Orthographic pitch deliberately
+     * keeps the same scale on both halves so upright features cannot lean
+     * toward a screen-centred vanishing point.</p>
      *
      * <p>Put by rather than drawn, because whether this sprite belongs in
      * front of or behind the last one is not a question either of them can
@@ -1048,7 +1042,7 @@ public final class LostTalesMapDecorationRenderer {
     private static float maximumDrawnWidth(
             float worldWidth, float zoomScale) {
         return worldWidth * zoomScale
-                * MAX_SITE_SCALE * MAX_PERSPECTIVE_SCALE;
+                * MAX_SITE_SCALE;
     }
 
 }
