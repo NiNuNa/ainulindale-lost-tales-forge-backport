@@ -49,7 +49,7 @@ public final class LostTalesInputIconAtlasTest {
         assertEquals(0, escape.getU(0));
         assertEquals(22, escape.getU(1));
         assertEquals(44, escape.getU(2));
-        assertEquals(20, escape.getV(0));
+        assertEquals(40, escape.getV(0));
     }
 
     @Test
@@ -69,7 +69,8 @@ public final class LostTalesInputIconAtlasTest {
                 Keyboard.KEY_0, Keyboard.KEY_1, Keyboard.KEY_2,
                 Keyboard.KEY_3, Keyboard.KEY_4, Keyboard.KEY_5,
                 Keyboard.KEY_6, Keyboard.KEY_7, Keyboard.KEY_8,
-                Keyboard.KEY_9
+                Keyboard.KEY_9,
+                Keyboard.KEY_PERIOD, Keyboard.KEY_COMMA
         };
         for (int index = 0; index < codes.length; index++) {
             Sprite sprite = LostTalesInputIconAtlas.findSprite(
@@ -84,14 +85,33 @@ public final class LostTalesInputIconAtlasTest {
 
     @Test
     public void wordKeysUseTheFrameFamilyMatchingTheirLength() {
-        assertWordKey(Keyboard.KEY_LMENU, 21, 20, 0, 34, 15, 22);
-        assertWordKey(Keyboard.KEY_ESCAPE, 21, 20, 16, 34, 15, 22);
-        assertWordKey(Keyboard.KEY_TAB, 21, 20, 32, 34, 15, 22);
-        assertWordKey(Keyboard.KEY_CAPITAL, 25, 40, 0, 54, 19, 26);
-        assertWordKey(Keyboard.KEY_LCONTROL, 25, 40, 20, 54, 19, 26);
-        assertWordKey(Keyboard.KEY_RCONTROL, 25, 40, 20, 54, 19, 26);
-        assertWordKey(Keyboard.KEY_LSHIFT, 29, 60, 0, 74, 23, 30);
-        assertWordKey(Keyboard.KEY_SPACE, 29, 60, 24, 74, 23, 30);
+        assertWordKey(Keyboard.KEY_LMENU, 21, 40, 0, 54, 15, 22);
+        assertWordKey(Keyboard.KEY_ESCAPE, 21, 40, 16, 54, 15, 22);
+        assertWordKey(Keyboard.KEY_TAB, 21, 40, 32, 54, 15, 22);
+        assertWordKey(Keyboard.KEY_DELETE, 21, 40, 48, 54, 15, 22);
+        assertWordKey(Keyboard.KEY_CAPITAL, 25, 60, 0, 74, 19, 26);
+        assertWordKey(Keyboard.KEY_LCONTROL, 25, 60, 20, 74, 19, 26);
+        assertWordKey(Keyboard.KEY_RCONTROL, 25, 60, 20, 74, 19, 26);
+        assertWordKey(Keyboard.KEY_LSHIFT, 29, 80, 0, 94, 23, 30);
+        assertWordKey(Keyboard.KEY_SPACE, 29, 80, 24, 94, 23, 30);
+    }
+
+    @Test
+    public void functionKeysSplitByHowManyCharactersTheyNeed() {
+        // F1 to F9 are two characters wide and have their own frame family;
+        // F10 to F12 are three, so they share the ALT/ESC/TAB frames.
+        int[] shortKeys = {
+                Keyboard.KEY_F1, Keyboard.KEY_F2, Keyboard.KEY_F3,
+                Keyboard.KEY_F4, Keyboard.KEY_F5, Keyboard.KEY_F6,
+                Keyboard.KEY_F7, Keyboard.KEY_F8, Keyboard.KEY_F9
+        };
+        for (int index = 0; index < shortKeys.length; index++) {
+            assertWordKey(shortKeys[index], 17, 20,
+                    index * 12, 34, 11, 18);
+        }
+        assertWordKey(Keyboard.KEY_F10, 21, 40, 64, 54, 15, 22);
+        assertWordKey(Keyboard.KEY_F11, 21, 40, 80, 54, 15, 22);
+        assertWordKey(Keyboard.KEY_F12, 21, 40, 96, 54, 15, 22);
     }
 
     @Test
@@ -100,8 +120,8 @@ public final class LostTalesInputIconAtlasTest {
         assertNotNull(wheel);
         assertFalse(wheel.isAnimated());
         assertFalse(wheel.hasGlyph());
-        assertEquals(80, wheel.getV(0));
-        assertEquals(80, wheel.getV(2));
+        assertEquals(100, wheel.getV(0));
+        assertEquals(100, wheel.getV(2));
     }
 
     private static void assertWordKey(
@@ -119,6 +139,37 @@ public final class LostTalesInputIconAtlasTest {
         assertEquals(glyphV, sprite.getGlyphV());
         assertEquals(glyphWidth, sprite.getGlyphWidth());
         assertCenteredGlyph(sprite);
+    }
+
+    /**
+     * Every glyph sits inside the frame it is composed over, which is what
+     * keeps a re-tiered atlas from addressing a neighbouring band.
+     */
+    @Test
+    public void everyGlyphFitsInsideItsOwnFrame() {
+        int[] codes = {
+                Keyboard.KEY_A, Keyboard.KEY_9,
+                Keyboard.KEY_PERIOD, Keyboard.KEY_COMMA,
+                Keyboard.KEY_F1, Keyboard.KEY_F9,
+                Keyboard.KEY_LMENU, Keyboard.KEY_DELETE, Keyboard.KEY_F12,
+                Keyboard.KEY_CAPITAL, Keyboard.KEY_LCONTROL,
+                Keyboard.KEY_LSHIFT, Keyboard.KEY_SPACE
+        };
+        for (int index = 0; index < codes.length; index++) {
+            Sprite sprite = LostTalesInputIconAtlas.findSprite(
+                    Type.KEYBOARD, codes[index]);
+            assertNotNull(sprite);
+            assertEquals(sprite.getWidth(),
+                    sprite.getGlyphWidth() + sprite.getGlyphOffsetX() * 2);
+            int lastFrame = sprite.getFrameCount() - 1;
+            assertTrue(sprite.getU(lastFrame) + sprite.getWidth()
+                    <= LostTalesInputIconAtlas.TEXTURE_WIDTH);
+            assertTrue(sprite.getGlyphV() + sprite.getGlyphHeight()
+                    <= LostTalesInputIconAtlas.TEXTURE_HEIGHT);
+            assertTrue(sprite.getGlyphOffsetY(lastFrame)
+                    + sprite.getGlyphHeight()
+                    <= LostTalesInputIconAtlas.SPRITE_HEIGHT);
+        }
     }
 
     private static void assertCenteredGlyph(Sprite sprite) {

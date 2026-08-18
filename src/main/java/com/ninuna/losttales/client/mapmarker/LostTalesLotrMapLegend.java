@@ -159,6 +159,39 @@ final class LostTalesLotrMapLegend {
         return true;
     }
 
+    /** The tiles, and the arrows that still have somewhere to scroll to. */
+    static boolean isPointerOverAction(
+            LostTalesLotrMapGui gui, int mouseX, int mouseY) {
+        Layout layout = currentLayout(gui);
+        if (!layout.visible) {
+            return false;
+        }
+        int pivotX = layout.panelX + layout.panelWidth / 2;
+        int pivotY = layout.panelY + layout.panelHeight / 2;
+        mouseX = LostTalesMapPopupAnimation.inverseMouseX(
+                gui.getMapLegendAnimationKey(), mouseX, pivotX);
+        mouseY = LostTalesMapPopupAnimation.inverseMouseY(
+                gui.getMapLegendAnimationKey(), mouseY, pivotY);
+        if (!layout.containsPanel(mouseX, mouseY)) {
+            return false;
+        }
+        int categoryCount =
+                LostTalesMapLegendRegistry.getCategories().size();
+        if (layout.containsLeftArrow(mouseX, mouseY)) {
+            return layout.firstIndex > 0;
+        }
+        if (layout.containsRightArrow(mouseX, mouseY)) {
+            return layout.firstIndex + layout.visibleCount < categoryCount;
+        }
+        for (int slot = 0; slot < layout.visibleCount; slot++) {
+            if (layout.containsTile(slot, mouseX, mouseY)
+                    && layout.firstIndex + slot < categoryCount) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static boolean handleMouseWheel(
             LostTalesLotrMapGui gui, int mouseX, int mouseY, int wheel) {
         Layout layout = currentLayout(gui);

@@ -104,6 +104,13 @@ final class LostTalesMapMoveMarkerPrompt {
         return Action.NONE;
     }
 
+    /** Whether a click here would do something; see the fast-travel popup. */
+    boolean isPointerOverAction(int screenWidth, int screenHeight,
+                                int mouseX, int mouseY) {
+        return mouseClicked(screenWidth, screenHeight,
+                mouseX, mouseY, 0) != Action.NONE;
+    }
+
     Action keyTyped(int keyCode) {
         if (keyCode == Keyboard.KEY_ESCAPE) {
             return Action.LEAVE;

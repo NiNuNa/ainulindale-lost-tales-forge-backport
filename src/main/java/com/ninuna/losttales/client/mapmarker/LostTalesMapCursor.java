@@ -36,21 +36,42 @@ import org.lwjgl.opengl.GL11;
 @SideOnly(Side.CLIENT)
 public final class LostTalesMapCursor {
     private static final ResourceLocation TEXTURE = new ResourceLocation(
-            LostTalesMetaData.MOD_ID, "textures/gui/map_cursor.png");
+            LostTalesMetaData.MOD_ID, "textures/gui/cursor.png");
+    /** The two poses, side by side in one strip. */
+    static final int TEXTURE_WIDTH = 16;
+    static final int TEXTURE_HEIGHT = 10;
     /**
      * Drawn in GUI pixels, so the pointer is the same size relative to the
      * interface at every resolution and GUI scale, and its pixels line up with
      * everything else drawn on the map.
      */
-    static final int WIDTH = 7;
-    static final int HEIGHT = 10;
+    static final int SPRITE_WIDTH = 8;
+    static final int SPRITE_HEIGHT = 10;
+
     /**
-     * Where the sprite's point is, within the sprite. The arrow is drawn from
-     * its own tip, so this is the origin; a replacement sprite whose point is
-     * elsewhere moves these and nothing else.
+     * Which pose the pointer is drawn in, and where its point sits inside it.
+     *
+     * <p>Both poses are drawn from their own point, so the pixel the player is
+     * aiming at is the pixel every GUI hit test resolved against, whichever
+     * artwork is showing. A pose whose point is elsewhere moves its own
+     * hotspot and nothing else.</p>
      */
-    private static final int HOTSPOT_X = 0;
-    private static final int HOTSPOT_Y = 0;
+    enum Pose {
+        /** Nothing under the pointer answers to a click. */
+        ARROW(0, 0, 0),
+        /** Something under the pointer does: the hand, tip of finger first. */
+        HAND(SPRITE_WIDTH, 3, 0);
+
+        private final int u;
+        private final int hotspotX;
+        private final int hotspotY;
+
+        Pose(int u, int hotspotX, int hotspotY) {
+            this.u = u;
+            this.hotspotX = hotspotX;
+            this.hotspotY = hotspotY;
+        }
+    }
 
     private static Cursor blankCursor;
     private static boolean cursorUnavailable;
@@ -119,14 +140,21 @@ public final class LostTalesMapCursor {
 
     /**
      * Draws the pointer, last of everything, at the GUI's hit-test position.
+     *
+     * @param interactable whether the thing under the pointer answers to a
+     *                     click, which is the only thing that decides the pose
      */
-    public static void render(Minecraft minecraft, int mouseX, int mouseY) {
+    public static void render(Minecraft minecraft, int mouseX, int mouseY,
+                              boolean interactable) {
         if (!held || minecraft == null
                 || minecraft.getTextureManager() == null) {
             return;
         }
-        int x = mouseX - HOTSPOT_X;
-        int y = mouseY - HOTSPOT_Y;
+        Pose pose = interactable ? Pose.HAND : Pose.ARROW;
+        int x = mouseX - pose.hotspotX;
+        int y = mouseY - pose.hotspotY;
+        float minU = pose.u / (float)TEXTURE_WIDTH;
+        float maxU = (pose.u + SPRITE_WIDTH) / (float)TEXTURE_WIDTH;
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT
                 | GL11.GL_CURRENT_BIT | GL11.GL_DEPTH_BUFFER_BIT);
         GL11.glPushMatrix();
@@ -149,11 +177,13 @@ public final class LostTalesMapCursor {
                     GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
             Tessellator tessellator = Tessellator.instance;
             tessellator.startDrawingQuads();
-            tessellator.addVertexWithUV(x, y + HEIGHT, 0.0D, 0.0D, 1.0D);
             tessellator.addVertexWithUV(
-                    x + WIDTH, y + HEIGHT, 0.0D, 1.0D, 1.0D);
-            tessellator.addVertexWithUV(x + WIDTH, y, 0.0D, 1.0D, 0.0D);
-            tessellator.addVertexWithUV(x, y, 0.0D, 0.0D, 0.0D);
+                    x, y + SPRITE_HEIGHT, 0.0D, minU, 1.0D);
+            tessellator.addVertexWithUV(
+                    x + SPRITE_WIDTH, y + SPRITE_HEIGHT, 0.0D, maxU, 1.0D);
+            tessellator.addVertexWithUV(
+                    x + SPRITE_WIDTH, y, 0.0D, maxU, 0.0D);
+            tessellator.addVertexWithUV(x, y, 0.0D, minU, 0.0D);
             tessellator.draw();
         } catch (Throwable ignored) {
             // A pointer that cannot be drawn must not leave one that cannot

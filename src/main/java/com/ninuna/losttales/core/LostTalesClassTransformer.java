@@ -80,6 +80,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.guiAnimationInputTransformer.active";
     private static final String GUI_ANIMATION_BACKGROUND_ACTIVE_PROPERTY =
             "losttales.guiAnimationBackgroundTransformer.active";
+    public static final String TOOLTIP_ICON_ACTIVE_PROPERTY =
+            "losttales.tooltipIconTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
@@ -234,6 +236,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     private static final String SMOOTH_INVENTORY_HOOK_OWNER =
             "com/ninuna/losttales/client/gui/inventory/"
                     + "LostTalesSmoothInventoryHooks";
+    private static final String TOOLTIP_HOOK_OWNER =
+            "com/ninuna/losttales/client/gui/tooltip/"
+                    + "LostTalesTooltipHooks";
 
     @Override
     public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -244,8 +249,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return transformGuiScreenDraw(transformCamera(basicClass));
         }
         if (GUI_SCREEN.equals(transformedName)) {
-            return transformGuiScreenBackground(
-                    transformGuiScreenInput(basicClass));
+            return transformGuiScreenTooltip(
+                    transformGuiScreenBackground(
+                            transformGuiScreenInput(basicClass)));
         }
         if (GUI_CONTAINER.equals(transformedName)) {
             return transformGuiContainer(basicClass);
@@ -2062,6 +2068,64 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return basicClass;
         } catch (Throwable throwable) {
             warn("Failed to patch stationary GUI backdrops: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Offers every tooltip to Lost Tales before vanilla draws it.
+     *
+     * <p>A tooltip carrying a key icon is laid out and drawn by the mod,
+     * because an icon is taller than a line of text and the box has to be
+     * measured around it; every other tooltip is declined and falls straight
+     * through to vanilla's own drawing. Without this patch the hint lines keep
+     * their plain "[SHIFT]" text, so a failure here costs the artwork and
+     * nothing else.</p>
+     */
+    private static byte[] transformGuiScreenTooltip(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("drawHoveringText".equals(method.name)
+                        || "func_146283_a".equals(method.name))
+                        || !("(Ljava/util/List;IILnet/minecraft/client/gui/"
+                        + "FontRenderer;)V").equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, TOOLTIP_HOOK_OWNER,
+                        "drawHoveringText")) {
+                    System.setProperty(
+                            TOOLTIP_ICON_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                LabelNode vanilla = new LabelNode();
+                InsnList head = new InsnList();
+                head.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                head.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                head.add(new VarInsnNode(Opcodes.ILOAD, 2));
+                head.add(new VarInsnNode(Opcodes.ILOAD, 3));
+                head.add(new VarInsnNode(Opcodes.ALOAD, 4));
+                head.add(new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        TOOLTIP_HOOK_OWNER,
+                        "drawHoveringText",
+                        "(Lnet/minecraft/client/gui/GuiScreen;"
+                                + "Ljava/util/List;II"
+                                + "Lnet/minecraft/client/gui/FontRenderer;)Z"));
+                head.add(new JumpInsnNode(Opcodes.IFEQ, vanilla));
+                head.add(new InsnNode(Opcodes.RETURN));
+                head.add(vanilla);
+                method.instructions.insert(head);
+                System.setProperty(TOOLTIP_ICON_ACTIVE_PROPERTY, "true");
+                info("Patched GuiScreen tooltips for inline key icons");
+                return write(owner);
+            }
+            warn("Could not locate GuiScreen#drawHoveringText; tooltips will "
+                    + "name their keys in text instead of icons");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch tooltip key icons: " + throwable);
             return basicClass;
         }
     }

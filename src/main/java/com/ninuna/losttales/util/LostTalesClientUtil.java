@@ -1,6 +1,7 @@
 package com.ninuna.losttales.util;
 
 import com.ninuna.losttales.block.custom.LostTalesBlockPlushie;
+import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipIcons;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.entity.ELostTalesUser;
 import com.ninuna.losttales.item.ELostTalesItem;
@@ -68,7 +69,9 @@ public final class LostTalesClientUtil {
                 list.add("§7§o" + lore);
             }
         } else {
-            list.add("Hold §f[SHIFT] §r§7to view item lore.");
+            list.add("Hold " + LostTalesTooltipIcons.key(
+                    Keyboard.KEY_LSHIFT, "§f[SHIFT]")
+                    + " §r§7to view item lore.");
         }
     }
 
@@ -89,7 +92,9 @@ public final class LostTalesClientUtil {
             }
         } else {
             list.add("");
-            list.add("Hold §f[CTRL] §r§7to view item details.");
+            list.add("Hold " + LostTalesTooltipIcons.key(
+                    Keyboard.KEY_LCONTROL, "§f[CTRL]")
+                    + " §r§7to view item details.");
         }
     }
 
@@ -108,7 +113,9 @@ public final class LostTalesClientUtil {
             }
         } else {
             list.add("");
-            list.add("Hold §f[CTRL] §r§7to view item details.");
+            list.add("Hold " + LostTalesTooltipIcons.key(
+                    Keyboard.KEY_LCONTROL, "§f[CTRL]")
+                    + " §r§7to view item details.");
         }
     }
 
@@ -143,8 +150,11 @@ public final class LostTalesClientUtil {
                             ? "§e§oNo set bonus!" : "§e§o" + setBonusDescription);
                 }
             } else {
-                list.add("Hold §e[" + LostTalesKeyBindings.getModifierKeyDisplayName()
-                        + "] §r§7to view armor set information.");
+                list.add("Hold " + LostTalesTooltipIcons.key(
+                        LostTalesKeyBindings.getModifierKeyBinding(),
+                        "§e[" + LostTalesKeyBindings
+                                .getModifierKeyDisplayName() + "]")
+                        + " §r§7to view armor set information.");
             }
         }
     }

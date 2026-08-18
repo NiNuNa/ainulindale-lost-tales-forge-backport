@@ -33,6 +33,8 @@ public final class LostTalesClassTransformerTest {
             "com/ninuna/losttales/client/camera/ThirdPersonEntityActionHooks";
     private static final String THIRD_PERSON_BLOCK_ACTION_HOOK_OWNER =
             "com/ninuna/losttales/client/camera/ThirdPersonBlockActionHooks";
+    private static final String TOOLTIP_HOOK_OWNER =
+            "com/ninuna/losttales/client/gui/tooltip/LostTalesTooltipHooks";
     private static final String DEBUG_HOOK_OWNER =
             "com/ninuna/losttales/character/physics/CharacterDebugHitboxHook";
     private static final String FAST_TRAVEL_HOOK_OWNER =
@@ -158,6 +160,20 @@ public final class LostTalesClassTransformerTest {
                 screen, "drawWorldBackground",
                 GUI_ANIMATION_HOOK_OWNER,
                 "endVanillaBackground"));
+    }
+
+    @Test
+    public void tooltipsOfferThemselvesToTheKeyIconRenderer()
+            throws Exception {
+        ClassNode screen = transform("net.minecraft.client.gui.GuiScreen");
+        assertTrue(containsStaticHook(
+                screen, "drawHoveringText",
+                TOOLTIP_HOOK_OWNER, "drawHoveringText"));
+        // The offer has to come before vanilla draws anything, or the tooltip
+        // would be drawn twice, once in each layout.
+        MethodNode method = findMethod(screen, "drawHoveringText");
+        assertTrue(firstCallIsHook(
+                method, TOOLTIP_HOOK_OWNER, "drawHoveringText"));
     }
 
     @Test
@@ -536,6 +552,22 @@ public final class LostTalesClassTransformerTest {
                     return true;
                 }
             }
+        }
+        return false;
+    }
+
+    /** True when the first call the method makes is that hook. */
+    private static boolean firstCallIsHook(
+            MethodNode method, String hookOwner, String hookName) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof MethodInsnNode)) {
+                continue;
+            }
+            MethodInsnNode call = (MethodInsnNode)instruction;
+            return call.getOpcode() == Opcodes.INVOKESTATIC
+                    && hookOwner.equals(call.owner)
+                    && hookName.equals(call.name);
         }
         return false;
     }

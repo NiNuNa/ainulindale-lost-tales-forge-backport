@@ -86,7 +86,7 @@ Tilt the map and each one lays a shadow of its own artwork down on the ground be
 
 Tall things stand up as the map tips, too: a mountain is drawn a little taller as the eye drops, its foot pinned exactly where the ground is. That is a vertical scale of a square-on sprite and nothing else — no shear, no rotation, no resampling along a diagonal — so pixel art stays pixel art. Markers are left out of both: they are pins in the paper rather than things standing on the country, and lifting one off the place it marks reads as the pin coming loose.
 
-While the map is open it draws its own pixel-art pointer and hides the system one. The pointer's tip is the exact coordinate every hit test is resolved against, so what you aim at is what responds at any resolution or GUI scale. The system pointer is restored when the map closes, when another screen takes over, and on the tick after anything goes wrong inside the map screen.
+While the map is open it draws its own pixel-art pointer and hides the system one. The pointer's tip is the exact coordinate every hit test is resolved against, so what you aim at is what responds at any resolution or GUI scale. It has two poses: an arrow over anything that does nothing, and a pointing hand over anything a click would reach — a button, a marker or waypoint, a legend tile, a popup action, or an inventory slot on the other screens that use the same pointer. The hand is decided by the same hit tests the click itself runs, in the same order, so the pointer cannot promise something the click would not do; a popup owns the pointer alone while it is open, exactly as it owns the click. The system pointer is restored when the map closes, when another screen takes over, and on the tick after anything goes wrong inside the map screen.
 
 Press `R` on the map to bring the camera back to where you are standing, and `F` to open Find Location: type part of a name and pick a place from the list to fly the camera to it. The list holds only what the player is allowed to be told about — places they have found, their own and shared waypoints, and their party's markers — so a location that has not been discovered cannot be found by name either.
 
@@ -111,6 +111,10 @@ With the popup open, the left and right arrow keys, `A` and `D`, and the arrows 
 Quick loot works only for supported inventories in reach. The client requests a preview; the server re-resolves the block, distance, inventory, seal state, dimension, and slot before any mutation. A stale or fabricated slot request is ignored. Sealed urns can be displayed but cannot be emptied through quick loot.
 
 The feature drops the selected full stack into the world above the container. It does not transfer items directly into the player's inventory.
+
+## Key icons
+
+The same animated key artwork the quick-loot and map control strips use is also drawn inside item tooltips, so a hint reads "Hold [icon] to view item lore" rather than naming the key in text. Tooltips are a list of strings and nothing else, so the icon travels inside one as a marked span carrying both the key it stands for and the plain label it replaces; the coremod offers every tooltip to Lost Tales before vanilla draws it, and only the ones carrying a marker are taken over — everything else is drawn by vanilla exactly as before. The line an icon sits on is measured and drawn taller than a line of text, and the box grows with it, because measurement and drawing happen in the same pass. Nothing writes a marker until the tooltip renderer is patched, so on an installation where that patch does not apply the hints simply name their keys in text, and a foreign tooltip renderer that never learned about the markers still shows the readable label.
 
 ## Third-person camera and combat
 

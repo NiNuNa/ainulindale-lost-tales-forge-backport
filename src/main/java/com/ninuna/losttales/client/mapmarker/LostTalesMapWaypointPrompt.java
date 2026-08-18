@@ -425,6 +425,56 @@ final class LostTalesMapWaypointPrompt {
         return Action.NONE;
     }
 
+    /**
+     * Whether a click here would land on something.
+     *
+     * <p>Written out rather than asked of {@link #mouseClicked}: the fields,
+     * the swatches and the fellowship rows all take a click and all report no
+     * action, so the click test alone would leave the pointer plain over half
+     * the popup.</p>
+     */
+    boolean isPointerOverAction(int screenWidth, int screenHeight,
+                                int mouseX, int mouseY,
+                                boolean withinWaypointLimit) {
+        Layout layout = calculateLayout(
+                screenWidth, screenHeight, this.editing);
+        int pivotX = layout.x + layout.width / 2;
+        int pivotY = layout.y + layout.height / 2;
+        mouseX = LostTalesMapPopupAnimation.inverseMouseX(
+                this, mouseX, pivotX);
+        mouseY = LostTalesMapPopupAnimation.inverseMouseY(
+                this, mouseY, pivotY);
+        if (layout.nameField.contains(mouseX, mouseY)
+                || layout.noteField.contains(mouseX, mouseY)) {
+            return true;
+        }
+        for (int index = 0;
+             index < LostTalesCustomWaypointStyle.PALETTE.length;
+             index++) {
+            if (layout.swatch(index).contains(mouseX, mouseY)) {
+                return true;
+            }
+        }
+        if (this.editing) {
+            int rows = Math.min(VISIBLE_FELLOWSHIPS,
+                    this.shareTargets.size());
+            for (int row = 0; row < rows; row++) {
+                if (layout.shareRow(row).contains(mouseX, mouseY)) {
+                    return true;
+                }
+            }
+            if (layout.travel.contains(mouseX, mouseY)
+                    || layout.delete.contains(mouseX, mouseY)) {
+                return true;
+            }
+        }
+        if (layout.cancel.contains(mouseX, mouseY)) {
+            return true;
+        }
+        return layout.confirm.contains(mouseX, mouseY)
+                && canConfirm(withinWaypointLimit);
+    }
+
     /** Scrolls the fellowship list; the map behind stays where it is. */
     void mouseWheel(int wheel) {
         if (wheel == 0) {

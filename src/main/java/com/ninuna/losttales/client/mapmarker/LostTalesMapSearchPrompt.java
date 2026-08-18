@@ -253,6 +253,28 @@ final class LostTalesMapSearchPrompt {
         return true;
     }
 
+    /** The query field and the results a click would choose. */
+    boolean isPointerOverAction(int screenWidth, int screenHeight,
+                                int mouseX, int mouseY) {
+        Layout layout = calculateLayout(screenWidth, screenHeight);
+        int pivotX = layout.x + layout.width / 2;
+        int pivotY = layout.y + layout.height / 2;
+        mouseX = LostTalesMapPopupAnimation.inverseMouseX(
+                this, mouseX, pivotX);
+        mouseY = LostTalesMapPopupAnimation.inverseMouseY(
+                this, mouseY, pivotY);
+        if (layout.field.contains(mouseX, mouseY)) {
+            return true;
+        }
+        int rows = Math.min(VISIBLE_ROWS, this.results.size());
+        for (int row = 0; row < rows; row++) {
+            if (layout.row(row).contains(mouseX, mouseY)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     void mouseWheel(int wheel) {
         if (wheel == 0) {
             return;

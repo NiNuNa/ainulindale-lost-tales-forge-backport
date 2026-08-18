@@ -2,6 +2,8 @@ package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
+import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
+import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
@@ -49,7 +51,8 @@ import org.lwjgl.opengl.GL11;
  * owns Lost Tales icons plus undiscovered hover/selection so private names,
  * lore, and fast-travel actions never reach the native GUI path.</p>
  */
-public class LostTalesLotrMapGui extends LOTRGuiMap {
+public class LostTalesLotrMapGui extends LOTRGuiMap
+        implements LostTalesPointerInteractable {
     private static Field controlZoneFactionField;
     private static Field conquestGridField;
     private static boolean initialModeReflectionReady;
@@ -1123,7 +1126,60 @@ public class LostTalesLotrMapGui extends LOTRGuiMap {
         // Last of everything: the pointer is over the map, the popups and the
         // strip alike, and it is drawn at the very coordinate every hit test
         // above was resolved against.
-        LostTalesMapCursor.render(this.mc, fixedMouseX, fixedMouseY);
+        LostTalesMapCursor.render(this.mc, fixedMouseX, fixedMouseY,
+                LostTalesGuiPointerTargets.isOverInteractable(
+                        this, mouseX, mouseY));
+    }
+
+    /**
+     * Whether a click where the pointer is would reach something.
+     *
+     * <p>The same order as {@link #mouseClicked}, and the same hit tests: an
+     * open popup owns the pointer alone, the legend answers for its own
+     * panel, and the map underneath answers for the icons drawn on it. What
+     * the pointer promises and what a click does are therefore one decision
+     * asked twice rather than two that can drift apart.</p>
+     */
+    @Override
+    public boolean isPointerOverInteractable(int mouseX, int mouseY) {
+        int fixedMouseX = LostTalesGuiAnimations.forwardMouseX(
+                this, mouseX);
+        int fixedMouseY = LostTalesGuiAnimations.forwardMouseY(
+                this, mouseY);
+        if (this.waypointPrompt != null) {
+            return this.waypointPrompt.isPointerOverAction(
+                    this.width, this.height, fixedMouseX, fixedMouseY,
+                    isWithinCustomWaypointLimit());
+        }
+        if (this.fastTravelPrompt != null) {
+            return this.fastTravelPrompt.isPointerOverAction(
+                    this.width, this.height, fixedMouseX, fixedMouseY,
+                    canPlacePromptMarker());
+        }
+        if (this.moveMarkerPrompt != null) {
+            return this.moveMarkerPrompt.isPointerOverAction(
+                    this.width, this.height, fixedMouseX, fixedMouseY);
+        }
+        if (this.searchPrompt != null) {
+            return this.searchPrompt.isPointerOverAction(
+                    this.width, this.height, fixedMouseX, fixedMouseY);
+        }
+        if (LostTalesLotrMapLegend.isPointerOverAction(
+                this, fixedMouseX, fixedMouseY)) {
+            return true;
+        }
+        // Buttons are hit in untransformed screen space, the same space
+        // LOTR's own click path passes on to them.
+        if (LostTalesGuiPointerTargets.isOverEnabledButton(
+                this, mouseX, mouseY)) {
+            return true;
+        }
+        return LostTalesLotrMapMarkerIconOverlay.isPointerOverIcon(
+                        this, mouseX, mouseY)
+                || LostTalesLotrMapMarkerIconOverlay
+                        .getHoveredNativeWaypoint(
+                                this, this.clickableNativeWaypoints,
+                                mouseX, mouseY, false) != null;
     }
 
     /**

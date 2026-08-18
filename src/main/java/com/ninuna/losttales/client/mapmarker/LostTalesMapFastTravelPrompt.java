@@ -161,6 +161,20 @@ final class LostTalesMapFastTravelPrompt {
         return Action.NONE;
     }
 
+    /**
+     * Whether a click here would do something.
+     *
+     * <p>Asked of the click test itself, which decides nothing but which
+     * bounds the pointer is in, so the pointer cannot drift out of step with
+     * what the popup would actually act on.</p>
+     */
+    boolean isPointerOverAction(int screenWidth, int screenHeight,
+                                int mouseX, int mouseY,
+                                boolean canPlaceMarker) {
+        return mouseClicked(screenWidth, screenHeight, mouseX, mouseY,
+                0, canPlaceMarker) != Action.NONE;
+    }
+
     Action keyTyped(int keyCode) {
         if (keyCode == Keyboard.KEY_ESCAPE
                 || keyCode == Keyboard.KEY_N) {

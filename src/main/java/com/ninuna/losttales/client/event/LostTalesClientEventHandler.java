@@ -23,6 +23,7 @@ import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import com.ninuna.losttales.client.chat.LostTalesChatPresentation;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.client.gui.LostTalesGuiInventory;
+import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneStateStore;
@@ -317,7 +318,9 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         }
         LostTalesMapCursor.acquire();
         LostTalesMapCursor.render(
-                Minecraft.getMinecraft(), event.mouseX, event.mouseY);
+                Minecraft.getMinecraft(), event.mouseX, event.mouseY,
+                LostTalesGuiPointerTargets.isOverInteractable(
+                        event.gui, event.mouseX, event.mouseY));
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)

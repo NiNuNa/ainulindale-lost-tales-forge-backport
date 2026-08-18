@@ -2257,6 +2257,19 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         return candidate == null ? null : candidate.marker;
     }
 
+    /**
+     * Whether any Lost Tales icon owns the pointer.
+     *
+     * <p>The same hit test the click path runs, over every kind of icon at
+     * once and without any of its consequences, so the pointer agrees with
+     * what a click there would reach.</p>
+     */
+    public static boolean isPointerOverIcon(
+            LOTRGuiMap gui, int mouseX, int mouseY) {
+        return getHoveredGroupedCandidate(
+                gui, mouseX, mouseY, null, CandidateKind.ANY) != null;
+    }
+
     public static LostTalesMapMarkerData getHoveredLockedMappedMarker(
             LOTRGuiMap gui, int mouseX, int mouseY) {
         MarkerRenderCandidate candidate = getHoveredGroupedCandidate(

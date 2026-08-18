@@ -27,32 +27,35 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 
 public final class LostTalesQuickLootHudRenderer {
-    private static final ResourceLocation TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/quickloothud.png");
+    static final ResourceLocation TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/quick_loot_hud.png");
 
-    private static final int TEXTURE_WIDTH = 280;
-    private static final int TEXTURE_HEIGHT = 120;
-    private static final int TOP_HEIGHT = 23;
-    private static final int ROW_HEIGHT = 22;
-    private static final int BOTTOM_HEIGHT = 8;
-    private static final int SELECTION_WIDTH = 211;
-    private static final int SELECTION_HEIGHT = 20;
+    static final int TEXTURE_WIDTH = 280;
+    static final int TEXTURE_HEIGHT = 114;
+    static final int TOP_HEIGHT = 23;
+    static final int ROW_HEIGHT = 22;
+    static final int BOTTOM_HEIGHT = 8;
+    static final int SELECTION_WIDTH = 211;
+    static final int SELECTION_HEIGHT = 20;
     private static final int SELECTION_OFFSET_X = 13;
 
-    private static final int ORNAMENT_HORIZONTAL_HEIGHT = 10;
-    private static final int ORNAMENT_VERTICAL_WIDTH = 22;
-    private static final int ORNAMENT_VERTICAL_HEIGHT = 22;
+    static final int ORNAMENT_HORIZONTAL_HEIGHT = 10;
+    static final int ORNAMENT_VERTICAL_WIDTH = 22;
+    static final int ORNAMENT_VERTICAL_HEIGHT = 22;
     private static final int ORNAMENT_VERTICAL_OFFSET_X = -5;
     private static final int ORNAMENT_VERTICAL_LINE_OFFSET_X = 5;
 
     private static final int INPUT_HINT_HEIGHT = LostTalesInputIconRenderer.BASE_ICON_HEIGHT;
 
-    private static final int SELECTION_TEXTURE_V = 59;
-    private static final int VERTICAL_ORNAMENT_TEXTURE_V = 81;
-    private static final int HORIZONTAL_ORNAMENT_TEXTURE_V = 105;
-    private static final int ARROW_TEXTURE_V = 117;
+    // The strip is one segment per band, separated by a single blank row.
+    static final int ROW_TEXTURE_V = TOP_HEIGHT + 1;
+    static final int BOTTOM_TEXTURE_V = ROW_TEXTURE_V + ROW_HEIGHT + 1;
+    static final int SELECTION_TEXTURE_V = BOTTOM_TEXTURE_V + BOTTOM_HEIGHT + 1;
+    static final int VERTICAL_ORNAMENT_TEXTURE_V = SELECTION_TEXTURE_V + SELECTION_HEIGHT + 1;
+    static final int HORIZONTAL_ORNAMENT_TEXTURE_V = VERTICAL_ORNAMENT_TEXTURE_V + ORNAMENT_VERTICAL_HEIGHT + 1;
+    static final int ARROW_TEXTURE_V = HORIZONTAL_ORNAMENT_TEXTURE_V + ORNAMENT_HORIZONTAL_HEIGHT + 1;
 
-    private static final int ARROW_WIDTH = 5;
-    private static final int ARROW_HEIGHT = 3;
+    static final int ARROW_WIDTH = 5;
+    static final int ARROW_HEIGHT = 3;
     private static final int ARROW_OFFSET_X = SELECTION_OFFSET_X + SELECTION_WIDTH + 5;
 
     private static final long REQUEST_INTERVAL_MS = 250L;
@@ -195,7 +198,7 @@ public final class LostTalesQuickLootHudRenderer {
                 panelY + font.FONT_HEIGHT / 2, 0xFFFFFF);
 
         if (slots.isEmpty()) {
-            drawQuickLootTexture(minecraft, TEXTURE, panelX, rowY, 0, 25, TEXTURE_WIDTH, ROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+            drawQuickLootTexture(minecraft, TEXTURE, panelX, rowY, 0, ROW_TEXTURE_V, TEXTURE_WIDTH, ROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
             font.drawStringWithShadow(StatCollector.translateToLocal("quickLootHud.losttales.empty"), itemNameX, rowY + 7, 0xFFFFFF);
         } else {
             for (int i = 0; i < rowsToDraw; i++) {
@@ -204,7 +207,7 @@ public final class LostTalesQuickLootHudRenderer {
                 ItemStack stack = snapshot.getStack(slot);
                 int y = rowY + i * ROW_HEIGHT;
 
-                drawQuickLootTexture(minecraft, TEXTURE, panelX, y, 0, 25, TEXTURE_WIDTH, ROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+                drawQuickLootTexture(minecraft, TEXTURE, panelX, y, 0, ROW_TEXTURE_V, TEXTURE_WIDTH, ROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
                 if (actualRow == selectedRow) {
                     drawQuickLootTexture(minecraft, TEXTURE, panelX + SELECTION_OFFSET_X, y + 1, 0, SELECTION_TEXTURE_V, SELECTION_WIDTH, SELECTION_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
                 }
@@ -217,7 +220,7 @@ public final class LostTalesQuickLootHudRenderer {
         }
 
         int bottomY = panelY + TOP_HEIGHT + rowsToDraw * ROW_HEIGHT;
-        drawQuickLootTexture(minecraft, TEXTURE, panelX, bottomY, 0, 49, TEXTURE_WIDTH, BOTTOM_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
+        drawQuickLootTexture(minecraft, TEXTURE, panelX, bottomY, 0, BOTTOM_TEXTURE_V, TEXTURE_WIDTH, BOTTOM_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
         renderScrollArrows(minecraft, panelX, rowY, bottomY, rowsToDraw, slots.size());
         renderHints(minecraft, font, panelX + 3, bottomY + BOTTOM_HEIGHT + 3, !snapshot.sealed);
         renderVerticalOrnament(minecraft, panelX, panelY, rowsToDraw);
