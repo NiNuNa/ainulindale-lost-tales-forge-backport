@@ -189,13 +189,17 @@ public final class LostTalesChatPresentationTest {
     }
 
     @Test
-    public void chatBackdropStaysBlackAndFadesAfterThreeQuarters() {
-        assertEquals(0x000000,
+    public void chatBackdropUsesPlumBlackAndFadesAfterTwoThirds() {
+        assertEquals(LostTalesColors.rgb(LostTalesColors.PLUM_BLACK),
                 LostTalesChatOverlayRenderer.CHAT_BACKDROP_RGB);
-        assertEquals(75,
+        assertEquals(0x2D1E2F,
+                LostTalesChatOverlayRenderer.CHAT_BACKDROP_RGB);
+        assertEquals(67,
                 LostTalesChatOverlayRenderer.backdropFadeStart(100));
-        assertEquals(76,
-                LostTalesChatOverlayRenderer.backdropFadeStart(101));
+        assertEquals(66,
+                LostTalesChatOverlayRenderer.backdropFadeStart(99));
+        assertEquals(200,
+                LostTalesChatOverlayRenderer.backdropFadeStart(300));
     }
 
     @Test
@@ -204,6 +208,53 @@ public final class LostTalesChatPresentationTest {
                 ChatChannel.ALL.getDisplayColor());
         assertEquals(LostTalesColors.rgb(LostTalesColors.BLUE),
                 ChatChannel.PARTY.getDisplayColor());
+    }
+
+    @Test
+    public void ampersandCodesRenderInTheMessageBodyOnly() {
+        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
+        LostTalesConfig.showChatTimestamps = false;
+        try {
+            LostTalesChatMessagePacket packet =
+                    new LostTalesChatMessagePacket(
+                            ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                            "RangerOfTheNorth", "", 0x55AA55, 0x336633,
+                            "&6gold words", 123456789L,
+                            "losttales:human_ranger_male_2");
+            IChatComponent message = LostTalesChatPresentation.build(packet);
+            StringBuilder plainText = new StringBuilder();
+            ChatHeadMarker.Data marker = null;
+            for (Object value : message) {
+                IChatComponent part = (IChatComponent)value;
+                plainText.append(part.getUnformattedTextForChat());
+                if (ChatHeadMarker.decode(part) != null) {
+                    marker = ChatHeadMarker.decode(part);
+                }
+            }
+            assertTrue(plainText.toString().endsWith(
+                    "\u00a76gold words"));
+            assertNotNull(marker);
+            // Copying yields exactly what the sender typed.
+            assertEquals("&6gold words", marker.copyText);
+        } finally {
+            LostTalesConfig.showChatTimestamps = originalTimestamps;
+        }
+    }
+
+    @Test
+    public void pingedLinesAreTrackedBoundedAndCleared() {
+        LostTalesChatPresentation.clear();
+        LostTalesChatPresentation.markPinged(7);
+        assertTrue(LostTalesChatPresentation.isPingedLine(7));
+        assertFalse(LostTalesChatPresentation.isPingedLine(8));
+        for (int index = 0; index < 150; index++) {
+            LostTalesChatPresentation.markPinged(1000 + index);
+        }
+        // The oldest entries are evicted once the history cap is hit.
+        assertFalse(LostTalesChatPresentation.isPingedLine(7));
+        assertTrue(LostTalesChatPresentation.isPingedLine(1149));
+        LostTalesChatPresentation.clear();
+        assertFalse(LostTalesChatPresentation.isPingedLine(1149));
     }
 
     private static ChatHeadMarker.Data markerOf(IChatComponent message) {

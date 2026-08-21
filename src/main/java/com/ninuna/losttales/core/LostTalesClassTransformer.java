@@ -44,6 +44,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.lotrBountyTransformer.active";
     public static final String LOTR_SPEECH_ACTIVE_PROPERTY =
             "losttales.lotrSpeechTransformer.active";
+    public static final String NPC_CHAT_ACTIVE_PROPERTY =
+            "losttales.npcChatTransformer.active";
     public static final String ACCESSORY_CONTAINER_ACTIVE_PROPERTY =
             "losttales.accessoryContainerTransformer.active";
     public static final String ACCESSORY_PICK_BLOCK_ACTIVE_PROPERTY =
@@ -115,6 +117,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "lotr.common.fac.LOTRFactionBounties$PlayerData";
     private static final String LOTR_SPEECH =
             "lotr.common.entity.npc.LOTRSpeech";
+    private static final String LOTR_NPC_SPEECH_HANDLER =
+            "lotr.common.network.LOTRPacketNPCSpeech$Handler";
     private static final String LOTR_GUI_MAP =
             "lotr.client.gui.LOTRGuiMap";
     private static final String LOTR_LEVEL_DATA =
@@ -172,6 +176,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "(Llotr/common/LOTRPlayerData;"
                     + "Llotr/common/world/map/LOTRAbstractWaypoint;"
                     + "Lnet/minecraft/entity/player/EntityPlayerMP;)V";
+    private static final String NPC_CHAT_HOOK_OWNER =
+            "com/ninuna/losttales/client/chat/LostTalesNpcChatHook";
+    private static final String NPC_CHAT_HOOK_DESC =
+            "(Lnet/minecraft/entity/player/EntityPlayer;"
+                    + "Lnet/minecraft/util/IChatComponent;"
+                    + "Llotr/common/entity/npc/LOTREntityNPC;)V";
     private static final String ROLEPLAY_IDENTITY_HOOK_OWNER =
             "com/ninuna/losttales/character/identity/"
                     + "RoleplayCharacterIdentityHook";
@@ -294,6 +304,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
         if (LOTR_SPEECH.equals(transformedName)) {
             return transformLotrSpeech(basicClass);
+        }
+        if (LOTR_NPC_SPEECH_HANDLER.equals(transformedName)) {
+            return transformLotrNpcSpeechHandler(basicClass);
         }
         if (LOTR_GUI_MAP.equals(transformedName)) {
             return transformLotrGuiMap(basicClass);
@@ -1679,6 +1692,100 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             warn("Failed to patch LOTR NPC speech names: " + throwable);
             return basicClass;
         }
+    }
+
+    /**
+     * Reroutes the client-side chat print of NPC speech through the Lost
+     * Tales chat presentation. Only the final addChatMessage call is
+     * replaced; LOTR's immersive floating speech, recipients, and speech
+     * content are untouched. The hook falls back to the original component,
+     * so a partial failure degrades to LOTR's plain yellow line.
+     */
+    private static byte[] transformLotrNpcSpeechHandler(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"onMessage".equals(method.name)
+                        || !method.desc.startsWith(
+                        "(Llotr/common/network/LOTRPacketNPCSpeech;")) {
+                    continue;
+                }
+                MethodInsnNode chatCall = null;
+                for (AbstractInsnNode instruction =
+                        method.instructions.getFirst();
+                     instruction != null;
+                     instruction = instruction.getNext()) {
+                    if (!(instruction instanceof MethodInsnNode)) {
+                        continue;
+                    }
+                    MethodInsnNode call = (MethodInsnNode)instruction;
+                    if (call.getOpcode() == Opcodes.INVOKESTATIC
+                            && NPC_CHAT_HOOK_OWNER.equals(call.owner)
+                            && "addNpcChatMessage".equals(call.name)) {
+                        System.setProperty(
+                                NPC_CHAT_ACTIVE_PROPERTY, "true");
+                        return basicClass;
+                    }
+                    if (call.getOpcode() == Opcodes.INVOKEVIRTUAL
+                            && "net/minecraft/entity/player/EntityPlayer"
+                            .equals(call.owner)
+                            && "(Lnet/minecraft/util/IChatComponent;)V"
+                            .equals(call.desc)
+                            && ("addChatMessage".equals(call.name)
+                            || "func_145747_a".equals(call.name))) {
+                        chatCall = call;
+                        break;
+                    }
+                }
+                if (chatCall == null) {
+                    continue;
+                }
+                int npcLocal = findNpcSpeechHandlerNpcLocal(method);
+                if (npcLocal < 0) {
+                    warn("Could not identify LOTR NPC speech handler NPC "
+                            + "local; NPC chat will keep LOTR's style");
+                    return basicClass;
+                }
+                method.instructions.insertBefore(
+                        chatCall,
+                        new VarInsnNode(Opcodes.ALOAD, npcLocal));
+                chatCall.setOpcode(Opcodes.INVOKESTATIC);
+                chatCall.owner = NPC_CHAT_HOOK_OWNER;
+                chatCall.name = "addNpcChatMessage";
+                chatCall.desc = NPC_CHAT_HOOK_DESC;
+                System.setProperty(NPC_CHAT_ACTIVE_PROPERTY, "true");
+                info("Patched LOTR NPC speech chat lines into the "
+                        + "Lost Tales chat presentation");
+                return write(owner);
+            }
+            warn("Could not locate LOTRPacketNPCSpeech$Handler#onMessage; "
+                    + "NPC chat will keep LOTR's style");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch LOTR NPC speech chat: " + throwable);
+            return basicClass;
+        }
+    }
+
+    private static int findNpcSpeechHandlerNpcLocal(MethodNode method) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof TypeInsnNode)
+                    || instruction.getOpcode() != Opcodes.CHECKCAST) {
+                continue;
+            }
+            if (!"lotr/common/entity/npc/LOTREntityNPC".equals(
+                    ((TypeInsnNode)instruction).desc)) {
+                continue;
+            }
+            AbstractInsnNode store = nextCode(instruction);
+            if (store instanceof VarInsnNode
+                    && store.getOpcode() == Opcodes.ASTORE) {
+                return ((VarInsnNode)store).var;
+            }
+        }
+        return -1;
     }
 
     private static void activateLotrBountyTransformer() {

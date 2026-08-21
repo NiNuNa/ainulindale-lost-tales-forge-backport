@@ -40,6 +40,8 @@ public final class LostTalesClassTransformerTest {
     private static final String FAST_TRAVEL_HOOK_OWNER =
             "com/ninuna/losttales/world/map/waypoint/"
                     + "LostTalesWaypointFastTravelPolicy";
+    private static final String NPC_CHAT_HOOK_OWNER =
+            "com/ninuna/losttales/client/chat/LostTalesNpcChatHook";
     private static final String CLIENT_IDENTITY_HOOK_OWNER =
             "com/ninuna/losttales/client/character/"
                     + "ClientRoleplayCharacterIdentityHook";
@@ -247,6 +249,16 @@ public final class LostTalesClassTransformerTest {
         assertTrue(containsStaticHook(
                 transformed, "onMessage", FAST_TRAVEL_HOOK_OWNER,
                 "setTargetIfAllowed"));
+    }
+
+    @Test
+    public void npcSpeechChatLinesAreRestyledOnTheClient()
+            throws Exception {
+        ClassNode transformed = transform(
+                "lotr.common.network.LOTRPacketNPCSpeech$Handler");
+        assertTrue(containsStaticHook(
+                transformed, "onMessage", NPC_CHAT_HOOK_OWNER,
+                "addNpcChatMessage"));
     }
 
     @Test

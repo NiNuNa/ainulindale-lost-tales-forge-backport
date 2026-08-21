@@ -19,9 +19,10 @@ public final class LostTalesSkyrimUiStyle extends LostTalesColors {
         if (LostTalesGuiAnimations.isManagingBackdrop()) {
             return;
         }
-        Gui.drawRect(0, 0, width, height, 0x88000000);
-        Gui.drawRect(0, 0, width, 28, 0x72000000);
-        Gui.drawRect(0, height - 32, width, height, 0x72000000);
+        Gui.drawRect(0, 0, width, height, withAlpha(PLUM_BLACK, 0x88));
+        Gui.drawRect(0, 0, width, 28, withAlpha(PLUM_BLACK, 0x72));
+        Gui.drawRect(0, height - 32, width, height,
+                withAlpha(PLUM_BLACK, 0x72));
     }
 
     public static void drawPanel(int x, int y, int width, int height) {
@@ -33,7 +34,8 @@ public final class LostTalesSkyrimUiStyle extends LostTalesColors {
     }
 
     public static void drawPanel(int x, int y, int width, int height, int fillColor) {
-        Gui.drawRect(x + 1, y + 1, x + width + 1, y + height + 1, 0x78000000);
+        Gui.drawRect(x + 1, y + 1, x + width + 1, y + height + 1,
+                withAlpha(PLUM_BLACK, 0x78));
         Gui.drawRect(x, y, x + width, y + height, fillColor);
         Gui.drawRect(x, y, x + width, y + 1, BORDER);
         Gui.drawRect(x, y + height - 1, x + width, y + height, BORDER_DIM);
@@ -111,7 +113,8 @@ public final class LostTalesSkyrimUiStyle extends LostTalesColors {
             Gui.drawRect(x, y, x + 2, y + height, GOLD);
             drawDiamond(x + 8, y + height / 2, GOLD);
         } else if (hovered) {
-            Gui.drawRect(x, y, x + width, y + height, 0x362B2D31);
+            Gui.drawRect(x, y, x + width, y + height,
+                    withAlpha(PLUM_GRAY, 0x36));
             Gui.drawRect(x, y, x + 1, y + height, BORDER_DIM);
         }
     }
@@ -139,17 +142,20 @@ public final class LostTalesSkyrimUiStyle extends LostTalesColors {
         int clampedTarget = Math.max(1, target);
         int clampedCurrent = Math.max(0, Math.min(current, clampedTarget));
         int fill = width * clampedCurrent / clampedTarget;
-        Gui.drawRect(x, y, x + width, y + 2, 0x553D3A33);
+        Gui.drawRect(x, y, x + width, y + 2, withAlpha(PLUM_DARK, 0x55));
         if (fill > 0) {
             Gui.drawRect(x, y, x + fill, y + 2, complete ? GREEN : GOLD);
         }
-        Gui.drawRect(x, y + 2, x + width, y + 3, 0x55000000);
+        Gui.drawRect(x, y + 2, x + width, y + 3,
+                withAlpha(PLUM_BLACK, 0x55));
     }
 
     public static void drawCompassFrame(int x, int y, int width, int height) {
         int barY = y + 10;
-        Gui.drawRect(x + 4, barY - 3, x + width - 4, barY + 4, 0x5A000000);
-        Gui.drawRect(x + 8, barY, x + width - 8, barY + 1, 0xB8D8D1C3);
+        Gui.drawRect(x + 4, barY - 3, x + width - 4, barY + 4,
+                withAlpha(PLUM_BLACK, 0x5A));
+        Gui.drawRect(x + 8, barY, x + width - 8, barY + 1,
+                withAlpha(SAND, 0xB8));
         Gui.drawRect(x + width / 2 - 10, barY - 6, x + width / 2 + 10, barY - 5, BORDER_DIM);
         Gui.drawRect(x + width / 2 - 1, barY - 8, x + width / 2 + 1, barY + 6, TEXT_BRIGHT);
         drawDiamond(x + width / 2, barY - 9, GOLD);

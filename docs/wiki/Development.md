@@ -33,6 +33,10 @@ Use `runClient` or `runServer` only with a prepared legacy Forge development env
 - `src/main/resources/assets/losttales`: language, models, animations, textures, sounds, shaders, quests, lore characters, markers, camera presets, and map resources.
 - `src/test/java`: JUnit 4 unit and transformation tests.
 
+## Colours
+
+The mod's art direction uses exactly one palette: *Nanner Pancakes* (32 colours). `gui/style/LostTalesColors` holds every palette entry plus the semantic aliases (`TEXT`, `GOLD`, `PANEL_FILL`, `HUD_SHADOW`, …) that GUIs, the HUD, the map, and chat actually reference, along with `withAlpha`/`rgb`/`redF`-style helpers for translucency and GL tinting. Never hardcode a hex colour in rendering code — reference a palette entry or a semantic alias, adding a new alias in `LostTalesColors` if a role is missing. The project-wide shadow/black is `PLUM_BLACK` (`#2d1e2f`); pure black is not used.
+
 ## Compatibility conventions
 
 - Keep registry names, entity IDs, biome IDs, packet discriminators, NBT keys, and public JSON IDs stable unless a migration is part of the same change.

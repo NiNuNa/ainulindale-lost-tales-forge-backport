@@ -1,6 +1,8 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.IChatComponent;
@@ -11,6 +13,16 @@ final class LostTalesChatVisualStyle {
             LostTalesSkyrimUiStyle.HUD_LABEL);
     static final int SHADOW = LostTalesSkyrimUiStyle.rgb(
             LostTalesSkyrimUiStyle.HUD_SHADOW);
+    /** Shared translucent surface behind the indicator, popups, and button. */
+    static final int SURFACE = LostTalesSkyrimUiStyle.withAlpha(
+            LostTalesSkyrimUiStyle.PLUM_BLACK, 0xB0);
+    static final int SURFACE_HOVER = LostTalesSkyrimUiStyle.withAlpha(
+            LostTalesSkyrimUiStyle.PLUM_DARK, 0xCC);
+    /** Alpha-free surface tones for popups that animate their own opacity. */
+    static final int SURFACE_RGB = LostTalesSkyrimUiStyle.rgb(
+            LostTalesSkyrimUiStyle.PLUM_BLACK);
+    static final int SURFACE_HIGHLIGHT_RGB = LostTalesSkyrimUiStyle.rgb(
+            LostTalesSkyrimUiStyle.PLUM_GRAY);
 
     private LostTalesChatVisualStyle() {}
 
@@ -62,6 +74,34 @@ final class LostTalesChatVisualStyle {
             ChatHeadMarker.Data marker = ChatHeadMarker.decode(part);
             if (marker != null) {
                 afterHead = true;
+            }
+
+            ChatEmoji emoji = ChatEmojiMarker.decode(part);
+            if (emoji != null) {
+                int slotWidth = font.getStringWidth(formatting + text);
+                if (ChatEmojiMarker.reservesFullSlot(text)) {
+                    float size = Math.min(
+                            ChatEmoji.SPRITE_SIZE, slotWidth);
+                    float spriteX = cursor
+                            + Math.max(0.0F, (slotWidth - size) / 2.0F);
+                    // Two rows above the text baseline keeps the sprite
+                    // centred in the chat band while the text sits one
+                    // pixel lower than the sprite's top edge.
+                    Minecraft minecraft = Minecraft.getMinecraft();
+                    if (shadowPass) {
+                        ChatEmojiRenderer.drawTinted(minecraft, emoji,
+                                spriteX, y - 2, size,
+                                LostTalesSkyrimUiStyle.redF(SHADOW),
+                                LostTalesSkyrimUiStyle.greenF(SHADOW),
+                                LostTalesSkyrimUiStyle.blueF(SHADOW),
+                                alpha);
+                    } else {
+                        ChatEmojiRenderer.draw(minecraft, emoji,
+                                spriteX, y - 2, size, alpha);
+                    }
+                }
+                cursor += slotWidth;
+                continue;
             }
 
             String rendered;

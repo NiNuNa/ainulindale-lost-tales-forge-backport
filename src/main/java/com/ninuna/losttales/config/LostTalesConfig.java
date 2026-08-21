@@ -110,6 +110,10 @@ public final class LostTalesConfig {
     public static int chatProximityRadius = 64;
     /** Client-only presentation preferences; neither affects recipients. */
     public static boolean showChatTimestamps = true;
+    public static boolean enableChatEmojis = true;
+    public static boolean enableNpcChatStyling = true;
+    public static boolean enableChatPings = true;
+    public static String chatPingSound = "note.pling";
     public static boolean enableChatAnimations = true;
     public static int chatAnimationDurationMillis = 180;
     public static int chatInputAnimationDurationMillis = 180;
@@ -780,6 +784,30 @@ public final class LostTalesConfig {
                     showChatTimestamps,
                     "Show short local-time timestamps on Lost Tales player channel messages."
             );
+            enableChatEmojis = config.getBoolean(
+                    "enableChatEmojis",
+                    CATEGORY_CLIENT,
+                    enableChatEmojis,
+                    "Render supported :shortcodes: as inline emotes and show the chat emote picker."
+            );
+            enableChatPings = config.getBoolean(
+                    "enableChatPings",
+                    CATEGORY_CLIENT,
+                    enableChatPings,
+                    "Highlight and play a sound for chat messages that @-mention your account or active character name."
+            );
+            chatPingSound = config.getString(
+                    "chatPingSound",
+                    CATEGORY_CLIENT,
+                    chatPingSound,
+                    "Sound event played when a chat message @-mentions you; empty disables the sound."
+            );
+            enableNpcChatStyling = config.getBoolean(
+                    "enableNpcChatStyling",
+                    CATEGORY_CLIENT,
+                    enableNpcChatStyling,
+                    "Show LOTR NPC speech through the Lost Tales chat style with head icons, timestamps, and channels."
+            );
             enableChatAnimations = config.getBoolean(
                     "enableChatAnimations",
                     CATEGORY_CLIENT,
@@ -1440,6 +1468,14 @@ public final class LostTalesConfig {
                 chatProximityRadius).set(chatProximityRadius);
         config.get(CATEGORY_CLIENT, "showTimestamps",
                 showChatTimestamps).set(showChatTimestamps);
+        config.get(CATEGORY_CLIENT, "enableChatEmojis",
+                enableChatEmojis).set(enableChatEmojis);
+        config.get(CATEGORY_CLIENT, "enableNpcChatStyling",
+                enableNpcChatStyling).set(enableNpcChatStyling);
+        config.get(CATEGORY_CLIENT, "enableChatPings",
+                enableChatPings).set(enableChatPings);
+        config.get(CATEGORY_CLIENT, "chatPingSound",
+                chatPingSound).set(chatPingSound);
         config.get(CATEGORY_CLIENT, "enableChatAnimations",
                 enableChatAnimations).set(enableChatAnimations);
         config.get(CATEGORY_CLIENT, "chatAnimationDurationMillis",

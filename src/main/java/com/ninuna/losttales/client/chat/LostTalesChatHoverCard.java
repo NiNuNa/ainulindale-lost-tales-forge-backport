@@ -120,7 +120,8 @@ final class LostTalesChatHoverCard {
                     + 20.0F
                     + LostTalesChatOverlayRenderer
                     .getEntryDisplacement(scroll);
-            int visible = chat.func_146232_i();
+            int visible =
+                    LostTalesChatOverlayRenderer.visibleLineCount(chat);
             for (int visibleIndex = 0;
                  visibleIndex < visible
                          && visibleIndex + scroll < lines.size();
@@ -130,7 +131,9 @@ final class LostTalesChatHoverCard {
                 if (line == null) {
                     continue;
                 }
-                float lineTranslateY = -visibleIndex * 9.0F - 8.0F;
+                float lineTranslateY = -visibleIndex
+                        * (float)LostTalesChatOverlayRenderer.LINE_HEIGHT
+                        - 9.0F;
                 int cursor = 0;
                 for (Object value : line.func_151461_a()) {
                     if (!(value instanceof IChatComponent)) {
@@ -142,7 +145,11 @@ final class LostTalesChatHoverCard {
                             + part.getUnformattedTextForChat();
                     int partWidth = minecraft.fontRenderer
                             .getStringWidth(formatted);
-                    boolean head = ChatHeadMarker.decode(part) != null;
+                    ChatHeadMarker.Data decodedHead =
+                            ChatHeadMarker.decode(part);
+                    // NPCs have no account or character card to show.
+                    boolean head = decodedHead != null
+                            && !decodedHead.npcIdentity;
                     boolean identity = isReplyIdentity(part);
                     if (head || identity) {
                         float localX = head ? cursor + 0.5F : cursor;
@@ -201,6 +208,9 @@ final class LostTalesChatHoverCard {
                 IChatComponent part = (IChatComponent)value;
                 ChatHeadMarker.Data decoded = ChatHeadMarker.decode(part);
                 if (decoded != null) {
+                    if (decoded.npcIdentity) {
+                        return null;
+                    }
                     marker = decoded;
                     afterHead = true;
                     continue;

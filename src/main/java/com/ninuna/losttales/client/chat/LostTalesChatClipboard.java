@@ -57,36 +57,41 @@ final class LostTalesChatClipboard {
                 minecraft.displayHeight);
         int scaleFactor = resolution.getScaleFactor();
         float chatScale = chat.func_146244_h();
-        int visibleLines = Math.min(chat.func_146232_i(), lines.size());
+        int visibleLines = Math.min(
+                LostTalesChatOverlayRenderer.visibleLineCount(chat),
+                lines.size());
         int width = MathHelper.floor_float(
                 chat.func_146228_f() / chatScale);
         int scrollPosition =
                 LostTalesChatOverlayRenderer.getScrollPosition(chat);
         return lineIndexAt(rawMouseX, rawMouseY, scaleFactor, chatScale,
-                width, visibleLines, minecraft.fontRenderer.FONT_HEIGHT,
-                scrollPosition, scrollPosition == 0
+                width, visibleLines, scrollPosition, scrollPosition == 0
                         ? entryDisplacement : 0.0F, lines.size());
     }
 
-    /** Vanilla 1.7.10 hit testing with the visual entry offset removed. */
+    /**
+     * Vanilla 1.7.10 hit testing adjusted to the renderer's contiguous
+     * line stride, with the visual entry offset removed.
+     */
     static int lineIndexAt(int rawMouseX, int rawMouseY, int scaleFactor,
                            float chatScale, int width, int visibleLines,
-                           int fontHeight, int scrollPosition,
+                           int scrollPosition,
                            float entryDisplacement, int totalLines) {
         if (scaleFactor <= 0 || chatScale <= 0.0F || visibleLines <= 0
-                || fontHeight <= 0 || totalLines <= 0) {
+                || totalLines <= 0) {
             return -1;
         }
+        int lineHeight = LostTalesChatOverlayRenderer.LINE_HEIGHT;
         int x = MathHelper.floor_float(
                 (rawMouseX / scaleFactor - 3) / chatScale);
         int y = MathHelper.floor_float(
                 (rawMouseY / scaleFactor - 27 + entryDisplacement)
                         / chatScale);
         if (x < 0 || y < 0 || x > width
-                || y >= fontHeight * visibleLines + visibleLines) {
+                || y >= lineHeight * visibleLines) {
             return -1;
         }
-        int lineIndex = y / fontHeight + scrollPosition;
+        int lineIndex = y / lineHeight + scrollPosition;
         return lineIndex >= 0 && lineIndex < totalLines
                 ? lineIndex : -1;
     }

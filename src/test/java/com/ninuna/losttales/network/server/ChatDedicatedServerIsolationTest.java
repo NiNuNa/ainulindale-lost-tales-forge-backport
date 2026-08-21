@@ -1,6 +1,10 @@
 package com.ninuna.losttales.network.server;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatFormattingCodes;
+import com.ninuna.losttales.chat.ChatMentions;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
@@ -25,6 +29,11 @@ public final class ChatDedicatedServerIsolationTest {
         assertNoClientReference(LostTalesChatSendPacket.Handler.class);
         assertNoClientReference(LostTalesChatMessagePacket.class);
         assertNoClientReference(LostTalesChatMessagePacket.Handler.class);
+        assertNoClientReference(ChatEmoji.class);
+        assertNoClientReference(ChatEmojiParser.class);
+        assertNoClientReference(ChatEmojiParser.Segment.class);
+        assertNoClientReference(ChatFormattingCodes.class);
+        assertNoClientReference(ChatMentions.class);
     }
 
     private static void assertNoClientReference(Class<?> type)

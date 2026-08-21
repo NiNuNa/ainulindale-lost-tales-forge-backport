@@ -26,6 +26,16 @@ final class ChatHeadMarker {
                 + ':' + colorHex(nameColor);
     }
 
+    /** NPC variant: the skin field carries the entity's texture path. */
+    static String encodeNpc(UUID npcId, String texturePath,
+                            String copyText, int titleColor,
+                            int nameColor) {
+        return PREFIX + npcId + ":N:" + encodeText(texturePath)
+                + ':' + encodeText(copyText)
+                + ':' + colorHex(titleColor)
+                + ':' + colorHex(nameColor);
+    }
+
     static Data decode(IChatComponent component) {
         if (component == null || component.getChatStyle() == null) {
             return null;
@@ -49,7 +59,7 @@ final class ChatHeadMarker {
             UUID senderId = UUID.fromString(
                     value.substring(PREFIX.length(), separator));
             char identity = value.charAt(separator + 1);
-            if (identity != 'A' && identity != 'C') {
+            if (identity != 'A' && identity != 'C' && identity != 'N') {
                 return null;
             }
             String[] fields = value.substring(separator + 3)
@@ -57,7 +67,7 @@ final class ChatHeadMarker {
             if (fields.length == 1) {
                 // Compatibility with chat lines created by the earlier
                 // client-only marker format during the same session.
-                return new Data(senderId, identity == 'A', "",
+                return new Data(senderId, identity == 'A', false, "",
                         decodeText(fields[0]), LostTalesColors.rgb(
                         LostTalesColors.HUD_LABEL), LostTalesColors.rgb(
                         LostTalesColors.HUD_LABEL));
@@ -65,7 +75,7 @@ final class ChatHeadMarker {
             if (fields.length != 4) {
                 return null;
             }
-            return new Data(senderId, identity == 'A',
+            return new Data(senderId, identity == 'A', identity == 'N',
                     decodeText(fields[0]), decodeText(fields[1]),
                     parseColor(fields[2]), parseColor(fields[3]));
         } catch (IllegalArgumentException ignored) {
@@ -105,15 +115,19 @@ final class ChatHeadMarker {
     static final class Data {
         final UUID senderId;
         final boolean accountIdentity;
+        /** NPC lines carry a texture path in {@link #skinId} instead. */
+        final boolean npcIdentity;
         final String skinId;
         final String copyText;
         final int titleColor;
         final int nameColor;
 
-        private Data(UUID senderId, boolean accountIdentity, String skinId,
+        private Data(UUID senderId, boolean accountIdentity,
+                     boolean npcIdentity, String skinId,
                      String copyText, int titleColor, int nameColor) {
             this.senderId = senderId;
             this.accountIdentity = accountIdentity;
+            this.npcIdentity = npcIdentity;
             this.skinId = skinId == null ? "" : skinId;
             this.copyText = copyText == null ? "" : copyText;
             this.titleColor = titleColor & 0xFFFFFF;

@@ -9,14 +9,19 @@ public enum ChatChannel {
             ChatRecipientRule.GLOBAL,
             LostTalesColors.rgb(LostTalesColors.GREEN)),
     PROXIMITY("proximity", "Proximity", ChatIdentityType.CHARACTER,
-            ChatRecipientRule.PROXIMITY, 0xC8D6C0),
+            ChatRecipientRule.PROXIMITY,
+            LostTalesColors.rgb(LostTalesColors.TEAL)),
     PARTY("party", "Party", ChatIdentityType.CHARACTER,
             ChatRecipientRule.PARTY,
             LostTalesColors.rgb(LostTalesColors.BLUE)),
+    // Presentation shows the sender's LOTR faction colour; this palette
+    // honey is only the indicator/selector fallback.
     FACTION("faction", "Faction", ChatIdentityType.CHARACTER,
-            ChatRecipientRule.FACTION, 0xD6C36F),
+            ChatRecipientRule.FACTION,
+            LostTalesColors.rgb(LostTalesColors.HONEY)),
     OOC("ooc", "OOC", ChatIdentityType.ACCOUNT,
-            ChatRecipientRule.GLOBAL, 0xC7A8E8);
+            ChatRecipientRule.GLOBAL,
+            LostTalesColors.rgb(LostTalesColors.ORCHID));
 
     private final String id;
     private final String displayName;

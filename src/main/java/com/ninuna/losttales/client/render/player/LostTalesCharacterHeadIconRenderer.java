@@ -39,6 +39,8 @@ public final class LostTalesCharacterHeadIconRenderer {
     private static final Set<UUID> REQUESTED_ACCOUNT_SKINS =
             java.util.Collections.newSetFromMap(
                     new ConcurrentHashMap<UUID, Boolean>());
+    private static final Map<String, float[]> NPC_TEXTURE_SIZES =
+            new ConcurrentHashMap<String, float[]>();
 
     private LostTalesCharacterHeadIconRenderer() {}
 
@@ -129,6 +131,135 @@ public final class LostTalesCharacterHeadIconRenderer {
         return drawResolvedHead(minecraft,
                 resolveSnapshotHead(minecraft, ownerId, skinId),
                 x, y, size, red, green, blue, alpha, false);
+    }
+
+    /**
+     * Draws an NPC portrait from an explicit skin texture path (as recorded
+     * on a chat line by the NPC speech hook). LOTR humanoid NPCs use
+     * biped-layout skins, so the face sits at the standard 8x8 region
+     * scaled by the texture's actual dimensions; taller-than-wide LOTR
+     * skins additionally carry their hair on the extended headwear region.
+     */
+    public static boolean drawNpcHead(Minecraft minecraft,
+                                      String texturePath,
+                                      float x,
+                                      float y,
+                                      float size,
+                                      float brightness,
+                                      float alpha) {
+        return drawNpcHead(minecraft, texturePath, x, y, size,
+                brightness, brightness, brightness, alpha, true);
+    }
+
+    /** NPC-portrait shadow without the raised headwear layer. */
+    public static boolean drawTintedNpcHeadBase(
+            Minecraft minecraft, String texturePath,
+            float x, float y, float size,
+            float red, float green, float blue, float alpha) {
+        return drawNpcHead(minecraft, texturePath, x, y, size,
+                red, green, blue, alpha, false);
+    }
+
+    private static boolean drawNpcHead(Minecraft minecraft,
+                                       String texturePath,
+                                       float x,
+                                       float y,
+                                       float size,
+                                       float red,
+                                       float green,
+                                       float blue,
+                                       float alpha,
+                                       boolean drawFeatures) {
+        if (minecraft == null || texturePath == null
+                || texturePath.length() == 0 || size <= 0.0F
+                || alpha <= 0.0F) {
+            return false;
+        }
+        try {
+            ResourceLocation location = new ResourceLocation(texturePath);
+            float[] dimensions = measureNpcTexture(minecraft, location);
+            float imageWidth = dimensions[0];
+            float imageHeight = dimensions[1];
+            // LOTR humanoid skins scale with their width; 64 is the biped
+            // reference width the 8x8 face region is defined against.
+            float unit = imageWidth / 64.0F;
+            minecraft.getTextureManager().bindTexture(location);
+            GL11.glColor4f(
+                    Math.min(1.0F, red), Math.min(1.0F, green),
+                    Math.min(1.0F, blue), Math.min(1.0F, alpha));
+            drawTexturedQuad(
+                    x, y, size, size,
+                    8.0F * unit, 8.0F * unit,
+                    8.0F * unit, 8.0F * unit,
+                    imageWidth, imageHeight);
+            if (drawFeatures && imageHeight >= imageWidth) {
+                float outerSize = size * OUTER_LAYER_SCALE;
+                float outerOffset = (outerSize - size) * 0.5F;
+                GL11.glColor4f(
+                        Math.min(1.0F, red) * OUTER_LAYER_SHADE,
+                        Math.min(1.0F, green) * OUTER_LAYER_SHADE,
+                        Math.min(1.0F, blue) * OUTER_LAYER_SHADE,
+                        Math.min(1.0F, alpha) * 0.82F);
+                drawNpcExtendedOverlay(
+                        x - outerOffset + OUTER_LAYER_DEPTH,
+                        y - outerOffset + OUTER_LAYER_DEPTH,
+                        outerSize, unit, imageWidth, imageHeight);
+                GL11.glColor4f(
+                        Math.min(1.0F, red), Math.min(1.0F, green),
+                        Math.min(1.0F, blue), Math.min(1.0F, alpha));
+                drawNpcExtendedOverlay(
+                        x - outerOffset, y - outerOffset,
+                        outerSize, unit, imageWidth, imageHeight);
+            }
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        } finally {
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        }
+    }
+
+    private static void drawNpcExtendedOverlay(float x, float y,
+                                               float size, float unit,
+                                               float imageWidth,
+                                               float imageHeight) {
+        drawTexturedQuad(
+                x, y, size, size,
+                8.0F * unit, 40.0F * unit,
+                8.0F * unit, 8.0F * unit,
+                imageWidth, imageHeight);
+    }
+
+    private static float[] measureNpcTexture(Minecraft minecraft,
+                                             ResourceLocation location) {
+        float[] cached = NPC_TEXTURE_SIZES.get(location.toString());
+        if (cached != null) {
+            return cached;
+        }
+        float[] measured = new float[] {64.0F, 32.0F};
+        java.io.InputStream stream = null;
+        try {
+            stream = minecraft.getResourceManager()
+                    .getResource(location).getInputStream();
+            java.awt.image.BufferedImage image =
+                    javax.imageio.ImageIO.read(stream);
+            if (image != null && image.getWidth() > 0
+                    && image.getHeight() > 0) {
+                measured = new float[] {
+                        image.getWidth(), image.getHeight()};
+            }
+        } catch (Throwable ignored) {
+            // Unreadable textures fall back to the classic 64x32 layout.
+        } finally {
+            if (stream != null) {
+                try {
+                    stream.close();
+                } catch (java.io.IOException ignored) {
+                }
+            }
+        }
+        NPC_TEXTURE_SIZES.put(location.toString(), measured);
+        return measured;
     }
 
     /** Starts vanilla's asynchronous skin lookup for an OOC sender if needed. */

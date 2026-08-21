@@ -1,11 +1,39 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatNameSuggester;
+import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
+import com.ninuna.losttales.character.sync.CharacterSummary;
+import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
+import com.ninuna.losttales.chat.emoji.ChatEmojiSuggester;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import net.minecraft.client.gui.GuiChat;
+import net.minecraft.client.gui.GuiConfirmOpenLink;
+import net.minecraft.client.gui.GuiPlayerInfo;
+import net.minecraft.event.ClickEvent;
+import net.minecraft.event.HoverEvent;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.JsonToNBT;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTException;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.stats.Achievement;
+import net.minecraft.stats.StatBase;
+import net.minecraft.stats.StatList;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
@@ -22,6 +50,12 @@ public final class LostTalesChatGui extends GuiChat {
     private long selectorTransitionNanos;
     private final long openedAtNanos = System.nanoTime();
     private long copiedNoticeNanos;
+    private final ChatEmojiPicker emojiPicker = new ChatEmojiPicker();
+    private final ChatEmojiSuggestionBox emojiSuggestions =
+            new ChatEmojiSuggestionBox();
+    private final ChatNameSuggestionBox nameSuggestions =
+            new ChatNameSuggestionBox();
+    private URI clickedLinkUri;
 
     public LostTalesChatGui(String defaultText) {
         super(defaultText == null ? "" : defaultText);
@@ -40,6 +74,7 @@ public final class LostTalesChatGui extends GuiChat {
     @Override
     public void updateScreen() {
         super.updateScreen();
+        emojiPicker.tick();
         ChatChannel before = ClientChatChannelState.getSelected();
         ClientChatChannelState.ensureAvailable();
         if (before != ClientChatChannelState.getSelected()) {
@@ -50,6 +85,26 @@ public final class LostTalesChatGui extends GuiChat {
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) {
+        if (LostTalesConfig.enableChatEmojis) {
+            if (emojiPicker.handleKeyTyped(typedChar, keyCode)) {
+                return;
+            }
+            emojiSuggestions.update(this.inputField.getText(),
+                    this.inputField.getCursorPosition());
+            if (emojiSuggestions.isActive()
+                    && handleSuggestionKey(keyCode)) {
+                return;
+            }
+        }
+        if (LostTalesConfig.enableChatPings) {
+            nameSuggestions.update(this.inputField.getText(),
+                    this.inputField.getCursorPosition(),
+                    collectMentionNames());
+            if (nameSuggestions.isActive()
+                    && handleNameSuggestionKey(keyCode)) {
+                return;
+            }
+        }
         if (keyCode == Keyboard.KEY_TAB
                 && this.inputField.getText().length() == 0) {
             ClientChatChannelState.cycle();
@@ -58,6 +113,131 @@ public final class LostTalesChatGui extends GuiChat {
             return;
         }
         super.keyTyped(typedChar, keyCode);
+        if (LostTalesConfig.enableChatEmojis) {
+            emojiSuggestions.update(this.inputField.getText(),
+                    this.inputField.getCursorPosition());
+        }
+        if (LostTalesConfig.enableChatPings) {
+            nameSuggestions.update(this.inputField.getText(),
+                    this.inputField.getCursorPosition(),
+                    collectMentionNames());
+        }
+    }
+
+    /** Keys owned by the mention completion list while it is visible. */
+    private boolean handleNameSuggestionKey(int keyCode) {
+        if (keyCode == Keyboard.KEY_UP) {
+            nameSuggestions.moveSelection(-1);
+            return true;
+        }
+        if (keyCode == Keyboard.KEY_DOWN) {
+            nameSuggestions.moveSelection(1);
+            return true;
+        }
+        if (keyCode == Keyboard.KEY_TAB
+                || keyCode == Keyboard.KEY_RETURN
+                || keyCode == Keyboard.KEY_NUMPADENTER) {
+            acceptNameSuggestion(nameSuggestions.getSelected());
+            return true;
+        }
+        if (keyCode == Keyboard.KEY_ESCAPE) {
+            nameSuggestions.dismiss();
+            return true;
+        }
+        return false;
+    }
+
+    /** Replaces the {@code @prefix} at the cursor with the full mention. */
+    private void acceptNameSuggestion(String name) {
+        ChatNameSuggester.Query query = nameSuggestions.getQuery();
+        if (name == null || query == null) {
+            return;
+        }
+        String text = this.inputField.getText();
+        int atIndex = Math.min(query.atIndex, text.length());
+        int cursor = Math.max(atIndex, Math.min(
+                this.inputField.getCursorPosition(), text.length()));
+        String replacement = "@" + name + " ";
+        this.inputField.setText(text.substring(0, atIndex)
+                + replacement + text.substring(cursor));
+        this.inputField.setCursorPosition(Math.min(
+                this.inputField.getText().length(),
+                atIndex + replacement.length()));
+        nameSuggestions.update(this.inputField.getText(),
+                this.inputField.getCursorPosition(),
+                collectMentionNames());
+    }
+
+    /**
+     * Online account names plus this player's own identities, so anyone
+     * visible in the tab list can be mentioned and self-pings work.
+     */
+    private List<String> collectMentionNames() {
+        List<String> names = new ArrayList<String>();
+        if (this.mc.thePlayer == null) {
+            return names;
+        }
+        names.add(this.mc.thePlayer.getCommandSenderName());
+        CharacterRosterSnapshot snapshot =
+                ClientCharacterRosterCache.getSnapshot();
+        CharacterSummary active = snapshot == null
+                ? null : snapshot.getActiveCharacter();
+        if (active != null) {
+            names.add(active.getName());
+        }
+        if (this.mc.thePlayer.sendQueue != null
+                && this.mc.thePlayer.sendQueue.playerInfoList != null) {
+            for (Object value
+                    : this.mc.thePlayer.sendQueue.playerInfoList) {
+                if (value instanceof GuiPlayerInfo) {
+                    names.add(((GuiPlayerInfo)value).name);
+                }
+            }
+        }
+        return names;
+    }
+
+    /** Keys owned by the completion list while it is visible. */
+    private boolean handleSuggestionKey(int keyCode) {
+        if (keyCode == Keyboard.KEY_UP) {
+            emojiSuggestions.moveSelection(-1);
+            return true;
+        }
+        if (keyCode == Keyboard.KEY_DOWN) {
+            emojiSuggestions.moveSelection(1);
+            return true;
+        }
+        if (keyCode == Keyboard.KEY_TAB
+                || keyCode == Keyboard.KEY_RETURN
+                || keyCode == Keyboard.KEY_NUMPADENTER) {
+            acceptSuggestion(emojiSuggestions.getSelected());
+            return true;
+        }
+        if (keyCode == Keyboard.KEY_ESCAPE) {
+            emojiSuggestions.dismiss();
+            return true;
+        }
+        return false;
+    }
+
+    /** Replaces the {@code :prefix} at the cursor with the full shortcode. */
+    private void acceptSuggestion(ChatEmoji emoji) {
+        ChatEmojiSuggester.Query query = emojiSuggestions.getQuery();
+        if (emoji == null || query == null) {
+            return;
+        }
+        String text = this.inputField.getText();
+        int colonIndex = Math.min(query.colonIndex, text.length());
+        int cursor = Math.max(colonIndex, Math.min(
+                this.inputField.getCursorPosition(), text.length()));
+        String shortcode = emoji.getShortcode();
+        this.inputField.setText(text.substring(0, colonIndex)
+                + shortcode + text.substring(cursor));
+        this.inputField.setCursorPosition(Math.min(
+                this.inputField.getText().length(),
+                colonIndex + shortcode.length()));
+        emojiSuggestions.update(this.inputField.getText(),
+                this.inputField.getCursorPosition());
     }
 
     @Override
@@ -71,6 +251,14 @@ public final class LostTalesChatGui extends GuiChat {
             return;
         }
         this.mc.ingameGUI.getChatGUI().addToSentMessages(message);
+        if (LostTalesConfig.enableChatEmojis) {
+            for (ChatEmojiParser.Segment segment
+                    : ChatEmojiParser.split(message)) {
+                if (segment.isEmoji()) {
+                    ChatEmojiUsageStore.recordUse(segment.getEmoji());
+                }
+            }
+        }
         LostTalesNetworkHandler.CHANNEL.sendToServer(
                 new LostTalesChatSendPacket(
                         ClientChatChannelState.getSelected(), message));
@@ -85,9 +273,26 @@ public final class LostTalesChatGui extends GuiChat {
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(0.0F, offsetY, 0.0F);
-            super.drawScreen(mouseX, adjustedMouseY, partialTicks);
+            drawChatBody(mouseX, adjustedMouseY);
             drawSelector(mouseX, adjustedMouseY);
             drawIndicator(mouseX, adjustedMouseY);
+            if (LostTalesConfig.enableChatEmojis) {
+                emojiPicker.draw(this.mc, this.width, this.height,
+                        mouseX, adjustedMouseY);
+                emojiSuggestions.update(this.inputField.getText(),
+                        this.inputField.getCursorPosition());
+                emojiSuggestions.draw(this.mc, this.fontRendererObj,
+                        this.height, this.inputField.xPosition,
+                        mouseX, adjustedMouseY);
+            }
+            if (LostTalesConfig.enableChatPings) {
+                nameSuggestions.update(this.inputField.getText(),
+                        this.inputField.getCursorPosition(),
+                        collectMentionNames());
+                nameSuggestions.draw(this.fontRendererObj, this.height,
+                        this.inputField.xPosition, mouseX,
+                        adjustedMouseY);
+            }
         } finally {
             GL11.glPopMatrix();
         }
@@ -96,9 +301,124 @@ public final class LostTalesChatGui extends GuiChat {
                 this.width, this.height);
     }
 
+    /**
+     * Vanilla {@code GuiChat.drawScreen} with only the input bar colour
+     * changed: the palette's plum black at the same half opacity as the
+     * message backdrop, with no fade. Hover cards for item, text, and
+     * achievement components are reproduced unchanged; GuiScreen's button
+     * pass is skipped because this screen registers no buttons.
+     */
+    private void drawChatBody(int mouseX, int mouseY) {
+        drawRect(2, this.height - 14, this.width - 2, this.height - 2,
+                LostTalesSkyrimUiStyle.withAlpha(
+                        LostTalesSkyrimUiStyle.PLUM_BLACK, 0x80));
+        this.inputField.drawTextBox();
+        LostTalesChatOverlayRenderer.Hit hovered =
+                LostTalesChatOverlayRenderer.hitAt(
+                        this.mc, Mouse.getX(), Mouse.getY());
+        if (hovered != null && hovered.component.getChatStyle()
+                .getChatHoverEvent() != null) {
+            drawComponentHoverCard(hovered.component.getChatStyle()
+                    .getChatHoverEvent(), mouseX, mouseY);
+            GL11.glDisable(GL11.GL_LIGHTING);
+        }
+    }
+
+    private void drawComponentHoverCard(HoverEvent hoverEvent,
+                                        int mouseX, int mouseY) {
+        if (hoverEvent.getAction() == HoverEvent.Action.SHOW_ITEM) {
+            ItemStack stack = null;
+            try {
+                NBTBase nbt = JsonToNBT.func_150315_a(
+                        hoverEvent.getValue().getUnformattedText());
+                if (nbt instanceof NBTTagCompound) {
+                    stack = ItemStack.loadItemStackFromNBT(
+                            (NBTTagCompound)nbt);
+                }
+            } catch (NBTException ignored) {
+            }
+            if (stack != null) {
+                this.renderToolTip(stack, mouseX, mouseY);
+            } else {
+                this.drawCreativeTabHoveringText(
+                        EnumChatFormatting.RED + "Invalid Item!",
+                        mouseX, mouseY);
+            }
+        } else if (hoverEvent.getAction() == HoverEvent.Action.SHOW_TEXT) {
+            this.func_146283_a(Splitter.on("\n").splitToList(
+                    hoverEvent.getValue().getFormattedText()),
+                    mouseX, mouseY);
+        } else if (hoverEvent.getAction()
+                == HoverEvent.Action.SHOW_ACHIEVEMENT) {
+            StatBase stat = StatList.func_151177_a(
+                    hoverEvent.getValue().getUnformattedText());
+            if (stat != null) {
+                IChatComponent title = stat.func_150951_e();
+                ChatComponentTranslation type =
+                        new ChatComponentTranslation("stats.tooltip.type."
+                                + (stat.isAchievement()
+                                        ? "achievement" : "statistic"));
+                type.getChatStyle().setItalic(Boolean.TRUE);
+                String description = stat instanceof Achievement
+                        ? ((Achievement)stat).getDescription() : null;
+                ArrayList<String> lines = Lists.newArrayList(
+                        title.getFormattedText(),
+                        type.getFormattedText());
+                if (description != null) {
+                    @SuppressWarnings("unchecked")
+                    List<String> wrapped = this.fontRendererObj
+                            .listFormattedStringToWidth(description, 150);
+                    lines.addAll(wrapped);
+                }
+                this.func_146283_a(lines, mouseX, mouseY);
+            } else {
+                this.drawCreativeTabHoveringText(EnumChatFormatting.RED
+                        + "Invalid statistic/achievement!",
+                        mouseX, mouseY);
+            }
+        }
+    }
+
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
         int adjustedMouseY = Math.round(mouseY - inputEntranceOffset());
+        if (LostTalesConfig.enableChatEmojis && button == 0
+                && emojiSuggestions.isActive()) {
+            ChatEmoji suggested = emojiSuggestions.suggestionAt(
+                    this.fontRendererObj, mouseX, adjustedMouseY,
+                    this.height, this.inputField.xPosition);
+            if (suggested != null) {
+                acceptSuggestion(suggested);
+                return;
+            }
+        }
+        if (LostTalesConfig.enableChatPings && button == 0
+                && nameSuggestions.isActive()) {
+            String suggestedName = nameSuggestions.suggestionAt(
+                    this.fontRendererObj, mouseX, adjustedMouseY,
+                    this.height, this.inputField.xPosition);
+            if (suggestedName != null) {
+                acceptNameSuggestion(suggestedName);
+                return;
+            }
+        }
+        if (LostTalesConfig.enableChatEmojis && emojiPicker.isOpen()
+                && emojiPicker.isInsidePanel(mouseX, adjustedMouseY,
+                        this.width, this.height)) {
+            emojiPicker.mouseClicked(mouseX, adjustedMouseY, button,
+                    this.width, this.height);
+            if (button == 0) {
+                ChatEmoji selected = emojiPicker.emojiAt(
+                        mouseX, adjustedMouseY, this.width, this.height);
+                if (selected != null) {
+                    this.inputField.writeText(selected.getShortcode());
+                }
+            } else if (button == 1) {
+                emojiPicker.toggleFavoriteAt(
+                        mouseX, adjustedMouseY, this.width, this.height);
+            }
+            return;
+        }
         if (button == 1 && LostTalesChatClipboard.copy(
                 this.mc.ingameGUI.getChatGUI(), this.mc,
                 Mouse.getX(), Mouse.getY(),
@@ -106,11 +426,22 @@ public final class LostTalesChatGui extends GuiChat {
             this.copiedNoticeNanos = System.nanoTime();
             return;
         }
-        IChatComponent component = this.mc.ingameGUI.getChatGUI()
-                .func_146236_a(Mouse.getX(), Mouse.getY());
         if (button == 0 && isInsideIndicator(mouseX, adjustedMouseY)) {
             setSelectorOpen(!selectorTargetOpen);
+            emojiPicker.setOpen(false);
             return;
+        }
+        if (LostTalesConfig.enableChatEmojis && button == 0
+                && emojiPicker.isInsideButton(mouseX, adjustedMouseY,
+                        this.width, this.height)) {
+            emojiPicker.setOpen(!emojiPicker.isOpen());
+            setSelectorOpen(false);
+            return;
+        }
+        if (button == 0 && emojiPicker.isOpen()) {
+            // Clicks inside the panel were consumed above; anything else
+            // closes the picker and is processed normally.
+            emojiPicker.setOpen(false);
         }
         if (button == 0 && selectorTargetOpen) {
             ChatChannel clicked = channelAt(mouseX, adjustedMouseY);
@@ -123,11 +454,121 @@ public final class LostTalesChatGui extends GuiChat {
             }
             setSelectorOpen(false);
         }
-        if (ChatHeadMarker.isMarker(component)
-                || ChatColorMarker.isMarker(component)) {
+        if (button == 0 && handleComponentClick(
+                LostTalesChatOverlayRenderer.hitAt(
+                        this.mc, Mouse.getX(), Mouse.getY()))) {
             return;
         }
-        super.mouseClicked(mouseX, adjustedMouseY, button);
+        // GuiChat's own component handling relies on GuiNewChat's 9px hit
+        // testing, which no longer matches the 12px layout; only the input
+        // field still needs the vanilla click path.
+        this.inputField.mouseClicked(mouseX, adjustedMouseY, button);
+    }
+
+    /**
+     * Vanilla component-click behaviour resolved against this mod's line
+     * layout. The head marker acts as the sender like the visible name
+     * does; colour and emote markers are internal metadata and never a
+     * user-facing action.
+     */
+    private boolean handleComponentClick(
+            LostTalesChatOverlayRenderer.Hit hit) {
+        if (hit == null || !this.mc.gameSettings.chatLinks) {
+            return false;
+        }
+        if (ChatHeadMarker.isMarker(hit.component)) {
+            ClickEvent reply = findReplySuggestion(hit.line);
+            if (reply != null) {
+                this.inputField.setText(reply.getValue());
+            }
+            return true;
+        }
+        if (ChatColorMarker.isMarker(hit.component)
+                || ChatEmojiMarker.isMarker(hit.component)) {
+            return true;
+        }
+        ClickEvent event =
+                hit.component.getChatStyle().getChatClickEvent();
+        if (event == null) {
+            return false;
+        }
+        if (isShiftKeyDown()) {
+            this.inputField.writeText(
+                    hit.component.getUnformattedTextForChat());
+            return true;
+        }
+        if (event.getAction() == ClickEvent.Action.SUGGEST_COMMAND) {
+            this.inputField.setText(event.getValue());
+        } else if (event.getAction() == ClickEvent.Action.RUN_COMMAND) {
+            this.func_146403_a(event.getValue());
+        } else if (event.getAction() == ClickEvent.Action.OPEN_URL) {
+            openChatLink(event.getValue());
+        }
+        return true;
+    }
+
+    /** The line's {@code /msg} suggestion, shared by name and head. */
+    private static ClickEvent findReplySuggestion(IChatComponent line) {
+        if (line == null) {
+            return null;
+        }
+        for (Object value : line) {
+            if (!(value instanceof IChatComponent)) {
+                continue;
+            }
+            IChatComponent part = (IChatComponent)value;
+            ClickEvent event = part.getChatStyle() == null
+                    ? null : part.getChatStyle().getChatClickEvent();
+            if (event != null
+                    && event.getAction() == ClickEvent.Action.SUGGEST_COMMAND
+                    && event.getValue() != null
+                    && event.getValue().startsWith("/msg ")) {
+                return event;
+            }
+        }
+        return null;
+    }
+
+    private void openChatLink(String value) {
+        try {
+            URI uri = new URI(value);
+            String scheme = uri.getScheme() == null ? ""
+                    : uri.getScheme().toLowerCase(Locale.ROOT);
+            if (!"http".equals(scheme) && !"https".equals(scheme)) {
+                return;
+            }
+            if (this.mc.gameSettings.chatLinksPrompt) {
+                this.clickedLinkUri = uri;
+                this.mc.displayGuiScreen(
+                        new GuiConfirmOpenLink(this, value, 0, false));
+            } else {
+                browseTo(uri);
+            }
+        } catch (URISyntaxException ignored) {
+        }
+    }
+
+    @Override
+    public void confirmClicked(boolean result, int id) {
+        if (id == 0) {
+            if (result && this.clickedLinkUri != null) {
+                browseTo(this.clickedLinkUri);
+            }
+            this.clickedLinkUri = null;
+            this.mc.displayGuiScreen(this);
+            return;
+        }
+        super.confirmClicked(result, id);
+    }
+
+    /** Vanilla's reflective desktop-browse, minus the private plumbing. */
+    private static void browseTo(URI uri) {
+        try {
+            Class<?> desktop = Class.forName("java.awt.Desktop");
+            Object instance = desktop.getMethod("getDesktop").invoke(null);
+            desktop.getMethod("browse", URI.class).invoke(instance, uri);
+        } catch (Throwable ignored) {
+        }
     }
 
     private void drawIndicator(int mouseX, int mouseY) {
@@ -137,7 +578,8 @@ public final class LostTalesChatGui extends GuiChat {
         boolean hovered = isInsideIndicator(mouseX, mouseY);
         drawRect(INDICATOR_X, top, INDICATOR_X + width,
                 top + INDICATOR_HEIGHT,
-                hovered ? 0xCC303030 : 0xB0181818);
+                hovered ? LostTalesChatVisualStyle.SURFACE_HOVER
+                        : LostTalesChatVisualStyle.SURFACE);
         drawRect(INDICATOR_X, top, INDICATOR_X + 2,
                 top + INDICATOR_HEIGHT,
                 0xFF000000
@@ -172,7 +614,9 @@ public final class LostTalesChatGui extends GuiChat {
             int optionAlpha = Math.max(0, Math.min(255,
                     Math.round(220.0F * optionProgress)));
             int background = (optionAlpha << 24)
-                    | (hovered ? 0x383838 : 0x181818);
+                    | (hovered
+                            ? LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB
+                            : LostTalesChatVisualStyle.SURFACE_RGB);
             drawRect(INDICATOR_X, optionTop,
                     INDICATOR_X + width, optionBottom, background);
             drawRect(INDICATOR_X, optionTop,
@@ -263,7 +707,8 @@ public final class LostTalesChatGui extends GuiChat {
         int y = this.height - 31
                 + Math.round((1.0F - opacity) * 3.0F);
         drawRect(x, y, x + popupWidth, y + 13,
-                (Math.min(220, alpha) << 24) | 0x181818);
+                (Math.min(220, alpha) << 24)
+                        | LostTalesChatVisualStyle.SURFACE_RGB);
         LostTalesChatVisualStyle.drawPlain(this.fontRendererObj,
                 message, x + 5, y + 2, alpha);
     }
@@ -299,7 +744,10 @@ public final class LostTalesChatGui extends GuiChat {
             return;
         }
         int left = INDICATOR_X + indicatorWidth() + 3;
+        int right = LostTalesConfig.enableChatEmojis
+                ? ChatEmojiPicker.buttonLeft(this.width) - 3
+                : this.width - 2;
         this.inputField.xPosition = left;
-        this.inputField.width = Math.max(20, this.width - left - 2);
+        this.inputField.width = Math.max(20, right - left);
     }
 }

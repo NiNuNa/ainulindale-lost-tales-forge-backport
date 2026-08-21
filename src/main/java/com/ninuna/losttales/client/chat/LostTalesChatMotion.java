@@ -4,12 +4,24 @@ package com.ninuna.losttales.client.chat;
 final class LostTalesChatMotion {
     private LostTalesChatMotion() {}
 
+    /**
+     * Entry motion for the newest message. The primary action is the stack
+     * rising into place; the secondary action slides the line in from the
+     * left with a decelerating ease-out (slow-out), briefly overshoots its
+     * resting position to the right (follow-through), and settles on a
+     * damped return. Opacity leads slightly so the text is readable while
+     * the motion is still finishing.
+     */
     static MessageSample message(float progress) {
         float p = clamp(progress);
         float settled = smoothStep(p);
+        float slideIn = -14.0F * (1.0F - settled) * (1.0F - settled);
+        float followThrough = 6.0F * (1.0F - p)
+                * (float)Math.sin(clamp((p - 0.35F) / 0.65F) * Math.PI);
         return new MessageSample(
                 7.0F * (1.0F - settled),
-                smoothStep(clamp(p / 0.58F)));
+                smoothStep(clamp(p / 0.58F)),
+                slideIn + followThrough);
     }
 
     static float inputOffset(float progress) {
@@ -45,10 +57,14 @@ final class LostTalesChatMotion {
     static final class MessageSample {
         final float stackOffsetY;
         final float opacity;
+        /** Negative while entering from the left; briefly positive after. */
+        final float slideOffsetX;
 
-        private MessageSample(float stackOffsetY, float opacity) {
+        private MessageSample(float stackOffsetY, float opacity,
+                              float slideOffsetX) {
             this.stackOffsetY = stackOffsetY;
             this.opacity = opacity;
+            this.slideOffsetX = slideOffsetX;
         }
     }
 }
