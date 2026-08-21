@@ -58,6 +58,14 @@ public final class ChatEmojiSuggesterTest {
     }
 
     @Test
+    public void itemShowcaseOpenerDoesNotOpenAnEmoteQuery() {
+        // "{i:s" belongs to the item completion list, not the emote one.
+        assertNull(ChatEmojiSuggester.findQuery("[i:s", 4));
+        assertNull(ChatEmojiSuggester.findQuery("look [m:sm", 10));
+        assertNotNull(ChatEmojiSuggester.findQuery("[i:Bow] :sm", 11));
+    }
+
+    @Test
     public void overlongPrefixesStopSuggesting() {
         StringBuilder text = new StringBuilder(":");
         for (int index = 0; index <= ChatEmoji.longestName(); index++) {

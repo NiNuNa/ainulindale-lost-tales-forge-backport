@@ -2,12 +2,20 @@ package com.ninuna.losttales.network.server;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatFormattingCodes;
+import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatMentions;
+import com.ninuna.losttales.chat.ChatNameSuggester;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
+import com.ninuna.losttales.chat.share.ChatShowcase;
+import com.ninuna.losttales.chat.share.ChatShareSuggester;
+import com.ninuna.losttales.chat.share.ChatShareTokenParser;
+import com.ninuna.losttales.chat.share.ChatShareKind;
+import com.ninuna.losttales.chat.share.ChatShareReference;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
+import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPacket;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,6 +42,15 @@ public final class ChatDedicatedServerIsolationTest {
         assertNoClientReference(ChatEmojiParser.Segment.class);
         assertNoClientReference(ChatFormattingCodes.class);
         assertNoClientReference(ChatMentions.class);
+        assertNoClientReference(ChatMentionCandidate.class);
+        assertNoClientReference(ChatNameSuggester.class);
+        assertNoClientReference(ChatShareTokenParser.class);
+        assertNoClientReference(ChatShareKind.class);
+        assertNoClientReference(ChatShareReference.class);
+        assertNoClientReference(ChatShareTokenParser.Token.class);
+        assertNoClientReference(ChatShareSuggester.class);
+        assertNoClientReference(ChatShowcase.class);
+        assertNoClientReference(CharacterAppearanceSyncPacket.class);
     }
 
     private static void assertNoClientReference(Class<?> type)

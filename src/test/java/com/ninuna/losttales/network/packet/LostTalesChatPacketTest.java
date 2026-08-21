@@ -4,8 +4,12 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatRecipientRule;
+import com.ninuna.losttales.chat.share.ChatShareKind;
+import com.ninuna.losttales.chat.share.ChatShareReference;
+import com.ninuna.losttales.chat.share.ChatShowcase;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import java.util.Arrays;
 import java.util.UUID;
 import org.junit.Test;
 
@@ -31,6 +35,8 @@ public final class LostTalesChatPacketTest {
         assertEquals(ChatChannel.PROXIMITY,
                 ChatChannel.fromId("Proximity"));
         assertNull(ChatChannel.fromId("trade"));
+        assertEquals("Global", ChatChannel.ALL.getDisplayName());
+        assertEquals("all", ChatChannel.ALL.getId());
     }
 
     @Test
@@ -47,6 +53,7 @@ public final class LostTalesChatPacketTest {
         assertFalse(decoded.isMalformed());
         assertEquals(ChatChannel.PARTY, decoded.getChannel());
         assertEquals("Meet at the western gate.", decoded.getMessage());
+        assertTrue(decoded.getReferences().isEmpty());
 
         ByteBuf trailing = Unpooled.buffer();
         original.toBytes(trailing);
@@ -58,40 +65,127 @@ public final class LostTalesChatPacketTest {
     }
 
     @Test
-    public void presentationRoundTripsBoundedIdentity() {
-        UUID sender = UUID.randomUUID();
+    public void sendRequestCarriesBoundedShareReferences() {
+        LostTalesChatSendPacket original = new LostTalesChatSendPacket(
+                ChatChannel.ALL, "see [i:Sword] [m:Bree] [i:Bow]",
+                Arrays.asList(ChatShareReference.item(4),
+                        ChatShareReference.marker("losttales:bree"),
+                        ChatShareReference.unresolved(ChatShareKind.ITEM)));
+        ByteBuf buffer = Unpooled.buffer();
+        original.toBytes(buffer);
+        LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(3, decoded.getReferences().size());
+        assertEquals(4, decoded.getReferences().get(0).getSlot());
+        assertEquals("losttales:bree",
+                decoded.getReferences().get(1).getMarkerId());
+        assertEquals(ChatShareKind.MARKER,
+                decoded.getReferences().get(1).getKind());
+        assertFalse(decoded.getReferences().get(2).isResolved());
+
+        boolean rejectedSlot = false;
+        try {
+            ChatShareReference.item(40);
+        } catch (IllegalArgumentException expected) {
+            rejectedSlot = true;
+        }
+        assertTrue(rejectedSlot);
+
+        // A hand-built payload with an out-of-range slot is discarded.
+        ByteBuf forged = Unpooled.buffer();
+        new LostTalesChatSendPacket(ChatChannel.ALL, "[i:Sword]")
+                .toBytes(forged);
+        forged.writerIndex(forged.writerIndex() - 1);
+        forged.writeByte(1);
+        forged.writeByte('i');
+        forged.writeByte(77);
+        LostTalesChatSendPacket rejected = new LostTalesChatSendPacket();
+        rejected.fromBytes(forged);
+        assertTrue(rejected.isMalformed());
+        assertTrue(rejected.getReferences().isEmpty());
+    }
+
+    @Test
+    public void presentationCarriesValidatedShowcasesAndRejectsBadOnes() {
+        byte[] data = new byte[] {31, -117, 8, 0, 1, 2, 3, 4};
         LostTalesChatMessagePacket original =
                 new LostTalesChatMessagePacket(
-                        ChatChannel.ALL, sender, "Arathorn",
-                        "RangerOfTheNorth", "Ranger",
-                        0x55AA55, 0x336633,
-                        "The road is clear.", 123456789L,
-                        "losttales:human_ranger_male_2");
+                        ChatChannel.OOC, UUID.randomUUID(), "Steve",
+                        "Steve", "", 0xFFFFFF, 0xFFFFFF,
+                        "look [i:Sword] near [m:Bree]", 5L, "",
+                        Arrays.asList(ChatShowcase.item(0, data),
+                                ChatShowcase.marker(1, "losttales:bree",
+                                        "Bree", "town", "orange", 100,
+                                        512.5D, -384.0D)));
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatMessagePacket decoded =
                 new LostTalesChatMessagePacket();
         decoded.fromBytes(buffer);
-
         assertFalse(decoded.isMalformed());
-        assertEquals(ChatChannel.ALL, decoded.getChannel());
-        assertEquals(sender, decoded.getSenderId());
-        assertEquals("Arathorn", decoded.getIdentityName());
-        assertEquals("RangerOfTheNorth", decoded.getAccountName());
-        assertEquals("Ranger", decoded.getTitle());
-        assertEquals(0x55AA55, decoded.getTitleColor());
-        assertEquals(0x336633, decoded.getNameColor());
-        assertEquals("The road is clear.", decoded.getMessage());
-        assertEquals(123456789L, decoded.getTimestampMillis());
-        assertEquals("losttales:human_ranger_male_2",
-                decoded.getSkinId());
+        assertEquals(2, decoded.getShowcases().size());
+        assertEquals(ChatShareKind.ITEM,
+                decoded.getShowcases().get(0).getKind());
+        assertTrue(Arrays.equals(data,
+                decoded.getShowcases().get(0).getStackData()));
+        ChatShowcase marker = decoded.getShowcases().get(1);
+        assertEquals(ChatShareKind.MARKER, marker.getKind());
+        assertEquals("losttales:bree", marker.getMarkerId());
+        assertEquals("Bree", marker.getMarkerName());
+        assertEquals("town", marker.getMarkerIcon());
+        assertEquals(100, marker.getMarkerDimension());
+        assertEquals(512.5D, marker.getMarkerX(), 0.0D);
+        assertEquals(-384.0D, marker.getMarkerZ(), 0.0D);
+
+        // A showcase whose kind does not match its token is refused.
+        boolean rejectedKind = false;
+        try {
+            new LostTalesChatMessagePacket(
+                    ChatChannel.OOC, UUID.randomUUID(), "Steve",
+                    "Steve", "", 0xFFFFFF, 0xFFFFFF,
+                    "only [m:Bree]", 5L, "",
+                    Arrays.asList(ChatShowcase.item(0, data)));
+        } catch (IllegalArgumentException expected) {
+            rejectedKind = true;
+        }
+        assertTrue(rejectedKind);
+
+        boolean rejectedIndex = false;
+        try {
+            new LostTalesChatMessagePacket(
+                    ChatChannel.OOC, UUID.randomUUID(), "Steve",
+                    "Steve", "", 0xFFFFFF, 0xFFFFFF,
+                    "only [i:Sword]", 5L, "",
+                    Arrays.asList(ChatShowcase.item(1, data)));
+        } catch (IllegalArgumentException expected) {
+            rejectedIndex = true;
+        }
+        assertTrue(rejectedIndex);
+
+        boolean rejectedSize = false;
+        try {
+            ChatShowcase.item(0, new byte[ChatShowcase.MAX_STACK_BYTES + 1]);
+        } catch (IllegalArgumentException expected) {
+            rejectedSize = true;
+        }
+        assertTrue(rejectedSize);
+
+        boolean rejectedCoordinate = false;
+        try {
+            ChatShowcase.marker(0, "id", "Name", "", "", 0,
+                    Double.NaN, 0.0D);
+        } catch (IllegalArgumentException expected) {
+            rejectedCoordinate = true;
+        }
+        assertTrue(rejectedCoordinate);
     }
 
     @Test
     public void messageValidationRejectsFormattingAndControlText() {
         assertTrue(ChatMessageValidator.isValid("Mae govannen!"));
         assertFalse(ChatMessageValidator.isValid(" padded "));
-        assertFalse(ChatMessageValidator.isValid("colored \u00a7cmessage"));
+        assertFalse(ChatMessageValidator.isValid("colored §cmessage"));
         assertFalse(ChatMessageValidator.isValid("line\nbreak"));
 
         StringBuilder oversized = new StringBuilder();
@@ -100,5 +194,31 @@ public final class LostTalesChatPacketTest {
             oversized.append('x');
         }
         assertFalse(ChatMessageValidator.isValid(oversized.toString()));
+    }
+
+    @Test
+    public void shareTokensCountAsOneVisibleCharacter() {
+        StringBuilder filler = new StringBuilder();
+        for (int index = 0;
+             index < ChatMessageValidator.MAX_CHARACTERS - 1; index++) {
+            filler.append('x');
+        }
+        String withToken = filler + "[m:Northgate Test City]";
+        assertEquals(ChatMessageValidator.MAX_CHARACTERS,
+                ChatMessageValidator.visibleLength(withToken));
+        assertTrue(ChatMessageValidator.isValid(withToken));
+        assertFalse(ChatMessageValidator.isValid(withToken + "y"));
+        assertTrue(withToken.length() > ChatMessageValidator.MAX_CHARACTERS);
+        assertEquals(5, ChatMessageValidator.visibleLength("ab[i:Sword]cd"));
+
+        LostTalesChatSendPacket packet = new LostTalesChatSendPacket(
+                ChatChannel.OOC, withToken,
+                Arrays.asList(ChatShareReference.marker("losttales:x")));
+        ByteBuf buffer = Unpooled.buffer();
+        packet.toBytes(buffer);
+        LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(withToken, decoded.getMessage());
     }
 }

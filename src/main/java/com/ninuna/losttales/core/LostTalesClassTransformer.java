@@ -84,11 +84,15 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.guiAnimationBackgroundTransformer.active";
     public static final String TOOLTIP_ICON_ACTIVE_PROPERTY =
             "losttales.tooltipIconTransformer.active";
+    public static final String CHAT_HIT_TEST_ACTIVE_PROPERTY =
+            "losttales.chatHitTestTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
     private static final String GUI_SCREEN =
             "net.minecraft.client.gui.GuiScreen";
+    private static final String GUI_NEW_CHAT =
+            "net.minecraft.client.gui.GuiNewChat";
     private static final String GUI_CONTAINER =
             "net.minecraft.client.gui.inventory.GuiContainer";
     private static final String MINECRAFT =
@@ -249,6 +253,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     private static final String TOOLTIP_HOOK_OWNER =
             "com/ninuna/losttales/client/gui/tooltip/"
                     + "LostTalesTooltipHooks";
+    private static final String CHAT_HIT_HOOK_OWNER =
+            "com/ninuna/losttales/client/chat/LostTalesChatHitHooks";
 
     @Override
     public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -262,6 +268,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return transformGuiScreenTooltip(
                     transformGuiScreenBackground(
                             transformGuiScreenInput(basicClass)));
+        }
+        if (GUI_NEW_CHAT.equals(transformedName)) {
+            return transformGuiNewChatHitTest(basicClass);
         }
         if (GUI_CONTAINER.equals(transformedName)) {
             return transformGuiContainer(basicClass);
@@ -2175,6 +2184,69 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return basicClass;
         } catch (Throwable throwable) {
             warn("Failed to patch stationary GUI backdrops: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Routes vanilla's chat hit test through the Lost Tales chat layout.
+     *
+     * <p>{@code GuiNewChat.func_146236_a} maps a raw mouse position to the
+     * chat component under it with vanilla's nine-pixel line stride, which
+     * is not what Lost Tales draws. Everything that asks vanilla — LOTR's
+     * achievement hover card drawn after every chat screen, other mods, and
+     * vanilla's own click handling — would otherwise resolve against a
+     * layout that is not on screen. While the Lost Tales chat screen is
+     * open the hook answers from the lines actually drawn and reports
+     * nothing under a popup; at any other time vanilla proceeds unchanged.
+     * A failure here leaves third-party chat hovers on vanilla's geometry.</p>
+     */
+    private static byte[] transformGuiNewChatHitTest(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"func_146236_a".equals(method.name)
+                        || !"(II)Lnet/minecraft/util/IChatComponent;"
+                        .equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, CHAT_HIT_HOOK_OWNER,
+                        "componentAt")) {
+                    System.setProperty(
+                            CHAT_HIT_TEST_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                LabelNode vanilla = new LabelNode();
+                InsnList head = new InsnList();
+                head.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                head.add(new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        CHAT_HIT_HOOK_OWNER,
+                        "isActive",
+                        "(Lnet/minecraft/client/gui/GuiNewChat;)Z"));
+                head.add(new JumpInsnNode(Opcodes.IFEQ, vanilla));
+                head.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                head.add(new VarInsnNode(Opcodes.ILOAD, 1));
+                head.add(new VarInsnNode(Opcodes.ILOAD, 2));
+                head.add(new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        CHAT_HIT_HOOK_OWNER,
+                        "componentAt",
+                        "(Lnet/minecraft/client/gui/GuiNewChat;II)"
+                                + "Lnet/minecraft/util/IChatComponent;"));
+                head.add(new InsnNode(Opcodes.ARETURN));
+                head.add(vanilla);
+                method.instructions.insert(head);
+                System.setProperty(CHAT_HIT_TEST_ACTIVE_PROPERTY, "true");
+                info("Patched GuiNewChat hit testing for the Lost Tales chat layout");
+                return write(owner);
+            }
+            warn("Could not locate GuiNewChat#func_146236_a; third-party chat "
+                    + "hover cards will use vanilla's line geometry");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch chat hit testing: " + throwable);
             return basicClass;
         }
     }

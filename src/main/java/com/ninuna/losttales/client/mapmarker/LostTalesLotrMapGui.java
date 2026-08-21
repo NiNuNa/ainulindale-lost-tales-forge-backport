@@ -142,6 +142,12 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     private LostTalesMapSearchPrompt searchPrompt;
     /** Search result brackets that survive the popup until the next input. */
     private boolean searchSelectionFrameActive;
+    /** A focus parked by {@link #openFocusedOn} for the next fresh screen. */
+    private static boolean pendingFocus;
+    private static String pendingFocusMarkerId = "";
+    private static double pendingFocusX;
+    private static double pendingFocusZ;
+    private static int pendingFocusDimension;
     /**
      * Where the "go here" marker would move to, as {@code {dimension, x, z}},
      * while that question is on screen. Null when the popup was opened on the
@@ -226,6 +232,56 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         if (minecraft != null) {
             minecraft.displayGuiScreen(new LOTRGuiMap());
         }
+    }
+
+    /**
+     * Opens the map and flies the camera to a world position — a location
+     * shared in chat, for instance. The request is parked until the fresh
+     * screen has restored its remembered view, so the focus starts from
+     * where the player last left the map rather than from LOTR's default
+     * framing. A known marker id also gets the selection frame.
+     */
+    public static void openFocusedOn(String markerId, int dimensionId,
+                                     double worldX, double worldZ) {
+        pendingFocusMarkerId = markerId == null ? "" : markerId;
+        pendingFocusDimension = dimensionId;
+        pendingFocusX = worldX;
+        pendingFocusZ = worldZ;
+        pendingFocus = true;
+        open();
+    }
+
+    /** Runs the parked focus once, on the first frame of a fresh screen. */
+    private void consumePendingFocus() {
+        if (!pendingFocus) {
+            return;
+        }
+        pendingFocus = false;
+        if (pendingFocusDimension != LOTRDimension.MIDDLE_EARTH.dimensionID) {
+            // The LOTR map only shows Middle-earth; elsewhere opening the
+            // map is all that can be done for the location.
+            return;
+        }
+        LostTalesMapMarkerData marker =
+                LostTalesClientMapMarkerStore.getSharedMarker(
+                        pendingFocusMarkerId);
+        float[] target = marker != null
+                ? LostTalesLotrMapMarkerIconOverlay
+                        .resolveMapImagePosition(marker, null)
+                : new float[] {
+                        (float)LostTalesMapCoordinateHelper
+                                .worldToRenderedMapImageX(pendingFocusX),
+                        (float)LostTalesMapCoordinateHelper
+                                .worldToRenderedMapImageZ(pendingFocusZ)};
+        if (target == null) {
+            return;
+        }
+        if (marker != null) {
+            LostTalesLotrMapMarkerIconOverlay.setSelectedMarkerFrame(
+                    this, marker, null);
+            this.searchSelectionFrameActive = true;
+        }
+        focusMapPoint(target[0], target[1]);
     }
 
     static boolean copyInitialMode(
@@ -1053,6 +1109,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         LostTalesLotrMapMarkerIconOverlay
                 .clearInvalidLotrSelection(this);
         long now = System.nanoTime();
+        // After initGui has restored the remembered view and before the
+        // camera advances, so a shared location flies in from there.
+        consumePendingFocus();
         // A pass that throws part way through cannot leave the map stuck
         // drawing as though it were square.
         LostTalesLotrMapRotation.clearSheetPasses();

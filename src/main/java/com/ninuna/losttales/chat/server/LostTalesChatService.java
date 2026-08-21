@@ -4,11 +4,18 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatRecipientRule;
+import com.ninuna.losttales.chat.share.ChatShareKind;
+import com.ninuna.losttales.chat.share.ChatShareReference;
+import com.ninuna.losttales.chat.share.ChatShareTokenParser;
+import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibilityPolicy;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.party.model.Party;
@@ -17,9 +24,9 @@ import com.ninuna.losttales.party.server.PartyService;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentTranslation;
 
@@ -30,6 +37,20 @@ public final class LostTalesChatService {
 
     public static void send(EntityPlayerMP sender,
                             ChatChannel channel, String message) {
+        send(sender, channel, message, null);
+    }
+
+    /**
+     * Validates and distributes one message. {@code references} pair, in
+     * order, with the share tokens found in the message; an item slot is
+     * re-read from the sender's live inventory and a marker id from world
+     * data under the sender's own visibility, and only a match whose real
+     * name agrees with the token is attached. Tokens that cannot be
+     * verified are delivered as the literal text the sender typed.
+     */
+    public static void send(EntityPlayerMP sender,
+                            ChatChannel channel, String message,
+                            List<ChatShareReference> references) {
         if (sender == null || sender.worldObj == null
                 || sender.worldObj.isRemote || channel == null
                 || !ChatMessageValidator.isValid(message)) {
@@ -72,6 +93,8 @@ public final class LostTalesChatService {
                 : characterNameOrFallback(character, accountName);
         LostTalesChatPresentationResolver.Presentation presentation =
                 LostTalesChatPresentationResolver.resolve(sender, character);
+        List<ChatShowcase> showcases =
+                resolveShowcases(sender, message, references);
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
                 channel, sender.getUniqueID(), identityName,
                 accountName,
@@ -85,14 +108,136 @@ public final class LostTalesChatService {
                         LostTalesColors.HUD_LABEL),
                 message, System.currentTimeMillis(),
                 channel.getIdentityType() == ChatIdentityType.CHARACTER
-                        && character != null ? character.getSkinId() : "");
+                        && character != null ? character.getSkinId() : "",
+                showcases);
 
-        FMLLog.info("[losttales/chat/%s] <%s (%s)> %s",
-                channel.getId(), identityName, accountName, message);
+        FMLLog.info("[losttales/chat/%s] <%s (%s)> %s%s",
+                channel.getId(), identityName, accountName, message,
+                showcases.isEmpty() ? ""
+                        : " [shared: " + showcases.size() + "]");
 
         for (EntityPlayerMP recipient : resolveRecipients(
                 sender, channel, party, factionId)) {
             LostTalesNetworkHandler.CHANNEL.sendTo(packet, recipient);
+        }
+    }
+
+    /**
+     * Pairs tokens with references by position and keeps only the things
+     * that exist, match the typed name, and fit the wire bound. The sender
+     * is told once per message and kind when something was dropped; nothing
+     * here trusts a reference beyond using it as a lookup key.
+     */
+    private static List<ChatShowcase> resolveShowcases(
+            EntityPlayerMP sender, String message,
+            List<ChatShareReference> references) {
+        if (references == null || references.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<ChatShareTokenParser.Token> tokens =
+                ChatShareTokenParser.parse(message);
+        int count = Math.min(tokens.size(), Math.min(
+                references.size(), ChatShareTokenParser.MAX_TOKENS));
+        List<ChatShowcase> result = new ArrayList<ChatShowcase>(count);
+        boolean itemUnavailable = false;
+        boolean itemTooLarge = false;
+        boolean markerUnavailable = false;
+        for (int index = 0; index < count; index++) {
+            ChatShareTokenParser.Token token = tokens.get(index);
+            ChatShareReference reference = references.get(index);
+            if (reference == null || reference.getKind() != token.kind) {
+                if (token.kind == ChatShareKind.MARKER) {
+                    markerUnavailable = true;
+                } else {
+                    itemUnavailable = true;
+                }
+                continue;
+            }
+            if (token.kind == ChatShareKind.ITEM) {
+                ItemStack stack = resolveItem(sender, reference, token);
+                if (stack == null) {
+                    itemUnavailable = true;
+                    continue;
+                }
+                byte[] encoded = ChatShowcase.encodeStack(stack.copy());
+                if (encoded == null) {
+                    itemTooLarge = true;
+                    continue;
+                }
+                result.add(ChatShowcase.item(index, encoded));
+            } else {
+                ChatShowcase marker = resolveMarker(
+                        sender, reference, token, index);
+                if (marker == null) {
+                    markerUnavailable = true;
+                    continue;
+                }
+                result.add(marker);
+            }
+        }
+        if (itemUnavailable) {
+            sender.addChatMessage(new ChatComponentTranslation(
+                    "chat.losttales.item.unavailable"));
+        }
+        if (itemTooLarge) {
+            sender.addChatMessage(new ChatComponentTranslation(
+                    "chat.losttales.item.too_large"));
+        }
+        if (markerUnavailable) {
+            sender.addChatMessage(new ChatComponentTranslation(
+                    "chat.losttales.marker.unavailable"));
+        }
+        return result;
+    }
+
+    private static ItemStack resolveItem(EntityPlayerMP sender,
+                                         ChatShareReference reference,
+                                         ChatShareTokenParser.Token token) {
+        if (sender.inventory == null || !reference.isResolved()) {
+            return null;
+        }
+        ItemStack stack = sender.inventory.getStackInSlot(reference.getSlot());
+        if (stack == null || stack.getItem() == null || stack.stackSize <= 0
+                || !token.normalizedName().equals(
+                        ChatShareTokenParser.normalizeName(
+                                stack.getDisplayName()))) {
+            return null;
+        }
+        return stack;
+    }
+
+    /**
+     * A marker the sender may actually see, by the id the client supplied,
+     * with the typed name checked against the record. The public fields go
+     * out; ownership, sharing lists, and settings never do.
+     */
+    private static ChatShowcase resolveMarker(EntityPlayerMP sender,
+                                              ChatShareReference reference,
+                                              ChatShareTokenParser.Token token,
+                                              int tokenIndex) {
+        if (!reference.isResolved()) {
+            return null;
+        }
+        try {
+            LostTalesMapMarkerRecord record = LostTalesMapMarkerStorage
+                    .get(sender.worldObj).getRecord(reference.getMarkerId());
+            if (record == null
+                    || !LostTalesMapMarkerVisibilityPolicy.canView(
+                            record, sender)
+                    || !token.normalizedName().equals(
+                            ChatShareTokenParser.normalizeName(
+                                    record.getName()))) {
+                return null;
+            }
+            return ChatShowcase.marker(tokenIndex, record.getId(),
+                    record.getName(), record.getIconName(),
+                    record.getColorName(), record.getDimensionId(),
+                    record.getX(), record.getZ());
+        } catch (RuntimeException exception) {
+            FMLLog.warning("[losttales/chat] Could not resolve shared marker "
+                    + "%s for %s: %s", reference.getMarkerId(),
+                    sender.getUniqueID(), exception.toString());
+            return null;
         }
     }
 

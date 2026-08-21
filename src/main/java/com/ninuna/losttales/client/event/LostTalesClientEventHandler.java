@@ -20,6 +20,8 @@ import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
+import com.ninuna.losttales.client.chat.ClientChatChannelViews;
+import com.ninuna.losttales.client.chat.ClientChatShowcaseStore;
 import com.ninuna.losttales.client.chat.LostTalesChatPresentation;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.client.gui.LostTalesGuiInventory;
@@ -129,6 +131,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientPartyMemberStatusCache.clear();
         ClientPartyTrackingCache.clear();
         ClientChatChannelState.clear();
+        ClientChatChannelViews.clear();
+        ClientChatShowcaseStore.clear();
         LostTalesChatPresentation.clear();
         LostTalesCharacterHeadIconRenderer.clearAccountSkinCache();
         ClientAccessoryEffectCache.clear();

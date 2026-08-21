@@ -36,7 +36,7 @@ public final class CharacterAppearanceSyncManager {
                 }
                 CharacterRoster roster = data.getRoster(player.getUniqueID());
                 CharacterAppearance appearance = CharacterAppearance.fromRoster(
-                        player.getUniqueID(), roster);
+                        player.getUniqueID(), accountName(player), roster);
                 if (appearance.isPresent()) {
                     appearances.add(appearance);
                 }
@@ -55,7 +55,7 @@ public final class CharacterAppearanceSyncManager {
         CharacterWorldData data = CharacterStorage.get(recipient.worldObj);
         CharacterRoster roster = data.getRoster(target.getUniqueID());
         CharacterAppearance appearance = CharacterAppearance.fromRoster(
-                target.getUniqueID(), roster);
+                target.getUniqueID(), accountName(target), roster);
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new CharacterAppearanceSyncPacket(
                         false, Collections.singletonList(appearance)), recipient);
@@ -66,7 +66,7 @@ public final class CharacterAppearanceSyncManager {
             return;
         }
         CharacterAppearance appearance = CharacterAppearance.fromRoster(
-                player.getUniqueID(), roster);
+                player.getUniqueID(), accountName(player), roster);
         LostTalesNetworkHandler.CHANNEL.sendToAll(
                 new CharacterAppearanceSyncPacket(
                         false, Collections.singletonList(appearance)));
@@ -80,5 +80,13 @@ public final class CharacterAppearanceSyncManager {
                 new CharacterAppearanceSyncPacket(
                         false,
                         Collections.singletonList(CharacterAppearance.removed(playerId))));
+    }
+
+    /** The authenticated account name, never the roleplay identity. */
+    private static String accountName(EntityPlayerMP player) {
+        return player.getGameProfile() == null
+                || player.getGameProfile().getName() == null
+                ? player.getCommandSenderName()
+                : player.getGameProfile().getName();
     }
 }

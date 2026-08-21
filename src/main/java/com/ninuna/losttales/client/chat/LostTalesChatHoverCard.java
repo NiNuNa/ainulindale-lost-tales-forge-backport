@@ -1,11 +1,14 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import java.util.List;
+import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.FontRenderer;
@@ -15,7 +18,13 @@ import net.minecraft.util.IChatComponent;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
 
-/** Resolves and draws the player card for the chat geometry on this frame. */
+/**
+ * The bounded player card: shown for the head or name of a chat line, and
+ * for a row of the mention completion list, so hovering either tells the
+ * same story about the same player. A chat line supplies its snapshotted
+ * identity; a mention row supplies the live public appearance the server
+ * already synced for that player.
+ */
 final class LostTalesChatHoverCard {
     private static final int PADDING = 6;
     private static final int HEAD_SIZE = 16;
@@ -27,7 +36,67 @@ final class LostTalesChatHoverCard {
     static void draw(Minecraft minecraft, int mouseX, int mouseY,
                      int screenWidth, int screenHeight) {
         Target target = find(minecraft, mouseX, mouseY);
-        if (target == null || minecraft.fontRenderer == null) {
+        if (target != null) {
+            drawCard(minecraft, target, mouseX, mouseY,
+                    screenWidth, screenHeight);
+        }
+    }
+
+    /**
+     * Card for a mention candidate. The candidate's key is the player's
+     * UUID when the appearance sync knows them; without it only the
+     * account identity can be shown.
+     */
+    static void drawForCandidate(Minecraft minecraft,
+                                 ChatMentionCandidate candidate,
+                                 int mouseX, int mouseY,
+                                 int screenWidth, int screenHeight) {
+        if (minecraft == null || candidate == null
+                || !candidate.isUsable()) {
+            return;
+        }
+        UUID playerId = parseUuid(candidate.getKey());
+        if (playerId == null && minecraft.thePlayer != null
+                && candidate.getAccountName().equalsIgnoreCase(
+                        minecraft.thePlayer.getCommandSenderName())) {
+            playerId = minecraft.thePlayer.getUniqueID();
+        }
+        if (playerId == null) {
+            return;
+        }
+        CharacterAppearance appearance =
+                ClientCharacterAppearanceCache.getAuthoritative(playerId);
+        boolean accountIdentity = appearance == null
+                || !appearance.isPresent()
+                || candidate.getCharacterName().length() == 0;
+        if (accountIdentity) {
+            LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
+                    minecraft, playerId, candidate.getAccountName());
+        }
+        drawCard(minecraft, new Target(playerId, accountIdentity,
+                        appearance == null ? "" : appearance.getSkinId(),
+                        accountIdentity ? candidate.getAccountName()
+                                : candidate.getCharacterName(),
+                        "", candidate.getAccountName(),
+                        LostTalesColors.rgb(LostTalesColors.HUD_LABEL)),
+                mouseX, mouseY, screenWidth, screenHeight);
+    }
+
+    private static UUID parseUuid(String value) {
+        if (value == null || value.length() != 36) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private static void drawCard(Minecraft minecraft, Target target,
+                                 int mouseX, int mouseY,
+                                 int screenWidth, int screenHeight) {
+        if (minecraft.fontRenderer == null) {
             return;
         }
         FontRenderer font = minecraft.fontRenderer;
@@ -71,12 +140,10 @@ final class LostTalesChatHoverCard {
         try {
             GL11.glTranslatef(0.0F, 0.0F, 300.0F);
             LostTalesSkyrimUiStyle.drawPanel(x, y, width, height);
-            drawHead(minecraft, target.marker,
-                    x + PADDING, y + PADDING);
+            drawHead(minecraft, target, x + PADDING, y + PADDING);
             int textX = x + PADDING + HEAD_SIZE + 6;
             int textY = y + PADDING;
-            drawColored(font, name, textX, textY,
-                    target.marker.nameColor);
+            drawColored(font, name, textX, textY, target.nameColor);
             textY += font.FONT_HEIGHT;
             if (title.length() > 0) {
                 LostTalesChatVisualStyle.drawPlain(font, title,
@@ -108,67 +175,44 @@ final class LostTalesChatHoverCard {
         }
         try {
             List<ChatLine> lines =
-                    LostTalesChatOverlayRenderer.getDrawnLines(chat);
-            int scroll = LostTalesChatOverlayRenderer.getScrollPosition(chat);
-            if (lines == null || lines.isEmpty()) {
+                    LostTalesChatOverlayRenderer.getViewLines(chat);
+            LostTalesChatOverlayRenderer.Band band =
+                    LostTalesChatOverlayRenderer.bandAt(
+                            minecraft, mouseX, mouseY);
+            if (band == null || lines == null
+                    || band.viewIndex >= lines.size()
+                    || lines.get(band.viewIndex) == null) {
                 return null;
             }
-            float chatScale = chat.func_146244_h();
-            float originX = LostTalesChatOverlayRenderer.getLastOffsetX()
-                    + 2.0F;
-            float originY = LostTalesChatOverlayRenderer.getLastOffsetY()
-                    + 20.0F
-                    + LostTalesChatOverlayRenderer
-                    .getEntryDisplacement(scroll);
-            int visible =
-                    LostTalesChatOverlayRenderer.visibleLineCount(chat);
-            for (int visibleIndex = 0;
-                 visibleIndex < visible
-                         && visibleIndex + scroll < lines.size();
-                 visibleIndex++) {
-                int lineIndex = visibleIndex + scroll;
-                ChatLine line = lines.get(lineIndex);
-                if (line == null) {
+            // The band already answers the vertical question exactly as
+            // drawn; only the horizontal component walk remains, in the
+            // line's own text space, skipping what the renderer skipped.
+            int cursor = 0;
+            for (Object value
+                    : lines.get(band.viewIndex).func_151461_a()) {
+                if (!(value instanceof IChatComponent)) {
                     continue;
                 }
-                float lineTranslateY = -visibleIndex
-                        * (float)LostTalesChatOverlayRenderer.LINE_HEIGHT
-                        - 9.0F;
-                int cursor = 0;
-                for (Object value : line.func_151461_a()) {
-                    if (!(value instanceof IChatComponent)) {
-                        continue;
-                    }
-                    IChatComponent part = (IChatComponent)value;
-                    String formatted = part.getChatStyle()
-                            .getFormattingCode()
-                            + part.getUnformattedTextForChat();
-                    int partWidth = minecraft.fontRenderer
-                            .getStringWidth(formatted);
-                    ChatHeadMarker.Data decodedHead =
-                            ChatHeadMarker.decode(part);
-                    // NPCs have no account or character card to show.
-                    boolean head = decodedHead != null
-                            && !decodedHead.npcIdentity;
-                    boolean identity = isReplyIdentity(part);
-                    if (head || identity) {
-                        float localX = head ? cursor + 0.5F : cursor;
-                        float localY = head ? -0.5F : 0.0F;
-                        float localWidth = head ? 9.0F : partWidth;
-                        float localHeight = head ? 9.0F
-                                : minecraft.fontRenderer.FONT_HEIGHT;
-                        float left = originX + chatScale * localX;
-                        float top = originY + chatScale
-                                * (lineTranslateY + localY);
-                        float right = left + chatScale * localWidth;
-                        float bottom = top + chatScale * localHeight;
-                        if (contains(mouseX, mouseY,
-                                left, top, right, bottom)) {
-                            return targetForGroup(lines, lineIndex);
-                        }
-                    }
-                    cursor += partWidth;
+                IChatComponent part = (IChatComponent)value;
+                if (ChatChannelPrefixMarker.isHidden(part, true)) {
+                    continue;
                 }
+                int partWidth = LostTalesChatVisualStyle.partWidth(
+                        minecraft.fontRenderer, part);
+                ChatHeadMarker.Data decodedHead =
+                        ChatHeadMarker.decode(part);
+                // NPCs have no account or character card to show.
+                boolean head = decodedHead != null
+                        && !decodedHead.npcIdentity;
+                boolean identity = isReplyIdentity(part);
+                if (head || identity) {
+                    float left = head ? cursor + 0.5F : cursor;
+                    float right = left + (head ? 9.0F : partWidth);
+                    if (band.localX >= left && band.localX < right) {
+                        return targetForGroup(lines, band.viewIndex);
+                    }
+                }
+                cursor += partWidth;
             }
         } catch (IllegalAccessException ignored) {
             return null;
@@ -230,7 +274,9 @@ final class LostTalesChatHoverCard {
         }
         return marker == null || identity.length() == 0
                 || account.length() == 0 ? null
-                : new Target(marker, identity, title, account);
+                : new Target(marker.senderId, marker.accountIdentity,
+                        marker.skinId, identity, title, account,
+                        marker.nameColor);
     }
 
     private static boolean isReplyIdentity(IChatComponent part) {
@@ -252,11 +298,11 @@ final class LostTalesChatHoverCard {
     private static String raceFor(Target target) {
         CharacterAppearance appearance =
                 ClientCharacterAppearanceCache.getAuthoritative(
-                        target.marker.senderId);
+                        target.playerId);
         if (appearance == null || !appearance.isPresent()) {
             return "";
         }
-        if (!target.marker.accountIdentity
+        if (!target.accountIdentity
                 && !target.identityName.equals(
                 appearance.getCharacterName())) {
             // A historic chat line must not borrow the sender's newer
@@ -266,28 +312,24 @@ final class LostTalesChatHoverCard {
         return ClientCharacterDisplayNames.race(appearance.getRaceId());
     }
 
-    private static void drawHead(Minecraft minecraft,
-                                 ChatHeadMarker.Data marker,
+    private static void drawHead(Minecraft minecraft, Target target,
                                  float x, float y) {
-        if (marker.accountIdentity) {
+        if (target.accountIdentity) {
             LostTalesCharacterHeadIconRenderer.drawAccountHead(
-                    minecraft, marker.senderId, x, y,
+                    minecraft, target.playerId, x, y,
                     HEAD_SIZE, 1.0F, 1.0F);
         } else {
             LostTalesCharacterHeadIconRenderer.drawSnapshotHead(
-                    minecraft, marker.senderId, marker.skinId,
+                    minecraft, target.playerId, target.skinId,
                     x, y, HEAD_SIZE, 1.0F, 1.0F);
         }
     }
 
     private static void drawColored(FontRenderer font, String text,
                                     int x, int y, int color) {
-        String visible = LostTalesChatVisualStyle.removeColorCodes(text);
-        font.drawString(visible, x + 1, y + 1,
-                LostTalesChatVisualStyle.argb(
-                        LostTalesChatVisualStyle.SHADOW, 255));
-        font.drawString(visible, x, y,
-                LostTalesChatVisualStyle.argb(color, 255));
+        LostTalesChatVisualStyle.drawColored(font,
+                LostTalesChatVisualStyle.removeColorCodes(text),
+                x, y, color, 255);
     }
 
     static boolean contains(float x, float y, float left, float top,
@@ -324,17 +366,24 @@ final class LostTalesChatHoverCard {
     }
 
     private static final class Target {
-        final ChatHeadMarker.Data marker;
+        final UUID playerId;
+        final boolean accountIdentity;
+        final String skinId;
         final String identityName;
         final String title;
         final String accountName;
+        final int nameColor;
 
-        Target(ChatHeadMarker.Data marker, String identityName,
-               String title, String accountName) {
-            this.marker = marker;
+        Target(UUID playerId, boolean accountIdentity, String skinId,
+               String identityName, String title, String accountName,
+               int nameColor) {
+            this.playerId = playerId;
+            this.accountIdentity = accountIdentity;
+            this.skinId = skinId == null ? "" : skinId;
             this.identityName = identityName;
             this.title = title;
             this.accountName = accountName;
+            this.nameColor = nameColor;
         }
     }
 }

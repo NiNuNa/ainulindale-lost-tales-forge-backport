@@ -79,16 +79,26 @@ final class ChatEmojiSuggestionBox {
         }
     }
 
-    /** The suggestion under the mouse, or null. Also used for clicks. */
-    ChatEmoji suggestionAt(FontRenderer font, int mouseX, int mouseY,
-                           int screenHeight, int inputX) {
+    /** True while the mouse is over the visible popup, including padding. */
+    boolean contains(FontRenderer font, int mouseX, int mouseY,
+                     int screenHeight, int inputX) {
         if (!isActive()) {
-            return null;
+            return false;
         }
         int width = boxWidth(font);
         int top = boxTop(screenHeight);
-        if (mouseX < inputX || mouseX >= inputX + width
-                || mouseY < top + PADDING) {
+        return mouseX >= inputX && mouseX < inputX + width
+                && mouseY >= top && mouseY < screenHeight - BOTTOM_MARGIN;
+    }
+
+    /** The suggestion under the mouse, or null. Also used for clicks. */
+    ChatEmoji suggestionAt(FontRenderer font, int mouseX, int mouseY,
+                           int screenHeight, int inputX) {
+        if (!contains(font, mouseX, mouseY, screenHeight, inputX)) {
+            return null;
+        }
+        int top = boxTop(screenHeight);
+        if (mouseY < top + PADDING) {
             return null;
         }
         int row = (mouseY - top - PADDING) / ROW_HEIGHT;
@@ -96,7 +106,8 @@ final class ChatEmojiSuggestionBox {
                 ? this.matches.get(row) : null;
     }
 
-    void draw(Minecraft minecraft, FontRenderer font, int screenHeight,
+    void draw(Minecraft minecraft, FontRenderer font,
+              ChatPointerRegions regions, int screenHeight,
               int inputX, int mouseX, int mouseY) {
         if (!isActive()) {
             return;
@@ -104,6 +115,7 @@ final class ChatEmojiSuggestionBox {
         int width = boxWidth(font);
         int top = boxTop(screenHeight);
         int bottom = screenHeight - BOTTOM_MARGIN;
+        regions.add(inputX, top, inputX + width, bottom);
         Gui.drawRect(inputX, top, inputX + width, bottom,
                 LostTalesChatVisualStyle.argb(
                         LostTalesChatVisualStyle.SURFACE_RGB, 0xE0));

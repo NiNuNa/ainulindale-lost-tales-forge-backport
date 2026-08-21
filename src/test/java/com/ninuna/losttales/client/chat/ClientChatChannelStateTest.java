@@ -23,15 +23,22 @@ public final class ClientChatChannelStateTest {
     }
 
     @Test
-    public void accountOnlyPlayersCanUseOocButNotRoleplayChannels() {
-        assertFalse(ClientChatChannelState.isAvailable(ChatChannel.ALL));
+    public void accountOnlyPlayersReadGlobalButOnlyTalkInOoc() {
+        // Global stays readable (achievements live there) but not sendable.
+        assertTrue(ClientChatChannelState.isAvailable(ChatChannel.ALL));
+        assertFalse(ClientChatChannelState.canSend(ChatChannel.ALL));
         assertFalse(ClientChatChannelState.isAvailable(
                 ChatChannel.PROXIMITY));
         assertTrue(ClientChatChannelState.isAvailable(ChatChannel.OOC));
-        assertEquals(Collections.singletonList(ChatChannel.OOC),
+        assertTrue(ClientChatChannelState.canSend(ChatChannel.OOC));
+        assertEquals(java.util.Arrays.asList(ChatChannel.ALL, ChatChannel.OOC),
                 ClientChatChannelState.getAvailableChannels());
-        assertEquals(ChatChannel.OOC,
-                ClientChatChannelState.getSelected());
+        // Global is the readable default; OOC is where the player can talk.
+        assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelected());
+        ClientChatChannelState.select(ChatChannel.OOC);
+        assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelected());
+        ClientChatChannelState.select(ChatChannel.PROXIMITY);
+        assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelected());
     }
 
     @Test

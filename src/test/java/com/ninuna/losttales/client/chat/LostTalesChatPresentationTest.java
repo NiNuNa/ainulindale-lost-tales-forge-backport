@@ -46,7 +46,7 @@ public final class LostTalesChatPresentationTest {
                 if (decoded != null) {
                     headMarker = decoded;
                 }
-                if ("All".equals(part.getUnformattedTextForChat())) {
+                if ("Global".equals(part.getUnformattedTextForChat())) {
                     assertFalse(part.getChatStyle().getBold());
                 }
                 if ("Arathorn".equals(part.getUnformattedTextForChat())) {
@@ -63,7 +63,7 @@ public final class LostTalesChatPresentationTest {
                 }
             }
 
-            assertEquals("All: <  Ranger Arathorn> The road is clear.",
+            assertEquals("Global: <  Ranger Arathorn> The road is clear.",
                     plainText.toString());
             assertNotNull(reply);
             assertEquals(ClickEvent.Action.SUGGEST_COMMAND,
@@ -117,7 +117,8 @@ public final class LostTalesChatPresentationTest {
 
             String rendered = plainText.toString();
             assertTrue(rendered.startsWith("Proximity: ["));
-            assertTrue(rendered.contains("] | <"));
+            assertTrue(rendered.contains("] <"));
+            assertFalse(rendered.contains(" | "));
             assertTrue(rendered.endsWith(
                     "Arathorn> Halt."));
         } finally {
@@ -141,7 +142,7 @@ public final class LostTalesChatPresentationTest {
                 if ("Faction".equals(
                         part.getUnformattedTextForChat())) {
                     assertEquals(Integer.valueOf(0x245A32),
-                            ChatColorMarker.decode(part));
+                            ChatChannelPrefixMarker.decode(part));
                     return;
                 }
             }

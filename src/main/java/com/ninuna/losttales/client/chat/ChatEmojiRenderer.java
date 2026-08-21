@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
@@ -23,6 +24,24 @@ final class ChatEmojiRenderer {
                      float x, float y, float size, int alpha) {
         drawTinted(minecraft, emoji, x, y, size,
                 1.0F, 1.0F, 1.0F, alpha);
+    }
+
+    /**
+     * Solid-colour shadow of the sprite's outline, the emote equivalent of
+     * the font's shadow pass. A tinted copy would keep the sprite's own
+     * shading and turn its dark outline black; the silhouette replaces RGB
+     * outright and keeps only the sprite's alpha.
+     */
+    static void drawShadow(Minecraft minecraft, ChatEmoji emoji,
+                           float x, float y, float size,
+                           int shadowRgb, int alpha) {
+        LostTalesSilhouetteRenderState.begin(shadowRgb);
+        try {
+            drawTinted(minecraft, emoji, x, y, size,
+                    1.0F, 1.0F, 1.0F, alpha);
+        } finally {
+            LostTalesSilhouetteRenderState.end();
+        }
     }
 
     static void drawTinted(Minecraft minecraft, ChatEmoji emoji,

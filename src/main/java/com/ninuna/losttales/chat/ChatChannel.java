@@ -5,7 +5,7 @@ import java.util.Locale;
 
 /** Small stable channel catalogue shared by packet validation and client UI. */
 public enum ChatChannel {
-    ALL("all", "All", ChatIdentityType.CHARACTER,
+    ALL("all", "Global", ChatIdentityType.CHARACTER,
             ChatRecipientRule.GLOBAL,
             LostTalesColors.rgb(LostTalesColors.GREEN)),
     PROXIMITY("proximity", "Proximity", ChatIdentityType.CHARACTER,

@@ -5,32 +5,32 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.GuiNewChat;
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.IChatComponent;
-import net.minecraft.util.MathHelper;
 
 /** Resolves a clicked wrapped line back to its full channel message. */
 final class LostTalesChatClipboard {
     private LostTalesChatClipboard() {}
 
+    /** {@code mouseX}/{@code mouseY} are GUI coordinates, as the screen sees them. */
     static boolean copy(GuiNewChat chat, Minecraft minecraft,
-                        int rawMouseX, int rawMouseY,
-                        float entryDisplacement) {
+                        int mouseX, int mouseY) {
         if (chat == null || minecraft == null || !chat.getChatOpen()) {
             return false;
         }
         try {
             List<ChatLine> lines =
-                    LostTalesChatOverlayRenderer.getDrawnLines(chat);
-            int clickedIndex = findClickedLine(
-                    chat, minecraft, lines, rawMouseX, rawMouseY,
-                    entryDisplacement);
-            if (clickedIndex < 0) {
+                    LostTalesChatOverlayRenderer.getViewLines(chat);
+            LostTalesChatOverlayRenderer.Band band =
+                    LostTalesChatOverlayRenderer.bandAt(
+                            minecraft, mouseX, mouseY);
+            if (band == null || lines == null
+                    || band.viewIndex >= lines.size()
+                    || lines.get(band.viewIndex) == null) {
                 return false;
             }
-            String text = resolveChannelMessage(lines, clickedIndex);
+            String text = resolveChannelMessage(lines, band.viewIndex);
             if (text.length() == 0) {
-                text = plainText(lines.get(clickedIndex).func_151461_a())
+                text = plainText(lines.get(band.viewIndex).func_151461_a())
                         .trim();
             }
             if (text.length() == 0) {
@@ -43,57 +43,6 @@ final class LostTalesChatClipboard {
         } catch (RuntimeException ignored) {
             return false;
         }
-    }
-
-    private static int findClickedLine(
-            GuiNewChat chat, Minecraft minecraft, List<ChatLine> lines,
-            int rawMouseX, int rawMouseY, float entryDisplacement)
-            throws IllegalAccessException {
-        if (lines == null || lines.isEmpty()) {
-            return -1;
-        }
-        ScaledResolution resolution = new ScaledResolution(
-                minecraft, minecraft.displayWidth,
-                minecraft.displayHeight);
-        int scaleFactor = resolution.getScaleFactor();
-        float chatScale = chat.func_146244_h();
-        int visibleLines = Math.min(
-                LostTalesChatOverlayRenderer.visibleLineCount(chat),
-                lines.size());
-        int width = MathHelper.floor_float(
-                chat.func_146228_f() / chatScale);
-        int scrollPosition =
-                LostTalesChatOverlayRenderer.getScrollPosition(chat);
-        return lineIndexAt(rawMouseX, rawMouseY, scaleFactor, chatScale,
-                width, visibleLines, scrollPosition, scrollPosition == 0
-                        ? entryDisplacement : 0.0F, lines.size());
-    }
-
-    /**
-     * Vanilla 1.7.10 hit testing adjusted to the renderer's contiguous
-     * line stride, with the visual entry offset removed.
-     */
-    static int lineIndexAt(int rawMouseX, int rawMouseY, int scaleFactor,
-                           float chatScale, int width, int visibleLines,
-                           int scrollPosition,
-                           float entryDisplacement, int totalLines) {
-        if (scaleFactor <= 0 || chatScale <= 0.0F || visibleLines <= 0
-                || totalLines <= 0) {
-            return -1;
-        }
-        int lineHeight = LostTalesChatOverlayRenderer.LINE_HEIGHT;
-        int x = MathHelper.floor_float(
-                (rawMouseX / scaleFactor - 3) / chatScale);
-        int y = MathHelper.floor_float(
-                (rawMouseY / scaleFactor - 27 + entryDisplacement)
-                        / chatScale);
-        if (x < 0 || y < 0 || x > width
-                || y >= lineHeight * visibleLines) {
-            return -1;
-        }
-        int lineIndex = y / lineHeight + scrollPosition;
-        return lineIndex >= 0 && lineIndex < totalLines
-                ? lineIndex : -1;
     }
 
     private static String resolveChannelMessage(List<ChatLine> lines,
@@ -140,8 +89,7 @@ final class LostTalesChatClipboard {
                 : line.getUpdatedCounter() == updateCounter);
     }
 
-    private static ChatHeadMarker.Data findMarker(
-            net.minecraft.util.IChatComponent line) {
+    private static ChatHeadMarker.Data findMarker(IChatComponent line) {
         for (Object value : line) {
             ChatHeadMarker.Data marker = ChatHeadMarker.decode(
                     (IChatComponent)value);
@@ -152,8 +100,7 @@ final class LostTalesChatClipboard {
         return null;
     }
 
-    private static String plainText(
-            net.minecraft.util.IChatComponent line) {
+    private static String plainText(IChatComponent line) {
         StringBuilder text = new StringBuilder();
         for (Object value : line) {
             text.append(((IChatComponent)value)
@@ -161,5 +108,4 @@ final class LostTalesChatClipboard {
         }
         return text.toString();
     }
-
 }

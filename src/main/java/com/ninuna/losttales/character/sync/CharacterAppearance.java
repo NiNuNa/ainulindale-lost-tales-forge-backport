@@ -13,6 +13,7 @@ import java.util.UUID;
 public final class CharacterAppearance {
 
     private final UUID playerId;
+    private final String accountName;
     private final String characterName;
     private final String raceId;
     private final String genderId;
@@ -38,10 +39,24 @@ public final class CharacterAppearance {
     public CharacterAppearance(UUID playerId, String characterName,
                                String raceId, String genderId, String skinId,
                                boolean showMinecraftCape, int cosmeticCapeId) {
+        this(playerId, "", characterName, raceId, genderId, skinId,
+                showMinecraftCape, cosmeticCapeId);
+    }
+
+    /**
+     * Full projection including the public Minecraft account name, which
+     * lets clients pair a tab-list account with its active character without
+     * a second roster sync. Account names are already public on the tab list.
+     */
+    public CharacterAppearance(UUID playerId, String accountName,
+                               String characterName,
+                               String raceId, String genderId, String skinId,
+                               boolean showMinecraftCape, int cosmeticCapeId) {
         if (playerId == null) {
             throw new IllegalArgumentException("playerId must not be null");
         }
         this.playerId = playerId;
+        this.accountName = normalizeName(accountName);
         this.characterName = normalizeName(characterName);
         this.raceId = CharacterRaceRegistry.canonicalizeIdentifier(raceId);
         this.genderId = CharacterGenderRegistry.normalizeIdentifier(genderId);
@@ -51,11 +66,17 @@ public final class CharacterAppearance {
     }
 
     public static CharacterAppearance fromRoster(UUID playerId, CharacterRoster roster) {
+        return fromRoster(playerId, "", roster);
+    }
+
+    public static CharacterAppearance fromRoster(UUID playerId, String accountName,
+                                                 CharacterRoster roster) {
         RoleplayCharacter active = roster == null ? null : roster.getActiveCharacter();
         return active == null
                 ? removed(playerId)
                 : new CharacterAppearance(
                         playerId,
+                        accountName,
                         active.getName(),
                         active.getRaceId(),
                         active.getGenderId(),
@@ -72,6 +93,11 @@ public final class CharacterAppearance {
 
     public UUID getPlayerId() {
         return this.playerId;
+    }
+
+    /** Public Minecraft account name; empty for removals and previews. */
+    public String getAccountName() {
+        return this.accountName;
     }
 
     public String getCharacterName() {

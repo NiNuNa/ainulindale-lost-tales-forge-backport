@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatNameSuggester;
 import java.util.Collections;
 import java.util.List;
@@ -10,23 +11,31 @@ import net.minecraft.client.gui.Gui;
  * Live {@code @Name} completion list shown above the chat input, the
  * counterpart of {@link ChatEmojiSuggestionBox} for player mentions.
  * Selection state lives here; applying a completion is the chat screen's
- * job. The candidate names are supplied on update so this box stays free
- * of network and world lookups.
+ * job. Candidates are supplied on update, already shaped for the selected
+ * channel (account identity in OOC, character identity otherwise), so this
+ * box stays free of network and world lookups and never shows the same
+ * player twice.
  */
 final class ChatNameSuggestionBox {
     static final int MAX_ROWS = 8;
     private static final int ROW_HEIGHT = 11;
     private static final int PADDING = 2;
-    /** Matches the channel selector's gap above the input row. */
+    /** Matches the tab row's gap above the input row. */
     private static final int BOTTOM_MARGIN = 15;
 
-    private List<String> matches = Collections.emptyList();
+    private List<ChatMentionCandidate> matches = Collections.emptyList();
     private ChatNameSuggester.Query query;
     private int selectedIndex;
     private int dismissedAtIndex = -1;
+    private int candidateRevision = -1;
 
-    /** Recomputes the query and matches; cheap enough to run per frame. */
-    void update(String text, int cursor, List<String> candidates) {
+    /**
+     * Recomputes the query and matches. {@code revision} identifies the
+     * candidate list build so matches are only refiltered when either the
+     * typed prefix or the candidate set actually changed.
+     */
+    void update(String text, int cursor,
+                List<ChatMentionCandidate> candidates, int revision) {
         ChatNameSuggester.Query found =
                 ChatNameSuggester.findQuery(text, cursor);
         if (found == null) {
@@ -40,12 +49,16 @@ final class ChatNameSuggestionBox {
         }
         boolean changed = this.query == null
                 || this.query.atIndex != found.atIndex
-                || !this.query.prefix.equals(found.prefix);
+                || !this.query.prefix.equals(found.prefix)
+                || this.candidateRevision != revision;
         this.query = found;
         if (changed) {
             this.matches = ChatNameSuggester.matches(
                     found.prefix, candidates, MAX_ROWS);
-            this.selectedIndex = 0;
+            this.candidateRevision = revision;
+            if (this.selectedIndex >= this.matches.size()) {
+                this.selectedIndex = 0;
+            }
         }
     }
 
@@ -54,7 +67,7 @@ final class ChatNameSuggestionBox {
                 && this.query.atIndex != this.dismissedAtIndex;
     }
 
-    String getSelected() {
+    ChatMentionCandidate getSelected() {
         return isActive() && this.selectedIndex < this.matches.size()
                 ? this.matches.get(this.selectedIndex) : null;
     }
@@ -79,31 +92,39 @@ final class ChatNameSuggestionBox {
         }
     }
 
-    /** The name under the mouse, or null. Also used for clicks. */
-    String suggestionAt(FontRenderer font, int mouseX, int mouseY,
-                        int screenHeight, int inputX) {
+    boolean contains(FontRenderer font, int mouseX, int mouseY,
+                     int screenHeight, int inputX) {
         if (!isActive()) {
-            return null;
+            return false;
         }
         int width = boxWidth(font);
         int top = boxTop(screenHeight);
-        if (mouseX < inputX || mouseX >= inputX + width
-                || mouseY < top + PADDING) {
+        return mouseX >= inputX && mouseX < inputX + width
+                && mouseY >= top && mouseY < screenHeight - BOTTOM_MARGIN;
+    }
+
+    /** The candidate under the mouse, or null. Also used for clicks. */
+    ChatMentionCandidate suggestionAt(FontRenderer font, int mouseX,
+                                      int mouseY, int screenHeight,
+                                      int inputX) {
+        if (!contains(font, mouseX, mouseY, screenHeight, inputX)
+                || mouseY < boxTop(screenHeight) + PADDING) {
             return null;
         }
-        int row = (mouseY - top - PADDING) / ROW_HEIGHT;
+        int row = (mouseY - boxTop(screenHeight) - PADDING) / ROW_HEIGHT;
         return row >= 0 && row < this.matches.size()
                 ? this.matches.get(row) : null;
     }
 
-    void draw(FontRenderer font, int screenHeight, int inputX,
-              int mouseX, int mouseY) {
+    void draw(FontRenderer font, ChatPointerRegions regions,
+              int screenHeight, int inputX, int mouseX, int mouseY) {
         if (!isActive()) {
             return;
         }
         int width = boxWidth(font);
         int top = boxTop(screenHeight);
         int bottom = screenHeight - BOTTOM_MARGIN;
+        regions.add(inputX, top, inputX + width, bottom);
         Gui.drawRect(inputX, top, inputX + width, bottom,
                 LostTalesChatVisualStyle.argb(
                         LostTalesChatVisualStyle.SURFACE_RGB, 0xE0));
@@ -123,7 +144,7 @@ final class ChatNameSuggestionBox {
                                         .SURFACE_HIGHLIGHT_RGB, 0xC8));
             }
             LostTalesChatVisualStyle.drawPlain(font,
-                    "@" + this.matches.get(row),
+                    "@" + this.matches.get(row).getDisplayName(),
                     inputX + 4, rowTop + 2,
                     row == this.selectedIndex ? 255 : 200);
         }
@@ -133,7 +154,7 @@ final class ChatNameSuggestionBox {
         int width = 0;
         for (int index = 0; index < this.matches.size(); index++) {
             width = Math.max(width, font.getStringWidth(
-                    "@" + this.matches.get(index)));
+                    "@" + this.matches.get(index).getDisplayName()));
         }
         return width + 8;
     }

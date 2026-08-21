@@ -2,16 +2,17 @@ package com.ninuna.losttales.chat;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
 /**
  * Finds the {@code @Name} mention being typed at the input cursor and the
- * candidate names that could complete it. Pure text logic, mirroring
+ * candidates that could complete it. Pure text logic, mirroring
  * {@link com.ninuna.losttales.chat.emoji.ChatEmojiSuggester}; the client
- * GUI supplies the candidate names (online players plus own identities).
+ * GUI supplies {@link ChatMentionCandidate}s built from online players plus
+ * its own identities, already shaped for the selected channel.
  */
 public final class ChatNameSuggester {
     /** Prefixes may contain spaces for multi-word character names. */
@@ -45,26 +46,29 @@ public final class ChatNameSuggester {
                 .toLowerCase(Locale.ROOT));
     }
 
-    /** Candidate-ordered names starting with the prefix, deduplicated. */
-    public static List<String> matches(String prefix,
-                                       List<String> candidates,
-                                       int limit) {
+    /**
+     * Candidates any of whose aliases start with the prefix, in candidate
+     * order, one entry per key. Candidates whose displayed name already
+     * appeared (two players with the same character name) are kept, so a
+     * deterministic first match is still reachable by account alias.
+     */
+    public static List<ChatMentionCandidate> matches(
+            String prefix, List<ChatMentionCandidate> candidates, int limit) {
         if (prefix == null || candidates == null || limit <= 0) {
             return Collections.emptyList();
         }
         String query = prefix.toLowerCase(Locale.ROOT);
-        Set<String> seen = new LinkedHashSet<String>();
-        List<String> result = new ArrayList<String>();
+        Set<String> seenKeys = new HashSet<String>();
+        List<ChatMentionCandidate> result =
+                new ArrayList<ChatMentionCandidate>();
         for (int index = 0; index < candidates.size(); index++) {
-            String candidate = candidates.get(index);
-            String trimmed = candidate == null ? "" : candidate.trim();
-            if (trimmed.length() == 0
-                    || !trimmed.toLowerCase(Locale.ROOT)
-                            .startsWith(query)
-                    || !seen.add(trimmed.toLowerCase(Locale.ROOT))) {
+            ChatMentionCandidate candidate = candidates.get(index);
+            if (candidate == null || !candidate.isUsable()
+                    || !candidate.matches(query)
+                    || !seenKeys.add(candidate.getKey())) {
                 continue;
             }
-            result.add(trimmed);
+            result.add(candidate);
             if (result.size() >= limit) {
                 break;
             }

@@ -45,7 +45,7 @@ public final class LostTalesNpcChatTest {
 
             String rendered = plainText.toString();
             assertTrue(rendered.startsWith("Proximity: ["));
-            assertTrue(rendered.contains("] | <"));
+            assertTrue(rendered.contains("] <"));
             assertTrue(rendered.contains("Grey Wanderer> Good day"));
             assertNotNull(marker);
             assertTrue(marker.npcIdentity);

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.chat.emoji;
 
+import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,7 +29,8 @@ public final class ChatEmojiSuggester {
         while (index >= 0 && isPrefixCharacter(text.charAt(index))) {
             index--;
         }
-        if (index < 0 || text.charAt(index) != ':') {
+        if (index < 0 || text.charAt(index) != ':'
+                || opensItemToken(text, index)) {
             return null;
         }
         int prefixLength = clamped - index - 1;
@@ -55,6 +57,14 @@ public final class ChatEmojiSuggester {
                 && text.charAt(index) == ':'
                 && ChatEmoji.fromName(text.substring(index + 1, colonIndex)
                         .toLowerCase(Locale.ROOT)) != null;
+    }
+
+    /**
+     * True when the colon belongs to an item-showcase opener ({@code {i:}),
+     * whose completion list is the item suggester's, not this one's.
+     */
+    private static boolean opensItemToken(String text, int colonIndex) {
+        return ChatShareTokenParser.opensShareToken(text, colonIndex);
     }
 
     /** Registry-ordered emotes whose name starts with the prefix. */

@@ -3,15 +3,32 @@ package com.ninuna.losttales.network.packet;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.chat.share.ChatShareKind;
+import com.ninuna.losttales.chat.share.ChatShareTokenParser;
+import com.ninuna.losttales.chat.share.ChatShowcase;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
-/** Server-created public presentation snapshot for one authorized recipient. */
+/**
+ * Server-created public presentation snapshot for one authorized recipient.
+ * Shared items and markers arrive as server-validated payloads, so
+ * recipients never have to trust the sender for them.
+ */
 public final class LostTalesChatMessagePacket implements IMessage {
-    private static final int MAX_PACKET_BYTES = 2048;
+    private static final int MAX_SHOWCASE_BYTES = Math.max(
+            ChatShowcase.MAX_STACK_BYTES,
+            ChatShowcase.MAX_MARKER_ID_BYTES
+                    + ChatShowcase.MAX_MARKER_NAME_BYTES
+                    + ChatShowcase.MAX_MARKER_STYLE_BYTES * 2 + 32);
+    private static final int MAX_PACKET_BYTES = 2048
+            + ChatMessageValidator.MAX_UTF8_BYTES
+            + ChatShareTokenParser.MAX_TOKENS * (MAX_SHOWCASE_BYTES + 8);
     private static final int MAX_CHANNEL_BYTES = 16;
     private static final int MAX_IDENTITY_BYTES = 256;
     private static final int MAX_ACCOUNT_NAME_BYTES = 64;
@@ -28,6 +45,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
     private String message = "";
     private long timestampMillis;
     private String skinId = "";
+    private List<ChatShowcase> showcases = Collections.emptyList();
     private boolean malformed;
 
     public LostTalesChatMessagePacket() {}
@@ -37,6 +55,17 @@ public final class LostTalesChatMessagePacket implements IMessage {
             String accountName, String title,
             int titleColor, int nameColor,
             String message, long timestampMillis, String skinId) {
+        this(channel, senderId, identityName, accountName, title,
+                titleColor, nameColor, message, timestampMillis, skinId,
+                null);
+    }
+
+    public LostTalesChatMessagePacket(
+            ChatChannel channel, UUID senderId, String identityName,
+            String accountName, String title,
+            int titleColor, int nameColor,
+            String message, long timestampMillis, String skinId,
+            List<ChatShowcase> showcases) {
         this.channelId = channel == null ? "" : channel.getId();
         this.senderId = senderId;
         this.identityName = identityName == null ? "" : identityName;
@@ -47,6 +76,10 @@ public final class LostTalesChatMessagePacket implements IMessage {
         this.message = message == null ? "" : message;
         this.timestampMillis = timestampMillis;
         this.skinId = skinId == null ? "" : skinId;
+        this.showcases = showcases == null || showcases.isEmpty()
+                ? Collections.<ChatShowcase>emptyList()
+                : Collections.unmodifiableList(
+                        new ArrayList<ChatShowcase>(showcases));
         validate();
     }
 
@@ -74,12 +107,49 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.timestampMillis = buffer.readLong();
             this.skinId = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_SKIN_ID_BYTES);
+            int count = buffer.readUnsignedByte();
+            if (count > ChatShareTokenParser.MAX_TOKENS) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "too many showcases");
+            }
+            List<ChatShowcase> decoded = new ArrayList<ChatShowcase>(count);
+            for (int index = 0; index < count; index++) {
+                decoded.add(readShowcase(buffer));
+            }
+            this.showcases = Collections.unmodifiableList(decoded);
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
             this.malformed = true;
+            this.showcases = Collections.emptyList();
             LostTalesPacketCodec.discardRemaining(buffer);
         }
+    }
+
+    private static ChatShowcase readShowcase(ByteBuf buffer) {
+        int tokenIndex = buffer.readUnsignedByte();
+        ChatShareKind kind = ChatShareKind.fromCode(buffer.readUnsignedByte());
+        if (kind == ChatShareKind.ITEM) {
+            return ChatShowcase.item(tokenIndex,
+                    LostTalesPacketCodec.readBytes(
+                            buffer, ChatShowcase.MAX_STACK_BYTES));
+        }
+        if (kind == ChatShareKind.MARKER) {
+            String id = LostTalesPacketCodec.readUtf8String(
+                    buffer, ChatShowcase.MAX_MARKER_ID_BYTES);
+            String name = LostTalesPacketCodec.readUtf8String(
+                    buffer, ChatShowcase.MAX_MARKER_NAME_BYTES);
+            String icon = LostTalesPacketCodec.readUtf8String(
+                    buffer, ChatShowcase.MAX_MARKER_STYLE_BYTES);
+            String color = LostTalesPacketCodec.readUtf8String(
+                    buffer, ChatShowcase.MAX_MARKER_STYLE_BYTES);
+            int dimension = buffer.readInt();
+            double x = buffer.readDouble();
+            double z = buffer.readDouble();
+            return ChatShowcase.marker(tokenIndex, id, name, icon, color,
+                    dimension, x, z);
+        }
+        throw new LostTalesPacketCodec.DecodeException("unknown showcase kind");
     }
 
     @Override
@@ -102,6 +172,32 @@ public final class LostTalesChatMessagePacket implements IMessage {
         buffer.writeLong(this.timestampMillis);
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.skinId, MAX_SKIN_ID_BYTES);
+        buffer.writeByte(this.showcases.size());
+        for (ChatShowcase showcase : this.showcases) {
+            buffer.writeByte(showcase.getTokenIndex());
+            buffer.writeByte(showcase.getKind().getCode());
+            if (showcase.getKind() == ChatShareKind.ITEM) {
+                LostTalesPacketCodec.writeBytes(buffer,
+                        showcase.getStackData(),
+                        ChatShowcase.MAX_STACK_BYTES);
+            } else {
+                LostTalesPacketCodec.writeUtf8String(buffer,
+                        showcase.getMarkerId(),
+                        ChatShowcase.MAX_MARKER_ID_BYTES);
+                LostTalesPacketCodec.writeUtf8String(buffer,
+                        showcase.getMarkerName(),
+                        ChatShowcase.MAX_MARKER_NAME_BYTES);
+                LostTalesPacketCodec.writeUtf8String(buffer,
+                        showcase.getMarkerIcon(),
+                        ChatShowcase.MAX_MARKER_STYLE_BYTES);
+                LostTalesPacketCodec.writeUtf8String(buffer,
+                        showcase.getMarkerColor(),
+                        ChatShowcase.MAX_MARKER_STYLE_BYTES);
+                buffer.writeInt(showcase.getMarkerDimension());
+                buffer.writeDouble(showcase.getMarkerX());
+                buffer.writeDouble(showcase.getMarkerZ());
+            }
+        }
     }
 
     private void validate() {
@@ -118,8 +214,24 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || !ChatMessageValidator.isValid(this.message)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.skinId, MAX_SKIN_ID_BYTES)
-                || this.timestampMillis <= 0L) {
+                || this.timestampMillis <= 0L
+                || this.showcases.size() > ChatShareTokenParser.MAX_TOKENS) {
             throw new IllegalArgumentException("invalid chat message");
+        }
+        // Each token index may carry one showcase of the token's own kind,
+        // and every index must point at a token the message contains.
+        List<ChatShareTokenParser.Token> tokens =
+                ChatShareTokenParser.parse(this.message);
+        boolean[] used = new boolean[ChatShareTokenParser.MAX_TOKENS];
+        for (ChatShowcase showcase : this.showcases) {
+            if (showcase == null || showcase.getTokenIndex() >= tokens.size()
+                    || used[showcase.getTokenIndex()]
+                    || tokens.get(showcase.getTokenIndex()).kind
+                            != showcase.getKind()) {
+                throw new IllegalArgumentException(
+                        "invalid chat showcase index");
+            }
+            used[showcase.getTokenIndex()] = true;
         }
     }
 
@@ -135,6 +247,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
     public String getMessage() { return this.message; }
     public long getTimestampMillis() { return this.timestampMillis; }
     public String getSkinId() { return this.skinId; }
+    /** Validated showcases keyed by token index; never null. */
+    public List<ChatShowcase> getShowcases() { return this.showcases; }
     public boolean isMalformed() { return this.malformed; }
 
     public static final class Handler implements IMessageHandler<

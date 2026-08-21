@@ -69,6 +69,8 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 boolean showMinecraftCape = buffer.readBoolean();
                 int cosmeticCapeId = buffer.readUnsignedShort();
+                String accountName = CharacterPacketCodec.readString(
+                        buffer, CharacterPacketCodec.MAX_NAME_BYTES);
                 if (!playerIds.add(playerId)) {
                     throw new CharacterPacketCodec.DecodeException(
                             "duplicate appearance player UUID");
@@ -78,8 +80,8 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                             "invalid cosmetic cape ID");
                 }
                 decoded.add(new CharacterAppearance(
-                        playerId, characterName, raceId, genderId, skinId,
-                        showMinecraftCape, cosmeticCapeId));
+                        playerId, accountName, characterName, raceId,
+                        genderId, skinId, showMinecraftCape, cosmeticCapeId));
             }
             CharacterPacketCodec.requireFinished(buffer);
             this.appearances = Collections.unmodifiableList(decoded);
@@ -112,6 +114,11 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeBoolean(appearance.isMinecraftCapeVisible());
             buffer.writeShort(appearance.getCosmeticCapeId());
+            // Appended after the original layout; account names pair the
+            // tab list with characters for mention completion.
+            CharacterPacketCodec.writeString(
+                    buffer, appearance.getAccountName(),
+                    CharacterPacketCodec.MAX_NAME_BYTES);
         }
     }
 

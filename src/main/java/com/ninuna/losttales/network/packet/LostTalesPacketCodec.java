@@ -97,6 +97,31 @@ final class LostTalesPacketCodec {
         return slot >= 0 && slot <= MAX_REASONABLE_INVENTORY_SLOT;
     }
 
+    /** Length-prefixed opaque bytes with an explicit upper bound. */
+    static byte[] readBytes(ByteBuf buffer, int maximumBytes) {
+        if (buffer == null || maximumBytes < 0) {
+            throw new DecodeException("invalid byte array decoder arguments");
+        }
+        int length = ByteBufUtils.readVarInt(buffer, 3);
+        if (length < 0 || length > maximumBytes) {
+            throw new DecodeException("byte array exceeds packet limit");
+        }
+        requireReadable(buffer, length);
+        byte[] bytes = new byte[length];
+        buffer.readBytes(bytes);
+        return bytes;
+    }
+
+    static void writeBytes(ByteBuf buffer, byte[] value, int maximumBytes) {
+        if (buffer == null || value == null || maximumBytes < 0
+                || value.length > maximumBytes) {
+            throw new IllegalArgumentException(
+                    "byte array exceeds packet limit");
+        }
+        ByteBufUtils.writeVarInt(buffer, value.length, 3);
+        buffer.writeBytes(value);
+    }
+
     private static void requireReadable(ByteBuf buffer, int count) {
         if (buffer == null || count < 0 || buffer.readableBytes() < count) {
             throw new DecodeException("truncated packet");
