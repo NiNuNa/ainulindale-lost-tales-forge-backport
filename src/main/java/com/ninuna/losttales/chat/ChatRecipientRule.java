@@ -9,5 +9,7 @@ public enum ChatRecipientRule {
     /** Only the sender: a private console that echoes back to its author. */
     SELF,
     /** Only server operators; sending also requires operator status. */
-    OPERATORS
+    OPERATORS,
+    /** The sender and one named online player. */
+    WHISPER
 }

@@ -29,8 +29,8 @@ public enum ChatChannel {
     OOC("ooc", "OOC", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.GLOBAL,
             LostTalesColors.rgb(LostTalesColors.ORCHID)),
-    /** Staff channel: operators only, account identity. Appended last. */
-    ADMIN("admin", "Admin", ChatIdentityType.ACCOUNT,
+    /** Staff channel: operators only, account identity; the wire id stays. */
+    ADMIN("admin", "Operator", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.OPERATORS,
             LostTalesColors.rgb(LostTalesColors.CRIMSON)),
     /**
@@ -40,10 +40,19 @@ public enum ChatChannel {
      */
     CONSOLE("console", "Console", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.SELF,
-            LostTalesColors.rgb(LostTalesColors.ROSE_GRAY));
+            LostTalesColors.rgb(LostTalesColors.ROSE_GRAY)),
+    /**
+     * A private conversation between two accounts. Not a tab of its own:
+     * every whisper partner is one tab on this channel, and the client
+     * keeps them apart by the partner's name.
+     */
+    WHISPER("whisper", "Whisper", ChatIdentityType.ACCOUNT,
+            ChatRecipientRule.WHISPER,
+            LostTalesColors.rgb(LostTalesColors.APRICOT));
 
     /** Tab, indicator, and cycle order: the two global channels bracket
-     *  the scoped role-play ones, then Party, staff, and the console. */
+     *  the scoped role-play ones, then Party, staff, and the console.
+     *  Whispers are not listed: their tabs exist per conversation. */
     private static final List<ChatChannel> PRESENTATION_ORDER =
             Collections.unmodifiableList(Arrays.asList(
                     ALL, PROXIMITY, FACTION, OOC, PARTY, ADMIN, CONSOLE));

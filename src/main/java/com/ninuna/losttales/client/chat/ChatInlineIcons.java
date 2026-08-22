@@ -20,9 +20,12 @@ import net.minecraft.item.ItemStack;
  * <li>The box sits {@link #CONTENT_TOP_OFFSET} above the text's top edge,
  * which centres it in the eleven-pixel line band, so every kind shares the
  * text's baseline relationship.</li>
- * <li>On the toolbar buttons, where nothing has to fit a line, glyphs are
- * drawn crisp: emotes 1:1, items at exactly half size, marker artwork at
- * its native pixels, so no aspect or texel is ever distorted.</li>
+ * <li>On the toolbar buttons every glyph fills the same
+ * {@link #CONTENT_SIZE} box centred in the button square, fitted by its
+ * larger edge exactly as it is inline — the emote 1:1, the item sprite
+ * scaled onto the box, the marker artwork fitted uniformly — so the
+ * emote, item, marker and quest buttons read at one size on one baseline
+ * and nothing is stretched.</li>
  * <li>Shadows are flat {@link LostTalesChatVisualStyle#SHADOW}
  * silhouettes offset by {@link LostTalesChatVisualStyle#SHADOW_OFFSET}
  * at {@link LostTalesChatVisualStyle#SHADOW_OPACITY}, exactly like the
@@ -43,9 +46,6 @@ final class ChatInlineIcons {
     static final float CONTENT_SIZE = 10.0F;
     /** Box top relative to the text top: centred in the 11px line band. */
     static final int CONTENT_TOP_OFFSET = -2;
-    /** Items on buttons: half the vanilla sprite, a crisp 2:1. */
-    private static final float BUTTON_ITEM_SIZE = 8.0F;
-
     private ChatInlineIcons() {}
 
     /** Content edge for a slot; a degraded slot narrower than ten shrinks it. */
@@ -147,7 +147,7 @@ final class ChatInlineIcons {
         drawMarker(minecraft, iconName, rgb, boxX, boxY, size, alpha, false);
     }
 
-    /* Toolbar buttons: crisp, undistorted, centred in the button square. */
+    /* Toolbar buttons: one content box, centred in the button square. */
 
     static void drawEmojiButton(Minecraft minecraft, ChatEmoji emoji,
                                 int left, int top, int buttonSize) {
@@ -158,24 +158,16 @@ final class ChatInlineIcons {
 
     static void drawItemButton(Minecraft minecraft, ItemStack stack,
                                int left, int top, int buttonSize) {
-        float inset = (buttonSize - BUTTON_ITEM_SIZE) / 2.0F;
+        float inset = (buttonSize - CONTENT_SIZE) / 2.0F;
         drawItem(minecraft, stack, left + inset, top + inset,
-                BUTTON_ITEM_SIZE, 255);
+                CONTENT_SIZE, 255);
     }
 
-    /** Native-size marker artwork centred on the button. */
+    /** Marker artwork fitted into the content box, uniformly scaled. */
     static void drawMarkerButton(Minecraft minecraft, String iconName,
                                  int rgb, int left, int top, int buttonSize) {
-        float centerX = left + buttonSize / 2.0F;
-        float centerY = top + buttonSize / 2.0F;
-        int shadow = LostTalesChatVisualStyle.shadowAlpha(255);
-        if (shadow > 0) {
-            ChatMapMarkerRenderer.drawNativeShadow(minecraft, iconName,
-                    centerX + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    centerY + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    LostTalesChatVisualStyle.SHADOW, shadow);
-        }
-        ChatMapMarkerRenderer.drawNative(minecraft, iconName, centerX, centerY,
-                rgb, 255);
+        float inset = (buttonSize - CONTENT_SIZE) / 2.0F;
+        drawMarker(minecraft, iconName, rgb, left + inset, top + inset,
+                CONTENT_SIZE, 255);
     }
 }

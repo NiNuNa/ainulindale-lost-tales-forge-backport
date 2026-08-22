@@ -63,7 +63,7 @@ public final class LostTalesChatPresentationTest {
                 }
             }
 
-            assertEquals("Global: <  Ranger Arathorn> The road is clear.",
+            assertEquals("Global: <  Arathorn, the Ranger> The road is clear.",
                     plainText.toString());
             assertNotNull(reply);
             assertEquals(ClickEvent.Action.SUGGEST_COMMAND,
@@ -92,6 +92,84 @@ public final class LostTalesChatPresentationTest {
                     headMarker.skinId);
             assertEquals(0x55AA55, headMarker.titleColor);
             assertEquals(0x336633, headMarker.nameColor);
+        } finally {
+            LostTalesConfig.showChatTimestamps = originalTimestamps;
+        }
+    }
+
+    @Test
+    public void titledNamesFollowLotrNpcNamingAndUntitledNamesAreBare() {
+        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
+        LostTalesConfig.showChatTimestamps = false;
+        try {
+            LostTalesChatMessagePacket titled =
+                    new LostTalesChatMessagePacket(
+                            ChatChannel.ALL, UUID.randomUUID(), "Aldric",
+                            "Aldric123", "Farmer", 0x55AA55, 0x336633,
+                            "Good harvest.", 123456789L, "", null, "Gondor");
+            ChatTitleMarker.Data marker = null;
+            StringBuilder plainText = new StringBuilder();
+            for (Object value : LostTalesChatPresentation.build(titled)) {
+                IChatComponent part = (IChatComponent)value;
+                plainText.append(part.getUnformattedTextForChat());
+                ChatTitleMarker.Data decoded = ChatTitleMarker.decode(part);
+                if (decoded != null) {
+                    marker = decoded;
+                }
+            }
+            assertEquals("Global: <  Aldric, the Gondor Farmer> Good harvest.",
+                    plainText.toString());
+            assertNotNull(marker);
+            assertEquals("Gondor Farmer", marker.epithet);
+            assertEquals(0x55AA55, marker.color);
+
+            LostTalesChatMessagePacket untitled =
+                    new LostTalesChatMessagePacket(
+                            ChatChannel.ALL, UUID.randomUUID(), "Aldric",
+                            "Aldric123", "", 0x55AA55, 0x336633,
+                            "Good harvest.", 123456789L, "", null, "Gondor");
+            plainText.setLength(0);
+            for (Object value : LostTalesChatPresentation.build(untitled)) {
+                IChatComponent part = (IChatComponent)value;
+                plainText.append(part.getUnformattedTextForChat());
+                assertFalse(ChatTitleMarker.isMarker(part));
+            }
+            assertEquals("Global: <  Aldric> Good harvest.",
+                    plainText.toString());
+            assertEquals("Farmer", LostTalesChatPresentation.epithet("", "Farmer"));
+            assertEquals("Gondor Farmer",
+                    LostTalesChatPresentation.epithet(" Gondor ", "Farmer "));
+        } finally {
+            LostTalesConfig.showChatTimestamps = originalTimestamps;
+        }
+    }
+
+    @Test
+    public void systemLinesCarryTheChannelPrefixAndTimestamp() {
+        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
+        LostTalesConfig.showChatTimestamps = true;
+        try {
+            IChatComponent line = LostTalesChatPresentation.buildSystemLine(
+                    new net.minecraft.util.ChatComponentText(
+                            "Your game mode has been updated"),
+                    ChatChannel.CONSOLE, 123456789L);
+            StringBuilder plainText = new StringBuilder();
+            boolean anchor = false;
+            Integer prefixColor = null;
+            for (Object value : line) {
+                IChatComponent part = (IChatComponent)value;
+                plainText.append(part.getUnformattedTextForChat());
+                anchor |= ChatLayoutMarker.isAnchor(part);
+                if ("Console".equals(part.getUnformattedTextForChat())) {
+                    prefixColor = ChatChannelPrefixMarker.decode(part);
+                }
+            }
+            String rendered = plainText.toString();
+            assertTrue(rendered.startsWith("Console: ["));
+            assertTrue(rendered.endsWith("] Your game mode has been updated"));
+            assertTrue(anchor);
+            assertEquals(Integer.valueOf(ChatChannel.CONSOLE.getDisplayColor()),
+                    prefixColor);
         } finally {
             LostTalesConfig.showChatTimestamps = originalTimestamps;
         }

@@ -31,10 +31,13 @@ public final class LostTalesChatSendPacket implements IMessage {
             + ChatShareTokenParser.MAX_TOKENS
             * (ChatShareReference.MAX_MARKER_ID_BYTES + 8);
     private static final int MAX_CHANNEL_BYTES = 16;
+    private static final int MAX_TARGET_BYTES = 64;
 
     private String channelId = "";
     private String message = "";
     private List<ChatShareReference> references = Collections.emptyList();
+    /** Account name a whisper is for; empty for every other channel. */
+    private String target = "";
     private boolean malformed;
 
     public LostTalesChatSendPacket() {}
@@ -45,6 +48,13 @@ public final class LostTalesChatSendPacket implements IMessage {
 
     public LostTalesChatSendPacket(ChatChannel channel, String message,
                                    List<ChatShareReference> references) {
+        this(channel, message, references, "");
+    }
+
+    public LostTalesChatSendPacket(ChatChannel channel, String message,
+                                   List<ChatShareReference> references,
+                                   String target) {
+        this.target = target == null ? "" : target.trim();
         this.channelId = channel == null ? "" : channel.getId();
         this.message = message == null ? "" : message;
         this.references = references == null || references.isEmpty()
@@ -89,10 +99,13 @@ public final class LostTalesChatSendPacket implements IMessage {
                 }
             }
             this.references = Collections.unmodifiableList(decoded);
+            this.target = LostTalesPacketCodec.readUtf8String(
+                    buffer, MAX_TARGET_BYTES).trim();
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
             this.malformed = true;
+            this.target = "";
             this.references = Collections.emptyList();
             LostTalesPacketCodec.discardRemaining(buffer);
         }
@@ -116,10 +129,16 @@ public final class LostTalesChatSendPacket implements IMessage {
                         ChatShareReference.MAX_MARKER_ID_BYTES);
             }
         }
+        LostTalesPacketCodec.writeUtf8String(buffer, this.target,
+                MAX_TARGET_BYTES);
     }
 
     private void validate() {
         if (ChatChannel.fromId(this.channelId) == null
+                || !LostTalesPacketCodec.isUtf8WithinLimit(
+                        this.target, MAX_TARGET_BYTES)
+                || (ChatChannel.fromId(this.channelId) == ChatChannel.WHISPER
+                        && this.target.length() == 0)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.channelId, MAX_CHANNEL_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
@@ -141,6 +160,8 @@ public final class LostTalesChatSendPacket implements IMessage {
     public String getMessage() { return this.message; }
     /** References in token order; may be shorter than the token list. */
     public List<ChatShareReference> getReferences() { return this.references; }
+    /** The whisper's account name; empty otherwise. */
+    public String getTarget() { return this.target; }
     public boolean isMalformed() { return this.malformed; }
 
     public static final class Handler implements IMessageHandler<
@@ -164,7 +185,8 @@ public final class LostTalesChatSendPacket implements IMessage {
                             LostTalesChatService.send(
                                     livePlayer, message.getChannel(),
                                     message.getMessage(),
-                                    message.getReferences());
+                                    message.getReferences(),
+                                    message.getTarget());
                         }
                     });
             return null;

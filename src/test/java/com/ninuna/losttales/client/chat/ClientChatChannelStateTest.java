@@ -20,6 +20,38 @@ public final class ClientChatChannelStateTest {
     public void cleanUp() {
         ClientChatChannelState.clear();
         ClientCharacterRosterCache.clear();
+        ChatWindowLayout.reset();
+    }
+
+    @Test
+    public void closedChannelsAreNeverSelectedAndCycleFollowsTheLayout() {
+        acceptRoster("lotr:gondor");
+        ChatWindowLayout.detach(ChatChannel.PROXIMITY, 0.0D, 0.0D);
+        assertEquals(java.util.Arrays.asList(ChatChannel.CONSOLE,
+                ChatChannel.ALL, ChatChannel.FACTION, ChatChannel.OOC,
+                ChatChannel.PROXIMITY),
+                ClientChatChannelState.getOpenChannels());
+        // Cycling stays within the window: Proximity is alone in its.
+        ClientChatChannelState.select(ChatChannel.PROXIMITY);
+        assertEquals(ChatChannel.PROXIMITY, ClientChatChannelState.cycle().getChannel());
+        ClientChatChannelState.select(ChatChannel.OOC);
+        assertEquals(ChatChannel.ALL, ClientChatChannelState.cycle().getChannel());
+        assertEquals(ChatChannel.FACTION, ClientChatChannelState.cycle().getChannel());
+        // A closed channel stays available (readable) but not selectable.
+        ClientChatChannelState.select(ChatChannel.OOC);
+        ChatWindowLayout.close(ChatChannel.OOC);
+        assertTrue(ClientChatChannelState.isAvailable(ChatChannel.OOC));
+        assertFalse(ClientChatChannelState.isSelectable(ChatChannel.OOC));
+        assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
+        ClientChatChannelState.select(ChatChannel.OOC);
+        assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
+        // Without a character and with Global closed, the fallback is OOC
+        // (account conversation) even though it now sits after Console.
+        ChatWindowLayout.restore(ChatChannel.OOC);
+        ChatWindowLayout.close(ChatChannel.ALL);
+        acceptRoster("");
+        ClientChatChannelState.ensureAvailable();
+        assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelectedChannel());
     }
 
     @Test
@@ -31,14 +63,48 @@ public final class ClientChatChannelStateTest {
                 ChatChannel.PROXIMITY));
         assertTrue(ClientChatChannelState.isAvailable(ChatChannel.OOC));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.OOC));
-        assertEquals(java.util.Arrays.asList(ChatChannel.ALL, ChatChannel.OOC),
+        // The console is always there; Admin only once the server says so.
+        assertEquals(java.util.Arrays.asList(ChatChannel.ALL, ChatChannel.OOC,
+                ChatChannel.CONSOLE),
                 ClientChatChannelState.getAvailableChannels());
-        // Global is the readable default; OOC is where the player can talk.
-        assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelected());
+        // TAB cycles inside the selected channel's own window: Global and
+        // OOC share the conversation window, the console lives elsewhere.
         ClientChatChannelState.select(ChatChannel.OOC);
-        assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelected());
+        assertEquals(ChatChannel.ALL, ClientChatChannelState.cycle().getChannel());
+        assertEquals(ChatChannel.OOC, ClientChatChannelState.cycle().getChannel());
+        ClientChatChannelState.select(ChatChannel.CONSOLE);
+        assertEquals(ChatChannel.CONSOLE, ClientChatChannelState.cycle().getChannel());
+        assertFalse(ClientChatChannelState.canSend(ChatChannel.ADMIN));
+        assertTrue(ClientChatChannelState.canSend(ChatChannel.CONSOLE));
+        ClientChatChannelState.setAdminAccess(true);
+        assertEquals(java.util.Arrays.asList(ChatChannel.ALL, ChatChannel.OOC,
+                ChatChannel.ADMIN, ChatChannel.CONSOLE),
+                ClientChatChannelState.getAvailableChannels());
+        ClientChatChannelState.select(ChatChannel.ADMIN);
+        ClientChatChannelState.setAdminAccess(false);
+        // Losing op status drops the selection back to a channel the
+        // player can talk in: OOC, since there is no character here.
+        assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelectedChannel());
+        ClientChatChannelState.setDraft("unsent text");
+        assertEquals("unsent text", ClientChatChannelState.getDraft());
+        // Drafts belong to the tab they were typed in.
+        ChatTab alex = ChatTab.whisper("Alex");
+        ClientChatChannelState.setDraft(alex, "for alex");
+        assertEquals("unsent text", ClientChatChannelState.getDraft());
+        assertEquals("for alex", ClientChatChannelState.getDraft(alex));
+        assertEquals("for alex",
+                ClientChatChannelState.getDraft(ChatTab.whisper("alex")));
+        ClientChatChannelState.setDraft(alex, "");
+        assertEquals("", ClientChatChannelState.getDraft(alex));
+        assertEquals("unsent text", ClientChatChannelState.getDraft());
+        ClientChatChannelState.clear();
+        assertEquals("", ClientChatChannelState.getDraft());
+        // Global is the readable default; OOC is where the player can talk.
+        assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
+        ClientChatChannelState.select(ChatChannel.OOC);
+        assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelectedChannel());
         ClientChatChannelState.select(ChatChannel.PROXIMITY);
-        assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelected());
+        assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelectedChannel());
     }
 
     @Test
@@ -53,7 +119,7 @@ public final class ClientChatChannelStateTest {
 
         acceptRoster("");
         assertEquals(ChatChannel.ALL,
-                ClientChatChannelState.getSelected());
+                ClientChatChannelState.getSelectedChannel());
     }
 
     private static void acceptRoster(String factionId) {

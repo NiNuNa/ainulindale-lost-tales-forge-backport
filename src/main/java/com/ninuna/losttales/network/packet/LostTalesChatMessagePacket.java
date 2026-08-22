@@ -34,6 +34,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
     private static final int MAX_ACCOUNT_NAME_BYTES = 64;
     private static final int MAX_TITLE_BYTES = 256;
     private static final int MAX_SKIN_ID_BYTES = 128;
+    private static final int MAX_FACTION_NAME_BYTES = 128;
 
     private String channelId = "";
     private UUID senderId;
@@ -46,6 +47,10 @@ public final class LostTalesChatMessagePacket implements IMessage {
     private long timestampMillis;
     private String skinId = "";
     private List<ChatShowcase> showcases = Collections.emptyList();
+    /** Sender's faction display name for the title; empty when untitled. */
+    private String factionName = "";
+    /** For a whisper, the other party's account name as this recipient sees it. */
+    private String partner = "";
     private boolean malformed;
 
     public LostTalesChatMessagePacket() {}
@@ -66,6 +71,30 @@ public final class LostTalesChatMessagePacket implements IMessage {
             int titleColor, int nameColor,
             String message, long timestampMillis, String skinId,
             List<ChatShowcase> showcases) {
+        this(channel, senderId, identityName, accountName, title,
+                titleColor, nameColor, message, timestampMillis, skinId,
+                showcases, "");
+    }
+
+    public LostTalesChatMessagePacket(
+            ChatChannel channel, UUID senderId, String identityName,
+            String accountName, String title,
+            int titleColor, int nameColor,
+            String message, long timestampMillis, String skinId,
+            List<ChatShowcase> showcases, String factionName) {
+        this(channel, senderId, identityName, accountName, title,
+                titleColor, nameColor, message, timestampMillis, skinId,
+                showcases, factionName, "");
+    }
+
+    public LostTalesChatMessagePacket(
+            ChatChannel channel, UUID senderId, String identityName,
+            String accountName, String title,
+            int titleColor, int nameColor,
+            String message, long timestampMillis, String skinId,
+            List<ChatShowcase> showcases, String factionName,
+            String partner) {
+        this.partner = partner == null ? "" : partner.trim();
         this.channelId = channel == null ? "" : channel.getId();
         this.senderId = senderId;
         this.identityName = identityName == null ? "" : identityName;
@@ -80,6 +109,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 ? Collections.<ChatShowcase>emptyList()
                 : Collections.unmodifiableList(
                         new ArrayList<ChatShowcase>(showcases));
+        this.factionName = factionName == null ? "" : factionName;
         validate();
     }
 
@@ -117,11 +147,17 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 decoded.add(readShowcase(buffer));
             }
             this.showcases = Collections.unmodifiableList(decoded);
+            this.factionName = LostTalesPacketCodec.readUtf8String(
+                    buffer, MAX_FACTION_NAME_BYTES);
+            this.partner = LostTalesPacketCodec.readUtf8String(
+                    buffer, MAX_ACCOUNT_NAME_BYTES).trim();
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.showcases = Collections.emptyList();
+            this.factionName = "";
+            this.partner = "";
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -198,6 +234,10 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 buffer.writeDouble(showcase.getMarkerZ());
             }
         }
+        LostTalesPacketCodec.writeUtf8String(
+                buffer, this.factionName, MAX_FACTION_NAME_BYTES);
+        LostTalesPacketCodec.writeUtf8String(
+                buffer, this.partner, MAX_ACCOUNT_NAME_BYTES);
     }
 
     private void validate() {
@@ -214,6 +254,12 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || !ChatMessageValidator.isValid(this.message)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.skinId, MAX_SKIN_ID_BYTES)
+                || !LostTalesPacketCodec.isUtf8WithinLimit(
+                        this.factionName, MAX_FACTION_NAME_BYTES)
+                || !LostTalesPacketCodec.isUtf8WithinLimit(
+                        this.partner, MAX_ACCOUNT_NAME_BYTES)
+                || (ChatChannel.fromId(this.channelId) == ChatChannel.WHISPER
+                        && this.partner.length() == 0)
                 || this.timestampMillis <= 0L
                 || this.showcases.size() > ChatShareTokenParser.MAX_TOKENS) {
             throw new IllegalArgumentException("invalid chat message");
@@ -247,6 +293,10 @@ public final class LostTalesChatMessagePacket implements IMessage {
     public String getMessage() { return this.message; }
     public long getTimestampMillis() { return this.timestampMillis; }
     public String getSkinId() { return this.skinId; }
+    /** The sender's faction display name, or empty. */
+    public String getFactionName() { return this.factionName; }
+    /** For a whisper, the other party's account name; empty otherwise. */
+    public String getPartner() { return this.partner; }
     /** Validated showcases keyed by token index; never null. */
     public List<ChatShowcase> getShowcases() { return this.showcases; }
     public boolean isMalformed() { return this.malformed; }

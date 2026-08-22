@@ -840,7 +840,7 @@ public final class LostTalesConfig {
                     chatInputAnimationDurationMillis,
                     60,
                     1000,
-                    "Duration of the chat input bar's opening animation in milliseconds."
+                    "Duration of the chat input bars' opening animation in milliseconds."
             );
             chatSelectorAnimationDurationMillis = config.getInt(
                     "chatSelectorAnimationDurationMillis",

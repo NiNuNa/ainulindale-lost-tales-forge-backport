@@ -24,6 +24,7 @@ final class LostTalesChatMotion {
                 slideIn + followThrough);
     }
 
+    /** Entry of the input bars: up from below with a brief overshoot. */
     static float inputOffset(float progress) {
         float p = clamp(progress);
         float settled = smoothStep(p);

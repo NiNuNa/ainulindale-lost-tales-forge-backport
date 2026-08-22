@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.render.EntityRenderTextureAccess;
 import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.common.FMLLog;
@@ -14,6 +13,7 @@ import net.minecraft.util.ResourceLocation;
  * Called by the coremod in place of the plain chat print inside LOTR's
  * client-side NPC speech packet handler. Purely presentational: recipients,
  * speech content, immersive floating speech, and NPC behaviour are LOTR's.
+ * LOTR sends speech to one player, so it shows as a whisper from the NPC.
  * Any failure falls back to LOTR's original yellow chat line.
  */
 public final class LostTalesNpcChatHook {
@@ -50,14 +50,12 @@ public final class LostTalesNpcChatHook {
         if (name == null || name.length() == 0 || speech.length() == 0) {
             return false;
         }
-        double radius = Math.max(1, LostTalesConfig.chatProximityRadius);
-        boolean nearby = npc.worldObj == player.worldObj
-                && npc.getDistanceSqToEntity(player) <= radius * radius;
+        // LOTR addresses its speech to this one player, so it is a
+        // whisper from the NPC: a tab of its own, named after it.
         ResourceLocation texture =
                 EntityRenderTextureAccess.resolveEntityTexture(npc);
         return LostTalesChatPresentation.receiveNpcSpeech(
-                nearby ? ChatChannel.PROXIMITY : ChatChannel.ALL,
-                npc.getUniqueID(), name,
+                ChatTab.npc(name), npc.getUniqueID(), name,
                 texture == null ? "" : texture.toString(), speech);
     }
 

@@ -14,13 +14,18 @@ public final class ChatChannelTest {
                 ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY,
                 ChatChannel.ADMIN, ChatChannel.CONSOLE),
                 ChatChannel.presentationOrder());
-        // Every channel is presented exactly once; declaration order (the
-        // ordinals client view state is indexed by) is left alone.
-        assertEquals(new HashSet<ChatChannel>(Arrays.asList(
-                ChatChannel.values())),
+        // Every channel but Whisper is presented exactly once (whispers
+        // are tabs per conversation, never a channel tab); declaration
+        // order (the ordinals client view state is indexed by) is left
+        // alone.
+        HashSet<ChatChannel> presented = new HashSet<ChatChannel>(
+                Arrays.asList(ChatChannel.values()));
+        presented.remove(ChatChannel.WHISPER);
+        assertEquals(presented,
                 new HashSet<ChatChannel>(ChatChannel.presentationOrder()));
-        assertEquals(ChatChannel.values().length,
+        assertEquals(ChatChannel.values().length - 1,
                 ChatChannel.presentationOrder().size());
+        assertEquals("whisper", ChatChannel.WHISPER.getId());
     }
 
     @Test

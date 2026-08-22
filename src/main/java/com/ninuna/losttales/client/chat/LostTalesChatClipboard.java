@@ -18,11 +18,10 @@ final class LostTalesChatClipboard {
             return false;
         }
         try {
-            List<ChatLine> lines =
-                    LostTalesChatOverlayRenderer.getViewLines(chat);
             LostTalesChatOverlayRenderer.Band band =
                     LostTalesChatOverlayRenderer.bandAt(
                             minecraft, mouseX, mouseY);
+            List<ChatLine> lines = band == null ? null : band.lines;
             if (band == null || lines == null
                     || band.viewIndex >= lines.size()
                     || lines.get(band.viewIndex) == null) {
@@ -38,8 +37,6 @@ final class LostTalesChatClipboard {
             }
             GuiScreen.setClipboardString(text);
             return true;
-        } catch (IllegalAccessException ignored) {
-            return false;
         } catch (RuntimeException ignored) {
             return false;
         }

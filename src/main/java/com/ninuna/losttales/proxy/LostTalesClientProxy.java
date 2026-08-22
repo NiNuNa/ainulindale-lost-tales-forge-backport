@@ -15,6 +15,7 @@ import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.chat.ChatEmojiUsageStore;
+import com.ninuna.losttales.client.chat.ChatWindowLayoutStore;
 import com.ninuna.losttales.client.chat.LostTalesChatClientHandler;
 import com.ninuna.losttales.client.chat.LostTalesChatPresentation;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraHooks;
@@ -107,6 +108,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         CameraPresetFileStore.initialize(
                 event.getModConfigurationDirectory());
         ChatEmojiUsageStore.initialize(
+                event.getModConfigurationDirectory());
+        ChatWindowLayoutStore.initialize(
                 event.getModConfigurationDirectory());
         LostTalesClientMapMarkerUsageStore.initialize(
                 event.getModConfigurationDirectory());

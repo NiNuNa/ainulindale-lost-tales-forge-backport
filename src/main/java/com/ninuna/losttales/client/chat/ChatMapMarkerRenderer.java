@@ -41,27 +41,6 @@ final class ChatMapMarkerRenderer {
         }
     }
 
-    /** Native-size artwork centred on a point. */
-    static void drawNative(Minecraft minecraft, String iconName,
-                           float centerX, float centerY, int rgb, int alpha) {
-        LostTalesCompassMarkerIcon icon =
-                LostTalesCompassMarkerIcon.fromName(iconName);
-        drawArt(minecraft, icon, centerX - artWidth(icon) / 2.0F,
-                centerY - artHeight(icon) / 2.0F,
-                Math.max(artWidth(icon), artHeight(icon)), 1.0F, rgb, alpha);
-    }
-
-    static void drawNativeShadow(Minecraft minecraft, String iconName,
-                                 float centerX, float centerY,
-                                 int shadowRgb, int alpha) {
-        LostTalesSilhouetteRenderState.begin(shadowRgb);
-        try {
-            drawNative(minecraft, iconName, centerX, centerY, 0xFFFFFF, alpha);
-        } finally {
-            LostTalesSilhouetteRenderState.end();
-        }
-    }
-
     private static float artWidth(LostTalesCompassMarkerIcon icon) {
         return icon.getArtRight() - icon.getArtLeft();
     }

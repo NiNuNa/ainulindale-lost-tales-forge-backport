@@ -42,7 +42,7 @@ public final class ClientChatChannelViewsTest {
         drawn.add(line(0));
         drawn.add(line(-10));
 
-        assertSame(drawn, ClientChatChannelViews.visibleLines(drawn, null));
+        assertSame(drawn, ClientChatChannelViews.visibleLines(drawn, (ChatChannel)null));
         // Vanilla lines (achievements, commands) belong to the console only.
         List<ChatLine> party = ClientChatChannelViews.visibleLines(
                 drawn, ChatChannel.PARTY);
@@ -61,6 +61,48 @@ public final class ClientChatChannelViewsTest {
                 drawn, ChatChannel.CONSOLE));
         assertNull(ClientChatChannelViews.channelOf(0));
         assertEquals(ChatChannel.PARTY, ClientChatChannelViews.channelOf(-10));
+    }
+
+    @Test
+    public void filtersCombineChannelsAndCarryUntrackedLinesWithTheConsole() {
+        ClientChatChannelViews.record(-10, ChatChannel.PARTY,
+                ChatChannel.ALL, false);
+        ClientChatChannelViews.record(-11, ChatChannel.ALL,
+                ChatChannel.ALL, false);
+        ClientChatChannelViews.record(-12, ChatChannel.OOC,
+                ChatChannel.ALL, false);
+        List<ChatLine> drawn = new ArrayList<ChatLine>();
+        drawn.add(line(-12));
+        drawn.add(line(-11));
+        drawn.add(line(0));
+        drawn.add(line(-10));
+
+        ChatLineFilter window = ChatLineFilter.ofChannels(java.util.Arrays.asList(
+                ChatChannel.ALL, ChatChannel.PARTY));
+        List<ChatLine> lines = ClientChatChannelViews.visibleLines(drawn, window);
+        assertEquals(2, lines.size());
+        assertEquals(-11, lines.get(0).getChatLineID());
+        assertEquals(-10, lines.get(1).getChatLineID());
+        assertSame(lines, ClientChatChannelViews.visibleLines(drawn,
+                ChatLineFilter.ofChannels(java.util.Arrays.asList(
+                        ChatChannel.PARTY, ChatChannel.ALL))));
+        // The console channel brings the untracked line with it.
+        List<ChatLine> withConsole = ClientChatChannelViews.visibleLines(
+                drawn, ChatLineFilter.ofChannels(java.util.Arrays.asList(
+                        ChatChannel.OOC, ChatChannel.CONSOLE)));
+        assertEquals(2, withConsole.size());
+        assertEquals(-12, withConsole.get(0).getChatLineID());
+        assertEquals(0, withConsole.get(1).getChatLineID());
+        assertTrue(ClientChatChannelViews.visibleLines(drawn,
+                ChatLineFilter.ofChannels(java.util.Collections.<ChatChannel>emptyList()))
+                .isEmpty());
+        assertTrue(ChatLineFilter.of(ChatChannel.CONSOLE).accepts(null));
+        assertFalse(ChatLineFilter.of(ChatChannel.ALL).accepts(null));
+        // Separate filters keep separate cached results.
+        assertEquals(1, ClientChatChannelViews.visibleLines(drawn,
+                ChatChannel.OOC).size());
+        assertEquals(2, ClientChatChannelViews.visibleLines(drawn, window)
+                .size());
     }
 
     @Test
@@ -150,7 +192,7 @@ public final class ClientChatChannelViewsTest {
         ClientChatChannelViews.scroll(ChatChannel.ALL, -100, 32, 10);
         assertEquals(0, ClientChatChannelViews.getScroll(
                 ChatChannel.ALL, 32, 10));
-        assertEquals(0, ClientChatChannelViews.getScroll(null, 32, 10));
+        assertEquals(0, ClientChatChannelViews.getScroll((ChatTab)null, 32, 10));
         ClientChatChannelViews.scroll(ChatChannel.ALL, 5, 32, 10);
         ClientChatChannelViews.resetScroll();
         assertEquals(0, ClientChatChannelViews.getScroll(

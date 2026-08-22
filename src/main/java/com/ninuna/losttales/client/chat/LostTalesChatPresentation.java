@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.chat.ChatMentions;
+import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
@@ -30,12 +31,13 @@ import net.minecraft.util.ChatStyle;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.StatCollector;
 
 /** Builds structured legacy chat components and records entry-animation time. */
 public final class LostTalesChatPresentation {
     private static volatile long lastMessageNanos;
     private static volatile int lastMessageUpdateCounter = -1;
-    private static volatile ChatChannel lastMessageChannel;
+    private static volatile ChatTab lastMessageTab;
     private static int nextChatLineId = Integer.MIN_VALUE;
     private static final int MAX_PINGED_LINES = 100;
     private static final LinkedHashSet<Integer> pingedChatLineIds =
@@ -59,15 +61,74 @@ public final class LostTalesChatPresentation {
         }
         boolean mentioned = LostTalesConfig.enableChatPings
                 && isLocalPlayerMentioned(minecraft, packet.getMessage());
+        // A whisper lands in the tab of its conversation, opened on the
+        // first message in the window the player is typing in.
+        ChatTab tab = channel == ChatChannel.WHISPER
+                ? ChatWindowLayout.openWhisper(packet.getPartner(),
+                        windowIdOfSelection())
+                : ChatTab.of(channel);
+        if (tab == null) {
+            return;
+        }
+        int chatLineId = print(minecraft, packet, tab, mentioned);
+        if (mentioned || tab.isWhisper()) {
+            if (mentioned) {
+                markPinged(chatLineId);
+            }
+            // The highlight stays for when the tab is read; the cue only
+            // plays for a tab the player has open and not muted, and a
+            // whisper is always a cue.
+            if (ChatWindowLayout.isOpen(tab) && !ChatWindowLayout.isMuted(tab)) {
+                playPingSound(minecraft);
+            }
+        }
+    }
+
+    private static int print(Minecraft minecraft,
+                             LostTalesChatMessagePacket packet, ChatTab tab,
+                             boolean mentioned) {
         int chatLineId = allocateChatLineId();
         GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
         chat.printChatMessageWithOptionalDeletion(
                 build(packet, decodeShowcases(packet)), chatLineId);
-        noteLinePrinted(minecraft, chat, chatLineId, channel, mentioned);
-        if (mentioned) {
-            markPinged(chatLineId);
-            playPingSound(minecraft);
+        noteLinePrinted(minecraft, chat, chatLineId, tab, mentioned);
+        return chatLineId;
+    }
+
+    /**
+     * The player's own line in an NPC conversation: nobody is on the other
+     * end, so nothing is sent; the line is shown here exactly as a
+     * whisper of theirs would be, filed under the NPC's tab.
+     */
+    public static boolean echoToNpc(ChatTab tab, String message) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (tab == null || !tab.isNpc() || message == null
+                || !ChatMessageValidator.isValid(message)
+                || minecraft == null || minecraft.ingameGUI == null
+                || minecraft.thePlayer == null) {
+            return false;
         }
+        String account = minecraft.thePlayer.getCommandSenderName();
+        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
+                ChatChannel.WHISPER, minecraft.thePlayer.getUniqueID(),
+                account, account, "",
+                LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
+                LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
+                message, System.currentTimeMillis(), "", null, "",
+                tab.getPartner());
+        LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
+                minecraft, packet.getSenderId(), account);
+        if (ChatWindowLayout.openTab(tab, windowIdOfSelection()) == null) {
+            return false;
+        }
+        print(minecraft, packet, tab, false);
+        return true;
+    }
+
+    private static String windowIdOfSelection() {
+        ChatWindow window = ChatWindowLayout.windowOf(
+                ClientChatChannelState.getSelected());
+        return window == null ? null : window.getId();
     }
 
     /**
@@ -86,16 +147,16 @@ public final class LostTalesChatPresentation {
                 new LostTalesChatPingSound(new ResourceLocation(sound)));
     }
 
-    /** Records animation timing and the line's channel for the tab views. */
+    /** Records animation timing and the line's tab for the tab views. */
     private static void noteLinePrinted(Minecraft minecraft, GuiNewChat chat,
-                                        int chatLineId, ChatChannel channel,
+                                        int chatLineId, ChatTab tab,
                                         boolean mentioned) {
         lastMessageUpdateCounter = minecraft.ingameGUI.getUpdateCounter();
         lastMessageNanos = System.nanoTime();
-        lastMessageChannel = channel;
-        ClientChatChannelViews.record(chatLineId, channel,
+        lastMessageTab = tab;
+        ClientChatChannelViews.record(chatLineId, tab,
                 ClientChatChannelState.getSelected(), mentioned);
-        ClientChatChannelViews.onLinesAdded(channel,
+        ClientChatChannelViews.onLinesAdded(tab,
                 LostTalesChatOverlayRenderer.countLeadingLines(
                         chat, chatLineId));
     }
@@ -169,14 +230,14 @@ public final class LostTalesChatPresentation {
         return lastMessageUpdateCounter;
     }
 
-    static ChatChannel getLastMessageChannel() {
-        return lastMessageChannel;
+    static ChatTab getLastMessageTab() {
+        return lastMessageTab;
     }
 
     public static void clear() {
         lastMessageNanos = 0L;
         lastMessageUpdateCounter = -1;
-        lastMessageChannel = null;
+        lastMessageTab = null;
         nextChatLineId = Integer.MIN_VALUE;
         pingedChatLineIds.clear();
     }
@@ -198,7 +259,11 @@ public final class LostTalesChatPresentation {
         ChatComponentText root = new ChatComponentText("");
         int channelColor = channel == ChatChannel.FACTION
                 ? packet.getNameColor() : channel.getDisplayColor();
-        appendChannelPrefix(root, channel, channelColor);
+        appendChannelPrefix(root, channel == ChatChannel.WHISPER
+                ? ChatTab.whisper(packet.getPartner()) : ChatTab.of(channel),
+                channelColor);
+        // (An NPC conversation names the same partner, so its prefix
+        // reads the same.)
         appendTimestamp(root, packet.getTimestampMillis());
         // Continuation lines of a wrapped message align here, under the
         // sender's opening bracket; see ChatLineWrapper.
@@ -222,16 +287,25 @@ public final class LostTalesChatPresentation {
                                 packet.getNameColor()))));
         root.appendSibling(marker);
 
-        if (packet.getTitle().length() > 0) {
-            root.appendSibling(text(packet.getTitle() + " ",
-                    nearestFormatting(packet.getTitleColor()), false));
-        }
         ChatComponentText identity = text(packet.getIdentityName(),
                 nearestFormatting(packet.getNameColor()), false);
         identity.setChatStyle(identity.getChatStyle().setChatClickEvent(
                 new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
                         "/msg " + packet.getAccountName() + " ")));
         root.appendSibling(identity);
+        if (packet.getTitle().length() > 0) {
+            // LOTR's NPC naming, "Name, the Gondor Farmer": the epithet is
+            // the sender's faction and title; an untitled sender gets no
+            // comma, no "the", nothing.
+            String epithet = epithet(packet.getFactionName(),
+                    packet.getTitle());
+            root.appendSibling(ChatTitleMarker.apply(
+                    text(translate("chat.losttales.title.suffix",
+                            ", the %s", epithet),
+                            nearestFormatting(packet.getTitleColor()),
+                            false),
+                    packet.getTitleColor(), epithet));
+        }
         root.appendSibling(ChatColorMarker.apply(
                 text("> ", nearestFormatting(
                         packet.getNameColor()), false),
@@ -241,40 +315,145 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * Prints an LOTR NPC speech line styled like a player message. The
-     * honey name keeps LOTR's yellow-name convention within the palette;
-     * the title colour is the plain body ivory so the un-clickable NPC
-     * name does not tint the message text that follows it.
+     * {@code Gondor Farmer}: the faction name before the title, or the
+     * bare title when the sender's faction is unknown.
      */
-    public static boolean receiveNpcSpeech(ChatChannel channel, UUID npcId,
-                                           String npcName,
-                                           String texturePath,
-                                           String message) {
+    static String epithet(String factionName, String title) {
+        String faction = factionName == null ? "" : factionName.trim();
+        String bare = title == null ? "" : title.trim();
+        if (faction.length() == 0) {
+            return bare;
+        }
+        return translate("chat.losttales.title.epithet", "%s %s",
+                faction, bare);
+    }
+
+    /**
+     * A localized format with an English fallback, so the line is still
+     * right when the language file does not carry the key.
+     */
+    private static String translate(String key, String fallback,
+                                    Object... arguments) {
+        String format = StatCollector.translateToLocal(key);
+        if (format == null || format.length() == 0 || format.equals(key)) {
+            format = fallback;
+        }
+        try {
+            return String.format(format, arguments);
+        } catch (IllegalArgumentException ignored) {
+            return String.format(fallback, arguments);
+        }
+    }
+
+    /**
+     * Prints a vanilla or third-party line that Lost Tales classified
+     * into a channel — an achievement, a death message, command output,
+     * a fast-travel countdown — with the channel prefix and timestamp
+     * every other line carries and a tracked line id, so the feed names
+     * its channel and the tabs can file it. The component itself is the
+     * server's, untouched; no head, no mention check.
+     */
+    public static boolean receiveSystemLine(IChatComponent message,
+                                            ChatChannel channel) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (channel == null || npcId == null || npcName == null
-                || npcName.length() == 0 || message == null
-                || message.length() == 0 || minecraft == null
+        if (message == null || channel == null || minecraft == null
                 || minecraft.ingameGUI == null) {
             return false;
         }
         int chatLineId = allocateChatLineId();
         GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
         chat.printChatMessageWithOptionalDeletion(
-                buildNpcSpeech(channel, npcId, npcName,
-                        texturePath, message,
-                        System.currentTimeMillis()),
-                chatLineId);
-        noteLinePrinted(minecraft, chat, chatLineId, channel, false);
+                buildSystemLine(message, channel,
+                        System.currentTimeMillis()), chatLineId);
+        ChatTab tab = ChatTab.of(channel);
+        ClientChatChannelViews.record(chatLineId, tab,
+                ClientChatChannelState.getSelected(), false);
+        ClientChatChannelViews.onLinesAdded(tab,
+                LostTalesChatOverlayRenderer.countLeadingLines(
+                        chat, chatLineId));
+        if (channel == ChatChannel.CONSOLE && chat.getChatOpen()) {
+            frontConsole();
+        }
         return true;
     }
 
-    static IChatComponent buildNpcSpeech(ChatChannel channel, UUID npcId,
+    /**
+     * Console output while the screen is open brings the console tab to
+     * the front of its window, so the player sees it. In the window the
+     * player is typing in that means selecting it; in another window the
+     * input stays where it is and only the tab comes forward.
+     */
+    private static void frontConsole() {
+        ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
+        ChatWindow window = ChatWindowLayout.windowOf(console);
+        if (window == null) {
+            return;
+        }
+        ChatWindow current = ChatWindowLayout.windowOf(
+                ClientChatChannelState.getSelected());
+        if (window == current) {
+            ClientChatChannelState.select(console);
+        } else {
+            ChatWindowLayout.setActiveTab(console);
+        }
+    }
+
+    /**
+     * {@code Channel: [HH:mm] } ahead of the server's own component, with
+     * the anchor that lets continuation lines indent under the text.
+     */
+    static IChatComponent buildSystemLine(IChatComponent message,
+                                          ChatChannel channel,
+                                          long timestampMillis) {
+        ChatComponentText root = new ChatComponentText("");
+        appendChannelPrefix(root, ChatTab.of(channel),
+                ClientChatChannelState.displayColor(channel));
+        appendTimestamp(root, timestampMillis);
+        root.appendSibling(ChatLayoutMarker.anchor());
+        root.appendSibling(message);
+        return root;
+    }
+
+    /**
+     * Prints an LOTR NPC speech line styled like a player message. The
+     * honey name keeps LOTR's yellow-name convention within the palette;
+     * the title colour is the plain body ivory so the un-clickable NPC
+     * name does not tint the message text that follows it.
+     */
+    public static boolean receiveNpcSpeech(ChatTab tab, UUID npcId,
+                                           String npcName,
+                                           String texturePath,
+                                           String message) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (tab == null || npcId == null || npcName == null
+                || npcName.length() == 0 || message == null
+                || message.length() == 0 || minecraft == null
+                || minecraft.ingameGUI == null) {
+            return false;
+        }
+        if (tab.isWhisper()
+                && ChatWindowLayout.openTab(tab, windowIdOfSelection())
+                        == null) {
+            return false;
+        }
+        int chatLineId = allocateChatLineId();
+        GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
+        chat.printChatMessageWithOptionalDeletion(
+                buildNpcSpeech(tab, npcId, npcName,
+                        texturePath, message,
+                        System.currentTimeMillis()),
+                chatLineId);
+        noteLinePrinted(minecraft, chat, chatLineId, tab, false);
+        return true;
+    }
+
+    static IChatComponent buildNpcSpeech(ChatTab tab, UUID npcId,
                                          String npcName,
                                          String texturePath,
                                          String message,
                                          long timestampMillis) {
         ChatComponentText root = new ChatComponentText("");
-        appendChannelPrefix(root, channel, channel.getDisplayColor());
+        appendChannelPrefix(root, tab, tab.getChannel().getDisplayColor());
         appendTimestamp(root, timestampMillis);
         root.appendSibling(ChatLayoutMarker.anchor());
         int nameColor = LostTalesColors.rgb(LostTalesColors.HONEY);
@@ -308,10 +487,10 @@ public final class LostTalesChatPresentation {
      * routes faction chat to members.
      */
     private static void appendChannelPrefix(ChatComponentText root,
-                                            ChatChannel channel,
+                                            ChatTab tab,
                                             int channelColor) {
         root.appendSibling(ChatChannelPrefixMarker.apply(
-                text(ClientChatChannelState.displayName(channel),
+                text(ClientChatChannelState.displayName(tab),
                         nearestFormatting(channelColor), false),
                 channelColor));
         root.appendSibling(ChatChannelPrefixMarker.apply(

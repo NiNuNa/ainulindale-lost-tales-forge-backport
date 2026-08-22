@@ -256,11 +256,10 @@ final class LostTalesChatHoverCard {
             return null;
         }
         try {
-            List<ChatLine> lines =
-                    LostTalesChatOverlayRenderer.getViewLines(chat);
             LostTalesChatOverlayRenderer.Band band =
                     LostTalesChatOverlayRenderer.bandAt(
                             minecraft, mouseX, mouseY);
+            List<ChatLine> lines = band == null ? null : band.lines;
             if (band == null || lines == null
                     || band.viewIndex >= lines.size()
                     || lines.get(band.viewIndex) == null) {
@@ -296,8 +295,6 @@ final class LostTalesChatHoverCard {
                 }
                 cursor += partWidth;
             }
-        } catch (IllegalAccessException ignored) {
-            return null;
         } catch (RuntimeException ignored) {
             return null;
         }
@@ -345,12 +342,11 @@ final class LostTalesChatHoverCard {
                     identity = LostTalesChatVisualStyle.removeColorCodes(
                             part.getUnformattedTextForChat()).trim();
                     account = replyAccount(part);
-                } else if (afterHead && title.length() == 0
-                        && identity.length() == 0
-                        && part.getUnformattedTextForChat()
-                        .startsWith("[")) {
-                    title = LostTalesChatVisualStyle.removeColorCodes(
-                            part.getUnformattedTextForChat()).trim();
+                    continue;
+                }
+                ChatTitleMarker.Data titleData = ChatTitleMarker.decode(part);
+                if (titleData != null && afterHead) {
+                    title = titleData.epithet.trim();
                 }
             }
         }

@@ -54,10 +54,33 @@ public final class LostTalesChatService {
     public static void send(EntityPlayerMP sender,
                             ChatChannel channel, String message,
                             List<ChatShareReference> references) {
+        send(sender, channel, message, references, "");
+    }
+
+    /**
+     * As above, with the account name a whisper is for. A whisper goes
+     * to the sender and that one online player, each told who the other
+     * party is; an unknown name is refused with a notice.
+     */
+    public static void send(EntityPlayerMP sender,
+                            ChatChannel channel, String message,
+                            List<ChatShareReference> references,
+                            String target) {
         if (sender == null || sender.worldObj == null
                 || sender.worldObj.isRemote || channel == null
                 || !ChatMessageValidator.isValid(message)) {
             return;
+        }
+        EntityPlayerMP whisperTarget = null;
+        if (channel.getRecipientRule() == ChatRecipientRule.WHISPER) {
+            whisperTarget = findOnlinePlayer(target);
+            if (whisperTarget == null || whisperTarget == sender) {
+                sender.addChatMessage(new ChatComponentTranslation(
+                        whisperTarget == sender
+                                ? "chat.losttales.whisper.self"
+                                : "chat.losttales.whisper.unavailable"));
+                return;
+            }
         }
 
         RoleplayCharacter character = CharacterActiveResolver.get(sender);
@@ -121,17 +144,61 @@ public final class LostTalesChatService {
                 message, System.currentTimeMillis(),
                 channel.getIdentityType() == ChatIdentityType.CHARACTER
                         && character != null ? character.getSkinId() : "",
-                showcases);
+                showcases,
+                channel.getIdentityType() == ChatIdentityType.CHARACTER
+                        ? presentation.factionName : "");
 
-        FMLLog.info("[losttales/chat/%s] <%s (%s)> %s%s",
+        FMLLog.info("[losttales/chat/%s] <%s (%s)> %s%s%s",
                 channel.getId(), identityName, accountName, message,
+                whisperTarget == null ? ""
+                        : " -> " + whisperTarget.getCommandSenderName(),
                 showcases.isEmpty() ? ""
                         : " [shared: " + showcases.size() + "]");
 
+        if (whisperTarget != null) {
+            // Each side is told who the other party is.
+            LostTalesNetworkHandler.CHANNEL.sendTo(withPartner(packet,
+                    whisperTarget.getCommandSenderName()), sender);
+            LostTalesNetworkHandler.CHANNEL.sendTo(withPartner(packet,
+                    accountName), whisperTarget);
+            return;
+        }
         for (EntityPlayerMP recipient : resolveRecipients(
                 sender, channel, party, factionId)) {
             LostTalesNetworkHandler.CHANNEL.sendTo(packet, recipient);
         }
+    }
+
+    private static LostTalesChatMessagePacket withPartner(
+            LostTalesChatMessagePacket packet, String partner) {
+        return new LostTalesChatMessagePacket(packet.getChannel(),
+                packet.getSenderId(), packet.getIdentityName(),
+                packet.getAccountName(), packet.getTitle(),
+                packet.getTitleColor(), packet.getNameColor(),
+                packet.getMessage(), packet.getTimestampMillis(),
+                packet.getSkinId(), packet.getShowcases(),
+                packet.getFactionName(), partner);
+    }
+
+    /** The online player with that account name, case-insensitively. */
+    private static EntityPlayerMP findOnlinePlayer(String name) {
+        MinecraftServer server = MinecraftServer.getServer();
+        String wanted = name == null ? "" : name.trim();
+        if (wanted.length() == 0 || server == null
+                || server.getConfigurationManager() == null
+                || server.getConfigurationManager().playerEntityList == null) {
+            return null;
+        }
+        @SuppressWarnings("unchecked")
+        List<EntityPlayerMP> online =
+                server.getConfigurationManager().playerEntityList;
+        for (EntityPlayerMP candidate : online) {
+            if (candidate != null && wanted.equalsIgnoreCase(
+                    candidate.getCommandSenderName())) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     /**
@@ -293,7 +360,9 @@ public final class LostTalesChatService {
             }
             if (channel.getRecipientRule() == ChatRecipientRule.GLOBAL) {
                 result.add(candidate);
-            } else if (channel.getRecipientRule() == ChatRecipientRule.SELF) {
+            } else if (channel.getRecipientRule() == ChatRecipientRule.SELF
+                    || channel.getRecipientRule()
+                    == ChatRecipientRule.WHISPER) {
                 if (candidate == sender) {
                     result.add(candidate);
                 }

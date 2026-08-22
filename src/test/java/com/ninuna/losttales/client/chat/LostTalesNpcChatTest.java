@@ -25,7 +25,7 @@ public final class LostTalesNpcChatTest {
         try {
             UUID npcId = UUID.randomUUID();
             IChatComponent line = LostTalesChatPresentation.buildNpcSpeech(
-                    ChatChannel.PROXIMITY, npcId, "Grey Wanderer",
+                    ChatTab.whisper("Grey Wanderer"), npcId, "Grey Wanderer",
                     "lotr:mob/wanderer.png",
                     "Good day to you! :smile:", 123456789L);
 
@@ -44,7 +44,8 @@ public final class LostTalesNpcChatTest {
             }
 
             String rendered = plainText.toString();
-            assertTrue(rendered.startsWith("Proximity: ["));
+            // NPC speech is a whisper from the NPC: its tab bears its name.
+            assertTrue(rendered.startsWith("Grey Wanderer: ["));
             assertTrue(rendered.contains("] <"));
             assertTrue(rendered.contains("Grey Wanderer> Good day"));
             assertNotNull(marker);

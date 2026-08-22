@@ -10,48 +10,86 @@ import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.util.EnumChatFormatting;
 
 /**
- * Session-local selected channel with deterministic availability fallback.
+ * Session-local selected tab with deterministic availability fallback.
  * A channel can be <em>viewable</em> without being <em>sendable</em>: Global
  * is always readable because achievements and other vanilla lines live in
  * its tab, but only an active role-playing character may talk there. The
- * server enforces the same rule; this only keeps the client honest.
+ * server enforces the same rule; this only keeps the client honest. The
+ * selection is also kept to tabs that are open in the
+ * {@link ChatWindowLayout}: a closed channel cannot be the input target,
+ * and {@code TAB} cycles through the tabs of the selected tab's own
+ * window. Whisper tabs are always available and always sendable: they
+ * use the account identity.
  */
 public final class ClientChatChannelState {
     /** How often an unavailable faction-name lookup is retried. */
     private static final long FACTION_NAME_RETRY_NANOS = 5000L * 1000000L;
 
-    private static ChatChannel selected = ChatChannel.ALL;
+    private static ChatTab selected = ChatTab.of(ChatChannel.ALL);
     private static String cachedFactionId = "";
     private static String cachedFactionName = "";
     private static long cachedFactionNanos;
     /** Server-stated operator status; the Admin tab exists only with it. */
     private static boolean adminAccess;
     /** Unsent input kept across closing and reopening the chat screen. */
-    private static String draft = "";
+    /** Unsent text per tab, oldest first; bounded, whispers included. */
+    private static final Map<ChatTab, String> DRAFTS =
+            new LinkedHashMap<ChatTab, String>();
+    private static final int MAX_DRAFTS = 64;
 
     private ClientChatChannelState() {}
 
-    public static synchronized ChatChannel getSelected() {
+    public static synchronized ChatTab getSelected() {
         ensureAvailable();
         return selected;
     }
 
-    public static synchronized void select(ChatChannel channel) {
-        selected = isAvailable(channel) ? channel : fallbackChannel();
+    public static synchronized ChatChannel getSelectedChannel() {
+        return getSelected().getChannel();
     }
 
-    public static synchronized ChatChannel cycle() {
-        List<ChatChannel> available = getAvailableChannels();
-        int index = available.indexOf(getSelected());
-        selected = available.get((index + 1) % available.size());
+    public static synchronized void select(ChatTab tab) {
+        selected = isSelectable(tab) ? tab : fallbackTab();
+    }
+
+    public static synchronized void select(ChatChannel channel) {
+        select(ChatTab.of(channel));
+    }
+
+    /**
+     * Next available tab of the selected tab's window, in row order; a
+     * selection without a window cycles every open tab.
+     */
+    public static synchronized ChatTab cycle() {
+        ChatTab current = getSelected();
+        ChatWindow window = ChatWindowLayout.windowOf(current);
+        List<ChatTab> order = new ArrayList<ChatTab>();
+        if (window != null) {
+            for (ChatTab tab : window.getTabs()) {
+                if (isAvailable(tab)) {
+                    order.add(tab);
+                }
+            }
+        }
+        if (order.isEmpty()) {
+            order = getOpenTabs();
+        }
+        if (order.isEmpty()) {
+            order.add(ChatTab.of(ChatChannel.ALL));
+        }
+        int index = order.indexOf(current);
+        selected = order.get((index + 1) % order.size());
         return selected;
     }
 
-    /** Available channels in presentation order (tabs, indicator, cycle). */
+    /** Available channels in presentation order (plain tabs only). */
     public static synchronized List<ChatChannel> getAvailableChannels() {
         ArrayList<ChatChannel> result = new ArrayList<ChatChannel>();
         for (ChatChannel channel : ChatChannel.presentationOrder()) {
@@ -62,10 +100,47 @@ public final class ClientChatChannelState {
         return Collections.unmodifiableList(result);
     }
 
-    public static synchronized void ensureAvailable() {
-        if (!isAvailable(selected)) {
-            selected = fallbackChannel();
+    /**
+     * Available tabs that are open in some window, in window and tab
+     * order.
+     */
+    public static synchronized List<ChatTab> getOpenTabs() {
+        ArrayList<ChatTab> result = new ArrayList<ChatTab>();
+        for (ChatTab tab : ChatWindowLayout.order()) {
+            if (isAvailable(tab)) {
+                result.add(tab);
+            }
         }
+        return result;
+    }
+
+    /** The channels of the open, available tabs, in window and tab order. */
+    public static synchronized List<ChatChannel> getOpenChannels() {
+        ArrayList<ChatChannel> result = new ArrayList<ChatChannel>();
+        for (ChatTab tab : getOpenTabs()) {
+            result.add(tab.getChannel());
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    public static synchronized void ensureAvailable() {
+        if (!isSelectable(selected)) {
+            selected = fallbackTab();
+        }
+    }
+
+    /** Available to this player and open in a window. */
+    public static synchronized boolean isSelectable(ChatTab tab) {
+        return isAvailable(tab) && ChatWindowLayout.isOpen(tab);
+    }
+
+    public static synchronized boolean isSelectable(ChatChannel channel) {
+        return isSelectable(ChatTab.of(channel));
+    }
+
+    /** Whether the tab's history is readable and its tab shown. */
+    public static synchronized boolean isAvailable(ChatTab tab) {
+        return tab != null && isAvailable(tab.getChannel());
     }
 
     /** Whether the channel's tab is shown and its history readable. */
@@ -74,10 +149,15 @@ public final class ClientChatChannelState {
             return false;
         }
         if (channel == ChatChannel.ALL || channel == ChatChannel.OOC
-                || channel == ChatChannel.CONSOLE) {
+                || channel == ChatChannel.CONSOLE
+                || channel == ChatChannel.WHISPER) {
             return true;
         }
         return canSend(channel);
+    }
+
+    public static synchronized boolean canSend(ChatTab tab) {
+        return tab != null && canSend(tab.getChannel());
     }
 
     /** Whether the local player may currently send into the channel. */
@@ -87,6 +167,9 @@ public final class ClientChatChannelState {
         }
         if (channel == ChatChannel.ADMIN) {
             return adminAccess;
+        }
+        if (channel == ChatChannel.WHISPER) {
+            return true;
         }
         CharacterSummary active = activeCharacter();
         if (channel.getIdentityType() == ChatIdentityType.CHARACTER
@@ -108,6 +191,10 @@ public final class ClientChatChannelState {
                         snapshot.getActiveCharacterId());
     }
 
+    public static synchronized int displayColor(ChatTab tab) {
+        return tab == null ? 0xFFFFFF : displayColor(tab.getChannel());
+    }
+
     public static synchronized int displayColor(ChatChannel channel) {
         if (channel != ChatChannel.FACTION) {
             return channel == null ? 0xFFFFFF : channel.getDisplayColor();
@@ -117,6 +204,15 @@ public final class ClientChatChannelState {
                 : LotrCharacterAdapter.getInstance().getFactionColor(
                         active.getStartingFactionId(),
                         channel.getDisplayColor());
+    }
+
+    /** Visible label for a tab: the partner's name for a whisper. */
+    public static synchronized String displayName(ChatTab tab) {
+        if (tab == null) {
+            return "";
+        }
+        return tab.isWhisper() ? tab.getPartner()
+                : displayName(tab.getChannel());
     }
 
     /**
@@ -167,22 +263,49 @@ public final class ClientChatChannelState {
         return adminAccess;
     }
 
-    /** Remembers unsent input so closing the screen does not lose it. */
+    /**
+     * Remembers the selected tab's unsent input so closing the screen or
+     * switching tabs does not lose it.
+     */
     public static synchronized void setDraft(String text) {
-        draft = text == null ? "" : text;
+        setDraft(selected, text);
+    }
+
+    /** Remembers a tab's unsent input; empty text forgets it. */
+    public static synchronized void setDraft(ChatTab tab, String text) {
+        if (tab == null) {
+            return;
+        }
+        String value = text == null ? "" : text;
+        if (value.length() == 0) {
+            DRAFTS.remove(tab);
+            return;
+        }
+        if (!DRAFTS.containsKey(tab) && DRAFTS.size() >= MAX_DRAFTS) {
+            Iterator<ChatTab> oldest = DRAFTS.keySet().iterator();
+            oldest.next();
+            oldest.remove();
+        }
+        DRAFTS.put(tab, value);
     }
 
     public static synchronized String getDraft() {
-        return draft;
+        return getDraft(selected);
+    }
+
+    /** A tab's unsent input; empty when it has none. */
+    public static synchronized String getDraft(ChatTab tab) {
+        String value = tab == null ? null : DRAFTS.get(tab);
+        return value == null ? "" : value;
     }
 
     public static synchronized void clear() {
-        selected = ChatChannel.ALL;
+        selected = ChatTab.of(ChatChannel.ALL);
         cachedFactionId = "";
         cachedFactionName = "";
         cachedFactionNanos = 0L;
         adminAccess = false;
-        draft = "";
+        DRAFTS.clear();
     }
 
     private static CharacterSummary activeCharacter() {
@@ -191,8 +314,31 @@ public final class ClientChatChannelState {
         return roster == null ? null : roster.getActiveCharacter();
     }
 
-    /** Without a character the player lands where they can actually talk. */
-    private static ChatChannel fallbackChannel() {
-        return canSend(ChatChannel.ALL) ? ChatChannel.ALL : ChatChannel.OOC;
+    /**
+     * Without a character the player lands where they can actually talk:
+     * Global when it is open and sendable, else OOC when open (account
+     * conversation, always sendable), else the first open tab they can
+     * send to, else the first open readable one; with nothing open at
+     * all, the catalogue default.
+     */
+    private static ChatTab fallbackTab() {
+        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        if (isSelectable(global) && canSend(global)) {
+            return global;
+        }
+        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
+        if (isSelectable(ooc)) {
+            return ooc;
+        }
+        List<ChatTab> open = getOpenTabs();
+        for (ChatTab tab : open) {
+            if (canSend(tab)) {
+                return tab;
+            }
+        }
+        if (!open.isEmpty()) {
+            return open.get(0);
+        }
+        return canSend(ChatChannel.ALL) ? global : ooc;
     }
 }

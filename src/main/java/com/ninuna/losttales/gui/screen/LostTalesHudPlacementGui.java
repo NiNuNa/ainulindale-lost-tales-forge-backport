@@ -1,5 +1,8 @@
 package com.ninuna.losttales.gui.screen;
 
+import com.ninuna.losttales.client.chat.ChatWindow;
+import com.ninuna.losttales.client.chat.ChatWindowLayout;
+import com.ninuna.losttales.client.chat.ChatWindowPlacement;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
@@ -8,10 +11,22 @@ import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
 import com.ninuna.losttales.gui.hud.mapmarker.LostTalesMapMarkerHudRenderer;
 import com.ninuna.losttales.gui.hud.party.PartyHudLayout;
 import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
 
-/** Direct-manipulation editor for every movable Lost Tales HUD panel. */
+/**
+ * Direct-manipulation editor for every movable Lost Tales HUD panel. The
+ * fixed panels read and write their percent offsets in the config; every
+ * chat window, and the feed the closed chat shows, are elements too,
+ * reading and writing the very same {@link ChatWindowLayout} positions
+ * the in-game chat draws them at, and drag in fractional pixels like a
+ * window does in the chat. A locked chat
+ * window is shown but cannot be moved here: the lock is the chat's own
+ * and this editor offers no override for it.
+ */
 public class LostTalesHudPlacementGui extends GuiScreen {
     private static final int GRID_MINOR_SPACING = 10;
     private static final int GRID_MAJOR_SPACING = 50;
@@ -20,10 +35,11 @@ public class LostTalesHudPlacementGui extends GuiScreen {
     private static final int KEYBOARD_FAST_NUDGE = 10;
 
     private final GuiScreen parent;
-    private HudElement selected;
+    private final List<Placeable> elements = new ArrayList<Placeable>();
+    private Placeable selected;
     private boolean dragging;
-    private int dragOffsetX;
-    private int dragOffsetY;
+    private double dragOffsetX;
+    private double dragOffsetY;
     private boolean snappedToCenterX;
     private boolean snappedToCenterY;
 
@@ -37,6 +53,29 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         this.dragging = false;
         this.snappedToCenterX = false;
         this.snappedToCenterY = false;
+        rebuildElements();
+    }
+
+    /** The fixed panels, the closed-chat feed, then every chat window. */
+    private void rebuildElements() {
+        Placeable previous = this.selected;
+        this.elements.clear();
+        for (HudElement element : HudElement.values()) {
+            this.elements.add(element);
+        }
+        this.elements.add(new ChatFeedElement());
+        List<ChatWindow> windows = ChatWindowLayout.windows();
+        for (int index = 0; index < windows.size(); index++) {
+            this.elements.add(new ChatWindowElement(windows.get(index)));
+        }
+        this.selected = null;
+        if (previous != null) {
+            for (Placeable element : this.elements) {
+                if (element.sameAs(previous)) {
+                    this.selected = element;
+                }
+            }
+        }
     }
 
     @Override
@@ -46,11 +85,13 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             return;
         }
         if (keyCode == Keyboard.KEY_TAB) {
-            this.selected = this.selected == null
-                    ? HudElement.COMPASS : this.selected.next();
+            int index = this.selected == null ? -1
+                    : this.elements.indexOf(this.selected);
+            this.selected = this.elements.isEmpty() ? null
+                    : this.elements.get((index + 1) % this.elements.size());
             return;
         }
-        if (this.selected == null) {
+        if (this.selected == null || this.selected.isLocked()) {
             return;
         }
 
@@ -70,15 +111,23 @@ public class LostTalesHudPlacementGui extends GuiScreen {
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) {
         if (mouseButton == 0) {
-            HudElement clicked = getElementAt(mouseX, mouseY);
+            Placeable clicked = getElementAt(mouseX, mouseY);
             this.selected = clicked;
-            this.dragging = clicked != null;
+            this.dragging = clicked != null && !clicked.isLocked();
             this.snappedToCenterX = false;
             this.snappedToCenterY = false;
             if (clicked != null) {
-                HudPlacementLayout.Bounds bounds = getBounds(clicked);
-                this.dragOffsetX = mouseX - bounds.x;
-                this.dragOffsetY = mouseY - bounds.y;
+                if (clicked.precise()) {
+                    ChatWindowPlacement.Box box = clicked.preciseBounds(this);
+                    this.dragOffsetX = ChatWindowPlacement.preciseMouseX(
+                            this.mc, this.width) - box.x;
+                    this.dragOffsetY = ChatWindowPlacement.preciseMouseY(
+                            this.mc, this.height) - box.y;
+                } else {
+                    HudPlacementLayout.Bounds bounds = getBounds(clicked);
+                    this.dragOffsetX = mouseX - bounds.x;
+                    this.dragOffsetY = mouseY - bounds.y;
+                }
                 return;
             }
         }
@@ -90,12 +139,16 @@ public class LostTalesHudPlacementGui extends GuiScreen {
                                   int clickedMouseButton,
                                   long timeSinceLastClick) {
         if (this.dragging && clickedMouseButton == 0
-                && this.selected != null) {
+                && this.selected != null && !this.selected.isLocked()) {
+            if (this.selected.precise()) {
+                dragPrecise();
+                return;
+            }
             HudPlacementLayout.Bounds bounds = getBounds(this.selected);
             HudPlacementLayout.DragResult position =
                     HudPlacementLayout.constrainDrag(
-                            mouseX - this.dragOffsetX,
-                            mouseY - this.dragOffsetY,
+                            mouseX - (int)Math.round(this.dragOffsetX),
+                            mouseY - (int)Math.round(this.dragOffsetY),
                             bounds.width,
                             bounds.height,
                             this.width,
@@ -110,20 +163,38 @@ public class LostTalesHudPlacementGui extends GuiScreen {
                 timeSinceLastClick);
     }
 
+    /** Chat elements follow the raw mouse in fractional pixels. */
+    private void dragPrecise() {
+        ChatWindowPlacement.Box box = this.selected.preciseBounds(this);
+        HudPlacementLayout.PreciseDragResult position =
+                HudPlacementLayout.constrainDrag(
+                        ChatWindowPlacement.preciseMouseX(this.mc, this.width)
+                                - this.dragOffsetX,
+                        ChatWindowPlacement.preciseMouseY(this.mc, this.height)
+                                - this.dragOffsetY,
+                        box.width, box.height, this.width, this.height,
+                        CENTER_SNAP_THRESHOLD);
+        this.snappedToCenterX = position.snappedX;
+        this.snappedToCenterY = position.snappedY;
+        this.selected.moveTo(position.x, position.y, this);
+    }
+
     @Override
     protected void mouseMovedOrUp(int mouseX, int mouseY, int mouseButton) {
         if (mouseButton == 0 && this.dragging) {
             this.dragging = false;
             this.snappedToCenterX = false;
             this.snappedToCenterY = false;
-            LostTalesConfig.save();
+            if (this.selected != null) {
+                this.selected.persist();
+            }
         }
         super.mouseMovedOrUp(mouseX, mouseY, mouseButton);
     }
 
     @Override
     public void onGuiClosed() {
-        LostTalesConfig.save();
+        persistAll();
         super.onGuiClosed();
     }
 
@@ -132,8 +203,8 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         drawDefaultBackground();
         drawPlacementGrid();
 
-        HudElement hovered = getElementAt(mouseX, mouseY);
-        for (HudElement element : HudElement.values()) {
+        Placeable hovered = getElementAt(mouseX, mouseY);
+        for (Placeable element : this.elements) {
             if (element != this.selected) {
                 drawPreviewBox(element, element == hovered);
             }
@@ -215,7 +286,7 @@ public class LostTalesHudPlacementGui extends GuiScreen {
                 this.width / 2, 9, 0xFFD37A);
     }
 
-    private void drawPreviewBox(HudElement element, boolean hovered) {
+    private void drawPreviewBox(Placeable element, boolean hovered) {
         HudPlacementLayout.Bounds bounds = getBounds(element);
         boolean isSelected = element == this.selected;
         int fill = isSelected
@@ -226,11 +297,16 @@ public class LostTalesHudPlacementGui extends GuiScreen {
                 bounds.x + bounds.width, bounds.y + bounds.height, fill);
         drawBorder(bounds, border, isSelected ? 2 : 1);
 
+        String label = element.displayName();
+        if (element.isLocked()) {
+            label = StatCollector.translateToLocalFormatted(
+                    "gui.losttales.hud.placement.locked", label);
+        }
         int textY = bounds.y
                 + Math.max(2,
                 (bounds.height - this.fontRendererObj.FONT_HEIGHT) / 2);
         this.fontRendererObj.drawStringWithShadow(
-                element.displayName,
+                label,
                 bounds.x + 5,
                 textY,
                 isSelected ? 0xFFD37A : 0xFFFFFF);
@@ -248,14 +324,13 @@ public class LostTalesHudPlacementGui extends GuiScreen {
                 bounds.x + bounds.width, bounds.y + bounds.height, color);
     }
 
-    private HudElement getElementAt(int mouseX, int mouseY) {
+    private Placeable getElementAt(int mouseX, int mouseY) {
         if (this.selected != null
                 && contains(getBounds(this.selected), mouseX, mouseY)) {
             return this.selected;
         }
-        HudElement[] elements = HudElement.values();
-        for (int index = elements.length - 1; index >= 0; index--) {
-            HudElement element = elements[index];
+        for (int index = this.elements.size() - 1; index >= 0; index--) {
+            Placeable element = this.elements.get(index);
             if (element != this.selected
                     && contains(getBounds(element), mouseX, mouseY)) {
                 return element;
@@ -271,6 +346,16 @@ public class LostTalesHudPlacementGui extends GuiScreen {
     }
 
     private void nudgeSelected(int dx, int dy) {
+        if (this.selected.precise()) {
+            ChatWindowPlacement.Box box = this.selected.preciseBounds(this);
+            HudPlacementLayout.PreciseDragResult position =
+                    HudPlacementLayout.constrainDrag(
+                            box.x + dx, box.y + dy, box.width, box.height,
+                            this.width, this.height, 0);
+            this.selected.moveTo(position.x, position.y, this);
+            this.selected.persist();
+            return;
+        }
         HudPlacementLayout.Bounds bounds = getBounds(this.selected);
         HudPlacementLayout.DragResult position =
                 HudPlacementLayout.constrainDrag(
@@ -278,10 +363,10 @@ public class LostTalesHudPlacementGui extends GuiScreen {
                         bounds.width, bounds.height,
                         this.width, this.height, 0);
         applyPosition(this.selected, position.x, position.y, bounds);
-        LostTalesConfig.save();
+        this.selected.persist();
     }
 
-    private void applyPosition(HudElement element, int x, int y,
+    private void applyPosition(Placeable element, int x, int y,
                                HudPlacementLayout.Bounds bounds) {
         double offsetX = HudPlacementLayout.percentForPosition(
                 x, this.width, bounds.width,
@@ -289,16 +374,20 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         double offsetY = HudPlacementLayout.percentForPosition(
                 y, this.height, bounds.height,
                 element.verticalMode(), element.pixelOffsetY(this));
-        LostTalesConfig.updateHudOffset(
-                element.configKey, offsetX, offsetY);
+        element.apply(offsetX, offsetY);
     }
 
-    private HudPlacementLayout.Bounds getBounds(HudElement element) {
+    private HudPlacementLayout.Bounds getBounds(Placeable element) {
+        if (element.precise()) {
+            ChatWindowPlacement.Box box = element.preciseBounds(this);
+            return HudPlacementLayout.bounds((int)Math.floor(box.x),
+                    (int)Math.floor(box.y), box.width, box.height);
+        }
         return HudPlacementLayout.calculate(
                 this.width,
                 this.height,
-                element.width(),
-                element.height(),
+                element.width(this),
+                element.height(this),
                 element.offsetX(),
                 element.offsetY(),
                 element.horizontalMode(),
@@ -307,8 +396,13 @@ public class LostTalesHudPlacementGui extends GuiScreen {
                 element.pixelOffsetY(this));
     }
 
-    private void closeEditor() {
+    private void persistAll() {
         LostTalesConfig.save();
+        ChatWindowLayout.persist();
+    }
+
+    private void closeEditor() {
+        persistAll();
         this.mc.displayGuiScreen(this.parent);
     }
 
@@ -317,7 +411,196 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         return false;
     }
 
-    private enum HudElement {
+    /**
+     * One movable box: where it is, how big, and where that is stored.
+     * Config panels use the integer percent layout; chat elements are
+     * <em>precise</em> and supply fractional boxes of their own.
+     */
+    private interface Placeable {
+        String displayName();
+        int width(LostTalesHudPlacementGui gui);
+        int height(LostTalesHudPlacementGui gui);
+        double offsetX();
+        double offsetY();
+        HudPlacementLayout.CoordinateMode horizontalMode();
+        HudPlacementLayout.CoordinateMode verticalMode();
+        int pixelOffsetX();
+        int pixelOffsetY(LostTalesHudPlacementGui gui);
+        boolean isLocked();
+        /** Live update while dragging; nothing is written yet. */
+        void apply(double offsetX, double offsetY);
+        /** Writes the position out. */
+        void persist();
+        boolean sameAs(Placeable other);
+        /** Whether the element positions itself in fractional pixels. */
+        boolean precise();
+        ChatWindowPlacement.Box preciseBounds(LostTalesHudPlacementGui gui);
+        /** Live fractional move of the top-left corner. */
+        void moveTo(double x, double y, LostTalesHudPlacementGui gui);
+    }
+
+    /** Shared no-op answers for the two element families. */
+    private abstract static class ChatElement implements Placeable {
+        @Override
+        public int width(LostTalesHudPlacementGui gui) {
+            return preciseBounds(gui).width;
+        }
+
+        @Override
+        public int height(LostTalesHudPlacementGui gui) {
+            return preciseBounds(gui).height;
+        }
+
+        @Override
+        public HudPlacementLayout.CoordinateMode horizontalMode() {
+            return HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT;
+        }
+
+        @Override
+        public HudPlacementLayout.CoordinateMode verticalMode() {
+            return HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT;
+        }
+
+        @Override
+        public int pixelOffsetX() {
+            return 0;
+        }
+
+        @Override
+        public int pixelOffsetY(LostTalesHudPlacementGui gui) {
+            return 0;
+        }
+
+        @Override
+        public boolean precise() {
+            return true;
+        }
+
+        @Override
+        public void persist() {
+            ChatWindowLayout.persist();
+        }
+    }
+
+    /** A chat window, positioned through the chat's own layout. */
+    private static final class ChatWindowElement extends ChatElement {
+        private final ChatWindow window;
+
+        ChatWindowElement(ChatWindow window) {
+            this.window = window;
+        }
+
+        @Override
+        public String displayName() {
+            return ChatWindowPlacement.displayName(this.window);
+        }
+
+        @Override
+        public double offsetX() {
+            return this.window.getOffsetX();
+        }
+
+        @Override
+        public double offsetY() {
+            return this.window.getOffsetY();
+        }
+
+        @Override
+        public boolean isLocked() {
+            return this.window.isLocked();
+        }
+
+        @Override
+        public void apply(double offsetX, double offsetY) {
+            ChatWindowLayout.setPosition(this.window.getId(), offsetX,
+                    offsetY, false);
+        }
+
+        @Override
+        public ChatWindowPlacement.Box preciseBounds(
+                LostTalesHudPlacementGui gui) {
+            return ChatWindowPlacement.windowBounds(this.window, gui.mc,
+                    gui.width, gui.height);
+        }
+
+        @Override
+        public void moveTo(double x, double y, LostTalesHudPlacementGui gui) {
+            // The box moves by its top-left; the window is anchored by
+            // its baseline, which sits a bar's height above the bottom.
+            // The other windows are walls here as they are in the chat,
+            // and moving the window on its own breaks the link it had.
+            ChatWindowLayout.unlink(this.window.getId());
+            ChatWindowPlacement.Box box = preciseBounds(gui);
+            ChatWindowPlacement.Anchor anchor =
+                    ChatWindowPlacement.constrainWindow(this.window, gui.mc,
+                            x, y + box.height - box.barHeight,
+                            gui.width, gui.height,
+                            ChatWindowPlacement.wallsExcept(this.window,
+                                    gui.mc, gui.width, gui.height));
+            apply(ChatWindowPlacement.windowPercentX(anchor.x, gui.mc,
+                            gui.width),
+                    ChatWindowPlacement.windowPercentY(anchor.baseline,
+                            gui.mc, gui.height));
+        }
+
+        @Override
+        public boolean sameAs(Placeable other) {
+            return other instanceof ChatWindowElement
+                    && ((ChatWindowElement)other).window.getId().equals(
+                            this.window.getId());
+        }
+    }
+
+    /** The closed-chat feed, positioned through the chat's own layout. */
+    private static final class ChatFeedElement extends ChatElement {
+        @Override
+        public String displayName() {
+            return StatCollector.translateToLocal(
+                    "gui.losttales.hud.placement.chat_feed");
+        }
+
+        @Override
+        public double offsetX() {
+            return ChatWindowLayout.feedOffsetX();
+        }
+
+        @Override
+        public double offsetY() {
+            return ChatWindowLayout.feedOffsetY();
+        }
+
+        @Override
+        public boolean isLocked() {
+            return false;
+        }
+
+        @Override
+        public void apply(double offsetX, double offsetY) {
+            ChatWindowLayout.setFeedPosition(offsetX, offsetY, false);
+        }
+
+        @Override
+        public ChatWindowPlacement.Box preciseBounds(
+                LostTalesHudPlacementGui gui) {
+            return ChatWindowPlacement.feedBounds(gui.mc, gui.width,
+                    gui.height);
+        }
+
+        @Override
+        public void moveTo(double x, double y, LostTalesHudPlacementGui gui) {
+            ChatWindowPlacement.Box box = preciseBounds(gui);
+            apply(ChatWindowPlacement.windowPercentX(x, gui.mc, gui.width),
+                    ChatWindowPlacement.feedPercentY(y + box.height, gui.mc,
+                            gui.height));
+        }
+
+        @Override
+        public boolean sameAs(Placeable other) {
+            return other instanceof ChatFeedElement;
+        }
+    }
+
+    private enum HudElement implements Placeable {
         COMPASS("Compass", "compass"),
         PARTY("Party", "party"),
         QUICK_LOOT("Quick Loot", "quickloot"),
@@ -326,20 +609,21 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         LOCATION_DISCOVERY("Location Discovery", "mapdiscovery"),
         AREA_NAME("Area Name", "areanotice");
 
-        private final String displayName;
+        private final String label;
         private final String configKey;
 
-        HudElement(String displayName, String configKey) {
-            this.displayName = displayName;
+        HudElement(String label, String configKey) {
+            this.label = label;
             this.configKey = configKey;
         }
 
-        private HudElement next() {
-            HudElement[] elements = values();
-            return elements[(ordinal() + 1) % elements.length];
+        @Override
+        public String displayName() {
+            return this.label;
         }
 
-        private int width() {
+        @Override
+        public int width(LostTalesHudPlacementGui gui) {
             if (this == COMPASS) {
                 return LostTalesCompassHudRenderer.getPlacementWidth();
             }
@@ -363,7 +647,8 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             return LostTalesMapMarkerHudRenderer.getAreaPlacementWidth();
         }
 
-        private int height() {
+        @Override
+        public int height(LostTalesHudPlacementGui gui) {
             if (this == COMPASS) {
                 return LostTalesCompassHudRenderer.getPlacementHeight();
             }
@@ -388,7 +673,8 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             return LostTalesMapMarkerHudRenderer.getAreaPlacementHeight();
         }
 
-        private double offsetX() {
+        @Override
+        public double offsetX() {
             if (this == COMPASS) {
                 return LostTalesConfig.compassHudOffsetX;
             }
@@ -410,7 +696,8 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             return LostTalesConfig.areaNoticeHudOffsetX;
         }
 
-        private double offsetY() {
+        @Override
+        public double offsetY() {
             if (this == COMPASS) {
                 return LostTalesConfig.compassHudOffsetY;
             }
@@ -432,7 +719,8 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             return LostTalesConfig.areaNoticeHudOffsetY;
         }
 
-        private HudPlacementLayout.CoordinateMode horizontalMode() {
+        @Override
+        public HudPlacementLayout.CoordinateMode horizontalMode() {
             if (this == PARTY || this == QUICK_LOOT
                     || this == QUEST_TRACKER) {
                 return HudPlacementLayout.CoordinateMode.SCREEN_PERCENT;
@@ -441,7 +729,8 @@ public class LostTalesHudPlacementGui extends GuiScreen {
                     .AVAILABLE_SPACE_PERCENT;
         }
 
-        private HudPlacementLayout.CoordinateMode verticalMode() {
+        @Override
+        public HudPlacementLayout.CoordinateMode verticalMode() {
             if (this == COMPASS || this == PARTY || this == QUICK_LOOT
                     || this == QUEST_TRACKER) {
                 return HudPlacementLayout.CoordinateMode.SCREEN_PERCENT;
@@ -450,17 +739,57 @@ public class LostTalesHudPlacementGui extends GuiScreen {
                     .AVAILABLE_SPACE_PERCENT;
         }
 
-        private int pixelOffsetX() {
+        @Override
+        public int pixelOffsetX() {
             return 0;
         }
 
-        private int pixelOffsetY(LostTalesHudPlacementGui gui) {
+        @Override
+        public int pixelOffsetY(LostTalesHudPlacementGui gui) {
             if (this == COMPASS) {
                 return gui.fontRendererObj.FONT_HEIGHT
                         + LostTalesCompassHudRenderer
                         .MAP_MARKER_DISTANCE_LABEL_OFFSET_Y;
             }
             return 0;
+        }
+
+        @Override
+        public boolean isLocked() {
+            return false;
+        }
+
+        @Override
+        public void apply(double offsetX, double offsetY) {
+            LostTalesConfig.updateHudOffset(this.configKey, offsetX, offsetY);
+        }
+
+        @Override
+        public void persist() {
+            LostTalesConfig.save();
+        }
+
+        @Override
+        public boolean sameAs(Placeable other) {
+            return other == this;
+        }
+
+        @Override
+        public boolean precise() {
+            return false;
+        }
+
+        @Override
+        public ChatWindowPlacement.Box preciseBounds(
+                LostTalesHudPlacementGui gui) {
+            return null;
+        }
+
+        @Override
+        public void moveTo(double x, double y, LostTalesHudPlacementGui gui) {
+            HudPlacementLayout.Bounds bounds = gui.getBounds(this);
+            gui.applyPosition(this, (int)Math.round(x), (int)Math.round(y),
+                    bounds);
         }
     }
 }

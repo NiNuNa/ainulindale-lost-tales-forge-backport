@@ -6,6 +6,7 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationState;
 import com.ninuna.losttales.config.LostTalesConfig;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,16 +14,18 @@ import java.util.Map;
 import net.minecraft.client.gui.ChatLine;
 
 /**
- * Per-channel views over vanilla's single chat history. Lines stay in
- * {@code GuiNewChat}; this class only remembers which channel each Lost
- * Tales chat-line id belongs to and derives the selected channel's visible
- * subset, scroll offset, and unread counts from that. Lines without a
- * recorded channel (commands, server notices, other mods) belong to every
- * view, so nothing vanilla ever disappears. Messages are never copied.
+ * Per-tab views over vanilla's single chat history. Lines stay in
+ * {@code GuiNewChat}; this class only remembers which tab each Lost Tales
+ * chat-line id belongs to and derives a tab's visible subset, scroll
+ * offset, and unread counts from that. Lines without a recorded tab
+ * (printed on the client without passing through the chat event) belong
+ * to the console view. Messages are never copied.
  *
- * <p>The HUD overlay with chat closed still shows the combined feed; the
- * per-channel view applies while the chat screen is open, where the tabs
- * make the split visible. Scroll offsets survive closing the screen.</p>
+ * <p>A view is described by a {@link ChatLineFilter}: one tab while the
+ * chat screen is open, a window's tabs minus the muted ones for the
+ * closed-chat feed. The last few filters' results are cached so every
+ * window pays one comparison per frame. Scroll offsets are per tab and
+ * survive closing the screen.</p>
  */
 public final class ClientChatChannelViews {
     /** Above vanilla's 100-message history so every shown line is tracked. */
@@ -30,121 +33,175 @@ public final class ClientChatChannelViews {
     /** Unread counts stop climbing here; the tab shows "99+". */
     public static final int MAX_UNREAD = 99;
     /**
-     * The one tab that shows lines Lost Tales did not route: command
-     * output, fast-travel countdowns, achievements, other mods' notices.
-     * They are what only this player sees anyway, so they live in the
-     * console tab and keep the conversation tabs clean.
+     * The channel whose tab shows lines Lost Tales did not route: they
+     * are what only this player sees anyway, so they live in the console
+     * tab and keep the conversation tabs clean.
      */
     public static final ChatChannel SYSTEM_LINE_VIEW = ChatChannel.CONSOLE;
-    private static final LinkedHashMap<Integer, ChatChannel> CHANNEL_BY_LINE_ID =
-            new LinkedHashMap<Integer, ChatChannel>();
-    private static final int CHANNEL_COUNT = ChatChannel.values().length;
-    private static final int[] SCROLL = new int[CHANNEL_COUNT];
+    private static final LinkedHashMap<Integer, ChatTab> TAB_BY_LINE_ID =
+            new LinkedHashMap<Integer, ChatTab>();
+    private static final Map<ChatTab, Integer> SCROLL =
+            new HashMap<ChatTab, Integer>();
     /**
-     * Unread messages per channel, split once at arrival: a message that
+     * Unread messages per tab, split once at arrival: a message that
      * @-mentions the local player counts as a ping and nowhere else, so the
      * two counters never describe the same line twice.
      */
-    private static final int[] UNREAD_PINGS = new int[CHANNEL_COUNT];
-    private static final int[] UNREAD_OTHER = new int[CHANNEL_COUNT];
+    private static final Map<ChatTab, Integer> UNREAD_PINGS =
+            new HashMap<ChatTab, Integer>();
+    private static final Map<ChatTab, Integer> UNREAD_OTHER =
+            new HashMap<ChatTab, Integer>();
 
-    private static long viewSwitchNanos;
     private static long openedNanos;
     private static final LostTalesGuiAnimationState OPEN_STATE =
             new LostTalesGuiAnimationState();
-    private static ChatChannel lastView;
 
-    private static List<ChatLine> cachedSource;
-    private static int cachedSourceSize = -1;
-    private static ChatLine cachedFirst;
-    private static ChatChannel cachedView;
-    private static List<ChatLine> cachedVisible = Collections.emptyList();
+    /** Filters whose visible subset is kept; one per window is plenty. */
+    private static final int MAX_CACHED_FILTERS = 8;
+    private static final LinkedHashMap<ChatLineFilter, CachedView> CACHE =
+            new LinkedHashMap<ChatLineFilter, CachedView>(16, 0.75F, true);
 
     private ClientChatChannelViews() {}
 
-    /** Remembers a new Lost Tales line's channel and counts it unread elsewhere. */
-    public static synchronized void record(int chatLineId, ChatChannel channel,
-                                           ChatChannel selected,
+    /** Remembers a new Lost Tales line's tab and counts it unread elsewhere. */
+    public static synchronized void record(int chatLineId, ChatTab tab,
+                                           ChatTab selected,
                                            boolean mentionsLocalPlayer) {
-        if (channel == null) {
+        if (tab == null) {
             return;
         }
-        CHANNEL_BY_LINE_ID.put(Integer.valueOf(chatLineId), channel);
-        while (CHANNEL_BY_LINE_ID.size() > MAX_TRACKED_LINES) {
-            Iterator<Integer> iterator = CHANNEL_BY_LINE_ID.keySet().iterator();
+        TAB_BY_LINE_ID.put(Integer.valueOf(chatLineId), tab);
+        while (TAB_BY_LINE_ID.size() > MAX_TRACKED_LINES) {
+            Iterator<Integer> iterator = TAB_BY_LINE_ID.keySet().iterator();
             iterator.next();
             iterator.remove();
         }
         invalidateCache();
-        if (channel != selected) {
-            int[] counter = mentionsLocalPlayer ? UNREAD_PINGS : UNREAD_OTHER;
-            int ordinal = channel.ordinal();
-            counter[ordinal] = Math.min(MAX_UNREAD + 1, counter[ordinal] + 1);
+        if (!tab.equals(selected)) {
+            Map<ChatTab, Integer> counter = mentionsLocalPlayer
+                    ? UNREAD_PINGS : UNREAD_OTHER;
+            counter.put(tab, Integer.valueOf(
+                    Math.min(MAX_UNREAD + 1, count(counter, tab) + 1)));
         }
     }
 
+    public static synchronized void record(int chatLineId, ChatChannel channel,
+                                           ChatChannel selected,
+                                           boolean mentionsLocalPlayer) {
+        record(chatLineId, ChatTab.of(channel), ChatTab.of(selected),
+                mentionsLocalPlayer);
+    }
+
     /** Keeps a scrolled-up view stable when lines are inserted above it. */
-    public static synchronized void onLinesAdded(ChatChannel channel,
+    public static synchronized void onLinesAdded(ChatTab tab,
                                                  int addedLineCount) {
         if (addedLineCount <= 0) {
             return;
         }
-        for (ChatChannel view : ChatChannel.values()) {
-            if ((channel == null || view == channel)
-                    && SCROLL[view.ordinal()] > 0) {
-                SCROLL[view.ordinal()] += addedLineCount;
+        for (Map.Entry<ChatTab, Integer> entry : SCROLL.entrySet()) {
+            if ((tab == null || entry.getKey().equals(tab))
+                    && entry.getValue().intValue() > 0) {
+                entry.setValue(Integer.valueOf(
+                        entry.getValue().intValue() + addedLineCount));
             }
         }
     }
 
+    public static synchronized void onLinesAdded(ChatChannel channel,
+                                                 int addedLineCount) {
+        onLinesAdded(ChatTab.of(channel), addedLineCount);
+    }
+
     /** Called while a view is on screen; clears its unread counters. */
-    public static synchronized void markViewed(ChatChannel channel) {
-        if (channel != null) {
-            UNREAD_PINGS[channel.ordinal()] = 0;
-            UNREAD_OTHER[channel.ordinal()] = 0;
+    public static synchronized void markViewed(ChatTab tab) {
+        if (tab != null) {
+            UNREAD_PINGS.remove(tab);
+            UNREAD_OTHER.remove(tab);
         }
     }
 
+    public static synchronized void markViewed(ChatChannel channel) {
+        markViewed(ChatTab.of(channel));
+    }
+
     /** Unread messages that mentioned the player, capped at MAX_UNREAD + 1. */
-    public static synchronized int unreadPingCount(ChatChannel channel) {
-        return channel == null ? 0 : UNREAD_PINGS[channel.ordinal()];
+    public static synchronized int unreadPingCount(ChatTab tab) {
+        return count(UNREAD_PINGS, tab);
     }
 
     /** Unread messages other than pings, capped at MAX_UNREAD + 1. */
+    public static synchronized int unreadOtherCount(ChatTab tab) {
+        return count(UNREAD_OTHER, tab);
+    }
+
+    public static synchronized int unreadPingCount(ChatChannel channel) {
+        return unreadPingCount(ChatTab.of(channel));
+    }
+
     public static synchronized int unreadOtherCount(ChatChannel channel) {
-        return channel == null ? 0 : UNREAD_OTHER[channel.ordinal()];
+        return unreadOtherCount(ChatTab.of(channel));
+    }
+
+    public static synchronized boolean hasUnread(ChatTab tab) {
+        return unreadPingCount(tab) + unreadOtherCount(tab) > 0;
     }
 
     public static synchronized boolean hasUnread(ChatChannel channel) {
-        return unreadPingCount(channel) + unreadOtherCount(channel) > 0;
+        return hasUnread(ChatTab.of(channel));
+    }
+
+    public static synchronized boolean hasUnreadMention(ChatTab tab) {
+        return unreadPingCount(tab) > 0;
     }
 
     public static synchronized boolean hasUnreadMention(ChatChannel channel) {
-        return unreadPingCount(channel) > 0;
+        return hasUnreadMention(ChatTab.of(channel));
+    }
+
+    /** The recorded tab, or null for vanilla and untracked lines. */
+    public static synchronized ChatTab tabOf(int chatLineId) {
+        return TAB_BY_LINE_ID.get(Integer.valueOf(chatLineId));
     }
 
     /** The recorded channel, or null for vanilla and untracked lines. */
     public static synchronized ChatChannel channelOf(int chatLineId) {
-        return CHANNEL_BY_LINE_ID.get(Integer.valueOf(chatLineId));
+        ChatTab tab = tabOf(chatLineId);
+        return tab == null ? null : tab.getChannel();
     }
 
     /**
      * The lines shown for {@code view} (null meaning the combined feed), in
-     * vanilla's newest-first order. Cached until the drawn-line list, its
-     * head, or the view changes, so per-frame callers pay one comparison.
+     * vanilla's newest-first order.
      */
     public static synchronized List<ChatLine> visibleLines(
+            List<ChatLine> drawnLines, ChatTab view) {
+        if (view == null) {
+            return drawnLines == null
+                    ? Collections.<ChatLine>emptyList() : drawnLines;
+        }
+        return visibleLines(drawnLines, ChatLineFilter.of(view));
+    }
+
+    public static synchronized List<ChatLine> visibleLines(
             List<ChatLine> drawnLines, ChatChannel view) {
-        if (drawnLines == null || drawnLines.isEmpty()) {
+        return visibleLines(drawnLines, ChatTab.of(view));
+    }
+
+    /**
+     * The lines the filter accepts, in vanilla's newest-first order.
+     * Cached per filter until the drawn-line list, its size or its head
+     * changes, so per-frame callers pay one comparison.
+     */
+    static synchronized List<ChatLine> visibleLines(
+            List<ChatLine> drawnLines, ChatLineFilter filter) {
+        if (drawnLines == null || drawnLines.isEmpty() || filter == null
+                || filter.isEmpty()) {
             return Collections.emptyList();
         }
-        if (view == null) {
-            return drawnLines;
-        }
         ChatLine first = drawnLines.get(0);
-        if (drawnLines == cachedSource && drawnLines.size() == cachedSourceSize
-                && first == cachedFirst && view == cachedView) {
-            return cachedVisible;
+        CachedView cached = CACHE.get(filter);
+        if (cached != null && cached.describes(drawnLines, first)) {
+            return cached.visible;
         }
         List<ChatLine> visible = new ArrayList<ChatLine>(drawnLines.size());
         for (int index = 0; index < drawnLines.size(); index++) {
@@ -152,61 +209,62 @@ public final class ClientChatChannelViews {
             if (line == null) {
                 continue;
             }
-            ChatChannel channel = CHANNEL_BY_LINE_ID.get(
-                    Integer.valueOf(line.getChatLineID()));
-            // Untracked lines (achievements, commands, other mods) live in
-            // the console tab only, so the conversation tabs stay clean.
-            if (channel == view
-                    || (channel == null && view == SYSTEM_LINE_VIEW)) {
+            // Untracked lines belong to the console wherever its tab lives.
+            if (filter.accepts(TAB_BY_LINE_ID.get(
+                    Integer.valueOf(line.getChatLineID())))) {
                 visible.add(line);
             }
         }
-        cachedSource = drawnLines;
-        cachedSourceSize = drawnLines.size();
-        cachedFirst = first;
-        cachedView = view;
-        cachedVisible = Collections.unmodifiableList(visible);
-        return cachedVisible;
+        List<ChatLine> result = Collections.unmodifiableList(visible);
+        CACHE.put(filter, new CachedView(drawnLines, first, result));
+        while (CACHE.size() > MAX_CACHED_FILTERS) {
+            Iterator<ChatLineFilter> iterator = CACHE.keySet().iterator();
+            iterator.next();
+            iterator.remove();
+        }
+        return result;
     }
 
     /** Scroll offset (in lines) for the view, clamped to its content. */
-    public static synchronized int getScroll(ChatChannel view,
-                                             int totalLines,
+    public static synchronized int getScroll(ChatTab view, int totalLines,
                                              int visibleLineCount) {
         if (view == null) {
             return 0;
         }
         int maximum = Math.max(0, totalLines - Math.max(1, visibleLineCount));
-        int clamped = Math.max(0, Math.min(maximum, SCROLL[view.ordinal()]));
-        SCROLL[view.ordinal()] = clamped;
+        int clamped = Math.max(0, Math.min(maximum, count(SCROLL, view)));
+        if (clamped == 0) {
+            SCROLL.remove(view);
+        } else {
+            SCROLL.put(view, Integer.valueOf(clamped));
+        }
         return clamped;
     }
 
-    public static synchronized void scroll(ChatChannel view, int delta,
+    public static synchronized int getScroll(ChatChannel view, int totalLines,
+                                             int visibleLineCount) {
+        return getScroll(ChatTab.of(view), totalLines, visibleLineCount);
+    }
+
+    public static synchronized void scroll(ChatTab view, int delta,
                                            int totalLines,
                                            int visibleLineCount) {
         if (view == null) {
             return;
         }
-        SCROLL[view.ordinal()] += delta;
+        SCROLL.put(view, Integer.valueOf(count(SCROLL, view) + delta));
         getScroll(view, totalLines, visibleLineCount);
+    }
+
+    public static synchronized void scroll(ChatChannel view, int delta,
+                                           int totalLines,
+                                           int visibleLineCount) {
+        scroll(ChatTab.of(view), delta, totalLines, visibleLineCount);
     }
 
     /** Drops every view back to the newest line. */
     public static synchronized void resetScroll() {
-        for (int index = 0; index < SCROLL.length; index++) {
-            SCROLL[index] = 0;
-        }
-    }
-
-    /** Starts the view transition when the selected channel changes. */
-    public static synchronized void noteView(ChatChannel view) {
-        if (view != lastView) {
-            if (lastView != null) {
-                viewSwitchNanos = System.nanoTime();
-            }
-            lastView = view;
-        }
+        SCROLL.clear();
     }
 
     /** Starts the history's entrance when the chat screen opens. */
@@ -219,7 +277,7 @@ public final class ClientChatChannelViews {
      * The opening motion for the history and the tabs: the same sampler,
      * easing, direction, duration and reduced-motion rule every other Lost
      * Tales screen animates with, so the chat arrives like the rest of the
-     * interface. Only the input bar keeps its own entrance.
+     * interface. Only the input bars keep their own entrance.
      */
     public static synchronized LostTalesGuiAnimationSample openSample() {
         if (!LostTalesConfig.enableGuiAnimations
@@ -238,47 +296,57 @@ public final class ClientChatChannelViews {
                 (float)LostTalesConfig.guiAnimationScale);
     }
 
-    /** 0 while a switch transition starts, 1 once settled; 1 when disabled. */
-    public static synchronized float viewTransitionProgress() {
-        if (!LostTalesConfig.enableChatAnimations || viewSwitchNanos <= 0L) {
-            return 1.0F;
-        }
-        long duration = Math.max(1,
-                LostTalesConfig.chatSelectorAnimationDurationMillis)
-                * 1000000L;
-        return Math.max(0.0F, Math.min(1.0F,
-                (System.nanoTime() - viewSwitchNanos) / (float)duration));
+    public static synchronized void clear() {
+        TAB_BY_LINE_ID.clear();
+        SCROLL.clear();
+        UNREAD_PINGS.clear();
+        UNREAD_OTHER.clear();
+        openedNanos = 0L;
+        invalidateCache();
+        ChatWindowFrame.clear();
+        // The history is gone with the world, and so are its conversations.
+        ChatWindowLayout.closeConversations();
     }
 
-    public static synchronized void clear() {
-        CHANNEL_BY_LINE_ID.clear();
-        for (int index = 0; index < CHANNEL_COUNT; index++) {
-            SCROLL[index] = 0;
-            UNREAD_PINGS[index] = 0;
-            UNREAD_OTHER[index] = 0;
-        }
-        viewSwitchNanos = 0L;
-        openedNanos = 0L;
-        lastView = null;
-        invalidateCache();
+    private static int count(Map<ChatTab, Integer> counter, ChatTab tab) {
+        Integer value = tab == null ? null : counter.get(tab);
+        return value == null ? 0 : value.intValue();
     }
 
     private static void invalidateCache() {
-        cachedSource = null;
-        cachedSourceSize = -1;
-        cachedFirst = null;
-        cachedView = null;
-        cachedVisible = Collections.emptyList();
+        CACHE.clear();
+    }
+
+    /** One filter's last result and the history state it was built from. */
+    private static final class CachedView {
+        final List<ChatLine> source;
+        final int sourceSize;
+        final ChatLine first;
+        final List<ChatLine> visible;
+
+        CachedView(List<ChatLine> source, ChatLine first,
+                   List<ChatLine> visible) {
+            this.source = source;
+            this.sourceSize = source.size();
+            this.first = first;
+            this.visible = visible;
+        }
+
+        boolean describes(List<ChatLine> drawnLines, ChatLine head) {
+            return drawnLines == this.source
+                    && drawnLines.size() == this.sourceSize
+                    && head == this.first;
+        }
     }
 
     /** Test and diagnostics hook: tracked line count. */
     static synchronized int trackedLineCount() {
-        return CHANNEL_BY_LINE_ID.size();
+        return TAB_BY_LINE_ID.size();
     }
 
     /** Convenience for tests: the map view of tracked lines. */
-    static synchronized Map<Integer, ChatChannel> trackedLines() {
+    static synchronized Map<Integer, ChatTab> trackedLines() {
         return Collections.unmodifiableMap(
-                new LinkedHashMap<Integer, ChatChannel>(CHANNEL_BY_LINE_ID));
+                new LinkedHashMap<Integer, ChatTab>(TAB_BY_LINE_ID));
     }
 }

@@ -182,6 +182,42 @@ public final class LostTalesChatPacketTest {
     }
 
     @Test
+    public void whisperPacketsCarryTheirTargetAndPartner() {
+        LostTalesChatSendPacket send = new LostTalesChatSendPacket(
+                ChatChannel.WHISPER, "psst", null, " Steve ");
+        ByteBuf buffer = Unpooled.buffer();
+        send.toBytes(buffer);
+        LostTalesChatSendPacket decodedSend = new LostTalesChatSendPacket();
+        decodedSend.fromBytes(buffer);
+        assertFalse(decodedSend.isMalformed());
+        assertEquals("Steve", decodedSend.getTarget());
+        assertEquals(ChatChannel.WHISPER, decodedSend.getChannel());
+        // A whisper without a target is refused; other channels need none.
+        boolean rejected = false;
+        try {
+            new LostTalesChatSendPacket(ChatChannel.WHISPER, "psst", null, "");
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        assertTrue(rejected);
+        assertEquals("", new LostTalesChatSendPacket(ChatChannel.OOC, "hi")
+                .getTarget());
+
+        LostTalesChatMessagePacket message = new LostTalesChatMessagePacket(
+                ChatChannel.WHISPER, UUID.randomUUID(), "Alex", "Alex", "",
+                0xFFFFFF, 0xFFFFFF, "psst", 5L, "", null, "", "Steve");
+        buffer = Unpooled.buffer();
+        message.toBytes(buffer);
+        LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals("Steve", decoded.getPartner());
+        assertEquals("", new LostTalesChatMessagePacket(
+                ChatChannel.OOC, UUID.randomUUID(), "Alex", "Alex", "",
+                0xFFFFFF, 0xFFFFFF, "hi", 5L, "").getPartner());
+    }
+
+    @Test
     public void messageValidationRejectsFormattingAndControlText() {
         assertTrue(ChatMessageValidator.isValid("Mae govannen!"));
         assertFalse(ChatMessageValidator.isValid(" padded "));

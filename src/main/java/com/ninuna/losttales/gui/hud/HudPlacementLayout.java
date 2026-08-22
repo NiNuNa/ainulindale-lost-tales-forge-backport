@@ -112,6 +112,41 @@ public final class HudPlacementLayout {
         return new DragResult(x, y, snappedX, snappedY);
     }
 
+    /**
+     * Fractional variant of {@link #constrainDrag} for elements that move
+     * in sub-pixel steps; same centre snap and margins.
+     */
+    public static PreciseDragResult constrainDrag(
+            double requestedX,
+            double requestedY,
+            int width,
+            int height,
+            int screenWidth,
+            int screenHeight,
+            int snapThreshold) {
+        double x = requestedX;
+        double y = requestedY;
+        boolean snappedX = Math.abs(
+                requestedX + width / 2.0D - screenWidth / 2.0D)
+                <= Math.max(0, snapThreshold);
+        boolean snappedY = Math.abs(
+                requestedY + height / 2.0D - screenHeight / 2.0D)
+                <= Math.max(0, snapThreshold);
+        if (snappedX) {
+            x = screenWidth / 2 - width / 2;
+        }
+        if (snappedY) {
+            y = screenHeight / 2 - height / 2;
+        }
+        x = Math.max(SCREEN_MARGIN, Math.min(
+                Math.max(SCREEN_MARGIN, screenWidth - width - SCREEN_MARGIN),
+                x));
+        y = Math.max(SCREEN_MARGIN, Math.min(
+                Math.max(SCREEN_MARGIN, screenHeight - height - SCREEN_MARGIN),
+                y));
+        return new PreciseDragResult(x, y, snappedX, snappedY);
+    }
+
     private static int positionForPercent(
             double percent,
             int screenSize,
@@ -151,6 +186,11 @@ public final class HudPlacementLayout {
         AVAILABLE_SPACE_PERCENT
     }
 
+    /** A box computed elsewhere (a chat window) in this layout's terms. */
+    public static Bounds bounds(int x, int y, int width, int height) {
+        return new Bounds(x, y, Math.max(1, width), Math.max(1, height));
+    }
+
     public static final class Bounds {
         public final int x;
         public final int y;
@@ -162,6 +202,21 @@ public final class HudPlacementLayout {
             this.y = y;
             this.width = width;
             this.height = height;
+        }
+    }
+
+    public static final class PreciseDragResult {
+        public final double x;
+        public final double y;
+        public final boolean snappedX;
+        public final boolean snappedY;
+
+        private PreciseDragResult(double x, double y,
+                                  boolean snappedX, boolean snappedY) {
+            this.x = x;
+            this.y = y;
+            this.snappedX = snappedX;
+            this.snappedY = snappedY;
         }
     }
 
