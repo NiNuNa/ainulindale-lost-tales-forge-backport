@@ -113,7 +113,14 @@ public final class LostTalesConfig {
     public static boolean enableChatEmojis = true;
     public static boolean enableNpcChatStyling = true;
     public static boolean enableChatPings = true;
-    public static String chatPingSound = "note.pling";
+    /** Vanilla note-block pling: a short UI cue that exists on every client. */
+    static final String DEFAULT_CHAT_PING_SOUND = "note.pling";
+    /**
+     * The first backport shipped LOTR's horn as the ping and config files
+     * written then still carry it; it is migrated back to the note sound.
+     */
+    private static final String LEGACY_CHAT_PING_SOUND = "lotr:item.horn";
+    public static String chatPingSound = DEFAULT_CHAT_PING_SOUND;
     public static boolean enableChatAnimations = true;
     public static int chatAnimationDurationMillis = 180;
     public static int chatInputAnimationDurationMillis = 180;
@@ -802,6 +809,11 @@ public final class LostTalesConfig {
                     chatPingSound,
                     "Sound event played when a chat message @-mentions you; empty disables the sound."
             );
+            if (isLegacyChatPingSound(chatPingSound)) {
+                chatPingSound = DEFAULT_CHAT_PING_SOUND;
+                config.get(CATEGORY_CLIENT, "chatPingSound",
+                        DEFAULT_CHAT_PING_SOUND).set(chatPingSound);
+            }
             enableNpcChatStyling = config.getBoolean(
                     "enableNpcChatStyling",
                     CATEGORY_CLIENT,
@@ -1410,6 +1422,11 @@ public final class LostTalesConfig {
         mapDiscoveryHudOffsetY = clampPercent(mapDiscoveryHudOffsetY);
         areaNoticeHudOffsetX = clampPercent(areaNoticeHudOffsetX);
         areaNoticeHudOffsetY = clampPercent(areaNoticeHudOffsetY);
+    }
+
+    static boolean isLegacyChatPingSound(String sound) {
+        return sound != null
+                && LEGACY_CHAT_PING_SOUND.equalsIgnoreCase(sound.trim());
     }
 
     static double migrateLegacyQuickLootOffsetX(double legacyOffsetX) {

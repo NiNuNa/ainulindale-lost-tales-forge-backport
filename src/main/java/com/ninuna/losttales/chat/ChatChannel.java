@@ -1,9 +1,16 @@
 package com.ninuna.losttales.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 
-/** Small stable channel catalogue shared by packet validation and client UI. */
+/**
+ * Small stable channel catalogue shared by packet validation and client UI.
+ * Declaration order is storage surface (ordinals index client view state);
+ * the order channels are presented in is {@link #presentationOrder()}.
+ */
 public enum ChatChannel {
     ALL("all", "Global", ChatIdentityType.CHARACTER,
             ChatRecipientRule.GLOBAL,
@@ -21,7 +28,25 @@ public enum ChatChannel {
             LostTalesColors.rgb(LostTalesColors.HONEY)),
     OOC("ooc", "OOC", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.GLOBAL,
-            LostTalesColors.rgb(LostTalesColors.ORCHID));
+            LostTalesColors.rgb(LostTalesColors.ORCHID)),
+    /** Staff channel: operators only, account identity. Appended last. */
+    ADMIN("admin", "Admin", ChatIdentityType.ACCOUNT,
+            ChatRecipientRule.OPERATORS,
+            LostTalesColors.rgb(LostTalesColors.CRIMSON)),
+    /**
+     * The player's private console: what only they see anyway — command
+     * output, fast-travel countdowns, other mods' notices — plus anything
+     * they type there, which is echoed back to them alone.
+     */
+    CONSOLE("console", "Console", ChatIdentityType.ACCOUNT,
+            ChatRecipientRule.SELF,
+            LostTalesColors.rgb(LostTalesColors.ROSE_GRAY));
+
+    /** Tab, indicator, and cycle order: the two global channels bracket
+     *  the scoped role-play ones, then Party, staff, and the console. */
+    private static final List<ChatChannel> PRESENTATION_ORDER =
+            Collections.unmodifiableList(Arrays.asList(
+                    ALL, PROXIMITY, FACTION, OOC, PARTY, ADMIN, CONSOLE));
 
     private final String id;
     private final String displayName;
@@ -44,6 +69,11 @@ public enum ChatChannel {
     public ChatIdentityType getIdentityType() { return this.identityType; }
     public ChatRecipientRule getRecipientRule() { return this.recipientRule; }
     public int getDisplayColor() { return this.displayColor; }
+
+    /** Every channel in the order the client presents them. */
+    public static List<ChatChannel> presentationOrder() {
+        return PRESENTATION_ORDER;
+    }
 
     public static ChatChannel fromId(String id) {
         String normalized = id == null ? ""

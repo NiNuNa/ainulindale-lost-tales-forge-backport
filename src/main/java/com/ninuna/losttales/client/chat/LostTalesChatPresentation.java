@@ -11,7 +11,6 @@ import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.config.LostTalesConfig;
-import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
@@ -30,6 +29,7 @@ import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatStyle;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
+import net.minecraft.util.ResourceLocation;
 
 /** Builds structured legacy chat components and records entry-animation time. */
 public final class LostTalesChatPresentation {
@@ -66,12 +66,24 @@ public final class LostTalesChatPresentation {
         noteLinePrinted(minecraft, chat, chatLineId, channel, mentioned);
         if (mentioned) {
             markPinged(chatLineId);
-            if (minecraft.thePlayer != null
-                    && LostTalesConfig.chatPingSound.length() > 0) {
-                minecraft.thePlayer.playSound(
-                        LostTalesConfig.chatPingSound, 0.4F, 1.0F);
-            }
+            playPingSound(minecraft);
         }
+    }
+
+    /**
+     * The mention cue, only on this client and only because this client's
+     * own names matched: the server never triggers it and no other client
+     * can hear it. Played as a UI sound so the player's position, the
+     * dimension, or a respawn in progress cannot swallow or duplicate it.
+     */
+    private static void playPingSound(Minecraft minecraft) {
+        String sound = LostTalesConfig.chatPingSound == null
+                ? "" : LostTalesConfig.chatPingSound.trim();
+        if (sound.length() == 0 || minecraft.getSoundHandler() == null) {
+            return;
+        }
+        minecraft.getSoundHandler().playSound(
+                new LostTalesChatPingSound(new ResourceLocation(sound)));
     }
 
     /** Records animation timing and the line's channel for the tab views. */
@@ -188,6 +200,9 @@ public final class LostTalesChatPresentation {
                 ? packet.getNameColor() : channel.getDisplayColor();
         appendChannelPrefix(root, channel, channelColor);
         appendTimestamp(root, packet.getTimestampMillis());
+        // Continuation lines of a wrapped message align here, under the
+        // sender's opening bracket; see ChatLineWrapper.
+        root.appendSibling(ChatLayoutMarker.anchor());
 
         root.appendSibling(ChatColorMarker.apply(
                 text("<", nearestFormatting(
@@ -261,6 +276,7 @@ public final class LostTalesChatPresentation {
         ChatComponentText root = new ChatComponentText("");
         appendChannelPrefix(root, channel, channel.getDisplayColor());
         appendTimestamp(root, timestampMillis);
+        root.appendSibling(ChatLayoutMarker.anchor());
         int nameColor = LostTalesColors.rgb(LostTalesColors.HONEY);
         int bodyColor = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
         root.appendSibling(ChatColorMarker.apply(
@@ -399,10 +415,7 @@ public final class LostTalesChatPresentation {
         if (marker == null) {
             return false;
         }
-        float[] color = LostTalesCompassMarker.parseColor(marker.colorName);
-        int rgb = (Math.round(color[0] * 255.0F) << 16)
-                | (Math.round(color[1] * 255.0F) << 8)
-                | Math.round(color[2] * 255.0F);
+        int rgb = ChatInlineIcons.markerRgb(marker.colorName);
         appendShowcaseParts(root, kind, showcaseId,
                 ChatShareTokenParser.plainName(marker.name),
                 nearestFormatting(rgb), rgb);

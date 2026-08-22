@@ -5,5 +5,9 @@ public enum ChatRecipientRule {
     GLOBAL,
     PROXIMITY,
     PARTY,
-    FACTION
+    FACTION,
+    /** Only the sender: a private console that echoes back to its author. */
+    SELF,
+    /** Only server operators; sending also requires operator status. */
+    OPERATORS
 }

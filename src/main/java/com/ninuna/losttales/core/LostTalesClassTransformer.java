@@ -86,6 +86,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.tooltipIconTransformer.active";
     public static final String CHAT_HIT_TEST_ACTIVE_PROPERTY =
             "losttales.chatHitTestTransformer.active";
+    public static final String CHAT_WRAP_ACTIVE_PROPERTY =
+            "losttales.chatWrapTransformer.active";
+    public static final String LOTR_FAST_TRAVEL_ARRIVAL_ACTIVE_PROPERTY =
+            "losttales.lotrFastTravelArrivalTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
@@ -255,6 +259,13 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + "LostTalesTooltipHooks";
     private static final String CHAT_HIT_HOOK_OWNER =
             "com/ninuna/losttales/client/chat/LostTalesChatHitHooks";
+    private static final String CHAT_WRAP_HOOK_OWNER =
+            "com/ninuna/losttales/client/chat/LostTalesChatWrapHooks";
+    private static final String LOTR_PLAYER_DATA =
+            "lotr.common.LOTRPlayerData";
+    private static final String FAST_TRAVEL_ARRIVAL_HOOK_OWNER =
+            "com/ninuna/losttales/compat/lotr/"
+                    + "LostTalesLotrFastTravelArrivalHook";
 
     @Override
     public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -270,7 +281,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             transformGuiScreenInput(basicClass)));
         }
         if (GUI_NEW_CHAT.equals(transformedName)) {
-            return transformGuiNewChatHitTest(basicClass);
+            return transformGuiNewChatWrap(
+                    transformGuiNewChatHitTest(basicClass));
+        }
+        if (LOTR_PLAYER_DATA.equals(transformedName)) {
+            return transformLotrFastTravelArrival(basicClass);
         }
         if (GUI_CONTAINER.equals(transformedName)) {
             return transformGuiContainer(basicClass);
@@ -2249,6 +2264,194 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             warn("Failed to patch chat hit testing: " + throwable);
             return basicClass;
         }
+    }
+
+    /**
+     * Lets Lost Tales lay out its own chat lines.
+     *
+     * <p>{@code GuiNewChat.func_146237_a} wraps a message into drawn lines
+     * inline and then files them into the history. The hook is inserted
+     * at the seam between the two — after the last wrapped line has been
+     * added to the local list and before {@code getChatOpen()} starts the
+     * filing loop — and replaces that list for Lost Tales messages, so
+     * continuation lines indent under the message body while vanilla's
+     * history, scroll, trimming and resize re-wrap stay untouched. The
+     * list local is found from the {@code ArrayList.add} call that
+     * precedes the seam rather than assumed by index. Without the patch
+     * wrapped lines simply return to the left edge.</p>
+     */
+    private static byte[] transformGuiNewChatWrap(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"func_146237_a".equals(method.name)
+                        || !"(Lnet/minecraft/util/IChatComponent;IIZ)V"
+                        .equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, CHAT_WRAP_HOOK_OWNER, "wrap")) {
+                    System.setProperty(CHAT_WRAP_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                MethodInsnNode chatOpen = findChatOpenCall(method);
+                AbstractInsnNode receiver = chatOpen == null
+                        ? null : previousCode(chatOpen);
+                VarInsnNode lines = receiver == null
+                        ? null : findWrappedLinesLocal(receiver);
+                if (chatOpen == null || lines == null
+                        || !(receiver instanceof VarInsnNode)
+                        || receiver.getOpcode() != Opcodes.ALOAD
+                        || ((VarInsnNode)receiver).var != 0) {
+                    warn("Could not locate the wrapped-line seam in "
+                            + "GuiNewChat#func_146237_a; wrapped chat lines "
+                            + "will not indent under the message body");
+                    return basicClass;
+                }
+                InsnList hook = new InsnList();
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                hook.add(new VarInsnNode(Opcodes.ALOAD, lines.var));
+                hook.add(new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        CHAT_WRAP_HOOK_OWNER,
+                        "wrap",
+                        "(Lnet/minecraft/client/gui/GuiNewChat;"
+                                + "Lnet/minecraft/util/IChatComponent;"
+                                + "Ljava/util/ArrayList;)Ljava/util/ArrayList;"));
+                hook.add(new VarInsnNode(Opcodes.ASTORE, lines.var));
+                method.instructions.insertBefore(receiver, hook);
+                System.setProperty(CHAT_WRAP_ACTIVE_PROPERTY, "true");
+                info("Patched GuiNewChat line wrapping for the Lost Tales chat layout");
+                return write(owner);
+            }
+            warn("Could not locate GuiNewChat#func_146237_a; wrapped chat "
+                    + "lines will not indent under the message body");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch chat line wrapping: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Reports completed LOTR fast travel.
+     *
+     * <p>LOTR finishes a fast travel in
+     * {@code LOTRPlayerData.receiveFTBouncePacket}: the client bounces the
+     * countdown back and the server calls the private
+     * {@code fastTravelTo(waypoint)}. The receiver and argument are
+     * duplicated on the stack before that call and handed to the arrival
+     * hook after it, so the hook sees exactly the waypoint that was
+     * travelled to, only once the teleport has run, and never for a
+     * request that was refused. Without the patch arrivals are not
+     * reported and the chat picker's recent-destinations list stays
+     * empty.</p>
+     */
+    private static byte[] transformLotrFastTravelArrival(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"receiveFTBouncePacket".equals(method.name)
+                        || !"()V".equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, FAST_TRAVEL_ARRIVAL_HOOK_OWNER,
+                        "onArrived")) {
+                    System.setProperty(
+                            LOTR_FAST_TRAVEL_ARRIVAL_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                MethodInsnNode travel = null;
+                for (AbstractInsnNode instruction =
+                     method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (!(instruction instanceof MethodInsnNode)) {
+                        continue;
+                    }
+                    MethodInsnNode call = (MethodInsnNode)instruction;
+                    if (call.getOpcode() == Opcodes.INVOKESPECIAL
+                            && "lotr/common/LOTRPlayerData".equals(call.owner)
+                            && "fastTravelTo".equals(call.name)
+                            && "(Llotr/common/world/map/LOTRAbstractWaypoint;)V"
+                            .equals(call.desc)) {
+                        travel = call;
+                        break;
+                    }
+                }
+                if (travel == null) {
+                    warn("Could not locate LOTRPlayerData#fastTravelTo inside "
+                            + "receiveFTBouncePacket; fast-travel arrivals "
+                            + "will not be reported");
+                    return basicClass;
+                }
+                method.instructions.insertBefore(
+                        travel, new InsnNode(Opcodes.DUP2));
+                method.instructions.insert(travel, new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        FAST_TRAVEL_ARRIVAL_HOOK_OWNER,
+                        "onArrived",
+                        "(Llotr/common/LOTRPlayerData;"
+                                + "Llotr/common/world/map/LOTRAbstractWaypoint;)V"));
+                System.setProperty(
+                        LOTR_FAST_TRAVEL_ARRIVAL_ACTIVE_PROPERTY, "true");
+                info("Patched LOTR fast travel completion to report arrivals");
+                return write(owner);
+            }
+            warn("Could not locate LOTRPlayerData#receiveFTBouncePacket; "
+                    + "fast-travel arrivals will not be reported");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch LOTR fast travel completion: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /** The single {@code getChatOpen()} call inside the wrap method. */
+    private static MethodInsnNode findChatOpenCall(MethodNode method) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof MethodInsnNode)) {
+                continue;
+            }
+            MethodInsnNode call = (MethodInsnNode)instruction;
+            if (call.getOpcode() == Opcodes.INVOKEVIRTUAL
+                    && "net/minecraft/client/gui/GuiNewChat".equals(call.owner)
+                    && "()Z".equals(call.desc)
+                    && ("getChatOpen".equals(call.name)
+                    || "func_146241_e".equals(call.name))) {
+                return call;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The {@code ALOAD} of the list the nearest preceding
+     * {@code ArrayList.add(Object)} appended to: the wrapped-line list.
+     */
+    private static VarInsnNode findWrappedLinesLocal(AbstractInsnNode before) {
+        for (AbstractInsnNode cursor = before; cursor != null;
+             cursor = cursor.getPrevious()) {
+            if (!(cursor instanceof MethodInsnNode)) {
+                continue;
+            }
+            MethodInsnNode call = (MethodInsnNode)cursor;
+            if (call.getOpcode() != Opcodes.INVOKEVIRTUAL
+                    || !"java/util/ArrayList".equals(call.owner)
+                    || !"add".equals(call.name)
+                    || !"(Ljava/lang/Object;)Z".equals(call.desc)) {
+                continue;
+            }
+            AbstractInsnNode element = previousCode(call);
+            AbstractInsnNode list = previousCode(element);
+            return element instanceof VarInsnNode
+                    && list instanceof VarInsnNode
+                    && list.getOpcode() == Opcodes.ALOAD
+                    ? (VarInsnNode)list : null;
+        }
+        return null;
     }
 
     /**

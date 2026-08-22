@@ -29,6 +29,7 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationHandler;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
+import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerUsageStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneStateStore;
 import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
@@ -59,7 +60,10 @@ import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
+import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
 import com.ninuna.losttales.accessory.player.AccessoryPlayerData;
@@ -103,6 +107,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         CameraPresetFileStore.initialize(
                 event.getModConfigurationDirectory());
         ChatEmojiUsageStore.initialize(
+                event.getModConfigurationDirectory());
+        LostTalesClientMapMarkerUsageStore.initialize(
                 event.getModConfigurationDirectory());
         LostTalesThirdPersonConfig.load(
                 event.getModConfigurationDirectory());
@@ -414,6 +420,22 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleChatMessage(LostTalesChatMessagePacket packet) {
         LostTalesChatPresentation.receive(packet);
+    }
+
+    @Override
+    public void handleChatAccess(LostTalesChatAccessPacket packet) {
+        if (packet != null && !packet.isMalformed()) {
+            ClientChatChannelState.setAdminAccess(packet.hasAdminAccess());
+        }
+    }
+
+    @Override
+    public void handleFastTravelArrival(
+            LostTalesFastTravelArrivalPacket packet) {
+        if (packet != null && !packet.isMalformed()) {
+            LostTalesClientMapMarkerUsageStore.recordTravel(
+                    packet.getMarkerId());
+        }
     }
 
     @Override

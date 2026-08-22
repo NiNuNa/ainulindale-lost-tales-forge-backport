@@ -43,19 +43,22 @@ public final class ClientChatChannelViewsTest {
         drawn.add(line(-10));
 
         assertSame(drawn, ClientChatChannelViews.visibleLines(drawn, null));
-        // Vanilla lines (achievements, commands) belong to Global only.
+        // Vanilla lines (achievements, commands) belong to the console only.
         List<ChatLine> party = ClientChatChannelViews.visibleLines(
                 drawn, ChatChannel.PARTY);
         assertEquals(1, party.size());
         assertEquals(-10, party.get(0).getChatLineID());
         List<ChatLine> all = ClientChatChannelViews.visibleLines(
                 drawn, ChatChannel.ALL);
-        assertEquals(2, all.size());
+        assertEquals(1, all.size());
         assertEquals(-11, all.get(0).getChatLineID());
-        assertEquals(0, all.get(1).getChatLineID());
+        List<ChatLine> console = ClientChatChannelViews.visibleLines(
+                drawn, ChatChannel.CONSOLE);
+        assertEquals(1, console.size());
+        assertEquals(0, console.get(0).getChatLineID());
         // Same list, same head, same view: the cached instance is reused.
-        assertSame(all, ClientChatChannelViews.visibleLines(
-                drawn, ChatChannel.ALL));
+        assertSame(console, ClientChatChannelViews.visibleLines(
+                drawn, ChatChannel.CONSOLE));
         assertNull(ClientChatChannelViews.channelOf(0));
         assertEquals(ChatChannel.PARTY, ClientChatChannelViews.channelOf(-10));
     }
@@ -79,7 +82,7 @@ public final class ClientChatChannelViewsTest {
     }
 
     @Test
-    public void unreadFlagsFollowTheSelectedChannel() {
+    public void unreadCountersFollowTheSelectedChannel() {
         ClientChatChannelViews.record(-1, ChatChannel.PARTY,
                 ChatChannel.ALL, true);
         ClientChatChannelViews.record(-2, ChatChannel.ALL,
@@ -87,21 +90,44 @@ public final class ClientChatChannelViewsTest {
         ClientChatChannelViews.record(-3, ChatChannel.PARTY,
                 ChatChannel.ALL, false);
         assertTrue(ClientChatChannelViews.hasUnread(ChatChannel.PARTY));
-        assertEquals(2, ClientChatChannelViews.unreadCount(ChatChannel.PARTY));
+        // A ping is counted once, as a ping, never also as "other".
+        assertEquals(1, ClientChatChannelViews.unreadPingCount(
+                ChatChannel.PARTY));
+        assertEquals(1, ClientChatChannelViews.unreadOtherCount(
+                ChatChannel.PARTY));
         assertTrue(ClientChatChannelViews.hasUnreadMention(ChatChannel.PARTY));
+        // Lines arriving in the selected channel are read on arrival.
         assertFalse(ClientChatChannelViews.hasUnread(ChatChannel.ALL));
-        assertEquals(0, ClientChatChannelViews.unreadCount(ChatChannel.ALL));
+        assertEquals(0, ClientChatChannelViews.unreadPingCount(
+                ChatChannel.ALL));
+        assertEquals(0, ClientChatChannelViews.unreadOtherCount(
+                ChatChannel.ALL));
         ClientChatChannelViews.markViewed(ChatChannel.PARTY);
         assertFalse(ClientChatChannelViews.hasUnread(ChatChannel.PARTY));
-        assertEquals(0, ClientChatChannelViews.unreadCount(ChatChannel.PARTY));
+        assertEquals(0, ClientChatChannelViews.unreadPingCount(
+                ChatChannel.PARTY));
+        assertEquals(0, ClientChatChannelViews.unreadOtherCount(
+                ChatChannel.PARTY));
         assertFalse(ClientChatChannelViews.hasUnreadMention(
                 ChatChannel.PARTY));
         for (int index = 0; index < 150; index++) {
             ClientChatChannelViews.record(-10 - index, ChatChannel.OOC,
+                    ChatChannel.ALL, index % 2 == 0);
+        }
+        assertEquals(75, ClientChatChannelViews.unreadPingCount(
+                ChatChannel.OOC));
+        assertEquals(75, ClientChatChannelViews.unreadOtherCount(
+                ChatChannel.OOC));
+        for (int index = 0; index < 150; index++) {
+            ClientChatChannelViews.record(-200 - index, ChatChannel.OOC,
                     ChatChannel.ALL, false);
         }
         assertEquals(ClientChatChannelViews.MAX_UNREAD + 1,
-                ClientChatChannelViews.unreadCount(ChatChannel.OOC));
+                ClientChatChannelViews.unreadOtherCount(ChatChannel.OOC));
+        assertEquals("", ChatChannelTabBar.counterText(0));
+        assertEquals("(3)", ChatChannelTabBar.counterText(3));
+        assertEquals("(99)", ChatChannelTabBar.counterText(99));
+        assertEquals("(99+)", ChatChannelTabBar.counterText(100));
     }
 
     @Test

@@ -1,7 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
-import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
@@ -10,68 +9,116 @@ import net.minecraft.util.MathHelper;
 import org.lwjgl.opengl.GL11;
 
 /**
- * Draws a map-marker glyph from the shared marker atlas at chat scale, in
- * the marker's own colour, with the same silhouette shadow every other
- * chat icon uses. The 17-pixel atlas cell is scaled onto the requested
- * size so the glyph keeps its proportions inside the ten-pixel slot.
+ * Draws a map-marker glyph from the shared marker atlas in a flat colour,
+ * with the same silhouette shadow every other chat glyph uses. Only the
+ * glyph's opaque artwork is taken from its 17-pixel atlas cell, using the
+ * art bounds the icon enum already records. Inline it is fitted into a
+ * square box by its larger edge, always uniformly, so a tall glyph stays
+ * tall; on buttons it is drawn at its native pixel size.
  */
 final class ChatMapMarkerRenderer {
-    /** On-screen glyph edge inside the ten-pixel reserved slot. */
-    static final float ICON_SIZE = 10.0F;
-
     private ChatMapMarkerRenderer() {}
 
-    static void draw(Minecraft minecraft, String iconName, String colorName,
-                     float x, float y, float size, int alpha) {
-        float[] color = LostTalesCompassMarker.parseColor(colorName);
-        drawInternal(minecraft, iconName, x, y, size,
-                color[0], color[1], color[2], alpha);
+    static void draw(Minecraft minecraft, String iconName,
+                     float boxX, float boxY, float size, int rgb, int alpha) {
+        LostTalesCompassMarkerIcon icon =
+                LostTalesCompassMarkerIcon.fromName(iconName);
+        float scale = fitScale(icon, size);
+        drawArt(minecraft, icon, boxX, boxY, size, scale, rgb, alpha);
     }
 
     static void drawShadow(Minecraft minecraft, String iconName,
-                           float x, float y, float size,
+                           float boxX, float boxY, float size,
                            int shadowRgb, int alpha) {
+        LostTalesCompassMarkerIcon icon =
+                LostTalesCompassMarkerIcon.fromName(iconName);
         LostTalesSilhouetteRenderState.begin(shadowRgb);
         try {
-            drawInternal(minecraft, iconName, x, y, size,
-                    1.0F, 1.0F, 1.0F, alpha);
+            drawArt(minecraft, icon, boxX, boxY, size, fitScale(icon, size),
+                    0xFFFFFF, alpha);
         } finally {
             LostTalesSilhouetteRenderState.end();
         }
     }
 
-    private static void drawInternal(Minecraft minecraft, String iconName,
-                                     float x, float y, float size,
-                                     float red, float green, float blue,
-                                     int alpha) {
-        if (minecraft == null || size <= 0.0F
+    /** Native-size artwork centred on a point. */
+    static void drawNative(Minecraft minecraft, String iconName,
+                           float centerX, float centerY, int rgb, int alpha) {
+        LostTalesCompassMarkerIcon icon =
+                LostTalesCompassMarkerIcon.fromName(iconName);
+        drawArt(minecraft, icon, centerX - artWidth(icon) / 2.0F,
+                centerY - artHeight(icon) / 2.0F,
+                Math.max(artWidth(icon), artHeight(icon)), 1.0F, rgb, alpha);
+    }
+
+    static void drawNativeShadow(Minecraft minecraft, String iconName,
+                                 float centerX, float centerY,
+                                 int shadowRgb, int alpha) {
+        LostTalesSilhouetteRenderState.begin(shadowRgb);
+        try {
+            drawNative(minecraft, iconName, centerX, centerY, 0xFFFFFF, alpha);
+        } finally {
+            LostTalesSilhouetteRenderState.end();
+        }
+    }
+
+    private static float artWidth(LostTalesCompassMarkerIcon icon) {
+        return icon.getArtRight() - icon.getArtLeft();
+    }
+
+    private static float artHeight(LostTalesCompassMarkerIcon icon) {
+        return icon.getArtBottom() - icon.getArtTop();
+    }
+
+    private static float fitScale(LostTalesCompassMarkerIcon icon, float size) {
+        float largest = Math.max(artWidth(icon), artHeight(icon));
+        return largest <= 0.0F ? 0.0F : size / largest;
+    }
+
+    /**
+     * Draws the artwork at {@code scale}, centred in a {@code box}-sized
+     * square at ({@code boxX}, {@code boxY}) — for native drawing the box
+     * is the artwork's own larger edge, so it lands exactly on its centre.
+     */
+    private static void drawArt(Minecraft minecraft,
+                                LostTalesCompassMarkerIcon icon,
+                                float boxX, float boxY, float box, float scale,
+                                int rgb, int alpha) {
+        if (minecraft == null || icon == null || scale <= 0.0F
                 || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
-        LostTalesCompassMarkerIcon icon =
-                LostTalesCompassMarkerIcon.fromName(iconName);
+        float width = artWidth(icon) * scale;
+        float height = artHeight(icon) * scale;
+        if (width <= 0.0F || height <= 0.0F) {
+            return;
+        }
+        float x = boxX + (box - width) / 2.0F;
+        float y = boxY + (box - height) / 2.0F;
         minecraft.getTextureManager().bindTexture(
                 LostTalesCompassMarkerIcon.TEXTURE);
         GL11.glEnable(GL11.GL_BLEND);
         OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
                 GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
         GL11.glColor4f(
-                MathHelper.clamp_float(red, 0.0F, 1.0F),
-                MathHelper.clamp_float(green, 0.0F, 1.0F),
-                MathHelper.clamp_float(blue, 0.0F, 1.0F),
+                ((rgb >> 16) & 0xFF) / 255.0F,
+                ((rgb >> 8) & 0xFF) / 255.0F,
+                (rgb & 0xFF) / 255.0F,
                 MathHelper.clamp_float(alpha / 255.0F, 0.0F, 1.0F));
         try {
-            float u0 = icon.getU() / (float)LostTalesCompassMarkerIcon.TEXTURE_WIDTH;
-            float u1 = (icon.getU() + LostTalesCompassMarkerIcon.WIDTH)
+            float u0 = (icon.getU() + icon.getArtLeft())
                     / (float)LostTalesCompassMarkerIcon.TEXTURE_WIDTH;
-            float v0 = icon.getV() / (float)LostTalesCompassMarkerIcon.TEXTURE_HEIGHT;
-            float v1 = (icon.getV() + LostTalesCompassMarkerIcon.HEIGHT)
+            float u1 = (icon.getU() + icon.getArtRight())
+                    / (float)LostTalesCompassMarkerIcon.TEXTURE_WIDTH;
+            float v0 = (icon.getV() + icon.getArtTop())
+                    / (float)LostTalesCompassMarkerIcon.TEXTURE_HEIGHT;
+            float v1 = (icon.getV() + icon.getArtBottom())
                     / (float)LostTalesCompassMarkerIcon.TEXTURE_HEIGHT;
             Tessellator tessellator = Tessellator.instance;
             tessellator.startDrawingQuads();
-            tessellator.addVertexWithUV(x, y + size, 0.0D, u0, v1);
-            tessellator.addVertexWithUV(x + size, y + size, 0.0D, u1, v1);
-            tessellator.addVertexWithUV(x + size, y, 0.0D, u1, v0);
+            tessellator.addVertexWithUV(x, y + height, 0.0D, u0, v1);
+            tessellator.addVertexWithUV(x + width, y + height, 0.0D, u1, v1);
+            tessellator.addVertexWithUV(x + width, y, 0.0D, u1, v0);
             tessellator.addVertexWithUV(x, y, 0.0D, u0, v0);
             tessellator.draw();
         } finally {

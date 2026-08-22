@@ -54,6 +54,17 @@ public final class LostTalesClientMapMarkerVisibility {
         return !marker.isHiddenUntilDiscovered();
     }
 
+    /**
+     * Whether the player has actually reached the marker: its region gate
+     * is open and, if it has to be discovered, it has been. The client
+     * mirror of the server's sharing rule; a marker merely shown as an
+     * undiscovered question mark does not qualify.
+     */
+    public static boolean isVisited(LostTalesMapMarkerData marker) {
+        return marker != null && isRegionRequirementMet(marker)
+                && (!marker.isDiscoverable() || isDiscovered(marker));
+    }
+
     public static boolean isNonDiscoverableVisible(
             LostTalesMapMarkerData marker) {
         return marker != null && !marker.isDiscoverable()

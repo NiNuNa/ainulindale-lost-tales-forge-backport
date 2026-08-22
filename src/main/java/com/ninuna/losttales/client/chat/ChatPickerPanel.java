@@ -11,19 +11,23 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiTextField;
+import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.opengl.GL11;
 
 /**
  * Shared frame for the share pickers toggled from the small buttons beside
  * the chat input: a search field on top and collapsible sections of cells
- * below, anchored above the input at the right edge. Subclasses supply the
+ * below, anchored above the input at its right edge. Subclasses supply the
  * sections for a query, draw one cell, and say what a chosen cell inserts;
- * everything else — open/close easing, search input, section folding, hit
- * testing, hover tooltip, pointer-region registration — lives here so the
- * emote, item and marker pickers behave identically. Geometry is derived
- * from the live screen size, so GUI scale and resolution changes are
- * handled.
+ * everything else — open/close easing, search input, section folding,
+ * scrolling, hit testing, hover tooltip, pointer-region registration —
+ * lives here so the emote, item, marker and quest pickers behave
+ * identically. The panel never grows past the middle of the screen: a
+ * list taller than that scrolls inside it (mouse wheel over the panel),
+ * clipped to the body below the search row. Geometry is derived from the
+ * live screen size, so GUI scale and resolution changes are handled.
  */
 abstract class ChatPickerPanel {
     static final int BUTTON_SIZE = 12;
@@ -41,6 +45,8 @@ abstract class ChatPickerPanel {
     private GuiTextField searchField;
     private int buttonIndex;
     private Entry hoveredEntry;
+    /** Pixels the body is scrolled up by; clamped on every layout. */
+    private int scroll;
 
     /** Position from the right edge: 0 is the rightmost button. */
     void setButtonIndex(int buttonIndex) {
@@ -55,6 +61,7 @@ abstract class ChatPickerPanel {
         if (this.targetOpen != open) {
             this.targetOpen = open;
             this.transitionNanos = System.nanoTime();
+            this.scroll = 0;
             if (this.searchField != null) {
                 this.searchField.setText("");
                 this.searchField.setFocused(false);
@@ -90,8 +97,14 @@ abstract class ChatPickerPanel {
                 && this.searchField.textboxKeyTyped(typedChar, keyCode);
     }
 
-    int buttonLeft(int screenWidth) {
-        return screenWidth - BUTTON_MARGIN
+    /** Scrolls the body; positive moves the list up (shows later rows). */
+    void scrollBy(int pixels) {
+        this.scroll = Math.max(0, this.scroll + pixels);
+    }
+
+    /** Button left edge; {@code anchorRight} is the input bar's right edge. */
+    int buttonLeft(int anchorRight) {
+        return anchorRight - BUTTON_MARGIN
                 - (this.buttonIndex + 1) * (BUTTON_SIZE + BUTTON_MARGIN)
                 + BUTTON_MARGIN;
     }
@@ -101,19 +114,19 @@ abstract class ChatPickerPanel {
     }
 
     boolean isInsideButton(int mouseX, int mouseY,
-                           int screenWidth, int screenHeight) {
-        int left = buttonLeft(screenWidth);
+                           int anchorRight, int screenHeight) {
+        int left = buttonLeft(anchorRight);
         int top = buttonTop(screenHeight);
         return mouseX >= left && mouseX < left + BUTTON_SIZE
                 && mouseY >= top && mouseY < top + BUTTON_SIZE;
     }
 
     boolean isInsidePanel(int mouseX, int mouseY,
-                          int screenWidth, int screenHeight) {
+                          int anchorRight, int screenHeight) {
         if (!this.targetOpen) {
             return false;
         }
-        Layout layout = buildLayout(screenWidth, screenHeight);
+        Layout layout = buildLayout(anchorRight, screenHeight);
         return mouseX >= layout.left && mouseX < layout.left + panelWidth()
                 && mouseY >= layout.top
                 && mouseY < layout.top + layout.height;
@@ -124,11 +137,11 @@ abstract class ChatPickerPanel {
      * Returns true when a section header consumed the click.
      */
     boolean mouseClicked(int mouseX, int mouseY, int button,
-                         int screenWidth, int screenHeight) {
+                         int anchorRight, int screenHeight) {
         if (!this.targetOpen) {
             return false;
         }
-        Layout layout = buildLayout(screenWidth, screenHeight);
+        Layout layout = buildLayout(anchorRight, screenHeight);
         if (this.searchField != null) {
             positionSearchField(layout);
             this.searchField.mouseClicked(mouseX, mouseY, button);
@@ -139,7 +152,8 @@ abstract class ChatPickerPanel {
         for (Label label : layout.labels) {
             if (label.collapsible && mouseX >= layout.left
                     && mouseX < layout.left + panelWidth()
-                    && mouseY >= label.y && mouseY < label.y + LABEL_HEIGHT) {
+                    && mouseY >= label.y && mouseY < label.y + LABEL_HEIGHT
+                    && layout.showsRow(label.y, LABEL_HEIGHT)) {
                 toggleCollapsed(label.key);
                 return true;
             }
@@ -148,14 +162,15 @@ abstract class ChatPickerPanel {
     }
 
     /** The cell under the mouse while the picker is open, else null. */
-    Entry entryAt(int mouseX, int mouseY, int screenWidth, int screenHeight) {
+    Entry entryAt(int mouseX, int mouseY, int anchorRight, int screenHeight) {
         if (!this.targetOpen) {
             return null;
         }
-        Layout layout = buildLayout(screenWidth, screenHeight);
+        Layout layout = buildLayout(anchorRight, screenHeight);
         for (Cell cell : layout.cells) {
             if (mouseX >= cell.x && mouseX < cell.x + cellWidth()
-                    && mouseY >= cell.y && mouseY < cell.y + cellHeight()) {
+                    && mouseY >= cell.y && mouseY < cell.y + cellHeight()
+                    && layout.showsRow(cell.y, cellHeight())) {
                 return cell.entry;
             }
         }
@@ -163,22 +178,22 @@ abstract class ChatPickerPanel {
     }
 
     void draw(Minecraft minecraft, ChatPointerRegions regions,
-              int screenWidth, int screenHeight, int mouseX, int mouseY) {
+              int anchorRight, int screenHeight, int mouseX, int mouseY) {
         this.hoveredEntry = null;
-        drawButton(minecraft, regions, screenWidth, screenHeight,
+        drawButton(minecraft, regions, anchorRight, screenHeight,
                 mouseX, mouseY);
-        drawPanel(minecraft, regions, screenWidth, screenHeight,
+        drawPanel(minecraft, regions, anchorRight, screenHeight,
                 mouseX, mouseY);
-        drawTooltip(minecraft.fontRenderer, mouseX, mouseY, screenWidth);
+        drawTooltip(minecraft.fontRenderer, mouseX, mouseY, anchorRight);
     }
 
     private void drawButton(Minecraft minecraft, ChatPointerRegions regions,
-                            int screenWidth, int screenHeight,
+                            int anchorRight, int screenHeight,
                             int mouseX, int mouseY) {
-        int left = buttonLeft(screenWidth);
+        int left = buttonLeft(anchorRight);
         int top = buttonTop(screenHeight);
         boolean lifted = this.targetOpen || isInsideButton(mouseX, mouseY,
-                screenWidth, screenHeight);
+                anchorRight, screenHeight);
         // A bare icon with the shared shadow; hover and open states lift it
         // a pixel rather than painting a backdrop.
         drawButtonIcon(minecraft, left, top - (lifted ? 1 : 0));
@@ -186,7 +201,7 @@ abstract class ChatPickerPanel {
     }
 
     private void drawPanel(Minecraft minecraft, ChatPointerRegions regions,
-                           int screenWidth, int screenHeight,
+                           int anchorRight, int screenHeight,
                            int mouseX, int mouseY) {
         float progress = openProgress();
         if (progress <= 0.0F) {
@@ -194,7 +209,7 @@ abstract class ChatPickerPanel {
         }
         FontRenderer font = minecraft.fontRenderer;
         ensureSearchField(font);
-        Layout layout = buildLayout(screenWidth, screenHeight);
+        Layout layout = buildLayout(anchorRight, screenHeight);
         positionSearchField(layout);
         int slide = Math.round((1.0F - progress) * 5.0F);
         int top = layout.top + slide;
@@ -209,26 +224,63 @@ abstract class ChatPickerPanel {
         int textAlpha = Math.max(LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA,
                 Math.min(255, Math.round(255.0F * progress)));
         drawSearchRow(font, layout, slide, textAlpha);
-        for (Label label : layout.labels) {
-            String glyph = label.collapsible
-                    ? (isCollapsed(label.key) ? "+ " : "- ") : "";
-            LostTalesChatVisualStyle.drawPlain(font, glyph + label.text,
-                    label.x, label.y + slide, Math.min(textAlpha, 170));
-        }
-        for (Cell cell : layout.cells) {
-            boolean hovered = this.targetOpen && slide == 0
-                    && mouseX >= cell.x && mouseX < cell.x + cellWidth()
-                    && mouseY >= cell.y && mouseY < cell.y + cellHeight();
-            if (hovered) {
-                this.hoveredEntry = cell.entry;
-                Gui.drawRect(cell.x, cell.y, cell.x + cellWidth(),
-                        cell.y + cellHeight(), (backgroundAlpha << 24)
-                                | LostTalesChatVisualStyle
-                                        .SURFACE_HIGHLIGHT_RGB);
+        // Rows are clipped to the body so a scrolled list never paints
+        // over the search row or past the panel's bottom edge.
+        boolean clipped = beginBodyClip(minecraft, layout, slide);
+        try {
+            for (Label label : layout.labels) {
+                if (!layout.showsRow(label.y, LABEL_HEIGHT)) {
+                    continue;
+                }
+                String glyph = label.collapsible
+                        ? (isCollapsed(label.key) ? "+ " : "- ") : "";
+                LostTalesChatVisualStyle.drawPlain(font, glyph + label.text,
+                        label.x, label.y + slide, Math.min(textAlpha, 170));
             }
-            drawEntry(minecraft, cell.entry, cell.x, cell.y + slide,
-                    textAlpha, hovered);
+            for (Cell cell : layout.cells) {
+                if (!layout.showsRow(cell.y, cellHeight())) {
+                    continue;
+                }
+                boolean hovered = this.targetOpen && slide == 0
+                        && mouseX >= cell.x && mouseX < cell.x + cellWidth()
+                        && mouseY >= cell.y && mouseY < cell.y + cellHeight()
+                        && mouseY >= layout.bodyTop
+                        && mouseY < layout.bodyBottom;
+                if (hovered) {
+                    this.hoveredEntry = cell.entry;
+                    Gui.drawRect(cell.x, cell.y, cell.x + cellWidth(),
+                            cell.y + cellHeight(), (backgroundAlpha << 24)
+                                    | LostTalesChatVisualStyle
+                                            .SURFACE_HIGHLIGHT_RGB);
+                }
+                drawEntry(minecraft, cell.entry, cell.x, cell.y + slide,
+                        textAlpha, hovered);
+            }
+        } finally {
+            endBodyClip(clipped);
         }
+        drawScrollbar(layout, slide, textAlpha);
+    }
+
+    /** A thin track at the right edge while the list is longer than the body. */
+    private void drawScrollbar(Layout layout, int slide, int alpha) {
+        if (layout.maxScroll <= 0) {
+            return;
+        }
+        int bodyHeight = layout.bodyBottom - layout.bodyTop;
+        int contentHeight = bodyHeight + layout.maxScroll;
+        int thumbHeight = Math.max(4, bodyHeight * bodyHeight / contentHeight);
+        int thumbTop = layout.bodyTop + slide
+                + (bodyHeight - thumbHeight) * this.scroll / layout.maxScroll;
+        int x = layout.left + panelWidth() - 2;
+        Gui.drawRect(x, layout.bodyTop + slide, x + 1,
+                layout.bodyBottom + slide,
+                LostTalesChatVisualStyle.argb(
+                        LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
+                        Math.min(alpha, 120)));
+        Gui.drawRect(x, thumbTop, x + 1, thumbTop + thumbHeight,
+                LostTalesChatVisualStyle.argb(
+                        LostTalesChatVisualStyle.IVORY, Math.min(alpha, 200)));
     }
 
     private void drawSearchRow(FontRenderer font, Layout layout,
@@ -255,20 +307,46 @@ abstract class ChatPickerPanel {
     }
 
     private void drawTooltip(FontRenderer font, int mouseX, int mouseY,
-                             int screenWidth) {
+                             int anchorRight) {
         Entry entry = this.hoveredEntry;
         String label = entry == null ? null : tooltip(entry);
         if (label == null || label.length() == 0) {
             return;
         }
         int width = font.getStringWidth(label) + 6;
-        int x = Math.max(2, Math.min(screenWidth - width - 2,
+        int x = Math.max(2, Math.min(anchorRight - width,
                 mouseX - width / 2));
         int y = mouseY - 14;
         Gui.drawRect(x, y, x + width, y + 11,
                 LostTalesChatVisualStyle.argb(
                         LostTalesChatVisualStyle.SURFACE_RGB, 0xE6));
         LostTalesChatVisualStyle.drawPlain(font, label, x + 3, y + 2, 255);
+    }
+
+    /** Scissors the body rectangle in window pixels; false if unavailable. */
+    private boolean beginBodyClip(Minecraft minecraft, Layout layout,
+                                  int slide) {
+        try {
+            ScaledResolution resolution = new ScaledResolution(minecraft,
+                    minecraft.displayWidth, minecraft.displayHeight);
+            int factor = Math.max(1, resolution.getScaleFactor());
+            GL11.glPushAttrib(GL11.GL_SCISSOR_BIT | GL11.GL_ENABLE_BIT);
+            GL11.glEnable(GL11.GL_SCISSOR_TEST);
+            GL11.glScissor(layout.left * factor,
+                    (resolution.getScaledHeight() - (layout.bodyBottom + slide))
+                            * factor,
+                    panelWidth() * factor,
+                    Math.max(0, layout.bodyBottom - layout.bodyTop) * factor);
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private static void endBodyClip(boolean clipped) {
+        if (clipped) {
+            GL11.glPopAttrib();
+        }
     }
 
     private void ensureSearchField(FontRenderer font) {
@@ -311,32 +389,39 @@ abstract class ChatPickerPanel {
     }
 
     /**
-     * Sections and resting cell positions for the current search and fold
-     * state. Rebuilt on demand; candidate counts are small enough that
-     * this costs nothing measurable per frame.
+     * Sections and cell positions for the current search, fold and scroll
+     * state. The panel takes its natural height up to the screen's middle;
+     * beyond that the body scrolls. Rebuilt on demand; candidate counts are
+     * small enough that this costs nothing measurable per frame.
      */
-    private Layout buildLayout(int screenWidth, int screenHeight) {
+    private Layout buildLayout(int anchorRight, int screenHeight) {
         Layout layout = new Layout();
         List<Section> sections = buildSections(searchQuery());
-        int height = PADDING + SEARCH_HEIGHT;
+        int bodyHeight = 0;
         for (Section section : sections) {
             if (section.label != null) {
-                height += LABEL_HEIGHT;
+                bodyHeight += LABEL_HEIGHT;
                 if (section.collapsible
                         && isCollapsed(collapseKey(section.label))) {
                     continue;
                 }
             }
-            height += rowsOf(section) * cellHeight();
+            bodyHeight += rowsOf(section) * cellHeight();
         }
-        height += PADDING;
-
-        layout.height = height;
-        layout.left = screenWidth - panelWidth() - BUTTON_MARGIN;
-        layout.top = screenHeight - PANEL_BOTTOM_MARGIN - height;
+        int frame = PADDING + SEARCH_HEIGHT + PADDING;
+        int maxHeight = Math.max(frame + cellHeight(),
+                screenHeight - PANEL_BOTTOM_MARGIN - screenHeight / 2);
+        layout.height = Math.min(frame + bodyHeight, maxHeight);
+        layout.left = anchorRight - panelWidth() - BUTTON_MARGIN;
+        layout.top = screenHeight - PANEL_BOTTOM_MARGIN - layout.height;
         layout.searchY = layout.top + PADDING + 1;
+        layout.bodyTop = layout.top + PADDING + SEARCH_HEIGHT;
+        layout.bodyBottom = layout.top + layout.height - PADDING;
+        layout.maxScroll = Math.max(0,
+                bodyHeight - (layout.bodyBottom - layout.bodyTop));
+        this.scroll = Math.max(0, Math.min(layout.maxScroll, this.scroll));
 
-        int cursorY = layout.top + PADDING + SEARCH_HEIGHT;
+        int cursorY = layout.bodyTop - this.scroll;
         for (Section section : sections) {
             if (section.label != null) {
                 layout.labels.add(new Label(section.label,
@@ -359,9 +444,16 @@ abstract class ChatPickerPanel {
         return layout;
     }
 
+    /**
+     * Rows a section occupies. A labelled section with nothing in it is
+     * its label alone (an empty-state line); an unlabelled empty result
+     * list still keeps one blank row so the panel has a body.
+     */
     private int rowsOf(Section section) {
-        return Math.max(1, (section.entries.size() + columns() - 1)
-                / columns());
+        if (section.entries.isEmpty()) {
+            return section.label == null ? 1 : 0;
+        }
+        return (section.entries.size() + columns() - 1) / columns();
     }
 
     private float openProgress() {
@@ -460,5 +552,14 @@ abstract class ChatPickerPanel {
         int top;
         int height;
         int searchY;
+        /** Visible body: rows are clipped to [bodyTop, bodyBottom). */
+        int bodyTop;
+        int bodyBottom;
+        int maxScroll;
+
+        /** Whether any part of a row at {@code y} lies inside the body. */
+        boolean showsRow(int y, int rowHeight) {
+            return y + rowHeight > this.bodyTop && y < this.bodyBottom;
+        }
     }
 }

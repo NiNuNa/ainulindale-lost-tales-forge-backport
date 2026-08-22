@@ -7,6 +7,7 @@ import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
@@ -22,14 +23,19 @@ import org.lwjgl.opengl.GL11;
  * The bounded player card: shown for the head or name of a chat line, and
  * for a row of the mention completion list, so hovering either tells the
  * same story about the same player. A chat line supplies its snapshotted
- * identity; a mention row supplies the live public appearance the server
- * already synced for that player.
+ * identity; the details — race, starting faction, level, gender, age, and
+ * biography — come from the public appearance the server already synced
+ * for that player, and are only shown when they describe the character
+ * the line names.
  */
 final class LostTalesChatHoverCard {
     private static final int PADDING = 6;
     private static final int HEAD_SIZE = 16;
     private static final int MIN_WIDTH = 118;
     private static final int MAX_WIDTH = 210;
+    /** Text width a biography may push the card out to before wrapping. */
+    private static final int DESCRIPTION_WIDTH = 170;
+    private static final int MAX_DESCRIPTION_LINES = 4;
 
     private LostTalesChatHoverCard() {}
 
@@ -93,6 +99,12 @@ final class LostTalesChatHoverCard {
         }
     }
 
+    /**
+     * Lays the card out as a name line followed by detail lines, then
+     * draws it. The name line reads {@code Character (Account)} for a
+     * character identity and just {@code Account} otherwise; every detail
+     * line is omitted rather than shown empty when the value is unknown.
+     */
     private static void drawCard(Minecraft minecraft, Target target,
                                  int mouseX, int mouseY,
                                  int screenWidth, int screenHeight) {
@@ -100,39 +112,71 @@ final class LostTalesChatHoverCard {
             return;
         }
         FontRenderer font = minecraft.fontRenderer;
-        String name = target.identityName;
+        CharacterAppearance details = detailsFor(target);
+        String name = LostTalesChatVisualStyle.removeColorCodes(
+                target.identityName).trim();
+        String account = target.accountName.trim();
+        // Never "Name ()" or "(Account)": the suffix only exists when both
+        // halves do, and an account identity shows the account alone.
+        String suffix = !target.accountIdentity && name.length() > 0
+                && account.length() > 0 && !name.equalsIgnoreCase(account)
+                ? " (" + account + ")" : "";
+        if (name.length() == 0) {
+            name = account;
+            suffix = "";
+        }
         String title = cleanBracketed(target.title);
-        String account = target.accountName;
-        String race = raceFor(target);
+        List<String> lines = new ArrayList<String>(8);
+        if (title.length() > 0) {
+            lines.add(title);
+        }
+        addDetail(lines, "gui.losttales.character.race",
+                details == null ? "" : ClientCharacterDisplayNames.race(
+                        details.getRaceId()));
+        addDetail(lines, "gui.losttales.chat.card.faction",
+                details == null || details.getStartingFactionId().length() == 0
+                        ? "" : ClientCharacterDisplayNames.faction(
+                                details.getStartingFactionId()));
+        addDetail(lines, "gui.losttales.chat.card.level",
+                details == null || details.getRoleplayLevel() <= 0
+                        ? "" : String.valueOf(details.getRoleplayLevel()));
+        addDetail(lines, "gui.losttales.character.gender",
+                details == null || details.getGenderId().length() == 0
+                        ? "" : ClientCharacterDisplayNames.gender(
+                                details.getGenderId()));
+        addDetail(lines, "gui.losttales.character.age",
+                details == null || details.getAge() <= 0
+                        ? "" : String.valueOf(details.getAge()));
+        String description = details == null ? "" : details.getDescription();
 
-        String accountLine = StatCollector.translateToLocal(
-                "gui.losttales.character.minecraft_account") + ": "
-                + account;
-        String raceLine = race.length() == 0 ? ""
-                : StatCollector.translateToLocal(
-                        "gui.losttales.character.race") + ": " + race;
-        int contentWidth = Math.max(font.getStringWidth(name),
-                font.getStringWidth(accountLine));
-        contentWidth = Math.max(contentWidth,
-                font.getStringWidth(title));
-        contentWidth = Math.max(contentWidth,
-                font.getStringWidth(raceLine));
+        int contentWidth = font.getStringWidth(name + suffix);
+        for (int index = 0; index < lines.size(); index++) {
+            contentWidth = Math.max(contentWidth,
+                    font.getStringWidth(lines.get(index)));
+        }
+        if (description.length() > 0) {
+            contentWidth = Math.max(contentWidth, Math.min(
+                    font.getStringWidth(description), DESCRIPTION_WIDTH));
+        }
         int width = Math.max(MIN_WIDTH,
                 Math.min(MAX_WIDTH, PADDING + HEAD_SIZE + 6
                         + contentWidth + PADDING));
         width = Math.min(width, Math.max(40, screenWidth - 8));
         int textWidth = width - PADDING - HEAD_SIZE - 6 - PADDING;
-        name = LostTalesSkyrimUiStyle.trimToWidth(font, name, textWidth);
-        title = LostTalesSkyrimUiStyle.trimToWidth(
-                font, title, textWidth);
-        accountLine = LostTalesSkyrimUiStyle.trimToWidth(
-                font, accountLine, textWidth);
-        raceLine = LostTalesSkyrimUiStyle.trimToWidth(
-                font, raceLine, textWidth);
-        int lines = 2 + (title.length() == 0 ? 0 : 1)
-                + (raceLine.length() == 0 ? 0 : 1);
+        if (description.length() > 0) {
+            appendDescription(font, lines, description, textWidth);
+        }
+        int nameWidth = font.getStringWidth(name);
+        if (nameWidth + font.getStringWidth(suffix) > textWidth) {
+            // The account suffix gives way before the name does.
+            suffix = LostTalesSkyrimUiStyle.trimToWidth(font, suffix,
+                    Math.max(0, textWidth - nameWidth));
+            name = LostTalesSkyrimUiStyle.trimToWidth(font, name, textWidth);
+            nameWidth = font.getStringWidth(name);
+        }
+        int lineCount = 1 + lines.size();
         int height = Math.max(HEAD_SIZE + PADDING * 2,
-                PADDING * 2 + lines * font.FONT_HEIGHT);
+                PADDING * 2 + lineCount * font.FONT_HEIGHT);
         int x = cardX(mouseX, width, screenWidth);
         int y = cardY(mouseY, height, screenHeight);
 
@@ -144,23 +188,61 @@ final class LostTalesChatHoverCard {
             int textX = x + PADDING + HEAD_SIZE + 6;
             int textY = y + PADDING;
             drawColored(font, name, textX, textY, target.nameColor);
-            textY += font.FONT_HEIGHT;
-            if (title.length() > 0) {
-                LostTalesChatVisualStyle.drawPlain(font, title,
-                        textX, textY, 255);
-                textY += font.FONT_HEIGHT;
-            }
-            drawColored(font, accountLine, textX, textY,
-                    LostTalesSkyrimUiStyle.TEXT_MUTED);
-            textY += font.FONT_HEIGHT;
-            if (raceLine.length() > 0) {
-                drawColored(font, raceLine, textX, textY,
+            if (suffix.length() > 0) {
+                drawColored(font, suffix, textX + nameWidth, textY,
                         LostTalesSkyrimUiStyle.TEXT_MUTED);
+            }
+            textY += font.FONT_HEIGHT;
+            for (int index = 0; index < lines.size(); index++) {
+                String line = LostTalesSkyrimUiStyle.trimToWidth(font,
+                        lines.get(index), textWidth);
+                if (index == 0 && title.length() > 0) {
+                    LostTalesChatVisualStyle.drawPlain(font, line,
+                            textX, textY, 255);
+                } else {
+                    drawColored(font, line, textX, textY,
+                            LostTalesSkyrimUiStyle.TEXT_MUTED);
+                }
+                textY += font.FONT_HEIGHT;
             }
         } finally {
             GL11.glPopMatrix();
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glEnable(GL11.GL_ALPHA_TEST);
+        }
+    }
+
+    private static void addDetail(List<String> lines, String labelKey,
+                                  String value) {
+        String text = value == null ? "" : value.trim();
+        if (text.length() > 0) {
+            lines.add(StatCollector.translateToLocal(labelKey) + ": "
+                    + text);
+        }
+    }
+
+    /**
+     * The biography, wrapped to the card and bounded to a few lines so a
+     * long one cannot push the card off the screen.
+     */
+    private static void appendDescription(FontRenderer font,
+                                          List<String> lines,
+                                          String description,
+                                          int textWidth) {
+        String label = StatCollector.translateToLocal(
+                "gui.losttales.character.description") + ": ";
+        @SuppressWarnings("unchecked")
+        List<String> wrapped = font.listFormattedStringToWidth(
+                label + LostTalesChatVisualStyle.removeColorCodes(
+                        description), Math.max(20, textWidth));
+        int count = Math.min(wrapped.size(), MAX_DESCRIPTION_LINES);
+        for (int index = 0; index < count; index++) {
+            String line = wrapped.get(index).trim();
+            if (index == count - 1 && wrapped.size() > count) {
+                line = LostTalesSkyrimUiStyle.trimToWidth(font,
+                        line + "...", textWidth);
+            }
+            lines.add(line);
         }
     }
 
@@ -198,7 +280,7 @@ final class LostTalesChatHoverCard {
                     continue;
                 }
                 int partWidth = LostTalesChatVisualStyle.partWidth(
-                        minecraft.fontRenderer, part);
+                        minecraft.fontRenderer, part, true);
                 ChatHeadMarker.Data decodedHead =
                         ChatHeadMarker.decode(part);
                 // NPCs have no account or character card to show.
@@ -295,21 +377,26 @@ final class LostTalesChatHoverCard {
         return space < 0 ? account : account.substring(0, space);
     }
 
-    private static String raceFor(Target target) {
+    /**
+     * The live public character details behind a card, or null when none
+     * are known or they belong to a different character than the line
+     * names: a historic chat line must not borrow the sender's newer
+     * identity after a switch.
+     */
+    private static CharacterAppearance detailsFor(Target target) {
         CharacterAppearance appearance =
                 ClientCharacterAppearanceCache.getAuthoritative(
                         target.playerId);
         if (appearance == null || !appearance.isPresent()) {
-            return "";
+            return null;
         }
         if (!target.accountIdentity
-                && !target.identityName.equals(
-                appearance.getCharacterName())) {
-            // A historic chat line must not borrow the sender's newer
-            // character identity after a switch.
-            return "";
+                && !LostTalesChatVisualStyle.removeColorCodes(
+                        target.identityName).trim().equals(
+                        appearance.getCharacterName())) {
+            return null;
         }
-        return ClientCharacterDisplayNames.race(appearance.getRaceId());
+        return appearance;
     }
 
     private static void drawHead(Minecraft minecraft, Target target,

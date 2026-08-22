@@ -28,6 +28,10 @@ public final class ClientChatChannelState {
     private static String cachedFactionId = "";
     private static String cachedFactionName = "";
     private static long cachedFactionNanos;
+    /** Server-stated operator status; the Admin tab exists only with it. */
+    private static boolean adminAccess;
+    /** Unsent input kept across closing and reopening the chat screen. */
+    private static String draft = "";
 
     private ClientChatChannelState() {}
 
@@ -47,9 +51,10 @@ public final class ClientChatChannelState {
         return selected;
     }
 
+    /** Available channels in presentation order (tabs, indicator, cycle). */
     public static synchronized List<ChatChannel> getAvailableChannels() {
         ArrayList<ChatChannel> result = new ArrayList<ChatChannel>();
-        for (ChatChannel channel : ChatChannel.values()) {
+        for (ChatChannel channel : ChatChannel.presentationOrder()) {
             if (isAvailable(channel)) {
                 result.add(channel);
             }
@@ -68,7 +73,8 @@ public final class ClientChatChannelState {
         if (channel == null) {
             return false;
         }
-        if (channel == ChatChannel.ALL || channel == ChatChannel.OOC) {
+        if (channel == ChatChannel.ALL || channel == ChatChannel.OOC
+                || channel == ChatChannel.CONSOLE) {
             return true;
         }
         return canSend(channel);
@@ -78,6 +84,9 @@ public final class ClientChatChannelState {
     public static synchronized boolean canSend(ChatChannel channel) {
         if (channel == null) {
             return false;
+        }
+        if (channel == ChatChannel.ADMIN) {
+            return adminAccess;
         }
         CharacterSummary active = activeCharacter();
         if (channel.getIdentityType() == ChatIdentityType.CHARACTER
@@ -148,11 +157,32 @@ public final class ClientChatChannelState {
                 ? channel.getDisplayName() : cachedFactionName;
     }
 
+    /** Applies the server's statement of operator status. */
+    public static synchronized void setAdminAccess(boolean access) {
+        adminAccess = access;
+        ensureAvailable();
+    }
+
+    public static synchronized boolean hasAdminAccess() {
+        return adminAccess;
+    }
+
+    /** Remembers unsent input so closing the screen does not lose it. */
+    public static synchronized void setDraft(String text) {
+        draft = text == null ? "" : text;
+    }
+
+    public static synchronized String getDraft() {
+        return draft;
+    }
+
     public static synchronized void clear() {
         selected = ChatChannel.ALL;
         cachedFactionId = "";
         cachedFactionName = "";
         cachedFactionNanos = 0L;
+        adminAccess = false;
+        draft = "";
     }
 
     private static CharacterSummary activeCharacter() {

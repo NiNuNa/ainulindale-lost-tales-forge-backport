@@ -53,7 +53,11 @@ final class ChatShareCandidates {
         return entries;
     }
 
-    /** Visible map markers in store order with duplicate-name ordinals. */
+    /**
+     * Map markers the player has actually reached — discovered and
+     * region-unlocked, the same rule the server applies on send — in store
+     * order with duplicate-name ordinals.
+     */
     static List<MarkerEntry> markers() {
         List<MarkerEntry> entries = new ArrayList<MarkerEntry>();
         List<String> seenNames = new ArrayList<String>();
@@ -62,7 +66,7 @@ final class ChatShareCandidates {
                 : LostTalesClientMapMarkerStore.getAllMarkers()) {
             if (marker == null || marker.getId() == null
                     || marker.getId().length() == 0
-                    || !LostTalesClientMapMarkerVisibility.isMapVisible(marker)) {
+                    || !LostTalesClientMapMarkerVisibility.isVisited(marker)) {
                 continue;
             }
             String name = ChatShareTokenParser.plainName(marker.getName());

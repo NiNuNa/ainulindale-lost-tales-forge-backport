@@ -37,6 +37,10 @@ public final class LostTalesClassTransformerTest {
             "com/ninuna/losttales/client/gui/tooltip/LostTalesTooltipHooks";
     private static final String CHAT_HIT_HOOK_OWNER =
             "com/ninuna/losttales/client/chat/LostTalesChatHitHooks";
+    private static final String CHAT_WRAP_HOOK_OWNER =
+            "com/ninuna/losttales/client/chat/LostTalesChatWrapHooks";
+    private static final String FAST_TRAVEL_ARRIVAL_HOOK_OWNER =
+            "com/ninuna/losttales/compat/lotr/LostTalesLotrFastTravelArrivalHook";
     private static final String DEBUG_HOOK_OWNER =
             "com/ninuna/losttales/character/physics/CharacterDebugHitboxHook";
     private static final String FAST_TRAVEL_HOOK_OWNER =
@@ -179,6 +183,76 @@ public final class LostTalesClassTransformerTest {
         MethodNode method = findMethod(chat, "func_146236_a");
         assertTrue(firstCallIsHook(
                 method, CHAT_HIT_HOOK_OWNER, "isActive"));
+    }
+
+    @Test
+    public void chatLinesAreLaidOutByTheLostTalesWrapper() throws Exception {
+        ClassNode chat = transform("net.minecraft.client.gui.GuiNewChat");
+        MethodNode method = findMethod(chat, "func_146237_a");
+        assertTrue(containsStaticHook(
+                chat, "func_146237_a", CHAT_WRAP_HOOK_OWNER, "wrap"));
+        // The replacement happens after vanilla has wrapped (so the
+        // vanilla list is complete) and before getChatOpen() starts filing
+        // lines into the history, and it stores back into the same local
+        // the list was loaded from.
+        boolean hookSeen = false;
+        boolean storesBack = false;
+        boolean openAfterHook = false;
+        int loadedVar = -1;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (instruction instanceof MethodInsnNode) {
+                MethodInsnNode call = (MethodInsnNode)instruction;
+                if (CHAT_WRAP_HOOK_OWNER.equals(call.owner)
+                        && "wrap".equals(call.name)) {
+                    hookSeen = true;
+                    loadedVar = ((org.objectweb.asm.tree.VarInsnNode)
+                            previousCode(call)).var;
+                    org.objectweb.asm.tree.VarInsnNode store =
+                            (org.objectweb.asm.tree.VarInsnNode)
+                                    nextCode(call);
+                    storesBack = store.getOpcode() == Opcodes.ASTORE
+                            && store.var == loadedVar;
+                } else if (hookSeen && "net/minecraft/client/gui/GuiNewChat"
+                        .equals(call.owner)
+                        && ("getChatOpen".equals(call.name)
+                        || "func_146241_e".equals(call.name))) {
+                    openAfterHook = true;
+                }
+            }
+        }
+        assertTrue(hookSeen);
+        assertTrue(storesBack);
+        assertTrue(openAfterHook);
+    }
+
+    @Test
+    public void lotrFastTravelCompletionReportsArrivals() throws Exception {
+        ClassNode data = transform("lotr.common.LOTRPlayerData");
+        MethodNode method = findMethod(data, "receiveFTBouncePacket");
+        assertTrue(containsStaticHook(data, "receiveFTBouncePacket",
+                FAST_TRAVEL_ARRIVAL_HOOK_OWNER, "onArrived"));
+        // The hook runs directly after the teleport, fed by a copy of the
+        // receiver and waypoint taken just before it.
+        boolean ordered = false;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof MethodInsnNode)) {
+                continue;
+            }
+            MethodInsnNode call = (MethodInsnNode)instruction;
+            if ("fastTravelTo".equals(call.name)) {
+                AbstractInsnNode before = previousCode(call);
+                AbstractInsnNode after = nextCode(call);
+                ordered = before != null
+                        && before.getOpcode() == Opcodes.DUP2
+                        && after instanceof MethodInsnNode
+                        && FAST_TRAVEL_ARRIVAL_HOOK_OWNER.equals(
+                                ((MethodInsnNode)after).owner)
+                        && "onArrived".equals(((MethodInsnNode)after).name);
+            }
+        }
+        assertTrue(ordered);
     }
 
     @Test
@@ -617,6 +691,15 @@ public final class LostTalesClassTransformerTest {
                 ? null : instruction.getPrevious();
         while (cursor != null && cursor.getOpcode() < 0) {
             cursor = cursor.getPrevious();
+        }
+        return cursor;
+    }
+
+    private static AbstractInsnNode nextCode(AbstractInsnNode instruction) {
+        AbstractInsnNode cursor = instruction == null
+                ? null : instruction.getNext();
+        while (cursor != null && cursor.getOpcode() < 0) {
+            cursor = cursor.getNext();
         }
         return cursor;
     }

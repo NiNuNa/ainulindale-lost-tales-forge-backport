@@ -27,16 +27,26 @@ import net.minecraft.client.gui.ChatLine;
 public final class ClientChatChannelViews {
     /** Above vanilla's 100-message history so every shown line is tracked. */
     private static final int MAX_TRACKED_LINES = 256;
-    /** Unread counts stop climbing here; the badge shows "99+". */
+    /** Unread counts stop climbing here; the tab shows "99+". */
     public static final int MAX_UNREAD = 99;
-    /** The one tab that also shows vanilla and other mods' lines. */
-    public static final ChatChannel SYSTEM_LINE_VIEW = ChatChannel.ALL;
+    /**
+     * The one tab that shows lines Lost Tales did not route: command
+     * output, fast-travel countdowns, achievements, other mods' notices.
+     * They are what only this player sees anyway, so they live in the
+     * console tab and keep the conversation tabs clean.
+     */
+    public static final ChatChannel SYSTEM_LINE_VIEW = ChatChannel.CONSOLE;
     private static final LinkedHashMap<Integer, ChatChannel> CHANNEL_BY_LINE_ID =
             new LinkedHashMap<Integer, ChatChannel>();
     private static final int CHANNEL_COUNT = ChatChannel.values().length;
     private static final int[] SCROLL = new int[CHANNEL_COUNT];
-    private static final int[] UNREAD = new int[CHANNEL_COUNT];
-    private static final boolean[] MENTION = new boolean[CHANNEL_COUNT];
+    /**
+     * Unread messages per channel, split once at arrival: a message that
+     * @-mentions the local player counts as a ping and nowhere else, so the
+     * two counters never describe the same line twice.
+     */
+    private static final int[] UNREAD_PINGS = new int[CHANNEL_COUNT];
+    private static final int[] UNREAD_OTHER = new int[CHANNEL_COUNT];
 
     private static long viewSwitchNanos;
     private static long openedNanos;
@@ -67,9 +77,9 @@ public final class ClientChatChannelViews {
         }
         invalidateCache();
         if (channel != selected) {
+            int[] counter = mentionsLocalPlayer ? UNREAD_PINGS : UNREAD_OTHER;
             int ordinal = channel.ordinal();
-            UNREAD[ordinal] = Math.min(MAX_UNREAD + 1, UNREAD[ordinal] + 1);
-            MENTION[ordinal] |= mentionsLocalPlayer;
+            counter[ordinal] = Math.min(MAX_UNREAD + 1, counter[ordinal] + 1);
         }
     }
 
@@ -87,25 +97,30 @@ public final class ClientChatChannelViews {
         }
     }
 
-    /** Called while a view is on screen; clears its unread markers. */
+    /** Called while a view is on screen; clears its unread counters. */
     public static synchronized void markViewed(ChatChannel channel) {
         if (channel != null) {
-            UNREAD[channel.ordinal()] = 0;
-            MENTION[channel.ordinal()] = false;
+            UNREAD_PINGS[channel.ordinal()] = 0;
+            UNREAD_OTHER[channel.ordinal()] = 0;
         }
     }
 
-    /** Messages received since the channel was last viewed, capped. */
-    public static synchronized int unreadCount(ChatChannel channel) {
-        return channel == null ? 0 : UNREAD[channel.ordinal()];
+    /** Unread messages that mentioned the player, capped at MAX_UNREAD + 1. */
+    public static synchronized int unreadPingCount(ChatChannel channel) {
+        return channel == null ? 0 : UNREAD_PINGS[channel.ordinal()];
+    }
+
+    /** Unread messages other than pings, capped at MAX_UNREAD + 1. */
+    public static synchronized int unreadOtherCount(ChatChannel channel) {
+        return channel == null ? 0 : UNREAD_OTHER[channel.ordinal()];
     }
 
     public static synchronized boolean hasUnread(ChatChannel channel) {
-        return unreadCount(channel) > 0;
+        return unreadPingCount(channel) + unreadOtherCount(channel) > 0;
     }
 
     public static synchronized boolean hasUnreadMention(ChatChannel channel) {
-        return channel != null && MENTION[channel.ordinal()];
+        return unreadPingCount(channel) > 0;
     }
 
     /** The recorded channel, or null for vanilla and untracked lines. */
@@ -140,7 +155,7 @@ public final class ClientChatChannelViews {
             ChatChannel channel = CHANNEL_BY_LINE_ID.get(
                     Integer.valueOf(line.getChatLineID()));
             // Untracked lines (achievements, commands, other mods) live in
-            // the Global tab only, so the role-play and OOC tabs stay clean.
+            // the console tab only, so the conversation tabs stay clean.
             if (channel == view
                     || (channel == null && view == SYSTEM_LINE_VIEW)) {
                 visible.add(line);
@@ -239,8 +254,8 @@ public final class ClientChatChannelViews {
         CHANNEL_BY_LINE_ID.clear();
         for (int index = 0; index < CHANNEL_COUNT; index++) {
             SCROLL[index] = 0;
-            UNREAD[index] = 0;
-            MENTION[index] = false;
+            UNREAD_PINGS[index] = 0;
+            UNREAD_OTHER[index] = 0;
         }
         viewSwitchNanos = 0L;
         openedNanos = 0L;

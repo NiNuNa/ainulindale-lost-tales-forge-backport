@@ -26,6 +26,22 @@ public final class ChatPointerRegionsTest {
     }
 
     @Test
+    public void translatedOverlaysAndScreenOverlaysShareOneSpace() {
+        ChatPointerRegions regions = new ChatPointerRegions();
+        // The input bar group is drawn 13px lower this frame.
+        regions.reset(13);
+        regions.add(0, 100, 10, 110);
+        regions.addScreen(50, 100, 60, 110);
+        assertFalse(regions.contains(5, 105));
+        assertTrue(regions.contains(5, 118));
+        assertTrue(regions.contains(55, 105));
+        assertFalse(regions.contains(55, 118));
+        regions.reset();
+        regions.add(0, 100, 10, 110);
+        assertTrue(regions.contains(5, 105));
+    }
+
+    @Test
     public void growsBeyondInitialCapacity() {
         ChatPointerRegions regions = new ChatPointerRegions();
         for (int index = 0; index < 20; index++) {

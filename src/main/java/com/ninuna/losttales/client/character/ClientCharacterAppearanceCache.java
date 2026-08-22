@@ -68,12 +68,17 @@ public final class ClientCharacterAppearanceCache {
             if (active != null) {
                 return new CharacterAppearance(
                         playerId,
+                        "",
                         active.getName(),
                         active.getRaceId(),
                         active.getGenderId(),
                         active.getSkinId(),
                         active.isMinecraftCapeVisible(),
-                        active.getCosmeticCapeId());
+                        active.getCosmeticCapeId(),
+                        active.getStartingFactionId(),
+                        active.getRoleplayLevel(),
+                        active.getAge(),
+                        active.getDescription());
             }
         }
         return null;

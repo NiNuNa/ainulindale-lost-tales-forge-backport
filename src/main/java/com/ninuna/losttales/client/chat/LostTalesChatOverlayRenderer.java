@@ -217,7 +217,7 @@ final class LostTalesChatOverlayRenderer {
                     continue;
                 }
                 cursor += LostTalesChatVisualStyle.partWidth(
-                        minecraft.fontRenderer, part);
+                        minecraft.fontRenderer, part, true);
                 if (band.localX < cursor) {
                     return new Hit(part, lineRoot);
                 }
@@ -259,6 +259,21 @@ final class LostTalesChatOverlayRenderer {
             this.bottom = bottom;
             this.scale = scale;
         }
+    }
+
+    /**
+     * Right edge (GUI coordinates) of the history's backdrop band before
+     * its fade: the chat width setting at the chat scale, plus the band's
+     * own margins, as drawn from the resting origin.
+     */
+    static int historyRight(GuiNewChat chat) {
+        if (chat == null) {
+            return 0;
+        }
+        float scale = chat.func_146244_h();
+        int unscaledWidth = MathHelper.ceiling_float_int(
+                chat.func_146228_f() / scale);
+        return Math.round(2.0F + (unscaledWidth + 4) * scale);
     }
 
     /** Lines that fit the user's configured chat pixel height at 11px. */
@@ -332,20 +347,22 @@ final class LostTalesChatOverlayRenderer {
                 alpha = (int)(alpha * (0.35F + 0.65F * viewProgress));
                 alpha = (int)(alpha * opening.getOpacity());
                 eligibleLineCount++;
-                if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
-                    continue;
-                }
-
                 int y = -index * LINE_HEIGHT;
                 float slide = entrySlide(line);
                 if (open) {
                     // Recorded exactly as drawn: the same translate, slide
-                    // and scale the quads below use.
+                    // and scale the quads below use. Recorded even while
+                    // the line is still too faint to paint, so the tabs
+                    // standing on the bands exist from the first frame of
+                    // the opening fade instead of popping in later.
                     float bandLeft = originX + slide * scale;
                     BANDS.add(index + scrollPosition, bandLeft,
                             bandLeft + unscaledWidth * scale,
                             originY + (y - LINE_HEIGHT) * scale,
                             originY + y * scale);
+                }
+                if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+                    continue;
                 }
                 // Backdrop and text slide together so the newest message
                 // enters as one piece instead of text moving over a static
@@ -473,9 +490,9 @@ final class LostTalesChatOverlayRenderer {
                 return;
             }
             // getFormattedText() recursively includes a component's siblings.
-            // Measuring only this node keeps the marker aligned after vanilla
-            // has split the structured message into wrapped ChatLines.
-            x += LostTalesChatVisualStyle.partWidth(font, part);
+            // Measuring only this node keeps the marker aligned after the
+            // structured message has been split into wrapped ChatLines.
+            x += LostTalesChatVisualStyle.partWidth(font, part, chatOpen);
         }
     }
 

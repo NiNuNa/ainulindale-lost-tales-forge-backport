@@ -10,6 +10,7 @@ import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
+import com.ninuna.losttales.compat.lotr.LostTalesWaystonePermissionPolicy;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
@@ -17,10 +18,12 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibilityPolicy;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
+import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyMember;
 import com.ninuna.losttales.party.server.PartyService;
+import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -82,6 +85,15 @@ public final class LostTalesChatService {
             sender.addChatMessage(new ChatComponentTranslation(
                     "chat.losttales.channel.faction_unavailable"));
             return;
+        } else if (channel.getRecipientRule()
+                == ChatRecipientRule.OPERATORS
+                && !LostTalesWaystonePermissionPolicy.isOperator(sender)) {
+            // The client only offers the tab while it believes the player
+            // is an operator; tell it again so a revoked op loses the tab.
+            sendAccess(sender);
+            sender.addChatMessage(new ChatComponentTranslation(
+                    "chat.losttales.channel.admin_unavailable"));
+            return;
         }
 
         String accountName = sender.getGameProfile() == null
@@ -120,6 +132,23 @@ public final class LostTalesChatService {
                 sender, channel, party, factionId)) {
             LostTalesNetworkHandler.CHANNEL.sendTo(packet, recipient);
         }
+    }
+
+    /**
+     * Tells one client which channels its operator status unlocks. Sent
+     * on login and whenever a staff-channel message is refused, so the
+     * Admin tab follows the server's view of op status without the client
+     * ever deciding it.
+     */
+    public static void sendAccess(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null
+                || player.worldObj.isRemote) {
+            return;
+        }
+        LostTalesNetworkHandler.CHANNEL.sendTo(
+                new LostTalesChatAccessPacket(
+                        LostTalesWaystonePermissionPolicy.isOperator(player)),
+                player);
     }
 
     /**
@@ -229,6 +258,11 @@ public final class LostTalesChatService {
                                     record.getName()))) {
                 return null;
             }
+            if (!LostTalesWaypointFastTravelPolicy.hasVisited(sender, record)) {
+                // Only places the sender has actually reached are shared;
+                // an undiscovered or region-locked marker stays plain text.
+                return null;
+            }
             return ChatShowcase.marker(tokenIndex, record.getId(),
                     record.getName(), record.getIconName(),
                     record.getColorName(), record.getDimensionId(),
@@ -259,6 +293,15 @@ public final class LostTalesChatService {
             }
             if (channel.getRecipientRule() == ChatRecipientRule.GLOBAL) {
                 result.add(candidate);
+            } else if (channel.getRecipientRule() == ChatRecipientRule.SELF) {
+                if (candidate == sender) {
+                    result.add(candidate);
+                }
+            } else if (channel.getRecipientRule()
+                    == ChatRecipientRule.OPERATORS) {
+                if (LostTalesWaystonePermissionPolicy.isOperator(candidate)) {
+                    result.add(candidate);
+                }
             } else if (channel.getRecipientRule()
                     == ChatRecipientRule.PROXIMITY) {
                 if (candidate.dimension == sender.dimension

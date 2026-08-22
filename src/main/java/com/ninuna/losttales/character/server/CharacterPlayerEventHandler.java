@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.accessory.player.AccessoryInventorySyncManager;
 import com.ninuna.losttales.accessory.player.AccessoryRecoveryService;
 import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
+import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.character.switching.CharacterLifecycleStateTracker;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
 import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferCoordinator;
@@ -141,6 +142,7 @@ public final class CharacterPlayerEventHandler {
                 CharacterSyncManager.UNSOLICITED_REQUEST_ID,
                 result.getRoster());
         CharacterAppearanceSyncManager.sendFullSnapshot(serverPlayer);
+        LostTalesChatService.sendAccess(serverPlayer);
         CharacterRaceGameplayHandler.apply(serverPlayer);
         CharacterAppearanceSyncManager.broadcastPlayer(serverPlayer, result.getRoster());
         AccessoryRecoveryService.recover(serverPlayer);

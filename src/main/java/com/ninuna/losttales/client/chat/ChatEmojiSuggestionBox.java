@@ -135,10 +135,14 @@ final class ChatEmojiSuggestionBox {
                                 LostTalesChatVisualStyle
                                         .SURFACE_HIGHLIGHT_RGB, 0xC8));
             }
-            ChatEmojiRenderer.draw(minecraft, emoji,
-                    inputX + 3, rowTop + 1, ChatEmoji.SPRITE_SIZE, 255);
+            ChatInlineIcons.drawEmoji(minecraft, emoji,
+                    ChatInlineIcons.boxLeft(inputX + 3,
+                            ChatInlineIcons.SLOT_WIDTH),
+                    ChatInlineIcons.boxTop(rowTop + 2,
+                            ChatInlineIcons.SLOT_WIDTH),
+                    ChatInlineIcons.CONTENT_SIZE, 255);
             LostTalesChatVisualStyle.drawPlain(font, emoji.getShortcode(),
-                    inputX + 3 + ChatEmoji.SPRITE_SIZE + 4, rowTop + 2,
+                    inputX + 3 + ChatInlineIcons.SLOT_WIDTH + 4, rowTop + 2,
                     row == this.selectedIndex ? 255 : 200);
         }
     }
@@ -149,7 +153,7 @@ final class ChatEmojiSuggestionBox {
             width = Math.max(width,
                     font.getStringWidth(emoji.getShortcode()));
         }
-        return width + ChatEmoji.SPRITE_SIZE + 12;
+        return width + ChatInlineIcons.SLOT_WIDTH + 12;
     }
 
     private int boxTop(int screenHeight) {

@@ -44,7 +44,7 @@ public enum ChatEmoji {
 
     /**
      * Square sprite edge in texels; also the on-screen size everywhere,
-     * including inline chat, whose 12px line stride leaves room for it.
+     * including inline chat, whose 11px line stride leaves room for it.
      */
     public static final int SPRITE_SIZE = 10;
     /** Cell-to-cell distance on the sheet: sprite plus a one-texel gutter. */

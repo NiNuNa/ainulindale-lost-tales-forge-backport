@@ -17,9 +17,16 @@ import net.minecraft.client.gui.Gui;
  * drawn last, lifted, and brighter, and its body runs into the box so the
  * two read as one sheet. Each tab eases its own prominence toward its
  * target from wherever it currently is, so rapid switching never waits on
- * a previous transition. A tab with unread messages carries a count badge.
- * Geometry is computed once per change of inputs and reused by drawing
- * and hit testing, so a frame allocates nothing.
+ * a previous transition. A tab with unread messages carries textual
+ * counters after its name: {@code (p)} pings in salmon, then {@code (x)}
+ * other unread lines in honey. Geometry is computed once per change of
+ * inputs and reused by drawing and hit testing, so a frame allocates
+ * nothing.
+ *
+ * <p>The row is positioned by the history it stands on: {@code boxTop}
+ * and {@code offsetX} come from the bands the overlay renderer drew, so
+ * the tabs enter, settle and fade with the same shared motion state as
+ * the history and its backdrop rather than with the input bar.</p>
  */
 final class ChatChannelTabBar {
     /** Body height of a resting tab; the selected tab rises above it. */
@@ -32,9 +39,12 @@ final class ChatChannelTabBar {
     private static final int PADDING_X = 6;
     private static final int MAX_LABEL_WIDTH = 72;
     private static final int MIN_LABEL_WIDTH = 14;
-    private static final int BADGE_GAP = 3;
-    private static final int BADGE_PADDING = 2;
-    private static final int BADGE_HEIGHT = 9;
+    /** Gap between the label and a counter, and between the counters. */
+    private static final int COUNTER_GAP = 3;
+    private static final int PING_COUNTER_RGB =
+            LostTalesColors.rgb(LostTalesColors.SALMON);
+    private static final int UNREAD_COUNTER_RGB =
+            LostTalesColors.rgb(LostTalesColors.HONEY);
 
     private static final int CHANNEL_COUNT = ChatChannel.values().length;
     private final float[] prominence = new float[CHANNEL_COUNT];
@@ -46,9 +56,11 @@ final class ChatChannelTabBar {
     private List<Tab> cachedTabs = Collections.emptyList();
     private List<ChatChannel> cachedChannels = Collections.emptyList();
     private final String[] cachedLabels = new String[CHANNEL_COUNT];
-    private final int[] cachedCounts = new int[CHANNEL_COUNT];
+    private final int[] cachedPings = new int[CHANNEL_COUNT];
+    private final int[] cachedOther = new int[CHANNEL_COUNT];
     private FontRenderer cachedFont;
     private int cachedScreenWidth = -1;
+    private float alphaScale = 1.0F;
 
     /** Advances every tab's easing toward the current selection. */
     void update(ChatChannel selected) {
@@ -96,9 +108,13 @@ final class ChatChannelTabBar {
         return boxTop - HEIGHT - LIFT;
     }
 
+    /**
+     * The tab under a GUI-space point, or null. {@code offsetX} is the
+     * horizontal motion the history is currently drawn with.
+     */
     ChatChannel tabAt(FontRenderer font, List<ChatChannel> channels,
                       ChatChannel selected, int screenWidth, int boxTop,
-                      int mouseX, int mouseY) {
+                      int offsetX, int mouseX, int mouseY) {
         if (mouseY < rowTop(boxTop) || mouseY >= rowBottom(boxTop)) {
             return null;
         }
@@ -106,9 +122,10 @@ final class ChatChannelTabBar {
         // Later tabs overlap earlier ones, so the last hit wins, except
         // the selected tab, which is on top of everything.
         ChatChannel hit = null;
+        int localX = mouseX - offsetX;
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
-            if (mouseX >= tab.x && mouseX < tab.x + tab.width) {
+            if (localX >= tab.x && localX < tab.x + tab.width) {
                 if (tab.channel == selected) {
                     return tab.channel;
                 }
@@ -119,13 +136,15 @@ final class ChatChannelTabBar {
     }
 
     /**
-     * Draws the row on top of the history; {@code alphaScale} follows the
-     * history's own opening fade so tabs and lines arrive together.
+     * Draws the row on top of the history. {@code offsetX} and
+     * {@code alphaScale} are the history's own opening motion, so tabs and
+     * lines arrive and fade together; the rectangle registered with
+     * {@code regions} is the one actually painted.
      */
     void draw(FontRenderer font, ChatPointerRegions regions,
               List<ChatChannel> channels, ChatChannel selected,
-              int screenWidth, int boxTop, int mouseX, int mouseY,
-              float alphaScale) {
+              int screenWidth, int boxTop, int offsetX,
+              int mouseX, int mouseY, float alphaScale) {
         update(selected);
         List<Tab> tabs = layout(font, channels, screenWidth);
         if (tabs.isEmpty()) {
@@ -133,7 +152,7 @@ final class ChatChannelTabBar {
         }
         this.alphaScale = Math.max(0.0F, Math.min(1.0F, alphaScale));
         ChatChannel hovered = tabAt(font, channels, selected, screenWidth,
-                boxTop, mouseX, mouseY);
+                boxTop, offsetX, mouseX, mouseY);
         int bottom = rowBottom(boxTop);
         Tab selectedTab = null;
         for (int index = 0; index < tabs.size(); index++) {
@@ -142,18 +161,17 @@ final class ChatChannelTabBar {
                 selectedTab = tab;
                 continue;
             }
-            drawTab(font, tab, bottom, tab.channel == hovered, false);
+            drawTab(font, tab, offsetX, bottom, tab.channel == hovered,
+                    false);
         }
         if (selectedTab != null) {
-            drawTab(font, selectedTab, bottom,
+            drawTab(font, selectedTab, offsetX, bottom,
                     selectedTab.channel == hovered, true);
         }
         Tab last = tabs.get(tabs.size() - 1);
-        regions.add(tabs.get(0).x, rowTop(boxTop), last.x + last.width,
-                bottom);
+        regions.addScreen(offsetX + tabs.get(0).x, rowTop(boxTop),
+                offsetX + last.x + last.width, bottom);
     }
-
-    private float alphaScale = 1.0F;
 
     private int scaled(int alpha) {
         int result = Math.round(alpha * this.alphaScale);
@@ -161,16 +179,16 @@ final class ChatChannelTabBar {
                 ? 0 : result;
     }
 
-    private void drawTab(FontRenderer font, Tab tab, int rowBottom,
-                         boolean hovered, boolean selected) {
+    private void drawTab(FontRenderer font, Tab tab, int offsetX,
+                         int rowBottom, boolean hovered, boolean selected) {
         float rise = this.prominence[tab.channel.ordinal()];
         int lift = Math.round(LIFT * rise);
         int top = rowBottom - HEIGHT - lift;
         // The selected tab joins the history box; resting tabs keep a one
         // pixel seam so they read as sitting behind it.
         int bottom = selected ? rowBottom + 1 : rowBottom;
-        int left = tab.x;
-        int right = tab.x + tab.width;
+        int left = offsetX + tab.x;
+        int right = left + tab.width;
 
         int surfaceAlpha = scaled(Math.round(0x90 + (0xE6 - 0x90) * rise));
         int surfaceRgb = blend(LostTalesChatVisualStyle.SURFACE_RGB,
@@ -192,32 +210,22 @@ final class ChatChannelTabBar {
                             LostTalesChatVisualStyle.SHADOW, scaled(0x90)));
         }
         int textAlpha = scaled(Math.round(185 + (255 - 185) * rise));
-        LostTalesChatVisualStyle.drawPlain(font, tab.label,
-                left + PADDING_X, top + 3, textAlpha);
-        if (tab.badge.length() > 0) {
-            drawBadge(font, tab, left + PADDING_X + tab.labelWidth
-                    + BADGE_GAP, top + 1);
+        int textX = left + PADDING_X;
+        int textY = top + 3;
+        LostTalesChatVisualStyle.drawPlain(font, tab.label, textX, textY,
+                textAlpha);
+        textX += tab.labelWidth;
+        if (tab.pingText.length() > 0) {
+            textX += COUNTER_GAP;
+            LostTalesChatVisualStyle.drawColored(font, tab.pingText,
+                    textX, textY, PING_COUNTER_RGB, textAlpha);
+            textX += tab.pingWidth;
         }
-    }
-
-    /**
-     * Unread count in a small pill; salmon when one of the unread messages
-     * mentioned the player, honey otherwise. The count is drawn in the
-     * shadow colour without a shadow of its own so it stays crisp.
-     */
-    private static void drawBadge(FontRenderer font, Tab tab,
-                                  int x, int y) {
-        boolean mention = ClientChatChannelViews.hasUnreadMention(tab.channel);
-        int fill = mention
-                ? LostTalesColors.rgb(LostTalesColors.SALMON)
-                : LostTalesColors.rgb(LostTalesColors.HONEY);
-        int width = tab.badgeWidth;
-        Gui.drawRect(x + 1, y, x + width - 1, y + BADGE_HEIGHT,
-                0xFF000000 | fill);
-        Gui.drawRect(x, y + 1, x + width, y + BADGE_HEIGHT - 1,
-                0xFF000000 | fill);
-        font.drawString(tab.badge, x + BADGE_PADDING, y + 1,
-                0xFF000000 | LostTalesChatVisualStyle.SHADOW);
+        if (tab.otherText.length() > 0) {
+            textX += COUNTER_GAP;
+            LostTalesChatVisualStyle.drawColored(font, tab.otherText,
+                    textX, textY, UNREAD_COUNTER_RGB, textAlpha);
+        }
     }
 
     /**
@@ -245,16 +253,18 @@ final class ChatChannelTabBar {
         int x = LEFT;
         for (int index = 0; index < channels.size(); index++) {
             ChatChannel channel = channels.get(index);
+            int ordinal = channel.ordinal();
             String label = LostTalesSkyrimUiStyle.trimToWidth(font,
-                    this.cachedLabels[channel.ordinal()], maxLabelWidth);
-            String badge = badgeText(this.cachedCounts[channel.ordinal()]);
+                    this.cachedLabels[ordinal], maxLabelWidth);
+            String pingText = counterText(this.cachedPings[ordinal]);
+            String otherText = counterText(this.cachedOther[ordinal]);
             int labelWidth = font.getStringWidth(label);
-            int badgeWidth = badge.length() == 0 ? 0
-                    : font.getStringWidth(badge) + BADGE_PADDING * 2;
+            int pingWidth = font.getStringWidth(pingText);
+            int otherWidth = font.getStringWidth(otherText);
             int width = labelWidth + PADDING_X * 2
-                    + (badgeWidth > 0 ? BADGE_GAP + badgeWidth : 0);
-            tabs.add(new Tab(channel, label, labelWidth, badge, badgeWidth,
-                    x, width));
+                    + countersWidth(pingWidth, otherWidth);
+            tabs.add(new Tab(channel, label, labelWidth, pingText,
+                    pingWidth, otherText, otherWidth, x, width));
             x += width - OVERLAP;
         }
         this.cachedTabs = Collections.unmodifiableList(tabs);
@@ -275,24 +285,33 @@ final class ChatChannelTabBar {
             ChatChannel channel = channels.get(index);
             int ordinal = channel.ordinal();
             String label = ClientChatChannelState.displayName(channel);
-            int count = ClientChatChannelViews.unreadCount(channel);
+            int pings = ClientChatChannelViews.unreadPingCount(channel);
+            int other = ClientChatChannelViews.unreadOtherCount(channel);
             if (!label.equals(this.cachedLabels[ordinal])
-                    || count != this.cachedCounts[ordinal]) {
+                    || pings != this.cachedPings[ordinal]
+                    || other != this.cachedOther[ordinal]) {
                 this.cachedLabels[ordinal] = label;
-                this.cachedCounts[ordinal] = count;
+                this.cachedPings[ordinal] = pings;
+                this.cachedOther[ordinal] = other;
                 current = false;
             }
         }
         return current;
     }
 
-    private static String badgeText(int count) {
+    /** {@code (n)} for a positive count, {@code (99+)} past the cap, else empty. */
+    static String counterText(int count) {
         if (count <= 0) {
             return "";
         }
-        return count > ClientChatChannelViews.MAX_UNREAD
+        return "(" + (count > ClientChatChannelViews.MAX_UNREAD
                 ? ClientChatChannelViews.MAX_UNREAD + "+"
-                : String.valueOf(count);
+                : String.valueOf(count)) + ")";
+    }
+
+    private static int countersWidth(int pingWidth, int otherWidth) {
+        return (pingWidth > 0 ? COUNTER_GAP + pingWidth : 0)
+                + (otherWidth > 0 ? COUNTER_GAP + otherWidth : 0);
     }
 
     private int totalWidth(FontRenderer font, List<ChatChannel> channels,
@@ -302,10 +321,12 @@ final class ChatChannelTabBar {
             int ordinal = channels.get(index).ordinal();
             String label = LostTalesSkyrimUiStyle.trimToWidth(font,
                     this.cachedLabels[ordinal], maxLabelWidth);
-            String badge = badgeText(this.cachedCounts[ordinal]);
             total += font.getStringWidth(label) + PADDING_X * 2
-                    + (badge.length() == 0 ? 0 : BADGE_GAP
-                            + font.getStringWidth(badge) + BADGE_PADDING * 2);
+                    + countersWidth(
+                            font.getStringWidth(counterText(
+                                    this.cachedPings[ordinal])),
+                            font.getStringWidth(counterText(
+                                    this.cachedOther[ordinal])));
         }
         return total;
     }
@@ -325,18 +346,26 @@ final class ChatChannelTabBar {
         final ChatChannel channel;
         final String label;
         final int labelWidth;
-        final String badge;
-        final int badgeWidth;
+        /** {@code (p)} unread pings, or empty. */
+        final String pingText;
+        final int pingWidth;
+        /** {@code (x)} other unread lines, or empty. */
+        final String otherText;
+        final int otherWidth;
+        /** Resting left edge before the history's horizontal motion. */
         final int x;
         final int width;
 
         Tab(ChatChannel channel, String label, int labelWidth,
-            String badge, int badgeWidth, int x, int width) {
+            String pingText, int pingWidth, String otherText,
+            int otherWidth, int x, int width) {
             this.channel = channel;
             this.label = label;
             this.labelWidth = labelWidth;
-            this.badge = badge;
-            this.badgeWidth = badgeWidth;
+            this.pingText = pingText;
+            this.pingWidth = pingWidth;
+            this.otherText = otherText;
+            this.otherWidth = otherWidth;
             this.x = x;
             this.width = width;
         }

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.world.map.waypoint;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdResolver;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibilityPolicy;
@@ -75,6 +76,70 @@ public final class LostTalesWaypointFastTravelPolicy {
             data.setTargetFTWaypoint(null);
             data.setTicksUntilFT(0);
         }
+    }
+
+    /**
+     * Whether the player has actually reached a marker: they may see it,
+     * its fast-travel region (if any) is unlocked for them, and, if it has
+     * to be discovered, their active character has discovered it. This is
+     * the rule for sharing a marker in chat; it deliberately ignores
+     * whether the marker offers fast travel or which dimension it is in.
+     */
+    public static boolean hasVisited(
+            EntityPlayerMP player, LostTalesMapMarkerRecord record) {
+        if (player == null || record == null || player.worldObj == null
+                || !LostTalesMapMarkerVisibilityPolicy.canView(
+                        record, player)) {
+            return false;
+        }
+        if (record.requiresRegionUnlock()) {
+            LOTRWaypoint.Region markerRegion =
+                    LostTalesMapMarkerRegionResolver.resolve(
+                            player.worldObj, record.toDefinition());
+            LOTRPlayerData lotrData = LOTRLevelData.getData(player);
+            if (markerRegion == null || lotrData == null
+                    || !lotrData.isFTRegionUnlocked(markerRegion)) {
+                return false;
+            }
+        }
+        if (!record.isDiscoverable()) {
+            return true;
+        }
+        LostTalesQuestPlayerData data =
+                LostTalesQuestPlayerData.get(player);
+        return data != null && data.isMarkerDiscovered(record.getId());
+    }
+
+    /**
+     * The marker id a fast-travel destination stands for: the saved record
+     * behind a custom waypoint, the bundled marker registered for a native
+     * waypoint, or the canonical {@code lotr:waypoint:name} id of a native
+     * waypoint without one. Empty when nothing answers.
+     */
+    public static String resolveMarkerId(
+            EntityPlayerMP player, LOTRAbstractWaypoint waypoint) {
+        if (waypoint == null) {
+            return "";
+        }
+        LostTalesMapMarkerRecord record = getSavedMarker(player, waypoint);
+        if (record != null && record.getId() != null
+                && record.getId().length() > 0) {
+            return record.getId();
+        }
+        LostTalesMapMarkerDefinition marker =
+                LostTalesMapMarkerWaypointRegistry
+                        .getMarkerForWaypoint(waypoint);
+        if (marker != null && marker.getId() != null
+                && marker.getId().length() > 0) {
+            return marker.getId();
+        }
+        if (waypoint instanceof LOTRWaypoint) {
+            String code = waypoint.getCodeName();
+            return code == null || code.length() == 0 ? ""
+                    : LostTalesMapMarkerIdResolver.LOTR_WAYPOINT_PREFIX
+                            + code.toLowerCase(java.util.Locale.ROOT);
+        }
+        return "";
     }
 
     public static boolean isAllowed(

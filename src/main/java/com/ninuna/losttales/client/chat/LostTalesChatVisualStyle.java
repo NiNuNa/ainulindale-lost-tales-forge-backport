@@ -7,6 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 
 /**
@@ -14,9 +15,11 @@ import net.minecraft.util.IChatComponent;
  * chat element — text, emotes, head icons, item and marker icons — draws
  * its shadow as a flat {@link #SHADOW} silhouette offset by one pixel at
  * half opacity, so the relationship between content and shadow is
- * identical at every GUI scale. Channel prefix components are skipped
+ * identical at every GUI scale; inline glyphs share the box and baseline
+ * rules of {@link ChatInlineIcons}. Channel prefix components are skipped
  * entirely while the chat screen is open (the tabs already say which
- * channel a line belongs to).
+ * channel a line belongs to), and layout markers advance the cursor
+ * without drawing.
  */
 final class LostTalesChatVisualStyle {
     static final int IVORY = LostTalesSkyrimUiStyle.rgb(
@@ -96,10 +99,48 @@ final class LostTalesChatVisualStyle {
                 | (rgb & 0xFFFFFF);
     }
 
-    /** Measured width of one component as the renderer advances past it. */
-    static int partWidth(FontRenderer font, IChatComponent part) {
-        return font.getStringWidth(part.getChatStyle().getFormattingCode()
-                + part.getUnformattedTextForChat());
+    /**
+     * Width of one component as the renderer advances past it: the text
+     * measured with its style's formatting code, or, for an indent marker,
+     * the inset recorded for the current chat state. Every walk over a
+     * line — drawing, head placement, hit testing, the hover card — must
+     * advance by this, so they all ask here.
+     */
+    static int partWidth(FontRenderer font, IChatComponent part,
+                         boolean chatOpen) {
+        ChatLayoutMarker.Data layout = ChatLayoutMarker.decode(part);
+        if (layout != null) {
+            return layout.indent(chatOpen);
+        }
+        return measure(font, part.getChatStyle().getFormattingCode(),
+                part.getUnformattedTextForChat(), chatColoursEnabled());
+    }
+
+    /**
+     * Vanilla's "chat colours" option. Off, every formatting code — ours
+     * and the sender's — is stripped before measuring and drawing, and the
+     * whole line is plain ivory, exactly as vanilla renders colourless
+     * chat. Measuring and drawing always agree because both ask here.
+     */
+    static boolean chatColoursEnabled() {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        return minecraft == null || minecraft.gameSettings == null
+                || minecraft.gameSettings.chatColours;
+    }
+
+    /** Every section-sign code removed, colour and decoration alike. */
+    static String stripCodes(String text) {
+        if (text == null || text.indexOf('§') < 0) {
+            return text == null ? "" : text;
+        }
+        String stripped = EnumChatFormatting.getTextWithoutFormattingCodes(text);
+        return stripped == null ? "" : stripped;
+    }
+
+    private static int measure(FontRenderer font, String formatting,
+                               String text, boolean colours) {
+        return font.getStringWidth(colours ? formatting + text
+                : stripCodes(formatting + text));
     }
 
     private static String removeExplicitWhite(String text) {
@@ -113,12 +154,20 @@ final class LostTalesChatVisualStyle {
         int cursor = x;
         boolean afterHead = false;
         boolean identitySeen = false;
+        boolean colours = chatColoursEnabled();
         for (Object value : line) {
             if (!(value instanceof IChatComponent)) {
                 continue;
             }
             IChatComponent part = (IChatComponent)value;
             if (ChatChannelPrefixMarker.isHidden(part, chatOpen)) {
+                continue;
+            }
+            ChatLayoutMarker.Data layout = ChatLayoutMarker.decode(part);
+            if (layout != null) {
+                // Zero-width layout metadata; an indent marker insets a
+                // continuation line under the message body.
+                cursor += layout.indent(chatOpen);
                 continue;
             }
             String text = part.getUnformattedTextForChat();
@@ -130,23 +179,13 @@ final class LostTalesChatVisualStyle {
 
             ChatEmoji emoji = ChatEmojiMarker.decode(part);
             if (emoji != null) {
-                int slotWidth = font.getStringWidth(formatting + text);
+                int slotWidth = measure(font, formatting, text, colours);
                 if (ChatEmojiMarker.reservesFullSlot(text)) {
-                    float size = Math.min(
-                            ChatEmoji.SPRITE_SIZE, slotWidth);
-                    float spriteX = cursor
-                            + Math.max(0.0F, (slotWidth - size) / 2.0F);
-                    // Two rows above the text baseline keeps the sprite
-                    // centred in the chat band while the text sits one
-                    // pixel lower than the sprite's top edge.
-                    Minecraft minecraft = Minecraft.getMinecraft();
-                    if (shadowPass) {
-                        ChatEmojiRenderer.drawShadow(minecraft, emoji,
-                                spriteX, y - 2, size, SHADOW, alpha);
-                    } else {
-                        ChatEmojiRenderer.draw(minecraft, emoji,
-                                spriteX, y - 2, size, alpha);
-                    }
+                    ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(), emoji,
+                            ChatInlineIcons.boxLeft(cursor, slotWidth),
+                            ChatInlineIcons.boxTop(y, slotWidth),
+                            ChatInlineIcons.contentSize(slotWidth), alpha,
+                            shadowPass);
                 }
                 cursor += slotWidth;
                 continue;
@@ -154,7 +193,7 @@ final class LostTalesChatVisualStyle {
 
             ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
             if (share != null && share.icon) {
-                int slotWidth = font.getStringWidth(formatting + text);
+                int slotWidth = measure(font, formatting, text, colours);
                 if (ChatEmojiMarker.reservesFullSlot(text)) {
                     drawShareIcon(share, cursor, y, slotWidth, alpha,
                             shadowPass);
@@ -170,7 +209,10 @@ final class LostTalesChatVisualStyle {
             boolean replyIdentity = isReplyIdentity(part);
             boolean identityBracket = "<".equals(text)
                     || (identitySeen && text.startsWith(">"));
-            if (shadowPass) {
+            if (!colours) {
+                rendered = stripCodes(formatting + text);
+                color = shadowPass ? SHADOW : IVORY;
+            } else if (shadowPass) {
                 rendered = styleCodesOnly(formatting)
                         + removeColorCodes(text);
                 color = SHADOW;
@@ -204,7 +246,7 @@ final class LostTalesChatVisualStyle {
                 color = IVORY;
             }
             font.drawString(rendered, cursor, y, argb(color, alpha));
-            cursor += font.getStringWidth(formatting + text);
+            cursor += measure(font, formatting, text, colours);
             identitySeen |= replyIdentity;
         }
     }
@@ -213,35 +255,23 @@ final class LostTalesChatVisualStyle {
                                       int cursor, int y, int slotWidth,
                                       int alpha, boolean shadowPass) {
         Minecraft minecraft = Minecraft.getMinecraft();
+        float boxX = ChatInlineIcons.boxLeft(cursor, slotWidth);
+        float boxY = ChatInlineIcons.boxTop(y, slotWidth);
+        float size = ChatInlineIcons.contentSize(slotWidth);
         if (share.kind == ChatShareKind.ITEM) {
             ItemStack stack = ClientChatShowcaseStore.getItem(share.showcaseId);
-            if (stack == null) {
-                return;
-            }
-            float size = Math.min(ChatItemRenderer.ICON_SIZE, slotWidth);
-            float iconX = cursor + Math.max(0.0F, (slotWidth - size) / 2.0F);
-            if (shadowPass) {
-                ChatItemRenderer.drawShadow(minecraft, stack, iconX, y - 1,
-                        size, SHADOW, alpha);
-            } else {
-                ChatItemRenderer.draw(minecraft, stack, iconX, y - 1,
-                        size, alpha);
+            if (stack != null) {
+                ChatInlineIcons.drawItem(minecraft, stack, boxX, boxY, size,
+                        alpha, shadowPass);
             }
             return;
         }
         ClientChatShowcaseStore.Marker marker =
                 ClientChatShowcaseStore.getMarker(share.showcaseId);
-        if (marker == null) {
-            return;
-        }
-        float size = Math.min(ChatMapMarkerRenderer.ICON_SIZE, slotWidth);
-        float iconX = cursor + Math.max(0.0F, (slotWidth - size) / 2.0F);
-        if (shadowPass) {
-            ChatMapMarkerRenderer.drawShadow(minecraft, marker.iconName,
-                    iconX, y - 2, size, SHADOW, alpha);
-        } else {
-            ChatMapMarkerRenderer.draw(minecraft, marker.iconName,
-                    marker.colorName, iconX, y - 2, size, alpha);
+        if (marker != null) {
+            ChatInlineIcons.drawMarker(minecraft, marker.iconName,
+                    ChatInlineIcons.markerRgb(marker.colorName),
+                    boxX, boxY, size, alpha, shadowPass);
         }
     }
 

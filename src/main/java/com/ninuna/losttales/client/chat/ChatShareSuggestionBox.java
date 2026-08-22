@@ -193,36 +193,24 @@ final class ChatShareSuggestionBox {
         }
     }
 
-    private static final int ICON_SLOT = 10;
+    private static final int ICON_SLOT = ChatInlineIcons.SLOT_WIDTH;
 
+    /** The row's glyph, on the same box the text line would give it. */
     private static void drawIcon(Minecraft minecraft,
                                  ChatShareCandidates.Entry entry,
                                  int x, int y) {
+        float boxX = ChatInlineIcons.boxLeft(x, ICON_SLOT);
+        float boxY = ChatInlineIcons.boxTop(y + 1, ICON_SLOT);
         if (entry instanceof ChatShareCandidates.ItemEntry) {
-            ChatShareCandidates.ItemEntry item =
-                    (ChatShareCandidates.ItemEntry)entry;
-            ChatItemRenderer.drawShadow(minecraft, item.stack,
-                    x + 1 + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    y + 1 + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    ChatItemRenderer.ICON_SIZE,
-                    LostTalesChatVisualStyle.SHADOW,
-                    LostTalesChatVisualStyle.shadowAlpha(255));
-            ChatItemRenderer.draw(minecraft, item.stack, x + 1, y + 1,
-                    ChatItemRenderer.ICON_SIZE, 255);
+            ChatInlineIcons.drawItem(minecraft,
+                    ((ChatShareCandidates.ItemEntry)entry).stack,
+                    boxX, boxY, ChatInlineIcons.CONTENT_SIZE, 255);
         } else if (entry instanceof ChatShareCandidates.MarkerEntry) {
             ChatShareCandidates.MarkerEntry marker =
                     (ChatShareCandidates.MarkerEntry)entry;
-            ChatMapMarkerRenderer.drawShadow(minecraft,
-                    marker.marker.getIconName(),
-                    x + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    y + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    ChatMapMarkerRenderer.ICON_SIZE,
-                    LostTalesChatVisualStyle.SHADOW,
-                    LostTalesChatVisualStyle.shadowAlpha(255));
-            ChatMapMarkerRenderer.draw(minecraft,
-                    marker.marker.getIconName(),
-                    marker.marker.getColorName(), x, y,
-                    ChatMapMarkerRenderer.ICON_SIZE, 255);
+            ChatInlineIcons.drawMarker(minecraft, marker.marker.getIconName(),
+                    ChatInlineIcons.markerRgb(marker.marker.getColorName()),
+                    boxX, boxY, ChatInlineIcons.CONTENT_SIZE, 255);
         }
     }
 

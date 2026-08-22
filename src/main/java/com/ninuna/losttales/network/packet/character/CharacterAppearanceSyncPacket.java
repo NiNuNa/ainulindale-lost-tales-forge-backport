@@ -71,6 +71,12 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                 int cosmeticCapeId = buffer.readUnsignedShort();
                 String accountName = CharacterPacketCodec.readString(
                         buffer, CharacterPacketCodec.MAX_NAME_BYTES);
+                String startingFactionId = CharacterPacketCodec.readString(
+                        buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                int roleplayLevel = buffer.readInt();
+                int age = buffer.readInt();
+                String description = CharacterPacketCodec.readString(
+                        buffer, CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
                 if (!playerIds.add(playerId)) {
                     throw new CharacterPacketCodec.DecodeException(
                             "duplicate appearance player UUID");
@@ -79,9 +85,15 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                     throw new CharacterPacketCodec.DecodeException(
                             "invalid cosmetic cape ID");
                 }
+                if (roleplayLevel < 0 || age < 0 || description.length()
+                        > CharacterAppearance.MAX_DESCRIPTION_LENGTH) {
+                    throw new CharacterPacketCodec.DecodeException(
+                            "invalid appearance details");
+                }
                 decoded.add(new CharacterAppearance(
                         playerId, accountName, characterName, raceId,
-                        genderId, skinId, showMinecraftCape, cosmeticCapeId));
+                        genderId, skinId, showMinecraftCape, cosmeticCapeId,
+                        startingFactionId, roleplayLevel, age, description));
             }
             CharacterPacketCodec.requireFinished(buffer);
             this.appearances = Collections.unmodifiableList(decoded);
@@ -119,6 +131,16 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
             CharacterPacketCodec.writeString(
                     buffer, appearance.getAccountName(),
                     CharacterPacketCodec.MAX_NAME_BYTES);
+            // Appended again for the chat player card: starting faction,
+            // level, age, and biography are public character identity.
+            CharacterPacketCodec.writeString(
+                    buffer, appearance.getStartingFactionId(),
+                    CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            buffer.writeInt(appearance.getRoleplayLevel());
+            buffer.writeInt(appearance.getAge());
+            CharacterPacketCodec.writeString(
+                    buffer, appearance.getDescription(),
+                    CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
         }
     }
 

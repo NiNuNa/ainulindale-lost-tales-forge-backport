@@ -78,14 +78,23 @@ final class ChatItemPicker extends ChatPickerPanel {
                 inventory.add(entry);
             }
         }
+        // An empty section is not shown; a fully empty inventory leaves
+        // the panel with its search row and one blank result row.
         List<Section> sections = new ArrayList<Section>(3);
-        sections.add(new Section(StatCollector.translateToLocal(
-                "gui.losttales.chat.share.hotbar"), true, hotbar));
-        sections.add(new Section(StatCollector.translateToLocal(
-                "gui.losttales.chat.share.inventory"), true, inventory));
+        if (!hotbar.isEmpty()) {
+            sections.add(new Section(StatCollector.translateToLocal(
+                    "gui.losttales.chat.share.hotbar"), true, hotbar));
+        }
+        if (!inventory.isEmpty()) {
+            sections.add(new Section(StatCollector.translateToLocal(
+                    "gui.losttales.chat.share.inventory"), true, inventory));
+        }
         if (!armor.isEmpty()) {
             sections.add(new Section(StatCollector.translateToLocal(
                     "gui.losttales.chat.share.armor"), true, armor));
+        }
+        if (sections.isEmpty()) {
+            sections.add(new Section(null, false, null));
         }
         return sections;
     }
@@ -95,15 +104,10 @@ final class ChatItemPicker extends ChatPickerPanel {
                    int alpha, boolean hovered) {
         ChatShareCandidates.ItemEntry item =
                 (ChatShareCandidates.ItemEntry)entry.value;
-        float iconX = x + (CELL_SIZE - ChatItemRenderer.ICON_SIZE) / 2.0F;
-        float iconY = y + (CELL_SIZE - ChatItemRenderer.ICON_SIZE) / 2.0F;
-        ChatItemRenderer.drawShadow(minecraft, item.stack,
-                iconX + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                iconY + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                ChatItemRenderer.ICON_SIZE, LostTalesChatVisualStyle.SHADOW,
-                LostTalesChatVisualStyle.shadowAlpha(alpha));
-        ChatItemRenderer.draw(minecraft, item.stack, iconX, iconY,
-                ChatItemRenderer.ICON_SIZE, alpha);
+        ChatInlineIcons.drawItem(minecraft, item.stack,
+                x + (CELL_SIZE - ChatInlineIcons.CONTENT_SIZE) / 2.0F,
+                y + (CELL_SIZE - ChatInlineIcons.CONTENT_SIZE) / 2.0F,
+                ChatInlineIcons.CONTENT_SIZE, alpha);
     }
 
     @Override
@@ -118,14 +122,7 @@ final class ChatItemPicker extends ChatPickerPanel {
 
     @Override
     void drawButtonIcon(Minecraft minecraft, int left, int top) {
-        float iconX = left + (BUTTON_SIZE - ChatItemRenderer.ICON_SIZE) / 2.0F;
-        float iconY = top + (BUTTON_SIZE - ChatItemRenderer.ICON_SIZE) / 2.0F;
-        ChatItemRenderer.drawShadow(minecraft, BUTTON_ICON,
-                iconX + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                iconY + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                ChatItemRenderer.ICON_SIZE, LostTalesChatVisualStyle.SHADOW,
-                LostTalesChatVisualStyle.shadowAlpha(255));
-        ChatItemRenderer.draw(minecraft, BUTTON_ICON, iconX, iconY,
-                ChatItemRenderer.ICON_SIZE, 255);
+        ChatInlineIcons.drawItemButton(minecraft, BUTTON_ICON, left, top,
+                BUTTON_SIZE);
     }
 }
