@@ -137,6 +137,7 @@ public final class ClientChatChannelViewsTest {
                 ChatChannel.PARTY));
         assertEquals(1, ClientChatChannelViews.unreadOtherCount(
                 ChatChannel.PARTY));
+        assertEquals(2, ClientChatChannelViews.unreadCount(ChatChannel.PARTY));
         assertTrue(ClientChatChannelViews.hasUnreadMention(ChatChannel.PARTY));
         // Lines arriving in the selected channel are read on arrival.
         assertFalse(ClientChatChannelViews.hasUnread(ChatChannel.ALL));
@@ -166,10 +167,48 @@ public final class ClientChatChannelViewsTest {
         }
         assertEquals(ClientChatChannelViews.MAX_UNREAD + 1,
                 ClientChatChannelViews.unreadOtherCount(ChatChannel.OOC));
-        assertEquals("", ChatChannelTabBar.counterText(0));
-        assertEquals("(3)", ChatChannelTabBar.counterText(3));
-        assertEquals("(99)", ChatChannelTabBar.counterText(99));
-        assertEquals("(99+)", ChatChannelTabBar.counterText(100));
+        // The total shares the cap rather than summing past it.
+        assertEquals(ClientChatChannelViews.MAX_UNREAD + 1,
+                ClientChatChannelViews.unreadCount(ChatChannel.OOC));
+        assertEquals("", ClientChatChannelViews.counterText(0));
+        assertEquals("[3]", ClientChatChannelViews.counterText(3));
+        assertEquals("[99]", ClientChatChannelViews.counterText(99));
+        assertEquals("[99+]", ClientChatChannelViews.counterText(100));
+    }
+
+    /**
+     * Unread state does not care whether a channel has a tab: a closed
+     * channel keeps counting, and restoring it (which selects it and
+     * marks it viewed) clears the count the same way a tab switch does.
+     */
+    @Test
+    public void closedChannelsAccumulateUnreadUntilRestoredAndViewed() {
+        ChatWindowLayout.reset();
+        try {
+            assertTrue(ChatWindowLayout.close(ChatChannel.PARTY));
+            ClientChatChannelViews.record(-1, ChatChannel.PARTY,
+                    ChatChannel.ALL, false);
+            ClientChatChannelViews.record(-2, ChatChannel.PARTY,
+                    ChatChannel.ALL, true);
+            ClientChatChannelViews.record(-3, ChatChannel.PARTY,
+                    ChatChannel.ALL, false);
+            assertEquals(3, ClientChatChannelViews.unreadCount(
+                    ChatChannel.PARTY));
+            assertEquals("[3]", ClientChatChannelViews.counterText(
+                    ClientChatChannelViews.unreadCount(ChatChannel.PARTY)));
+            // Closing and restoring touch no counter on their own.
+            assertTrue(ChatWindowLayout.restore(ChatChannel.PARTY));
+            assertEquals(3, ClientChatChannelViews.unreadCount(
+                    ChatChannel.PARTY));
+            assertTrue(ChatWindowLayout.close(ChatChannel.PARTY));
+            assertEquals(3, ClientChatChannelViews.unreadCount(
+                    ChatChannel.PARTY));
+            ClientChatChannelViews.markViewed(ChatChannel.PARTY);
+            assertEquals(0, ClientChatChannelViews.unreadCount(
+                    ChatChannel.PARTY));
+        } finally {
+            ChatWindowLayout.reset();
+        }
     }
 
     @Test
@@ -199,14 +238,19 @@ public final class ClientChatChannelViewsTest {
                 ChatChannel.ALL, 32, 10));
     }
 
+    /** The bound follows the history's capacity, so every kept line has its tab. */
     @Test
-    public void trackingIsBounded() {
-        for (int index = 0; index < 400; index++) {
+    public void trackingIsBoundedByTheHistoryCapacity() {
+        int bound = ClientChatChannelViews.maxTrackedLines();
+        assertTrue(bound >= LostTalesChatHistoryHooks.capacity());
+        int recorded = bound + 150;
+        for (int index = 0; index < recorded; index++) {
             ClientChatChannelViews.record(-index - 1, ChatChannel.ALL,
                     ChatChannel.ALL, false);
         }
-        assertEquals(256, ClientChatChannelViews.trackedLineCount());
+        assertEquals(bound, ClientChatChannelViews.trackedLineCount());
         assertNull(ClientChatChannelViews.channelOf(-1));
-        assertEquals(ChatChannel.ALL, ClientChatChannelViews.channelOf(-400));
+        assertEquals(ChatChannel.ALL,
+                ClientChatChannelViews.channelOf(-recorded));
     }
 }

@@ -8,6 +8,7 @@ import java.util.UUID;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
+import net.minecraft.util.StatCollector;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -326,14 +327,60 @@ public final class LostTalesChatPresentationTest {
         LostTalesChatPresentation.markPinged(7);
         assertTrue(LostTalesChatPresentation.isPingedLine(7));
         assertFalse(LostTalesChatPresentation.isPingedLine(8));
-        for (int index = 0; index < 150; index++) {
+        int pinged = LostTalesChatHistoryHooks.MAX_CAPACITY + 50;
+        for (int index = 0; index < pinged; index++) {
             LostTalesChatPresentation.markPinged(1000 + index);
         }
-        // The oldest entries are evicted once the history cap is hit.
+        // The oldest entries are evicted once the history's largest
+        // capacity is hit.
         assertFalse(LostTalesChatPresentation.isPingedLine(7));
-        assertTrue(LostTalesChatPresentation.isPingedLine(1149));
+        assertTrue(LostTalesChatPresentation.isPingedLine(1000 + pinged - 1));
         LostTalesChatPresentation.clear();
-        assertFalse(LostTalesChatPresentation.isPingedLine(1149));
+        assertFalse(LostTalesChatPresentation.isPingedLine(1000 + pinged - 1));
+    }
+
+    /** An operator's account line opens with the crimson tag; others never do. */
+    @Test
+    public void operatorAccountLinesCarryTheCrimsonTag() {
+        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
+        LostTalesConfig.showChatTimestamps = false;
+        try {
+            LostTalesChatMessagePacket tagged = new LostTalesChatMessagePacket(
+                    ChatChannel.OOC, UUID.randomUUID(), "Steve", "Steve", "",
+                    0xFCECD1, 0xFCECD1, "hello", 123456789L, "", null, "",
+                    "", true);
+            // Without a loaded language the tag reads as its key.
+            String tagText = StatCollector.translateToLocal(
+                    "chat.losttales.tag.operator") + " ";
+            StringBuilder plain = new StringBuilder();
+            Integer tagRgb = null;
+            for (Object value : LostTalesChatPresentation.build(tagged)) {
+                IChatComponent part = (IChatComponent)value;
+                plain.append(part.getUnformattedTextForChat());
+                if (tagText.equals(part.getUnformattedTextForChat())) {
+                    tagRgb = ChatColorMarker.decode(part);
+                }
+            }
+            // The tag stands ahead of the sender's opening bracket.
+            int tag = plain.indexOf(tagText);
+            assertTrue(tag >= 0 && tag < plain.indexOf("<"));
+            assertEquals(Integer.valueOf(
+                    LostTalesColors.rgb(LostTalesColors.CRIMSON)), tagRgb);
+
+            LostTalesChatMessagePacket plainPacket =
+                    new LostTalesChatMessagePacket(
+                            ChatChannel.OOC, UUID.randomUUID(), "Steve",
+                            "Steve", "", 0xFCECD1, 0xFCECD1, "hello",
+                            123456789L, "");
+            StringBuilder untagged = new StringBuilder();
+            for (Object value : LostTalesChatPresentation.build(plainPacket)) {
+                untagged.append(
+                        ((IChatComponent)value).getUnformattedTextForChat());
+            }
+            assertFalse(untagged.toString().contains(tagText));
+        } finally {
+            LostTalesConfig.showChatTimestamps = originalTimestamps;
+        }
     }
 
     private static ChatHeadMarker.Data markerOf(IChatComponent message) {

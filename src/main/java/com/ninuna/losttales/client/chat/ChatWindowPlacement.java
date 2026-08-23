@@ -1,7 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
-import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiNewChat;
@@ -19,12 +18,12 @@ import org.lwjgl.input.Mouse;
  * be placed anywhere on the screen, its top edge included. A window that
  * grows past the top margin is pushed down just far enough to stay on
  * screen — it grows downward from there — and returns to its anchor as
- * its lines go; the stored position never changes. Windows never overlap:
- * other windows are walls exactly like the screen edges, for dragging and
- * for growth alike; only a window linked to the growing one moves with
+ * its lines go; the stored position never changes. Windows keep off the
+ * screen edges only: they may overlap one another — the one in use is
+ * drawn in front — and only a window linked to a growing one moves with
  * it.
  *
- * <p>The closed-chat feed — one stack of every open, unmuted channel's
+ * <p>The closed-chat feed — one stack of every unmuted channel's
  * messages, shown only while the chat is closed — is placed the same way
  * by its own baseline, with no row and no bar.</p>
  *
@@ -33,8 +32,8 @@ import org.lwjgl.input.Mouse;
  * the mouse instead of stepping by whole GUI pixels.</p>
  */
 public final class ChatWindowPlacement {
-    /** Height of a window's input bar: the same as its control strip. */
-    public static final int INPUT_HEIGHT = ChatChannelTabBar.ROW_HEIGHT;
+    /** Height of a window's input bar: one text row with a margin. */
+    public static final int INPUT_HEIGHT = 13;
 
     private ChatWindowPlacement() {}
 
@@ -73,18 +72,6 @@ public final class ChatWindowPlacement {
 
         public double bottom() {
             return this.y + this.height;
-        }
-
-        boolean overlaps(double left, double top, double right,
-                         double bottom) {
-            return left < right() && right > this.x
-                    && top < bottom() && bottom > this.y;
-        }
-
-        /** The box grown by {@code by} on every side: a wall with its gap. */
-        Box inflated(int by) {
-            return new Box(this.x - by, this.y - by, this.width + by * 2,
-                    this.height + by * 2, this.barHeight);
         }
 
         /** Top of the input bar: one chat line below the baseline. */
@@ -174,14 +161,12 @@ public final class ChatWindowPlacement {
     }
 
     /**
-     * The window's box for the given screen size, with the other windows
-     * taken into account. A window linked to this one moves with it; any
-     * other window above is a border exactly like the screen edge, so a
-     * window growing upward into it stops growing — its box holds fewer
-     * lines — rather than overlap. A linked window that meets its own
-     * ceiling stops this window the same way. Stored anchors never
-     * change; it is all recomputed every frame and undoes itself as
-     * lines go.
+     * The window's box for the given screen size. A window linked to
+     * another takes its place from its target — a margin above or below
+     * it, following chains — and is kept on screen like any other. No
+     * window is a border for another: windows may overlap, and a growing
+     * one never loses lines to a neighbour. Stored anchors never change;
+     * it is all recomputed every frame and undoes itself as lines go.
      */
     public static Box windowBounds(ChatWindow window, Minecraft minecraft,
                                    int screenWidth, int screenHeight) {
@@ -207,8 +192,9 @@ public final class ChatWindowPlacement {
             baseline[i] = box.baseline();
             lines[i] = box.lines;
         }
-        // A linked window takes its place from its target first — above
-        // it or below it, a margin apart — following chains in passes.
+        // A linked window takes its place from its target — above it or
+        // below it, a margin apart — following chains in passes, and
+        // stops at the screen margins like any window.
         for (int pass = 0; pass < count; pass++) {
             boolean moved = false;
             for (int i = 0; i < count; i++) {
@@ -226,16 +212,7 @@ public final class ChatWindowPlacement {
                                 - barHeight
                         : baseline[t] + barHeight + margin
                                 + lines[i] * lineHeight + row;
-                // Its own ceiling: the top margin, or any window above
-                // the place it wants that it would otherwise run into.
                 double ceiling = margin + lines[i] * lineHeight + row;
-                for (int v = 0; v < count; v++) {
-                    if (v != i && v != t && baseline[v] < wanted
-                            && besides(x, width, i, v, margin)) {
-                        ceiling = Math.max(ceiling, baseline[v] + barHeight
-                                + margin + lines[i] * lineHeight + row);
-                    }
-                }
                 wanted = Math.max(ceiling,
                         Math.min(screenHeight - margin - barHeight, wanted));
                 if (wanted != baseline[i]) {
@@ -245,40 +222,6 @@ public final class ChatWindowPlacement {
             }
             if (!moved) {
                 break;
-            }
-        }
-        // Bottom-most first: each window settles against the ones above.
-        Integer[] order = new Integer[count];
-        for (int i = 0; i < count; i++) {
-            order[i] = Integer.valueOf(i);
-        }
-        java.util.Arrays.sort(order, new java.util.Comparator<Integer>() {
-            @Override
-            public int compare(Integer a, Integer b) {
-                return Double.compare(baseline[b.intValue()],
-                        baseline[a.intValue()]);
-            }
-        });
-        for (Integer wObject : order) {
-            int w = wObject.intValue();
-            for (Integer uObject : order) {
-                int u = uObject.intValue();
-                if (u == w || baseline[u] >= baseline[w]
-                        || !besides(x, width, w, u, margin)) {
-                    continue;
-                }
-                double top = baseline[w] - lines[w] * lineHeight - row;
-                double needed = baseline[u] + barHeight + margin - top;
-                if (needed <= 0.0D) {
-                    continue;
-                }
-                // The window above is a border, exactly like the screen
-                // edge: this window stops growing and shows what fits. (A
-                // window linked to this one has already moved with it.)
-                double room = baseline[w] - row
-                        - (baseline[u] + barHeight + margin);
-                lines[w] = Math.max(1, Math.min(lines[w],
-                        (int)Math.floor(room / lineHeight)));
             }
         }
         int height = heightFor(lines[index], minecraft);
@@ -293,11 +236,6 @@ public final class ChatWindowPlacement {
             }
         }
         return null;
-    }
-
-    private static boolean besides(double[] x, int width, int a, int b,
-                                   int margin) {
-        return x[a] < x[b] + width + margin && x[a] + width + margin > x[b];
     }
 
     /** The window's box from its stored anchor alone, kept on screen. */
@@ -352,21 +290,15 @@ public final class ChatWindowPlacement {
     }
 
     /**
-     * Keeps a window's requested position on screen and off the other
-     * windows: the whole box as it currently shows stays inside the
-     * margins, and {@code walls} — the other windows' boxes, each kept at
-     * the same distance as the margins — stop it like the margins do.
-     * Each axis is resolved on its own from the window's
-     * current position, so a dragged window slides along a wall instead
-     * of sticking to it; a window that already overlaps a wall (it grew
-     * into it) may always move away. {@code window} null means a window
-     * about to be created, at its smallest, placed clear of the walls.
+     * Keeps a window's requested position on screen: the whole box as it
+     * currently shows stays inside the margins. Other windows do not
+     * hold it; windows may overlap. {@code window} null means a window
+     * about to be created, at its smallest.
      */
     public static Anchor constrainWindow(ChatWindow window,
                                          Minecraft minecraft,
                                          double x, double baseline,
-                                         int screenWidth, int screenHeight,
-                                         List<Box> walls) {
+                                         int screenWidth, int screenHeight) {
         int margin = HudPlacementLayout.SCREEN_MARGIN;
         int width = windowWidth(minecraft);
         int height = window == null ? minHeight(minecraft)
@@ -376,178 +308,8 @@ public final class ChatWindowPlacement {
         double minBaseline = margin + height - barHeight;
         double maxBaseline = Math.max(minBaseline,
                 screenHeight - margin - barHeight);
-        double targetX = Math.max(margin, Math.min(maxX, x));
-        double targetBaseline = Math.max(minBaseline,
-                Math.min(maxBaseline, baseline));
-        if (walls == null || walls.isEmpty()) {
-            return new Anchor(targetX, targetBaseline);
-        }
-        List<Box> spaced = new ArrayList<Box>(walls.size());
-        for (Box wall : walls) {
-            spaced.add(wall.inflated(margin));
-        }
-        walls = spaced;
-        int above = height - barHeight;
-        if (window == null) {
-            return placeClear(targetX, targetBaseline, width, above,
-                    barHeight, margin, maxX, minBaseline, maxBaseline, walls);
-        }
-        Box current = anchoredBounds(window, minecraft, screenWidth,
-                screenHeight);
-        double fromX = current.x;
-        double fromBaseline = current.baseline();
-        // Walls the window already sits on do not hold it; it may leave.
-        List<Box> solid = new ArrayList<Box>(walls.size());
-        for (Box wall : walls) {
-            if (!wall.overlaps(fromX, fromBaseline - above,
-                    fromX + width, fromBaseline + barHeight)) {
-                solid.add(wall);
-            }
-        }
-        if (!overlapsAny(solid, targetX, targetBaseline, width, above,
-                barHeight)) {
-            return new Anchor(targetX, targetBaseline);
-        }
-        // Slide along the walls: resolve one axis at the other's current
-        // value, then the second; both orders are tried and the result
-        // nearer the target wins, so a corner is rounded either way.
-        double xFirst = slideX(targetX, fromBaseline, fromX, width, above,
-                barHeight, margin, maxX, solid);
-        double xFirstBaseline = slideY(targetBaseline, xFirst, fromBaseline,
-                width, above, barHeight, minBaseline, maxBaseline, solid);
-        double yFirstBaseline = slideY(targetBaseline, fromX, fromBaseline,
-                width, above, barHeight, minBaseline, maxBaseline, solid);
-        double yFirst = slideX(targetX, yFirstBaseline, fromX, width, above,
-                barHeight, margin, maxX, solid);
-        boolean aClear = !overlapsAny(solid, xFirst, xFirstBaseline, width,
-                above, barHeight);
-        boolean bClear = !overlapsAny(solid, yFirst, yFirstBaseline, width,
-                above, barHeight);
-        double aDistance = Math.abs(xFirst - targetX)
-                + Math.abs(xFirstBaseline - targetBaseline);
-        double bDistance = Math.abs(yFirst - targetX)
-                + Math.abs(yFirstBaseline - targetBaseline);
-        if (aClear && (!bClear || aDistance <= bDistance)) {
-            return new Anchor(xFirst, xFirstBaseline);
-        }
-        if (bClear) {
-            return new Anchor(yFirst, yFirstBaseline);
-        }
-        // Boxed in on both axes: stay where the window is.
-        return new Anchor(fromX, fromBaseline);
-    }
-
-    private static double slideX(double targetX, double baseline,
-                                 double fromX, int width, int above,
-                                 int barHeight, int margin, double maxX,
-                                 List<Box> walls) {
-        double x = targetX;
-        for (int pass = 0; pass < walls.size(); pass++) {
-            boolean moved = false;
-            for (Box wall : walls) {
-                if (wall.overlaps(x, baseline - above, x + width,
-                        baseline + barHeight)) {
-                    x = x > fromX ? Math.min(x, wall.x - width)
-                            : Math.max(x, wall.right());
-                    moved = true;
-                }
-            }
-            if (!moved) {
-                break;
-            }
-        }
-        return Math.max(margin, Math.min(maxX, x));
-    }
-
-    private static double slideY(double targetBaseline, double x,
-                                 double fromBaseline, int width, int above,
-                                 int barHeight, double minBaseline,
-                                 double maxBaseline, List<Box> walls) {
-        double baseline = targetBaseline;
-        for (int pass = 0; pass < walls.size(); pass++) {
-            boolean moved = false;
-            for (Box wall : walls) {
-                if (wall.overlaps(x, baseline - above, x + width,
-                        baseline + barHeight)) {
-                    baseline = baseline > fromBaseline
-                            ? Math.min(baseline, wall.y - barHeight)
-                            : Math.max(baseline, wall.bottom() + above);
-                    moved = true;
-                }
-            }
-            if (!moved) {
-                break;
-            }
-        }
-        return Math.max(minBaseline, Math.min(maxBaseline, baseline));
-    }
-
-    /** The nearest clear spot for a brand-new window, by least push. */
-    private static Anchor placeClear(double x, double baseline, int width,
-                                     int above, int barHeight, int margin,
-                                     double maxX, double minBaseline,
-                                     double maxBaseline, List<Box> walls) {
-        double bestX = x;
-        double bestBaseline = baseline;
-        double bestDistance = Double.MAX_VALUE;
-        if (!overlapsAny(walls, x, baseline, width, above, barHeight)) {
-            return new Anchor(x, baseline);
-        }
-        for (Box wall : walls) {
-            double[][] candidates = {
-                    {wall.x - width, baseline},
-                    {wall.right(), baseline},
-                    {x, wall.y - barHeight},
-                    {x, wall.bottom() + above},
-            };
-            for (double[] candidate : candidates) {
-                double cx = Math.max(margin, Math.min(maxX, candidate[0]));
-                double cb = Math.max(minBaseline,
-                        Math.min(maxBaseline, candidate[1]));
-                if (overlapsAny(walls, cx, cb, width, above, barHeight)) {
-                    continue;
-                }
-                double distance = Math.abs(cx - x) + Math.abs(cb - baseline);
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    bestX = cx;
-                    bestBaseline = cb;
-                }
-            }
-        }
-        return new Anchor(bestX, bestBaseline);
-    }
-
-    private static boolean overlapsAny(List<Box> walls, double x,
-                                       double baseline, int width, int above,
-                                       int barHeight) {
-        for (Box wall : walls) {
-            if (wall.overlaps(x, baseline - above, x + width,
-                    baseline + barHeight)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * The boxes of every window but {@code except} and the windows
-     * linked to it (they follow it, so they cannot block it), for the
-     * editor.
-     */
-    public static List<Box> wallsExcept(ChatWindow except, Minecraft minecraft,
-                                        int screenWidth, int screenHeight) {
-        List<ChatWindow> windows = ChatWindowLayout.windows();
-        List<Box> walls = new ArrayList<Box>(windows.size());
-        for (int index = 0; index < windows.size(); index++) {
-            ChatWindow other = windows.get(index);
-            if (other != except && (except == null
-                    || !except.getId().equals(other.getLinkTarget()))) {
-                walls.add(windowBounds(windows.get(index), minecraft,
-                        screenWidth, screenHeight));
-            }
-        }
-        return walls;
+        return new Anchor(Math.max(margin, Math.min(maxX, x)),
+                Math.max(minBaseline, Math.min(maxBaseline, baseline)));
     }
 
     /** The feed's box height: the lines it currently holds, at least one. */

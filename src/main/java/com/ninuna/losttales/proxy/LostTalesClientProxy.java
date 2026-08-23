@@ -62,9 +62,11 @@ import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
+import com.ninuna.losttales.client.chat.ClientChatTypingState;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
 import com.ninuna.losttales.accessory.player.AccessoryPlayerData;
@@ -430,6 +432,11 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         if (packet != null && !packet.isMalformed()) {
             ClientChatChannelState.setAdminAccess(packet.hasAdminAccess());
         }
+    }
+
+    @Override
+    public void handleChatTyping(LostTalesChatTypingSyncPacket packet) {
+        ClientChatTypingState.accept(packet);
     }
 
     @Override

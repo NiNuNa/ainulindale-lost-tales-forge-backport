@@ -12,6 +12,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
+import org.objectweb.asm.tree.IntInsnNode;
 import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LdcInsnNode;
@@ -261,6 +262,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "com/ninuna/losttales/client/chat/LostTalesChatHitHooks";
     private static final String CHAT_WRAP_HOOK_OWNER =
             "com/ninuna/losttales/client/chat/LostTalesChatWrapHooks";
+    private static final String CHAT_HISTORY_HOOK_OWNER =
+            "com/ninuna/losttales/client/chat/LostTalesChatHistoryHooks";
+    private static final String CHAT_HISTORY_ACTIVE_PROPERTY =
+            "losttales.chatHistory.active";
+    /** Vanilla's history limit, as the literal its trimming loops test. */
+    private static final int VANILLA_CHAT_HISTORY = 100;
     private static final String LOTR_PLAYER_DATA =
             "lotr.common.LOTRPlayerData";
     private static final String FAST_TRAVEL_ARRIVAL_HOOK_OWNER =
@@ -281,8 +288,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             transformGuiScreenInput(basicClass)));
         }
         if (GUI_NEW_CHAT.equals(transformedName)) {
-            return transformGuiNewChatWrap(
-                    transformGuiNewChatHitTest(basicClass));
+            return transformGuiNewChatHistory(transformGuiNewChatWrap(
+                    transformGuiNewChatHitTest(basicClass)));
         }
         if (LOTR_PLAYER_DATA.equals(transformedName)) {
             return transformLotrFastTravelArrival(basicClass);
@@ -2330,6 +2337,65 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return basicClass;
         } catch (Throwable throwable) {
             warn("Failed to patch chat line wrapping: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Lets the chat history keep more than vanilla's hundred.
+     *
+     * <p>{@code GuiNewChat.func_146237_a} files a message into the
+     * wrapped-line list and the message list and trims each back to a
+     * literal hundred. Every {@code bipush 100} in the method becomes a
+     * call to {@code LostTalesChatHistoryHooks.capacity()}, so the
+     * configured size applies to both lists and to nothing else; the
+     * resize re-wrap reads the same lists and needs no change. Without
+     * the patch vanilla's hundred stays.</p>
+     */
+    private static byte[] transformGuiNewChatHistory(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"func_146237_a".equals(method.name)
+                        || !"(Lnet/minecraft/util/IChatComponent;IIZ)V"
+                        .equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, CHAT_HISTORY_HOOK_OWNER,
+                        "capacity")) {
+                    System.setProperty(CHAT_HISTORY_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                int replaced = 0;
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (instruction.getOpcode() == Opcodes.BIPUSH
+                            && ((IntInsnNode)instruction).operand
+                                    == VANILLA_CHAT_HISTORY) {
+                        MethodInsnNode hook = new MethodInsnNode(
+                                Opcodes.INVOKESTATIC,
+                                CHAT_HISTORY_HOOK_OWNER, "capacity", "()I");
+                        method.instructions.set(instruction, hook);
+                        instruction = hook;
+                        replaced++;
+                    }
+                }
+                if (replaced != 2) {
+                    warn("Expected two history limits in "
+                            + "GuiNewChat#func_146237_a, found " + replaced
+                            + "; the chat history keeps vanilla's hundred");
+                    return basicClass;
+                }
+                System.setProperty(CHAT_HISTORY_ACTIVE_PROPERTY, "true");
+                info("Patched GuiNewChat history capacity");
+                return write(owner);
+            }
+            warn("Could not locate GuiNewChat#func_146237_a; the chat "
+                    + "history keeps vanilla's hundred");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch chat history capacity: " + throwable);
             return basicClass;
         }
     }

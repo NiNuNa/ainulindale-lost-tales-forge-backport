@@ -149,13 +149,6 @@ final class ChatInlineIcons {
 
     /* Toolbar buttons: one content box, centred in the button square. */
 
-    static void drawEmojiButton(Minecraft minecraft, ChatEmoji emoji,
-                                int left, int top, int buttonSize) {
-        float inset = (buttonSize - CONTENT_SIZE) / 2.0F;
-        drawEmoji(minecraft, emoji, left + inset, top + inset,
-                CONTENT_SIZE, 255);
-    }
-
     static void drawItemButton(Minecraft minecraft, ItemStack stack,
                                int left, int top, int buttonSize) {
         float inset = (buttonSize - CONTENT_SIZE) / 2.0F;

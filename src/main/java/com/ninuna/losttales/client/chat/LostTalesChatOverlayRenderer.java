@@ -28,8 +28,12 @@ import org.lwjgl.opengl.GL11;
  * — with the chat screen open, its front tab's channel with that channel's
  * own scroll offset from {@link ClientChatChannelViews} and without the
  * channel prefix. With the chat closed the windows are not drawn at all;
- * one feed shows every open, unmuted channel's messages, fading as
- * vanilla's do, at its own position. Every window is drawn inside the box
+ * one feed shows every unmuted channel's messages, fading as
+ * vanilla's do, at its own position. While the Lost Tales chat screen is
+ * open the screen draws the windows itself, one complete window after
+ * another, so the open chat lies above every HUD element and a front
+ * window covers the whole of one behind it; the HUD pass then only
+ * cancels vanilla's. Every window is drawn inside the box
  * {@link ChatWindowPlacement} gives it, with the opening motion every
  * other Lost Tales screen uses, and records the screen band of every
  * line it draws in its
@@ -57,22 +61,25 @@ final class LostTalesChatOverlayRenderer {
      */
     private static final int TEXT_OFFSET = 9;
     private static final float BACKDROP_FADE_START = 2.0F / 3.0F;
-    /** The top fade spans this many lines below the control strip. */
-    private static final float TOP_FADE_LINES = 2.0F;
-    /** How far past the fade's nominal length it reaches, in pixels. */
-    private static final int TOP_FADE_EXTRA = 2;
     /**
-     * Backdrop above the topmost line and below the newest one — half a
-     * line — so the text does not touch the tab row or the window's
+     * Depth of the shade along the backdrop's top and bottom edges — one
+     * line, measured inward from the edge. Independent of
+     * {@link #LINE_PADDING}: the padding moves where a fade starts,
+     * never how far it reaches.
+     */
+    private static final int EDGE_FADE_HEIGHT = LINE_HEIGHT;
+    /**
+     * Backdrop above the topmost line and below the newest one — a third
+     * of a line — so the text does not touch the tab row or the window's
      * bottom edge.
      */
-    static final int LINE_PADDING = LINE_HEIGHT / 2;
-    /** Opacity of the top fade where it meets the control strip. */
-    private static final int TOP_FADE_ALPHA = 0x80;
-    /** Mesh resolution of the top fade: rows down, columns across the
-     *  backdrop's horizontal fade. */
-    private static final int TOP_FADE_ROWS = 8;
-    private static final int TOP_FADE_COLUMNS = 16;
+    static final int LINE_PADDING = LINE_HEIGHT / 3;
+    /** Opacity of an edge fade on the edge it hangs from: a third. */
+    private static final int EDGE_FADE_ALPHA = 0x55;
+    /** Mesh resolution of an edge fade: rows inward, columns across the
+     *  band's width. */
+    private static final int EDGE_FADE_ROWS = 8;
+    private static final int EDGE_FADE_COLUMNS = 16;
     private static final Field DRAWN_LINES = findField("field_146253_i");
 
     private LostTalesChatOverlayRenderer() {}
@@ -99,49 +106,19 @@ final class LostTalesChatOverlayRenderer {
                 return true;
             }
             ChatWindowFrame.feed().drawn = false;
-            // Opening the screen brings the history in with the same
-            // sampler as every other Lost Tales screen; the tabs follow
-            // because they stand on the bands.
+            if (minecraft.currentScreen instanceof LostTalesChatGui) {
+                // The screen draws its windows after the HUD, each one
+                // whole; vanilla's chat pass is still cancelled here.
+                return true;
+            }
+            // Another chat screen is open: the windows are drawn here,
+            // back to front, the window in use over the others.
             LostTalesGuiAnimationSample opening =
                     ClientChatChannelViews.openSample();
-            for (int index = 0; index < windows.size(); index++) {
-                ChatWindow window = windows.get(index);
-                ChatWindowFrame frame = ChatWindowFrame.of(window);
-                List<ChatTab> tabs = ChatWindowFrame.visibleTabs(window);
-                ChatTab view = ChatWindowFrame.activeTab(window, tabs);
-                ChatLineFilter filter = ChatLineFilter.of(view);
-                List<ChatLine> lines = ClientChatChannelViews.visibleLines(
-                        drawn, filter);
-                frame.lines = lines;
-                frame.view = view;
-                if (tabs.isEmpty()) {
-                    // Nothing the player can see lives here right now.
-                    frame.drawn = false;
-                    frame.bands.reset(lines, 0, 1.0F);
-                    continue;
-                }
-                ChatWindowPlacement.Box box = ChatWindowPlacement.windowBounds(
-                        window, minecraft, screenWidth, screenHeight);
-                // The box says how many lines fit: fewer than the chat
-                // height setting when growth was stopped by a neighbour.
-                int lineLimit = Math.max(1, Math.min(visibleLineCount(chat),
-                        box.lines));
-                int scroll = view != null
-                        ? ClientChatChannelViews.getScroll(view,
-                                lines.size(), lineLimit)
-                        : 0;
-                float scale = chat.func_146244_h();
-                frame.begin(box, scale, opening.getTranslationX(),
-                        opening.getTranslationY());
-                frame.drawn = true;
-                // The newest line sits on the baseline; the whole window
-                // rides the opening motion, tabs and bar included.
-                float originX = (float)box.x + 2.0F * scale
-                        + opening.getTranslationX();
-                float originY = (float)box.baseline()
-                        + opening.getTranslationY();
-                drawWindow(minecraft, chat, frame, filter, lines, scroll,
-                        lineLimit, originX, originY, true, opening);
+            List<ChatWindow> stacked = ChatWindowLayout.stacked();
+            for (int index = 0; index < stacked.size(); index++) {
+                drawOpenWindow(minecraft, chat, drawn, stacked.get(index),
+                        screenWidth, screenHeight, opening);
             }
             return true;
         } catch (IllegalAccessException ignored) {
@@ -152,10 +129,111 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * The closed-chat feed: every open, unmuted channel's lines as one
-     * fading stack at the feed's own position, with the channel prefixes
-     * that tell the channels apart. Each window marks itself undrawn so
-     * nothing hit-tests against a window that is not on screen.
+     * One window of the open chat, for the chat screen: its history,
+     * backdrop and edge shades inside its placement box, its bands
+     * recorded for the row the screen draws next. Nothing is drawn, and
+     * the frame is marked undrawn, when the history cannot be read.
+     */
+    static void drawWindowForScreen(Minecraft minecraft, ChatWindow window,
+                                    int screenWidth, int screenHeight,
+                                    LostTalesGuiAnimationSample opening) {
+        if (minecraft == null || minecraft.ingameGUI == null
+                || window == null || opening == null) {
+            return;
+        }
+        GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
+        try {
+            drawOpenWindow(minecraft, chat, getDrawnLines(chat), window,
+                    screenWidth, screenHeight, opening);
+        } catch (IllegalAccessException ignored) {
+            ChatWindowFrame.of(window).drawn = false;
+        } catch (RuntimeException ignored) {
+            ChatWindowFrame.of(window).drawn = false;
+        }
+    }
+
+    /**
+     * Opening the screen brings the history in with the same sampler as
+     * every other Lost Tales screen; the tabs follow because they stand
+     * on the bands.
+     */
+    private static void drawOpenWindow(Minecraft minecraft, GuiNewChat chat,
+                                       List<ChatLine> drawn,
+                                       ChatWindow window, int screenWidth,
+                                       int screenHeight,
+                                       LostTalesGuiAnimationSample opening) {
+        ChatWindowFrame frame = ChatWindowFrame.of(window);
+        List<ChatTab> tabs = ChatWindowFrame.visibleTabs(window);
+        ChatTab view = ChatWindowFrame.activeTab(window, tabs);
+        ChatLineFilter filter = ChatLineFilter.of(view);
+        List<ChatLine> lines = ClientChatChannelViews.visibleLines(
+                drawn, filter);
+        frame.lines = lines;
+        frame.view = view;
+        if (tabs.isEmpty()) {
+            // Nothing the player can see lives here right now.
+            frame.drawn = false;
+            frame.bands.reset(lines, 0, 1.0F);
+            return;
+        }
+        ChatWindowPlacement.Box box = ChatWindowPlacement.windowBounds(
+                window, minecraft, screenWidth, screenHeight);
+        // The box says how many lines the window shows, never more than
+        // the chat height setting.
+        int lineLimit = Math.max(1, Math.min(visibleLineCount(chat),
+                box.lines));
+        int scroll = view != null
+                ? ClientChatChannelViews.getScroll(view, lines.size(),
+                        lineLimit)
+                : 0;
+        float scale = chat.func_146244_h();
+        frame.begin(box, scale, opening.getTranslationX(),
+                opening.getTranslationY());
+        frame.drawn = true;
+        // The newest line sits on the baseline; the whole window rides
+        // the opening motion, tabs and bar included.
+        float originX = (float)box.x + 2.0F * scale
+                + opening.getTranslationX();
+        float originY = (float)box.baseline() + opening.getTranslationY();
+        drawWindow(minecraft, chat, frame, filter, lines, scroll, lineLimit,
+                originX, originY, true, opening);
+    }
+
+    /**
+     * The window's bottom hairline, drawn by the chat screen after the
+     * bar so it lies over the edge shade: the row directly under the
+     * bottom padding. The top one is the tab row's, drawn with the row
+     * as its last pixel row so row and rule never drift apart.
+     */
+    static void drawBottomRule(Minecraft minecraft, ChatWindowFrame frame,
+                               LostTalesGuiAnimationSample opening) {
+        if (minecraft == null || minecraft.ingameGUI == null
+                || frame == null || !frame.drawn || opening == null) {
+            return;
+        }
+        GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
+        float scale = chat.func_146244_h();
+        int unscaledWidth = MathHelper.ceiling_float_int(
+                chat.func_146228_f() / scale);
+        float originX = (float)frame.drawnLeft() + 2.0F * scale;
+        float originY = (float)(frame.baseline + frame.motionY);
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(originX, originY, 0.0F);
+            GL11.glScalef(scale, scale, 1.0F);
+            drawEdgeRule(unscaledWidth, LINE_PADDING,
+                    Math.round(255.0F * opening.getOpacity()));
+        } finally {
+            GL11.glPopMatrix();
+        }
+    }
+
+    /**
+     * The closed-chat feed: every unmuted channel's lines, open or
+     * closed, as one fading stack at the feed's own position, with the
+     * channel prefixes that tell the channels apart. Each window marks
+     * itself undrawn so nothing hit-tests against a window that is not
+     * on screen.
      */
     private static void drawFeed(Minecraft minecraft, GuiNewChat chat,
                                  List<ChatLine> drawn, int screenWidth,
@@ -479,9 +557,12 @@ final class LostTalesChatOverlayRenderer {
                             topAlpha / 2, topColor);
                     GL11.glPopMatrix();
                 }
-                drawTopFade(unscaledWidth, stackTop - LINE_PADDING,
-                        Math.round(TOP_FADE_ALPHA * opacity
-                                * opening.getOpacity()));
+                int fadeAlpha = Math.round(EDGE_FADE_ALPHA * opacity
+                        * opening.getOpacity());
+                drawEdgeFade(unscaledWidth, stackTop - LINE_PADDING,
+                        LINE_PADDING, fadeAlpha);
+                drawEdgeFade(unscaledWidth, LINE_PADDING,
+                        stackTop - LINE_PADDING, fadeAlpha);
                 GL11.glTranslatef(-3.0F, 0.0F, 0.0F);
                 int fullHeight = totalLineCount * LINE_HEIGHT;
                 int visibleHeight = eligibleLineCount * LINE_HEIGHT;
@@ -490,15 +571,23 @@ final class LostTalesChatOverlayRenderer {
                 int thumbHeight = visibleHeight * visibleHeight
                         / Math.max(1, fullHeight);
                 if (fullHeight != visibleHeight) {
-                    int thumbAlpha = scrollOffset > 0 ? 170 : 96;
+                    // The scroll thumb in the palette: honey once the
+                    // view has left the newest line, rose grey at rest,
+                    // with an ivory edge.
+                    int thumbAlpha = scrollOffset > 0 ? 0xFF
+                            : LostTalesChatVisualStyle.SURFACE_ALPHA;
                     int thumbColor = scrollPosition > 0
-                            ? 13382451 : 3355562;
+                            ? LostTalesColors.rgb(LostTalesColors.HONEY)
+                            : LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
                     Gui.drawRect(0, -scrollOffset, 2,
                             -scrollOffset - thumbHeight,
-                            thumbColor + (thumbAlpha << 24));
+                            LostTalesChatVisualStyle.argb(thumbColor,
+                                    thumbAlpha));
                     Gui.drawRect(2, -scrollOffset, 1,
                             -scrollOffset - thumbHeight,
-                            13421772 + (thumbAlpha << 24));
+                            LostTalesChatVisualStyle.argb(
+                                    LostTalesChatVisualStyle.IVORY,
+                                    thumbAlpha));
                 }
             }
         } finally {
@@ -533,14 +622,17 @@ final class LostTalesChatOverlayRenderer {
             drawChatBackdrop(-2, -LINE_HEIGHT - LINE_PADDING,
                     unscaledWidth + 4, LINE_PADDING,
                     alpha / 2, CHAT_BACKDROP_RGB);
-            drawTopFade(unscaledWidth, -LINE_HEIGHT - LINE_PADDING,
-                    Math.round(TOP_FADE_ALPHA * opacity));
+            int fadeAlpha = Math.round(EDGE_FADE_ALPHA * opacity);
+            drawEdgeFade(unscaledWidth, -LINE_HEIGHT - LINE_PADDING,
+                    LINE_PADDING, fadeAlpha);
+            drawEdgeFade(unscaledWidth, LINE_PADDING,
+                    -LINE_HEIGHT - LINE_PADDING, fadeAlpha);
             GL11.glEnable(GL11.GL_BLEND);
             LostTalesChatVisualStyle.drawColored(minecraft.fontRenderer,
                     "\u00a7o" + StatCollector.translateToLocal(
                             "gui.losttales.chat.empty"),
                     0, -TEXT_OFFSET, LostTalesChatVisualStyle.IVORY,
-                    Math.round(alpha * 0.55F));
+                    alpha);
             GL11.glDisable(GL11.GL_ALPHA_TEST);
         } finally {
             GL11.glPopMatrix();
@@ -550,38 +642,40 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * The shade under the control strip: the backdrop's plum black at
-     * half opacity along the top of the history, fading to nothing over
-     * two lines, so the history darkens toward the strip it hangs from.
-     * Across the backdrop's own horizontal fade it falls off sideways as
-     * well, the two falloffs multiplied, so the shade ends in a rounded
-     * corner. It is drawn as a fine mesh with the opacity worked out at
-     * every vertex: a single shaded quad would put a visible seam along
-     * its diagonal.
+     * The shade along one edge of the backdrop: the backdrop's plum
+     * black at half opacity on the edge, fading to nothing two lines
+     * inward ({@link #EDGE_FADE_HEIGHT}) — downward from the top edge
+     * the tab row stands on, upward from the bottom edge the newest
+     * message stands on — and never past {@code limit}, the opposite
+     * edge. That vertical fade is then masked by a second, horizontal
+     * one — full at the band's left edge, nothing at its right, across
+     * the whole width — the two multiplied, so the shade is strongest in
+     * the left corner and thins out to the right. It is drawn as a fine
+     * mesh with the opacity worked out at every vertex: a single shaded
+     * quad would put a visible seam along its diagonal.
      */
-    private static void drawTopFade(int unscaledWidth, int stackTop,
-                                    int alpha) {
+    private static void drawEdgeFade(int unscaledWidth, int edge, int limit,
+                                     int alpha) {
         int safeAlpha = Math.max(0, Math.min(255, alpha));
         if (safeAlpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
+        boolean downward = limit > edge;
+        int far = downward
+                ? Math.min(limit, edge + EDGE_FADE_HEIGHT)
+                : Math.max(limit, edge - EDGE_FADE_HEIGHT);
+        // Exactly the backdrop band's span, so the two ramps coincide.
         int left = -2;
-        int right = unscaledWidth + 2;
-        int bottom = Math.min(0, stackTop + LINE_PADDING
-                + Math.round(TOP_FADE_LINES * LINE_HEIGHT) + TOP_FADE_EXTRA);
-        if (bottom <= stackTop || right <= left) {
+        int right = unscaledWidth + 4;
+        if (far == edge || right <= left) {
             return;
         }
-        int fadeStart = Math.min(right,
-                left + backdropFadeStart(right - left));
-        float[] columnX = new float[TOP_FADE_COLUMNS + 2];
+        float[] columnX = new float[EDGE_FADE_COLUMNS + 1];
         float[] columnWeight = new float[columnX.length];
-        columnX[0] = left;
-        columnWeight[0] = 1.0F;
-        for (int column = 0; column <= TOP_FADE_COLUMNS; column++) {
-            float t = column / (float)TOP_FADE_COLUMNS;
-            columnX[column + 1] = fadeStart + (right - fadeStart) * t;
-            columnWeight[column + 1] = 1.0F - LostTalesChatMotion.smoothStep(t);
+        for (int column = 0; column <= EDGE_FADE_COLUMNS; column++) {
+            float t = column / (float)EDGE_FADE_COLUMNS;
+            columnX[column] = left + (right - left) * t;
+            columnWeight[column] = 1.0F - t;
         }
         GL11.glDisable(GL11.GL_TEXTURE_2D);
         GL11.glEnable(GL11.GL_BLEND);
@@ -590,15 +684,22 @@ final class LostTalesChatOverlayRenderer {
         GL11.glShadeModel(GL11.GL_SMOOTH);
         Tessellator tessellator = Tessellator.instance;
         tessellator.startDrawingQuads();
-        for (int rowIndex = 0; rowIndex < TOP_FADE_ROWS; rowIndex++) {
-            float y0 = stackTop + (bottom - stackTop)
-                    * (rowIndex / (float)TOP_FADE_ROWS);
-            float y1 = stackTop + (bottom - stackTop)
-                    * ((rowIndex + 1) / (float)TOP_FADE_ROWS);
-            float v0 = 1.0F - LostTalesChatMotion.smoothStep(
-                    rowIndex / (float)TOP_FADE_ROWS);
-            float v1 = 1.0F - LostTalesChatMotion.smoothStep(
-                    (rowIndex + 1) / (float)TOP_FADE_ROWS);
+        for (int rowIndex = 0; rowIndex < EDGE_FADE_ROWS; rowIndex++) {
+            // Each band runs from nearer the edge to farther from it;
+            // its top and bottom are then taken in screen order so the
+            // winding is the backdrop's either way.
+            float near = edge + (far - edge)
+                    * (rowIndex / (float)EDGE_FADE_ROWS);
+            float away = edge + (far - edge)
+                    * ((rowIndex + 1) / (float)EDGE_FADE_ROWS);
+            float nearWeight = 1.0F - LostTalesChatMotion.smoothStep(
+                    rowIndex / (float)EDGE_FADE_ROWS);
+            float awayWeight = 1.0F - LostTalesChatMotion.smoothStep(
+                    (rowIndex + 1) / (float)EDGE_FADE_ROWS);
+            float y0 = downward ? near : away;
+            float y1 = downward ? away : near;
+            float v0 = downward ? nearWeight : awayWeight;
+            float v1 = downward ? awayWeight : nearWeight;
             for (int column = 0; column + 1 < columnX.length; column++) {
                 float x0 = columnX[column];
                 float x1 = columnX[column + 1];
@@ -628,6 +729,60 @@ final class LostTalesChatOverlayRenderer {
         GL11.glDisable(GL11.GL_BLEND);
         GL11.glEnable(GL11.GL_ALPHA_TEST);
         GL11.glEnable(GL11.GL_TEXTURE_2D);
+    }
+
+    /**
+     * A hairline along one edge of the backdrop band — the row directly
+     * under the bottom padding — its full width, in the window's own
+     * units: {@code top} is the row's y.
+     */
+    private static void drawEdgeRule(int unscaledWidth, int top, int alpha) {
+        drawRule(-2, unscaledWidth + 4, top, top + 1, alpha);
+    }
+
+    /**
+     * The chat's rule: a band of the chat's ivory between {@code left}
+     * and {@code right}, opaque at the centre and fading to nothing at
+     * either end, so the edges the messages stand between read as
+     * edges. The tab row draws the window's top rule with this as its
+     * last pixel row; the bottom rule is drawn under the bottom padding.
+     */
+    static void drawRule(float left, float right, float top, float bottom,
+                         int alpha) {
+        int safeAlpha = Math.max(0, Math.min(255, alpha));
+        if (safeAlpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
+                || right <= left || bottom <= top) {
+            return;
+        }
+        float centre = (left + right) / 2.0F;
+        GL11.glDisable(GL11.GL_TEXTURE_2D);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glDisable(GL11.GL_ALPHA_TEST);
+        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
+        GL11.glShadeModel(GL11.GL_SMOOTH);
+        Tessellator tessellator = Tessellator.instance;
+        tessellator.startDrawingQuads();
+        // Same winding as the backdrop: the GUI pass culls back faces.
+        // Left half: transparent edge to opaque centre.
+        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, safeAlpha);
+        tessellator.addVertex(centre, bottom, 0.0D);
+        tessellator.addVertex(centre, top, 0.0D);
+        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, 0);
+        tessellator.addVertex(left, top, 0.0D);
+        tessellator.addVertex(left, bottom, 0.0D);
+        // Right half: opaque centre to transparent edge.
+        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, 0);
+        tessellator.addVertex(right, bottom, 0.0D);
+        tessellator.addVertex(right, top, 0.0D);
+        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, safeAlpha);
+        tessellator.addVertex(centre, top, 0.0D);
+        tessellator.addVertex(centre, bottom, 0.0D);
+        tessellator.draw();
+        GL11.glShadeModel(GL11.GL_FLAT);
+        GL11.glDisable(GL11.GL_BLEND);
+        GL11.glEnable(GL11.GL_ALPHA_TEST);
+        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     static int backdropFadeStart(int width) {

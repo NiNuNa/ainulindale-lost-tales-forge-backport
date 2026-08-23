@@ -3,6 +3,7 @@ package com.ninuna.losttales.gui.screen;
 import com.ninuna.losttales.client.chat.ChatWindow;
 import com.ninuna.losttales.client.chat.ChatWindowLayout;
 import com.ninuna.losttales.client.chat.ChatWindowPlacement;
+import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
@@ -56,7 +57,11 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         rebuildElements();
     }
 
-    /** The fixed panels, the closed-chat feed, then every chat window. */
+    /**
+     * The fixed panels, the closed-chat feed, then every chat window the
+     * player can currently see: one whose channels are all unavailable
+     * (a Party window outside a party) is not on screen and not here.
+     */
     private void rebuildElements() {
         Placeable previous = this.selected;
         this.elements.clear();
@@ -66,7 +71,9 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         this.elements.add(new ChatFeedElement());
         List<ChatWindow> windows = ChatWindowLayout.windows();
         for (int index = 0; index < windows.size(); index++) {
-            this.elements.add(new ChatWindowElement(windows.get(index)));
+            if (ClientChatChannelState.isVisible(windows.get(index))) {
+                this.elements.add(new ChatWindowElement(windows.get(index)));
+            }
         }
         this.selected = null;
         if (previous != null) {
@@ -527,16 +534,14 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         public void moveTo(double x, double y, LostTalesHudPlacementGui gui) {
             // The box moves by its top-left; the window is anchored by
             // its baseline, which sits a bar's height above the bottom.
-            // The other windows are walls here as they are in the chat,
-            // and moving the window on its own breaks the link it had.
+            // Only the screen edges hold it, as in the chat, and moving
+            // the window on its own breaks the link it had.
             ChatWindowLayout.unlink(this.window.getId());
             ChatWindowPlacement.Box box = preciseBounds(gui);
             ChatWindowPlacement.Anchor anchor =
                     ChatWindowPlacement.constrainWindow(this.window, gui.mc,
                             x, y + box.height - box.barHeight,
-                            gui.width, gui.height,
-                            ChatWindowPlacement.wallsExcept(this.window,
-                                    gui.mc, gui.width, gui.height));
+                            gui.width, gui.height);
             apply(ChatWindowPlacement.windowPercentX(anchor.x, gui.mc,
                             gui.width),
                     ChatWindowPlacement.windowPercentY(anchor.baseline,

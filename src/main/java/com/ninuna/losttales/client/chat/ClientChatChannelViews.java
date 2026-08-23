@@ -28,8 +28,12 @@ import net.minecraft.client.gui.ChatLine;
  * survive closing the screen.</p>
  */
 public final class ClientChatChannelViews {
-    /** Above vanilla's 100-message history so every shown line is tracked. */
-    private static final int MAX_TRACKED_LINES = 256;
+    /**
+     * Tracked line ids never fall below the history's capacity, so every
+     * shown line has its tab; a little more covers ids allocated while
+     * the history trims.
+     */
+    private static final int TRACKED_LINES_MARGIN = 64;
     /** Unread counts stop climbing here; the tab shows "99+". */
     public static final int MAX_UNREAD = 99;
     /**
@@ -71,7 +75,7 @@ public final class ClientChatChannelViews {
             return;
         }
         TAB_BY_LINE_ID.put(Integer.valueOf(chatLineId), tab);
-        while (TAB_BY_LINE_ID.size() > MAX_TRACKED_LINES) {
+        while (TAB_BY_LINE_ID.size() > maxTrackedLines()) {
             Iterator<Integer> iterator = TAB_BY_LINE_ID.keySet().iterator();
             iterator.next();
             iterator.remove();
@@ -132,6 +136,28 @@ public final class ClientChatChannelViews {
     /** Unread messages other than pings, capped at MAX_UNREAD + 1. */
     public static synchronized int unreadOtherCount(ChatTab tab) {
         return count(UNREAD_OTHER, tab);
+    }
+
+    /** Every unread message, pings included, capped at MAX_UNREAD + 1. */
+    public static synchronized int unreadCount(ChatTab tab) {
+        return Math.min(MAX_UNREAD + 1,
+                unreadPingCount(tab) + unreadOtherCount(tab));
+    }
+
+    public static synchronized int unreadCount(ChatChannel channel) {
+        return unreadCount(ChatTab.of(channel));
+    }
+
+    /**
+     * The unread indicator every chat label carries: {@code [n]} for a
+     * positive count, {@code [99+]} past the cap, nothing otherwise.
+     */
+    public static String counterText(int count) {
+        if (count <= 0) {
+            return "";
+        }
+        return "[" + (count > MAX_UNREAD ? MAX_UNREAD + "+"
+                : String.valueOf(count)) + "]";
     }
 
     public static synchronized int unreadPingCount(ChatChannel channel) {
@@ -306,6 +332,12 @@ public final class ClientChatChannelViews {
         ChatWindowFrame.clear();
         // The history is gone with the world, and so are its conversations.
         ChatWindowLayout.closeConversations();
+        ChatChannelIcons.forgetPortraits();
+    }
+
+    /** Line ids remembered: the history's capacity and a margin. */
+    static int maxTrackedLines() {
+        return LostTalesChatHistoryHooks.capacity() + TRACKED_LINES_MARGIN;
     }
 
     private static int count(Map<ChatTab, Integer> counter, ChatTab tab) {

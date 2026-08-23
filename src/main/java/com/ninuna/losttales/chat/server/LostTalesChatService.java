@@ -20,6 +20,7 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibilityPolicy;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyMember;
 import com.ninuna.losttales.party.server.PartyService;
@@ -146,7 +147,18 @@ public final class LostTalesChatService {
                         && character != null ? character.getSkinId() : "",
                 showcases,
                 channel.getIdentityType() == ChatIdentityType.CHARACTER
-                        ? presentation.factionName : "");
+                        ? presentation.factionName : "",
+                // A whisper names its partner from the start: the packet
+                // refuses a partner-less whisper, so the sender's copy is
+                // built with the target's name and the target's copy is
+                // derived from it below.
+                whisperTarget == null ? ""
+                        : whisperTarget.getCommandSenderName(),
+                // Account lines say when their sender is an operator;
+                // role-play lines belong to the character, not the account.
+                channel.getIdentityType() == ChatIdentityType.ACCOUNT
+                        && LostTalesWaystonePermissionPolicy.isOperator(
+                                sender));
 
         FMLLog.info("[losttales/chat/%s] <%s (%s)> %s%s%s",
                 channel.getId(), identityName, accountName, message,
@@ -157,8 +169,7 @@ public final class LostTalesChatService {
 
         if (whisperTarget != null) {
             // Each side is told who the other party is.
-            LostTalesNetworkHandler.CHANNEL.sendTo(withPartner(packet,
-                    whisperTarget.getCommandSenderName()), sender);
+            LostTalesNetworkHandler.CHANNEL.sendTo(packet, sender);
             LostTalesNetworkHandler.CHANNEL.sendTo(withPartner(packet,
                     accountName), whisperTarget);
             return;
@@ -166,6 +177,71 @@ public final class LostTalesChatService {
         for (EntityPlayerMP recipient : resolveRecipients(
                 sender, channel, party, factionId)) {
             LostTalesNetworkHandler.CHANNEL.sendTo(packet, recipient);
+        }
+    }
+
+    /**
+     * Relays that the player is, or has stopped, typing into a channel
+     * to everyone who would receive a message sent there now — never to
+     * the sender — under the very same checks a message passes, but
+     * silently: presence earns no notices. Off on the server, nothing is
+     * relayed at all.
+     */
+    public static void typing(EntityPlayerMP sender, ChatChannel channel,
+                              String target, boolean typing) {
+        if (!LostTalesConfig.chatTypingIndicators || sender == null
+                || sender.worldObj == null || sender.worldObj.isRemote
+                || channel == null
+                || channel.getRecipientRule() == ChatRecipientRule.SELF) {
+            return;
+        }
+        RoleplayCharacter character = CharacterActiveResolver.get(sender);
+        if (channel.getIdentityType() == ChatIdentityType.CHARACTER
+                && character == null) {
+            return;
+        }
+        String accountName = sender.getGameProfile() == null
+                ? sender.getCommandSenderName()
+                : sender.getGameProfile().getName();
+        String identityName = channel.getIdentityType()
+                == ChatIdentityType.ACCOUNT
+                ? accountName
+                : characterNameOrFallback(character, accountName);
+        if (channel.getRecipientRule() == ChatRecipientRule.WHISPER) {
+            EntityPlayerMP whisperTarget = findOnlinePlayer(target);
+            if (whisperTarget != null && whisperTarget != sender) {
+                LostTalesNetworkHandler.CHANNEL.sendTo(
+                        new LostTalesChatTypingSyncPacket(channel,
+                                accountName, identityName, typing),
+                        whisperTarget);
+            }
+            return;
+        }
+        Party party = null;
+        String factionId = character == null ? ""
+                : LotrCharacterAdapter.normalizeFactionId(
+                        character.getStartingFactionId());
+        if (channel.getRecipientRule() == ChatRecipientRule.PARTY) {
+            party = PartyService.getInstance()
+                    .getPartyForActiveCharacter(sender);
+            if (party == null || character == null
+                    || !party.containsMember(character.getCharacterId())) {
+                return;
+            }
+        } else if (channel.getRecipientRule() == ChatRecipientRule.FACTION
+                && factionId.length() == 0) {
+            return;
+        } else if (channel.getRecipientRule() == ChatRecipientRule.OPERATORS
+                && !LostTalesWaystonePermissionPolicy.isOperator(sender)) {
+            return;
+        }
+        LostTalesChatTypingSyncPacket packet = new LostTalesChatTypingSyncPacket(
+                channel, "", identityName, typing);
+        for (EntityPlayerMP recipient : resolveRecipients(
+                sender, channel, party, factionId)) {
+            if (recipient != sender) {
+                LostTalesNetworkHandler.CHANNEL.sendTo(packet, recipient);
+            }
         }
     }
 
@@ -177,7 +253,7 @@ public final class LostTalesChatService {
                 packet.getTitleColor(), packet.getNameColor(),
                 packet.getMessage(), packet.getTimestampMillis(),
                 packet.getSkinId(), packet.getShowcases(),
-                packet.getFactionName(), partner);
+                packet.getFactionName(), partner, packet.isOperator());
     }
 
     /** The online player with that account name, case-insensitively. */

@@ -58,7 +58,8 @@ final class ChatQuestPicker extends ChatPickerPanel {
     }
 
     @Override
-    void drawButtonIcon(Minecraft minecraft, int left, int top) {
+    void drawButtonIcon(Minecraft minecraft, int left, int top,
+                        boolean lifted) {
         // The quest map marker, the same glyph quests carry on the map.
         ChatInlineIcons.drawMarkerButton(minecraft,
                 LostTalesCompassMarkerIcon.QUEST.name(),

@@ -9,6 +9,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -31,6 +32,8 @@ public final class ChatWindowLayoutStoreTest {
         ChatWindowLayout.setLocked("w3", true);
         ChatWindowLayout.close(ChatChannel.ADMIN);
         ChatWindowLayout.setMuted(ChatChannel.OOC, true);
+        ChatWindowLayout.setFeedHidden(ChatTab.of(ChatChannel.PROXIMITY), true);
+        ChatWindowLayout.setPingSilenced(ChatTab.of(ChatChannel.PARTY), true);
         ChatWindowLayout.setActiveTab(ChatChannel.OOC);
         ChatWindowLayout.setPosition("w2", 3.0D, 97.5D, true);
         ChatWindowLayout.setFeedPosition(12.25D, 88.0D, true);
@@ -47,6 +50,8 @@ public final class ChatWindowLayoutStoreTest {
                 + "active=faction link=w2:above tabs=party,faction"));
         assertTrue(lines.contains("closed admin"));
         assertTrue(lines.contains("muted ooc"));
+        assertTrue(lines.contains("nofeed proximity"));
+        assertTrue(lines.contains("noping party"));
 
         ChatWindowLayout.reset();
         ChatWindowLayoutStore.load(lines);
@@ -73,6 +78,10 @@ public final class ChatWindowLayoutStoreTest {
         assertEquals(Collections.singletonList(ChatChannel.ADMIN),
                 ChatWindowLayout.closedChannels());
         assertTrue(ChatWindowLayout.isMuted(ChatChannel.OOC));
+        assertTrue(ChatWindowLayout.isFeedHidden(ChatChannel.PROXIMITY));
+        assertFalse(ChatWindowLayout.isPingSilenced(ChatChannel.PROXIMITY));
+        assertTrue(ChatWindowLayout.isPingSilenced(ChatChannel.PARTY));
+        assertFalse(ChatWindowLayout.isFeedHidden(ChatChannel.PARTY));
         assertEquals(lines, ChatWindowLayoutStore.describe());
     }
 

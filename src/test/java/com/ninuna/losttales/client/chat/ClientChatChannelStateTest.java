@@ -122,6 +122,102 @@ public final class ClientChatChannelStateTest {
                 ClientChatChannelState.getSelectedChannel());
     }
 
+    /**
+     * The player keeps one tab they can see: without operator status
+     * the Admin tab is hidden, so with only Global and Admin open,
+     * Global is the last visible tab and cannot be closed even though
+     * the layout alone would allow it.
+     */
+    @Test
+    public void theLastVisibleTabCannotBeClosedEvenWhenHiddenTabsRemain() {
+        for (ChatChannel channel : ChatChannel.presentationOrder()) {
+            if (channel != ChatChannel.ALL && channel != ChatChannel.ADMIN) {
+                assertTrue(ClientChatChannelState.close(ChatTab.of(channel)));
+            }
+        }
+        assertEquals(2, ChatWindowLayout.openTabCount());
+        assertEquals(Collections.singletonList(ChatChannel.ALL),
+                ClientChatChannelState.getOpenChannels());
+        assertTrue(ChatWindowLayout.isClosable(ChatChannel.ALL));
+        assertFalse(ClientChatChannelState.isClosable(ChatTab.of(ChatChannel.ALL)));
+        assertFalse(ClientChatChannelState.close(ChatTab.of(ChatChannel.ALL)));
+        assertTrue(ChatWindowLayout.isOpen(ChatChannel.ALL));
+        // Closing the selected tab moves the selection to what is left.
+        ChatWindowLayout.restore(ChatChannel.OOC);
+        ClientChatChannelState.select(ChatChannel.OOC);
+        assertTrue(ClientChatChannelState.isClosable(ChatTab.of(ChatChannel.OOC)));
+        assertTrue(ClientChatChannelState.close(ChatTab.of(ChatChannel.OOC)));
+        assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
+        // With operator status Admin is a tab the player could keep.
+        ClientChatChannelState.setAdminAccess(true);
+        assertTrue(ClientChatChannelState.isClosable(ChatTab.of(ChatChannel.ALL)));
+    }
+
+    /**
+     * The feed reads every unmuted channel the player can see, closed
+     * ones included; only muting removes a channel from it.
+     */
+    @Test
+    public void theFeedShowsClosedChannelsUntilTheyAreMuted() {
+        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
+        ChatTab faction = ChatTab.of(ChatChannel.FACTION);
+        assertTrue(ChatWindowFrame.feedFilter().accepts(ooc));
+        assertTrue(ChatWindowLayout.close(ChatChannel.OOC));
+        assertTrue(ChatWindowFrame.feedFilter().accepts(ooc));
+        ChatWindowLayout.setMuted(ChatChannel.OOC, true);
+        assertFalse(ChatWindowFrame.feedFilter().accepts(ooc));
+        assertTrue(ChatWindowLayout.restore(ChatChannel.OOC));
+        assertFalse(ChatWindowFrame.feedFilter().accepts(ooc));
+        ChatWindowLayout.setMuted(ChatChannel.OOC, false);
+        assertTrue(ChatWindowFrame.feedFilter().accepts(ooc));
+        // A channel the player cannot see is not in the feed, open or not.
+        assertFalse(ChatWindowFrame.feedFilter().accepts(faction));
+        acceptRoster("lotr:gondor");
+        assertTrue(ChatWindowFrame.feedFilter().accepts(faction));
+        assertTrue(ChatWindowLayout.close(ChatChannel.FACTION));
+        assertTrue(ChatWindowFrame.feedFilter().accepts(faction));
+        // Untracked lines ride with the console wherever, or whether, it
+        // is placed.
+        assertTrue(ChatWindowFrame.feedFilter().accepts(null));
+        assertTrue(ChatWindowLayout.close(ChatChannel.CONSOLE));
+        assertTrue(ChatWindowFrame.feedFilter().accepts(null));
+        // Conversations are read from their open tabs only.
+        ChatTab whisper = ChatWindowLayout.openWhisper("Bilbo", null);
+        assertTrue(ChatWindowFrame.feedFilter().accepts(whisper));
+        ChatWindowLayout.setMuted(whisper, true);
+        assertFalse(ChatWindowFrame.feedFilter().accepts(whisper));
+        // Hiding from the feed alone is enough to leave it; silencing
+        // the cue alone is not.
+        ChatWindowLayout.setFeedHidden(ooc, true);
+        assertFalse(ChatWindowFrame.feedFilter().accepts(ooc));
+        ChatWindowLayout.setFeedHidden(ooc, false);
+        ChatWindowLayout.setPingSilenced(ooc, true);
+        assertTrue(ChatWindowFrame.feedFilter().accepts(ooc));
+    }
+
+    /**
+     * Ctrl+Tab walks every open tab across windows, both ways, wrapping
+     * at the ends; Tab on its own stays inside the selected window.
+     */
+    @Test
+    public void cyclingAcrossWindowsFollowsTheLayoutOrder() {
+        ClientChatChannelState.select(ChatChannel.CONSOLE);
+        assertEquals(ChatChannel.CONSOLE,
+                ClientChatChannelState.cycle().getChannel());
+        assertEquals(ChatChannel.ALL,
+                ClientChatChannelState.cycleAll(false).getChannel());
+        assertEquals(ChatChannel.OOC,
+                ClientChatChannelState.cycleAll(false).getChannel());
+        assertEquals(ChatChannel.CONSOLE,
+                ClientChatChannelState.cycleAll(false).getChannel());
+        assertEquals(ChatChannel.OOC,
+                ClientChatChannelState.cycleAll(true).getChannel());
+        assertEquals(ChatChannel.ALL,
+                ClientChatChannelState.cycleAll(true).getChannel());
+        assertEquals(ChatChannel.CONSOLE,
+                ClientChatChannelState.cycleAll(true).getChannel());
+    }
+
     private static void acceptRoster(String factionId) {
         UUID ownerId = UUID.randomUUID();
         UUID characterId = UUID.randomUUID();

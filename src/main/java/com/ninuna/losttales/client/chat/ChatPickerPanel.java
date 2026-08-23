@@ -196,7 +196,7 @@ abstract class ChatPickerPanel {
                 anchorRight, screenHeight);
         // A bare icon with the shared shadow; hover and open states lift it
         // a pixel rather than painting a backdrop.
-        drawButtonIcon(minecraft, left, top - (lifted ? 1 : 0));
+        drawButtonIcon(minecraft, left, top - (lifted ? 1 : 0), lifted);
         regions.add(left, top, left + BUTTON_SIZE, top + BUTTON_SIZE);
     }
 
@@ -235,7 +235,7 @@ abstract class ChatPickerPanel {
                 String glyph = label.collapsible
                         ? (isCollapsed(label.key) ? "+ " : "- ") : "";
                 LostTalesChatVisualStyle.drawPlain(font, glyph + label.text,
-                        label.x, label.y + slide, Math.min(textAlpha, 170));
+                        label.x, label.y + slide, textAlpha);
             }
             for (Cell cell : layout.cells) {
                 if (!layout.showsRow(cell.y, cellHeight())) {
@@ -493,7 +493,9 @@ abstract class ChatPickerPanel {
     /** The text a chosen cell inserts at the input cursor. */
     abstract String insertionText(Entry entry);
 
-    abstract void drawButtonIcon(Minecraft minecraft, int left, int top);
+    /** The button's icon; {@code lifted} while hovered or open. */
+    abstract void drawButtonIcon(Minecraft minecraft, int left, int top,
+                                 boolean lifted);
 
     static final class Section {
         final String label;

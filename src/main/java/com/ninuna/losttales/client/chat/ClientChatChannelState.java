@@ -89,6 +89,24 @@ public final class ClientChatChannelState {
         return selected;
     }
 
+    /**
+     * Next (or previous) open tab across every window, in window and
+     * tab order — the keyboard's way from one window to another.
+     */
+    public static synchronized ChatTab cycleAll(boolean backward) {
+        ChatTab current = getSelected();
+        List<ChatTab> order = getOpenTabs();
+        if (order.isEmpty()) {
+            return current;
+        }
+        int index = order.indexOf(current);
+        int step = backward ? -1 : 1;
+        selected = order.get(
+                ((index < 0 ? 0 : index) + step + order.size())
+                        % order.size());
+        return selected;
+    }
+
     /** Available channels in presentation order (plain tabs only). */
     public static synchronized List<ChatChannel> getAvailableChannels() {
         ArrayList<ChatChannel> result = new ArrayList<ChatChannel>();
@@ -138,9 +156,50 @@ public final class ClientChatChannelState {
         return isSelectable(ChatTab.of(channel));
     }
 
+    /**
+     * Whether the player may close the tab: the layout must keep one
+     * open tab, and the player must keep one they can actually see, so
+     * a tab hidden by availability (Admin without operator status) does
+     * not count as the remaining one.
+     */
+    public static synchronized boolean isClosable(ChatTab tab) {
+        return ChatWindowLayout.isClosable(tab) && getOpenTabs().size() > 1;
+    }
+
+    /**
+     * Closes the tab under {@link #isClosable} and moves the selection
+     * off it if it was selected. Closing never mutes: the channel keeps
+     * receiving and keeps its own mute setting.
+     */
+    public static synchronized boolean close(ChatTab tab) {
+        if (!isClosable(tab) || !ChatWindowLayout.close(tab)) {
+            return false;
+        }
+        ensureAvailable();
+        return true;
+    }
+
     /** Whether the tab's history is readable and its tab shown. */
     public static synchronized boolean isAvailable(ChatTab tab) {
         return tab != null && isAvailable(tab.getChannel());
+    }
+
+    /**
+     * Whether the window has a tab the player can currently see. One
+     * that has not is not drawn, not offered in the placement editor,
+     * and in nothing's way until one of its channels becomes available.
+     */
+    public static synchronized boolean isVisible(ChatWindow window) {
+        if (window == null) {
+            return false;
+        }
+        List<ChatTab> tabs = window.getTabs();
+        for (int index = 0; index < tabs.size(); index++) {
+            if (isAvailable(tabs.get(index))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether the channel's tab is shown and its history readable. */

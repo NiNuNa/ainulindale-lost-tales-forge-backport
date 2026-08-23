@@ -9,27 +9,35 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.renderer.OpenGlHelper;
+import net.minecraft.client.renderer.Tessellator;
+import org.lwjgl.opengl.GL11;
 
 /**
- * Folder-divider style tabs of one chat window, like the tabs on a
- * folder. Neighbouring tabs overlap by a few pixels like file dividers;
- * the selected tab is drawn last, lifted, and brighter, and its body runs
- * into the box so the two read as one sheet. Each tab eases its own
- * prominence toward its target from wherever it currently is, so rapid
- * switching never waits on a previous transition. A tab with unread
- * messages carries textual counters after its name: {@code (p)} pings in
- * salmon, then {@code (x)} other unread lines in honey; a muted tab is
- * drawn dim and italic.
+ * The tabs of one chat window, laid out the way a browser lays out
+ * its tabs. Tabs stand side by side with a one-pixel seam on the
+ * window's top rule; the selected tab is drawn last, lifted, and
+ * brighter. Each tab eases its own prominence
+ * toward its target from wherever it currently is, so rapid switching
+ * never waits on a previous transition. A tab with unread messages
+ * carries textual counters after its name: {@code [p]} pings in salmon,
+ * then {@code [x]} other unread lines in honey; a muted tab is drawn
+ * dim and italic. The channel's colour runs along each tab's top edge,
+ * full at the centre and fading to nothing at both ends.
  *
- * <p>The selected tab always carries its controls — a settings cog and
- * a close cross — and the row ends with the
- * window's lock and, while channels are closed, a restore control. The
- * row is the window's title strip: the space right of the controls is
- * the grip that moves the window. Geometry is computed once per change
- * of inputs and reused by drawing and hit testing, so a frame allocates
- * nothing.</p>
+ * <p>Every tab carries a settings cog and, unless it is the last tab the
+ * player could close, a close cross, while the row has room for them;
+ * when it has not, only the selected tab keeps its controls and the
+ * labels are shortened with an ellipsis, widest first, until the row
+ * fits. The tabs never cross their limit: the row ends with the window's
+ * lock, a restore control while channels are closed, and the grip that
+ * moves the window, and those keep their room however many tabs there
+ * are. Geometry is computed once per change of inputs and reused by
+ * drawing and hit testing, so a frame allocates nothing.</p>
  *
  * <p>The row is positioned by its window: {@code rowBottom} and
  * {@code offsetX} come from the frame that drew the window, so the row
@@ -37,18 +45,22 @@ import net.minecraft.client.gui.Gui;
  * history it stands on.</p>
  */
 final class ChatChannelTabBar {
-    /** Body height of a resting tab; the selected tab rises above it. */
-    static final int HEIGHT = 11;
+    /**
+     * Body height of a resting tab, the top rule's row included: the
+     * colour rule and its chamfer (two rows), the icon with a clear row
+     * above and below it (twelve), and the top rule (one). The selected
+     * tab rises above it and its interior grows by the lift.
+     */
+    static final int HEIGHT = 15;
     /** Pixels the selected tab rises out of the row. */
     static final int LIFT = 2;
     /** Full height of the row: a resting tab plus the lift. */
     static final int ROW_HEIGHT = HEIGHT + LIFT;
-    /** Horizontal overlap between neighbouring dividers. */
-    private static final int OVERLAP = 3;
+    /** Seam between neighbouring tabs. */
+    private static final int TAB_GAP = 1;
     private static final int PADDING_X = 6;
     /** A dragged tab's ghost never grows past this. */
     private static final int GHOST_LABEL_WIDTH = 120;
-    private static final int MIN_LABEL_WIDTH = 14;
     /** Gap between the label and a counter, and between the counters. */
     private static final int COUNTER_GAP = 3;
     /** Hit square of a control inside the selected tab. */
@@ -65,12 +77,6 @@ final class ChatChannelTabBar {
             LostTalesColors.rgb(LostTalesColors.SALMON);
     private static final int UNREAD_COUNTER_RGB =
             LostTalesColors.rgb(LostTalesColors.HONEY);
-    private static final int CLOSE_HOVER_RGB =
-            LostTalesColors.rgb(LostTalesColors.SALMON);
-    private static final int LOCKED_RGB =
-            LostTalesColors.rgb(LostTalesColors.HONEY);
-    private static final int RESTORE_RGB =
-            LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN);
     private static final int DROP_RGB =
             LostTalesColors.rgb(LostTalesColors.HONEY);
 
@@ -101,6 +107,11 @@ final class ChatChannelTabBar {
     private int cachedRight = Integer.MIN_VALUE;
     private boolean cachedShowClose;
     private boolean cachedShowRestore;
+    private int cachedClosedUnread;
+    /** {@code [n]} after the restore control, or empty. */
+    private String restoreBadge = "";
+    /** Width of the restore control together with its badge. */
+    private int restoreWidth;
     /** Right edge of the last tab, before the end controls. */
     private int tabsRight;
     private int lockX = -1;
@@ -139,6 +150,8 @@ final class ChatChannelTabBar {
         boolean closable;
         /** Whether the restore control is offered after the row. */
         boolean showRestore;
+        /** Unread lines waiting in closed channels, shown after the +. */
+        int closedUnread;
         /** Tab being dragged out of this row, drawn faint; or null. */
         ChatTab dragging;
         /** Insertion index to indicate during a drag, or -1. */
@@ -218,46 +231,32 @@ final class ChatChannelTabBar {
         if (tabs.isEmpty()) {
             return null;
         }
-        // Later tabs overlap earlier ones, so the last hit wins, except
-        // the selected tab, which is on top of everything.
-        Tab selectedTab = null;
-        Tab hit = null;
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
-            if (localX >= tab.x && localX < tab.x + tab.width) {
-                if (tab.tab.equals(row.selected)) {
-                    selectedTab = tab;
-                } else {
-                    hit = tab;
-                }
+            if (localX < tab.x || localX >= tab.x + tab.width) {
+                continue;
             }
-        }
-        if (selectedTab != null) {
-            if (selectedTab.closeX >= 0
-                    && localX >= selectedTab.closeX - 1
-                    && localX < selectedTab.closeX + CONTROL_SIZE + 1) {
-                return new Hit(HitKind.CLOSE, selectedTab.tab);
+            if (tab.closeX >= 0 && localX >= tab.closeX - 1
+                    && localX < tab.closeX + CONTROL_SIZE + 1) {
+                return new Hit(HitKind.CLOSE, tab.tab);
             }
-            if (selectedTab.settingsX >= 0
-                    && localX >= selectedTab.settingsX - 1
-                    && localX < selectedTab.settingsX + CONTROL_SIZE + 1) {
-                return new Hit(HitKind.SETTINGS, selectedTab.tab);
+            if (tab.settingsX >= 0 && localX >= tab.settingsX - 1
+                    && localX < tab.settingsX + CONTROL_SIZE + 1) {
+                return new Hit(HitKind.SETTINGS, tab.tab);
             }
-            return new Hit(HitKind.TAB, selectedTab.tab);
-        }
-        if (hit != null) {
-            return new Hit(HitKind.TAB, hit.tab);
+            return new Hit(HitKind.TAB, tab.tab);
         }
         if (this.lockX >= 0 && localX >= this.lockX
                 && localX < this.lockX + END_CONTROL_SIZE) {
             return new Hit(HitKind.LOCK, null);
         }
         if (this.restoreX >= 0 && localX >= this.restoreX
-                && localX < this.restoreX + END_CONTROL_SIZE) {
+                && localX < this.restoreX + this.restoreWidth) {
             return new Hit(HitKind.RESTORE, null);
         }
         if (localX >= this.controlsRight && localX < row.right) {
-            return new Hit(HitKind.GRIP, null);
+            // A locked window's grip is inert: no hover, no tip, no drag.
+            return row.locked ? null : new Hit(HitKind.GRIP, null);
         }
         return null;
     }
@@ -305,7 +304,7 @@ final class ChatChannelTabBar {
                 row.offsetX + row.right + 2, bottom,
                 LostTalesChatVisualStyle.argb(
                         LostTalesChatVisualStyle.SURFACE_RGB,
-                        scaled(0x70)));
+                        scaled(LostTalesChatVisualStyle.SURFACE_ALPHA)));
         drawGrip(row.offsetX + this.controlsRight, row.offsetX + row.right,
                 bottom, hovered != null && hovered.kind == HitKind.GRIP);
         Tab selectedTab = null;
@@ -323,15 +322,30 @@ final class ChatChannelTabBar {
         if (row.dropIndex >= 0) {
             drawDropIndicator(tabs, row, bottom);
         }
-        int controlTop = bottom - HEIGHT + (HEIGHT - END_CONTROL_SIZE) / 2;
+        // The end controls sit centred in the strip, like the selected
+        // tab's label; the badge's caps share that centre.
         if (this.lockX >= 0) {
-            drawLock(row.offsetX + this.lockX, controlTop, row.locked,
+            drawLock(row.offsetX + this.lockX, bottom, row.locked,
                     hovered != null && hovered.kind == HitKind.LOCK);
         }
         if (this.restoreX >= 0) {
-            drawRestore(row.offsetX + this.restoreX, controlTop,
-                    hovered != null && hovered.kind == HitKind.RESTORE);
+            boolean restoreHovered = hovered != null
+                    && hovered.kind == HitKind.RESTORE;
+            drawRestore(row.offsetX + this.restoreX, bottom, restoreHovered);
+            if (this.restoreBadge.length() > 0) {
+                // What waits behind the +, in the tabs' unread honey.
+                LostTalesChatVisualStyle.drawColored(font, this.restoreBadge,
+                        row.offsetX + this.restoreX + END_CONTROL_SIZE
+                                + COUNTER_GAP,
+                        centredInStrip(bottom, 7),
+                        UNREAD_COUNTER_RGB, scaled(0xFF));
+            }
         }
+        // The window's top rule: the strip's last row, over the tabs
+        // and controls, the exact width of the strip.
+        LostTalesChatOverlayRenderer.drawRule(row.offsetX + row.left - 2,
+                row.offsetX + row.right + 2, bottom - 1, bottom,
+                scaled(0xFF));
         regions.addScreen(row.offsetX + row.left - 2, rowTop(bottom),
                 row.offsetX + row.right + 2, bottom);
     }
@@ -343,17 +357,25 @@ final class ChatChannelTabBar {
         }
         String label = LostTalesSkyrimUiStyle.trimToWidth(font,
                 ClientChatChannelState.displayName(tab), GHOST_LABEL_WIDTH);
-        int width = font.getStringWidth(label) + PADDING_X * 2;
+        ChatEmoji icon = ChatChannelIcons.iconOf(tab);
+        int iconWidth = icon == null ? 0 : ChatChannelIcons.SIZE
+                + ChatChannelIcons.GAP;
+        int width = font.getStringWidth(label) + PADDING_X * 2 + iconWidth;
         int top = y - HEIGHT / 2;
         int surface = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB, 0xD0);
+                LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
+                LostTalesChatVisualStyle.SURFACE_ALPHA);
         Gui.drawRect(x + 1, top, x + width - 1, top + 1, surface);
         Gui.drawRect(x, top + 1, x + width, top + HEIGHT, surface);
         Gui.drawRect(x + 1, top + 1, x + width - 1, top + 2,
                 LostTalesChatVisualStyle.argb(
                         ClientChatChannelState.displayColor(tab), 0xFF));
-        LostTalesChatVisualStyle.drawPlain(font, label, x + PADDING_X,
-                top + 3, 230);
+        if (icon != null) {
+            ChatChannelIcons.draw(Minecraft.getMinecraft(), tab,
+                    x + PADDING_X, top + 3.0F, 230);
+        }
+        LostTalesChatVisualStyle.drawPlain(font, label,
+                x + PADDING_X + iconWidth, top + 4, 230);
     }
 
     private int scaled(int alpha) {
@@ -369,15 +391,19 @@ final class ChatChannelTabBar {
         float rise = prominence(tab.tab);
         int lift = Math.round(LIFT * rise);
         int top = rowBottom - HEIGHT - lift;
-        // The selected tab joins the history box; resting tabs keep a one
-        // pixel seam so they read as sitting behind it.
-        int bottom = selected ? rowBottom + 1 : rowBottom;
+        // Every tab reaches the strip's bottom, under the top rule that
+        // takes the strip's last row; the selected one rises, it does
+        // not sink.
+        int bottom = rowBottom;
         int left = row.offsetX + tab.x;
         int right = left + tab.width;
         float dim = faint ? 0.4F : 1.0F;
 
+        // Surfaces at the chat's half opacity; the selected tab is told
+        // apart by its lift, its lighter tone and its accent, not by
+        // being more solid.
         int surfaceAlpha = scaled(Math.round(
-                (0x90 + (0xE6 - 0x90) * rise) * dim));
+                LostTalesChatVisualStyle.SURFACE_ALPHA * dim));
         int surfaceRgb = blend(LostTalesChatVisualStyle.SURFACE_RGB,
                 LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
                 hoveredTab ? Math.max(0.35F, rise) : rise * 0.55F);
@@ -385,23 +411,32 @@ final class ChatChannelTabBar {
         // Chamfered top corners: the top row is inset one pixel per side.
         Gui.drawRect(left + 1, top, right - 1, top + 1, surface);
         Gui.drawRect(left, top + 1, right, bottom, surface);
-        // Channel accent along the top edge, brighter when forward.
+        // Channel accent along the top edge, brighter when forward,
+        // full at the centre and gone at the ends like the edge rules.
         int accentAlpha = scaled(Math.round(
                 (0xA0 + (0xFF - 0xA0) * rise) * dim));
-        Gui.drawRect(left + 1, top + 1, right - 1, top + 2,
-                (accentAlpha << 24)
-                        | ClientChatChannelState.displayColor(tab.tab));
-        if (!selected) {
-            // Shaded right edge suggests the next divider stacked above.
-            Gui.drawRect(right - 1, top + 1, right, bottom,
-                    LostTalesChatVisualStyle.argb(
-                            LostTalesChatVisualStyle.SHADOW, scaled(0x90)));
-        }
-        int textAlpha = scaled(Math.round(
-                (185 + (255 - 185) * rise) * dim
-                        * (tab.muted ? 0.6F : 1.0F)));
+        drawAccent(left + 1, right - 1, top + 1,
+                ClientChatChannelState.displayColor(tab.tab), accentAlpha);
+        // Text is always at full opacity; a muted tab is told by its
+        // italics alone.
+        int textAlpha = scaled(Math.round(255 * dim));
+        // Everything inside the tab is centred between the colour rule
+        // (the two rows at the top) and the window's top rule (the
+        // strip's last row) of a resting tab: the icon at its own size,
+        // the label's caps and the controls. The selected tab's lift
+        // carries them up with it rather than re-centring them in the
+        // taller body.
+        int interiorTop = top + 2;
+        int interiorHeight = HEIGHT - 3;
         int textX = left + PADDING_X;
-        int textY = top + 3;
+        int textY = interiorTop + (interiorHeight - 7) / 2;
+        if (tab.icon != null) {
+            ChatChannelIcons.draw(Minecraft.getMinecraft(), tab.tab, textX,
+                    interiorTop
+                            + (interiorHeight - ChatChannelIcons.SIZE) / 2.0F,
+                    textAlpha);
+            textX += ChatChannelIcons.SIZE + ChatChannelIcons.GAP;
+        }
         LostTalesChatVisualStyle.drawPlain(font,
                 tab.muted ? "§o" + tab.label : tab.label,
                 textX, textY, textAlpha);
@@ -417,17 +452,65 @@ final class ChatChannelTabBar {
             LostTalesChatVisualStyle.drawColored(font, tab.otherText,
                     textX, textY, UNREAD_COUNTER_RGB, textAlpha);
         }
-        int controlTop = top + 2 + (HEIGHT - 2 - CONTROL_SIZE) / 2;
+        // The controls are never dimmed with the label: only the
+        // window's own fade and a dragged tab's faintness reach them.
+        // The control sprites centred in the interior like the caps.
+        int controlTop = interiorTop + (interiorHeight - 5) / 2
+                - (CONTROL_SIZE - 5) / 2;
+        int controlAlpha = scaled(Math.round(0xFF * dim));
         if (tab.settingsX >= 0) {
             drawCog(row.offsetX + tab.settingsX, controlTop,
-                    hovered != null && hovered.kind == HitKind.SETTINGS,
-                    textAlpha);
+                    hovered != null && hovered.tab != null
+                            && hovered.kind == HitKind.SETTINGS
+                            && hovered.tab.equals(tab.tab),
+                    controlAlpha);
         }
         if (tab.closeX >= 0) {
             drawClose(row.offsetX + tab.closeX, controlTop,
-                    hovered != null && hovered.kind == HitKind.CLOSE,
-                    textAlpha);
+                    hovered != null && hovered.tab != null
+                            && hovered.kind == HitKind.CLOSE
+                            && hovered.tab.equals(tab.tab),
+                    controlAlpha);
         }
+    }
+
+    /**
+     * A one-pixel band of the channel's colour from {@code left} to
+     * {@code right}: the given alpha at the centre, nothing at either
+     * end, the same profile as the window's edge rules.
+     */
+    private static void drawAccent(int left, int right, int y, int rgb,
+                                   int alpha) {
+        if (right <= left || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        float centre = (left + right) / 2.0F;
+        GL11.glDisable(GL11.GL_TEXTURE_2D);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glDisable(GL11.GL_ALPHA_TEST);
+        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
+        GL11.glShadeModel(GL11.GL_SMOOTH);
+        Tessellator tessellator = Tessellator.instance;
+        tessellator.startDrawingQuads();
+        // Same winding as the chat backdrop: the GUI pass culls back faces.
+        tessellator.setColorRGBA_I(rgb, alpha);
+        tessellator.addVertex(centre, y + 1, 0.0D);
+        tessellator.addVertex(centre, y, 0.0D);
+        tessellator.setColorRGBA_I(rgb, 0);
+        tessellator.addVertex(left, y, 0.0D);
+        tessellator.addVertex(left, y + 1, 0.0D);
+        tessellator.setColorRGBA_I(rgb, 0);
+        tessellator.addVertex(right, y + 1, 0.0D);
+        tessellator.addVertex(right, y, 0.0D);
+        tessellator.setColorRGBA_I(rgb, alpha);
+        tessellator.addVertex(centre, y, 0.0D);
+        tessellator.addVertex(centre, y + 1, 0.0D);
+        tessellator.draw();
+        GL11.glShadeModel(GL11.GL_FLAT);
+        GL11.glDisable(GL11.GL_BLEND);
+        GL11.glEnable(GL11.GL_ALPHA_TEST);
+        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     private void drawDropIndicator(List<Tab> tabs, Row row, int rowBottom) {
@@ -441,130 +524,74 @@ final class ChatChannelTabBar {
                 LostTalesChatVisualStyle.argb(DROP_RGB, scaled(0xFF)));
     }
 
-    /* Control glyphs are drawn from rectangles so they stay crisp at every
-       GUI scale and take the palette directly. */
+    /* The controls are the sheet's sprites, drawn 1:1 and centred in
+       their hit squares; hovering swaps in the sprite's hover state. */
 
     private void drawClose(int x, int y, boolean hovered, int alpha) {
-        int color = LostTalesChatVisualStyle.argb(
-                hovered ? CLOSE_HOVER_RGB : LostTalesChatVisualStyle.IVORY,
-                hovered ? scaled(0xFF) : alpha);
-        int shadow = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.SHADOW,
-                LostTalesChatVisualStyle.shadowAlpha(alpha));
-        int size = 5;
-        int inset = (CONTROL_SIZE - size) / 2;
-        for (int step = 0; step < size; step++) {
-            int px = x + inset + step;
-            int py = y + inset + step;
-            int qx = x + inset + (size - 1 - step);
-            Gui.drawRect(px + 1, py + 1, px + 2, py + 2, shadow);
-            Gui.drawRect(qx + 1, py + 1, qx + 2, py + 2, shadow);
-        }
-        for (int step = 0; step < size; step++) {
-            int px = x + inset + step;
-            int py = y + inset + step;
-            int qx = x + inset + (size - 1 - step);
-            Gui.drawRect(px, py, px + 1, py + 1, color);
-            Gui.drawRect(qx, py, qx + 1, py + 1, color);
-        }
+        ChatIconSheet icon = hovered
+                ? ChatIconSheet.CLOSE_HOVER : ChatIconSheet.CLOSE;
+        icon.drawWithShadow(x + (CONTROL_SIZE - icon.getWidth()) / 2,
+                y + (CONTROL_SIZE - icon.getHeight()) / 2, alpha);
     }
 
     private void drawCog(int x, int y, boolean hovered, int alpha) {
-        int color = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.IVORY,
-                hovered ? scaled(0xFF) : alpha);
-        int shadow = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.SHADOW,
-                LostTalesChatVisualStyle.shadowAlpha(alpha));
-        // A ring with four teeth: a 5x5 hollow square minus its corners,
-        // plus one pixel out on each side.
-        for (int pass = 0; pass < 2; pass++) {
-            int c = pass == 0 ? shadow : color;
-            int ox = x + (pass == 0 ? 1 : 0) + 1;
-            int oy = y + (pass == 0 ? 1 : 0) + 1;
-            Gui.drawRect(ox + 1, oy, ox + 4, oy + 1, c);
-            Gui.drawRect(ox + 1, oy + 4, ox + 4, oy + 5, c);
-            Gui.drawRect(ox, oy + 1, ox + 1, oy + 4, c);
-            Gui.drawRect(ox + 4, oy + 1, ox + 5, oy + 4, c);
-            Gui.drawRect(ox + 2, oy - 1, ox + 3, oy, c);
-            Gui.drawRect(ox + 2, oy + 5, ox + 3, oy + 6, c);
-            Gui.drawRect(ox - 1, oy + 2, ox, oy + 3, c);
-            Gui.drawRect(ox + 5, oy + 2, ox + 6, oy + 3, c);
-        }
+        ChatIconSheet icon = hovered
+                ? ChatIconSheet.COG_HOVER : ChatIconSheet.COG;
+        icon.drawWithShadow(x + (CONTROL_SIZE - icon.getWidth()) / 2,
+                y + (CONTROL_SIZE - icon.getHeight()) / 2, alpha);
     }
 
-    private void drawLock(int x, int y, boolean locked, boolean hovered) {
-        int rgb = locked ? LOCKED_RGB : LostTalesChatVisualStyle.IVORY;
-        int alpha = scaled(hovered || locked ? 0xFF : 0xA0);
-        int color = LostTalesChatVisualStyle.argb(rgb, alpha);
-        int shadow = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.SHADOW,
-                LostTalesChatVisualStyle.shadowAlpha(alpha));
-        for (int pass = 0; pass < 2; pass++) {
-            int c = pass == 0 ? shadow : color;
-            int ox = x + 2 + (pass == 0 ? 1 : 0);
-            int oy = y + (pass == 0 ? 1 : 0);
-            // Body: 5 wide, 4 tall, with a one-pixel keyhole.
-            Gui.drawRect(ox, oy + 4, ox + 5, oy + 8, c);
-            if (pass == 1) {
-                Gui.drawRect(ox + 2, oy + 5, ox + 3, oy + 7,
-                        LostTalesChatVisualStyle.argb(
-                                LostTalesChatVisualStyle.SHADOW, alpha));
-            }
-            // Shackle: closed over the body, or swung open to the right.
-            if (locked) {
-                Gui.drawRect(ox + 1, oy + 1, ox + 4, oy + 2, c);
-                Gui.drawRect(ox, oy + 2, ox + 1, oy + 4, c);
-                Gui.drawRect(ox + 3, oy + 2, ox + 4, oy + 4, c);
-            } else {
-                Gui.drawRect(ox + 2, oy, ox + 5, oy + 1, c);
-                Gui.drawRect(ox + 1, oy + 1, ox + 2, oy + 3, c);
-                Gui.drawRect(ox + 4, oy + 1, ox + 5, oy + 4, c);
-            }
-        }
+    /**
+     * The y that centres a sprite of the given height in the strip above
+     * the window's top rule, which takes the strip's last row.
+     */
+    private static int centredInStrip(int rowBottom, int height) {
+        return rowTop(rowBottom) + (ROW_HEIGHT - 1 - height) / 2;
     }
 
-    private void drawRestore(int x, int y, boolean hovered) {
-        int alpha = scaled(hovered ? 0xFF : 0xA0);
-        int color = LostTalesChatVisualStyle.argb(RESTORE_RGB, alpha);
-        int shadow = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.SHADOW,
-                LostTalesChatVisualStyle.shadowAlpha(alpha));
-        for (int pass = 0; pass < 2; pass++) {
-            int c = pass == 0 ? shadow : color;
-            int ox = x + 2 + (pass == 0 ? 1 : 0);
-            int oy = y + 2 + (pass == 0 ? 1 : 0);
-            Gui.drawRect(ox, oy + 2, ox + 5, oy + 3, c);
-            Gui.drawRect(ox + 2, oy, ox + 3, oy + 5, c);
-        }
+    /**
+     * The lock's body keeps its place whichever way the shackle goes:
+     * both sprites start at the same left edge, the open shackle
+     * reaching past the square into the gap.
+     */
+    private void drawLock(int x, int rowBottom, boolean locked,
+                          boolean hovered) {
+        ChatIconSheet icon = locked
+                ? (hovered ? ChatIconSheet.LOCKED_HOVER : ChatIconSheet.LOCKED)
+                : (hovered ? ChatIconSheet.UNLOCKED_HOVER
+                        : ChatIconSheet.UNLOCKED);
+        icon.drawWithShadow(x + 1, centredInStrip(rowBottom, icon.getHeight()),
+                scaled(0xFF));
     }
 
+    private void drawRestore(int x, int rowBottom, boolean hovered) {
+        ChatIconSheet icon = hovered
+                ? ChatIconSheet.PLUS_HOVER : ChatIconSheet.PLUS;
+        icon.drawWithShadow(x + (END_CONTROL_SIZE - icon.getWidth()) / 2,
+                centredInStrip(rowBottom, icon.getHeight()), scaled(0xFF));
+    }
+
+    /** The drag handle at the strip's right end, where a title bar keeps it. */
     private void drawGrip(int left, int right, int rowBottom,
                           boolean hovered) {
         if (right - left < MIN_GRIP_WIDTH) {
             return;
         }
-        int alpha = scaled(hovered ? 0xC0 : 0x60);
-        int color = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.IVORY, alpha);
-        // Two columns of three dots at the strip's right end: the
-        // familiar drag handle, where a title bar keeps it.
-        int centerX = right - 6;
-        int centerY = rowBottom - HEIGHT / 2 - 1;
-        for (int column = 0; column < 2; column++) {
-            for (int dot = 0; dot < 3; dot++) {
-                int px = centerX - 2 + column * 3;
-                int py = centerY - 2 + dot * 2;
-                Gui.drawRect(px, py, px + 1, py + 1, color);
-            }
-        }
+        ChatIconSheet icon = hovered
+                ? ChatIconSheet.GRIP_HOVER : ChatIconSheet.GRIP;
+        icon.drawWithShadow(right - 3 - icon.getWidth(),
+                centredInStrip(rowBottom, icon.getHeight()), scaled(0xFF));
     }
 
     /**
      * Resting geometry for the row, cached until the font, limits, tab
      * list, selection, a label, a counter, a mute or the control set
-     * changes. Labels are trimmed when the row would overflow its limit,
-     * dividing the available width evenly.
+     * changes. The end controls keep their room at the right; the tabs
+     * share what is left: whole, with controls on every tab, while that
+     * fits, else with controls on the selected tab only and labels
+     * shortened, widest first, to one common width. A tab that still
+     * finds no room is left out of the row rather than crossing the
+     * limit; it stays open and reachable by cycling.
      */
     List<Tab> layout(FontRenderer font, Row row) {
         if (font == null || row == null || row.tabs == null
@@ -581,38 +608,65 @@ final class ChatChannelTabBar {
             return this.cachedTabs;
         }
         List<ChatTab> channels = row.tabs;
-        int endControls = END_CONTROL_SIZE + END_CONTROL_GAP
-                + (row.showRestore ? END_CONTROL_SIZE + END_CONTROL_GAP : 0)
+        int count = channels.size();
+        String badge = row.showRestore
+                ? ClientChatChannelViews.counterText(row.closedUnread) : "";
+        int badgeWidth = badge.length() == 0 ? 0
+                : COUNTER_GAP + font.getStringWidth(badge);
+        int endControls = END_CONTROL_GAP + END_CONTROL_SIZE + END_CONTROL_GAP
+                + (row.showRestore
+                        ? END_CONTROL_SIZE + badgeWidth + END_CONTROL_GAP : 0)
                 + MIN_GRIP_WIDTH;
-        int selectedExtra = controlsWidth(showClose);
-        int available = row.right - row.left - endControls
-                + OVERLAP * (channels.size() - 1);
-        // Labels are shown whole; only a row that would overflow its
-        // window trims them, dividing the width evenly.
-        int maxLabelWidth = Integer.MAX_VALUE / 4;
-        if (totalWidth(font, channels, maxLabelWidth) + selectedExtra
-                > available) {
-            maxLabelWidth = Math.max(MIN_LABEL_WIDTH,
-                    (available - selectedExtra) / channels.size()
-                            - PADDING_X * 2);
+        int limit = row.right - endControls;
+        int available = limit - row.left - TAB_GAP * (count - 1);
+        int controls = controlsWidth(showClose);
+        int[] labelWidths = new int[count];
+        int[] counters = new int[count];
+        int natural = 0;
+        for (int index = 0; index < count; index++) {
+            ChatTab channel = channels.get(index);
+            labelWidths[index] = font.getStringWidth(
+                    this.cachedLabels.get(channel));
+            counters[index] = countersWidth(
+                    font.getStringWidth(ClientChatChannelViews.counterText(
+                            count(this.cachedPings, channel))),
+                    font.getStringWidth(ClientChatChannelViews.counterText(
+                            count(this.cachedOther, channel))));
+            natural += PADDING_X * 2 + labelWidths[index] + counters[index]
+                    + iconWidth(channels.get(index)) + controls;
         }
-        List<Tab> tabs = new ArrayList<Tab>(channels.size());
+        boolean controlsEverywhere = natural <= available;
+        int[] labelRoom = labelWidths.clone();
+        if (!controlsEverywhere) {
+            int fixed = 0;
+            for (int index = 0; index < count; index++) {
+                fixed += PADDING_X * 2 + counters[index]
+                        + iconWidth(channels.get(index))
+                        + (channels.get(index).equals(row.selected)
+                                ? controls : 0);
+            }
+            capLabels(labelRoom, available - fixed);
+        }
+        List<Tab> tabs = new ArrayList<Tab>(count);
         int x = row.left;
-        for (int index = 0; index < channels.size(); index++) {
+        for (int index = 0; index < count; index++) {
             ChatTab channel = channels.get(index);
             boolean selected = channel.equals(row.selected);
             String label = LostTalesSkyrimUiStyle.trimToWidth(font,
-                    this.cachedLabels.get(channel), maxLabelWidth);
-            String pingText = counterText(count(this.cachedPings, channel));
-            String otherText = counterText(count(this.cachedOther, channel));
+                    this.cachedLabels.get(channel), labelRoom[index]);
+            String pingText = ClientChatChannelViews.counterText(
+                    count(this.cachedPings, channel));
+            String otherText = ClientChatChannelViews.counterText(
+                    count(this.cachedOther, channel));
             int labelWidth = font.getStringWidth(label);
             int pingWidth = font.getStringWidth(pingText);
             int otherWidth = font.getStringWidth(otherText);
-            int width = labelWidth + PADDING_X * 2
+            ChatEmoji icon = ChatChannelIcons.iconOf(channel);
+            int width = labelWidth + PADDING_X * 2 + iconWidth(channel)
                     + countersWidth(pingWidth, otherWidth);
             int settingsX = -1;
             int closeX = -1;
-            if (selected) {
+            if (controlsEverywhere || selected) {
                 settingsX = x + width - PADDING_X + CONTROL_GAP;
                 width += CONTROL_GAP + CONTROL_SIZE;
                 if (showClose) {
@@ -620,21 +674,28 @@ final class ChatChannelTabBar {
                     width += CONTROL_GAP + CONTROL_SIZE;
                 }
             }
+            if (x + width > limit) {
+                break;
+            }
             Boolean muted = this.cachedMuted.get(channel);
-            tabs.add(new Tab(channel, label, labelWidth, pingText,
+            tabs.add(new Tab(channel, icon, label, labelWidth, pingText,
                     pingWidth, otherText, otherWidth, x, width,
                     settingsX, closeX, muted != null && muted.booleanValue()));
-            x += width - OVERLAP;
+            x += width + TAB_GAP;
         }
-        this.tabsRight = x + OVERLAP;
+        this.tabsRight = tabs.isEmpty() ? row.left : x - TAB_GAP;
         int controlX = this.tabsRight + END_CONTROL_GAP;
         this.lockX = controlX;
         controlX += END_CONTROL_SIZE + END_CONTROL_GAP;
         if (row.showRestore) {
             this.restoreX = controlX;
-            controlX += END_CONTROL_SIZE + END_CONTROL_GAP;
+            this.restoreBadge = badge;
+            this.restoreWidth = END_CONTROL_SIZE + badgeWidth;
+            controlX += this.restoreWidth + END_CONTROL_GAP;
         } else {
             this.restoreX = -1;
+            this.restoreBadge = "";
+            this.restoreWidth = 0;
         }
         this.controlsRight = controlX;
         this.cachedTabs = Collections.unmodifiableList(tabs);
@@ -645,7 +706,41 @@ final class ChatChannelTabBar {
         this.cachedRight = row.right;
         this.cachedShowClose = showClose;
         this.cachedShowRestore = row.showRestore;
+        this.cachedClosedUnread = row.closedUnread;
         return this.cachedTabs;
+    }
+
+    /**
+     * Shortens the widest labels to one common cap, the largest at which
+     * they all fit {@code room} together; labels already narrower keep
+     * their width. With no room at all every label goes to nothing.
+     */
+    static void capLabels(int[] widths, int room) {
+        int widest = 0;
+        for (int index = 0; index < widths.length; index++) {
+            widest = Math.max(widest, widths[index]);
+        }
+        for (int cap = widest; cap >= 0; cap--) {
+            int total = 0;
+            for (int index = 0; index < widths.length; index++) {
+                total += Math.min(widths[index], cap);
+            }
+            if (total <= room) {
+                for (int index = 0; index < widths.length; index++) {
+                    widths[index] = Math.min(widths[index], cap);
+                }
+                return;
+            }
+        }
+        for (int index = 0; index < widths.length; index++) {
+            widths[index] = 0;
+        }
+    }
+
+    /** Room the tab's icon takes before the label, with its gap. */
+    private static int iconWidth(ChatTab tab) {
+        return ChatChannelIcons.iconOf(tab) == null ? 0
+                : ChatChannelIcons.SIZE + ChatChannelIcons.GAP;
     }
 
     private static int controlsWidth(boolean showClose) {
@@ -668,6 +763,7 @@ final class ChatChannelTabBar {
                         : row.selected.equals(this.cachedSelected))
                 && showClose == this.cachedShowClose
                 && row.showRestore == this.cachedShowRestore
+                && row.closedUnread == this.cachedClosedUnread
                 && row.tabs.equals(this.cachedChannels);
         for (int index = 0; index < row.tabs.size(); index++) {
             ChatTab tab = row.tabs.get(index);
@@ -691,36 +787,9 @@ final class ChatChannelTabBar {
         return current;
     }
 
-    /** {@code (n)} for a positive count, {@code (99+)} past the cap, else empty. */
-    static String counterText(int count) {
-        if (count <= 0) {
-            return "";
-        }
-        return "(" + (count > ClientChatChannelViews.MAX_UNREAD
-                ? ClientChatChannelViews.MAX_UNREAD + "+"
-                : String.valueOf(count)) + ")";
-    }
-
     private static int countersWidth(int pingWidth, int otherWidth) {
         return (pingWidth > 0 ? COUNTER_GAP + pingWidth : 0)
                 + (otherWidth > 0 ? COUNTER_GAP + otherWidth : 0);
-    }
-
-    private int totalWidth(FontRenderer font, List<ChatTab> channels,
-                           int maxLabelWidth) {
-        int total = 0;
-        for (int index = 0; index < channels.size(); index++) {
-            ChatTab tab = channels.get(index);
-            String label = LostTalesSkyrimUiStyle.trimToWidth(font,
-                    this.cachedLabels.get(tab), maxLabelWidth);
-            total += font.getStringWidth(label) + PADDING_X * 2
-                    + countersWidth(
-                            font.getStringWidth(counterText(
-                                    count(this.cachedPings, tab))),
-                            font.getStringWidth(counterText(
-                                    count(this.cachedOther, tab))));
-        }
-        return total;
     }
 
     private static int blend(int fromRgb, int toRgb, float amount) {
@@ -736,12 +805,14 @@ final class ChatChannelTabBar {
 
     static final class Tab {
         final ChatTab tab;
+        /** The channel's emote before the label, or null. */
+        final ChatEmoji icon;
         final String label;
         final int labelWidth;
-        /** {@code (p)} unread pings, or empty. */
+        /** {@code [p]} unread pings, or empty. */
         final String pingText;
         final int pingWidth;
-        /** {@code (x)} other unread lines, or empty. */
+        /** {@code [x]} other unread lines, or empty. */
         final String otherText;
         final int otherWidth;
         /** Resting left edge before the row's horizontal motion. */
@@ -753,11 +824,12 @@ final class ChatChannelTabBar {
         final int closeX;
         final boolean muted;
 
-        Tab(ChatTab tab, String label, int labelWidth,
+        Tab(ChatTab tab, ChatEmoji icon, String label, int labelWidth,
             String pingText, int pingWidth, String otherText,
             int otherWidth, int x, int width, int settingsX, int closeX,
             boolean muted) {
             this.tab = tab;
+            this.icon = icon;
             this.label = label;
             this.labelWidth = labelWidth;
             this.pingText = pingText;

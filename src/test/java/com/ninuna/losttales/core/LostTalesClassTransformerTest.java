@@ -14,8 +14,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /** Verifies the supported LOTR v36.15 integration points against the local jar. */
 public final class LostTalesClassTransformerTest {
@@ -37,6 +38,8 @@ public final class LostTalesClassTransformerTest {
             "com/ninuna/losttales/client/gui/tooltip/LostTalesTooltipHooks";
     private static final String CHAT_HIT_HOOK_OWNER =
             "com/ninuna/losttales/client/chat/LostTalesChatHitHooks";
+    private static final String CHAT_HISTORY_HOOK_OWNER =
+            "com/ninuna/losttales/client/chat/LostTalesChatHistoryHooks";
     private static final String CHAT_WRAP_HOOK_OWNER =
             "com/ninuna/losttales/client/chat/LostTalesChatWrapHooks";
     private static final String FAST_TRAVEL_ARRIVAL_HOOK_OWNER =
@@ -224,6 +227,28 @@ public final class LostTalesClassTransformerTest {
         assertTrue(hookSeen);
         assertTrue(storesBack);
         assertTrue(openAfterHook);
+    }
+
+    @Test
+    public void chatHistoryCapacityComesFromTheLostTalesHook()
+            throws Exception {
+        ClassNode chat = transform("net.minecraft.client.gui.GuiNewChat");
+        MethodNode method = findMethod(chat, "func_146237_a");
+        int hooks = 0;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (instruction instanceof MethodInsnNode
+                    && CHAT_HISTORY_HOOK_OWNER.equals(
+                            ((MethodInsnNode)instruction).owner)
+                    && "capacity".equals(((MethodInsnNode)instruction).name)) {
+                hooks++;
+            }
+            // Vanilla's literal hundred is gone from both trimming loops.
+            assertFalse(instruction.getOpcode() == Opcodes.BIPUSH
+                    && ((org.objectweb.asm.tree.IntInsnNode)instruction)
+                            .operand == 100);
+        }
+        assertEquals(2, hooks);
     }
 
     @Test

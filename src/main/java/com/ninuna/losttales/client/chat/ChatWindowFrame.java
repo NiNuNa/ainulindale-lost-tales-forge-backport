@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatChannel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -73,10 +74,10 @@ final class ChatWindowFrame {
         return FEED;
     }
 
-    /** Frames of windows drawn this frame, in window order. */
+    /** Frames of windows drawn this frame, back to front. */
     static synchronized List<ChatWindowFrame> drawnFrames() {
         List<ChatWindowFrame> result = new ArrayList<ChatWindowFrame>();
-        for (ChatWindow window : ChatWindowLayout.windows()) {
+        for (ChatWindow window : ChatWindowLayout.stacked()) {
             ChatWindowFrame frame = FRAMES.get(window.getId());
             if (frame != null && frame.drawn) {
                 result.add(frame);
@@ -115,14 +116,29 @@ final class ChatWindowFrame {
         FEED.bands.reset(null, 0, 1.0F);
     }
 
-    /** Every open, unmuted tab the player can see: the feed's filter. */
+    /**
+     * The feed's filter: every channel the player can see and has not
+     * muted or hidden from the feed, whether or not it has a tab —
+     * closing a tab hides the tab, not the channel's messages — plus
+     * every open conversation tab under the same preferences.
+     * Conversations are read from their open tabs only: a closed one is
+     * hidden until its next message reopens it.
+     */
     static ChatLineFilter feedFilter() {
         List<ChatTab> audible = new ArrayList<ChatTab>();
+        for (ChatChannel channel : ChatChannel.presentationOrder()) {
+            ChatTab tab = ChatTab.of(channel);
+            if (ClientChatChannelState.isAvailable(tab)
+                    && ChatWindowLayout.isInFeed(tab)) {
+                audible.add(tab);
+            }
+        }
         List<ChatWindow> windows = ChatWindowLayout.windows();
         for (int index = 0; index < windows.size(); index++) {
-            List<ChatTab> tabs = visibleTabs(windows.get(index));
+            List<ChatTab> tabs = windows.get(index).getTabs();
             for (int tab = 0; tab < tabs.size(); tab++) {
-                if (!ChatWindowLayout.isMuted(tabs.get(tab))) {
+                if (tabs.get(tab).isWhisper()
+                        && ChatWindowLayout.isInFeed(tabs.get(tab))) {
                     audible.add(tabs.get(tab));
                 }
             }
@@ -150,18 +166,6 @@ final class ChatWindowFrame {
             return active;
         }
         return visibleTabs.isEmpty() ? null : visibleTabs.get(0);
-    }
-
-    /** The closed-chat feed: the window's visible tabs minus muted ones. */
-    static ChatLineFilter passiveFilter(List<ChatTab> visibleTabs) {
-        List<ChatTab> audible = new ArrayList<ChatTab>(
-                visibleTabs.size());
-        for (int index = 0; index < visibleTabs.size(); index++) {
-            if (!ChatWindowLayout.isMuted(visibleTabs.get(index))) {
-                audible.add(visibleTabs.get(index));
-            }
-        }
-        return ChatLineFilter.of(audible);
     }
 
     /** Width of a window's box: the chat width at chat scale. */
@@ -215,13 +219,6 @@ final class ChatWindowFrame {
         return this.baseline + this.motionY
                 - LostTalesChatOverlayRenderer.LINE_HEIGHT * this.scale
                 - padding;
-    }
-
-    /** The box as drawn, for other windows to keep off. */
-    ChatWindowPlacement.Box wall() {
-        return new ChatWindowPlacement.Box(this.boxLeft, this.boxTop,
-                (int)Math.round(this.boxRight - this.boxLeft),
-                (int)Math.round(this.boxBottom - this.boxTop), 0);
     }
 
     /** Whether the point is inside this window's box. */

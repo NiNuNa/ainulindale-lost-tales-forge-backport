@@ -81,9 +81,11 @@ final class ChatEmojiPicker extends ChatPickerPanel {
     void drawEntry(Minecraft minecraft, Entry entry, int x, int y,
                    int alpha, boolean hovered) {
         ChatEmoji emoji = (ChatEmoji)entry.value;
+        // Lifted a pixel under the pointer, like the strip's buttons.
         ChatInlineIcons.drawEmoji(minecraft, emoji,
                 x + (CELL_SIZE - ChatInlineIcons.CONTENT_SIZE) / 2.0F,
-                y + (CELL_SIZE - ChatInlineIcons.CONTENT_SIZE) / 2.0F,
+                y + (CELL_SIZE - ChatInlineIcons.CONTENT_SIZE) / 2.0F
+                        - (hovered ? 1.0F : 0.0F),
                 ChatInlineIcons.CONTENT_SIZE, alpha);
         if (ChatEmojiUsageStore.isFavorite(emoji)) {
             Gui.drawRect(x + CELL_SIZE - 4, y + 2,
@@ -104,9 +106,12 @@ final class ChatEmojiPicker extends ChatPickerPanel {
     }
 
     @Override
-    void drawButtonIcon(Minecraft minecraft, int left, int top) {
-        ChatInlineIcons.drawEmojiButton(minecraft, ChatEmoji.SMILE, left, top,
-                BUTTON_SIZE);
+    void drawButtonIcon(Minecraft minecraft, int left, int top,
+                        boolean lifted) {
+        ChatIconSheet icon = lifted
+                ? ChatIconSheet.EMOJI_HOVER : ChatIconSheet.EMOJI;
+        icon.drawWithShadow(left + (BUTTON_SIZE - icon.getWidth()) / 2,
+                top + (BUTTON_SIZE - icon.getHeight()) / 2, 255);
     }
 
     /** The emote cell under the mouse while the picker is open, else null. */

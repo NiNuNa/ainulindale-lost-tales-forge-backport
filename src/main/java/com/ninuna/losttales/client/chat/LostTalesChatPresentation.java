@@ -39,7 +39,9 @@ public final class LostTalesChatPresentation {
     private static volatile int lastMessageUpdateCounter = -1;
     private static volatile ChatTab lastMessageTab;
     private static int nextChatLineId = Integer.MIN_VALUE;
-    private static final int MAX_PINGED_LINES = 100;
+    /** Pinged line ids remembered: as many as the history can hold. */
+    private static final int MAX_PINGED_LINES =
+            LostTalesChatHistoryHooks.MAX_CAPACITY;
     private static final LinkedHashSet<Integer> pingedChatLineIds =
             new LinkedHashSet<Integer>();
     private static final int[] NO_SHOWCASES = new int[0];
@@ -75,10 +77,10 @@ public final class LostTalesChatPresentation {
             if (mentioned) {
                 markPinged(chatLineId);
             }
-            // The highlight stays for when the tab is read; the cue only
-            // plays for a tab the player has open and not muted, and a
-            // whisper is always a cue.
-            if (ChatWindowLayout.isOpen(tab) && !ChatWindowLayout.isMuted(tab)) {
+            // The highlight stays for when the tab is read; the cue is
+            // silenced by the tab's own preference alone — a closed tab
+            // still receives — and a whisper is always a cue.
+            if (ChatWindowLayout.isPingAudible(tab)) {
                 playPingSound(minecraft);
             }
         }
@@ -269,6 +271,16 @@ public final class LostTalesChatPresentation {
         // sender's opening bracket; see ChatLineWrapper.
         root.appendSibling(ChatLayoutMarker.anchor());
 
+        if (packet.isOperator()) {
+            // The server's word on an account line's sender, ahead of the
+            // name in the palette's crimson.
+            int tagColor = LostTalesColors.rgb(LostTalesColors.CRIMSON);
+            root.appendSibling(ChatColorMarker.apply(
+                    text(StatCollector.translateToLocal(
+                            "chat.losttales.tag.operator") + " ",
+                            nearestFormatting(tagColor), false),
+                    tagColor));
+        }
         root.appendSibling(ChatColorMarker.apply(
                 text("<", nearestFormatting(
                         packet.getNameColor()), false),
@@ -431,6 +443,8 @@ public final class LostTalesChatPresentation {
                 || minecraft.ingameGUI == null) {
             return false;
         }
+        // The tab wears the same portrait the line is drawn with.
+        ChatChannelIcons.rememberNpcPortrait(tab, texturePath);
         if (tab.isWhisper()
                 && ChatWindowLayout.openTab(tab, windowIdOfSelection())
                         == null) {

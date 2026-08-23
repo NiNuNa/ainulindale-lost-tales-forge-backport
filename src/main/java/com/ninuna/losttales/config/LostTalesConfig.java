@@ -122,6 +122,17 @@ public final class LostTalesConfig {
     private static final String LEGACY_CHAT_PING_SOUND = "lotr:item.horn";
     public static String chatPingSound = DEFAULT_CHAT_PING_SOUND;
     public static boolean enableChatAnimations = true;
+    /**
+     * Messages (and wrapped lines) the chat history keeps, shared by
+     * every channel; vanilla keeps a hundred. A safety bound as much as
+     * a preference: the coremod feeds it to vanilla's own trimming.
+     */
+    public static int chatHistoryLines = 1000;
+    /** Tell others when this player is typing; show others' typing. */
+    public static boolean sendChatTypingStatus = true;
+    public static boolean showChatTypingIndicators = true;
+    /** Server switch for relaying typing presence at all. */
+    public static boolean chatTypingIndicators = true;
     public static int chatAnimationDurationMillis = 180;
     public static int chatInputAnimationDurationMillis = 180;
     public static int chatSelectorAnimationDurationMillis = 140;
@@ -785,6 +796,12 @@ public final class LostTalesConfig {
                     512,
                     "Server-authoritative maximum distance in blocks for Proximity chat recipients."
             );
+            chatTypingIndicators = config.getBoolean(
+                    "typingIndicators",
+                    CATEGORY_CHAT,
+                    chatTypingIndicators,
+                    "Relay who is typing into a channel to the players who would read the message; off drops every typing notice on the server."
+            );
             showChatTimestamps = config.getBoolean(
                     "showTimestamps",
                     CATEGORY_CLIENT,
@@ -808,6 +825,26 @@ public final class LostTalesConfig {
                     CATEGORY_CLIENT,
                     chatPingSound,
                     "Sound event played when a chat message @-mentions you; empty disables the sound."
+            );
+            chatHistoryLines = config.getInt(
+                    "chatHistoryLines",
+                    CATEGORY_CLIENT,
+                    chatHistoryLines,
+                    100,
+                    5000,
+                    "Chat messages kept in the history, shared by every channel tab (vanilla keeps 100)."
+            );
+            sendChatTypingStatus = config.getBoolean(
+                    "sendChatTypingStatus",
+                    CATEGORY_CLIENT,
+                    sendChatTypingStatus,
+                    "Let the people who would read your message see that you are typing it."
+            );
+            showChatTypingIndicators = config.getBoolean(
+                    "showChatTypingIndicators",
+                    CATEGORY_CLIENT,
+                    showChatTypingIndicators,
+                    "Show who is typing into a channel above that window's input bar."
             );
             if (isLegacyChatPingSound(chatPingSound)) {
                 chatPingSound = DEFAULT_CHAT_PING_SOUND;

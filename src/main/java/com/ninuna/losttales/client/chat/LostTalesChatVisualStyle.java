@@ -26,11 +26,16 @@ final class LostTalesChatVisualStyle {
             LostTalesSkyrimUiStyle.HUD_LABEL);
     static final int SHADOW = LostTalesSkyrimUiStyle.rgb(
             LostTalesSkyrimUiStyle.HUD_SHADOW);
+    /**
+     * The one opacity of every chat surface — backdrop, strips, tabs,
+     * bars, popups: half. Text and icons are always fully opaque.
+     */
+    static final int SURFACE_ALPHA = 0x80;
     /** Shared translucent surface behind popups. */
     static final int SURFACE = LostTalesSkyrimUiStyle.withAlpha(
-            LostTalesSkyrimUiStyle.PLUM_BLACK, 0xB0);
+            LostTalesSkyrimUiStyle.PLUM_BLACK, SURFACE_ALPHA);
     static final int SURFACE_HOVER = LostTalesSkyrimUiStyle.withAlpha(
-            LostTalesSkyrimUiStyle.PLUM_DARK, 0xCC);
+            LostTalesSkyrimUiStyle.PLUM_DARK, SURFACE_ALPHA);
     /** Alpha-free surface tones for popups that animate their own opacity. */
     static final int SURFACE_RGB = LostTalesSkyrimUiStyle.rgb(
             LostTalesSkyrimUiStyle.PLUM_BLACK);

@@ -18,6 +18,8 @@ import com.ninuna.losttales.network.packet.LostTalesWaystoneSettingsRequestPacke
 import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneTravelRequestPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatTypingPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
@@ -70,6 +72,7 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesWaystoneSettingsRequestPacket.Handler.class, LostTalesWaystoneSettingsRequestPacket.class, 32, Side.SERVER);
         CHANNEL.registerMessage(LostTalesWaystoneTravelRequestPacket.Handler.class, LostTalesWaystoneTravelRequestPacket.class, 34, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChatSendPacket.Handler.class, LostTalesChatSendPacket.class, 35, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesChatTypingPacket.Handler.class, LostTalesChatTypingPacket.class, 39, Side.SERVER);
 
         // Server -> client snapshots. These are registered from the common proxy so a
         // dedicated server also knows the packet discriminators when it sends them.
@@ -96,5 +99,6 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesChatMessagePacket.Handler.class, LostTalesChatMessagePacket.class, 36, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesChatAccessPacket.Handler.class, LostTalesChatAccessPacket.class, 37, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesFastTravelArrivalPacket.Handler.class, LostTalesFastTravelArrivalPacket.class, 38, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesChatTypingSyncPacket.Handler.class, LostTalesChatTypingSyncPacket.class, 40, Side.CLIENT);
     }
 }

@@ -121,7 +121,8 @@ final class ChatItemPicker extends ChatPickerPanel {
     }
 
     @Override
-    void drawButtonIcon(Minecraft minecraft, int left, int top) {
+    void drawButtonIcon(Minecraft minecraft, int left, int top,
+                        boolean lifted) {
         ChatInlineIcons.drawItemButton(minecraft, BUTTON_ICON, left, top,
                 BUTTON_SIZE);
     }

@@ -95,6 +95,142 @@ public final class ChatWindowLayoutTest {
         assertEquals(4, this.changes);
     }
 
+    /**
+     * Open, muted and closed are three separate things: closing a tab
+     * neither mutes nor unmutes it, and the setting is still there when
+     * the channel comes back.
+     */
+    @Test
+    public void closingNeverTouchesMuteAndMuteSurvivesRestore() {
+        ChatWindowLayout.setMuted(ChatChannel.PARTY, true);
+        assertTrue(ChatWindowLayout.close(ChatChannel.PARTY));
+        assertTrue(ChatWindowLayout.isMuted(ChatChannel.PARTY));
+        assertFalse(ChatWindowLayout.isOpen(ChatChannel.PARTY));
+        assertTrue(ChatWindowLayout.restore(ChatChannel.PARTY));
+        assertTrue(ChatWindowLayout.isMuted(ChatChannel.PARTY));
+        assertTrue(ChatWindowLayout.close(ChatChannel.OOC));
+        assertFalse(ChatWindowLayout.isMuted(ChatChannel.OOC));
+        assertTrue(ChatWindowLayout.restore(ChatChannel.OOC));
+        assertFalse(ChatWindowLayout.isMuted(ChatChannel.OOC));
+        // Muting a closed channel is allowed and is kept for its return.
+        assertTrue(ChatWindowLayout.close(ChatChannel.OOC));
+        ChatWindowLayout.setMuted(ChatChannel.OOC, true);
+        assertTrue(ChatWindowLayout.isMuted(ChatChannel.OOC));
+        assertTrue(ChatWindowLayout.restore(ChatChannel.OOC));
+        assertTrue(ChatWindowLayout.isMuted(ChatChannel.OOC));
+    }
+
+    /**
+     * Mute is the whole preference; the feed and the cue can also be
+     * switched off one at a time, independently of each other and of
+     * mute, and all three survive closing and travel with the store.
+     */
+    @Test
+    public void feedAndPingPreferencesAreIndependentHalvesOfMute() {
+        ChatTab party = ChatTab.of(ChatChannel.PARTY);
+        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
+        assertTrue(ChatWindowLayout.isInFeed(party));
+        assertTrue(ChatWindowLayout.isPingAudible(party));
+        ChatWindowLayout.setFeedHidden(party, true);
+        assertFalse(ChatWindowLayout.isInFeed(party));
+        assertTrue(ChatWindowLayout.isPingAudible(party));
+        assertFalse(ChatWindowLayout.isMuted(party));
+        ChatWindowLayout.setPingSilenced(ooc, true);
+        assertTrue(ChatWindowLayout.isInFeed(ooc));
+        assertFalse(ChatWindowLayout.isPingAudible(ooc));
+        assertFalse(ChatWindowLayout.isMuted(ooc));
+        ChatWindowLayout.setMuted(ooc, true);
+        assertFalse(ChatWindowLayout.isInFeed(ooc));
+        assertFalse(ChatWindowLayout.isPingAudible(ooc));
+        ChatWindowLayout.setMuted(ooc, false);
+        // Unmuting leaves the finer preference where it was.
+        assertFalse(ChatWindowLayout.isPingAudible(ooc));
+        assertTrue(ChatWindowLayout.isInFeed(ooc));
+        assertEquals(4, this.changes);
+        // Setting what is already set is not a change.
+        ChatWindowLayout.setFeedHidden(party, true);
+        assertEquals(4, this.changes);
+        assertTrue(ChatWindowLayout.close(ChatChannel.PARTY));
+        assertTrue(ChatWindowLayout.isFeedHidden(party));
+        assertEquals(Collections.singletonList(party),
+                ChatWindowLayout.feedHiddenTabs());
+        assertEquals(Collections.singletonList(ooc),
+                ChatWindowLayout.pingSilencedTabs());
+        // Conversations drop their preferences with their tabs.
+        ChatTab whisper = ChatWindowLayout.openWhisper("Bilbo", null);
+        ChatWindowLayout.setFeedHidden(whisper, true);
+        ChatWindowLayout.setPingSilenced(whisper, true);
+        assertTrue(ChatWindowLayout.feedHiddenTabs().size() == 1);
+        ChatWindowLayout.closeConversations();
+        assertFalse(ChatWindowLayout.isFeedHidden(whisper));
+        assertFalse(ChatWindowLayout.isPingSilenced(whisper));
+        assertTrue(ChatWindowLayout.isFeedHidden(party));
+    }
+
+    /**
+     * The window in use is drawn last and hit first. Raising is session
+     * state: it is not a layout change and does not survive a reset.
+     */
+    @Test
+    public void raisingAWindowBringsItToTheFrontOfTheStack() {
+        ChatWindow w1 = ChatWindowLayout.window("w1");
+        ChatWindow w2 = ChatWindowLayout.window("w2");
+        assertEquals(Arrays.asList(w1, w2), ChatWindowLayout.stacked());
+        ChatWindowLayout.raise("w1");
+        assertEquals(Arrays.asList(w2, w1), ChatWindowLayout.stacked());
+        ChatWindowLayout.raise("w2");
+        assertEquals(Arrays.asList(w1, w2), ChatWindowLayout.stacked());
+        ChatWindowLayout.raise("nope");
+        assertEquals(Arrays.asList(w1, w2), ChatWindowLayout.stacked());
+        assertEquals(0, this.changes);
+        // A new window starts at the back; a window that goes leaves the
+        // stack with it.
+        ChatWindow w3 = ChatWindowLayout.detach(ChatChannel.PARTY, 50.0D,
+                50.0D);
+        assertNotNull(w3);
+        assertEquals(Arrays.asList(w3, w1, w2), ChatWindowLayout.stacked());
+        ChatWindowLayout.raise(w3.getId());
+        assertEquals(Arrays.asList(w1, w2, w3), ChatWindowLayout.stacked());
+        assertTrue(ChatWindowLayout.moveTab(ChatChannel.PARTY, "w2", 0));
+        assertEquals(Arrays.asList(w1, w2), ChatWindowLayout.stacked());
+        ChatWindowLayout.reset();
+        assertEquals(ChatWindowLayout.windows(), ChatWindowLayout.stacked());
+    }
+
+    /** There is always at least one open tab, however the layout is cut. */
+    @Test
+    public void theLastOpenTabOfAllIsNeverClosable() {
+        assertEquals(7, ChatWindowLayout.openTabCount());
+        List<ChatChannel> order = new ArrayList<ChatChannel>(
+                ChatWindowLayout.orderChannels());
+        for (int index = 0; index < order.size() - 1; index++) {
+            assertTrue(ChatWindowLayout.isClosable(order.get(index)));
+            assertTrue(ChatWindowLayout.close(order.get(index)));
+            assertTrue(ChatWindowLayout.openTabCount() >= 1);
+        }
+        ChatChannel last = order.get(order.size() - 1);
+        assertEquals(1, ChatWindowLayout.openTabCount());
+        assertEquals(1, ChatWindowLayout.windows().size());
+        assertFalse(ChatWindowLayout.isClosable(last));
+        assertFalse(ChatWindowLayout.close(last));
+        assertTrue(ChatWindowLayout.isOpen(last));
+        // A closed tab is not closable either; a second open one makes
+        // both closable again.
+        assertFalse(ChatWindowLayout.isClosable(order.get(0)));
+        assertTrue(ChatWindowLayout.restore(order.get(0)));
+        assertTrue(ChatWindowLayout.isClosable(last));
+        assertTrue(ChatWindowLayout.isClosable(order.get(0)));
+        // Repeated closing and reopening leaves a consistent layout.
+        for (int round = 0; round < 5; round++) {
+            assertTrue(ChatWindowLayout.close(order.get(0)));
+            assertFalse(ChatWindowLayout.close(last));
+            assertTrue(ChatWindowLayout.restore(order.get(0)));
+        }
+        assertEquals(2, ChatWindowLayout.openTabCount());
+        assertEquals(Arrays.asList(last, order.get(0)),
+                ChatWindowLayout.orderChannels());
+    }
+
     @Test
     public void closedChannelsRestoreIntoTheWindowThatAsked() {
         ChatWindowLayout.close(ChatChannel.OOC);

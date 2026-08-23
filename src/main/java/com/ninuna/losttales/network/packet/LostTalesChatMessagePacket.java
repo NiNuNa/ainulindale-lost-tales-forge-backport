@@ -51,6 +51,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
     private String factionName = "";
     /** For a whisper, the other party's account name as this recipient sees it. */
     private String partner = "";
+    /** Whether the sender is a server operator; shown on account lines. */
+    private boolean operator;
     private boolean malformed;
 
     public LostTalesChatMessagePacket() {}
@@ -94,6 +96,19 @@ public final class LostTalesChatMessagePacket implements IMessage {
             String message, long timestampMillis, String skinId,
             List<ChatShowcase> showcases, String factionName,
             String partner) {
+        this(channel, senderId, identityName, accountName, title, titleColor,
+                nameColor, message, timestampMillis, skinId, showcases,
+                factionName, partner, false);
+    }
+
+    public LostTalesChatMessagePacket(
+            ChatChannel channel, UUID senderId, String identityName,
+            String accountName, String title,
+            int titleColor, int nameColor,
+            String message, long timestampMillis, String skinId,
+            List<ChatShowcase> showcases, String factionName,
+            String partner, boolean operator) {
+        this.operator = operator;
         this.partner = partner == null ? "" : partner.trim();
         this.channelId = channel == null ? "" : channel.getId();
         this.senderId = senderId;
@@ -151,6 +166,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                     buffer, MAX_FACTION_NAME_BYTES);
             this.partner = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_ACCOUNT_NAME_BYTES).trim();
+            this.operator = buffer.readBoolean();
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -158,6 +174,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.showcases = Collections.emptyList();
             this.factionName = "";
             this.partner = "";
+            this.operator = false;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -238,6 +255,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 buffer, this.factionName, MAX_FACTION_NAME_BYTES);
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.partner, MAX_ACCOUNT_NAME_BYTES);
+        buffer.writeBoolean(this.operator);
     }
 
     private void validate() {
@@ -297,6 +315,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
     public String getFactionName() { return this.factionName; }
     /** For a whisper, the other party's account name; empty otherwise. */
     public String getPartner() { return this.partner; }
+    /** Whether the sender is a server operator, as the server states it. */
+    public boolean isOperator() { return this.operator; }
     /** Validated showcases keyed by token index; never null. */
     public List<ChatShowcase> getShowcases() { return this.showcases; }
     public boolean isMalformed() { return this.malformed; }
