@@ -98,8 +98,8 @@ public final class ChatTabTest {
         assertFalse(ChatWindowLayout.isOpen(alex));
         assertFalse(ChatWindowLayout.isMuted(alex));
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY,
-                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY),
-                ChatWindowLayout.window("w2").getChannels());
+                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.DISCORD,
+                ChatChannel.PARTY), ChatWindowLayout.window("w2").getChannels());
         // They also end with the session: closed along with the history.
         ChatTab wanderer = ChatWindowLayout.openTab(
                 ChatTab.npc("Grey Wanderer"), "w2");
@@ -109,8 +109,8 @@ public final class ChatTabTest {
         assertEquals(2, ChatWindowLayout.windows().size());
         assertFalse(ChatWindowLayout.isOpen(wanderer));
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY,
-                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY),
-                ChatWindowLayout.window("w2").getChannels());
+                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.DISCORD,
+                ChatChannel.PARTY), ChatWindowLayout.window("w2").getChannels());
     }
 
     private static int countWhispers() {

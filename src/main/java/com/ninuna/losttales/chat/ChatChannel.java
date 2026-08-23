@@ -48,14 +48,24 @@ public enum ChatChannel {
      */
     WHISPER("whisper", "Whisper", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.WHISPER,
-            LostTalesColors.rgb(LostTalesColors.APRICOT));
+            LostTalesColors.rgb(LostTalesColors.APRICOT)),
+    /**
+     * The server's Discord channel, bridged both ways by the server's
+     * own bridge: account identity, everyone in the game reads it, and
+     * the tab exists only while the server says the bridge is on.
+     */
+    DISCORD("discord", "Discord", ChatIdentityType.ACCOUNT,
+            ChatRecipientRule.GLOBAL,
+            LostTalesColors.rgb(LostTalesColors.STEEL_BLUE));
 
     /** Tab, indicator, and cycle order: the two global channels bracket
-     *  the scoped role-play ones, then Party, staff, and the console.
-     *  Whispers are not listed: their tabs exist per conversation. */
+     *  the scoped role-play ones, Discord beside OOC as the other account
+     *  conversation, then Party, staff, and the console. Whispers are not
+     *  listed: their tabs exist per conversation. */
     private static final List<ChatChannel> PRESENTATION_ORDER =
             Collections.unmodifiableList(Arrays.asList(
-                    ALL, PROXIMITY, FACTION, OOC, PARTY, ADMIN, CONSOLE));
+                    ALL, PROXIMITY, FACTION, OOC, DISCORD, PARTY, ADMIN,
+                    CONSOLE));
 
     private final String id;
     private final String displayName;

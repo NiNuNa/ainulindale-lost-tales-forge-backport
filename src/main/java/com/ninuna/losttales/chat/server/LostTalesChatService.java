@@ -10,6 +10,8 @@ import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
+import com.ninuna.losttales.compat.discord.DiscordAvatarUrl;
+import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.compat.lotr.LostTalesWaystonePermissionPolicy;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -25,9 +27,11 @@ import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyMember;
 import com.ninuna.losttales.party.server.PartyService;
 import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
@@ -36,6 +40,13 @@ import net.minecraft.util.ChatComponentTranslation;
 
 /** Authoritative recipient resolution and presentation snapshot for player chat. */
 public final class LostTalesChatService {
+    /**
+     * The sender every Discord line carries: a fixed id no account owns,
+     * so heads resolve to the default skin and nothing is looked up.
+     */
+    private static final UUID DISCORD_SENDER_ID = UUID.nameUUIDFromBytes(
+            "losttales:discord".getBytes(Charset.forName("UTF-8")));
+
 
     private LostTalesChatService() {}
 
@@ -118,6 +129,12 @@ public final class LostTalesChatService {
             sender.addChatMessage(new ChatComponentTranslation(
                     "chat.losttales.channel.admin_unavailable"));
             return;
+        } else if (channel == ChatChannel.DISCORD
+                && !LostTalesConfig.discordEnabled) {
+            sendAccess(sender);
+            sender.addChatMessage(new ChatComponentTranslation(
+                    "chat.losttales.channel.discord_unavailable"));
+            return;
         }
 
         String accountName = sender.getGameProfile() == null
@@ -177,6 +194,48 @@ public final class LostTalesChatService {
         for (EntityPlayerMP recipient : resolveRecipients(
                 sender, channel, party, factionId)) {
             LostTalesNetworkHandler.CHANNEL.sendTo(packet, recipient);
+        }
+        if (channel == ChatChannel.DISCORD) {
+            // The bridge posts the line under the sender's name with their
+            // head as the picture; share tokens go as the text they were
+            // typed as.
+            LostTalesDiscordBridge.getInstance().relay(identityName,
+                    DiscordAvatarUrl.of(LostTalesConfig.discordAvatarUrlTemplate,
+                            accountName, sender.getUniqueID()),
+                    message);
+        }
+    }
+
+    /**
+     * A message from Discord, delivered by the bridge on the server
+     * thread: it enters the Discord channel for everyone online under
+     * the Discord display name, with a fixed sender id no account owns,
+     * and is never posted back to Discord. The bridge has already
+     * sanitised and bounded the text.
+     */
+    public static void sendFromDiscord(String displayName, String message) {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (!LostTalesConfig.discordEnabled || displayName == null
+                || displayName.length() == 0
+                || !ChatMessageValidator.isValid(message) || server == null
+                || server.getConfigurationManager() == null
+                || server.getConfigurationManager().playerEntityList == null) {
+            return;
+        }
+        int ivory = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
+        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
+                ChatChannel.DISCORD, DISCORD_SENDER_ID, displayName,
+                displayName, "", ivory, ivory, message,
+                System.currentTimeMillis(), "", null, "", "", false);
+        FMLLog.info("[losttales/chat/discord] <%s (discord)> %s", displayName,
+                message);
+        @SuppressWarnings("unchecked")
+        List<EntityPlayerMP> online =
+                server.getConfigurationManager().playerEntityList;
+        for (EntityPlayerMP recipient : online) {
+            if (recipient != null) {
+                LostTalesNetworkHandler.CHANNEL.sendTo(packet, recipient);
+            }
         }
     }
 
@@ -290,7 +349,8 @@ public final class LostTalesChatService {
         }
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new LostTalesChatAccessPacket(
-                        LostTalesWaystonePermissionPolicy.isOperator(player)),
+                        LostTalesWaystonePermissionPolicy.isOperator(player),
+                        LostTalesConfig.discordEnabled),
                 player);
     }
 

@@ -11,8 +11,8 @@ public final class ChatChannelTest {
     @Test
     public void presentationOrderIsGlobalProximityFactionOocParty() {
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY,
-                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY,
-                ChatChannel.ADMIN, ChatChannel.CONSOLE),
+                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.DISCORD,
+                ChatChannel.PARTY, ChatChannel.ADMIN, ChatChannel.CONSOLE),
                 ChatChannel.presentationOrder());
         // Every channel but Whisper is presented exactly once (whispers
         // are tabs per conversation, never a channel tab); declaration
@@ -37,6 +37,7 @@ public final class ChatChannelTest {
         assertEquals("ooc", ChatChannel.OOC.getId());
         assertEquals("admin", ChatChannel.ADMIN.getId());
         assertEquals("console", ChatChannel.CONSOLE.getId());
+        assertEquals("discord", ChatChannel.DISCORD.getId());
         assertEquals(ChatChannel.PARTY, ChatChannel.fromId(" Party "));
         // The new channels were appended so existing ordinals are stable.
         assertEquals(4, ChatChannel.OOC.ordinal());

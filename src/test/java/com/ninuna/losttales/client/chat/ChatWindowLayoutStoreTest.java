@@ -45,7 +45,7 @@ public final class ChatWindowLayoutStoreTest {
         assertTrue(lines.contains("window w1 locked=false x=0.00 y=0.00 "
                 + "active=console tabs=console"));
         assertTrue(lines.contains("window w2 locked=false x=3.00 y=97.50 "
-                + "active=ooc tabs=all,proximity,ooc"));
+                + "active=ooc tabs=all,proximity,ooc,discord"));
         assertTrue(lines.contains("window w3 locked=true x=62.50 y=8.00 "
                 + "active=faction link=w2:above tabs=party,faction"));
         assertTrue(lines.contains("closed admin"));
@@ -60,7 +60,7 @@ public final class ChatWindowLayoutStoreTest {
         assertEquals(88.0D, ChatWindowLayout.feedOffsetY(), 0.0001D);
         ChatWindow w2 = ChatWindowLayout.window("w2");
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY,
-                ChatChannel.OOC), w2.getChannels());
+                ChatChannel.OOC, ChatChannel.DISCORD), w2.getChannels());
         assertEquals(3.0D, w2.getOffsetX(), 0.0001D);
         assertEquals(97.5D, w2.getOffsetY(), 0.0001D);
         assertEquals(ChatChannel.OOC, w2.getActiveChannel());
@@ -115,7 +115,7 @@ public final class ChatWindowLayoutStoreTest {
         // Unknown ids dropped, unplaced channels appended, Admin closed.
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.OOC,
                 ChatChannel.PROXIMITY, ChatChannel.FACTION,
-                ChatChannel.CONSOLE), main.getChannels());
+                ChatChannel.DISCORD, ChatChannel.CONSOLE), main.getChannels());
         assertEquals(ChatChannel.ALL, main.getActiveChannel());
         assertEquals(2, ChatWindowLayout.windows().size());
         ChatWindow w2 = ChatWindowLayout.window("w2");

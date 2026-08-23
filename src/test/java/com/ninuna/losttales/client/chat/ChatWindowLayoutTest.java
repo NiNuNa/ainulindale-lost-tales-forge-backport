@@ -51,8 +51,8 @@ public final class ChatWindowLayoutTest {
         ChatWindow conversation = ChatWindowLayout.windows().get(1);
         assertEquals("w2", conversation.getId());
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY,
-                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY),
-                conversation.getChannels());
+                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.DISCORD,
+                ChatChannel.PARTY), conversation.getChannels());
         assertEquals(ChatChannel.ALL, conversation.getActiveChannel());
         assertEquals(0.0D, conversation.getOffsetX(), 0.0D);
         assertEquals(100.0D, conversation.getOffsetY(), 0.0D);
@@ -65,7 +65,7 @@ public final class ChatWindowLayoutTest {
         assertTrue(ChatWindowLayout.closedChannels().isEmpty());
         assertEquals(Arrays.asList(ChatChannel.CONSOLE, ChatChannel.ADMIN,
                 ChatChannel.ALL, ChatChannel.PROXIMITY, ChatChannel.FACTION,
-                ChatChannel.OOC, ChatChannel.PARTY),
+                ChatChannel.OOC, ChatChannel.DISCORD, ChatChannel.PARTY),
                 ChatWindowLayout.orderChannels());
     }
 
@@ -200,7 +200,7 @@ public final class ChatWindowLayoutTest {
     /** There is always at least one open tab, however the layout is cut. */
     @Test
     public void theLastOpenTabOfAllIsNeverClosable() {
-        assertEquals(7, ChatWindowLayout.openTabCount());
+        assertEquals(8, ChatWindowLayout.openTabCount());
         List<ChatChannel> order = new ArrayList<ChatChannel>(
                 ChatWindowLayout.orderChannels());
         for (int index = 0; index < order.size() - 1; index++) {
@@ -405,10 +405,10 @@ public final class ChatWindowLayoutTest {
                 detached++;
             }
         }
-        // Every window that could be split was, once: five new windows,
-        // one per channel; with seven channels the cap is never reached.
-        assertEquals(5, detached);
-        assertEquals(7, ChatWindowLayout.windows().size());
+        // Every window that could be split was, once: six new windows,
+        // one per channel, which with eight channels meets the cap exactly.
+        assertEquals(6, detached);
+        assertEquals(8, ChatWindowLayout.windows().size());
         assertTrue(ChatWindowLayout.windows().size()
                 <= ChatWindowLayout.MAX_WINDOWS);
         for (ChatWindow window : ChatWindowLayout.windows()) {
@@ -447,7 +447,8 @@ public final class ChatWindowLayoutTest {
         // Party keeps its first placement; the unplaced channels land
         // in the first window.
         assertEquals(Arrays.asList(ChatChannel.PARTY, ChatChannel.OOC,
-                ChatChannel.FACTION, ChatChannel.CONSOLE), w3.getChannels());
+                ChatChannel.FACTION, ChatChannel.DISCORD, ChatChannel.CONSOLE),
+                w3.getChannels());
         assertEquals(ChatChannel.OOC, w3.getActiveChannel());
         assertTrue(w3.isLocked());
         assertEquals(100.0D, w3.getOffsetX(), 0.0D);
@@ -484,7 +485,7 @@ public final class ChatWindowLayoutTest {
         ChatWindow only = ChatWindowLayout.firstWindow();
         assertEquals("w1", only.getId());
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY,
-                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY,
+                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.DISCORD, ChatChannel.PARTY,
                 ChatChannel.CONSOLE), only.getChannels());
         assertEquals(ChatChannel.ALL, only.getActiveChannel());
         assertEquals(100.0D, only.getOffsetY(), 0.0D);

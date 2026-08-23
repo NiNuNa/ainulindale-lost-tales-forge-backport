@@ -38,6 +38,8 @@ public final class ClientChatChannelState {
     private static long cachedFactionNanos;
     /** Server-stated operator status; the Admin tab exists only with it. */
     private static boolean adminAccess;
+    /** Server-stated Discord bridge; the Discord tab exists only with it. */
+    private static boolean discordAccess;
     /** Unsent input kept across closing and reopening the chat screen. */
     /** Unsent text per tab, oldest first; bounded, whispers included. */
     private static final Map<ChatTab, String> DRAFTS =
@@ -227,6 +229,9 @@ public final class ClientChatChannelState {
         if (channel == ChatChannel.ADMIN) {
             return adminAccess;
         }
+        if (channel == ChatChannel.DISCORD) {
+            return discordAccess;
+        }
         if (channel == ChatChannel.WHISPER) {
             return true;
         }
@@ -322,6 +327,16 @@ public final class ClientChatChannelState {
         return adminAccess;
     }
 
+    /** Applies the server's statement of whether Discord is bridged. */
+    public static synchronized void setDiscordAccess(boolean access) {
+        discordAccess = access;
+        ensureAvailable();
+    }
+
+    public static synchronized boolean hasDiscordAccess() {
+        return discordAccess;
+    }
+
     /**
      * Remembers the selected tab's unsent input so closing the screen or
      * switching tabs does not lose it.
@@ -364,6 +379,7 @@ public final class ClientChatChannelState {
         cachedFactionName = "";
         cachedFactionNanos = 0L;
         adminAccess = false;
+        discordAccess = false;
         DRAFTS.clear();
     }
 

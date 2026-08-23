@@ -9,19 +9,23 @@ import io.netty.buffer.ByteBuf;
 /**
  * Server-to-client: which restricted chat channels the player may use.
  * The client cannot know its own operator status on a dedicated server,
- * so the server states it on login and whenever a staff-channel message
- * is refused; the server still checks on every send regardless.
+ * nor whether the server bridges Discord, so the server states both on
+ * login and whenever a refused message makes it worth saying again; the
+ * server still checks on every send regardless.
  */
 public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_PACKET_BYTES = 16;
 
     private boolean adminAccess;
+    private boolean discordAccess;
     private boolean malformed;
 
     public LostTalesChatAccessPacket() {}
 
-    public LostTalesChatAccessPacket(boolean adminAccess) {
+    public LostTalesChatAccessPacket(boolean adminAccess,
+                                     boolean discordAccess) {
         this.adminAccess = adminAccess;
+        this.discordAccess = discordAccess;
     }
 
     @Override
@@ -33,10 +37,12 @@ public final class LostTalesChatAccessPacket implements IMessage {
                         "invalid chat access packet size");
             }
             this.adminAccess = buffer.readBoolean();
+            this.discordAccess = buffer.readBoolean();
             LostTalesPacketCodec.requireFinished(buffer);
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.adminAccess = false;
+            this.discordAccess = false;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -44,9 +50,12 @@ public final class LostTalesChatAccessPacket implements IMessage {
     @Override
     public void toBytes(ByteBuf buffer) {
         buffer.writeBoolean(this.adminAccess);
+        buffer.writeBoolean(this.discordAccess);
     }
 
     public boolean hasAdminAccess() { return this.adminAccess; }
+    /** Whether the server bridges the Discord channel right now. */
+    public boolean hasDiscordAccess() { return this.discordAccess; }
     public boolean isMalformed() { return this.malformed; }
 
     public static final class Handler implements IMessageHandler<

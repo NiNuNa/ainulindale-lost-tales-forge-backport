@@ -20,6 +20,10 @@ Compatible in-world GUI screens use a restrained foreground fly-in; title and ma
 
 Inventory containers also provide optional smooth stack movement for Shift-click transfers and 1–9 hotbar swaps. Ordinary pickup and drag placement, creative search/repopulation, and bulk sorting stay immediate. `enableSmoothInventoryMovement` is the master toggle and `smoothInventoryAnimationDurationMillis` controls travel time; this is a client-side visual effect and does not modify container contents or server inventory authority.
 
+### `discord` (server only)
+
+`enabled`, `botToken`, `channelId`, `webhookUrl`, `pollIntervalSeconds` (2–60), `relayGameChat`, `relayDiscordChat`, `avatarUrlTemplate` — the server's own bridge between the Discord chat channel and one Discord text channel; the setup guide is [Discord_Bridge](Discord_Bridge.md). The token and webhook URL are secrets and must never be shared with clients.
+
 ## Server commands
 
 The root `/losttales` command requires permission level 2. Its subcommands are:

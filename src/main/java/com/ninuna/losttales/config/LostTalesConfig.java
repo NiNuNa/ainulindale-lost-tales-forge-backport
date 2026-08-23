@@ -19,6 +19,7 @@ public final class LostTalesConfig {
     public static final String CATEGORY_CHAT = "chat";
     public static final String CATEGORY_RANGED_COMBAT = "ranged_combat";
     public static final String CATEGORY_WAYSTONES = "waystones";
+    public static final String CATEGORY_DISCORD = "discord";
 
     public static final String HUD_PRESET_CUSTOM = "custom";
     public static final String HUD_PRESET_DEFAULT = "default";
@@ -133,6 +134,21 @@ public final class LostTalesConfig {
     public static boolean showChatTypingIndicators = true;
     /** Server switch for relaying typing presence at all. */
     public static boolean chatTypingIndicators = true;
+    /**
+     * The server's Discord bridge; read on the server only. The token
+     * and the webhook URL are secrets: they stay in this file and are
+     * never logged or sent to a client.
+     */
+    public static boolean discordEnabled;
+    public static String discordBotToken = "";
+    public static String discordChannelId = "";
+    public static String discordWebhookUrl = "";
+    public static int discordPollIntervalSeconds = 3;
+    public static boolean discordRelayGameChat = true;
+    public static boolean discordRelayDiscordChat = true;
+    /** The picture a post carries: {name}/{uuid} of the sender's account. */
+    public static String discordAvatarUrlTemplate =
+            "https://mc-heads.net/head/{name}/64";
     public static int chatAnimationDurationMillis = 180;
     public static int chatInputAnimationDurationMillis = 180;
     public static int chatSelectorAnimationDurationMillis = 140;
@@ -801,6 +817,56 @@ public final class LostTalesConfig {
                     CATEGORY_CHAT,
                     chatTypingIndicators,
                     "Relay who is typing into a channel to the players who would read the message; off drops every typing notice on the server."
+            );
+            discordEnabled = config.getBoolean(
+                    "enabled",
+                    CATEGORY_DISCORD,
+                    discordEnabled,
+                    "Server only: bridge the Discord chat channel to one Discord text channel, game to Discord through a webhook and Discord to game by polling with a bot. Players get the Discord tab only while this is on."
+            );
+            discordBotToken = config.getString(
+                    "botToken",
+                    CATEGORY_DISCORD,
+                    discordBotToken,
+                    "Server only, secret: the bot's token, used to read the Discord channel. The bot must be in the server with access to the channel and have the Message Content intent enabled."
+            );
+            discordChannelId = config.getString(
+                    "channelId",
+                    CATEGORY_DISCORD,
+                    discordChannelId,
+                    "Server only: the id of the Discord text channel to read."
+            );
+            discordWebhookUrl = config.getString(
+                    "webhookUrl",
+                    CATEGORY_DISCORD,
+                    discordWebhookUrl,
+                    "Server only, secret: a webhook URL of that channel, used to post the game's Discord-channel lines under each sender's name."
+            );
+            discordPollIntervalSeconds = config.getInt(
+                    "pollIntervalSeconds",
+                    CATEGORY_DISCORD,
+                    discordPollIntervalSeconds,
+                    2,
+                    60,
+                    "Server only: how often the Discord channel is read for new messages, in seconds."
+            );
+            discordRelayGameChat = config.getBoolean(
+                    "relayGameChat",
+                    CATEGORY_DISCORD,
+                    discordRelayGameChat,
+                    "Server only: post lines written in the game's Discord channel to Discord."
+            );
+            discordRelayDiscordChat = config.getBoolean(
+                    "relayDiscordChat",
+                    CATEGORY_DISCORD,
+                    discordRelayDiscordChat,
+                    "Server only: show messages written in the Discord channel in the game's Discord channel."
+            );
+            discordAvatarUrlTemplate = config.getString(
+                    "avatarUrlTemplate",
+                    CATEGORY_DISCORD,
+                    discordAvatarUrlTemplate,
+                    "Server only: the https URL of the picture a Discord post carries, with {name} and/or {uuid} replaced by the sender's Minecraft account (the default is an isometric head; https://mc-heads.net/avatar/{name}/64 is the flat face); empty shows the webhook's own picture."
             );
             showChatTimestamps = config.getBoolean(
                     "showTimestamps",
@@ -1509,6 +1575,8 @@ public final class LostTalesConfig {
                 "losttales.config.category.rangedCombat");
         config.getCategory(CATEGORY_WAYSTONES).setLanguageKey(
                 "losttales.config.category.waystones");
+        config.getCategory(CATEGORY_DISCORD).setLanguageKey(
+                "losttales.config.category.discord");
     }
 
     private static void writeCurrentValues(Configuration config) {

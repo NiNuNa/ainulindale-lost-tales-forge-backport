@@ -30,6 +30,7 @@ import com.ninuna.losttales.block.tileentity.LostTalesTileEntityStatue;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.command.ELostTalesCommand;
+import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.crafting.ELostTalesCrafting;
@@ -298,6 +299,7 @@ public class LostTalesCommonProxy {
         PartyMemberStatusSyncManager.clear();
         PartyTrackingSyncManager.clear();
         ELostTalesCommand.initAndRegisterCommands(event);
+        LostTalesDiscordBridge.getInstance().start();
     }
 
     private static void initializeLoreCharacterOwnership(
@@ -333,6 +335,7 @@ public class LostTalesCommonProxy {
     }
 
     public void onServerStopping(FMLServerStoppingEvent event) {
+        LostTalesDiscordBridge.getInstance().stop();
         LostTalesServerTaskQueue.stopAcceptingAndClear();
         CharacterLifecycleStateTracker.markServerStopping();
         int checkpointed = CharacterSwitchCoordinator.getInstance()

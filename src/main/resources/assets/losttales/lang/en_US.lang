@@ -539,6 +539,8 @@ item.horn_test.lore.line2=Plays a low note when used.
 
 key.categories.losttales.mappings=Ainulindalë: Lost Tales
 losttales.config.category.rangedCombat=Ranged Combat
+losttales.config.category.discord=Discord Bridge
+losttales.config.category.discord.tooltip=Server-only bridge between the Discord chat channel and one Discord text channel: webhook out, bot polling in.
 key.losttales.toggleHud=Toggle HUD
 key.losttales.use=Activate / Use
 key.losttales.modifier=Modifier Key
@@ -633,6 +635,7 @@ chat.losttales.channel.party_unavailable=Party chat is unavailable because you a
 chat.losttales.channel.faction_unavailable=Faction chat is unavailable because your active character has no valid faction.
 chat.losttales.channel.character_required=Select an active role-playing character to use role-playing chat. Account chat remains available in OOC.
 chat.losttales.channel.admin_unavailable=Operator chat is only available to server operators.
+chat.losttales.channel.discord_unavailable=Discord chat is not bridged on this server.
 chat.losttales.whisper.unavailable=That player is not online.
 chat.losttales.whisper.self=You cannot whisper to yourself.
 chat.losttales.item.unavailable=A shared item could not be verified in your inventory and was sent as plain text.

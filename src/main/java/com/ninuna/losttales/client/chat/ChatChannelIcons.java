@@ -189,6 +189,8 @@ final class ChatChannelIcons {
                 return ChatEmoji.CONFUSED;
             case WHISPER:
                 return ChatEmoji.SHY;
+            case DISCORD:
+                return ChatEmoji.AWE;
             default:
                 return ChatEmoji.SMILE;
         }

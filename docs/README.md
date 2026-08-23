@@ -6,6 +6,7 @@ Start with [the project overview](wiki/Ainulindalë_Lost_Tales.md), then use the
 
 - [Roleplay characters](wiki/RP-Characters.md)
 - [Chat channels](wiki/Chat_Channels.md)
+- [Discord bridge](wiki/Discord_Bridge.md)
 - [Playable races](wiki/Races.md)
 - [Factions](wiki/Factions.md)
 - [Parties](wiki/Parties.md)

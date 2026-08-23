@@ -55,8 +55,10 @@ public final class LostTalesChatPresentation {
             return;
         }
         ChatChannel channel = packet.getChannel();
+        // A Discord sender has no Minecraft account to look a skin up for.
         if (channel.getIdentityType()
-                == com.ninuna.losttales.chat.ChatIdentityType.ACCOUNT) {
+                == com.ninuna.losttales.chat.ChatIdentityType.ACCOUNT
+                && channel != ChatChannel.DISCORD) {
             LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
                     minecraft, packet.getSenderId(),
                     packet.getIdentityName());

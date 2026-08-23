@@ -3,14 +3,22 @@ package com.ninuna.losttales.chat.server;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import java.util.regex.Pattern;
 import lotr.common.LOTRLevelData;
 import lotr.common.LOTRPlayerData;
 import lotr.common.LOTRTitle;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.util.EnumChatFormatting;
 
 /** Reads optional LOTR presentation fields without making routing depend on them. */
 final class LostTalesChatPresentationResolver {
+    /**
+     * Vanilla's own formatting-code pattern. Not
+     * {@code EnumChatFormatting.getTextWithoutFormattingCodes}: that is
+     * {@code @SideOnly(CLIENT)} in 1.7.10 and does not exist on a
+     * dedicated server.
+     */
+    private static final Pattern FORMATTING_CODES =
+            Pattern.compile("(?i)§[0-9A-FK-OR]");
 
     private LostTalesChatPresentationResolver() {}
 
@@ -41,9 +49,8 @@ final class LostTalesChatPresentationResolver {
             // formatting codes stay behind, the client colours the title.
             String name = LotrCharacterAdapter.getInstance()
                     .getFactionDisplayName(character.getStartingFactionId());
-            String plain = name == null ? null
-                    : EnumChatFormatting.getTextWithoutFormattingCodes(name);
-            factionName = plain == null ? "" : plain.trim();
+            factionName = name == null ? ""
+                    : FORMATTING_CODES.matcher(name).replaceAll("").trim();
         }
         // The faction explorer renders LOTRFaction#getFactionColor(). Keep
         // title and character name on that exact same RGB source.
