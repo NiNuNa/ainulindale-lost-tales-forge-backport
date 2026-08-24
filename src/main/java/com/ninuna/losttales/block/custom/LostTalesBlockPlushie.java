@@ -4,7 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.block.base.LostTalesBlockStatueBase;
 import com.ninuna.losttales.block.collision.LostTalesBlockBounds;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityPlushie;
-import com.ninuna.losttales.entity.ELostTalesUser;
+import com.ninuna.losttales.user.ELostTalesUser;
 import com.ninuna.losttales.util.LostTalesBlockRotationHelper;
 import java.util.List;
 import net.minecraft.block.Block;

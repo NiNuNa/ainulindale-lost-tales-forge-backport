@@ -48,6 +48,33 @@ import java.util.Set;
 public final class ChatWindowLayout {
     /** Bound on windows; more than this is a broken file, not a layout. */
     public static final int MAX_WINDOWS = 8;
+    /** Fewest message lines a window may be resized to. */
+    public static final int MIN_WINDOW_LINES = 1;
+    /** Most message lines a window may be resized to. */
+    public static final int MAX_WINDOW_LINES = 64;
+    /**
+     * Absolute floor on a stored width, in GUI pixels: vanilla's own
+     * narrowest chat, so a hand-edited file cannot leave a width no
+     * message could be laid out in. What a drag may actually reach is
+     * {@code ChatWindowPlacement}'s readable minimum, which knows the
+     * chat scale the text is drawn at.
+     */
+    public static final int MIN_CHAT_WIDTH = 40;
+    /** Widest a window may be dragged; no screen is anywhere near this. */
+    public static final int MAX_CHAT_WIDTH = 4096;
+    /**
+     * How far below the first window a window made for an arriving
+     * conversation lands, as a percent of the screen travel: far enough
+     * to read as a window of its own, near enough to be found.
+     */
+    private static final double NEW_WINDOW_DROP = 12.0D;
+    /**
+     * How far a new window's anchor must be from every other one before
+     * it counts as clear of them, and how finely the screen is searched
+     * for such a spot.
+     */
+    private static final double NEW_WINDOW_CLEARANCE = 20.0D;
+    private static final int NEW_WINDOW_STEPS = 8;
     /** Window id of layouts written before every window was equal. */
     static final String LEGACY_MAIN_ID = "main";
     private static final String ID_PREFIX = "w";
@@ -128,6 +155,35 @@ public final class ChatWindowLayout {
             toolbarCollapsed = collapsed;
             changed();
         }
+    }
+
+    /**
+     * Gives a window its own width, in the chat's own pixels, or 0 to
+     * follow the game's chat-width setting again. {@code persist} is
+     * false while a resize is in progress so the file is written once,
+     * on release. Widths are per window: the closed-chat feed and any
+     * window without one of its own keep the game's.
+     */
+    public static synchronized boolean setWindowWidth(String windowId,
+                                                      int width,
+                                                      boolean persist) {
+        ChatWindow window = window(windowId);
+        if (window == null) {
+            return false;
+        }
+        window.setWidth(clampChatWidth(width));
+        if (persist) {
+            changed();
+        }
+        return true;
+    }
+
+    /** A width inside the bounds a layout may hold; 0 stays 0. */
+    static int clampChatWidth(int width) {
+        if (width <= 0) {
+            return 0;
+        }
+        return Math.max(MIN_CHAT_WIDTH, Math.min(MAX_CHAT_WIDTH, width));
     }
 
     public static synchronized double feedOffsetX() {
@@ -374,11 +430,15 @@ public final class ChatWindowLayout {
     }
 
     /**
-     * Whether {@link #close} would remove the tab: it is open and not
-     * the last open tab of all. The lock guards movement, not this.
+     * Whether {@link #close} would remove the tab: it is open, not the
+     * last open tab of all, and its window is unlocked. A locked window
+     * keeps the tabs it has — that is what locking it is for — so no
+     * cross is offered on its row and no shortcut closes one either.
      */
     public static synchronized boolean isClosable(ChatTab tab) {
-        return isOpen(tab) && openTabCount() > 1;
+        ChatWindow window = windowOf(tab);
+        return isOpen(tab) && openTabCount() > 1
+                && window != null && !window.isLocked();
     }
 
     public static synchronized boolean isClosable(ChatChannel channel) {
@@ -404,9 +464,41 @@ public final class ChatWindowLayout {
         return close(ChatTab.of(channel));
     }
 
-    /** Reopens a closed channel as the first window's last tab. */
+    /**
+     * Reopens a closed channel as the last tab of a window that will
+     * have it: an unlocked one, or a new one when every window is
+     * locked.
+     */
     public static synchronized boolean restore(ChatChannel channel) {
-        return restore(channel, firstWindow().getId());
+        ChatTab tab = ChatTab.of(channel);
+        // Asked before a window is chosen: picking one may create it,
+        // and a refused restore must not leave an empty window behind.
+        if (tab == null || channel == ChatChannel.WHISPER || isOpen(tab)) {
+            return false;
+        }
+        return restore(channel, receivingWindow().getId());
+    }
+
+    /**
+     * The window a tab that opens by itself — a conversation, the
+     * console answering a command — belongs in: the first unlocked one,
+     * or a new one when every window is locked and the layout has room
+     * for another. With no room left the first window takes it anyway,
+     * since losing the message would be worse than crossing a lock.
+     */
+    static synchronized ChatWindow receivingWindow() {
+        for (int index = 0; index < WINDOWS.size(); index++) {
+            if (!WINDOWS.get(index).isLocked()) {
+                return WINDOWS.get(index);
+            }
+        }
+        if (WINDOWS.size() < MAX_WINDOWS) {
+            ChatWindow created = newWindow();
+            placeClearOfOthers(created);
+            WINDOWS.add(created);
+            return created;
+        }
+        return firstWindow();
     }
 
     /** Reopens a closed channel as the given window's last tab. */
@@ -447,16 +539,9 @@ public final class ChatWindowLayout {
         }
         ChatWindow window = window(preferredWindowId);
         if (window == null || window.isLocked()) {
-            window = null;
-            for (int index = 0; index < WINDOWS.size() && window == null;
-                 index++) {
-                if (!WINDOWS.get(index).isLocked()) {
-                    window = WINDOWS.get(index);
-                }
-            }
-        }
-        if (window == null) {
-            window = firstWindow();
+            // A locked window is finished: the conversation opens in
+            // another one, or in a new one of its own.
+            window = receivingWindow();
         }
         window.tabs().add(tab);
         if (window.getActiveTab() == null) {
@@ -590,23 +675,120 @@ public final class ChatWindowLayout {
     }
 
     /**
+     * Gives a window its own height in message lines, or 0 to follow the
+     * game's chat-height setting again. The height is fractional: a
+     * window keeps the exact size it was dragged to and clips its
+     * topmost line rather than snapping to a whole one. {@code persist}
+     * is false while a resize is in progress so the file is written
+     * once, on release.
+     */
+    public static synchronized boolean setWindowLines(String windowId,
+                                                      double lines,
+                                                      boolean persist) {
+        ChatWindow window = window(windowId);
+        if (window == null) {
+            return false;
+        }
+        window.setMaxLines(clampWindowLines(lines));
+        if (persist) {
+            changed();
+        }
+        return true;
+    }
+
+    /** A window height inside the bounds a layout may hold; 0 stays 0. */
+    static double clampWindowLines(double lines) {
+        if (!(lines > 0.0D)) {
+            return 0.0D;
+        }
+        return Math.max(MIN_WINDOW_LINES, Math.min(MAX_WINDOW_LINES, lines));
+    }
+
+    /**
      * Links a window to another it sits directly above or below. A
      * window linked the other way round to this one lets go first, so
      * two windows never hold each other.
      */
     public static synchronized boolean link(String windowId, String targetId,
                                             boolean above) {
+        return link(windowId, targetId, above
+                ? ChatWindow.LinkSide.ABOVE : ChatWindow.LinkSide.BELOW);
+    }
+
+    /**
+     * Sticks a window to one side of another. A window stuck the other
+     * way round to this one lets go first, so two windows never hold
+     * each other, and a chain never closes on itself.
+     */
+    public static synchronized boolean link(String windowId, String targetId,
+                                            ChatWindow.LinkSide side) {
         ChatWindow window = window(windowId);
         ChatWindow target = window(targetId);
-        if (window == null || target == null || window == target) {
+        if (window == null || target == null || window == target
+                || side == null) {
             return false;
         }
         if (windowId.equals(target.getLinkTarget())) {
-            target.setLink(null, false);
+            target.setLink(null, ChatWindow.LinkSide.BELOW);
         }
-        window.setLink(targetId, above);
+        window.setLink(targetId, side);
         changed();
         return true;
+    }
+
+    /**
+     * The window at the head of a stuck chain — the one whose stored
+     * position the others are placed from. A window that is stuck to
+     * nothing is its own root, and a chain that somehow closed on itself
+     * stops at the window it started from.
+     */
+    /**
+     * Every window stuck to this one, however many hops away and in
+     * whichever direction the sticking runs, the window itself included.
+     * A stuck group moves as one piece, so a drag carries all of them.
+     */
+    public static synchronized List<ChatWindow> linkedGroup(
+            ChatWindow window) {
+        List<ChatWindow> group = new ArrayList<ChatWindow>();
+        if (window == null) {
+            return group;
+        }
+        group.add(window);
+        for (int pass = 0; pass < MAX_WINDOWS; pass++) {
+            boolean grew = false;
+            for (ChatWindow candidate : WINDOWS) {
+                if (group.contains(candidate)) {
+                    continue;
+                }
+                for (int index = 0; index < group.size(); index++) {
+                    ChatWindow member = group.get(index);
+                    if (candidate.getId().equals(member.getLinkTarget())
+                            || member.getId().equals(
+                                    candidate.getLinkTarget())) {
+                        group.add(candidate);
+                        grew = true;
+                        break;
+                    }
+                }
+            }
+            if (!grew) {
+                break;
+            }
+        }
+        return group;
+    }
+
+    public static synchronized ChatWindow linkRoot(ChatWindow window) {
+        ChatWindow root = window;
+        for (int step = 0; step < MAX_WINDOWS && root != null
+                && root.isLinked(); step++) {
+            ChatWindow target = window(root.getLinkTarget());
+            if (target == null || target == window) {
+                break;
+            }
+            root = target;
+        }
+        return root == null ? window : root;
     }
 
     public static synchronized boolean unlink(String windowId) {
@@ -758,11 +940,13 @@ public final class ChatWindowLayout {
                 window.setOffsets(clampPercent(spec.offsetX),
                         clampPercent(spec.offsetY));
                 window.setLocked(spec.locked);
+                window.setMaxLines(clampWindowLines(spec.maxLines));
+                window.setWidth(clampChatWidth(spec.width));
                 window.setActiveTab(spec.activeTab);
                 WINDOWS.add(window);
                 if (spec.linkTarget != null) {
                     window.setLink(LEGACY_MAIN_ID.equals(spec.linkTarget)
-                            ? null : spec.linkTarget, spec.linkAbove);
+                            ? null : spec.linkTarget, spec.linkSide);
                 }
             }
         }
@@ -771,9 +955,9 @@ public final class ChatWindowLayout {
             ChatWindow target = window.isLinked()
                     ? window(window.getLinkTarget()) : null;
             if (target == null || target == window) {
-                window.setLink(null, false);
+                window.setLink(null, ChatWindow.LinkSide.BELOW);
             } else if (window.getId().equals(target.getLinkTarget())) {
-                target.setLink(null, false);
+                target.setLink(null, ChatWindow.LinkSide.BELOW);
             }
         }
         List<ChatTab> unplaced = new ArrayList<ChatTab>();
@@ -842,9 +1026,67 @@ public final class ChatWindowLayout {
                     active != null && active.isWhisper() ? null : active,
                     window.isLocked(), window.getOffsetX(),
                     window.getOffsetY(), window.getLinkTarget(),
-                    window.isLinkedAbove()));
+                    window.getLinkSide(), window.getMaxLines(),
+                    window.getWidth()));
         }
         return result;
+    }
+
+    /**
+     * Puts a window the chat opened by itself where it covers no other
+     * one. Positions are percents of the screen's travel, which is all
+     * the layout knows — how tall a window is drawn depends on what it
+     * is holding at the time — so this reads clearance as distance
+     * between anchors rather than as boxes that do not meet. Of every
+     * spot far enough from all of them it takes the one nearest where
+     * the window would have gone anyway; if the screen is too crowded
+     * for any of them to be clear, it takes the roomiest and overlaps,
+     * which is better than refusing to show the conversation.
+     */
+    private static void placeClearOfOthers(ChatWindow created) {
+        double wantedX = firstWindow().getOffsetX();
+        double wantedY = clampPercent(
+                firstWindow().getOffsetY() + NEW_WINDOW_DROP);
+        double bestX = wantedX;
+        double bestY = wantedY;
+        double bestClearance = -1.0D;
+        double bestDistance = Double.MAX_VALUE;
+        for (int row = 0; row <= NEW_WINDOW_STEPS; row++) {
+            for (int column = 0; column <= NEW_WINDOW_STEPS; column++) {
+                double x = column * 100.0D / NEW_WINDOW_STEPS;
+                double y = row * 100.0D / NEW_WINDOW_STEPS;
+                double clearance = nearestAnchor(x, y);
+                double distance = distance(x, y, wantedX, wantedY);
+                boolean clear = clearance >= NEW_WINDOW_CLEARANCE;
+                boolean bestClear = bestClearance >= NEW_WINDOW_CLEARANCE;
+                if (clear && bestClear ? distance < bestDistance
+                        : clear || clearance > bestClearance) {
+                    bestClearance = clearance;
+                    bestDistance = distance;
+                    bestX = x;
+                    bestY = y;
+                }
+            }
+        }
+        created.setOffsets(clampPercent(bestX), clampPercent(bestY));
+    }
+
+    /** How far the nearest existing window's anchor is, in percent. */
+    private static double nearestAnchor(double x, double y) {
+        double nearest = Double.MAX_VALUE;
+        for (int index = 0; index < WINDOWS.size(); index++) {
+            ChatWindow window = WINDOWS.get(index);
+            nearest = Math.min(nearest, distance(x, y,
+                    window.getOffsetX(), window.getOffsetY()));
+        }
+        return nearest;
+    }
+
+    private static double distance(double x, double y,
+                                   double otherX, double otherY) {
+        double dx = x - otherX;
+        double dy = y - otherY;
+        return Math.sqrt(dx * dx + dy * dy);
     }
 
     private static ChatWindow newWindow() {
@@ -915,6 +1157,15 @@ public final class ChatWindowLayout {
         final double offsetY;
         final String linkTarget;
         final boolean linkAbove;
+        /** Which side of its target it is stuck to. */
+        final ChatWindow.LinkSide linkSide;
+        /**
+         * The window's own height in lines, fractions included; 0
+         * follows the game setting.
+         */
+        final double maxLines;
+        /** The window's own width; 0 follows the game setting. */
+        final int width;
 
         WindowSpec(String id, List<?> tabs, Object activeTab,
                    boolean locked, double offsetX, double offsetY) {
@@ -924,6 +1175,30 @@ public final class ChatWindowLayout {
         WindowSpec(String id, List<?> tabs, Object activeTab,
                    boolean locked, double offsetX, double offsetY,
                    String linkTarget, boolean linkAbove) {
+            this(id, tabs, activeTab, locked, offsetX, offsetY, linkTarget,
+                    linkAbove, 0);
+        }
+
+        WindowSpec(String id, List<?> tabs, Object activeTab,
+                   boolean locked, double offsetX, double offsetY,
+                   String linkTarget, boolean linkAbove, double maxLines) {
+            this(id, tabs, activeTab, locked, offsetX, offsetY, linkTarget,
+                    linkAbove, maxLines, 0);
+        }
+
+        WindowSpec(String id, List<?> tabs, Object activeTab,
+                   boolean locked, double offsetX, double offsetY,
+                   String linkTarget, boolean linkAbove, double maxLines,
+                   int width) {
+            this(id, tabs, activeTab, locked, offsetX, offsetY, linkTarget,
+                    linkAbove ? ChatWindow.LinkSide.ABOVE
+                            : ChatWindow.LinkSide.BELOW, maxLines, width);
+        }
+
+        WindowSpec(String id, List<?> tabs, Object activeTab,
+                   boolean locked, double offsetX, double offsetY,
+                   String linkTarget, ChatWindow.LinkSide linkSide,
+                   double maxLines, int width) {
             this.id = id;
             List<ChatTab> converted = new ArrayList<ChatTab>();
             if (tabs != null) {
@@ -940,7 +1215,11 @@ public final class ChatWindowLayout {
             this.offsetX = offsetX;
             this.offsetY = offsetY;
             this.linkTarget = linkTarget;
-            this.linkAbove = linkAbove;
+            this.linkSide = linkSide == null
+                    ? ChatWindow.LinkSide.BELOW : linkSide;
+            this.linkAbove = this.linkSide == ChatWindow.LinkSide.ABOVE;
+            this.maxLines = clampWindowLines(maxLines);
+            this.width = clampChatWidth(width);
         }
 
         private static ChatTab toTab(Object value) {

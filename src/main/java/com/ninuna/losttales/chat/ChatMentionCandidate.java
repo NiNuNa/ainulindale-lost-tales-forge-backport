@@ -15,12 +15,19 @@ import java.util.Locale;
  * detection on the receiving side still checks both names. The account and
  * character names are kept separately so a hover card can describe the
  * player the same way a chat line's name does.
+ *
+ * <p>A candidate is either a player or a role. A player carries the
+ * account id its face is drawn from; a role carries the colour it is
+ * named in and reaches everyone holding it. Roles are listed first, so
+ * addressing a whole group is never buried under a list of names.</p>
  */
 public final class ChatMentionCandidate {
     private final String key;
     private final String displayName;
     private final String accountName;
     private final String characterName;
+    private final String accountId;
+    private final int roleColor;
     private final List<String> aliases;
 
     public ChatMentionCandidate(String key, String displayName,
@@ -31,6 +38,33 @@ public final class ChatMentionCandidate {
     public ChatMentionCandidate(String key, String displayName,
                                 String accountName, String characterName,
                                 List<String> aliases) {
+        this(key, displayName, accountName, characterName, aliases, "", -1);
+    }
+
+    /**
+     * A role the whole server can be addressed by: named in its own
+     * colour, with no face of its own.
+     */
+    public static ChatMentionCandidate role(String key, String name,
+                                            int color) {
+        return new ChatMentionCandidate(key, name, "", "", null, "",
+                color & 0xFFFFFF);
+    }
+
+    /** A player, with the account id their face is drawn from. */
+    public static ChatMentionCandidate player(String key, String displayName,
+                                              String accountName,
+                                              String characterName,
+                                              String accountId,
+                                              List<String> aliases) {
+        return new ChatMentionCandidate(key, displayName, accountName,
+                characterName, aliases, accountId, -1);
+    }
+
+    private ChatMentionCandidate(String key, String displayName,
+                                 String accountName, String characterName,
+                                 List<String> aliases, String accountId,
+                                 int roleColor) {
         String trimmedDisplay = displayName == null ? "" : displayName.trim();
         this.key = key == null || key.trim().length() == 0
                 ? trimmedDisplay.toLowerCase(Locale.ROOT) : key.trim();
@@ -46,6 +80,27 @@ public final class ChatMentionCandidate {
             }
         }
         this.aliases = Collections.unmodifiableList(normalized);
+        this.accountId = accountId == null ? "" : accountId.trim();
+        this.roleColor = roleColor;
+    }
+
+    /**
+     * The account id this candidate's face is drawn from, or empty when
+     * there is none to draw — a role, or a player the client has not
+     * placed yet.
+     */
+    public String getAccountId() {
+        return this.accountId;
+    }
+
+    /** Whether this names a role rather than one player. */
+    public boolean isRole() {
+        return this.roleColor >= 0;
+    }
+
+    /** The colour a role is named in; -1 for a player. */
+    public int getRoleColor() {
+        return this.roleColor;
     }
 
     /** Convenience for a player known by a single name. */

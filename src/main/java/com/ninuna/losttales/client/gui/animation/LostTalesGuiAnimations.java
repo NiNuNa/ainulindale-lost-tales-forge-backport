@@ -59,21 +59,29 @@ public final class LostTalesGuiAnimations {
     }
 
     public static boolean isContentTransformActive(GuiScreen screen) {
-        net.minecraft.client.Minecraft minecraft =
-                net.minecraft.client.Minecraft.getMinecraft();
-        return isSpatialTransformAvailable()
-                && LostTalesConfig.enableGuiAnimations
-                && minecraft != null && minecraft.theWorld != null
-                && screen != null && screen == currentScreen
-                && currentProfile.isEnabled();
+        return isSpatialTransformAvailable() && isCurrent(screen);
     }
 
     public static boolean isManagingBackdrop() {
         return isManagingBackdrop(currentScreen);
     }
 
+    /**
+     * Whether the handler, rather than the screen, paints the veil
+     * behind the screen: it does once the transformer has taken
+     * vanilla's own veil away from it.
+     */
     public static boolean isManagingBackdrop(GuiScreen screen) {
         return isContentTransformActive(screen);
+    }
+
+    private static boolean isCurrent(GuiScreen screen) {
+        net.minecraft.client.Minecraft minecraft =
+                net.minecraft.client.Minecraft.getMinecraft();
+        return LostTalesConfig.enableGuiAnimations
+                && minecraft != null && minecraft.theWorld != null
+                && screen != null && screen == currentScreen
+                && currentProfile.isEnabled();
     }
 
     /**

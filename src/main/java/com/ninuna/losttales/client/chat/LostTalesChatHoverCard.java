@@ -275,7 +275,7 @@ final class LostTalesChatHoverCard {
                     continue;
                 }
                 IChatComponent part = (IChatComponent)value;
-                if (ChatChannelPrefixMarker.isHidden(part, true)) {
+                if (ChatPrefixMarker.isHidden(part, true)) {
                     continue;
                 }
                 int partWidth = LostTalesChatVisualStyle.partWidth(
@@ -287,8 +287,10 @@ final class LostTalesChatHoverCard {
                         && !decodedHead.npcIdentity;
                 boolean identity = isReplyIdentity(part);
                 if (head || identity) {
-                    float left = head ? cursor + 0.5F : cursor;
-                    float right = left + (head ? 9.0F : partWidth);
+                    float left = head
+                            ? cursor + ChatInlineIcons.HEAD_SLOT_INSET
+                            : cursor;
+                    float right = left + (head ? 8.0F : partWidth);
                     if (band.localX >= left && band.localX < right) {
                         return targetForGroup(lines, band.viewIndex);
                     }
@@ -339,9 +341,17 @@ final class LostTalesChatHoverCard {
                     continue;
                 }
                 if (isReplyIdentity(part)) {
-                    identity = LostTalesChatVisualStyle.removeColorCodes(
-                            part.getUnformattedTextForChat()).trim();
-                    account = replyAccount(part);
+                    // The brackets answer to the pointer as the name
+                    // does, but they are not it. The name is the one
+                    // that follows the head: the opening bracket comes
+                    // before it, the closing one after it is already
+                    // read, so position tells them apart without
+                    // anything having to look at the text.
+                    if (afterHead && identity.length() == 0) {
+                        identity = LostTalesChatVisualStyle.removeColorCodes(
+                                part.getUnformattedTextForChat()).trim();
+                        account = replyAccount(part);
+                    }
                     continue;
                 }
                 ChatTitleMarker.Data titleData = ChatTitleMarker.decode(part);

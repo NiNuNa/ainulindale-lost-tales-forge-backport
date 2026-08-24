@@ -81,9 +81,7 @@ enum ChatIconSheet {
             return;
         }
         minecraft.getTextureManager().bindTexture(TEXTURE);
-        GL11.glEnable(GL11.GL_BLEND);
-        OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
-                GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+        LostTalesChatVisualStyle.beginContent();
         GL11.glColor4f(1.0F, 1.0F, 1.0F,
                 MathHelper.clamp_float(alpha / 255.0F, 0.0F, 1.0F));
         try {

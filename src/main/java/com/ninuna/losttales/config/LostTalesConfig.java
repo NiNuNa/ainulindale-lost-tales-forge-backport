@@ -149,6 +149,12 @@ public final class LostTalesConfig {
     /** The picture a post carries: {name}/{uuid} of the sender's account. */
     public static String discordAvatarUrlTemplate =
             "https://mc-heads.net/head/{name}/64";
+    /** Post server start/stop and player join/leave notices to the webhook. */
+    public static boolean discordServerEvents = true;
+    /** Keep the channel topic saying whether the server is up and who is on. */
+    public static boolean discordChannelStatus = true;
+    /** Least seconds between two topic writes; Discord allows two per ten minutes. */
+    public static int discordChannelStatusIntervalSeconds = 300;
     public static int chatAnimationDurationMillis = 180;
     public static int chatInputAnimationDurationMillis = 180;
     public static int chatSelectorAnimationDurationMillis = 140;
@@ -867,6 +873,26 @@ public final class LostTalesConfig {
                     CATEGORY_DISCORD,
                     discordAvatarUrlTemplate,
                     "Server only: the https URL of the picture a Discord post carries, with {name} and/or {uuid} replaced by the sender's Minecraft account (the default is an isometric head; https://mc-heads.net/avatar/{name}/64 is the flat face); empty shows the webhook's own picture."
+            );
+            discordServerEvents = config.getBoolean(
+                    "serverEvents",
+                    CATEGORY_DISCORD,
+                    discordServerEvents,
+                    "Server only: post a short notice to the webhook when the server starts or shuts down and when a player joins or leaves."
+            );
+            discordChannelStatus = config.getBoolean(
+                    "channelStatus",
+                    CATEGORY_DISCORD,
+                    discordChannelStatus,
+                    "Server only: keep the Discord channel's topic saying whether the server is online and how many players are on (online, 3/20 players). Needs the bot token and channel id, and the bot needs the Manage Channels permission in that channel."
+            );
+            discordChannelStatusIntervalSeconds = config.getInt(
+                    "channelStatusIntervalSeconds",
+                    CATEGORY_DISCORD,
+                    discordChannelStatusIntervalSeconds,
+                    60,
+                    3600,
+                    "Server only: the least time between two topic writes, in seconds. Discord allows a channel's topic to change only twice per ten minutes, so the default of five minutes is the fastest that never waits; joins and leaves inside the interval are folded into the next write."
             );
             showChatTimestamps = config.getBoolean(
                     "showTimestamps",

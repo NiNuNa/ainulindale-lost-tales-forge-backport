@@ -65,6 +65,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
+import com.ninuna.losttales.client.chat.ClientChatAccountRoles;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import com.ninuna.losttales.client.chat.ClientChatTypingState;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
@@ -119,6 +120,10 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                 event.getModConfigurationDirectory());
         ThirdPersonCameraRuntime.resetSession();
         clientEventHandler = new LostTalesClientEventHandler();
+        // The chat handler is registered first on purpose: both watch
+        // GuiOpenEvent at the lowest priority, and the animation handler
+        // must see the Lost Tales chat screen the chat handler puts in
+        // place of vanilla's, not the one it replaces.
         chatClientHandler = new LostTalesChatClientHandler();
         guiAnimationHandler = new LostTalesGuiAnimationHandler();
         keyBindings = new LostTalesKeyBindings();
@@ -432,6 +437,15 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         if (packet != null && !packet.isMalformed()) {
             ClientChatChannelState.setAdminAccess(packet.hasAdminAccess());
             ClientChatChannelState.setDiscordAccess(packet.hasDiscordAccess());
+            ClientChatChannelState.setRoleMask(packet.getRoleMask());
+            // So a mention of this player is coloured from the first
+            // frame, rather than only once they have said something.
+            if (Minecraft.getMinecraft().thePlayer != null) {
+                ClientChatAccountRoles.remember(
+                        Minecraft.getMinecraft().thePlayer
+                                .getCommandSenderName(),
+                        packet.getRoleMask());
+            }
         }
     }
 

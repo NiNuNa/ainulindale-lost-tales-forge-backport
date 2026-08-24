@@ -7,7 +7,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiNewChat;
 import net.minecraft.util.IChatComponent;
-import net.minecraft.util.MathHelper;
 
 /**
  * Called by the coremod inside {@code GuiNewChat.func_146237_a} once
@@ -38,8 +37,8 @@ public final class LostTalesChatWrapHooks {
             // With chat colours off the renderer strips every code before
             // drawing, so the layout must measure the same stripped text.
             final boolean colours = LostTalesChatVisualStyle.chatColoursEnabled();
-            int width = MathHelper.floor_float(
-                    chat.func_146228_f() / chat.func_146244_h());
+            int width = ChatWindowPlacement.wrapWidth(
+                    chat.func_146228_f(), chat.func_146244_h());
             List<IChatComponent> lines = ChatLineWrapper.wrap(
                     new ChatLineWrapper.TextMetrics() {
                         @Override

@@ -1,7 +1,7 @@
 package com.ninuna.losttales.item.block;
 
 import com.ninuna.losttales.block.base.LostTalesBlockDirectionalContainerBase;
-import com.ninuna.losttales.entity.ELostTalesUser;
+import com.ninuna.losttales.user.ELostTalesUser;
 import com.ninuna.losttales.util.LostTalesClientUtil;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;

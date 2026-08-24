@@ -71,6 +71,12 @@ final class ChatChannelTabBar {
     private static final int END_CONTROL_GAP = 3;
     /** Minimum grip width a row keeps for dragging the window. */
     static final int MIN_GRIP_WIDTH = 12;
+    /** Inset of the grip glyph from the row's right edge. */
+    /**
+     * Clear space kept at the row's right end, which the grip stands
+     * against and no control crosses.
+     */
+    private static final int GRIP_INSET = 3;
     /** Easing state is kept for this many tabs before the oldest go. */
     private static final int MAX_EASED_TABS = 32;
     private static final int PING_COUNTER_RGB =
@@ -143,6 +149,12 @@ final class ChatChannelTabBar {
         int right;
         /** Screen y the tab bodies stand on. */
         int rowBottom;
+        /**
+         * The same edge before it was floored to a whole pixel, which is
+         * where the strip is really drawn. The clip that keeps the row's
+         * shadows off the rule is measured from this.
+         */
+        double rowBottomExact;
         /** Horizontal motion the whole row is drawn with. */
         int offsetX;
         boolean locked;
@@ -152,6 +164,8 @@ final class ChatChannelTabBar {
         boolean showRestore;
         /** Unread lines waiting in closed channels, shown after the +. */
         int closedUnread;
+        /** Whether this window is the one being dragged right now. */
+        boolean moving;
         /** Tab being dragged out of this row, drawn faint; or null. */
         ChatTab dragging;
         /** Insertion index to indicate during a drag, or -1. */
@@ -262,6 +276,27 @@ final class ChatChannelTabBar {
     }
 
     /**
+     * Whether the point lies on the grip's own glyph rather than
+     * anywhere in the empty stretch that also drags the window. The
+     * glyph is what the hover highlight and the move tip answer to, so
+     * neither follows a pointer resting on the bare strip.
+     */
+    boolean isOverGripHandle(FontRenderer font, Row row, int mouseX,
+                             int mouseY) {
+        if (row == null || row.locked || !inRowBand(row, mouseY)) {
+            return false;
+        }
+        layout(font, row);
+        if (row.right - this.controlsRight < MIN_GRIP_WIDTH) {
+            return false;
+        }
+        int localX = mouseX - row.offsetX;
+        int right = row.right - GRIP_INSET;
+        return localX >= right - ChatIconSheet.GRIP.getWidth()
+                && localX < right;
+    }
+
+    /**
      * Insertion index for a tab dropped at {@code mouseX}: before the
      * first tab whose centre lies right of the pointer, else at the end.
      */
@@ -298,55 +333,76 @@ final class ChatChannelTabBar {
         this.alphaScale = Math.max(0.0F, Math.min(1.0F, alphaScale));
         Hit hovered = hitAt(font, row, mouseX, mouseY);
         int bottom = row.rowBottom;
-        // The window's title strip: tabs stand on it and the empty
-        // stretch after the controls is the grip.
-        Gui.drawRect(row.offsetX + row.left - 2, rowTop(bottom),
-                row.offsetX + row.right + 2, bottom,
-                LostTalesChatVisualStyle.argb(
-                        LostTalesChatVisualStyle.SURFACE_RGB,
-                        scaled(LostTalesChatVisualStyle.SURFACE_ALPHA)));
-        drawGrip(row.offsetX + this.controlsRight, row.offsetX + row.right,
-                bottom, hovered != null && hovered.kind == HitKind.GRIP);
-        Tab selectedTab = null;
-        for (int index = 0; index < tabs.size(); index++) {
-            Tab tab = tabs.get(index);
-            if (tab.tab.equals(row.selected)) {
-                selectedTab = tab;
-                continue;
+        // Everything the strip draws stops short of the rule it ends
+        // on: a sprite's shadow falls a pixel down and right, and the
+        // rule is a hairline the window is bounded by, not something
+        // to cast onto. The rule itself is drawn after the clip.
+        boolean clipped = LostTalesChatOverlayRenderer.beginVerticalClip(
+                Minecraft.getMinecraft(), Double.NaN,
+                row.rowBottomExact - 1.0D);
+        try {
+            // The window's title strip: tabs stand on it and the empty
+            // stretch after the controls is the grip.
+            Gui.drawRect(row.offsetX + row.left - 2, rowTop(bottom),
+                    row.offsetX + row.right + 2, bottom,
+                    LostTalesChatVisualStyle.argb(
+                            LostTalesChatVisualStyle.SURFACE_RGB,
+                            scaled(LostTalesChatVisualStyle.SURFACE_ALPHA)));
+            // A window being dragged holds the grip's highlight wherever the
+            // pointer has gone, the way a control keeps its pressed look.
+            drawGrip(row.offsetX + this.controlsRight, row.offsetX + row.right,
+                    bottom, row.moving
+                            || isOverGripHandle(font, row, mouseX, mouseY));
+            Tab selectedTab = null;
+            for (int index = 0; index < tabs.size(); index++) {
+                Tab tab = tabs.get(index);
+                if (tab.tab.equals(row.selected)) {
+                    selectedTab = tab;
+                    continue;
+                }
+                drawTab(font, tab, row, bottom, hovered, false);
             }
-            drawTab(font, tab, row, bottom, hovered, false);
-        }
-        if (selectedTab != null) {
-            drawTab(font, selectedTab, row, bottom, hovered, true);
-        }
-        if (row.dropIndex >= 0) {
-            drawDropIndicator(tabs, row, bottom);
-        }
-        // The end controls sit centred in the strip, like the selected
-        // tab's label; the badge's caps share that centre.
-        if (this.lockX >= 0) {
-            drawLock(row.offsetX + this.lockX, bottom, row.locked,
-                    hovered != null && hovered.kind == HitKind.LOCK);
-        }
-        if (this.restoreX >= 0) {
-            boolean restoreHovered = hovered != null
-                    && hovered.kind == HitKind.RESTORE;
-            drawRestore(row.offsetX + this.restoreX, bottom, restoreHovered);
-            if (this.restoreBadge.length() > 0) {
-                // What waits behind the +, in the tabs' unread honey.
-                LostTalesChatVisualStyle.drawColored(font, this.restoreBadge,
-                        row.offsetX + this.restoreX + END_CONTROL_SIZE
-                                + COUNTER_GAP,
-                        centredInStrip(bottom, 7),
-                        UNREAD_COUNTER_RGB, scaled(0xFF));
+            if (selectedTab != null) {
+                drawTab(font, selectedTab, row, bottom, hovered, true);
             }
+            if (row.dropIndex >= 0) {
+                drawDropIndicator(tabs, row, bottom);
+            }
+            // The end controls sit centred in the strip, like the selected
+            // tab's label; the badge's caps share that centre.
+            if (this.lockX >= 0) {
+                drawLock(row.offsetX + this.lockX, bottom, row.locked,
+                        hovered != null && hovered.kind == HitKind.LOCK);
+            }
+            if (this.restoreX >= 0) {
+                boolean restoreHovered = hovered != null
+                        && hovered.kind == HitKind.RESTORE;
+                drawRestore(row.offsetX + this.restoreX, bottom, restoreHovered);
+                if (this.restoreBadge.length() > 0) {
+                    // What waits behind the +, in the tabs' unread honey.
+                    LostTalesChatVisualStyle.drawColored(font, this.restoreBadge,
+                            row.offsetX + this.restoreX + END_CONTROL_SIZE
+                                    + COUNTER_GAP,
+                            centredInStrip(bottom, 7),
+                            UNREAD_COUNTER_RGB, scaled(0xFF));
+                }
+            }
+        } finally {
+            LostTalesChatOverlayRenderer.endVerticalClip(clipped);
         }
         // The window's top rule: the strip's last row, over the tabs
-        // and controls, the exact width of the strip.
+        // and controls, the exact width of the strip. It stands on one
+        // row of the history's own backdrop, as the bottom rule does, so
+        // both edges of a window read the same way.
+        LostTalesChatOverlayRenderer.drawBackdropRow(
+                row.offsetX + row.left - 2, bottom - 1,
+                row.offsetX + row.right + 2, bottom,
+                scaled(LostTalesChatOverlayRenderer.backdropRowAlpha(
+                        Minecraft.getMinecraft())));
         LostTalesChatOverlayRenderer.drawRule(row.offsetX + row.left - 2,
                 row.offsetX + row.right + 2, bottom - 1, bottom,
                 scaled(0xFF));
-        regions.addScreen(row.offsetX + row.left - 2, rowTop(bottom),
+        regions.addWindow(row.offsetX + row.left - 2, rowTop(bottom),
                 row.offsetX + row.right + 2, bottom);
     }
 
@@ -545,8 +601,16 @@ final class ChatChannelTabBar {
      * The y that centres a sprite of the given height in the strip above
      * the window's top rule, which takes the strip's last row.
      */
+    /**
+     * Where a control of {@code height} pixels stands to sit in the
+     * middle of the strip. The strip's last row is the window's top
+     * rule, so the rows a control may use are one fewer; an odd
+     * remainder is spent above it, which is the side the selected tab's
+     * lift takes room from.
+     */
     private static int centredInStrip(int rowBottom, int height) {
-        return rowTop(rowBottom) + (ROW_HEIGHT - 1 - height) / 2;
+        return rowTop(rowBottom) + Math.round(
+                (ROW_HEIGHT - 1 - height) / 2.0F);
     }
 
     /**
@@ -579,7 +643,7 @@ final class ChatChannelTabBar {
         }
         ChatIconSheet icon = hovered
                 ? ChatIconSheet.GRIP_HOVER : ChatIconSheet.GRIP;
-        icon.drawWithShadow(right - 3 - icon.getWidth(),
+        icon.drawWithShadow(right - GRIP_INSET - icon.getWidth(),
                 centredInStrip(rowBottom, icon.getHeight()), scaled(0xFF));
     }
 
@@ -636,28 +700,62 @@ final class ChatChannelTabBar {
                     + iconWidth(channels.get(index)) + controls;
         }
         boolean controlsEverywhere = natural <= available;
-        int[] labelRoom = labelWidths.clone();
-        if (!controlsEverywhere) {
-            int fixed = 0;
-            for (int index = 0; index < count; index++) {
-                fixed += PADDING_X * 2 + counters[index]
-                        + iconWidth(channels.get(index))
-                        + (channels.get(index).equals(row.selected)
-                                ? controls : 0);
+        int selectedIndex = 0;
+        for (int index = 0; index < count; index++) {
+            if (channels.get(index).equals(row.selected)) {
+                selectedIndex = index;
             }
-            capLabels(labelRoom, available - fixed);
+        }
+        int[] labelRoom = labelWidths.clone();
+        // Counters are the first thing a crowded row gives up, and only
+        // if shortening every label was not enough.
+        boolean showCounters = true;
+        int first = 0;
+        int last = count - 1;
+        if (!controlsEverywhere) {
+            int[] fixed = fixedWidths(channels, counters, controls,
+                    selectedIndex, true);
+            if (total(fixed, 0, count - 1) > available) {
+                showCounters = false;
+                fixed = fixedWidths(channels, counters, controls,
+                        selectedIndex, false);
+            }
+            // Only when even bare tabs do not fit does the row show
+            // fewer of them, and then it keeps a run around the tab in
+            // front rather than whichever ones happen to be leftmost —
+            // so a tab does not come and go as the selection moves.
+            while (first <= last && total(fixed, first, last)
+                    > available + TAB_GAP * (count - (last - first + 1))) {
+                if (last > selectedIndex) {
+                    last--;
+                } else if (first < selectedIndex) {
+                    first++;
+                } else {
+                    break;
+                }
+            }
+            // The tab in front keeps its whole name — it is the one the
+            // player is reading — and the rest share what is left, so a
+            // crowded row shortens around it instead of hiding it.
+            // Seams are only needed between the tabs the row shows.
+            int room = available + TAB_GAP * (count - (last - first + 1))
+                    - total(fixed, first, last);
+            capLabelsAround(labelRoom, room, selectedIndex - first,
+                    first, last);
         }
         List<Tab> tabs = new ArrayList<Tab>(count);
         int x = row.left;
-        for (int index = 0; index < count; index++) {
+        for (int index = first; index <= last; index++) {
             ChatTab channel = channels.get(index);
             boolean selected = channel.equals(row.selected);
             String label = LostTalesSkyrimUiStyle.trimToWidth(font,
                     this.cachedLabels.get(channel), labelRoom[index]);
-            String pingText = ClientChatChannelViews.counterText(
-                    count(this.cachedPings, channel));
-            String otherText = ClientChatChannelViews.counterText(
-                    count(this.cachedOther, channel));
+            String pingText = showCounters
+                    ? ClientChatChannelViews.counterText(
+                            count(this.cachedPings, channel)) : "";
+            String otherText = showCounters
+                    ? ClientChatChannelViews.counterText(
+                            count(this.cachedOther, channel)) : "";
             int labelWidth = font.getStringWidth(label);
             int pingWidth = font.getStringWidth(pingText);
             int otherWidth = font.getStringWidth(otherText);
@@ -673,9 +771,6 @@ final class ChatChannelTabBar {
                     closeX = x + width - PADDING_X + CONTROL_GAP;
                     width += CONTROL_GAP + CONTROL_SIZE;
                 }
-            }
-            if (x + width > limit) {
-                break;
             }
             Boolean muted = this.cachedMuted.get(channel);
             tabs.add(new Tab(channel, icon, label, labelWidth, pingText,
@@ -708,6 +803,80 @@ final class ChatChannelTabBar {
         this.cachedShowRestore = row.showRestore;
         this.cachedClosedUnread = row.closedUnread;
         return this.cachedTabs;
+    }
+
+    /**
+     * What a tab takes before its label: its padding, its icon, its
+     * counters while the row still shows them, and the controls of the
+     * tab in front.
+     */
+    private static int[] fixedWidths(List<ChatTab> channels, int[] counters,
+                                     int controls, int selectedIndex,
+                                     boolean withCounters) {
+        int[] fixed = new int[channels.size()];
+        for (int index = 0; index < fixed.length; index++) {
+            fixed[index] = PADDING_X * 2 + iconWidth(channels.get(index))
+                    + (withCounters ? counters[index] : 0)
+                    + (index == selectedIndex ? controls : 0);
+        }
+        return fixed;
+    }
+
+    private static int total(int[] widths, int first, int last) {
+        int sum = 0;
+        for (int index = Math.max(0, first);
+             index <= Math.min(widths.length - 1, last); index++) {
+            sum += widths[index];
+        }
+        return sum;
+    }
+
+    /**
+     * Shortens the widest labels as {@link #capLabels} does, but gives
+     * the label at {@code keptIndex} first claim on the room: it keeps
+     * its whole width while any of it fits, and the others are capped
+     * against what remains. A negative index caps every label alike.
+     */
+    static void capLabelsAround(int[] widths, int room, int keptIndex) {
+        capLabelsAround(widths, room, keptIndex, 0, widths.length - 1);
+    }
+
+    /** As above, over the run of labels the row actually shows. */
+    static void capLabelsAround(int[] widths, int room, int keptOffset,
+                                int first, int last) {
+        int from = Math.max(0, first);
+        int to = Math.min(widths.length - 1, last);
+        if (from > to) {
+            return;
+        }
+        int span = to - from + 1;
+        int[] shown = new int[span];
+        for (int index = 0; index < span; index++) {
+            shown[index] = widths[from + index];
+        }
+        capShownLabels(shown, room, keptOffset);
+        for (int index = 0; index < span; index++) {
+            widths[from + index] = shown[index];
+        }
+    }
+
+    private static void capShownLabels(int[] widths, int room,
+                                       int keptIndex) {
+        if (keptIndex < 0 || keptIndex >= widths.length) {
+            capLabels(widths, room);
+            return;
+        }
+        int kept = Math.max(0, Math.min(widths[keptIndex], room));
+        int[] others = new int[widths.length - 1];
+        for (int index = 0, target = 0; index < widths.length; index++) {
+            if (index != keptIndex) {
+                others[target++] = widths[index];
+            }
+        }
+        capLabels(others, room - kept);
+        for (int index = 0, source = 0; index < widths.length; index++) {
+            widths[index] = index == keptIndex ? kept : others[source++];
+        }
     }
 
     /**

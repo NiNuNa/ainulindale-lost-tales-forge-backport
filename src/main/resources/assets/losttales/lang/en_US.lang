@@ -470,6 +470,27 @@ lotr.faction.ODANE.rank.g.f=Odane Daimyō
 lotr.faction.ODANE.rank.h=Shōgun
 lotr.faction.ODANE.rank.h.f=Odane Shōgun
 
+#   Faction demonyms: what a faction's people are called before a title
+#   ("Galadhrim Miner"), where that is not the faction's own name. Only
+#   the exceptions are listed; every other faction uses its display name.
+losttales.faction.demonym.HOBBIT=Hobbit
+losttales.faction.demonym.BREE=Bree-lander
+losttales.faction.demonym.RANGER_NORTH=Dúnedain
+losttales.faction.demonym.HIGH_ELF=Lindon
+losttales.faction.demonym.WOOD_ELF=Wood-elf
+losttales.faction.demonym.LOTHLORIEN=Galadhrim
+losttales.faction.demonym.DURINS_FOLK=Dwarf
+losttales.faction.demonym.DALE=Dalish
+losttales.faction.demonym.DUNLAND=Dunlending
+losttales.faction.demonym.ROHAN=Rohirrim
+losttales.faction.demonym.RHUDEL=Easterling
+losttales.faction.demonym.NEAR_HARAD=Haradrim
+losttales.faction.demonym.HALF_TROLL=Half-troll
+losttales.faction.demonym.MORIA_GOBLINS=Moria Goblin
+losttales.faction.demonym.BLUE_GOBLINS=Blue Goblin
+losttales.faction.demonym.MOON_ELVES=Ithildhrim
+losttales.faction.demonym.SUN_ELVES=Anardhrim
+
 #   Biomes
 lotr.biome.odaneIsland.name=Odane Isles
 lotr.biome.odaneMountains.name=Odane Mountains
@@ -689,7 +710,7 @@ gui.losttales.chat.tab.sound_pings=Sound mentions
 gui.losttales.chat.tab.restore_unread=%s unread in closed channels
 gui.losttales.chat.tab.detach=Move to its own window
 gui.losttales.chat.console_commands_only=The console only takes commands.
-gui.losttales.chat.empty=Nothing here yet
+gui.losttales.chat.empty=...
 gui.losttales.chat.typing.one=%s is typing...
 gui.losttales.chat.typing.two=%s and %s are typing...
 gui.losttales.chat.typing.three=%s, %s and %s are typing...
@@ -701,6 +722,9 @@ gui.losttales.hud.placement.locked=%s (locked)
 gui.losttales.hud.placement.chat_feed=Chat Feed
 chat.losttales.title.epithet=%s %s
 chat.losttales.tag.operator=[Operator]
+chat.losttales.tag.developer=[Developer]
+chat.losttales.role.operator=Operator
+chat.losttales.role.developer=Developer
 chat.losttales.title.suffix=, the %s
 chat.losttales.waystone.break_denied=Only this waystone's owner or a server operator may remove it.
 losttales.config.category.waystones=Waystones

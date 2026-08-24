@@ -213,29 +213,43 @@ public final class ClientChatChannelViewsTest {
 
     @Test
     public void scrollIsPerChannelClampedAndStableUnderInsertions() {
-        ClientChatChannelViews.scroll(ChatChannel.ALL, 7, 30, 10);
-        assertEquals(7, ClientChatChannelViews.getScroll(
-                ChatChannel.ALL, 30, 10));
-        assertEquals(0, ClientChatChannelViews.getScroll(
-                ChatChannel.OOC, 30, 10));
-        ClientChatChannelViews.scroll(ChatChannel.ALL, 100, 30, 10);
-        assertEquals(20, ClientChatChannelViews.getScroll(
-                ChatChannel.ALL, 30, 10));
+        ClientChatChannelViews.scroll(ChatChannel.ALL, 7, 30, 10.0D);
+        assertEquals(7.0D, ClientChatChannelViews.getScroll(
+                ChatChannel.ALL, 30, 10.0D), 0.0D);
+        assertEquals(0.0D, ClientChatChannelViews.getScroll(
+                ChatChannel.OOC, 30, 10.0D), 0.0D);
+        ClientChatChannelViews.scroll(ChatChannel.ALL, 100, 30, 10.0D);
+        assertEquals(20.0D, ClientChatChannelViews.getScroll(
+                ChatChannel.ALL, 30, 10.0D), 0.0D);
         ClientChatChannelViews.onLinesAdded(ChatChannel.ALL, 2);
-        assertEquals(22, ClientChatChannelViews.getScroll(
-                ChatChannel.ALL, 32, 10));
+        assertEquals(22.0D, ClientChatChannelViews.getScroll(
+                ChatChannel.ALL, 32, 10.0D), 0.0D);
         // A view that is not scrolled stays pinned to the newest line.
         ClientChatChannelViews.onLinesAdded(ChatChannel.OOC, 2);
-        assertEquals(0, ClientChatChannelViews.getScroll(
-                ChatChannel.OOC, 32, 10));
-        ClientChatChannelViews.scroll(ChatChannel.ALL, -100, 32, 10);
-        assertEquals(0, ClientChatChannelViews.getScroll(
-                ChatChannel.ALL, 32, 10));
-        assertEquals(0, ClientChatChannelViews.getScroll((ChatTab)null, 32, 10));
-        ClientChatChannelViews.scroll(ChatChannel.ALL, 5, 32, 10);
+        assertEquals(0.0D, ClientChatChannelViews.getScroll(
+                ChatChannel.OOC, 32, 10.0D), 0.0D);
+        ClientChatChannelViews.scroll(ChatChannel.ALL, -100, 32, 10.0D);
+        assertEquals(0.0D, ClientChatChannelViews.getScroll(
+                ChatChannel.ALL, 32, 10.0D), 0.0D);
+        assertEquals(0.0D, ClientChatChannelViews.getScroll(
+                (ChatTab)null, 32, 10.0D), 0.0D);
+        ClientChatChannelViews.scroll(ChatChannel.ALL, 5, 32, 10.0D);
         ClientChatChannelViews.resetScroll();
-        assertEquals(0, ClientChatChannelViews.getScroll(
-                ChatChannel.ALL, 32, 10));
+        assertEquals(0.0D, ClientChatChannelViews.getScroll(
+                ChatChannel.ALL, 32, 10.0D), 0.0D);
+    }
+
+    /**
+     * A window dragged to an odd height still comes to rest on whole
+     * messages: scrolled all the way up, the oldest line sits exactly on
+     * the window's top edge rather than half out of it.
+     */
+    @Test
+    public void theFarEndOfAScrollLeavesTheOldestLineWhole() {
+        ClientChatChannelViews.scroll(ChatChannel.ALL, 100, 30, 12.37D);
+        assertEquals(30.0D - 12.37D, ClientChatChannelViews.getScroll(
+                ChatChannel.ALL, 30, 12.37D), 1.0E-9D);
+        ClientChatChannelViews.resetScroll();
     }
 
     /** The bound follows the history's capacity, so every kept line has its tab. */

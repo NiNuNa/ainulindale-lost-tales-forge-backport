@@ -334,8 +334,11 @@ public final class ChatWindowLayoutTest {
         assertTrue(ChatWindowLayout.setLocked("w3", true));
         assertFalse(ChatWindowLayout.setLocked("w3", true));
         assertTrue(party.isLocked());
-        // The lock guards movement; closing is still allowed.
+        // A locked window keeps the tabs it has: nothing moves out of
+        // it, and nothing closes in it either.
         assertNull(ChatWindowLayout.detach(ChatChannel.PARTY, 1.0D, 1.0D));
+        assertFalse(ChatWindowLayout.isClosable(ChatChannel.PARTY));
+        assertFalse(ChatWindowLayout.close(ChatChannel.PARTY));
         assertFalse(ChatWindowLayout.moveTab(ChatChannel.OOC, "w3", 0));
         assertFalse(ChatWindowLayout.moveTab(ChatChannel.PARTY, "w2", 0));
         // Position and mute are not layout movement.
@@ -345,8 +348,39 @@ public final class ChatWindowLayoutTest {
         assertTrue(ChatWindowLayout.isMuted(ChatChannel.PARTY));
         ChatWindowLayout.setLocked("w2", true);
         assertFalse(ChatWindowLayout.moveTab(ChatChannel.OOC, "w2", 0));
+        assertFalse(ChatWindowLayout.close(ChatChannel.OOC));
+        // Unlocking gives the row its cross back.
+        assertTrue(ChatWindowLayout.setLocked("w2", false));
         assertTrue(ChatWindowLayout.close(ChatChannel.OOC));
         assertFalse(ChatWindowLayout.setPosition("nope", 1.0D, 1.0D, true));
+    }
+
+    /**
+     * A conversation that opens by itself when every window is locked
+     * gets a window of its own, and that window is put where it covers
+     * none of them.
+     */
+    @Test
+    public void aWindowOpenedForAConversationKeepsClearOfTheOthers() {
+        for (ChatWindow window : ChatWindowLayout.windows()) {
+            ChatWindowLayout.setLocked(window.getId(), true);
+        }
+        int before = ChatWindowLayout.windows().size();
+        ChatTab whisper = ChatWindowLayout.openWhisper("Bilbo", null);
+        assertNotNull(whisper);
+        ChatWindow opened = ChatWindowLayout.windowOf(whisper);
+        assertNotNull(opened);
+        // A locked window keeps the tabs it has; this one is new.
+        assertEquals(before + 1, ChatWindowLayout.windows().size());
+        for (ChatWindow other : ChatWindowLayout.windows()) {
+            if (other == opened) {
+                continue;
+            }
+            double dx = opened.getOffsetX() - other.getOffsetX();
+            double dy = opened.getOffsetY() - other.getOffsetY();
+            assertTrue("the new window sits on top of " + other.getId(),
+                    Math.sqrt(dx * dx + dy * dy) >= 20.0D);
+        }
     }
 
     @Test

@@ -10,16 +10,19 @@ public final class CharacterHeadIconLayoutTest {
 
     private static final float EPSILON = 0.0001F;
 
+    /**
+     * Every race that has LOTR's extended headwear cube shows the head's
+     * own square of it. A portrait is eight pixels for eight texels: the
+     * hair and beard rows the cube carries below the chin belong to the
+     * model, and squeezing them into the square would stretch every
+     * texel in it.
+     */
     @Test
-    public void humanAndElfKeepHatPixelsAlignedToTheHead() {
-        assertExtendedLayout(CharacterRaceRegistry.HUMAN, 8.0F);
-        assertExtendedLayout(CharacterRaceRegistry.ELF, 8.0F);
-    }
-
-    @Test
-    public void dwarfAndHobbitUseShorterHairAndBeardLayer() {
-        assertExtendedLayout(CharacterRaceRegistry.DWARF, 12.0F);
-        assertExtendedLayout(CharacterRaceRegistry.HOBBIT, 12.0F);
+    public void everyExtendedRaceShowsTheHeadsOwnSquare() {
+        assertExtendedLayout(CharacterRaceRegistry.HUMAN);
+        assertExtendedLayout(CharacterRaceRegistry.ELF);
+        assertExtendedLayout(CharacterRaceRegistry.DWARF);
+        assertExtendedLayout(CharacterRaceRegistry.HOBBIT);
     }
 
     @Test
@@ -49,8 +52,7 @@ public final class CharacterHeadIconLayoutTest {
         assertEquals(32.0F, layout.getImageHeight(), EPSILON);
     }
 
-    private static void assertExtendedLayout(
-            String raceId, float overlayHeight) {
+    private static void assertExtendedLayout(String raceId) {
         CharacterHeadIconLayout layout =
                 CharacterHeadIconLayout.forConfiguredRace(raceId);
         assertEquals(
@@ -58,9 +60,6 @@ public final class CharacterHeadIconLayoutTest {
                 layout.getOverlayKind());
         assertEquals(8.0F, layout.getFaceSize(), EPSILON);
         assertEquals(64.0F, layout.getImageHeight(), EPSILON);
-        assertEquals(
-                overlayHeight,
-                layout.getExtendedOverlayHeight(), EPSILON);
     }
 
     private static void assertFeatureLayout(
@@ -71,6 +70,5 @@ public final class CharacterHeadIconLayoutTest {
         assertEquals(featureKind, layout.getOverlayKind());
         assertEquals(faceSize, layout.getFaceSize(), EPSILON);
         assertEquals(imageHeight, layout.getImageHeight(), EPSILON);
-        assertEquals(0.0F, layout.getExtendedOverlayHeight(), EPSILON);
     }
 }

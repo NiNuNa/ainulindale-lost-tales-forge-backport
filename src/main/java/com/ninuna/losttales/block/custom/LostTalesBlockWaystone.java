@@ -6,7 +6,7 @@ import com.ninuna.losttales.block.LostTalesWaystoneLifecycleService;
 import com.ninuna.losttales.block.base.LostTalesBlockDirectionalContainerBase;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
 import com.ninuna.losttales.compat.lotr.LostTalesWaystonePermissionPolicy;
-import com.ninuna.losttales.entity.ELostTalesUser;
+import com.ninuna.losttales.user.ELostTalesUser;
 import com.ninuna.losttales.gui.LostTalesGuiIds;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRepository;

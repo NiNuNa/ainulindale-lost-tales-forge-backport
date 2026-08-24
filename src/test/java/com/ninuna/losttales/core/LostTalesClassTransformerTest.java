@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -227,6 +228,26 @@ public final class LostTalesClassTransformerTest {
         assertTrue(hookSeen);
         assertTrue(storesBack);
         assertTrue(openAfterHook);
+    }
+
+    @Test
+    public void chatLineReplacementSkipsRefreshes() throws Exception {
+        ClassNode chat = transform("net.minecraft.client.gui.GuiNewChat");
+        assertTrue(containsStaticHook(chat, "func_146237_a",
+                CHAT_HISTORY_HOOK_OWNER, "deleteUnlessRefreshing"));
+        MethodNode method = findMethod(chat, "func_146237_a");
+        // Vanilla's own call is gone, so nothing can delete a line the
+        // refresh is about to file again.
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (instruction instanceof MethodInsnNode) {
+                MethodInsnNode call = (MethodInsnNode)instruction;
+                assertFalse("deleteChatLine".equals(call.name)
+                        && Opcodes.INVOKEVIRTUAL == call.getOpcode());
+                assertFalse("func_146242_c".equals(call.name)
+                        && Opcodes.INVOKEVIRTUAL == call.getOpcode());
+            }
+        }
     }
 
     @Test

@@ -1,7 +1,7 @@
 package com.ninuna.losttales.block.base;
 
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
-import com.ninuna.losttales.entity.ELostTalesUser;
+import com.ninuna.losttales.user.ELostTalesUser;
 import com.ninuna.losttales.sound.ELostTalesBlockSoundType;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;

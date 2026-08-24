@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
@@ -17,6 +18,63 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public final class LostTalesChatPresentationTest {
+
+    /**
+     * 1 when the component answers to a click as the sender's name does
+     * — the same whisper, and so the same card on a hover — else null.
+     */
+    private static Integer replyOf(IChatComponent part) {
+        ClickEvent click = part.getChatStyle() == null ? null
+                : part.getChatStyle().getChatClickEvent();
+        return click != null
+                && click.getAction() == ClickEvent.Action.SUGGEST_COMMAND
+                && click.getValue() != null
+                && click.getValue().startsWith("/msg ")
+                ? Integer.valueOf(1) : null;
+    }
+
+    /**
+     * The brackets answer to the pointer as the name does, but the name
+     * is still the one component the player card reads: it is the first
+     * to answer after the head, the opening bracket coming before the
+     * head and the closing one after the name. The card's own walk
+     * depends on that order, so it is asserted here.
+     */
+    @Test
+    public void theNameIsTheFirstPartToAnswerAfterTheHead() {
+        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
+        LostTalesConfig.showChatTimestamps = false;
+        try {
+            IChatComponent message = LostTalesChatPresentation.build(
+                    new LostTalesChatMessagePacket(
+                            ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                            "RangerOfTheNorth", "", 0x55AA55, 0x336633,
+                            "hello", 123456789L, ""));
+            boolean afterHead = false;
+            String firstBefore = null;
+            String firstAfter = null;
+            for (Object value : message) {
+                IChatComponent part = (IChatComponent)value;
+                if (ChatHeadMarker.decode(part) != null) {
+                    afterHead = true;
+                    continue;
+                }
+                if (replyOf(part) == null) {
+                    continue;
+                }
+                String text = part.getUnformattedTextForChat();
+                if (!afterHead && firstBefore == null) {
+                    firstBefore = text;
+                } else if (afterHead && firstAfter == null) {
+                    firstAfter = text;
+                }
+            }
+            assertEquals("<", firstBefore);
+            assertEquals("Arathorn", firstAfter);
+        } finally {
+            LostTalesConfig.showChatTimestamps = originalTimestamps;
+        }
+    }
 
     @Test
     public void identityUsesBracketsSpacingAndVanillaReplyAction() {
@@ -56,11 +114,11 @@ public final class LostTalesChatPresentationTest {
                 } else if ("<".equals(
                         part.getUnformattedTextForChat())) {
                     openingBracketColor = part.getChatStyle().getColor();
-                    openingBracketRgb = ChatColorMarker.decode(part);
+                    openingBracketRgb = replyOf(part);
                 } else if ("> ".equals(
                         part.getUnformattedTextForChat())) {
                     closingBracketColor = part.getChatStyle().getColor();
-                    closingBracketRgb = ChatColorMarker.decode(part);
+                    closingBracketRgb = replyOf(part);
                 }
             }
 
@@ -72,8 +130,12 @@ public final class LostTalesChatPresentationTest {
             assertEquals("/msg RangerOfTheNorth ", reply.getValue());
             assertEquals(identityColor, openingBracketColor);
             assertEquals(identityColor, closingBracketColor);
-            assertEquals(Integer.valueOf(0x336633), openingBracketRgb);
-            assertEquals(Integer.valueOf(0x336633), closingBracketRgb);
+            // The brackets are part of the name: they carry the same
+            // whisper, so a hover over either shows the sender's card
+            // and a click opens the conversation. Their colour is the
+            // name's, which the renderer reads from the head marker.
+            assertEquals(Integer.valueOf(1), openingBracketRgb);
+            assertEquals(Integer.valueOf(1), closingBracketRgb);
             assertNotNull(headMarker);
             // The invisible two-space marker is bold only to reserve ten
             // pixels for the raised portrait and a compact final gap.
@@ -162,7 +224,7 @@ public final class LostTalesChatPresentationTest {
                 plainText.append(part.getUnformattedTextForChat());
                 anchor |= ChatLayoutMarker.isAnchor(part);
                 if ("Console".equals(part.getUnformattedTextForChat())) {
-                    prefixColor = ChatChannelPrefixMarker.decode(part);
+                    prefixColor = ChatPrefixMarker.decode(part);
                 }
             }
             String rendered = plainText.toString();
@@ -221,7 +283,7 @@ public final class LostTalesChatPresentationTest {
                 if ("Faction".equals(
                         part.getUnformattedTextForChat())) {
                     assertEquals(Integer.valueOf(0x245A32),
-                            ChatChannelPrefixMarker.decode(part));
+                            ChatPrefixMarker.decode(part));
                     return;
                 }
             }
@@ -339,33 +401,59 @@ public final class LostTalesChatPresentationTest {
         assertFalse(LostTalesChatPresentation.isPingedLine(1000 + pinged - 1));
     }
 
-    /** An operator's account line opens with the crimson tag; others never do. */
+    /**
+     * An account line tags every role its sender holds, in precedence
+     * order and each in its own colour, ahead of the name; a line without
+     * roles carries no tag.
+     */
     @Test
-    public void operatorAccountLinesCarryTheCrimsonTag() {
+    public void accountLinesTagEveryRoleInPrecedenceOrder() {
         boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
         LostTalesConfig.showChatTimestamps = false;
         try {
             LostTalesChatMessagePacket tagged = new LostTalesChatMessagePacket(
                     ChatChannel.OOC, UUID.randomUUID(), "Steve", "Steve", "",
-                    0xFCECD1, 0xFCECD1, "hello", 123456789L, "", null, "",
-                    "", true);
-            // Without a loaded language the tag reads as its key.
-            String tagText = StatCollector.translateToLocal(
-                    "chat.losttales.tag.operator") + " ";
+                    0xFCECD1, ChatAccountRole.DEVELOPER.getColor(), "hello",
+                    123456789L, "", null, "", "",
+                    ChatAccountRole.maskOf(ChatAccountRole.OPERATOR,
+                            ChatAccountRole.DEVELOPER));
+            // Without a loaded language a tag reads as its key.
+            String operatorTag = StatCollector.translateToLocal(
+                    ChatAccountRole.OPERATOR.getTagKey()) + " ";
+            String developerTag = StatCollector.translateToLocal(
+                    ChatAccountRole.DEVELOPER.getTagKey()) + " ";
             StringBuilder plain = new StringBuilder();
-            Integer tagRgb = null;
+            Integer operatorRgb = null;
+            Integer developerRgb = null;
+            Integer openingBracketRgb = null;
             for (Object value : LostTalesChatPresentation.build(tagged)) {
                 IChatComponent part = (IChatComponent)value;
-                plain.append(part.getUnformattedTextForChat());
-                if (tagText.equals(part.getUnformattedTextForChat())) {
-                    tagRgb = ChatColorMarker.decode(part);
+                String text = part.getUnformattedTextForChat();
+                plain.append(text);
+                if (operatorTag.equals(text)) {
+                    operatorRgb = ChatColorMarker.decode(part);
+                } else if (developerTag.equals(text)) {
+                    developerRgb = ChatColorMarker.decode(part);
+                } else if ("<".equals(text)) {
+                    openingBracketRgb = replyOf(part);
                 }
             }
-            // The tag stands ahead of the sender's opening bracket.
-            int tag = plain.indexOf(tagText);
-            assertTrue(tag >= 0 && tag < plain.indexOf("<"));
+            // Developer first, Operator second, both ahead of the bracket.
+            int developer = plain.indexOf(developerTag);
+            int operator = plain.indexOf(operatorTag);
+            assertTrue(developer >= 0 && developer < operator);
+            assertTrue(operator < plain.indexOf("<"));
             assertEquals(Integer.valueOf(
-                    LostTalesColors.rgb(LostTalesColors.CRIMSON)), tagRgb);
+                    LostTalesColors.rgb(LostTalesColors.MULBERRY)),
+                    developerRgb);
+            assertEquals(Integer.valueOf(
+                    LostTalesColors.rgb(LostTalesColors.CRIMSON)),
+                    operatorRgb);
+            // The bracket answers as the name does; the name's colour is
+            // the packet's, which the server set to the primary role's.
+            assertEquals(Integer.valueOf(1), openingBracketRgb);
+            assertEquals(ChatAccountRole.DEVELOPER.getColor(),
+                    markerOf(LostTalesChatPresentation.build(tagged)).nameColor);
 
             LostTalesChatMessagePacket plainPacket =
                     new LostTalesChatMessagePacket(
@@ -377,7 +465,8 @@ public final class LostTalesChatPresentationTest {
                 untagged.append(
                         ((IChatComponent)value).getUnformattedTextForChat());
             }
-            assertFalse(untagged.toString().contains(tagText));
+            assertFalse(untagged.toString().contains(operatorTag));
+            assertFalse(untagged.toString().contains(developerTag));
         } finally {
             LostTalesConfig.showChatTimestamps = originalTimestamps;
         }

@@ -6,29 +6,40 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+import cpw.mods.fml.common.gameevent.PlayerEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import java.io.IOException;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import net.minecraft.server.MinecraftServer;
 
 /**
  * The server's own Discord bridge, no library behind it: a worker
  * thread polls one Discord channel for new messages through the REST
- * API and posts the game's lines to a webhook, while the server thread
- * only ever touches two bounded queues. Discord messages are handed to
+ * API, posts the game's lines and the server's notices to a webhook,
+ * and keeps the channel's topic saying whether the server is up, while
+ * the server thread only ever touches two bounded queues and a wanted
+ * topic. Discord messages are handed to
  * {@link LostTalesChatService#sendFromDiscord} on the server tick, so
  * they reach players through the same packet as every other line; game
  * lines are queued here by the chat service and posted off-thread.
  *
+ * <p>The server's own notices — started, shutting down, a player joined
+ * or left — are plain webhook posts under the webhook's own name, and
+ * the topic is recomputed from the live player list on the tick after
+ * any of those, so a burst of joins is one write. At shutdown the
+ * farewell and the offline topic are queued first and the worker is
+ * given a bounded moment to send them; nothing waits longer than that.</p>
+ *
  * <p>Everything fails closed. A bad token or a missing permission stops
- * the inbound side for the session with one severe log line; a rate
- * limit is honoured for exactly the time Discord asks; any other failure
- * backs off, doubling up to a minute, and is logged once on the way
- * down and once on the way back. The webhook's own posts come back as
- * bot messages and are ignored, so nothing echoes. The token and the
- * webhook URL are never logged.</p>
+ * the inbound side (or the topic) for the session with one severe log
+ * line; a rate limit is honoured for exactly the time Discord asks; any
+ * other failure backs off, doubling up to a minute, and is logged once
+ * on the way down and once on the way back. The webhook's own posts
+ * come back as bot messages and are ignored, so nothing echoes. The
+ * token and the webhook URL are never logged.</p>
  */
 public final class LostTalesDiscordBridge {
     private static final LostTalesDiscordBridge INSTANCE =
@@ -38,12 +49,19 @@ public final class LostTalesDiscordBridge {
     private static final int MAX_INBOUND_PER_TICK = 8;
     private static final long MIN_BACKOFF_MILLIS = 5000L;
     private static final long MAX_BACKOFF_MILLIS = 60000L;
-    private static final long STOP_JOIN_MILLIS = 2000L;
+    /**
+     * How long a stop waits for the worker's last posts: enough for a
+     * webhook post and a topic write on a healthy link, and a bound on
+     * a shutdown with a stalled one.
+     */
+    private static final long STOP_JOIN_MILLIS = 5000L;
 
     private final Queue<Inbound> inbound = new ConcurrentLinkedQueue<Inbound>();
     private final AtomicInteger inboundCount = new AtomicInteger();
     private final Queue<Outbound> outbound = new ConcurrentLinkedQueue<Outbound>();
     private final AtomicInteger outboundCount = new AtomicInteger();
+    private final DiscordChannelStatus status = new DiscordChannelStatus();
+    private volatile boolean statusRefreshRequested;
     private volatile Worker worker;
     private boolean registered;
 
@@ -59,15 +77,17 @@ public final class LostTalesDiscordBridge {
         if (!LostTalesConfig.discordEnabled) {
             return;
         }
-        boolean reads = LostTalesConfig.discordRelayDiscordChat
-                && LostTalesConfig.discordBotToken.trim().length() > 0
+        boolean bot = LostTalesConfig.discordBotToken.trim().length() > 0
                 && LostTalesConfig.discordChannelId.trim().length() > 0;
-        boolean writes = LostTalesConfig.discordRelayGameChat
-                && LostTalesConfig.discordWebhookUrl.trim().length() > 0;
-        if (!reads && !writes) {
+        boolean reads = LostTalesConfig.discordRelayDiscordChat && bot;
+        boolean posts = LostTalesConfig.discordWebhookUrl.trim().length() > 0
+                && (LostTalesConfig.discordRelayGameChat
+                        || LostTalesConfig.discordServerEvents);
+        boolean manages = LostTalesConfig.discordChannelStatus && bot;
+        if (!reads && !posts && !manages) {
             FMLLog.warning("[%s] Discord bridge is enabled but has neither a "
-                    + "bot token and channel id to read with nor a webhook "
-                    + "URL to post to; nothing will be relayed",
+                    + "bot token and channel id to read or manage with nor a "
+                    + "webhook URL to post to; nothing will be relayed",
                     LostTalesMetaData.MOD_ID);
             return;
         }
@@ -75,15 +95,19 @@ public final class LostTalesDiscordBridge {
             FMLCommonHandler.instance().bus().register(this);
             this.registered = true;
         }
-        Worker started = new Worker(reads, writes);
+        Worker started = new Worker(reads, posts, manages);
         this.worker = started;
         started.start();
-        FMLLog.info("[%s] Discord bridge started (%s)", LostTalesMetaData.MOD_ID,
-                reads && writes ? "both ways" : reads ? "Discord to game"
-                        : "game to Discord");
+        FMLLog.info("[%s] Discord bridge started (%s%s)", LostTalesMetaData.MOD_ID,
+                reads && posts ? "both ways" : reads ? "Discord to game"
+                        : posts ? "game to Discord" : "topic only",
+                manages && (reads || posts) ? ", channel topic" : "");
     }
 
-    /** Stops the worker and forgets everything queued. */
+    /**
+     * Stops the worker after a bounded wait for what it still has to
+     * send, then forgets everything queued.
+     */
     public synchronized void stop() {
         Worker running = this.worker;
         this.worker = null;
@@ -94,11 +118,18 @@ public final class LostTalesDiscordBridge {
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
             }
+            if (running.isAlive()) {
+                FMLLog.warning("[%s] Discord bridge did not finish its last "
+                        + "posts within %d ms; leaving them", LostTalesMetaData.MOD_ID,
+                        Long.valueOf(STOP_JOIN_MILLIS));
+            }
         }
         this.inbound.clear();
         this.inboundCount.set(0);
         this.outbound.clear();
         this.outboundCount.set(0);
+        this.status.reset();
+        this.statusRefreshRequested = false;
     }
 
     public boolean isRunning() {
@@ -111,8 +142,24 @@ public final class LostTalesDiscordBridge {
      * the bridge is off, posting is off, or the queue is full.
      */
     public void relay(String username, String avatarUrl, String message) {
+        if (LostTalesConfig.discordRelayGameChat) {
+            post(username, avatarUrl, message);
+        }
+    }
+
+    /**
+     * Queues one of the server's own notices, under the webhook's own
+     * name and picture; dropped under the same conditions as a line.
+     */
+    public void announce(String message) {
+        if (LostTalesConfig.discordServerEvents) {
+            post("", "", message);
+        }
+    }
+
+    private void post(String username, String avatarUrl, String message) {
         Worker running = this.worker;
-        if (running == null || !running.writes || message == null
+        if (running == null || !running.posts || message == null
                 || message.length() == 0) {
             return;
         }
@@ -123,11 +170,66 @@ public final class LostTalesDiscordBridge {
         this.outbound.add(new Outbound(username, avatarUrl, message));
     }
 
-    /** Delivers queued Discord messages on the server thread, a few per tick. */
+    /**
+     * Asks for the topic to be recomputed from the live server on the
+     * next tick. Cheap and idempotent, so every join and leave may call it.
+     */
+    public void requestStatusRefresh() {
+        this.statusRefreshRequested = true;
+    }
+
+    /** The server is up and accepting players; say so. Server thread. */
+    public void onServerStarted() {
+        announce(DiscordServerNotices.serverStarted());
+        requestStatusRefresh();
+    }
+
+    /**
+     * The server is going down: queue the farewell and the offline topic
+     * ahead of {@link #stop()}, which gives the worker its bounded
+     * moment to send them. Server thread.
+     */
+    public void onServerStopping() {
+        announce(DiscordServerNotices.serverStopping());
+        Worker running = this.worker;
+        if (running != null && running.manages) {
+            this.status.request(DiscordServerNotices.offlineTopic());
+        }
+        this.statusRefreshRequested = false;
+    }
+
+    @SubscribeEvent
+    public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event == null || event.player == null || this.worker == null) {
+            return;
+        }
+        announce(DiscordServerNotices.playerJoined(
+                event.player.getCommandSenderName()));
+        requestStatusRefresh();
+    }
+
+    @SubscribeEvent
+    public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event == null || event.player == null || this.worker == null) {
+            return;
+        }
+        announce(DiscordServerNotices.playerLeft(
+                event.player.getCommandSenderName()));
+        // The player is still on the list while this fires; the count
+        // is taken on the next tick, when they are gone.
+        requestStatusRefresh();
+    }
+
+    /**
+     * Delivers queued Discord messages on the server thread, a few per
+     * tick, and restates the wanted topic from the live player list when
+     * something asked for it.
+     */
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
+        Worker running = this.worker;
         if (event == null || event.phase != TickEvent.Phase.START
-                || this.worker == null) {
+                || running == null) {
             return;
         }
         int delivered = 0;
@@ -143,6 +245,15 @@ public final class LostTalesDiscordBridge {
                         LostTalesMetaData.MOD_ID, exception.toString());
             }
             delivered++;
+        }
+        if (this.statusRefreshRequested && running.manages) {
+            this.statusRefreshRequested = false;
+            MinecraftServer server = MinecraftServer.getServer();
+            if (server != null) {
+                this.status.request(DiscordServerNotices.onlineTopic(
+                        server.getCurrentPlayerCount(),
+                        server.getMaxPlayers()));
+            }
         }
     }
 
@@ -176,10 +287,11 @@ public final class LostTalesDiscordBridge {
         }
     }
 
-    /** The polling and posting thread; one per started bridge. */
+    /** The polling, posting and topic-writing thread; one per started bridge. */
     private final class Worker extends Thread {
         final boolean reads;
-        final boolean writes;
+        final boolean posts;
+        final boolean manages;
         private volatile boolean running = true;
         /** The newest message id seen; empty until the channel is primed. */
         private String after = "";
@@ -188,11 +300,12 @@ public final class LostTalesDiscordBridge {
         private boolean healthy = true;
         private long backoffMillis = MIN_BACKOFF_MILLIS;
 
-        Worker(boolean reads, boolean writes) {
+        Worker(boolean reads, boolean posts, boolean manages) {
             super("LostTales-Discord");
             setDaemon(true);
             this.reads = reads;
-            this.writes = writes;
+            this.posts = posts;
+            this.manages = manages;
         }
 
         void shutdown() {
@@ -209,7 +322,7 @@ public final class LostTalesDiscordBridge {
                     if (this.reads && !this.readingDisabled) {
                         poll();
                     }
-                    if (this.writes) {
+                    if (this.posts) {
                         flushOutbound();
                     }
                     recovered();
@@ -220,12 +333,57 @@ public final class LostTalesDiscordBridge {
                 } catch (RuntimeException exception) {
                     sleepMillis = failed(exception.toString());
                 }
+                // The topic keeps its own clock: a limit on it must not
+                // hold the chat back, nor a chat failure the topic.
+                if (this.manages) {
+                    flushStatus(false);
+                }
+                if (!this.running) {
+                    break;
+                }
                 try {
                     Thread.sleep(sleepMillis);
                 } catch (InterruptedException interrupted) {
-                    return;
+                    break;
                 }
             }
+            sendLast();
+        }
+
+        /**
+         * One best-effort pass at what is still queued when the bridge
+         * stops — the farewell, the offline topic — with no retry and no
+         * wait: whatever does not go now is left.
+         */
+        private void sendLast() {
+            try {
+                if (this.posts) {
+                    flushOutbound();
+                }
+            } catch (RateLimited limited) {
+                FMLLog.info("[%s] Discord limited the bridge's last post; "
+                        + "leaving it", LostTalesMetaData.MOD_ID);
+            } catch (IOException exception) {
+                FMLLog.info("[%s] Discord bridge could not send its last "
+                        + "post: %s", LostTalesMetaData.MOD_ID,
+                        exception.toString());
+            } catch (RuntimeException exception) {
+                FMLLog.info("[%s] Discord bridge could not send its last "
+                        + "post: %s", LostTalesMetaData.MOD_ID,
+                        exception.toString());
+            }
+            if (this.manages) {
+                flushStatus(true);
+            }
+        }
+
+        private void flushStatus(boolean finalAttempt) {
+            status.flush(LostTalesConfig.discordBotToken.trim(),
+                    LostTalesConfig.discordChannelId.trim(),
+                    Math.max(60L, Math.min(3600L,
+                            LostTalesConfig.discordChannelStatusIntervalSeconds))
+                            * 1000L,
+                    finalAttempt);
         }
 
         /**

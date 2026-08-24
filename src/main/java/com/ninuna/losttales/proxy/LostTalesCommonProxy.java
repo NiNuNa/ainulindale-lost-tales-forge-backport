@@ -86,6 +86,7 @@ import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
+import cpw.mods.fml.common.event.FMLServerStartedEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.event.FMLServerStoppingEvent;
 import cpw.mods.fml.common.network.NetworkRegistry;
@@ -334,7 +335,15 @@ public class LostTalesCommonProxy {
         }
     }
 
+    /** The server accepts players from here on; the bridge may say so. */
+    public void onServerStarted(FMLServerStartedEvent event) {
+        LostTalesDiscordBridge.getInstance().onServerStarted();
+    }
+
     public void onServerStopping(FMLServerStoppingEvent event) {
+        // The farewell and the offline topic are queued before the stop,
+        // which gives the worker a bounded moment to send them.
+        LostTalesDiscordBridge.getInstance().onServerStopping();
         LostTalesDiscordBridge.getInstance().stop();
         LostTalesServerTaskQueue.stopAcceptingAndClear();
         CharacterLifecycleStateTracker.markServerStopping();

@@ -150,6 +150,13 @@ public final class LostTalesGuiAnimationHandler
         return LostTalesGuiAnimationProfile.DEFAULT;
     }
 
+    /**
+     * Screens the automatic fade never touches. Chat is one of them: it
+     * is opened and closed constantly during play and is meant to read
+     * over the world rather than in front of it, so the world behind it
+     * is neither blurred nor dimmed. Its windows carry their own opening
+     * motion instead.
+     */
     private static boolean isExcluded(GuiScreen screen) {
         return screen instanceof GuiChat
                 || screen instanceof LostTalesChatGui

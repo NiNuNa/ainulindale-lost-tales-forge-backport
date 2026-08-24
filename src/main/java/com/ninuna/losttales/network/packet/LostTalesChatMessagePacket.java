@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.LostTalesMod;
+import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.share.ChatShareKind;
@@ -51,8 +52,11 @@ public final class LostTalesChatMessagePacket implements IMessage {
     private String factionName = "";
     /** For a whisper, the other party's account name as this recipient sees it. */
     private String partner = "";
-    /** Whether the sender is a server operator; shown on account lines. */
-    private boolean operator;
+    /**
+     * The sender's {@link ChatAccountRole}s as a mask; set only on account
+     * lines, where the server also colours the name by the primary role.
+     */
+    private int roles;
     private boolean malformed;
 
     public LostTalesChatMessagePacket() {}
@@ -98,7 +102,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             String partner) {
         this(channel, senderId, identityName, accountName, title, titleColor,
                 nameColor, message, timestampMillis, skinId, showcases,
-                factionName, partner, false);
+                factionName, partner, 0);
     }
 
     public LostTalesChatMessagePacket(
@@ -107,8 +111,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
             int titleColor, int nameColor,
             String message, long timestampMillis, String skinId,
             List<ChatShowcase> showcases, String factionName,
-            String partner, boolean operator) {
-        this.operator = operator;
+            String partner, int roles) {
+        this.roles = roles;
         this.partner = partner == null ? "" : partner.trim();
         this.channelId = channel == null ? "" : channel.getId();
         this.senderId = senderId;
@@ -166,7 +170,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                     buffer, MAX_FACTION_NAME_BYTES);
             this.partner = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_ACCOUNT_NAME_BYTES).trim();
-            this.operator = buffer.readBoolean();
+            this.roles = buffer.readUnsignedByte();
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -174,7 +178,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.showcases = Collections.emptyList();
             this.factionName = "";
             this.partner = "";
-            this.operator = false;
+            this.roles = 0;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -255,7 +259,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 buffer, this.factionName, MAX_FACTION_NAME_BYTES);
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.partner, MAX_ACCOUNT_NAME_BYTES);
-        buffer.writeBoolean(this.operator);
+        buffer.writeByte(this.roles);
     }
 
     private void validate() {
@@ -279,6 +283,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || (ChatChannel.fromId(this.channelId) == ChatChannel.WHISPER
                         && this.partner.length() == 0)
                 || this.timestampMillis <= 0L
+                || this.roles < 0 || this.roles > 0xFF
+                || !ChatAccountRole.isValidMask(this.roles)
                 || this.showcases.size() > ChatShareTokenParser.MAX_TOKENS) {
             throw new IllegalArgumentException("invalid chat message");
         }
@@ -315,8 +321,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
     public String getFactionName() { return this.factionName; }
     /** For a whisper, the other party's account name; empty otherwise. */
     public String getPartner() { return this.partner; }
-    /** Whether the sender is a server operator, as the server states it. */
-    public boolean isOperator() { return this.operator; }
+    /** The sender's role mask, as the server states it; see {@link ChatAccountRole}. */
+    public int getRoles() { return this.roles; }
     /** Validated showcases keyed by token index; never null. */
     public List<ChatShowcase> getShowcases() { return this.showcases; }
     public boolean isMalformed() { return this.malformed; }

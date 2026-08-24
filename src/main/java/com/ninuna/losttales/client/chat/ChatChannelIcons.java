@@ -6,21 +6,26 @@ import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
+import com.ninuna.losttales.compat.lotr.LotrFactionBannerResolver;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
 
 /**
  * The icon each tab wears before its name — on its tab, in the restore
- * menu, wherever the name stands alone: an emote per channel, and for a
- * whisper with a player the partner's own head, exactly as their lines
- * show it, and for an NPC conversation the NPC's portrait as its speech
- * showed it. A whisper whose partner this client cannot place yet, or
- * an NPC whose portrait has not been seen, wears an emote. Purely
- * decorative: the catalogue names and ids are untouched.
+ * menu, wherever the name stands alone: an emote per channel, for the
+ * faction channel the LOTR banner of the active character's faction
+ * (the Stewards' banner when the faction has none), for a whisper with
+ * a player the partner's own head, exactly as their lines show it, and
+ * for an NPC conversation the NPC's portrait as its speech showed it. A
+ * whisper whose partner this client cannot place yet, an NPC whose
+ * portrait has not been seen, or a faction tab without LOTR's banner
+ * item wears an emote. Purely decorative: the catalogue names and ids
+ * are untouched.
  */
 final class ChatChannelIcons {
     /** Icons are drawn at the sheet's own sprite size, never scaled. */
@@ -73,7 +78,15 @@ final class ChatChannelIcons {
         }
         float inset = (SIZE - HEAD_SIZE) / 2.0F;
         int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
-        if (tab.isNpc()) {
+        if (tab.getChannel() == ChatChannel.FACTION) {
+            ItemStack banner = LotrFactionBannerResolver.bannerFor(
+                    ClientChatChannelState.activeFactionId());
+            if (banner != null) {
+                // The banner fills the icon box like a toolbar item does.
+                ChatInlineIcons.drawItem(minecraft, banner, x, y, SIZE, alpha);
+                return;
+            }
+        } else if (tab.isNpc()) {
             String portrait = npcPortrait(tab);
             if (portrait != null) {
                 if (shadow > 0) {

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
@@ -9,11 +10,14 @@ import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareReference;
 import com.ninuna.losttales.chat.share.ChatShareSuggester;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
+import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
+import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
@@ -41,6 +45,7 @@ import java.util.Map;
 import java.util.UUID;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.GuiChat;
+import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.gui.GuiConfirmOpenLink;
 import net.minecraft.client.gui.GuiNewChat;
 import net.minecraft.client.gui.GuiPlayerInfo;
@@ -86,12 +91,25 @@ public final class LostTalesChatGui extends GuiChat {
     private static final int INPUT_ANCHOR_BELOW_BAR = 14;
     /** Pointer travel before a press on a tab becomes a drag. */
     private static final int DRAG_THRESHOLD = 4;
+    /**
+     * Message lines one notch of the wheel moves. Short, because the
+     * view glides to the new offset rather than jumping to it: a long
+     * step would arrive before the eye could follow it. Shift still
+     * moves one line at a time.
+     */
+    private static final int WHEEL_LINES = 2;
     /** Vertical distance from a row beyond which a dropped tab detaches. */
     private static final int DETACH_DISTANCE = 14;
     /** Horizontal slack around a row that still counts as dropping on it. */
     private static final int DOCK_SLACK = 24;
     /** Distance from another window's edge at which a drag snaps and links. */
     private static final int LINK_SNAP = 6;
+    /** Height vanilla gives the chat's field, kept for the one we draw. */
+    private static final int FIELD_HEIGHT = 12;
+    /** How far outside its edge a window still answers to a resize. */
+    private static final int RESIZE_BORDER = 4;
+    /** How far along an edge from a corner still counts as that corner. */
+    private static final int RESIZE_CORNER = 12;
     /** The send arrow is the rightmost toolbar button. */
     private static final int SEND_BUTTON_INDEX = 0;
     /** The picker strip is one chat line tall, like the tabs' row body. */
@@ -146,6 +164,7 @@ public final class LostTalesChatGui extends GuiChat {
     private final ChatPopupMenu popup = new ChatPopupMenu();
     private TabDrag tabDrag;
     private WindowDrag windowDrag;
+    private WindowResize windowResize;
     /** Window a restore popup was opened from. */
     private String restoreWindowId;
     /**
@@ -169,6 +188,8 @@ public final class LostTalesChatGui extends GuiChat {
     private ChatChannel mentionChannel;
     private ChatTab lastSelected;
     private boolean openAnimationStarted;
+    /** The tab-strip control under the pointer as the windows were drawn. */
+    private ChatChannelTabBar.Hit hoveredRowHit;
 
     public LostTalesChatGui(String defaultText) {
         super(defaultText == null ? "" : defaultText);
@@ -178,6 +199,22 @@ public final class LostTalesChatGui extends GuiChat {
     public void initGui() {
         ClientChatChannelState.ensureAvailable();
         super.initGui();
+        // The chat draws its own text, shadow and all; vanilla's field
+        // would put a quarter-colour shadow under the one thing on the
+        // bar the player is looking at. Everything else about it —
+        // typing, history, the caret's own behaviour — stays vanilla's,
+        // and it takes over the state the field it replaces was given.
+        GuiTextField vanillaField = this.inputField;
+        ChatInputField styled = new ChatInputField(this.fontRendererObj,
+                vanillaField.xPosition, vanillaField.yPosition,
+                vanillaField.getWidth(), FIELD_HEIGHT);
+        styled.setEnableBackgroundDrawing(false);
+        styled.setCanLoseFocus(false);
+        styled.setFocused(true);
+        styled.setMaxStringLength(vanillaField.getMaxStringLength());
+        styled.setText(vanillaField.getText());
+        styled.setCursorPositionEnd();
+        this.inputField = styled;
         this.inputField.setTextColor(LostTalesChatVisualStyle.IVORY);
         this.inputField.setDisabledTextColour(
                 LostTalesChatVisualStyle.SHADOW);
@@ -575,9 +612,19 @@ public final class LostTalesChatGui extends GuiChat {
         if (shareSuggestions.isActive() && handleShareSuggestionKey(keyCode)) {
             return;
         }
-        if (keyCode == Keyboard.KEY_TAB
-                && this.inputField.getText().length() == 0) {
+        // Tab and the arrows walk the tabs of the window being typed
+        // in. All three need an empty field: with text in it the arrows
+        // belong to the caret, as they do in any text field.
+        if (this.inputField.getText().length() == 0
+                && (keyCode == Keyboard.KEY_TAB
+                        || keyCode == Keyboard.KEY_RIGHT)) {
             ClientChatChannelState.cycle();
+            syncSelection();
+            return;
+        }
+        if (this.inputField.getText().length() == 0
+                && keyCode == Keyboard.KEY_LEFT) {
+            ClientChatChannelState.cycleBack();
             syncSelection();
             return;
         }
@@ -612,6 +659,7 @@ public final class LostTalesChatGui extends GuiChat {
             return;
         }
         String text = this.inputField.getText().trim();
+        boolean command = text.length() > 0 && isServerCommand(text);
         if (text.length() > 0) {
             func_146403_a(text);
         }
@@ -620,11 +668,36 @@ public final class LostTalesChatGui extends GuiChat {
         ClientChatChannelState.setDraft("");
         resetSentHistoryCursor();
         stopTyping();
+        if (command) {
+            // Whatever the command answers is console output, so the
+            // console comes forward and takes the input before the
+            // answer arrives. Only once the field has been emptied:
+            // moving the selection swaps drafts between tabs, and the
+            // command that has just gone out is not one.
+            showConsole();
+        }
     }
 
     /** Whether the field holds a command rather than a message. */
     private boolean isCommand() {
         return this.inputField.getText().trim().startsWith("/");
+    }
+
+    /**
+     * Whether the text is a command the server will answer, rather than
+     * a message or one of the chat's own whisper verbs, which never
+     * reach the server as commands.
+     */
+    private static boolean isServerCommand(String text) {
+        return text.startsWith("/") && !isWhisperCommand(text);
+    }
+
+    /** {@code /msg}, {@code /tell} and {@code /w}, whatever follows. */
+    private static boolean isWhisperCommand(String text) {
+        String verb = text.trim().split("\\s+", 2)[0]
+                .toLowerCase(Locale.ROOT);
+        return "/msg".equals(verb) || "/tell".equals(verb)
+                || "/w".equals(verb);
     }
 
     /**
@@ -842,6 +915,20 @@ public final class LostTalesChatGui extends GuiChat {
         }
         boolean accountIdentity =
                 channel.getIdentityType() == ChatIdentityType.ACCOUNT;
+        // Roles stand above the players: addressing a whole group is
+        // never buried under a list of names. They are an account fact,
+        // so they are offered on the account channels alone.
+        if (accountIdentity) {
+            for (ChatAccountRole role : ChatAccountRole.mentionable()) {
+                String name = StatCollector.translateToLocal(
+                        role.getNameKey());
+                if (name.length() > 0 && !name.equals(role.getNameKey())) {
+                    result.add(ChatMentionCandidate.role(
+                            "role:" + role.name().toLowerCase(Locale.ROOT),
+                            name, role.getColor()));
+                }
+            }
+        }
         Map<String, CharacterAppearance> byAccount =
                 new HashMap<String, CharacterAppearance>();
         for (CharacterAppearance appearance
@@ -861,7 +948,8 @@ public final class LostTalesChatGui extends GuiChat {
         String selfCharacter = active == null ? "" : active.getName();
         UUID selfId = this.mc.thePlayer.getUniqueID();
         result.add(candidate(selfId == null ? "self" : selfId.toString(),
-                selfAccount, selfCharacter, accountIdentity));
+                selfAccount, selfCharacter, accountIdentity,
+                selfId == null ? "" : selfId.toString()));
 
         List<ChatMentionCandidate> others =
                 new ArrayList<ChatMentionCandidate>();
@@ -884,7 +972,8 @@ public final class LostTalesChatGui extends GuiChat {
                         : appearance.getPlayerId().toString();
                 others.add(candidate(key, account, appearance == null
                         ? "" : appearance.getCharacterName(),
-                        accountIdentity));
+                        accountIdentity, appearance == null ? ""
+                                : appearance.getPlayerId().toString()));
             }
         }
         Collections.sort(others, new Comparator<ChatMentionCandidate>() {
@@ -901,11 +990,11 @@ public final class LostTalesChatGui extends GuiChat {
 
     private static ChatMentionCandidate candidate(
             String key, String account, String character,
-            boolean accountIdentity) {
+            boolean accountIdentity, String accountId) {
         String display = accountIdentity || character == null
                 || character.trim().length() == 0 ? account : character;
-        return new ChatMentionCandidate(key, display, account, character,
-                Arrays.asList(account, character));
+        return ChatMentionCandidate.player(key, display, account, character,
+                accountId, Arrays.asList(account, character));
     }
 
     private static boolean sameCandidates(List<ChatMentionCandidate> left,
@@ -968,8 +1057,8 @@ public final class LostTalesChatGui extends GuiChat {
             if (sendWhisperCommand(message)) {
                 return;
             }
-            // The command's output brings the console tab to the front
-            // in its own window when it arrives; the input stays here.
+            // The console is brought forward by whatever asked for the
+            // send, once it has emptied the field.
             super.func_146403_a(message);
             return;
         }
@@ -983,8 +1072,11 @@ public final class LostTalesChatGui extends GuiChat {
         this.mc.ingameGUI.getChatGUI().addToSentMessages(message);
         if (tab.isNpc()) {
             // Nobody is on the other end of an NPC's conversation: the
-            // line is shown here as if whispered, and that is all.
-            LostTalesChatPresentation.echoToNpc(tab, message);
+            // line is shown here as if whispered, and that is all. What
+            // the player shared is resolved here too, since no server
+            // will do it for them.
+            LostTalesChatPresentation.echoToNpc(tab, message,
+                    resolveLocalShowcases(message));
             return;
         }
         if (LostTalesConfig.enableChatEmojis) {
@@ -1001,17 +1093,40 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
+     * Brings the console forward and puts the input in it: its window
+     * comes to the front, the console becomes that window's front tab,
+     * and the selection follows. A console the player has closed is
+     * reopened first. Purely local presentation — the command itself has
+     * already gone to the server, and nothing here depends on the
+     * answer, so it behaves the same in single player and on a server.
+     */
+    private void showConsole() {
+        ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
+        if (!ClientChatChannelState.isAvailable(console)) {
+            return;
+        }
+        if (!ChatWindowLayout.isOpen(console)
+                && !ChatWindowLayout.restore(ChatChannel.CONSOLE)) {
+            return;
+        }
+        ChatWindow window = ChatWindowLayout.windowOf(console);
+        if (window != null) {
+            ChatWindowLayout.raise(window.getId());
+        }
+        ChatWindowLayout.setActiveTab(console);
+        selectChannel(console);
+    }
+
+    /**
      * {@code /msg}, {@code /tell} and {@code /w} are the chat's own: the
      * name opens (and selects) that whisper tab, and any text after it is
      * sent there as a whisper rather than as a vanilla command.
      */
     private boolean sendWhisperCommand(String command) {
-        String[] parts = command.trim().split("\\s+", 3);
-        String verb = parts[0].toLowerCase(Locale.ROOT);
-        if (!"/msg".equals(verb) && !"/tell".equals(verb)
-                && !"/w".equals(verb)) {
+        if (!isWhisperCommand(command)) {
             return false;
         }
+        String[] parts = command.trim().split("\\s+", 3);
         if (parts.length < 2 || parts[1].length() == 0) {
             showNotice(StatCollector.translateToLocal(
                     "gui.losttales.chat.whisper.name_required"));
@@ -1064,6 +1179,63 @@ public final class LostTalesChatGui extends GuiChat {
      * with that name, scanning in the same order the pickers list them.
      * Only slot indices and ids leave the client.
      */
+    /**
+     * The things a message shares, resolved from this client alone: the
+     * stack in the slot the token names and the marker the token names,
+     * both checked against the typed name exactly as the server checks
+     * them. Only an NPC conversation uses these — every other channel is
+     * the server's to validate.
+     */
+    private List<ChatShowcase> resolveLocalShowcases(String message) {
+        List<ChatShareTokenParser.Token> tokens =
+                ChatShareTokenParser.parse(message);
+        if (tokens.isEmpty() || this.mc.thePlayer == null) {
+            return null;
+        }
+        List<ChatShareCandidates.ItemEntry> items =
+                ChatShareCandidates.items(this.mc.thePlayer);
+        List<ChatShareCandidates.MarkerEntry> markers =
+                ChatShareCandidates.markers();
+        List<ChatShowcase> showcases = new ArrayList<ChatShowcase>();
+        int index = 0;
+        for (ChatShareTokenParser.Token token : tokens) {
+            if (index >= ChatShareTokenParser.MAX_TOKENS) {
+                break;
+            }
+            if (token.kind == ChatShareKind.ITEM) {
+                for (ChatShareCandidates.ItemEntry entry : items) {
+                    if (!entry.matchesToken(token)) {
+                        continue;
+                    }
+                    byte[] encoded = ChatShowcase.encodeStack(
+                            entry.stack.copy());
+                    if (encoded != null) {
+                        showcases.add(ChatShowcase.item(index, encoded));
+                    }
+                    break;
+                }
+            } else {
+                for (ChatShareCandidates.MarkerEntry entry : markers) {
+                    if (!entry.matchesToken(token)) {
+                        continue;
+                    }
+                    LostTalesMapMarkerData marker = entry.marker;
+                    ChatShowcase showcase = ChatShowcase.marker(index,
+                            marker.getId(), marker.getName(),
+                            marker.getIconName(), marker.getColorName(),
+                            marker.getDimensionId(), marker.getX(),
+                            marker.getZ());
+                    if (showcase != null) {
+                        showcases.add(showcase);
+                    }
+                    break;
+                }
+            }
+            index++;
+        }
+        return showcases.isEmpty() ? null : showcases;
+    }
+
     private List<ChatShareReference> resolveShareReferences(String message) {
         List<ChatShareTokenParser.Token> tokens =
                 ChatShareTokenParser.parse(message);
@@ -1126,7 +1298,7 @@ public final class LostTalesChatGui extends GuiChat {
         // in the window under the pointer (the main one elsewhere).
         int step = wheel > 0 ? 1 : -1;
         if (!isShiftKeyDown()) {
-            step *= 7;
+            step *= WHEEL_LINES;
         }
         int mouseX = Mouse.getEventX() * this.width / this.mc.displayWidth;
         int mouseY = this.height - Mouse.getEventY() * this.height
@@ -1138,11 +1310,13 @@ public final class LostTalesChatGui extends GuiChat {
         if (frame == null || frame.view == null) {
             return;
         }
-        GuiNewChat chat = this.mc.ingameGUI.getChatGUI();
         List<ChatLine> lines = frame.lines;
+        // A page is the window's own message room, fractions of a line
+        // included, so scrolling to either end lands on a whole message.
         ClientChatChannelViews.scroll(frame.view, step,
                 lines == null ? 0 : lines.size(),
-                LostTalesChatOverlayRenderer.visibleLineCount(chat));
+                frame.room / (double)(LostTalesChatOverlayRenderer.LINE_HEIGHT
+                        * frame.scale));
     }
 
     /** The frontmost drawn window under a screen point, or null. */
@@ -1221,9 +1395,9 @@ public final class LostTalesChatGui extends GuiChat {
             }
             if (LostTalesConfig.enableChatPings) {
                 refreshNameSuggestions();
-                nameSuggestions.draw(this.fontRendererObj, this.regions,
-                        anchor, this.inputField.xPosition, mouseX,
-                        adjustedMouseY);
+                nameSuggestions.draw(this.mc, this.fontRendererObj,
+                        this.regions, anchor, this.inputField.xPosition,
+                        mouseX, adjustedMouseY);
             }
             refreshShareSuggestions();
             shareSuggestions.draw(this.mc, this.fontRendererObj,
@@ -1258,6 +1432,10 @@ public final class LostTalesChatGui extends GuiChat {
         } else if (hoverTip.length() > 0 && !this.popup.isOpen()) {
             drawHoverTip();
         }
+        updatePointerFeedback(mouseX, mouseY);
+        // Last of everything the chat draws: the edge being dragged is
+        // never covered by the window it belongs to.
+        drawResizePreview();
     }
 
     private static ChatWindowFrame frameFor(ChatWindow window) {
@@ -1282,6 +1460,7 @@ public final class LostTalesChatGui extends GuiChat {
         List<ChatWindow> windows = ChatWindowLayout.stacked();
         ChatChannelTabBar.Hit hoveredHit = null;
         ChatWindow hoveredWindow = null;
+        boolean hoveredGrip = false;
         for (int index = 0; index < windows.size(); index++) {
             ChatWindow window = windows.get(index);
             LostTalesChatOverlayRenderer.drawWindowForScreen(this.mc, window,
@@ -1309,6 +1488,10 @@ public final class LostTalesChatGui extends GuiChat {
             if (hit != null) {
                 hoveredHit = hit;
                 hoveredWindow = window;
+                // Only the grip's own glyph offers the move tip; the
+                // bare strip beside it drags without saying so.
+                hoveredGrip = frame.tabBar.isOverGripHandle(
+                        this.fontRendererObj, row, mouseX, mouseY);
             }
             if (frame != active) {
                 drawInactiveBar(window, frame, entrance);
@@ -1317,11 +1500,55 @@ public final class LostTalesChatGui extends GuiChat {
             LostTalesChatOverlayRenderer.drawBottomRule(this.mc, frame,
                     opening);
         }
+        this.hoveredRowHit = hoveredHit;
         if (hoveredHit != null && !isDragging()) {
-            this.hoverTip = tipFor(hoveredHit, hoveredWindow);
+            this.hoverTip = tipFor(hoveredHit, hoveredWindow, hoveredGrip);
             this.hoverTipX = mouseX;
             this.hoverTipY = mouseY;
         }
+    }
+
+    /**
+     * The pointer says what a press would do. Asked once the whole chat
+     * has been drawn, so it reads the same complete set of regions
+     * {@link #mouseClicked} does and cannot promise something a press
+     * would not start. A resize in progress keeps saying so wherever the
+     * pointer has gone, the way a pressed control keeps its look.
+     */
+    private void updatePointerFeedback(int mouseX, int mouseY) {
+        WindowResize resizing = this.windowResize;
+        if (resizing != null) {
+            LostTalesMapCursor.requestPose(cursorPose(resizing.edge));
+            return;
+        }
+        if (isDragging()) {
+            return;
+        }
+        ResizeTarget target = resizeUnderPointer(mouseX, mouseY);
+        if (target != null) {
+            LostTalesMapCursor.requestPose(cursorPose(target.edge));
+        } else if (isOverInteractable(mouseX, mouseY, this.hoveredRowHit)) {
+            // The chat's own controls are drawn, not vanilla widgets, so
+            // it says for itself what answers to a click.
+            LostTalesMapCursor.requestPose(LostTalesMapCursor.Pose.HAND);
+        }
+    }
+
+    /**
+     * The window edge a press at this point would take hold of, or null.
+     * One classification, in one order: what is drawn above the windows
+     * — the pickers, the completion lists, the settings menu, the input
+     * bar group — owns the pointer first; the resize border comes next,
+     * ahead of the tab strip it overlaps along the window's top edge;
+     * the strip and the windows themselves come last. Hover, the cursor,
+     * mouse-down and the drag it starts all ask this same question, so
+     * what the pointer shows is what the press does.
+     */
+    private ResizeTarget resizeUnderPointer(int mouseX, int mouseY) {
+        if (this.regions.containsOverlay(mouseX, mouseY)) {
+            return null;
+        }
+        return resizeTargetAt(mouseX, mouseY);
     }
 
     /**
@@ -1344,11 +1571,14 @@ public final class LostTalesChatGui extends GuiChat {
         // Whole-pixel geometry of the drawn (motion included) position;
         // the fractional remainder is applied when the row is drawn.
         row.rowBottom = (int)Math.floor(frame.tabRowBottom());
+        row.rowBottomExact = frame.tabRowBottom();
         row.left = (int)Math.floor(frame.drawnLeft()) + 2;
         row.right = (int)Math.floor(frame.drawnLeft()) + (int)Math.round(
                 frame.boxRight - frame.boxLeft) - 2;
         row.offsetX = 0;
         row.locked = window.isLocked();
+        row.moving = this.windowDrag != null && this.windowDrag.active
+                && window.getId().equals(this.windowDrag.windowId);
         // The last tab the player could see offers no cross: the close
         // itself is refused anyway, so the control would only mislead.
         row.closable = ClientChatChannelState.isClosable(row.selected);
@@ -1379,9 +1609,16 @@ public final class LostTalesChatGui extends GuiChat {
         return result;
     }
 
+    /**
+     * The label a hovered row control offers. A tab names itself in
+     * full, whatever the row had room to draw; the grip speaks only for
+     * its own glyph, so the empty strip that also drags stays silent.
+     */
     private static String tipFor(ChatChannelTabBar.Hit hit,
-                                 ChatWindow window) {
+                                 ChatWindow window, boolean overGrip) {
         switch (hit.kind) {
+            case TAB:
+                return ClientChatChannelState.displayName(hit.tab);
             case CLOSE:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.tab.close");
@@ -1404,8 +1641,8 @@ public final class LostTalesChatGui extends GuiChat {
                         : StatCollector.translateToLocal(
                                 "gui.losttales.chat.tab.restore");
             case GRIP:
-                return StatCollector.translateToLocal(
-                        "gui.losttales.chat.tab.move");
+                return overGrip ? StatCollector.translateToLocal(
+                        "gui.losttales.chat.tab.move") : "";
             default:
                 return "";
         }
@@ -1477,7 +1714,7 @@ public final class LostTalesChatGui extends GuiChat {
         } finally {
             GL11.glPopMatrix();
         }
-        this.regions.addScreen(x, y + Math.round(entrance), x + width,
+        this.regions.addWindow(x, y + Math.round(entrance), x + width,
                 y + Math.round(entrance) + ChatWindowPlacement.INPUT_HEIGHT);
     }
 
@@ -1705,7 +1942,19 @@ public final class LostTalesChatGui extends GuiChat {
             return;
         }
         // Pickers and completion lists paint above the tab rows, so they
-        // are asked first; the rows come before everything beneath them.
+        // are asked first. The resize border comes next: it overlaps the
+        // tab strip along the window's top edge, and the pointer shows a
+        // resize there, so a press there must resize.
+        if (button == 0) {
+            ResizeTarget edge = resizeUnderPointer(mouseX, mouseY);
+            ChatWindow edgeWindow = edge == null ? null
+                    : ChatWindowLayout.window(edge.frame.windowId);
+            if (edgeWindow != null) {
+                this.windowResize = resizeFrom(edge, edgeWindow,
+                        mouseX, mouseY);
+                return;
+            }
+        }
         if (button == 0 && handleRowClick(mouseX, mouseY)) {
             return;
         }
@@ -1766,14 +2015,14 @@ public final class LostTalesChatGui extends GuiChat {
             ChatWindowFrame frame = frameAt(mouseX, mouseY);
             ChatWindow window = frame == null ? null
                     : ChatWindowLayout.window(frame.windowId);
-            if (window != null && !window.isLocked()
-                    && mouseY < frame.barTop()) {
-                // A press on the messages arms a drag of the window; the
-                // click it would have been is delivered on release if the
-                // pointer has not moved.
-                this.windowDrag = windowDragFrom(frame, mouseX, mouseY,
-                        false);
-                return;
+            // Typing follows the pointer: a press anywhere in a window —
+            // its messages, its strip, its bar — moves the input there,
+            // the way clicking a window focuses it anywhere else. The
+            // messages themselves do not move the window: only its strip
+            // and its grip do, so a click on a line stays a click.
+            if (window != null) {
+                ChatWindowLayout.raise(window.getId());
+                selectWindow(window);
             }
         }
         clickLines(mouseX, mouseY, adjustedMouseY, button);
@@ -1791,6 +2040,23 @@ public final class LostTalesChatGui extends GuiChat {
         // testing, which no longer matches the 11px layout; only the input
         // field still needs the vanilla click path.
         this.inputField.mouseClicked(mouseX, adjustedMouseY, button);
+    }
+
+    /**
+     * Moves the input to a window: its front tab becomes the selected
+     * one, so what is typed goes where the player just clicked. Does
+     * nothing for the window that already has it.
+     */
+    private void selectWindow(ChatWindow window) {
+        if (window == null) {
+            return;
+        }
+        ChatTab front = ChatWindowFrame.activeTab(window,
+                ChatWindowFrame.visibleTabs(window));
+        if (front != null && !front.equals(
+                ClientChatChannelState.getSelected())) {
+            selectChannel(front);
+        }
     }
 
     private void selectChannel(ChatChannel channel) {
@@ -1845,12 +2111,10 @@ public final class LostTalesChatGui extends GuiChat {
         final int pressX;
         final int pressY;
         boolean active;
-        /** Whether the drag has already broken the window's old link. */
-        boolean unlinked;
         /** Window whose edge the drag is snapped to right now, or null. */
         String snapTargetId;
-        /** Whether the dragged window sits above that target. */
-        boolean snapAbove;
+        /** Which side of that target the dragged window sits on. */
+        ChatWindow.LinkSide snapSide = ChatWindow.LinkSide.BELOW;
 
         WindowDrag(String windowId, double grabOffsetX, double grabOffsetY,
                    int pressX, int pressY, boolean active) {
@@ -1863,13 +2127,398 @@ public final class LostTalesChatGui extends GuiChat {
         }
     }
 
+    /**
+     * The edge or corner of a window the pointer is on. A window is
+     * resized the way any window is: the edges the drag does not touch
+     * stay exactly where they are, so the opposite edge is the anchor.
+     */
+    enum ResizeEdge {
+        LEFT(true, false, true, false),
+        RIGHT(true, false, false, false),
+        TOP(false, true, false, true),
+        BOTTOM(false, true, false, false),
+        TOP_LEFT(true, true, true, true),
+        TOP_RIGHT(true, true, false, true),
+        BOTTOM_LEFT(true, true, true, false),
+        BOTTOM_RIGHT(true, true, false, false);
+
+        /** Which sizes this edge carries. */
+        final boolean horizontal;
+        final boolean vertical;
+        /** Which side follows the pointer; the other side is the anchor. */
+        final boolean fromLeft;
+        final boolean fromTop;
+
+        ResizeEdge(boolean horizontal, boolean vertical, boolean fromLeft,
+                   boolean fromTop) {
+            this.horizontal = horizontal;
+            this.vertical = vertical;
+            this.fromLeft = fromLeft;
+            this.fromTop = fromTop;
+        }
+
+        boolean isCorner() {
+            return this.horizontal && this.vertical;
+        }
+    }
+
+    /**
+     * A window being resized by one of its edges or corners. The window
+     * keeps its anchors — the edges the drag does not touch — and only
+     * an outline follows the pointer: the size is applied on release,
+     * once, because a width change lays the whole history out again.
+     */
+    private static final class WindowResize {
+        final String windowId;
+        final ResizeEdge edge;
+        /** The box the drag started from, in screen pixels. */
+        final double startLeft;
+        final double startRight;
+        final double startTop;
+        final double startBottom;
+        /** Pointer's offset from the edge it took hold of. */
+        final double grabX;
+        final double grabY;
+        final int pressX;
+        final int pressY;
+        boolean active;
+        /** The box under the pointer right now. */
+        double left;
+        double right;
+        double top;
+        double bottom;
+        /** Message lines the box asks for, fractions included. */
+        double lines;
+
+        WindowResize(String windowId, ResizeEdge edge, double left,
+                     double right, double top, double bottom, double grabX,
+                     double grabY, int pressX, int pressY, double lines) {
+            this.windowId = windowId;
+            this.edge = edge;
+            this.startLeft = left;
+            this.startRight = right;
+            this.startTop = top;
+            this.startBottom = bottom;
+            this.left = left;
+            this.right = right;
+            this.top = top;
+            this.bottom = bottom;
+            this.grabX = grabX;
+            this.grabY = grabY;
+            this.pressX = pressX;
+            this.pressY = pressY;
+            this.lines = lines;
+        }
+    }
+
+    /** A window and the edge of it the pointer is on. */
+    private static final class ResizeTarget {
+        final ChatWindowFrame frame;
+        final ResizeEdge edge;
+
+        ResizeTarget(ChatWindowFrame frame, ResizeEdge edge) {
+            this.frame = frame;
+            this.edge = edge;
+        }
+    }
+
+    /**
+     * The edge of an unlocked window under the pointer, or null. The
+     * band lies just outside the window, where nothing is drawn, so a
+     * tab, a control or the input field never loses a click to it; the
+     * frontmost window wins where two overlap.
+     */
+    private static ResizeTarget resizeTargetAt(int mouseX, int mouseY) {
+        List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
+        for (int index = frames.size() - 1; index >= 0; index--) {
+            ChatWindowFrame frame = frames.get(index);
+            if (coversPoint(frame, mouseX, mouseY)) {
+                // The window in front owns everything inside it, so a
+                // window behind it never takes a click through it.
+                return null;
+            }
+            ChatWindow window = ChatWindowLayout.window(frame.windowId);
+            if (window == null || window.isLocked()) {
+                continue;
+            }
+            ResizeEdge edge = edgeAt(frame, mouseX, mouseY);
+            if (edge != null) {
+                return new ResizeTarget(frame, edge);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether the point lies within the window as it was drawn — its
+     * strip, its messages and its bar — rather than on the border
+     * outside it.
+     */
+    private static boolean coversPoint(ChatWindowFrame frame, int mouseX,
+                                       int mouseY) {
+        double left = frame.drawnLeft();
+        double right = left + (frame.boxRight - frame.boxLeft);
+        double top = frame.boxTop + frame.motionY;
+        double bottom = frame.boxBottom + frame.motionY;
+        return mouseX > left && mouseX < right
+                && mouseY > top && mouseY < bottom;
+    }
+
+    /** Which edge or corner of one window's box a point lies on. */
+    private static ResizeEdge edgeAt(ChatWindowFrame frame, int mouseX,
+                                     int mouseY) {
+        double left = frame.drawnLeft();
+        double right = left + (frame.boxRight - frame.boxLeft);
+        double top = frame.boxTop + frame.motionY;
+        double bottom = frame.boxBottom + frame.motionY;
+        if (mouseX < left - RESIZE_BORDER || mouseX > right + RESIZE_BORDER
+                || mouseY < top - RESIZE_BORDER
+                || mouseY > bottom + RESIZE_BORDER) {
+            return null;
+        }
+        boolean onLeft = mouseX <= left;
+        boolean onRight = mouseX >= right;
+        boolean onTop = mouseY <= top;
+        boolean onBottom = mouseY >= bottom;
+        if (!onLeft && !onRight && !onTop && !onBottom) {
+            // Inside the window: its tabs, messages and bar own this.
+            return null;
+        }
+        // A corner reaches a little way along both of its edges, so it
+        // is as easy to catch as it is in any window manager.
+        boolean nearLeft = mouseX <= left + RESIZE_CORNER;
+        boolean nearRight = mouseX >= right - RESIZE_CORNER;
+        boolean nearTop = mouseY <= top + RESIZE_CORNER;
+        boolean nearBottom = mouseY >= bottom - RESIZE_CORNER;
+        if ((onTop || onLeft) && nearTop && nearLeft) {
+            return ResizeEdge.TOP_LEFT;
+        }
+        if ((onTop || onRight) && nearTop && nearRight) {
+            return ResizeEdge.TOP_RIGHT;
+        }
+        if ((onBottom || onLeft) && nearBottom && nearLeft) {
+            return ResizeEdge.BOTTOM_LEFT;
+        }
+        if ((onBottom || onRight) && nearBottom && nearRight) {
+            return ResizeEdge.BOTTOM_RIGHT;
+        }
+        if (onLeft) {
+            return ResizeEdge.LEFT;
+        }
+        if (onRight) {
+            return ResizeEdge.RIGHT;
+        }
+        return onTop ? ResizeEdge.TOP : ResizeEdge.BOTTOM;
+    }
+
+    /**
+     * Whether the point is on something the chat answers to: a tab or
+     * one of its controls, the lock, the restore control, the grip, the
+     * channel indicator, the send arrow, a picker button or an open
+     * overlay of one. The input bar's own field is not a control — a
+     * caret belongs there — but everything the player clicks is.
+     */
+    private boolean isOverInteractable(int mouseX, int mouseY,
+                                       ChatChannelTabBar.Hit hovered) {
+        if (hovered != null) {
+            return true;
+        }
+        if (this.regions.contains(mouseX, mouseY)) {
+            return true;
+        }
+        int barRight = inputBarRight();
+        if (isInsideIndicator(mouseX, mouseY)
+                || isInsideSendButton(mouseX, mouseY, barRight)) {
+            return true;
+        }
+        int pickerRight = pickerRight(barRight);
+        int toolbar = toolbarAnchor();
+        for (ChatPickerPanel picker : this.pickers) {
+            if (picker.isInsideButton(mouseX, mouseY, pickerRight,
+                    toolbar)) {
+                return true;
+            }
+        }
+        if (isInsideToolbarToggle(mouseX, mouseY, barRight)) {
+            return true;
+        }
+        // A window that is not the one being typed in answers to a
+        // click by becoming it, so the pointer says so over all of it.
+        ChatWindowFrame frame = frameAt(mouseX, mouseY);
+        if (frame == null) {
+            return false;
+        }
+        ChatWindow window = ChatWindowLayout.window(frame.windowId);
+        ChatTab front = window == null ? null
+                : ChatWindowFrame.activeTab(window,
+                        ChatWindowFrame.visibleTabs(window));
+        return front != null
+                && !front.equals(ClientChatChannelState.getSelected());
+    }
+
+    /** The pointer an edge is shown with: across it, or along its corner. */
+    private static LostTalesMapCursor.Pose cursorPose(ResizeEdge edge) {
+        switch (edge) {
+            case LEFT:
+            case RIGHT:
+                return LostTalesMapCursor.Pose.RESIZE_HORIZONTAL;
+            case TOP:
+            case BOTTOM:
+                return LostTalesMapCursor.Pose.RESIZE_VERTICAL;
+            case TOP_RIGHT:
+            case BOTTOM_LEFT:
+                // The sheet's diagonal runs bottom-left to top-right.
+                return LostTalesMapCursor.Pose.RESIZE_DIAGONAL;
+            default:
+                return LostTalesMapCursor.Pose.RESIZE_ANTI_DIAGONAL;
+        }
+    }
+
+    /**
+     * The outline of the size the pointer is asking for, in the chat's
+     * own ivory. Drawn last of everything the chat puts on screen, so no
+     * part of the window it belongs to — its bar least of all — covers
+     * the edge the player is dragging.
+     */
+    private void drawResizePreview() {
+        WindowResize resize = this.windowResize;
+        if (resize == null) {
+            return;
+        }
+        // Shown from the press, so the size the window would take is
+        // there before the pointer has travelled anywhere.
+        int left = (int)Math.round(resize.left);
+        int right = (int)Math.round(resize.right);
+        int top = (int)Math.round(resize.top);
+        int bottom = (int)Math.round(resize.bottom);
+        int color = LostTalesChatVisualStyle.argb(
+                LostTalesChatVisualStyle.IVORY, 0xC0);
+        drawRect(left, top, right, top + 1, color);
+        drawRect(left, bottom - 1, right, bottom, color);
+        drawRect(left, top, left + 1, bottom, color);
+        drawRect(right - 1, top, right, bottom, color);
+    }
+
+    /** Arms a resize from the pointer's position on an edge. */
+    private WindowResize resizeFrom(ResizeTarget target, ChatWindow window,
+                                    int mouseX, int mouseY) {
+        ChatWindowFrame frame = target.frame;
+        ChatWindowLayout.raise(frame.windowId);
+        selectWindow(window);
+        double left = frame.drawnLeft();
+        double right = left + (frame.boxRight - frame.boxLeft);
+        double top = frame.boxTop + frame.motionY;
+        double bottom = frame.boxBottom + frame.motionY;
+        double pointerX = ChatWindowPlacement.preciseMouseX(this.mc, this.width);
+        double pointerY = ChatWindowPlacement.preciseMouseY(this.mc, this.height);
+        return new WindowResize(frame.windowId, target.edge, left, right, top,
+                bottom,
+                pointerX - (target.edge.fromLeft ? left : right),
+                pointerY - (target.edge.fromTop ? top : bottom),
+                mouseX, mouseY,
+                ChatWindowPlacement.currentLines(window, this.mc));
+    }
+
+    /**
+     * Follows the pointer with the outline: the edges the drag holds
+     * move, the opposite ones stay, and neither size may leave the
+     * screen or fall below what a window needs to be readable. Height is
+     * as continuous as width — the window keeps the pixel height it is
+     * dragged to and clips its topmost line rather than snapping to a
+     * whole one.
+     */
+    private void updateResize(int mouseX, int mouseY) {
+        WindowResize resize = this.windowResize;
+        ChatWindow window = ChatWindowLayout.window(resize.windowId);
+        if (window == null || window.isLocked()) {
+            this.windowResize = null;
+            return;
+        }
+        int margin = HudPlacementLayout.SCREEN_MARGIN;
+        double minWidth = ChatWindowPlacement.minBoxWidth(this.mc);
+        double pointerX = ChatWindowPlacement.preciseMouseX(this.mc, this.width)
+                - resize.grabX;
+        double pointerY = ChatWindowPlacement.preciseMouseY(this.mc, this.height)
+                - resize.grabY;
+        resize.left = resize.startLeft;
+        resize.right = resize.startRight;
+        if (resize.edge.horizontal) {
+            // The margin bounds a window's width exactly as it bounds
+            // its position: it may reach the margin and go no further.
+            if (resize.edge.fromLeft) {
+                resize.left = Math.max(margin, Math.min(
+                        resize.startRight - minWidth, pointerX));
+            } else {
+                resize.right = Math.min(this.width - margin, Math.max(
+                        resize.startLeft + minWidth, pointerX));
+            }
+        }
+        resize.lines = ChatWindowPlacement.currentLines(window, this.mc);
+        resize.top = resize.startTop;
+        resize.bottom = resize.startBottom;
+        if (resize.edge.vertical) {
+            // The margin bounds the height the way it bounds the width.
+            double room = resize.edge.fromTop
+                    ? resize.startBottom - margin
+                    : this.height - margin - resize.startTop;
+            double height = Math.min(room, resize.edge.fromTop
+                    ? resize.startBottom - pointerY
+                    : pointerY - resize.startTop);
+            resize.lines = Math.max(ChatWindowLayout.MIN_WINDOW_LINES,
+                    Math.min(ChatWindowLayout.MAX_WINDOW_LINES,
+                            ChatWindowPlacement.linesForHeight(height,
+                                    this.mc)));
+            int applied = ChatWindowPlacement.heightForLines(resize.lines,
+                    this.mc);
+            if (resize.edge.fromTop) {
+                resize.top = resize.startBottom - applied;
+            } else {
+                resize.bottom = resize.startTop + applied;
+            }
+        }
+    }
+
+    /** Gives the window the size the outline shows and writes it down. */
+    private void applyResize(WindowResize resize) {
+        ChatWindow window = ChatWindowLayout.window(resize.windowId);
+        if (window == null) {
+            return;
+        }
+        if (resize.edge.vertical) {
+            ChatWindowLayout.setWindowLines(resize.windowId, resize.lines,
+                    true);
+        }
+        // The width goes first: a window's stored position is a percent
+        // of the travel its own width leaves, so the percent has to be
+        // worked out against the width the window is about to have.
+        if (resize.edge.horizontal) {
+            ChatWindowPlacement.applyWindowWidth(this.mc, window,
+                    ChatWindowPlacement.chatWidthForBox(
+                            resize.right - resize.left, this.mc));
+        }
+        // The window keeps the corner the drag did not hold: its left
+        // edge and its baseline are what the layout stores, so a drag
+        // from the left or the bottom moves them by exactly as much as
+        // the box grew.
+        double baseline = resize.bottom
+                - ChatWindowPlacement.barHeight(this.mc);
+        ChatWindowLayout.setPosition(resize.windowId,
+                ChatWindowPlacement.windowPercentX(window, resize.left,
+                        this.mc, this.width),
+                ChatWindowPlacement.windowPercentY(baseline, this.mc,
+                        this.height), true);
+        updateInputBounds();
+    }
+
     private boolean isDragging() {
         return (this.tabDrag != null && this.tabDrag.active)
-                || (this.windowDrag != null && this.windowDrag.active);
+                || (this.windowDrag != null && this.windowDrag.active)
+                || (this.windowResize != null && this.windowResize.active);
     }
 
     private void cancelDrags() {
         this.tabDrag = null;
+        this.windowResize = null;
         if (this.windowDrag != null) {
             if (this.windowDrag.active) {
                 ChatWindowLayout.persist();
@@ -1945,6 +2594,7 @@ public final class LostTalesChatGui extends GuiChat {
                         && mouseX >= frame.boxLeft
                         && mouseX < frame.boxRight) {
                     // The strip itself belongs to the window, and moves it.
+                    selectWindow(window);
                     if (!window.isLocked()) {
                         this.windowDrag = windowDragFrom(frame, mouseX,
                                 mouseY, true);
@@ -1953,6 +2603,9 @@ public final class LostTalesChatGui extends GuiChat {
                 }
                 continue;
             }
+            // Anything on a window's strip is a click on that window,
+            // so the input moves there whichever control was pressed.
+            selectWindow(window);
             switch (hit.kind) {
                 case TAB:
                     selectChannel(hit.tab);
@@ -1977,8 +2630,7 @@ public final class LostTalesChatGui extends GuiChat {
                             ChatChannelTabBar.rowTop(row.rowBottom) - 2);
                     return true;
                 case LOCK:
-                    ChatWindowLayout.setLocked(window.getId(),
-                            !window.isLocked());
+                    setWindowLocked(window, !window.isLocked());
                     return true;
                 case RESTORE:
                     this.restoreWindowId = window.getId();
@@ -1996,6 +2648,92 @@ public final class LostTalesChatGui extends GuiChat {
             }
         }
         return false;
+    }
+
+    /**
+     * Locks or unlocks a window, and with it whether it is stuck to a
+     * neighbour: a window locked while it touches another sticks to it
+     * and moves with it from then on, and unlocking lets go again. The
+     * locked window is the one that follows, since a locked window is
+     * the one that cannot be dragged.
+     */
+    private void setWindowLocked(ChatWindow window, boolean locked) {
+        if (window == null) {
+            return;
+        }
+        ChatWindowLayout.setLocked(window.getId(), locked);
+        if (!locked) {
+            ChatWindowLayout.unlink(window.getId());
+            return;
+        }
+        ChatWindowFrame frame = ChatWindowFrame.find(window.getId());
+        if (frame == null || !frame.drawn) {
+            return;
+        }
+        ChatWindow neighbour = touchingWindow(window, frame);
+        if (neighbour != null
+                // The window it touches may already be stuck to this one;
+                // two windows never hold each other.
+                && !window.getId().equals(neighbour.getLinkTarget())) {
+            ChatWindowLayout.link(window.getId(), neighbour.getId(),
+                    touchingSide(frame, neighbour));
+        }
+    }
+
+    /** The window this one is resting against, or null. */
+    private ChatWindow touchingWindow(ChatWindow window,
+                                      ChatWindowFrame frame) {
+        List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
+        for (int index = 0; index < frames.size(); index++) {
+            ChatWindowFrame other = frames.get(index);
+            if (other == frame) {
+                continue;
+            }
+            ChatWindow candidate = ChatWindowLayout.window(other.windowId);
+            if (candidate != null && touchingSide(frame, candidate) != null) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Which of a neighbour's edges this window is resting against, or
+     * null when it is against none of them. The same margin a snap uses,
+     * so a window that showed the touch highlight is one that sticks.
+     */
+    private ChatWindow.LinkSide touchingSide(ChatWindowFrame frame,
+                                             ChatWindow neighbour) {
+        ChatWindowFrame other = ChatWindowFrame.find(neighbour.getId());
+        if (other == null || !other.drawn) {
+            return null;
+        }
+        int margin = HudPlacementLayout.SCREEN_MARGIN;
+        boolean overlapsColumn = frame.boxLeft < other.boxRight + margin
+                && frame.boxRight + margin > other.boxLeft;
+        boolean overlapsRow = frame.boxTop < other.boxBottom + margin
+                && frame.boxBottom + margin > other.boxTop;
+        if (overlapsColumn) {
+            if (Math.abs(other.boxTop - margin - frame.boxBottom)
+                    <= LINK_SNAP) {
+                return ChatWindow.LinkSide.ABOVE;
+            }
+            if (Math.abs(frame.boxTop - (other.boxBottom + margin))
+                    <= LINK_SNAP) {
+                return ChatWindow.LinkSide.BELOW;
+            }
+        }
+        if (overlapsRow) {
+            if (Math.abs(frame.boxRight + margin - other.boxLeft)
+                    <= LINK_SNAP) {
+                return ChatWindow.LinkSide.LEFT;
+            }
+            if (Math.abs(frame.boxLeft - (other.boxRight + margin))
+                    <= LINK_SNAP) {
+                return ChatWindow.LinkSide.RIGHT;
+            }
+        }
+        return null;
     }
 
     private void closeChannel(ChatTab channel) {
@@ -2105,7 +2843,7 @@ public final class LostTalesChatGui extends GuiChat {
                             ? "gui.losttales.chat.tab.unmute"
                             : "gui.losttales.chat.tab.mute"),
                     muted, ClientChatChannelState.displayColor(channel),
-                    ChatChannelIcons.iconOf(channel)));
+                    ChatTab.of(channel)));
         }
         return entries;
     }
@@ -2147,7 +2885,7 @@ public final class LostTalesChatGui extends GuiChat {
             } else if (ENTRY_PINGS.equals(entry.id)) {
                 ChatWindowLayout.setPingSilenced(channel,
                         !ChatWindowLayout.isPingSilenced(channel));
-            } else if (ENTRY_DETACH.equals(entry.id)) {
+                        } else if (ENTRY_DETACH.equals(entry.id)) {
                 detachChannel(channel);
             } else if (ENTRY_CLOSE.equals(entry.id)) {
                 closeChannel(channel);
@@ -2170,6 +2908,20 @@ public final class LostTalesChatGui extends GuiChat {
         if (clickedMouseButton != 0) {
             super.mouseClickMove(mouseX, mouseY, clickedMouseButton,
                     timeSinceLastClick);
+            return;
+        }
+        if (this.windowResize != null) {
+            if (!this.windowResize.active
+                    && (Math.abs(mouseX - this.windowResize.pressX)
+                    >= DRAG_THRESHOLD
+                    || Math.abs(mouseY - this.windowResize.pressY)
+                            >= DRAG_THRESHOLD)) {
+                this.windowResize.active = true;
+                closePickers();
+            }
+            if (this.windowResize.active) {
+                updateResize(mouseX, mouseY);
+            }
             return;
         }
         if (this.windowDrag != null) {
@@ -2206,14 +2958,19 @@ public final class LostTalesChatGui extends GuiChat {
     @Override
     protected void mouseMovedOrUp(int mouseX, int mouseY, int mouseButton) {
         if (mouseButton == 0) {
+            if (this.windowResize != null) {
+                WindowResize resize = this.windowResize;
+                this.windowResize = null;
+                if (resize.active) {
+                    applyResize(resize);
+                }
+            }
             if (this.windowDrag != null) {
                 WindowDrag drag = this.windowDrag;
                 this.windowDrag = null;
                 if (drag.active) {
-                    if (drag.snapTargetId != null) {
-                        ChatWindowLayout.link(drag.windowId,
-                                drag.snapTargetId, drag.snapAbove);
-                    }
+                    // Touching only shows what a window would stick to;
+                    // locking it is what sticks it.
                     ChatWindowLayout.persist();
                 } else {
                     // Never moved: the press was a click on the lines.
@@ -2241,11 +2998,6 @@ public final class LostTalesChatGui extends GuiChat {
             this.windowDrag = null;
             return;
         }
-        if (!this.windowDrag.unlinked) {
-            // Moving the window on its own breaks the link it had.
-            ChatWindowLayout.unlink(window.getId());
-            this.windowDrag.unlinked = true;
-        }
         ChatWindowPlacement.Anchor anchor = ChatWindowPlacement.constrainWindow(
                 window, this.mc,
                 ChatWindowPlacement.preciseMouseX(this.mc, this.width)
@@ -2253,9 +3005,40 @@ public final class LostTalesChatGui extends GuiChat {
                 ChatWindowPlacement.preciseMouseY(this.mc, this.height)
                         - this.windowDrag.grabOffsetY,
                 this.width, this.height);
+        List<ChatWindow> group = ChatWindowLayout.linkedGroup(window);
+        if (group.size() > 1) {
+            // Stuck windows move as one piece: every one of them takes
+            // the same step the dragged one took, in both directions, so
+            // the group keeps its shape whichever way it is carried.
+            ChatWindowFrame frame = ChatWindowFrame.find(window.getId());
+            if (frame == null) {
+                return;
+            }
+            double deltaX = anchor.x - frame.boxLeft;
+            double deltaY = anchor.baseline - frame.baseline;
+            for (int index = 0; index < group.size(); index++) {
+                ChatWindow member = group.get(index);
+                ChatWindowFrame memberFrame =
+                        ChatWindowFrame.find(member.getId());
+                if (memberFrame == null) {
+                    continue;
+                }
+                ChatWindowPlacement.Anchor moved =
+                        ChatWindowPlacement.constrainWindow(member, this.mc,
+                                memberFrame.boxLeft + deltaX,
+                                memberFrame.baseline + deltaY,
+                                this.width, this.height);
+                ChatWindowLayout.setPosition(member.getId(),
+                        ChatWindowPlacement.windowPercentX(member, moved.x,
+                                this.mc, this.width),
+                        ChatWindowPlacement.windowPercentY(moved.baseline,
+                                this.mc, this.height), false);
+            }
+            return;
+        }
         double baseline = snapToNeighbour(window, anchor);
         ChatWindowLayout.setPosition(window.getId(),
-                ChatWindowPlacement.windowPercentX(anchor.x, this.mc,
+                ChatWindowPlacement.windowPercentX(window, anchor.x, this.mc,
                         this.width),
                 ChatWindowPlacement.windowPercentY(baseline, this.mc,
                         this.height), false);
@@ -2270,7 +3053,7 @@ public final class LostTalesChatGui extends GuiChat {
     private double snapToNeighbour(ChatWindow window,
                                    ChatWindowPlacement.Anchor anchor) {
         int margin = HudPlacementLayout.SCREEN_MARGIN;
-        int width = ChatWindowPlacement.windowWidth(this.mc);
+        int width = ChatWindowPlacement.windowWidth(window, this.mc);
         int height = ChatWindowPlacement.currentHeight(window, this.mc);
         int barHeight = ChatWindowPlacement.barHeight(this.mc);
         double top = anchor.baseline - (height - barHeight);
@@ -2283,24 +3066,47 @@ public final class LostTalesChatGui extends GuiChat {
             ChatWindowFrame frame = frames.get(index);
             ChatWindow other = ChatWindowLayout.window(frame.windowId);
             if (other == null || other == window
-                    || window.getId().equals(other.getLinkTarget())
-                    || anchor.x >= frame.boxRight + margin
-                    || anchor.x + width + margin <= frame.boxLeft) {
+                    || window.getId().equals(other.getLinkTarget())) {
                 continue;
             }
-            double aboveGap = Math.abs(frame.boxTop - margin - bottom);
-            if (aboveGap <= LINK_SNAP && aboveGap < best) {
-                best = aboveGap;
-                baseline = frame.boxTop - margin - barHeight;
-                this.windowDrag.snapTargetId = other.getId();
-                this.windowDrag.snapAbove = true;
+            boolean overlapsColumn = anchor.x < frame.boxRight + margin
+                    && anchor.x + width + margin > frame.boxLeft;
+            if (overlapsColumn) {
+                double aboveGap = Math.abs(frame.boxTop - margin - bottom);
+                if (aboveGap <= LINK_SNAP && aboveGap < best) {
+                    best = aboveGap;
+                    baseline = frame.boxTop - margin - barHeight;
+                    this.windowDrag.snapTargetId = other.getId();
+                    this.windowDrag.snapSide = ChatWindow.LinkSide.ABOVE;
+                }
+                double belowGap = Math.abs(top - (frame.boxBottom + margin));
+                if (belowGap <= LINK_SNAP && belowGap < best) {
+                    best = belowGap;
+                    baseline = frame.boxBottom + margin + (height - barHeight);
+                    this.windowDrag.snapTargetId = other.getId();
+                    this.windowDrag.snapSide = ChatWindow.LinkSide.BELOW;
+                }
             }
-            double belowGap = Math.abs(top - (frame.boxBottom + margin));
-            if (belowGap <= LINK_SNAP && belowGap < best) {
-                best = belowGap;
-                baseline = frame.boxBottom + margin + (height - barHeight);
+            // A side snap wants the two windows level with one another,
+            // the way a top or bottom snap wants them in one column.
+            boolean overlapsRow = top < frame.boxBottom + margin
+                    && bottom + margin > frame.boxTop;
+            if (!overlapsRow) {
+                continue;
+            }
+            double leftGap = Math.abs(
+                    anchor.x + width + margin - frame.boxLeft);
+            if (leftGap <= LINK_SNAP && leftGap < best) {
+                best = leftGap;
                 this.windowDrag.snapTargetId = other.getId();
-                this.windowDrag.snapAbove = false;
+                this.windowDrag.snapSide = ChatWindow.LinkSide.LEFT;
+            }
+            double rightGap = Math.abs(
+                    anchor.x - (frame.boxRight + margin));
+            if (rightGap <= LINK_SNAP && rightGap < best) {
+                best = rightGap;
+                this.windowDrag.snapTargetId = other.getId();
+                this.windowDrag.snapSide = ChatWindow.LinkSide.RIGHT;
             }
         }
         return baseline;
@@ -2319,10 +3125,23 @@ public final class LostTalesChatGui extends GuiChat {
         }
         int left = (int)Math.floor(target.boxLeft);
         int right = (int)Math.round(target.boxRight);
-        int edge = (int)Math.round(this.windowDrag.snapAbove
-                ? target.boxTop : target.boxBottom);
-        drawRect(left, edge - 1, right, edge + 1,
-                LostTalesChatVisualStyle.argb(LINK_HIGHLIGHT_RGB, 0xFF));
+        int top = (int)Math.floor(target.boxTop);
+        int bottom = (int)Math.round(target.boxBottom);
+        int colour = LostTalesChatVisualStyle.argb(LINK_HIGHLIGHT_RGB, 0xFF);
+        // The edge the window would stick to, lit along its whole length.
+        switch (this.windowDrag.snapSide) {
+            case ABOVE:
+                drawRect(left, top - 1, right, top + 1, colour);
+                return;
+            case BELOW:
+                drawRect(left, bottom - 1, right, bottom + 1, colour);
+                return;
+            case LEFT:
+                drawRect(left - 1, top, left + 1, bottom, colour);
+                return;
+            default:
+                drawRect(right - 1, top, right + 1, bottom, colour);
+        }
     }
 
     /**
@@ -2448,7 +3267,7 @@ public final class LostTalesChatGui extends GuiChat {
             return true;
         }
         if (ChatColorMarker.isMarker(hit.component)
-                || ChatChannelPrefixMarker.isMarker(hit.component)
+                || ChatPrefixMarker.isMarker(hit.component)
                 || ChatEmojiMarker.isMarker(hit.component)
                 || ChatTitleMarker.isMarker(hit.component)) {
             return true;
@@ -2703,11 +3522,15 @@ public final class LostTalesChatGui extends GuiChat {
         int top = this.barTop;
         boolean hovered = isInsideSendButton(mouseX, mouseY, barRight);
         boolean ready = this.inputField.getText().trim().length() > 0;
-        int alpha = hovered ? 255 : ready ? 220 : 120;
+        // Text and glyphs are always fully opaque; the arrow says
+        // what it can do with its colour, not by fading out.
+        int alpha = 255;
         int y = top + (hovered ? 0 : 1);
         int x = left + 2;
         int color = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.IVORY, alpha);
+                hovered || ready ? LostTalesChatVisualStyle.IVORY
+                        : LostTalesColors.rgb(LostTalesColors.MAUVE),
+                alpha);
         int shadow = LostTalesChatVisualStyle.argb(
                 LostTalesChatVisualStyle.SHADOW,
                 LostTalesChatVisualStyle.shadowAlpha(alpha));
@@ -2759,7 +3582,8 @@ public final class LostTalesChatGui extends GuiChat {
             GL11.glTranslatef(counterLeft(barRight), this.barTop + 4, 0.0F);
             GL11.glScalef(COUNTER_SCALE, COUNTER_SCALE, 1.0F);
             LostTalesChatVisualStyle.drawColored(this.fontRendererObj, text,
-                    0, 0, full ? COUNTER_FULL_RGB : COUNTER_RGB, 255);
+                    0, 0, full ? COUNTER_FULL_RGB : COUNTER_RGB, 255,
+                    COUNTER_SCALE);
         } finally {
             GL11.glPopMatrix();
         }
@@ -2769,6 +3593,13 @@ public final class LostTalesChatGui extends GuiChat {
         if (this.inputField == null) {
             return;
         }
+        // The field's position is the bar's whole-pixel part, and the
+        // group it is drawn in is translated by the fractional
+        // remainder. Both must come from the same reading of the
+        // window's box: mixing one frame's whole pixels with the next
+        // frame's fraction makes the text jump about while the window
+        // is dragged.
+        updateInputBox();
         int left = this.barLeft + indicatorWidth() + 3;
         // The counter sits left of the send arrow; the field ends before it.
         int right = counterLeft(inputBarRight()) - 3;

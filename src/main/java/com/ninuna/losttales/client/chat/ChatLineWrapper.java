@@ -25,9 +25,14 @@ import net.minecraft.util.IChatComponent;
  * space itself is dropped, and a word longer than a whole line is cut
  * hard so any input makes progress; inline emotes and showcase icons are
  * atomic words. Formatting codes active at a split are carried onto the
- * next piece. The prefix is measured with the channel prefix shown (the
- * closed HUD), which is the wider of the two states; the open screen then
- * simply has a little spare room on every line.</p>
+ * next piece.</p>
+ *
+ * <p>A line is laid out for the state it will be drawn in: the closed
+ * HUD shows the channel prefix and reserves its width, the open screen
+ * hides it (the tabs already name the channel) and gives that width back
+ * to the message body. Either way the indent marker carries both
+ * offsets, so the renderer can align continuation lines in both
+ * states.</p>
  *
  * <p>Pure layout over component text and widths: no rendering, no
  * Minecraft runtime, so it is unit-tested with a fake measure.</p>
@@ -47,16 +52,40 @@ final class ChatLineWrapper {
     private ChatLineWrapper() {}
 
     /**
-     * Wraps a Lost Tales line to {@code width}, or returns null when the
-     * root carries no anchor marker (not a Lost Tales line) or its header
-     * alone exceeds the width, in which case vanilla's wrapping applies.
+     * Wraps a Lost Tales line for the closed HUD, channel prefix and all.
      */
     static List<IChatComponent> wrap(TextMetrics metrics, IChatComponent root,
                                      int width) {
+        return wrap(metrics, root, width, false);
+    }
+
+    /**
+     * Wraps a Lost Tales line to {@code width}, or returns null when the
+     * root carries no anchor marker (not a Lost Tales line) or its header
+     * alone exceeds the width, in which case vanilla's wrapping applies.
+     * {@code chatOpen} lays the line out for the open chat screen, where
+     * the channel prefix is not drawn and its width belongs to the body.
+     */
+    static List<IChatComponent> wrap(TextMetrics metrics, IChatComponent root,
+                                     int width, boolean chatOpen) {
         if (metrics == null || root == null || width <= 0) {
             return null;
         }
         List<IChatComponent> parts = flatten(root);
+        // The head marker sits on the first line only, and it is where
+        // the renderer reads the sender's colours from; the continuation
+        // lines are given them so a wrapped name keeps its colour.
+        int nameColor = -1;
+        int titleColor = -1;
+        for (int index = 0; index < parts.size(); index++) {
+            ChatHeadMarker.Data head = ChatHeadMarker.decode(
+                    parts.get(index));
+            if (head != null) {
+                nameColor = head.nameColor & 0xFFFFFF;
+                titleColor = head.titleColor & 0xFFFFFF;
+                break;
+            }
+        }
         int bodyIndex = -1;
         for (int index = 0; index < parts.size(); index++) {
             if (ChatLayoutMarker.isAnchor(parts.get(index))) {
@@ -67,29 +96,38 @@ final class ChatLineWrapper {
         if (bodyIndex < 0) {
             return null;
         }
+        // Each state pays only for the header runs it draws: the
+        // closed feed for the channel prefix, the open screen for the
+        // timestamp.
         int closedPrefix = 0;
         int openPrefix = 0;
         for (int index = 0; index < bodyIndex; index++) {
             IChatComponent part = parts.get(index);
             int partWidth = partWidth(metrics, part);
-            closedPrefix += partWidth;
-            if (!ChatChannelPrefixMarker.isMarker(part)) {
+            if (!ChatPrefixMarker.isHidden(part, false)) {
+                closedPrefix += partWidth;
+            }
+            if (!ChatPrefixMarker.isHidden(part, true)) {
                 openPrefix += partWidth;
             }
         }
-        if (closedPrefix > width) {
+        // The header the drawn state actually shows is what the body
+        // has to make room for.
+        int prefix = chatOpen ? openPrefix : closedPrefix;
+        if (prefix > width) {
             return null;
         }
         int maxIndent = Math.max(0, Math.min(
                 Math.round(width * MAX_INDENT_RATIO), width - MIN_BODY_WIDTH));
         Builder builder = new Builder(metrics, width,
                 Math.min(closedPrefix, maxIndent),
-                Math.min(openPrefix, maxIndent));
+                Math.min(openPrefix, maxIndent), chatOpen, nameColor,
+                titleColor);
         for (int index = 0; index <= bodyIndex; index++) {
             builder.place(copy(parts.get(index)), 0);
         }
-        builder.used = closedPrefix;
-        builder.lineStart = closedPrefix;
+        builder.used = prefix;
+        builder.lineStart = prefix;
         if (bodyIndex + 1 < parts.size()) {
             builder.ensureBodyRoom();
         }
@@ -106,13 +144,22 @@ final class ChatLineWrapper {
 
     /** Width of one component as the renderer advances past it. */
     static int partWidth(TextMetrics metrics, IChatComponent part) {
+        // A head's slot and a plain gap declare their width rather
+        // than spelling it out in spaces; the layout has to advance by
+        // the same amount the renderer does, or a line breaks where
+        // nothing is drawn.
+        int declared = ChatInlineIcons.declaredWidth(part);
+        if (declared >= 0) {
+            return declared;
+        }
         return metrics.width(part.getChatStyle().getFormattingCode()
                 + part.getUnformattedTextForChat());
     }
 
     /** Glyph slots are single indivisible words, spaces or not. */
     private static boolean isAtomic(IChatComponent part) {
-        if (ChatEmojiMarker.isMarker(part) || ChatHeadMarker.isMarker(part)) {
+        if (ChatEmojiMarker.isMarker(part) || ChatHeadMarker.isMarker(part)
+                || ChatSpacerMarker.isMarker(part)) {
             return true;
         }
         ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
@@ -195,6 +242,11 @@ final class ChatLineWrapper {
         private final int width;
         private final int closedIndent;
         private final int openIndent;
+        /** The one of the two this layout reserves on every line. */
+        private final int indent;
+        /** The sender's colours, carried onto every continuation line. */
+        private final int nameColor;
+        private final int titleColor;
         private final List<IChatComponent> lines =
                 new ArrayList<IChatComponent>();
         private ChatComponentText current = new ChatComponentText("");
@@ -207,11 +259,15 @@ final class ChatLineWrapper {
         private boolean fresh;
 
         Builder(TextMetrics metrics, int width, int closedIndent,
-                int openIndent) {
+                int openIndent, boolean chatOpen, int nameColor,
+                int titleColor) {
             this.metrics = metrics;
             this.width = width;
             this.closedIndent = closedIndent;
             this.openIndent = openIndent;
+            this.indent = chatOpen ? openIndent : closedIndent;
+            this.nameColor = nameColor;
+            this.titleColor = titleColor;
         }
 
         void place(IChatComponent piece, int pieceWidth) {
@@ -224,9 +280,10 @@ final class ChatLineWrapper {
             this.lines.add(this.current);
             this.current = new ChatComponentText("");
             this.current.appendSibling(ChatLayoutMarker.indent(
-                    this.closedIndent, this.openIndent));
-            this.used = this.closedIndent;
-            this.lineStart = this.closedIndent;
+                    this.closedIndent, this.openIndent,
+                    this.nameColor, this.titleColor));
+            this.used = this.indent;
+            this.lineStart = this.indent;
             this.firstLine = false;
             this.fresh = true;
         }
@@ -237,7 +294,7 @@ final class ChatLineWrapper {
          */
         void ensureBodyRoom() {
             if (this.firstLine && this.width - this.used < MIN_BODY_WIDTH
-                    && this.width - this.closedIndent >= MIN_BODY_WIDTH) {
+                    && this.width - this.indent >= MIN_BODY_WIDTH) {
                 newLine();
             }
         }

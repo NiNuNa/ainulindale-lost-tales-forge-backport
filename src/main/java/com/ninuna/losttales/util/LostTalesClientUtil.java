@@ -3,7 +3,7 @@ package com.ninuna.losttales.util;
 import com.ninuna.losttales.block.custom.LostTalesBlockPlushie;
 import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipIcons;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
-import com.ninuna.losttales.entity.ELostTalesUser;
+import com.ninuna.losttales.user.ELostTalesUser;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.armor.LostTalesItemArmorBase;
 import com.ninuna.losttales.item.material.ELostTalesItemMaterial;

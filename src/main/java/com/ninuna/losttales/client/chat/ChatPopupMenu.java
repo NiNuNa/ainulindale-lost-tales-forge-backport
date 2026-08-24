@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -42,15 +41,15 @@ final class ChatPopupMenu {
         final boolean dim;
         /** The channel's colour, shown as a small bar before the name; -1 for none. */
         final int color;
-        /** The channel's emote before the name, or null. */
-        final ChatEmoji icon;
+        /** The tab whose icon stands before the name, or null for none. */
+        final ChatTab icon;
 
         Entry(String id, String label) {
             this(id, label, "", false, -1, null);
         }
 
         Entry(String id, String label, String action, boolean dim,
-              int color, ChatEmoji icon) {
+              int color, ChatTab icon) {
             this.id = id;
             this.label = label == null ? "" : label;
             this.action = action == null ? "" : action;
@@ -217,10 +216,10 @@ final class ChatPopupMenu {
                         LostTalesChatVisualStyle.argb(entry.color, 0xFF));
             }
             if (entry.icon != null) {
-                ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(), entry.icon,
+                ChatChannelIcons.draw(Minecraft.getMinecraft(), entry.icon,
                         this.x + this.labelX - ChatChannelIcons.SIZE
                                 - ChatChannelIcons.GAP,
-                        rowY + 0.5F, ChatChannelIcons.SIZE, 255);
+                        rowY + 0.5F, 255);
             }
             // Text at full opacity always; a muted channel is italic, the
             // hovered half is told by its highlight.

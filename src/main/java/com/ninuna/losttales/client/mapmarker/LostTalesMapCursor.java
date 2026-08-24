@@ -1,10 +1,16 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.IntBuffer;
+import javax.imageio.ImageIO;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
@@ -37,8 +43,15 @@ import org.lwjgl.opengl.GL11;
 public final class LostTalesMapCursor {
     private static final ResourceLocation TEXTURE = new ResourceLocation(
             LostTalesMetaData.MOD_ID, "textures/gui/cursor.png");
-    /** The two poses, side by side in one strip. */
-    static final int TEXTURE_WIDTH = 16;
+    /**
+     * The poses stand side by side in one strip, each as wide as its own
+     * artwork with a clear column between them, so a pose addresses its
+     * own rectangle rather than a cell of a fixed size.
+     * {@code LostTalesMapCursorTest} holds the sheet to these numbers, so
+     * a re-export at another size fails the build instead of smearing
+     * every pose after the first.
+     */
+    static final int TEXTURE_WIDTH = 33;
     static final int TEXTURE_HEIGHT = 10;
     /**
      * Drawn in GUI pixels, so the pointer is the same size relative to the
@@ -47,6 +60,18 @@ public final class LostTalesMapCursor {
      */
     static final int SPRITE_WIDTH = 8;
     static final int SPRITE_HEIGHT = 10;
+    /** Where each pose's artwork sits in the strip, and how wide it is. */
+    private static final int ARROW_WIDTH = 8;
+    private static final int HAND_WIDTH = 8;
+    private static final int STRETCH_U = 17;
+    private static final int STRETCH_WIDTH = 5;
+    private static final int DIAGONAL_U = 23;
+    private static final int DIAGONAL_WIDTH = 10;
+    /** The interface's own drop shadow, shared with the chat's glyphs. */
+    private static final int SHADOW_RGB =
+            LostTalesColors.rgb(LostTalesColors.HUD_SHADOW);
+    private static final float SHADOW_OPACITY = 0.5F;
+    private static final int SHADOW_OFFSET = 1;
 
     /**
      * Which pose the pointer is drawn in, and where its point sits inside it.
@@ -56,26 +81,84 @@ public final class LostTalesMapCursor {
      * artwork is showing. A pose whose point is elsewhere moves its own
      * hotspot and nothing else.</p>
      */
-    enum Pose {
+    public enum Pose {
         /** Nothing under the pointer answers to a click. */
-        ARROW(0, 0, 0),
+        ARROW(0, ARROW_WIDTH, 0, 0, Turn.NONE),
         /** Something under the pointer does: the hand, tip of finger first. */
-        HAND(SPRITE_WIDTH, 3, 0);
+        HAND(ARROW_WIDTH, HAND_WIDTH, 3, 0, Turn.NONE),
+        /** A top or bottom edge: the double arrow stood on end, as drawn. */
+        RESIZE_VERTICAL(STRETCH_U, STRETCH_WIDTH, STRETCH_WIDTH / 2,
+                SPRITE_HEIGHT / 2, Turn.NONE),
+        /** A left or right edge: the same arrow laid on its side. */
+        RESIZE_HORIZONTAL(STRETCH_U, STRETCH_WIDTH, SPRITE_HEIGHT / 2,
+                STRETCH_WIDTH / 2, Turn.QUARTER),
+        /** The corners the drawn diagonal runs between: top-right, bottom-left. */
+        RESIZE_DIAGONAL(DIAGONAL_U, DIAGONAL_WIDTH, DIAGONAL_WIDTH / 2,
+                SPRITE_HEIGHT / 2, Turn.NONE),
+        /** The other pair of corners: the same diagonal mirrored. */
+        RESIZE_ANTI_DIAGONAL(DIAGONAL_U, DIAGONAL_WIDTH, DIAGONAL_WIDTH / 2,
+                SPRITE_HEIGHT / 2, Turn.MIRROR);
 
+        /** How the sprite is turned as it is drawn. */
+        private enum Turn { NONE, QUARTER, MIRROR }
+
+        /** The sprite's own rectangle in the strip. */
         private final int u;
+        private final int spriteWidth;
         private final int hotspotX;
         private final int hotspotY;
+        private final Turn turn;
 
-        Pose(int u, int hotspotX, int hotspotY) {
+        Pose(int u, int spriteWidth, int hotspotX, int hotspotY, Turn turn) {
             this.u = u;
+            this.spriteWidth = spriteWidth;
             this.hotspotX = hotspotX;
             this.hotspotY = hotspotY;
+            this.turn = turn;
         }
+
+        /** Width on screen: a quarter turn stands the sprite on its end. */
+        int drawnWidth() {
+            return this.turn == Turn.QUARTER ? SPRITE_HEIGHT
+                    : this.spriteWidth;
+        }
+
+        int drawnHeight() {
+            return this.turn == Turn.QUARTER ? this.spriteWidth
+                    : SPRITE_HEIGHT;
+        }
+
+        /** Whether the sheet on disk is wide enough to hold this pose. */
+        boolean fitsSheet(int sheetWidth) {
+            return this.u + this.spriteWidth <= sheetWidth;
+        }
+
+        int textureU() { return this.u; }
+
+        int spriteWidth() { return this.spriteWidth; }
+
+        int hotspotX() { return this.hotspotX; }
+
+        int hotspotY() { return this.hotspotY; }
     }
 
     private static Cursor blankCursor;
     private static boolean cursorUnavailable;
     private static boolean held;
+    /** The strip's width, measured from the file; 0 until read. */
+    private static int measuredWidth;
+    /** A pose asked for by a screen this frame; spent by the next draw. */
+    private static Pose requestedPose;
+
+    /**
+     * Asks for a pose for the coming frame — a screen that knows better
+     * than "is this clickable" says so here. Spent by the next
+     * {@link #render}, so a frame that does not ask keeps the plain
+     * poses. A pose the sheet has no sprite for is ignored.
+     */
+    public static void requestPose(Pose pose) {
+        requestedPose = pose;
+    }
 
     private LostTalesMapCursor() {}
 
@@ -146,15 +229,21 @@ public final class LostTalesMapCursor {
      */
     public static void render(Minecraft minecraft, int mouseX, int mouseY,
                               boolean interactable) {
+        Pose asked = requestedPose;
+        // Spent whether or not it is drawn, so a pose asked for by one
+        // frame can never show up on a later one.
+        requestedPose = null;
         if (!held || minecraft == null
                 || minecraft.getTextureManager() == null) {
             return;
         }
-        Pose pose = interactable ? Pose.HAND : Pose.ARROW;
+        int sheetWidth = sheetWidth(minecraft);
+        Pose pose = asked != null && asked.fitsSheet(sheetWidth)
+                ? asked : (interactable ? Pose.HAND : Pose.ARROW);
         int x = mouseX - pose.hotspotX;
         int y = mouseY - pose.hotspotY;
-        float minU = pose.u / (float)TEXTURE_WIDTH;
-        float maxU = (pose.u + SPRITE_WIDTH) / (float)TEXTURE_WIDTH;
+        float minU = pose.u / (float)sheetWidth;
+        float maxU = (pose.u + pose.spriteWidth) / (float)sheetWidth;
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT
                 | GL11.GL_CURRENT_BIT | GL11.GL_DEPTH_BUFFER_BIT);
         GL11.glPushMatrix();
@@ -175,16 +264,19 @@ public final class LostTalesMapCursor {
                     GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
                     GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
-            Tessellator tessellator = Tessellator.instance;
-            tessellator.startDrawingQuads();
-            tessellator.addVertexWithUV(
-                    x, y + SPRITE_HEIGHT, 0.0D, minU, 1.0D);
-            tessellator.addVertexWithUV(
-                    x + SPRITE_WIDTH, y + SPRITE_HEIGHT, 0.0D, maxU, 1.0D);
-            tessellator.addVertexWithUV(
-                    x + SPRITE_WIDTH, y, 0.0D, maxU, 0.0D);
-            tessellator.addVertexWithUV(x, y, 0.0D, minU, 0.0D);
-            tessellator.draw();
+            // The pointer carries the interface's own drop shadow: the
+            // same flat colour, the same one-pixel offset, at half the
+            // opacity, so it sits over a GUI like every glyph in it.
+            LostTalesSilhouetteRenderState.begin(SHADOW_RGB);
+            try {
+                GL11.glColor4f(1.0F, 1.0F, 1.0F, SHADOW_OPACITY);
+                drawSprite(pose, x + SHADOW_OFFSET, y + SHADOW_OFFSET,
+                        minU, maxU);
+            } finally {
+                LostTalesSilhouetteRenderState.end();
+            }
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            drawSprite(pose, x, y, minU, maxU);
         } catch (Throwable ignored) {
             // A pointer that cannot be drawn must not leave one that cannot
             // be seen either.
@@ -194,6 +286,80 @@ public final class LostTalesMapCursor {
             GL11.glPopMatrix();
             GL11.glPopAttrib();
         }
+    }
+
+    /**
+     * One pose's quad, turned as the pose asks. Both turns keep the
+     * sprite's own pixels square: a quarter turn swaps the corners
+     * round, a mirror swaps them left for right.
+     */
+    private static void drawSprite(Pose pose, int x, int y,
+                                   float minU, float maxU) {
+        int width = pose.drawnWidth();
+        int height = pose.drawnHeight();
+        Tessellator tessellator = Tessellator.instance;
+        tessellator.startDrawingQuads();
+        if (pose.turn == Pose.Turn.QUARTER) {
+            // Laid on its side: the sprite's u runs down the quad and
+            // its v across it.
+            tessellator.addVertexWithUV(x, y + height, 0.0D, maxU, 1.0D);
+            tessellator.addVertexWithUV(x + width, y + height, 0.0D,
+                    maxU, 0.0D);
+            tessellator.addVertexWithUV(x + width, y, 0.0D, minU, 0.0D);
+            tessellator.addVertexWithUV(x, y, 0.0D, minU, 1.0D);
+            tessellator.draw();
+            return;
+        }
+        float left = pose.turn == Pose.Turn.MIRROR ? maxU : minU;
+        float right = pose.turn == Pose.Turn.MIRROR ? minU : maxU;
+        tessellator.addVertexWithUV(x, y + height, 0.0D, left, 1.0D);
+        tessellator.addVertexWithUV(x + width, y + height, 0.0D, right, 1.0D);
+        tessellator.addVertexWithUV(x + width, y, 0.0D, right, 0.0D);
+        tessellator.addVertexWithUV(x, y, 0.0D, left, 0.0D);
+        tessellator.draw();
+    }
+
+    /**
+     * The sheet's width in pixels, read from the file once. A sheet that
+     * cannot be read is taken for the two plain poses, so a pose it has
+     * no room for is never addressed.
+     */
+    private static int sheetWidth(Minecraft minecraft) {
+        if (measuredWidth > 0) {
+            return measuredWidth;
+        }
+        measuredWidth = ARROW_WIDTH + HAND_WIDTH;
+        if (minecraft == null || minecraft.getResourceManager() == null) {
+            return measuredWidth;
+        }
+        InputStream stream = null;
+        try {
+            stream = minecraft.getResourceManager()
+                    .getResource(TEXTURE).getInputStream();
+            BufferedImage image = ImageIO.read(stream);
+            if (image != null && image.getWidth() > 0) {
+                measuredWidth = image.getWidth();
+            }
+        } catch (IOException failure) {
+            warnUnmeasured(failure);
+        } catch (RuntimeException failure) {
+            warnUnmeasured(failure);
+        } finally {
+            if (stream != null) {
+                try {
+                    stream.close();
+                } catch (IOException ignored) {
+                    // Nothing useful to do while closing a resource.
+                }
+            }
+        }
+        return measuredWidth;
+    }
+
+    private static void warnUnmeasured(Throwable failure) {
+        FMLLog.warning("[%s] Could not measure the cursor sheet; keeping "
+                + "the plain poses (%s)", LostTalesMetaData.MOD_ID,
+                failure.toString());
     }
 
     /**

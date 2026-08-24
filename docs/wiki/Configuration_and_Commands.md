@@ -22,7 +22,7 @@ Inventory containers also provide optional smooth stack movement for Shift-click
 
 ### `discord` (server only)
 
-`enabled`, `botToken`, `channelId`, `webhookUrl`, `pollIntervalSeconds` (2–60), `relayGameChat`, `relayDiscordChat`, `avatarUrlTemplate` — the server's own bridge between the Discord chat channel and one Discord text channel; the setup guide is [Discord_Bridge](Discord_Bridge.md). The token and webhook URL are secrets and must never be shared with clients.
+`enabled`, `botToken`, `channelId`, `webhookUrl`, `pollIntervalSeconds` (2–60), `relayGameChat`, `relayDiscordChat`, `avatarUrlTemplate`, `serverEvents`, `channelStatus`, `channelStatusIntervalSeconds` (60–3600) — the server's own bridge between the Discord chat channel and one Discord text channel, its start/stop and join/leave notices, and the channel-topic status line; the setup guide is [Discord_Bridge](Discord_Bridge.md). The token and webhook URL are secrets and must never be shared with clients.
 
 ## Server commands
 

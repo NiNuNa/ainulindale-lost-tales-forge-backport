@@ -20,6 +20,7 @@ import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
+import com.ninuna.losttales.client.chat.ClientChatSession;
 import com.ninuna.losttales.client.chat.ClientChatChannelViews;
 import com.ninuna.losttales.client.chat.ClientChatTypingState;
 import com.ninuna.losttales.client.chat.ClientChatShowcaseStore;
@@ -64,6 +65,7 @@ import com.ninuna.losttales.world.map.LostTalesMapOverlay;
 import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+import cpw.mods.fml.common.network.FMLNetworkEvent.ClientConnectedToServerEvent;
 import cpw.mods.fml.common.network.FMLNetworkEvent.ClientDisconnectionFromServerEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import java.util.Arrays;
@@ -131,18 +133,43 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientPartyStateCache.clear();
         ClientPartyMemberStatusCache.clear();
         ClientPartyTrackingCache.clear();
-        ClientChatChannelState.clear();
-        ClientChatChannelViews.clear();
+        // Chat is the one client state that outlives a disconnect: the
+        // game keeps its own message history for as long as it runs, and
+        // everything Lost Tales knows about those messages — their tabs,
+        // the open conversations, the scroll offsets — has to outlive it
+        // too, or rejoining the same server would show a history it
+        // could no longer file. It is dropped on arriving somewhere
+        // else instead; see onClientConnect. Only what describes the
+        // connection itself goes here.
         ClientChatTypingState.clear();
-        ClientChatShowcaseStore.clear();
-        LostTalesChatPresentation.clear();
-        LostTalesCharacterHeadIconRenderer.clearAccountSkinCache();
         ClientAccessoryEffectCache.clear();
         WraithWorldVisualEffect.reset();
         CharacterClientTaskQueue.clear();
         LostTalesQuickLootHudRenderer.resetHud();
         LotrRaceProfileAdapter.getInstance().clear();
         ThirdPersonCameraRuntime.resetSession();
+    }
+
+    /**
+     * Chat state belongs to a server, not to a connection: arriving back
+     * at the same address keeps the history and its tabs, and arriving
+     * anywhere else starts clean — the game's own message list included,
+     * since nothing here could say which tab those lines belonged to.
+     */
+    @SubscribeEvent
+    public void onClientConnect(ClientConnectedToServerEvent event) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (ClientChatSession.resume(minecraft)) {
+            return;
+        }
+        if (minecraft != null && minecraft.ingameGUI != null) {
+            minecraft.ingameGUI.getChatGUI().clearChatMessages();
+        }
+        ClientChatChannelState.clear();
+        ClientChatChannelViews.clear();
+        ClientChatShowcaseStore.clear();
+        LostTalesChatPresentation.clear();
+        LostTalesCharacterHeadIconRenderer.clearAccountSkinCache();
     }
 
     @SubscribeEvent

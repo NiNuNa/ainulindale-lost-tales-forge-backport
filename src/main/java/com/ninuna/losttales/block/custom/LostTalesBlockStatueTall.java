@@ -1,7 +1,7 @@
 package com.ninuna.losttales.block.custom;
 
 import com.ninuna.losttales.block.base.LostTalesBlockStatueBase;
-import com.ninuna.losttales.entity.ELostTalesUser;
+import com.ninuna.losttales.user.ELostTalesUser;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.entity.EntityLivingBase;

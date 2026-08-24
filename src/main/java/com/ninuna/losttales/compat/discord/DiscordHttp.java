@@ -10,11 +10,18 @@ import java.net.URL;
 import java.nio.charset.Charset;
 
 /**
- * The two HTTPS calls the bridge makes, on plain {@link HttpURLConnection}
+ * The three HTTPS calls the bridge makes, on plain {@link HttpURLConnection}
  * so the mod carries no library: a bot-authorised GET of a channel's
- * messages and a webhook POST. Bodies are bounded, timeouts are short,
- * and a reply is returned as status plus text — the caller decides what
- * a status means. The token and the webhook URL never reach a log.
+ * messages, a webhook POST, and a bot-authorised PATCH of the channel's
+ * topic. Bodies are bounded, timeouts are short, and a reply is returned
+ * as status plus text — the caller decides what a status means. The
+ * token and the webhook URL never reach a log.
+ *
+ * <p>Java 8's {@code HttpURLConnection} refuses {@code PATCH} as a
+ * method name, so the topic write opens as a POST and sets the method
+ * on the connection's own field, the way every library-free client on
+ * this JVM does; when that cannot be done the write fails with
+ * {@link PatchUnsupportedException} and the caller stops trying.</p>
  */
 final class DiscordHttp {
     static final String API_BASE = "https://discord.com/api/v10";
@@ -62,6 +69,29 @@ final class DiscordHttp {
         HttpURLConnection connection = open(webhookUrl, "POST");
         connection.setRequestProperty("Content-Type", "application/json");
         return exchange(connection, body);
+    }
+
+    /**
+     * Modifies the channel with a JSON body (the topic, here); the bot
+     * needs Manage Channels. Discord answers 200 with the channel.
+     */
+    static Reply patchChannel(String botToken, String channelId, String body)
+            throws IOException {
+        HttpURLConnection connection = open(
+                API_BASE + "/channels/" + channelId, "POST");
+        DiscordHttpPatch.apply(connection);
+        connection.setRequestProperty("Authorization", "Bot " + botToken);
+        connection.setRequestProperty("Content-Type", "application/json");
+        return exchange(connection, body);
+    }
+
+    /** This JVM's HTTP client cannot send a PATCH; the caller should stop asking. */
+    static final class PatchUnsupportedException extends IOException {
+        private static final long serialVersionUID = 1L;
+
+        PatchUnsupportedException(String reason) {
+            super(reason);
+        }
     }
 
     private static HttpURLConnection open(String url, String method)

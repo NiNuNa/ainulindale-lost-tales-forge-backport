@@ -21,53 +21,44 @@ final class CharacterHeadIconLayout {
     private final float faceY;
     private final float faceSize;
     private final OverlayKind overlayKind;
-    private final float extendedOverlayHeight;
 
     private CharacterHeadIconLayout(float imageHeight,
                                     float faceX,
                                     float faceY,
                                     float faceSize,
-                                    OverlayKind overlayKind,
-                                    float extendedOverlayHeight) {
+                                    OverlayKind overlayKind) {
         this.imageHeight = imageHeight;
         this.faceX = faceX;
         this.faceY = faceY;
         this.faceSize = faceSize;
         this.overlayKind = overlayKind;
-        this.extendedOverlayHeight = extendedOverlayHeight;
     }
 
     static CharacterHeadIconLayout minecraftSkin() {
         return new CharacterHeadIconLayout(
-                32.0F, 8.0F, 8.0F, 8.0F,
-                OverlayKind.MINECRAFT, 0.0F);
+                32.0F, 8.0F, 8.0F, 8.0F, OverlayKind.MINECRAFT);
     }
 
     static CharacterHeadIconLayout forConfiguredRace(String raceId) {
         String canonicalRace =
                 CharacterRaceRegistry.canonicalizeIdentifier(raceId);
         if (CharacterRaceRegistry.HUMAN.equals(canonicalRace)
-                || CharacterRaceRegistry.ELF.equals(canonicalRace)) {
-            // Their 8x16 outer cuboid starts at the head crown and continues
-            // below the chin. A square portrait represents the actual 8x8
-            // head, so sample the upper eight rows without compressing the
-            // hanging hair into the face.
-            return new CharacterHeadIconLayout(
-                    64.0F, 8.0F, 8.0F, 8.0F,
-                    OverlayKind.LOTR_EXTENDED, 8.0F);
-        }
-        if (CharacterRaceRegistry.DWARF.equals(canonicalRace)
+                || CharacterRaceRegistry.ELF.equals(canonicalRace)
+                || CharacterRaceRegistry.DWARF.equals(canonicalRace)
                 || CharacterRaceRegistry.HOBBIT.equals(canonicalRace)) {
+            // Their outer cuboid starts at the head crown and continues
+            // below the chin. A square portrait is the head, so it takes
+            // the head's own eight rows and leaves the hanging hair and
+            // the beard on the model.
             return new CharacterHeadIconLayout(
-                    64.0F, 8.0F, 8.0F, 8.0F,
-                    OverlayKind.LOTR_EXTENDED, 12.0F);
+                    64.0F, 8.0F, 8.0F, 8.0F, OverlayKind.LOTR_EXTENDED);
         }
         if (CharacterRaceRegistry.HALF_TROLL.equals(canonicalRace)) {
             // LOTRModelHalfTroll uses a 10x10 head instead of a biped 8x8
             // head. Its inherited headwear cube is intentionally hidden.
             return new CharacterHeadIconLayout(
                     64.0F, 10.0F, 10.0F, 10.0F,
-                    OverlayKind.LOTR_HALF_TROLL_FEATURES, 0.0F);
+                    OverlayKind.LOTR_HALF_TROLL_FEATURES);
         }
         if (CharacterRaceRegistry.ORC.equals(canonicalRace)
                 || CharacterRaceRegistry.URUK.equals(canonicalRace)) {
@@ -75,11 +66,10 @@ final class CharacterHeadIconLayout {
             // Minecraft hat region contains unrelated body geometry.
             return new CharacterHeadIconLayout(
                     32.0F, 8.0F, 8.0F, 8.0F,
-                    OverlayKind.LOTR_ORC_FEATURES, 0.0F);
+                    OverlayKind.LOTR_ORC_FEATURES);
         }
         return new CharacterHeadIconLayout(
-                32.0F, 8.0F, 8.0F, 8.0F,
-                OverlayKind.NONE, 0.0F);
+                32.0F, 8.0F, 8.0F, 8.0F, OverlayKind.NONE);
     }
 
     float getImageHeight() {
@@ -100,9 +90,5 @@ final class CharacterHeadIconLayout {
 
     OverlayKind getOverlayKind() {
         return this.overlayKind;
-    }
-
-    float getExtendedOverlayHeight() {
-        return this.extendedOverlayHeight;
     }
 }

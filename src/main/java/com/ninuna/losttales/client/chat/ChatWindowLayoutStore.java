@@ -27,7 +27,7 @@ import java.util.Locale;
  *
  * <pre>
  * window w1 locked=false x=0.00 y=0.00 active=console tabs=console,admin
- * window w2 locked=true x=62.50 y=100.00 active=all tabs=all,ooc,party link=w1:above
+ * window w2 locked=true x=62.50 y=100.00 lines=12.40 width=320 active=all tabs=all,ooc,party link=w1:above
  * feed x=0.00 y=100.00
  * toolbar collapsed=false
  * closed faction
@@ -136,7 +136,11 @@ public final class ChatWindowLayoutStore {
         double offsetX = 0.0D;
         double offsetY = legacyMain ? 100.0D : 0.0D;
         String linkTarget = null;
-        boolean linkAbove = false;
+        ChatWindow.LinkSide linkSide = ChatWindow.LinkSide.BELOW;
+        // No size of its own: the window follows the game's settings,
+        // which is what every file written before resizing carries.
+        double maxLines = 0.0D;
+        int width = 0;
         for (int index = 2; index < parts.length; index++) {
             String part = parts[index];
             int equals = part.indexOf('=');
@@ -157,8 +161,10 @@ public final class ChatWindowLayoutStore {
                 String target = colon < 0 ? value : value.substring(0, colon);
                 if (ChatWindowLayout.isWindowId(target)) {
                     linkTarget = target;
-                    linkAbove = colon >= 0
-                            && "above".equals(value.substring(colon + 1));
+                    linkSide = colon >= 0
+                            ? ChatWindow.LinkSide.fromId(
+                                    value.substring(colon + 1))
+                            : ChatWindow.LinkSide.BELOW;
                 }
             } else if ("active".equals(key)) {
                 active = ChatTab.fromId(value);
@@ -168,10 +174,39 @@ public final class ChatWindowLayoutStore {
                 offsetX = parsePercent(value);
             } else if ("y".equals(key)) {
                 offsetY = parsePercent(value);
+            } else if ("lines".equals(key)) {
+                maxLines = parseLines(value);
+            } else if ("width".equals(key)) {
+                width = parseChatWidth(value);
             }
         }
         return new ChatWindowLayout.WindowSpec(id, tabs, active, locked,
-                offsetX, offsetY, linkTarget, linkAbove);
+                offsetX, offsetY, linkTarget, linkSide, maxLines, width);
+    }
+
+    /** A stored chat width; anything unreadable follows the slider. */
+    private static int parseChatWidth(String value) {
+        try {
+            return ChatWindowLayout.clampChatWidth(
+                    Integer.parseInt(value.trim()));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    /**
+     * A stored window height in message lines, fractions included, so a
+     * window keeps the exact pixel height it was dragged to; anything
+     * unreadable follows the setting. Whole numbers, which is all older
+     * files hold, read the same as they always did.
+     */
+    private static double parseLines(String value) {
+        try {
+            return ChatWindowLayout.clampWindowLines(
+                    Double.parseDouble(value.trim()));
+        } catch (NumberFormatException ignored) {
+            return 0.0D;
+        }
     }
 
     private static double parsePercent(String value) {
@@ -191,12 +226,18 @@ public final class ChatWindowLayoutStore {
             line.append(" locked=").append(spec.locked);
             line.append(" x=").append(formatPercent(spec.offsetX));
             line.append(" y=").append(formatPercent(spec.offsetY));
+            if (spec.maxLines > 0.0D) {
+                line.append(" lines=").append(formatLines(spec.maxLines));
+            }
+            if (spec.width > 0) {
+                line.append(" width=").append(spec.width);
+            }
             if (spec.activeTab != null) {
                 line.append(" active=").append(spec.activeTab.id());
             }
             if (spec.linkTarget != null) {
                 line.append(" link=").append(spec.linkTarget)
-                        .append(spec.linkAbove ? ":above" : ":below");
+                        .append(':').append(spec.linkSide.id());
             }
             line.append(" tabs=");
             for (int index = 0; index < spec.tabs.size(); index++) {
@@ -224,6 +265,11 @@ public final class ChatWindowLayoutStore {
             lines.add("noping " + tab.id());
         }
         return lines;
+    }
+
+    /** A window height with the fraction the drag left, kept short. */
+    private static String formatLines(double lines) {
+        return String.format(Locale.ROOT, "%.2f", lines);
     }
 
     private static String formatPercent(double value) {

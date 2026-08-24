@@ -6,8 +6,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.GuiNewChat;
+import net.minecraft.client.gui.ScaledResolution;
 
 /**
  * Per-window render state: the line bands the last draw recorded, the
@@ -30,6 +32,10 @@ final class ChatWindowFrame {
             new HashMap<String, ChatWindowFrame>();
     /** The closed-chat feed's frame; not a window, never pruned. */
     private static final ChatWindowFrame FEED = new ChatWindowFrame("feed");
+    /** The display the scale factor below was measured for. */
+    private static int measuredWidth;
+    private static int measuredHeight;
+    private static int measuredFactor = 1;
 
     final String windowId;
     final ChatLineBands bands = new ChatLineBands();
@@ -45,6 +51,16 @@ final class ChatWindowFrame {
     double boxBottom;
     /** The edge the newest message sits on; the bar hangs below it. */
     double baseline;
+    /**
+     * Top of the drawn message stack (screen y, motion included): the
+     * edge the tab row stands a padding above. A full window cuts its
+     * topmost line where its box runs out of room, so this is the box's
+     * own edge rather than the top of the last whole line; a window
+     * still filling up sits on the lines it has.
+     */
+    double stackTop;
+    /** Message-line room of the box drawn this frame, in pixels. */
+    int room;
     /** Top of the input bar at rest, one chat line below the baseline. */
     private double restingBarTop;
     /** Chat scale the box was drawn at; sizes one empty line. */
@@ -173,23 +189,87 @@ final class ChatWindowFrame {
         return LostTalesChatOverlayRenderer.historyRight(chat);
     }
 
-    /** Starts the window's frame from its placement box. */
+    /**
+     * Starts the window's frame from its placement box. The box is
+     * dragged in fractions of a GUI pixel so it follows the mouse
+     * exactly, and laid on whole display pixels to be drawn: the text,
+     * the heads and the emotes in it are pixel art, and between two
+     * pixels they crawl. A display pixel is the finest step the screen
+     * has, so the motion loses nothing by landing on one.
+     */
     void begin(ChatWindowPlacement.Box box, float chatScale,
                float openingMotionX, float openingMotionY) {
-        this.boxLeft = box.x;
-        this.boxTop = box.y;
-        this.boxRight = box.x + box.width;
-        this.boxBottom = box.y + box.height;
-        this.baseline = box.baseline();
-        this.restingBarTop = box.barTop();
+        this.boxLeft = snapToDisplayPixels(box.x);
+        this.boxTop = snapToDisplayPixels(box.y);
+        this.boxRight = this.boxLeft + box.width;
+        this.boxBottom = this.boxTop + box.height;
+        this.baseline = snapToDisplayPixels(box.baseline());
+        this.restingBarTop = snapToDisplayPixels(box.barTop());
         this.scale = chatScale <= 0.0F ? 1.0F : chatScale;
         this.motionX = openingMotionX;
         this.motionY = openingMotionY;
+        this.room = box.room;
+        // Until the draw says otherwise the stack fills the box; an
+        // empty window is corrected to its one placeholder line.
+        this.stackTop = this.baseline + this.motionY - box.room;
     }
 
-    /** Left edge as drawn this frame, motion included. */
+    /**
+     * A GUI-space position rounded to a whole display pixel, which is
+     * the finest step anything drawn can actually take.
+     */
+    static double snapToDisplayPixels(double position) {
+        int factor = displayScaleFactor();
+        return factor <= 1 ? Math.round(position)
+                : Math.round(position * factor) / (double)factor;
+    }
+
+    /**
+     * Display pixels per GUI pixel. Measured once per display size: this
+     * is asked several times for every window of every frame, and the
+     * answer only changes when the window does.
+     */
+    private static int displayScaleFactor() {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.displayWidth <= 0
+                || minecraft.displayHeight <= 0) {
+            return 1;
+        }
+        if (minecraft.displayWidth == measuredWidth
+                && minecraft.displayHeight == measuredHeight) {
+            return measuredFactor;
+        }
+        try {
+            measuredFactor = Math.max(1, new ScaledResolution(minecraft,
+                    minecraft.displayWidth,
+                    minecraft.displayHeight).getScaleFactor());
+            measuredWidth = minecraft.displayWidth;
+            measuredHeight = minecraft.displayHeight;
+        } catch (RuntimeException unavailable) {
+            return 1;
+        }
+        return measuredFactor;
+    }
+
+    /** Records where the drawn message stack ended up this frame. */
+    void setStackTop(double screenY) {
+        this.stackTop = screenY;
+    }
+
+    /**
+     * Left edge as drawn this frame, opening motion included and laid on
+     * a whole display pixel. Everything the window draws is measured
+     * from here, so everything in it lands on the same grid: the pixel
+     * art especially, which is sampled one texel to one pixel and shows
+     * every fraction of a pixel as a texel of the wrong width.
+     */
     double drawnLeft() {
-        return this.boxLeft + this.motionX;
+        return snapToDisplayPixels(this.boxLeft + this.motionX);
+    }
+
+    /** The edge the newest message sits on, as drawn this frame. */
+    double drawnBaseline() {
+        return snapToDisplayPixels(this.baseline + this.motionY);
     }
 
     /**
@@ -203,22 +283,14 @@ final class ChatWindowFrame {
 
     /**
      * Bottom of the tab row (screen y, fractional): the padding above
-     * the topmost drawn band, or above the one empty line the view shows
-     * when it has nothing yet.
+     * the drawn message stack. A full window's stack ends on its box's
+     * own edge, so the row and the box top never drift apart whatever
+     * the chat scale is; a window with fewer lines than it has room for
+     * carries its row down onto them.
      */
     double tabRowBottom() {
-        double padding = LostTalesChatOverlayRenderer.LINE_PADDING
+        return this.stackTop - LostTalesChatOverlayRenderer.LINE_PADDING
                 * this.scale;
-        if (this.bands.count() > 0) {
-            float top = Float.MAX_VALUE;
-            for (int index = 0; index < this.bands.count(); index++) {
-                top = Math.min(top, this.bands.topOf(index));
-            }
-            return top - padding;
-        }
-        return this.baseline + this.motionY
-                - LostTalesChatOverlayRenderer.LINE_HEIGHT * this.scale
-                - padding;
     }
 
     /** Whether the point is inside this window's box. */

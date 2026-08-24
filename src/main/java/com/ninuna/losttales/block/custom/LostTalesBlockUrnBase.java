@@ -3,7 +3,7 @@ package com.ninuna.losttales.block.custom;
 import com.ninuna.losttales.block.base.LostTalesBlockDirectionalContainerBase;
 import com.ninuna.losttales.block.collision.LostTalesBlockBounds;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
-import com.ninuna.losttales.entity.ELostTalesUser;
+import com.ninuna.losttales.user.ELostTalesUser;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.sound.ELostTalesBlockSoundType;
 import com.ninuna.losttales.util.LostTalesBlockRotationHelper;

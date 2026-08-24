@@ -20,7 +20,7 @@ From the repository root:
 
 The build targets Forge `10.13.4.1614` and Java 8. The release jar manifest loads `com.ninuna.losttales.core.LostTalesCorePlugin`. ForgeGradle run tasks pass the equivalent development property because a classes directory has no jar manifest.
 
-Use `runClient` or `runServer` only with a prepared legacy Forge development environment and the required dependencies. A dedicated-server run also requires accepting Minecraft's EULA in its run directory.
+Use `runClient` or `runServer` only with a prepared legacy Forge development environment and the required dependencies. A dedicated-server run also requires accepting Minecraft's EULA in its run directory. By default the client logs in as an offline `PlayerNNN`, whose name-derived UUID matches no real account — recognized-user cosmetics (the Developer chat role) therefore never apply in a development run.
 
 ## Source layout
 

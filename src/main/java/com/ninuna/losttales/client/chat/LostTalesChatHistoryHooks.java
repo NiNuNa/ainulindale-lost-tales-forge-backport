@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.config.LostTalesConfig;
+import net.minecraft.client.gui.GuiNewChat;
 
 /**
  * Called from patched vanilla code: the size vanilla's chat history is
@@ -31,5 +32,31 @@ public final class LostTalesChatHistoryHooks {
 
     public static boolean isActive() {
         return Boolean.getBoolean(ACTIVE_PROPERTY);
+    }
+
+    /**
+     * Vanilla's own line replacement, skipped while the history is
+     * being laid out again.
+     *
+     * <p>{@code GuiNewChat.func_146237_a} opens by deleting whatever
+     * carried the same line id, which is how
+     * {@code printChatMessageWithOptionalDeletion} replaces a line. That
+     * delete also removes the message from the unwrapped history — and
+     * {@code refreshChat} walks that very list by index while calling
+     * the method for each of its entries, re-adding nothing (its refresh
+     * flag says the message is already filed). Vanilla never notices,
+     * because vanilla prints with the id zero and the delete never runs;
+     * every Lost Tales line carries an id of its own, so a refresh —
+     * from a resize, a GUI-scale change or a window being made wider —
+     * emptied the history as it walked it.</p>
+     *
+     * <p>Deleting is right when a line is being replaced and wrong when
+     * it is being laid out again, which is exactly what the flag says.</p>
+     */
+    public static void deleteUnlessRefreshing(GuiNewChat chat, int chatLineId,
+                                              boolean refreshing) {
+        if (!refreshing && chat != null) {
+            chat.deleteChatLine(chatLineId);
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.chat.server;
 
+import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatMessageValidator;
@@ -148,34 +149,33 @@ public final class LostTalesChatService {
                 LostTalesChatPresentationResolver.resolve(sender, character);
         List<ChatShowcase> showcases =
                 resolveShowcases(sender, message, references);
+        // Account lines say which roles their sender holds and take the
+        // primary role's colour for the name; role-play lines belong to
+        // the character, not the account, and carry neither.
+        boolean accountLine = channel.getIdentityType()
+                == ChatIdentityType.ACCOUNT;
+        int roles = accountLine ? ChatAccountRoleResolver.resolve(sender) : 0;
+        int ivory = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
+        int accountNameColor = roles == 0 ? ivory
+                : ChatAccountRole.primary(roles).getColor();
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
                 channel, sender.getUniqueID(), identityName,
                 accountName,
-                channel.getIdentityType() == ChatIdentityType.CHARACTER
-                        ? presentation.title : "",
-                channel.getIdentityType() == ChatIdentityType.CHARACTER
-                        ? presentation.titleColor : LostTalesColors.rgb(
-                        LostTalesColors.HUD_LABEL),
-                channel.getIdentityType() == ChatIdentityType.CHARACTER
-                        ? presentation.nameColor : LostTalesColors.rgb(
-                        LostTalesColors.HUD_LABEL),
+                accountLine ? "" : presentation.title,
+                accountLine ? ivory : presentation.titleColor,
+                accountLine ? accountNameColor : presentation.nameColor,
                 message, System.currentTimeMillis(),
-                channel.getIdentityType() == ChatIdentityType.CHARACTER
-                        && character != null ? character.getSkinId() : "",
+                !accountLine && character != null
+                        ? character.getSkinId() : "",
                 showcases,
-                channel.getIdentityType() == ChatIdentityType.CHARACTER
-                        ? presentation.factionName : "",
+                accountLine ? "" : presentation.factionName,
                 // A whisper names its partner from the start: the packet
                 // refuses a partner-less whisper, so the sender's copy is
                 // built with the target's name and the target's copy is
                 // derived from it below.
                 whisperTarget == null ? ""
                         : whisperTarget.getCommandSenderName(),
-                // Account lines say when their sender is an operator;
-                // role-play lines belong to the character, not the account.
-                channel.getIdentityType() == ChatIdentityType.ACCOUNT
-                        && LostTalesWaystonePermissionPolicy.isOperator(
-                                sender));
+                roles);
 
         FMLLog.info("[losttales/chat/%s] <%s (%s)> %s%s%s",
                 channel.getId(), identityName, accountName, message,
@@ -226,7 +226,7 @@ public final class LostTalesChatService {
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
                 ChatChannel.DISCORD, DISCORD_SENDER_ID, displayName,
                 displayName, "", ivory, ivory, message,
-                System.currentTimeMillis(), "", null, "", "", false);
+                System.currentTimeMillis(), "", null, "", "", 0);
         FMLLog.info("[losttales/chat/discord] <%s (discord)> %s", displayName,
                 message);
         @SuppressWarnings("unchecked")
@@ -312,7 +312,7 @@ public final class LostTalesChatService {
                 packet.getTitleColor(), packet.getNameColor(),
                 packet.getMessage(), packet.getTimestampMillis(),
                 packet.getSkinId(), packet.getShowcases(),
-                packet.getFactionName(), partner, packet.isOperator());
+                packet.getFactionName(), partner, packet.getRoles());
     }
 
     /** The online player with that account name, case-insensitively. */
@@ -337,10 +337,12 @@ public final class LostTalesChatService {
     }
 
     /**
-     * Tells one client which channels its operator status unlocks. Sent
-     * on login and whenever a staff-channel message is refused, so the
-     * Admin tab follows the server's view of op status without the client
-     * ever deciding it.
+     * Tells one client which channels its operator status unlocks, and
+     * which roles it holds. Sent on login and whenever a staff-channel
+     * message is refused, so the Admin tab follows the server's view of
+     * op status without the client ever deciding it; the roles travel
+     * with it so the client can notice a mention addressed to one of
+     * them.
      */
     public static void sendAccess(EntityPlayerMP player) {
         if (player == null || player.worldObj == null
@@ -350,7 +352,8 @@ public final class LostTalesChatService {
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new LostTalesChatAccessPacket(
                         LostTalesWaystonePermissionPolicy.isOperator(player),
-                        LostTalesConfig.discordEnabled),
+                        LostTalesConfig.discordEnabled,
+                        ChatAccountRoleResolver.resolve(player)),
                 player);
     }
 

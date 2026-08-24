@@ -11,7 +11,7 @@ import com.ninuna.losttales.block.custom.LostTalesBlockUrnBase;
 import com.ninuna.losttales.block.custom.LostTalesBlockUrnTall;
 import com.ninuna.losttales.block.custom.LostTalesBlockWaystone;
 import com.ninuna.losttales.creativetab.ELostTalesCreativeTabs;
-import com.ninuna.losttales.entity.ELostTalesUser;
+import com.ninuna.losttales.user.ELostTalesUser;
 import com.ninuna.losttales.item.block.LostTalesItemBlockBase;
 import com.ninuna.losttales.item.block.LostTalesItemBlockPlushie;
 import com.ninuna.losttales.item.block.LostTalesItemBlockUrn;

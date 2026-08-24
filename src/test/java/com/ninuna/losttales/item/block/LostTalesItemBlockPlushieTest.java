@@ -1,7 +1,7 @@
 package com.ninuna.losttales.item.block;
 
 import com.ninuna.losttales.block.custom.LostTalesBlockPlushie;
-import com.ninuna.losttales.entity.ELostTalesUser;
+import com.ninuna.losttales.user.ELostTalesUser;
 import net.minecraft.block.Block;
 import net.minecraft.item.EnumRarity;
 import org.junit.Test;

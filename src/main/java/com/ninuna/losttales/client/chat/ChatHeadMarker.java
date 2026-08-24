@@ -112,6 +112,15 @@ final class ChatHeadMarker {
         return Integer.parseInt(value, 16) & 0xFFFFFF;
     }
 
+    /**
+     * The colours alone, for a wrapped line that carries no head of its
+     * own: enough for the renderer to colour the sender's name and title
+     * exactly as the line it was wrapped from.
+     */
+    static Data colorsOnly(int nameColor, int titleColor) {
+        return new Data(null, false, false, "", "", titleColor, nameColor);
+    }
+
     static final class Data {
         final UUID senderId;
         final boolean accountIdentity;

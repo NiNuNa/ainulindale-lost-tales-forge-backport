@@ -26,6 +26,13 @@ import net.minecraft.client.gui.ChatLine;
  * closed-chat feed. The last few filters' results are cached so every
  * window pays one comparison per frame. Scroll offsets are per tab and
  * survive closing the screen.</p>
+ *
+ * <p>A scroll offset is measured in message lines and fractions of one.
+ * The wheel moves the offset by whole lines; the drawn offset eases
+ * toward it, which is what makes the history glide instead of jumping.
+ * The far ends are exact rather than whole: at rest the newest message
+ * sits on the baseline, and scrolled all the way up the oldest one sits
+ * on the window's top edge, however tall the window was dragged.</p>
  */
 public final class ClientChatChannelViews {
     /**
@@ -44,8 +51,20 @@ public final class ClientChatChannelViews {
     public static final ChatChannel SYSTEM_LINE_VIEW = ChatChannel.CONSOLE;
     private static final LinkedHashMap<Integer, ChatTab> TAB_BY_LINE_ID =
             new LinkedHashMap<Integer, ChatTab>();
-    private static final Map<ChatTab, Integer> SCROLL =
-            new HashMap<ChatTab, Integer>();
+    /** Where each view is scrolled to, in message lines. */
+    private static final Map<ChatTab, Double> SCROLL =
+            new HashMap<ChatTab, Double>();
+    /** Where each view is drawn right now, easing toward its target. */
+    private static final Map<ChatTab, Ease> RENDERED =
+            new HashMap<ChatTab, Ease>();
+    /**
+     * How long the drawn offset takes to cover most of the distance to
+     * its target: short enough to feel immediate, long enough to read as
+     * motion rather than a jump.
+     */
+    private static final double SCROLL_EASE_SECONDS = 0.06D;
+    /** Closer than this to the target and the offset simply arrives. */
+    private static final double SCROLL_SNAP_LINES = 0.01D;
     /**
      * Unread messages per tab, split once at arrival: a message that
      * @-mentions the local player counts as a ping and nowhere else, so the
@@ -102,11 +121,17 @@ public final class ClientChatChannelViews {
         if (addedLineCount <= 0) {
             return;
         }
-        for (Map.Entry<ChatTab, Integer> entry : SCROLL.entrySet()) {
+        for (Map.Entry<ChatTab, Double> entry : SCROLL.entrySet()) {
             if ((tab == null || entry.getKey().equals(tab))
-                    && entry.getValue().intValue() > 0) {
-                entry.setValue(Integer.valueOf(
-                        entry.getValue().intValue() + addedLineCount));
+                    && entry.getValue().doubleValue() > 0.0D) {
+                entry.setValue(Double.valueOf(
+                        entry.getValue().doubleValue() + addedLineCount));
+                // The view stays on the same message, so what is drawn
+                // must move with it rather than easing across the gap.
+                Ease ease = RENDERED.get(entry.getKey());
+                if (ease != null) {
+                    ease.value += addedLineCount;
+                }
             }
         }
     }
@@ -252,45 +277,116 @@ public final class ClientChatChannelViews {
     }
 
     /** Scroll offset (in lines) for the view, clamped to its content. */
-    public static synchronized int getScroll(ChatTab view, int totalLines,
-                                             int visibleLineCount) {
+    /**
+     * The view's scroll target in message lines, clamped to what the
+     * window can actually reach: nothing below the newest line, and no
+     * further up than leaves the oldest line sitting exactly on the
+     * window's top edge. {@code roomLines} is the room the window has,
+     * fractions of a line included, so a window dragged to an odd height
+     * still comes to rest on a whole message at both ends.
+     */
+    public static synchronized double getScroll(ChatTab view, int totalLines,
+                                                double roomLines) {
         if (view == null) {
-            return 0;
+            return 0.0D;
         }
-        int maximum = Math.max(0, totalLines - Math.max(1, visibleLineCount));
-        int clamped = Math.max(0, Math.min(maximum, count(SCROLL, view)));
-        if (clamped == 0) {
+        double maximum = Math.max(0.0D,
+                totalLines - Math.max(1.0D, roomLines));
+        double clamped = Math.max(0.0D, Math.min(maximum, target(view)));
+        if (clamped <= 0.0D) {
             SCROLL.remove(view);
         } else {
-            SCROLL.put(view, Integer.valueOf(clamped));
+            SCROLL.put(view, Double.valueOf(clamped));
         }
         return clamped;
     }
 
-    public static synchronized int getScroll(ChatChannel view, int totalLines,
-                                             int visibleLineCount) {
-        return getScroll(ChatTab.of(view), totalLines, visibleLineCount);
+    public static synchronized double getScroll(ChatChannel view,
+                                                int totalLines,
+                                                double roomLines) {
+        return getScroll(ChatTab.of(view), totalLines, roomLines);
+    }
+
+    /**
+     * The offset the view is drawn at this frame: the target once it has
+     * arrived, and on the way there a value easing toward it. Called
+     * once per window draw; with chat animation switched off it is the
+     * target itself.
+     */
+    public static synchronized double renderedScroll(ChatTab view,
+                                                     double target) {
+        if (view == null) {
+            return 0.0D;
+        }
+        long now = System.nanoTime();
+        Ease ease = RENDERED.get(view);
+        if (ease == null) {
+            ease = new Ease(target, now);
+            RENDERED.put(view, ease);
+            return target;
+        }
+        if (!LostTalesConfig.enableChatAnimations) {
+            ease.value = target;
+            ease.nanos = now;
+            return target;
+        }
+        double elapsed = Math.max(0.0D,
+                Math.min(0.25D, (now - ease.nanos) / 1.0E9D));
+        ease.nanos = now;
+        double remaining = target - ease.value;
+        if (Math.abs(remaining) <= SCROLL_SNAP_LINES) {
+            ease.value = target;
+        } else {
+            ease.value += remaining * (1.0D - Math.exp(
+                    -elapsed / SCROLL_EASE_SECONDS));
+        }
+        while (RENDERED.size() > MAX_EASED_VIEWS) {
+            Iterator<ChatTab> oldest = RENDERED.keySet().iterator();
+            oldest.next();
+            oldest.remove();
+        }
+        return ease.value;
     }
 
     public static synchronized void scroll(ChatTab view, int delta,
                                            int totalLines,
-                                           int visibleLineCount) {
+                                           double roomLines) {
         if (view == null) {
             return;
         }
-        SCROLL.put(view, Integer.valueOf(count(SCROLL, view) + delta));
-        getScroll(view, totalLines, visibleLineCount);
+        SCROLL.put(view, Double.valueOf(target(view) + delta));
+        getScroll(view, totalLines, roomLines);
     }
 
     public static synchronized void scroll(ChatChannel view, int delta,
                                            int totalLines,
-                                           int visibleLineCount) {
-        scroll(ChatTab.of(view), delta, totalLines, visibleLineCount);
+                                           double roomLines) {
+        scroll(ChatTab.of(view), delta, totalLines, roomLines);
     }
 
     /** Drops every view back to the newest line. */
     public static synchronized void resetScroll() {
         SCROLL.clear();
+        RENDERED.clear();
+    }
+
+    private static double target(ChatTab view) {
+        Double value = view == null ? null : SCROLL.get(view);
+        return value == null ? 0.0D : value.doubleValue();
+    }
+
+    /** Views whose easing is remembered; one per window is plenty. */
+    private static final int MAX_EASED_VIEWS = 16;
+
+    /** One view's drawn scroll offset and when it was last advanced. */
+    private static final class Ease {
+        double value;
+        long nanos;
+
+        Ease(double value, long nanos) {
+            this.value = value;
+            this.nanos = nanos;
+        }
     }
 
     /** Starts the history's entrance when the chat screen opens. */
@@ -325,11 +421,14 @@ public final class ClientChatChannelViews {
     public static synchronized void clear() {
         TAB_BY_LINE_ID.clear();
         SCROLL.clear();
+        RENDERED.clear();
         UNREAD_PINGS.clear();
         UNREAD_OTHER.clear();
         openedNanos = 0L;
         invalidateCache();
+        ChatWindowLines.clear();
         ChatWindowFrame.clear();
+        ClientChatAccountRoles.clear();
         // The history is gone with the world, and so are its conversations.
         ChatWindowLayout.closeConversations();
         ChatChannelIcons.forgetPortraits();

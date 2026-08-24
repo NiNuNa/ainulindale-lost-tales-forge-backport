@@ -1,12 +1,14 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import net.minecraft.event.ClickEvent;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatStyle;
 import net.minecraft.util.EnumChatFormatting;
@@ -64,12 +66,49 @@ public final class ChatLineWrapperTest {
     /** {@code [p]} prefix of one marked channel part plus a name. */
     private static ChatComponentText line(String prefix, String body) {
         ChatComponentText root = new ChatComponentText("");
-        root.appendSibling(ChatChannelPrefixMarker.apply(
+        root.appendSibling(ChatPrefixMarker.channel(
                 text("Global: "), 0x00FF00));
         root.appendSibling(text(prefix));
         root.appendSibling(ChatLayoutMarker.anchor());
         root.appendSibling(text(body));
         return root;
+    }
+
+    /** As above with a timestamp between the channel and the name. */
+    private static ChatComponentText timedLine(String time, String prefix,
+                                               String body) {
+        ChatComponentText root = new ChatComponentText("");
+        root.appendSibling(ChatPrefixMarker.channel(
+                text("Global: "), 0x00FF00));
+        root.appendSibling(ChatPrefixMarker.timestamp(text(time), 0xDBC9B4));
+        root.appendSibling(text(prefix));
+        root.appendSibling(ChatLayoutMarker.anchor());
+        root.appendSibling(text(body));
+        return root;
+    }
+
+    /**
+     * Neither state pays for the header run the other one draws: the
+     * closed feed reserves the channel prefix and not the timestamp, the
+     * open screen the timestamp and not the channel prefix. "Global: "
+     * and "[12:34] " are 48px each, "&lt;N&gt; " is 24.
+     */
+    @Test
+    public void eachStateReservesOnlyTheHeaderRunsItDraws() {
+        List<IChatComponent> closed = ChatLineWrapper.wrap(METRICS,
+                timedLine("[12:34] ", "<N> ", "aaa bbb ccc ddd"),
+                150, false);
+        List<IChatComponent> open = ChatLineWrapper.wrap(METRICS,
+                timedLine("[12:34] ", "<N> ", "aaa bbb ccc ddd"),
+                150, true);
+        // Closed: 48 + 24 = 72 taken, 78 left — two words of 18 and a
+        // space. Open: the same 72, since the timestamp replaces the
+        // channel prefix exactly.
+        assertEquals(2, closed.size());
+        assertEquals(2, open.size());
+        // The continuation indent is the header each state draws.
+        assertEquals(72, indentOf(closed.get(1), false));
+        assertEquals(72, indentOf(open.get(1), true));
     }
 
     private static String plain(IChatComponent line) {
@@ -117,6 +156,34 @@ public final class ChatLineWrapperTest {
         assertTrue(90 + METRICS.width("one two three") > 150);
         assertTrue(75 + METRICS.width("three four") <= 150);
         assertTrue(75 + METRICS.width("three four five") > 150);
+    }
+
+    /**
+     * The open screen draws no channel prefix, so a line laid out for it
+     * gives that width back to the message body instead of leaving it
+     * blank at the end of every line. "Global: " is 48px of a 150px
+     * line: closed, the body starts at 90 and gets two words on the
+     * first line; open it starts at 42 and gets four.
+     */
+    @Test
+    public void theOpenLayoutGivesTheChannelPrefixWidthToTheBody() {
+        List<IChatComponent> closed = ChatLineWrapper.wrap(METRICS,
+                line("<Name> ", "one two three four five six"), 150, false);
+        List<IChatComponent> open = ChatLineWrapper.wrap(METRICS,
+                line("<Name> ", "one two three four five six"), 150, true);
+        assertNotNull(open);
+        assertEquals("Global: <Name> one two", plain(closed.get(0)));
+        assertEquals("Global: <Name> one two three four",
+                plain(open.get(0)));
+        assertEquals(2, open.size());
+        assertEquals("five six", plain(open.get(1)));
+        // The marker still carries both offsets: the renderer picks the
+        // one the state it draws in needs.
+        assertEquals(42, indentOf(open.get(1), true));
+        assertEquals(75, indentOf(open.get(1), false));
+        // Nothing exceeds the width the open screen actually draws in.
+        assertTrue(42 + METRICS.width("one two three four") <= 150);
+        assertTrue(42 + METRICS.width("one two three four five") > 150);
     }
 
     @Test
@@ -270,5 +337,61 @@ public final class ChatLineWrapperTest {
         } finally {
             LostTalesConfig.showChatTimestamps = originalTimestamps;
         }
+    }
+
+    /**
+     * A wrapped line keeps the sender's colours: the head marker stays
+     * on the first line, so every continuation line carries them itself
+     * and a name that wrapped is drawn in the colour one that did not is.
+     */
+    @Test
+    public void continuationLinesCarryTheSendersColours() {
+        ChatComponentText root = new ChatComponentText("");
+        root.appendSibling(ChatPrefixMarker.channel(
+                text("Global: "), 0x00FF00));
+        ChatComponentText head = text("  ");
+        head.setChatStyle(head.getChatStyle().setChatClickEvent(
+                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
+                        ChatHeadMarker.encode(UUID.randomUUID(),
+                                ChatIdentityType.ACCOUNT, "", "hello",
+                                0x123456, 0xA94B54))));
+        root.appendSibling(head);
+        root.appendSibling(ChatLayoutMarker.anchor());
+        root.appendSibling(text("one two three four five six"));
+        List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS, root, 150);
+        assertNotNull(lines);
+        assertTrue(lines.size() > 1);
+        for (int index = 1; index < lines.size(); index++) {
+            ChatLayoutMarker.Data indent = indentMarker(lines.get(index));
+            assertNotNull(indent);
+            assertTrue("line " + index + " lost the sender's colours",
+                    indent.hasColors());
+            assertEquals(0xA94B54, indent.nameColor);
+            assertEquals(0x123456, indent.titleColor);
+        }
+        // The first line has the head itself, so it needs no copy.
+        assertNull(indentMarker(lines.get(0)));
+    }
+
+    /** A line with no head of its own carries no colours either. */
+    @Test
+    public void aHeadlessLineCarriesNoColours() {
+        List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
+                line("<Name> ", "one two three four five six"), 150);
+        assertNotNull(lines);
+        ChatLayoutMarker.Data indent = indentMarker(lines.get(1));
+        assertNotNull(indent);
+        assertFalse(indent.hasColors());
+    }
+
+    private static ChatLayoutMarker.Data indentMarker(IChatComponent line) {
+        for (Object value : line) {
+            ChatLayoutMarker.Data data =
+                    ChatLayoutMarker.decode((IChatComponent)value);
+            if (data != null && !data.anchor) {
+                return data;
+            }
+        }
+        return null;
     }
 }

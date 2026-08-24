@@ -5,10 +5,12 @@ import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
+import org.lwjgl.opengl.GL11;
 
 /**
  * Lost Tales' ivory text and plum-black shadow treatment for chat. Every
@@ -16,7 +18,15 @@ import net.minecraft.util.IChatComponent;
  * its shadow as a flat {@link #SHADOW} silhouette offset by one pixel at
  * half opacity, so the relationship between content and shadow is
  * identical at every GUI scale; inline glyphs share the box and baseline
- * rules of {@link ChatInlineIcons}. Channel prefix components are skipped
+ * rules of {@link ChatInlineIcons}.
+ *
+ * <p>Every one of those draws goes through {@link #beginContent()} first,
+ * which turns blending on. It has to: {@code Gui.drawRect} — which every
+ * panel, strip and bar in the chat is built from — <em>disables</em>
+ * blending when it is done, and text or a sprite drawn after one would
+ * otherwise land opaque, shadow and all. Asking each call site to
+ * remember that is how a half-opacity shadow keeps coming back as a
+ * solid one, so nothing here relies on the state it is handed.</p> Channel prefix components are skipped
  * entirely while the chat screen is open (the tabs already say which
  * channel a line belongs to), and layout markers advance the cursor
  * without drawing.
@@ -64,12 +74,26 @@ final class LostTalesChatVisualStyle {
         return shadow < MIN_VISIBLE_ALPHA ? 0 : shadow;
     }
 
+    /**
+     * Puts the pipeline into the state every chat element is drawn in:
+     * blended, so a shadow's half opacity and a fading line's alpha both
+     * mean what they say. Called by every draw in this class, and by the
+     * chat's sprite drawing, so no call site has to know what the last
+     * rectangle left behind.
+     */
+    static void beginContent() {
+        GL11.glEnable(GL11.GL_BLEND);
+        OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
+                GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+    }
+
     static void drawFormatted(FontRenderer font, IChatComponent line,
                               ChatHeadMarker.Data metadata,
                               int x, int y, int alpha, boolean chatOpen) {
         if (font == null || line == null || alpha < MIN_VISIBLE_ALPHA) {
             return;
         }
+        beginContent();
         int shadow = shadowAlpha(alpha);
         if (shadow > 0) {
             drawComponentPass(font, line, metadata,
@@ -88,12 +112,26 @@ final class LostTalesChatVisualStyle {
     /** Text in an explicit colour with the shared shadow treatment. */
     static void drawColored(FontRenderer font, String text,
                             int x, int y, int rgb, int alpha) {
+        drawColored(font, text, x, y, rgb, alpha, 1.0F);
+    }
+
+    /**
+     * As above for text drawn inside a scaled matrix: the offset is
+     * given in that matrix's units so the shadow still lands one screen
+     * pixel away, which is what every other shadow in the chat does.
+     * A scale of one is the plain case.
+     */
+    static void drawColored(FontRenderer font, String text,
+                            int x, int y, int rgb, int alpha, float scale) {
         if (font == null || text == null || alpha < MIN_VISIBLE_ALPHA) {
             return;
         }
+        beginContent();
         int shadow = shadowAlpha(alpha);
         if (shadow > 0) {
-            font.drawString(text, x + SHADOW_OFFSET, y + SHADOW_OFFSET,
+            int offset = scale <= 0.0F ? SHADOW_OFFSET
+                    : Math.max(1, Math.round(SHADOW_OFFSET / scale));
+            font.drawString(text, x + offset, y + offset,
                     argb(SHADOW, shadow));
         }
         font.drawString(text, x, y, argb(rgb, alpha));
@@ -102,6 +140,70 @@ final class LostTalesChatVisualStyle {
     static int argb(int rgb, int alpha) {
         return (Math.max(0, Math.min(255, alpha)) << 24)
                 | (rgb & 0xFFFFFF);
+    }
+
+    /**
+     * The palette entry a vanilla colour code stands for, so text the
+     * chat did not compose itself — an achievement from vanilla or from
+     * LOTR, another mod's notice, a player's own {@code &}-codes — reads
+     * in the same sixteen colours everything else does. The mapping
+     * keeps each code's identity: green stays green, yellow yellow,
+     * only in the palette's own tones. Vanilla's white is the chat's
+     * ivory, which is what {@link #removeExplicitWhite} already assumes.
+     */
+    static int paletteRgb(EnumChatFormatting formatting) {
+        if (formatting == null) {
+            return IVORY;
+        }
+        switch (formatting) {
+            case BLACK:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.PLUM_BLACK);
+            case DARK_BLUE:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.INDIGO);
+            case DARK_GREEN:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.SEA_GREEN);
+            case DARK_AQUA:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.TEAL);
+            case DARK_RED:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.RUST);
+            case DARK_PURPLE:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.MULBERRY);
+            case GOLD:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.APRICOT);
+            case GRAY:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.ROSE_GRAY);
+            case DARK_GRAY:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.MAUVE);
+            case BLUE:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.STEEL_BLUE);
+            case GREEN:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.MEADOW_GREEN);
+            case AQUA:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.SEAFOAM);
+            case RED:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.SALMON);
+            case LIGHT_PURPLE:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.ORCHID);
+            case YELLOW:
+                return LostTalesSkyrimUiStyle.rgb(
+                        LostTalesSkyrimUiStyle.HONEY);
+            default:
+                return IVORY;
+        }
     }
 
     /**
@@ -116,6 +218,10 @@ final class LostTalesChatVisualStyle {
         ChatLayoutMarker.Data layout = ChatLayoutMarker.decode(part);
         if (layout != null) {
             return layout.indent(chatOpen);
+        }
+        int declared = ChatInlineIcons.declaredWidth(part);
+        if (declared >= 0) {
+            return declared;
         }
         return measure(font, part.getChatStyle().getFormattingCode(),
                 part.getUnformattedTextForChat(), chatColoursEnabled());
@@ -165,7 +271,7 @@ final class LostTalesChatVisualStyle {
                 continue;
             }
             IChatComponent part = (IChatComponent)value;
-            if (ChatChannelPrefixMarker.isHidden(part, chatOpen)) {
+            if (ChatPrefixMarker.isHidden(part, chatOpen)) {
                 continue;
             }
             ChatLayoutMarker.Data layout = ChatLayoutMarker.decode(part);
@@ -209,7 +315,7 @@ final class LostTalesChatVisualStyle {
 
             String rendered;
             int color;
-            Integer prefixColor = ChatChannelPrefixMarker.decode(part);
+            Integer prefixColor = ChatPrefixMarker.decode(part);
             Integer explicitColor = ChatColorMarker.decode(part);
             if (explicitColor == null) {
                 explicitColor = ChatTitleMarker.colorOf(part);
@@ -249,12 +355,28 @@ final class LostTalesChatVisualStyle {
                 rendered = styleCodesOnly(formatting)
                         + removeColorCodes(text);
                 color = metadata.titleColor;
+            } else if (part.getChatStyle().getColor() != null) {
+                // A line from vanilla, LOTR or any other mod says what
+                // colour it wants in vanilla's sixteen; it is drawn in
+                // the palette's nearest, so an achievement is still
+                // green (or yellow, or purple) but in the chat's own
+                // greens and yellows rather than beside them.
+                rendered = styleCodesOnly(formatting)
+                        + removeColorCodes(text);
+                color = paletteRgb(part.getChatStyle().getColor());
             } else {
                 rendered = removeExplicitWhite(formatting + text);
                 color = IVORY;
             }
+            // Asked again for every run: an inline glyph between two of
+            // them is drawn by code of its own, and whatever that leaves
+            // behind must not decide what the next run's shadow looks
+            // like.
+            beginContent();
             font.drawString(rendered, cursor, y, argb(color, alpha));
-            cursor += measure(font, formatting, text, colours);
+            int declared = ChatInlineIcons.declaredWidth(part);
+            cursor += declared >= 0 ? declared
+                    : measure(font, formatting, text, colours);
             identitySeen |= replyIdentity;
         }
     }

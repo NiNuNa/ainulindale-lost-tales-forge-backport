@@ -266,6 +266,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "com/ninuna/losttales/client/chat/LostTalesChatHistoryHooks";
     private static final String CHAT_HISTORY_ACTIVE_PROPERTY =
             "losttales.chatHistory.active";
+    private static final String CHAT_DELETE_ACTIVE_PROPERTY =
+            "losttales.chatDelete.active";
     /** Vanilla's history limit, as the literal its trimming loops test. */
     private static final int VANILLA_CHAT_HISTORY = 100;
     private static final String LOTR_PLAYER_DATA =
@@ -288,8 +290,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             transformGuiScreenInput(basicClass)));
         }
         if (GUI_NEW_CHAT.equals(transformedName)) {
-            return transformGuiNewChatHistory(transformGuiNewChatWrap(
-                    transformGuiNewChatHitTest(basicClass)));
+            return transformGuiNewChatDelete(transformGuiNewChatHistory(
+                    transformGuiNewChatWrap(
+                            transformGuiNewChatHitTest(basicClass))));
         }
         if (LOTR_PLAYER_DATA.equals(transformedName)) {
             return transformLotrFastTravelArrival(basicClass);
@@ -2337,6 +2340,77 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return basicClass;
         } catch (Throwable throwable) {
             warn("Failed to patch chat line wrapping: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Keeps the chat history from deleting itself as it is laid out
+     * again.
+     *
+     * <p>{@code GuiNewChat.func_146237_a} opens by deleting any line
+     * that carries the id it was given, which is how a line is replaced.
+     * That delete also drops the message from the unwrapped history,
+     * and {@code refreshChat} calls the method for every entry of that
+     * history while walking it — so with lines that carry an id, which
+     * every Lost Tales line does, a re-wrap ate the history. The call
+     * becomes {@code LostTalesChatHistoryHooks.deleteUnlessRefreshing},
+     * which does exactly what vanilla did except while refreshing.</p>
+     */
+    private static byte[] transformGuiNewChatDelete(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"func_146237_a".equals(method.name)
+                        || !"(Lnet/minecraft/util/IChatComponent;IIZ)V"
+                        .equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, CHAT_HISTORY_HOOK_OWNER,
+                        "deleteUnlessRefreshing")) {
+                    System.setProperty(CHAT_DELETE_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                int replaced = 0;
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (instruction.getOpcode() != Opcodes.INVOKEVIRTUAL) {
+                        continue;
+                    }
+                    MethodInsnNode call = (MethodInsnNode)instruction;
+                    if (!"net/minecraft/client/gui/GuiNewChat".equals(call.owner)
+                            || !"(I)V".equals(call.desc)
+                            || (!"deleteChatLine".equals(call.name)
+                                    && !"func_146242_c".equals(call.name))) {
+                        continue;
+                    }
+                    // The refresh flag is the method's fourth argument.
+                    method.instructions.insertBefore(call,
+                            new VarInsnNode(Opcodes.ILOAD, 4));
+                    MethodInsnNode hook = new MethodInsnNode(
+                            Opcodes.INVOKESTATIC, CHAT_HISTORY_HOOK_OWNER,
+                            "deleteUnlessRefreshing",
+                            "(Lnet/minecraft/client/gui/GuiNewChat;IZ)V");
+                    method.instructions.set(call, hook);
+                    instruction = hook;
+                    replaced++;
+                }
+                if (replaced != 1) {
+                    warn("Expected one line deletion in "
+                            + "GuiNewChat#func_146237_a, found " + replaced
+                            + "; re-wrapping the chat will lose its history");
+                    return basicClass;
+                }
+                System.setProperty(CHAT_DELETE_ACTIVE_PROPERTY, "true");
+                info("Patched GuiNewChat line replacement for re-wrapping");
+                return write(owner);
+            }
+            warn("Could not locate GuiNewChat#func_146237_a; re-wrapping "
+                    + "the chat will lose its history");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch chat line replacement: " + throwable);
             return basicClass;
         }
     }

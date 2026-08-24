@@ -42,11 +42,38 @@ import net.minecraft.item.ItemStack;
 final class ChatInlineIcons {
     /** Reserved inline slot: the width of two bold spaces. */
     static final int SLOT_WIDTH = 10;
+    /**
+     * The slot a head marker reserves: eight pixels of face with two
+     * clear either side of it, one of which the glyph before the head
+     * already provides as its own trailing space. Declared rather than
+     * measured, because a run of spaces cannot be eleven pixels wide —
+     * a space is four and a bold one five — and the gaps the head sits
+     * between should be even.
+     */
+    static final int HEAD_SLOT_WIDTH = 11;
+    /** Where the face starts inside that slot. */
+    static final float HEAD_SLOT_INSET = 1.0F;
+    /** The clear space a name keeps from what is written either side. */
+    static final int NAME_GAP = 2;
     /** Common inline content box edge; also the emote sprite's native size. */
     static final float CONTENT_SIZE = 10.0F;
     /** Box top relative to the text top: centred in the 11px line band. */
     static final int CONTENT_TOP_OFFSET = -2;
     private ChatInlineIcons() {}
+
+    /**
+     * How far the cursor moves past a component that declares its own
+     * width rather than being measured — a head's slot, a plain gap —
+     * or -1 for anything measured from its text. Every walk over a line
+     * asks here, so drawing, wrapping and hit testing cannot disagree
+     * about where the next glyph starts.
+     */
+    static int declaredWidth(net.minecraft.util.IChatComponent part) {
+        if (ChatHeadMarker.isMarker(part)) {
+            return HEAD_SLOT_WIDTH;
+        }
+        return ChatSpacerMarker.decode(part);
+    }
 
     /** Content edge for a slot; a degraded slot narrower than ten shrinks it. */
     static float contentSize(int slotWidth) {

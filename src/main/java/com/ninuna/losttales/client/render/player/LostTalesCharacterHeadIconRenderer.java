@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.resources.SkinManager;
@@ -25,15 +26,31 @@ import org.lwjgl.opengl.GL11;
  * model-specific extended headwear cube rather than Minecraft's normal
  * 64x32 hat layer. This renderer composes that layer into a square portrait
  * so every HUD and map surface shows the same character appearance.</p>
+ *
+ * <p>A portrait is pixel art: one texel of the skin to one pixel on
+ * screen, whichever layer it comes from and whichever model it belongs
+ * to. The face is laid on whole display pixels and its cell is sampled
+ * exactly, which together give every one of its texels the same number
+ * of pixels; only the head's own rows of an extended cube are taken, so
+ * nothing is ever squeezed into a square it does not fit. The headwear
+ * is the one thing drawn larger than its texels — a quarter again,
+ * about the face's centre, which is what stands it off as the model's
+ * second cube stands off the first.</p>
  */
 public final class LostTalesCharacterHeadIconRenderer {
 
     private static final ResourceLocation DEFAULT_PLAYER_SKIN =
             new ResourceLocation("textures/entity/steve.png");
-    /** Slightly raised headwear makes the model's second layer legible at 8px. */
-    private static final float OUTER_LAYER_SCALE = 9.5F / 8.0F;
-    private static final float OUTER_LAYER_DEPTH = 0.55F;
-    private static final float OUTER_LAYER_SHADE = 0.36F;
+    /**
+     * How much larger the headwear is drawn than the face it lies on,
+     * about their shared centre: a quarter again, which is what raises
+     * the model's second cube off the first. The face keeps one texel
+     * to one pixel and stays sharp; the headwear does not, and cannot —
+     * eight texels over ten pixels is uneven however it is drawn — but
+     * it is a hat, and the depth is worth more than its edges are.
+     */
+    private static final float OUTER_LAYER_SCALE = 1.25F;
+
     private static final Map<UUID, ResourceLocation> ACCOUNT_SKINS =
             new ConcurrentHashMap<UUID, ResourceLocation>();
     private static final Set<UUID> REQUESTED_ACCOUNT_SKINS =
@@ -193,22 +210,11 @@ public final class LostTalesCharacterHeadIconRenderer {
                     8.0F * unit, 8.0F * unit,
                     imageWidth, imageHeight);
             if (drawFeatures && imageHeight >= imageWidth) {
+                // As on a player's head: the headwear stands off the
+                // face by growing about their shared centre.
                 float outerSize = size * OUTER_LAYER_SCALE;
                 float outerOffset = (outerSize - size) * 0.5F;
-                GL11.glColor4f(
-                        Math.min(1.0F, red) * OUTER_LAYER_SHADE,
-                        Math.min(1.0F, green) * OUTER_LAYER_SHADE,
-                        Math.min(1.0F, blue) * OUTER_LAYER_SHADE,
-                        Math.min(1.0F, alpha) * 0.82F);
-                drawNpcExtendedOverlay(
-                        x - outerOffset + OUTER_LAYER_DEPTH,
-                        y - outerOffset + OUTER_LAYER_DEPTH,
-                        outerSize, unit, imageWidth, imageHeight);
-                GL11.glColor4f(
-                        Math.min(1.0F, red), Math.min(1.0F, green),
-                        Math.min(1.0F, blue), Math.min(1.0F, alpha));
-                drawNpcExtendedOverlay(
-                        x - outerOffset, y - outerOffset,
+                drawNpcExtendedOverlay(x - outerOffset, y - outerOffset,
                         outerSize, unit, imageWidth, imageHeight);
             }
             return true;
@@ -418,6 +424,13 @@ public final class LostTalesCharacterHeadIconRenderer {
         }
         try {
             minecraft.getTextureManager().bindTexture(head.location);
+            // A head is drawn wherever a caller wants one, and a GUI
+            // panel drawn just before it may have left blending off —
+            // vanilla's drawRect does. Without it a head at half opacity,
+            // a shadow above all, would land solid.
+            GL11.glEnable(GL11.GL_BLEND);
+            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
+                    GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
             GL11.glColor4f(
                     Math.min(1.0F, red), Math.min(1.0F, green),
                     Math.min(1.0F, blue), Math.min(1.0F, alpha));
@@ -428,28 +441,18 @@ public final class LostTalesCharacterHeadIconRenderer {
                     layout.getFaceSize(), layout.getFaceSize(),
                     64.0F, layout.getImageHeight());
 
-            float outerSize = size * OUTER_LAYER_SCALE;
-            float outerOffset = (outerSize - size) * 0.5F;
-            float outerX = x - outerOffset;
-            float outerY = y - outerOffset;
             if (drawFeatures && (layout.getOverlayKind()
                     == CharacterHeadIconLayout.OverlayKind.MINECRAFT
                     || layout.getOverlayKind()
                     == CharacterHeadIconLayout.OverlayKind.LOTR_EXTENDED)) {
-                // A tinted offset copy provides the missing visual depth of
-                // the model's raised headwear cube without moving its pixels.
-                GL11.glColor4f(
-                        Math.min(1.0F, red) * OUTER_LAYER_SHADE,
-                        Math.min(1.0F, green) * OUTER_LAYER_SHADE,
-                        Math.min(1.0F, blue) * OUTER_LAYER_SHADE,
-                        Math.min(1.0F, alpha) * 0.82F);
-                drawOuterOverlay(layout,
-                        outerX + OUTER_LAYER_DEPTH,
-                        outerY + OUTER_LAYER_DEPTH, outerSize);
-                GL11.glColor4f(
-                        Math.min(1.0F, red), Math.min(1.0F, green),
-                        Math.min(1.0F, blue), Math.min(1.0F, alpha));
-                drawOuterOverlay(layout, outerX, outerY, outerSize);
+                // The headwear stands off the face by growing about
+                // their shared centre — the second cube is larger than
+                // the first on the model too. No shade under it: the
+                // size is the depth.
+                float outerSize = size * OUTER_LAYER_SCALE;
+                float outerOffset = (outerSize - size) * 0.5F;
+                drawOuterOverlay(layout, x - outerOffset, y - outerOffset,
+                        outerSize);
             } else if (drawFeatures && layout.getOverlayKind()
                     == CharacterHeadIconLayout.OverlayKind.LOTR_ORC_FEATURES) {
                 drawOrcNose(x, y, size, layout.getImageHeight());
@@ -477,8 +480,7 @@ public final class LostTalesCharacterHeadIconRenderer {
                     40.0F, 8.0F, 8.0F, 8.0F,
                     64.0F, layout.getImageHeight());
         } else {
-            drawLotrExtendedOverlay(
-                    x, y, size, layout.getExtendedOverlayHeight(),
+            drawLotrExtendedOverlay(x, y, size, layout.getFaceSize(),
                     layout.getImageHeight());
         }
     }
@@ -506,22 +508,34 @@ public final class LostTalesCharacterHeadIconRenderer {
     }
 
     /**
-     * Projects the configured portrait portion of LOTR's extended headwear
-     * cube. Human and elf portraits use the upper 8x8 head region, preserving
-     * the model's pixel-for-pixel hat alignment; compact dwarf/hobbit layouts
-     * deliberately retain their additional beard rows.
+     * The head's own square of LOTR's extended headwear cube. Only that
+     * square: the cube carries hair below the chin for some races, and
+     * squeezing those extra rows into a square portrait would stretch
+     * every texel in it. A portrait shows the head, so it takes the
+     * head's rows and leaves the rest on the model.
      */
     private static void drawLotrExtendedOverlay(float x,
                                                 float y,
                                                 float size,
-                                                float overlayHeight,
+                                                float faceSize,
                                                 float imageHeight) {
         drawTexturedQuad(
                 x, y, size, size,
-                8.0F, 40.0F, 8.0F, overlayHeight,
+                8.0F, 40.0F, faceSize, faceSize,
                 64.0F, imageHeight);
     }
 
+    /**
+     * One cell of a skin, drawn as a quad. The sample rectangle is the
+     * cell exactly — no inset. A skin is pixel art sampled with no
+     * filtering, and the quad is laid on whole display pixels, so every
+     * destination pixel's centre falls strictly inside a texel and each
+     * texel gets the same number of pixels. Holding the rectangle even
+     * a quarter of a texel inside the cell samples less than the whole
+     * cell and spreads what is left unevenly: eight texels over
+     * twenty-four pixels becomes seven and a half, and the columns come
+     * out three, then four, then two pixels wide.
+     */
     private static void drawTexturedQuad(float x,
                                          float y,
                                          float width,

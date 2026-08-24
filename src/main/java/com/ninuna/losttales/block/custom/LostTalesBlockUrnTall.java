@@ -1,7 +1,7 @@
 package com.ninuna.losttales.block.custom;
 
 import com.ninuna.losttales.block.collision.LostTalesBlockBounds;
-import com.ninuna.losttales.entity.ELostTalesUser;
+import com.ninuna.losttales.user.ELostTalesUser;
 import java.util.Random;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.item.Item;

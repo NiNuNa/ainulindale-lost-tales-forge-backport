@@ -33,8 +33,21 @@ final class ChatLayoutMarker {
     }
 
     static ChatComponentText indent(int closedWidth, int openWidth) {
+        return indent(closedWidth, openWidth, -1, -1);
+    }
+
+    /**
+     * As above, carrying the sender's own colours. A wrapped message
+     * leaves its head marker on the first line, and the head marker is
+     * where the renderer reads the sender's name and title colours from;
+     * a continuation line carries them here instead, so a name that
+     * wrapped is drawn in the same colour as one that did not.
+     */
+    static ChatComponentText indent(int closedWidth, int openWidth,
+                                    int nameColor, int titleColor) {
         return marker(PREFIX + INDENT + Math.max(0, closedWidth) + ':'
-                + Math.max(0, openWidth));
+                + Math.max(0, openWidth) + ':' + nameColor + ':'
+                + titleColor);
     }
 
     private static ChatComponentText marker(String value) {
@@ -63,13 +76,15 @@ final class ChatLayoutMarker {
         if (!payload.startsWith(INDENT)) {
             return null;
         }
-        String[] widths = payload.substring(INDENT.length()).split(":", -1);
-        if (widths.length != 2) {
+        String[] fields = payload.substring(INDENT.length()).split(":", -1);
+        if (fields.length != 2 && fields.length != 4) {
             return null;
         }
         try {
-            return new Data(false, Integer.parseInt(widths[0]),
-                    Integer.parseInt(widths[1]));
+            return new Data(false, Integer.parseInt(fields[0]),
+                    Integer.parseInt(fields[1]),
+                    fields.length == 4 ? Integer.parseInt(fields[2]) : -1,
+                    fields.length == 4 ? Integer.parseInt(fields[3]) : -1);
         } catch (NumberFormatException ignored) {
             return null;
         }
@@ -85,16 +100,27 @@ final class ChatLayoutMarker {
     }
 
     static final class Data {
-        static final Data ANCHOR = new Data(true, 0, 0);
+        static final Data ANCHOR = new Data(true, 0, 0, -1, -1);
 
         final boolean anchor;
         private final int closedIndent;
         private final int openIndent;
+        /** The sender's colours, or -1 when the line carries none. */
+        final int nameColor;
+        final int titleColor;
 
-        private Data(boolean anchor, int closedIndent, int openIndent) {
+        private Data(boolean anchor, int closedIndent, int openIndent,
+                     int nameColor, int titleColor) {
             this.anchor = anchor;
             this.closedIndent = Math.max(0, closedIndent);
             this.openIndent = Math.max(0, openIndent);
+            this.nameColor = nameColor;
+            this.titleColor = titleColor;
+        }
+
+        /** Whether this marker knows what colour the sender's name is. */
+        boolean hasColors() {
+            return this.nameColor >= 0;
         }
 
         /** Pixels the cursor advances for this marker in the given state. */

@@ -2,6 +2,7 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
+import com.ninuna.losttales.faction.FactionDemonyms;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.regex.Pattern;
 import lotr.common.LOTRLevelData;
@@ -45,12 +46,16 @@ final class LostTalesChatPresentationResolver {
             factionColor = LotrCharacterAdapter.getInstance()
                     .getFactionColor(character.getStartingFactionId(),
                             factionColor);
-            // LOTR's own faction name, as its NPC naming uses it; any
-            // formatting codes stay behind, the client colours the title.
+            // The epithet names the sender's people, which is not always
+            // what the realm is called: a Lothlórien character is a
+            // Galadhrim Miner. Formatting codes stay behind; the client
+            // colours the title.
             String name = LotrCharacterAdapter.getInstance()
                     .getFactionDisplayName(character.getStartingFactionId());
-            factionName = name == null ? ""
+            String plain = name == null ? ""
                     : FORMATTING_CODES.matcher(name).replaceAll("").trim();
+            factionName = FactionDemonyms.of(
+                    character.getStartingFactionId(), plain);
         }
         // The faction explorer renders LOTRFaction#getFactionColor(). Keep
         // title and character name on that exact same RGB source.

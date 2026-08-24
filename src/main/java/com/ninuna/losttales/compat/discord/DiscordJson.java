@@ -11,10 +11,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The two shapes the bridge exchanges with Discord, with the bundled
- * Gson: the message list a channel returns, and the body a webhook is
- * given. Nothing else of the API is modelled. Parsing never throws:
- * anything that is not the expected shape yields an empty list.
+ * The shapes the bridge exchanges with Discord, with the bundled Gson:
+ * the message list a channel returns, the body a webhook is given, and
+ * the body that sets a channel's topic. Nothing else of the API is
+ * modelled. Parsing never throws: anything that is not the expected
+ * shape yields an empty list.
  */
 public final class DiscordJson {
     /** Messages read at a time; Discord allows up to a hundred. */
@@ -123,6 +124,13 @@ public final class DiscordJson {
         JsonObject allowedMentions = new JsonObject();
         allowedMentions.add("parse", new JsonArray());
         body.add("allowed_mentions", allowedMentions);
+        return body.toString();
+    }
+
+    /** The body of a channel modification that sets only the topic. */
+    public static String channelTopicBody(String topic) {
+        JsonObject body = new JsonObject();
+        body.addProperty("topic", topic == null ? "" : topic);
         return body.toString();
     }
 

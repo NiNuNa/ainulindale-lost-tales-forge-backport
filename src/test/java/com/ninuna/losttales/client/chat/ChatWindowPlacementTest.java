@@ -79,7 +79,7 @@ public final class ChatWindowPlacementTest {
             ChatWindowPlacement.Box belowBox =
                     ChatWindowPlacement.windowBounds(below, null, 1000, 600);
             assertEquals(88.4D, consoleBox.baseline(), 0.0001D);
-            assertEquals(8, belowBox.lines);
+            assertEquals(8 * 11, belowBox.room);
             assertEquals(152.48D, belowBox.baseline(), 0.0001D);
             assertEquals(44.48D, belowBox.y, 0.0001D);
             assertTrue(belowBox.y < consoleBox.bottom());
@@ -92,7 +92,7 @@ public final class ChatWindowPlacementTest {
                     600);
             assertEquals(35.0D, consoleBox.baseline(), 0.0001D);
             assertEquals(4.0D, consoleBox.y, 0.0001D);
-            assertEquals(8, belowBox.lines);
+            assertEquals(8 * 11, belowBox.room);
             assertEquals(152.48D, belowBox.baseline(), 0.0001D);
             // Stored anchors are untouched.
             assertEquals(10.0D, console.getOffsetY(), 0.0D);
@@ -103,7 +103,7 @@ public final class ChatWindowPlacementTest {
                     1000, 600);
             belowBox = ChatWindowPlacement.windowBounds(below, null, 1000,
                     600);
-            assertEquals(1, belowBox.lines);
+            assertEquals(11, belowBox.room);
             assertEquals(belowBox.y - 4.0D, consoleBox.bottom(), 0.0001D);
         } finally {
             ChatWindowFrame.clear();
@@ -157,6 +157,67 @@ public final class ChatWindowPlacementTest {
                 0.0001D);
         assertEquals(4.0D, ChatWindowPlacement.position(100.0D, 100, 200),
                 0.0001D);
+    }
+
+    /**
+     * A window is exactly as tall as it was dragged: the message room is
+     * a pixel count, not a whole number of lines. Without a Minecraft
+     * instance a line is 11 tall, the row 20 and the bar 27, so a box of
+     * n lines is 47 + round(11n) tall and every pixel of drag between
+     * two whole lines lands on a box of its own.
+     */
+    @Test
+    public void heightIsContinuousBetweenWholeLines() {
+        ChatWindowLayout.reset();
+        assertEquals(20 + 132 + 27,
+                ChatWindowPlacement.heightForLines(12.0D, null));
+        assertEquals(20 + 136 + 27,
+                ChatWindowPlacement.heightForLines(12.37D, null));
+        // Every height between two whole lines is reachable, and asking
+        // for one gives it back unchanged.
+        for (int height = 179; height <= 190; height++) {
+            double lines = ChatWindowPlacement.linesForHeight(height, null);
+            assertEquals(height,
+                    ChatWindowPlacement.heightForLines(lines, null));
+        }
+        // The box a resized window is drawn in carries that room, and
+        // the draw shows one more line than the whole ones to clip.
+        ChatWindow window = ChatWindowLayout.firstWindow();
+        ChatWindowLayout.setWindowLines(window.getId(), 12.37D, true);
+        ChatWindowFrame frame = ChatWindowFrame.of(window);
+        List<net.minecraft.client.gui.ChatLine> lines =
+                new java.util.ArrayList<net.minecraft.client.gui.ChatLine>();
+        for (int index = 0; index < 40; index++) {
+            lines.add(new net.minecraft.client.gui.ChatLine(0,
+                    new net.minecraft.util.ChatComponentText("x"), index));
+        }
+        frame.lines = lines;
+        try {
+            ChatWindowPlacement.Box box = ChatWindowPlacement.windowBounds(
+                    window, null, 1000, 600);
+            assertEquals(136, box.room);
+            assertEquals(20 + 136 + 27, box.height);
+            assertEquals(13, LostTalesChatOverlayRenderer.linesForRoom(
+                    box.room, 1.0F));
+        } finally {
+            ChatWindowFrame.clear();
+        }
+    }
+
+    /**
+     * Messages fill a share of the window and no more, so a wide window
+     * and a narrow one keep the same margin at the right; the share is
+     * of the window, not of the chat scale, so it looks the same at
+     * every scale.
+     */
+    @Test
+    public void messagesFillTheirShareOfTheWindowAndNoMore() {
+        assertEquals(304, ChatWindowPlacement.wrapWidth(320, 1.0F));
+        assertEquals(0.95D, ChatWindowPlacement.TEXT_WIDTH_SHARE, 0.0D);
+        // Half the chat scale is twice the chat units, same share.
+        assertEquals(608, ChatWindowPlacement.wrapWidth(320, 0.5F));
+        // Never past nothing, whatever the width.
+        assertTrue(ChatWindowPlacement.wrapWidth(1, 1.0F) >= 1);
     }
 
     @Test

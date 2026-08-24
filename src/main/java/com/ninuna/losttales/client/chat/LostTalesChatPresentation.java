@@ -1,6 +1,8 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.chat.ChatMentions;
 import com.ninuna.losttales.chat.ChatMessageValidator;
@@ -63,8 +65,13 @@ public final class LostTalesChatPresentation {
                     minecraft, packet.getSenderId(),
                     packet.getIdentityName());
         }
+        // The name this line was signed with, and what the server says
+        // it wears: that is where a mention of it takes its colour from.
+        ClientChatAccountRoles.remember(packet.getIdentityName(),
+                packet.getRoles());
         boolean mentioned = LostTalesConfig.enableChatPings
-                && isLocalPlayerMentioned(minecraft, packet.getMessage());
+                && isLocalPlayerMentioned(minecraft, channel,
+                        packet.getMessage());
         // A whisper lands in the tab of its conversation, opened on the
         // first message in the window the player is typing in.
         ChatTab tab = channel == ChatChannel.WHISPER
@@ -73,6 +80,13 @@ public final class LostTalesChatPresentation {
                 : ChatTab.of(channel);
         if (tab == null) {
             return;
+        }
+        if (tab.isWhisper() && minecraft.thePlayer != null
+                && !minecraft.thePlayer.getUniqueID().equals(
+                        packet.getSenderId())) {
+            // Their half of the conversation says what colour it is in.
+            ClientChatChannelState.rememberPartnerColor(tab,
+                    packet.getNameColor());
         }
         int chatLineId = print(minecraft, packet, tab, mentioned);
         if (mentioned || tab.isWhisper()) {
@@ -94,7 +108,7 @@ public final class LostTalesChatPresentation {
         int chatLineId = allocateChatLineId();
         GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
         chat.printChatMessageWithOptionalDeletion(
-                build(packet, decodeShowcases(packet)), chatLineId);
+                build(packet, tab, decodeShowcases(packet)), chatLineId);
         noteLinePrinted(minecraft, chat, chatLineId, tab, mentioned);
         return chatLineId;
     }
@@ -105,6 +119,18 @@ public final class LostTalesChatPresentation {
      * whisper of theirs would be, filed under the NPC's tab.
      */
     public static boolean echoToNpc(ChatTab tab, String message) {
+        return echoToNpc(tab, message, null);
+    }
+
+    /**
+     * As above with the things the player shared. Nobody is on the other
+     * end of an NPC's conversation, so no server ever validates them:
+     * the client resolved them from its own inventory and marker cache,
+     * and they are shown to the player who shared them and to nobody
+     * else.
+     */
+    public static boolean echoToNpc(ChatTab tab, String message,
+                                    List<ChatShowcase> showcases) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (tab == null || !tab.isNpc() || message == null
                 || !ChatMessageValidator.isValid(message)
@@ -118,7 +144,7 @@ public final class LostTalesChatPresentation {
                 account, account, "",
                 LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
                 LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
-                message, System.currentTimeMillis(), "", null, "",
+                message, System.currentTimeMillis(), "", showcases, "",
                 tab.getPartner());
         LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
                 minecraft, packet.getSenderId(), account);
@@ -195,12 +221,30 @@ public final class LostTalesChatPresentation {
         return ids;
     }
 
-    /** The local account name plus the active character's name, if any. */
+    /**
+     * The local account name, the active character's name, and — on the
+     * account channels only — the name of every role this player holds,
+     * so {@code @Operator} reaches the operators and nobody else. A role
+     * is an account fact and means nothing in character, so it is not
+     * addressable in the role-playing channels. Which roles the player
+     * holds is the server's word, sent with the chat access; nothing
+     * here is decided from the message.
+     */
     private static boolean isLocalPlayerMentioned(
-            Minecraft minecraft, String message) {
+            Minecraft minecraft, ChatChannel channel, String message) {
         List<String> names = new ArrayList<String>(2);
         if (minecraft.thePlayer != null) {
             names.add(minecraft.thePlayer.getCommandSenderName());
+        }
+        if (channel != null
+                && channel.getIdentityType() == ChatIdentityType.ACCOUNT) {
+            for (ChatAccountRole role
+                    : ClientChatChannelState.localRoles()) {
+                if (role.isMentionable()) {
+                    names.add(StatCollector.translateToLocal(
+                            role.getNameKey()));
+                }
+            }
         }
         CharacterRosterSnapshot snapshot =
                 ClientCharacterRosterCache.getSnapshot();
@@ -254,18 +298,37 @@ public final class LostTalesChatPresentation {
     }
 
     static IChatComponent build(LostTalesChatMessagePacket packet) {
-        return build(packet, NO_SHOWCASES);
+        return build(packet, tabOf(packet), NO_SHOWCASES);
     }
 
+    /** The tab a packet would be filed under, read from the packet alone. */
+    private static ChatTab tabOf(LostTalesChatMessagePacket packet) {
+        return packet.getChannel() == ChatChannel.WHISPER
+                ? ChatTab.whisper(packet.getPartner())
+                : ChatTab.of(packet.getChannel());
+    }
+
+    /**
+     * The line as it is shown, filed under {@code tab}. The tab is the
+     * caller's, not the packet's: an NPC conversation and a whisper with
+     * a player of the same name are two different tabs, and only the
+     * caller knows which one this line belongs to.
+     */
     static IChatComponent build(LostTalesChatMessagePacket packet,
-                                int[] showcaseIds) {
+                                ChatTab tab, int[] showcaseIds) {
         ChatChannel channel = packet.getChannel();
         ChatComponentText root = new ChatComponentText("");
-        int channelColor = channel == ChatChannel.FACTION
-                ? packet.getNameColor() : channel.getDisplayColor();
-        appendChannelPrefix(root, channel == ChatChannel.WHISPER
-                ? ChatTab.whisper(packet.getPartner()) : ChatTab.of(channel),
-                channelColor);
+        ChatTab named = tab == null ? tabOf(packet) : tab;
+        // The prefix names the tab, so it is the colour the tab is drawn
+        // in: a conversation speaks in the other party's colour, every
+        // other channel in its own. Nothing in the feed may name a
+        // channel in a colour its tab does not use. Faction takes the
+        // sender's own faction colour, which the server put on the line
+        // and which is the receiver's too — the server routes faction
+        // chat to members only.
+        appendChannelPrefix(root, named, channel == ChatChannel.FACTION
+                ? packet.getNameColor()
+                : ClientChatChannelState.displayColor(named));
         // (An NPC conversation names the same partner, so its prefix
         // reads the same.)
         appendTimestamp(root, packet.getTimestampMillis());
@@ -273,23 +336,30 @@ public final class LostTalesChatPresentation {
         // sender's opening bracket; see ChatLineWrapper.
         root.appendSibling(ChatLayoutMarker.anchor());
 
-        if (packet.isOperator()) {
-            // The server's word on an account line's sender, ahead of the
-            // name in the palette's crimson.
-            int tagColor = LostTalesColors.rgb(LostTalesColors.CRIMSON);
+        // The server's word on an account line's sender: every role it
+        // holds, tagged ahead of the name in the role's own colour. The
+        // name's colour is the primary role's too, but that is already
+        // the packet's name colour — the server set it when it built the
+        // line, so nothing here decides what a role looks like.
+        for (ChatAccountRole role : ChatAccountRole.fromMask(
+                packet.getRoles())) {
             root.appendSibling(ChatColorMarker.apply(
-                    text(StatCollector.translateToLocal(
-                            "chat.losttales.tag.operator") + " ",
-                            nearestFormatting(tagColor), false),
-                    tagColor));
+                    text(StatCollector.translateToLocal(role.getTagKey())
+                            + " ", nearestFormatting(role.getColor()),
+                            false),
+                    role.getColor()));
         }
-        root.appendSibling(ChatColorMarker.apply(
-                text("<", nearestFormatting(
-                        packet.getNameColor()), false),
-                packet.getNameColor()));
-        // Two bold spaces reserve ten pixels: enough for the raised
-        // headwear layer plus the compact gap seen in the identity
-        // reference, without adding a visible spacer component.
+        // The brackets are part of the name: they answer to a hover
+        // and a click exactly as it does, so the card comes up wherever
+        // the pointer is over the sender. Their colour comes from the
+        // head marker, which is where every part of the name takes it.
+        String whisper = "/msg " + packet.getAccountName() + " ";
+        root.appendSibling(reply(text("<", nearestFormatting(
+                packet.getNameColor()), false), whisper));
+        // Two bold spaces stand in for the head; what the line actually
+        // advances by is the slot ChatInlineIcons declares, which every
+        // walk over the line — drawing, wrapping, hit testing — reads.
+        // The spaces are only so the raw text has something there.
         ChatComponentText marker = text("  ",
                 EnumChatFormatting.WHITE, true);
         marker.setChatStyle(marker.getChatStyle().setChatClickEvent(
@@ -301,12 +371,8 @@ public final class LostTalesChatPresentation {
                                 packet.getNameColor()))));
         root.appendSibling(marker);
 
-        ChatComponentText identity = text(packet.getIdentityName(),
-                nearestFormatting(packet.getNameColor()), false);
-        identity.setChatStyle(identity.getChatStyle().setChatClickEvent(
-                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
-                        "/msg " + packet.getAccountName() + " ")));
-        root.appendSibling(identity);
+        root.appendSibling(reply(text(packet.getIdentityName(),
+                nearestFormatting(packet.getNameColor()), false), whisper));
         if (packet.getTitle().length() > 0) {
             // LOTR's NPC naming, "Name, the Gondor Farmer": the epithet is
             // the sender's faction and title; an untitled sender gets no
@@ -320,12 +386,29 @@ public final class LostTalesChatPresentation {
                             false),
                     packet.getTitleColor(), epithet));
         }
-        root.appendSibling(ChatColorMarker.apply(
-                text("> ", nearestFormatting(
-                        packet.getNameColor()), false),
-                packet.getNameColor()));
-        appendMessageBody(root, packet.getMessage(), showcaseIds);
+        // The closing bracket keeps the same clear space from what
+        // precedes it that the opening one keeps from the head; a glyph
+        // carries one pixel of that as its own trailing space.
+        root.appendSibling(ChatSpacerMarker.of(
+                ChatInlineIcons.NAME_GAP - 1));
+        root.appendSibling(reply(text("> ", nearestFormatting(
+                packet.getNameColor()), false), whisper));
+        appendMessageBody(root, packet.getMessage(), showcaseIds,
+                channel);
         return root;
+    }
+
+    /**
+     * A component that answers to the pointer as the sender's name
+     * does: the same whisper on a click, and so the same card on a
+     * hover. Its colour comes from the line's head marker, which is
+     * where every part of a sender's name takes it.
+     */
+    private static ChatComponentText reply(ChatComponentText part,
+                                           String whisper) {
+        part.setChatStyle(part.getChatStyle().setChatClickEvent(
+                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, whisper)));
+        return part;
     }
 
     /**
@@ -445,8 +528,11 @@ public final class LostTalesChatPresentation {
                 || minecraft.ingameGUI == null) {
             return false;
         }
-        // The tab wears the same portrait the line is drawn with.
+        // The tab wears the same portrait the line is drawn with, and
+        // is named in the same honey the NPC's own name is.
         ChatChannelIcons.rememberNpcPortrait(tab, texturePath);
+        ClientChatChannelState.rememberPartnerColor(tab,
+                LostTalesColors.rgb(LostTalesColors.HONEY));
         if (tab.isWhisper()
                 && ChatWindowLayout.openTab(tab, windowIdOfSelection())
                         == null) {
@@ -469,7 +555,8 @@ public final class LostTalesChatPresentation {
                                          String message,
                                          long timestampMillis) {
         ChatComponentText root = new ChatComponentText("");
-        appendChannelPrefix(root, tab, tab.getChannel().getDisplayColor());
+        appendChannelPrefix(root, tab,
+                ClientChatChannelState.displayColor(tab));
         appendTimestamp(root, timestampMillis);
         root.appendSibling(ChatLayoutMarker.anchor());
         int nameColor = LostTalesColors.rgb(LostTalesColors.HONEY);
@@ -490,7 +577,8 @@ public final class LostTalesChatPresentation {
         root.appendSibling(ChatColorMarker.apply(
                 text("> ", nearestFormatting(nameColor), false),
                 nameColor));
-        appendMessageBody(root, message, NO_SHOWCASES);
+        appendMessageBody(root, message, NO_SHOWCASES,
+                ChatChannel.WHISPER);
         return root;
     }
 
@@ -505,18 +593,20 @@ public final class LostTalesChatPresentation {
     private static void appendChannelPrefix(ChatComponentText root,
                                             ChatTab tab,
                                             int channelColor) {
-        root.appendSibling(ChatChannelPrefixMarker.apply(
+        root.appendSibling(ChatPrefixMarker.channel(
                 text(ClientChatChannelState.displayName(tab),
                         nearestFormatting(channelColor), false),
                 channelColor));
-        root.appendSibling(ChatChannelPrefixMarker.apply(
+        root.appendSibling(ChatPrefixMarker.channel(
                 text(": ", nearestFormatting(channelColor), false),
                 channelColor));
     }
 
     /**
      * {@code [HH:mm] } in the palette's sand with the time itself — digits
-     * and their colon — italic; the brackets stay upright.
+     * and their colon — italic; the brackets stay upright. Marked as a
+     * timestamp run, so the closed feed leaves it out: the feed is a
+     * glance at what was just said, not a log to read times off.
      */
     private static void appendTimestamp(ChatComponentText root,
                                         long timestampMillis) {
@@ -539,7 +629,7 @@ public final class LostTalesChatPresentation {
             if (time) {
                 run.getChatStyle().setItalic(Boolean.TRUE);
             }
-            root.appendSibling(ChatColorMarker.apply(run, color));
+            root.appendSibling(ChatPrefixMarker.timestamp(run, color));
             index = end;
         }
     }
@@ -557,7 +647,8 @@ public final class LostTalesChatPresentation {
      * text.
      */
     private static void appendMessageBody(
-            ChatComponentText root, String message, int[] showcaseIds) {
+            ChatComponentText root, String message, int[] showcaseIds,
+            ChatChannel channel) {
         List<ChatShareTokenParser.Token> tokens = showcaseIds.length == 0
                 ? Collections.<ChatShareTokenParser.Token>emptyList()
                 : ChatShareTokenParser.parse(message);
@@ -570,13 +661,14 @@ public final class LostTalesChatPresentation {
             }
             if (literalStart < token.start) {
                 appendStyledText(root, message.substring(
-                        literalStart, token.start));
+                        literalStart, token.start), channel);
             }
             appendShowcase(root, token.kind, showcaseIds[index]);
             literalStart = token.end;
         }
         if (literalStart < message.length()) {
-            appendStyledText(root, message.substring(literalStart));
+            appendStyledText(root, message.substring(literalStart),
+                    channel);
         }
     }
 
@@ -630,13 +722,13 @@ public final class LostTalesChatPresentation {
     }
 
     private static void appendStyledText(ChatComponentText root,
-                                         String rawText) {
+                                         String rawText,
+                                         ChatChannel channel) {
         // Player-typed &-codes become renderable formatting only here, at
         // display time; the wire and copy text keep the ampersand form.
         String displayed = ChatFormattingCodes.translateAmpersand(rawText);
         if (!LostTalesConfig.enableChatEmojis) {
-            root.appendSibling(text(displayed,
-                    EnumChatFormatting.WHITE, false));
+            appendMentions(root, displayed, channel);
             return;
         }
         for (ChatEmojiParser.Segment segment
@@ -645,9 +737,56 @@ public final class LostTalesChatPresentation {
                 root.appendSibling(ChatEmojiMarker.create(
                         segment.getEmoji()));
             } else {
-                root.appendSibling(text(segment.getText(),
-                        EnumChatFormatting.WHITE, false));
+                appendMentions(root, segment.getText(), channel);
             }
+        }
+    }
+
+    /**
+     * Splits a run of message text so that every {@code @name} reaching
+     * somebody is a piece of its own in that somebody's colour, and the
+     * words around it stay as they were typed. A name that reaches
+     * nobody is left alone: it is only text with an at-sign in front.
+     */
+    private static void appendMentions(ChatComponentText root, String text,
+                                       ChatChannel channel) {
+        int literalStart = 0;
+        int cursor = 0;
+        while (cursor < text.length()) {
+            int at = text.indexOf('@', cursor);
+            if (at < 0) {
+                break;
+            }
+            int end = at + 1;
+            while (end < text.length() && ChatMentionColors
+                    .isMentionCharacter(text.charAt(end))) {
+                end++;
+            }
+            // The at-sign must open a word, so an address never becomes
+            // a mention of whoever is named after it.
+            boolean opensWord = at == 0 || !ChatMentionColors
+                    .isMentionCharacter(text.charAt(at - 1));
+            int color = opensWord && end > at + 1
+                    ? ChatMentionColors.colorOf(
+                            text.substring(at + 1, end), channel)
+                    : -1;
+            if (color >= 0) {
+                if (at > literalStart) {
+                    root.appendSibling(text(
+                            text.substring(literalStart, at),
+                            EnumChatFormatting.WHITE, false));
+                }
+                root.appendSibling(ChatColorMarker.apply(
+                        text(text.substring(at, end),
+                                nearestFormatting(color), false),
+                        color));
+                literalStart = end;
+            }
+            cursor = Math.max(end, at + 1);
+        }
+        if (literalStart < text.length()) {
+            root.appendSibling(text(text.substring(literalStart),
+                    EnumChatFormatting.WHITE, false));
         }
     }
 

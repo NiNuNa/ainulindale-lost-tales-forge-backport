@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
@@ -33,6 +34,10 @@ public final class ClientChatChannelState {
     private static final long FACTION_NAME_RETRY_NANOS = 5000L * 1000000L;
 
     private static ChatTab selected = ChatTab.of(ChatChannel.ALL);
+    /** Conversations remembered for their partner's colour; oldest go first. */
+    private static final int MAX_PARTNER_COLORS = 64;
+    private static final LinkedHashMap<ChatTab, Integer> PARTNER_COLORS =
+            new LinkedHashMap<ChatTab, Integer>();
     private static String cachedFactionId = "";
     private static String cachedFactionName = "";
     private static long cachedFactionNanos;
@@ -40,6 +45,8 @@ public final class ClientChatChannelState {
     private static boolean adminAccess;
     /** Server-stated Discord bridge; the Discord tab exists only with it. */
     private static boolean discordAccess;
+    /** Server-stated roles of this player; what {@code @Operator} reaches. */
+    private static int roleMask;
     /** Unsent input kept across closing and reopening the chat screen. */
     /** Unsent text per tab, oldest first; bounded, whispers included. */
     private static final Map<ChatTab, String> DRAFTS =
@@ -65,11 +72,21 @@ public final class ClientChatChannelState {
         select(ChatTab.of(channel));
     }
 
-    /**
-     * Next available tab of the selected tab's window, in row order; a
-     * selection without a window cycles every open tab.
-     */
+    /** Next available tab of the selected tab's window, in row order. */
     public static synchronized ChatTab cycle() {
+        return cycle(1);
+    }
+
+    /** The previous one, for walking the row the other way. */
+    public static synchronized ChatTab cycleBack() {
+        return cycle(-1);
+    }
+
+    /**
+     * The tab {@code step} places along the selected tab's window, in
+     * row order; a selection without a window walks every open tab.
+     */
+    private static synchronized ChatTab cycle(int step) {
         ChatTab current = getSelected();
         ChatWindow window = ChatWindowLayout.windowOf(current);
         List<ChatTab> order = new ArrayList<ChatTab>();
@@ -86,8 +103,10 @@ public final class ClientChatChannelState {
         if (order.isEmpty()) {
             order.add(ChatTab.of(ChatChannel.ALL));
         }
-        int index = order.indexOf(current);
-        selected = order.get((index + 1) % order.size());
+        int index = Math.max(0, order.indexOf(current));
+        selected = order.get(
+                ((index + step) % order.size() + order.size())
+                        % order.size());
         return selected;
     }
 
@@ -255,8 +274,50 @@ public final class ClientChatChannelState {
                         snapshot.getActiveCharacterId());
     }
 
+    /**
+     * The active character's normalized starting faction id
+     * ({@code lotr:gondor}), or empty without a character or faction.
+     */
+    public static synchronized String activeFactionId() {
+        CharacterSummary active = activeCharacter();
+        return active == null ? ""
+                : LotrCharacterAdapter.normalizeFactionId(
+                        active.getStartingFactionId());
+    }
+
+    /**
+     * A conversation is named in the colour the other party speaks in —
+     * an NPC's honey, a player's own name colour — so the tab, its icon
+     * and its lines read as one. Every other tab takes its channel's
+     * colour.
+     */
     public static synchronized int displayColor(ChatTab tab) {
-        return tab == null ? 0xFFFFFF : displayColor(tab.getChannel());
+        if (tab == null) {
+            return 0xFFFFFF;
+        }
+        Integer partner = PARTNER_COLORS.get(tab);
+        if (partner != null) {
+            return partner.intValue();
+        }
+        return displayColor(tab.getChannel());
+    }
+
+    /**
+     * Remembers the colour the other party's name is drawn in, for the
+     * conversation's own tab. Only their lines say it: the player's own
+     * copy of a whisper carries the player's colour, not theirs.
+     */
+    public static synchronized void rememberPartnerColor(ChatTab tab,
+                                                         int color) {
+        if (tab == null || (!tab.isWhisper() && !tab.isNpc())) {
+            return;
+        }
+        PARTNER_COLORS.put(tab, Integer.valueOf(color & 0xFFFFFF));
+        while (PARTNER_COLORS.size() > MAX_PARTNER_COLORS) {
+            Iterator<ChatTab> oldest = PARTNER_COLORS.keySet().iterator();
+            oldest.next();
+            oldest.remove();
+        }
     }
 
     public static synchronized int displayColor(ChatChannel channel) {
@@ -318,6 +379,24 @@ public final class ClientChatChannelState {
     }
 
     /** Applies the server's statement of operator status. */
+    /**
+     * The roles the server says this player holds. Only used to notice
+     * that a role mention was addressed to this client: nothing here
+     * grants anything, and the server never reads it back.
+     */
+    public static synchronized void setRoleMask(int mask) {
+        roleMask = ChatAccountRole.isValidMask(mask) ? mask : 0;
+    }
+
+    public static synchronized int getRoleMask() {
+        return roleMask;
+    }
+
+    /** The roles this player holds, in precedence order. */
+    public static synchronized List<ChatAccountRole> localRoles() {
+        return ChatAccountRole.fromMask(roleMask);
+    }
+
     public static synchronized void setAdminAccess(boolean access) {
         adminAccess = access;
         ensureAvailable();
@@ -375,11 +454,13 @@ public final class ClientChatChannelState {
 
     public static synchronized void clear() {
         selected = ChatTab.of(ChatChannel.ALL);
+        PARTNER_COLORS.clear();
         cachedFactionId = "";
         cachedFactionName = "";
         cachedFactionNanos = 0L;
         adminAccess = false;
         discordAccess = false;
+        roleMask = 0;
         DRAFTS.clear();
     }
 
