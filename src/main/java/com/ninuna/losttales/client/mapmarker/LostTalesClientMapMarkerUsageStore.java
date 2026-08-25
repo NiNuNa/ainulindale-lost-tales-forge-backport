@@ -18,7 +18,7 @@ import java.util.List;
 /**
  * Client-side map marker preferences keyed by marker id: the markers the
  * player has favourited and the destinations they most recently travelled
- * to. Like the emote preferences this is a per-installation presentation
+ * to. Like the emoji preferences this is a per-installation presentation
  * preference under {@code config/}, never world state, never synchronized
  * and never cleared between worlds; an id that names no visible marker on
  * the current server is simply kept and not shown. Travel is recorded

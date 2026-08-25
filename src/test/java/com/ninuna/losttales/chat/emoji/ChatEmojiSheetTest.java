@@ -9,6 +9,8 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -23,10 +25,10 @@ public final class ChatEmojiSheetTest {
     public void sheetMetadataMatchesBundledSprite() throws Exception {
         InputStream stream = ChatEmojiSheetTest.class.getResourceAsStream(
                 "/assets/losttales/" + ChatEmoji.TEXTURE_PATH);
-        assertNotNull("Emote sprite sheet is missing", stream);
+        assertNotNull("Emoji sprite sheet is missing", stream);
         try {
             BufferedImage sheet = ImageIO.read(stream);
-            assertNotNull("Emote sheet is not a readable PNG", sheet);
+            assertNotNull("Emoji sheet is not a readable PNG", sheet);
             assertEquals(ChatEmoji.SHEET_WIDTH, sheet.getWidth());
             assertEquals(ChatEmoji.SHEET_HEIGHT, sheet.getHeight());
             for (ChatEmoji emoji : ChatEmoji.values()) {
@@ -63,6 +65,38 @@ public final class ChatEmojiSheetTest {
             assertEquals(":" + emoji.getName() + ":",
                     emoji.getShortcode());
         }
+    }
+
+    @Test
+    public void aliasesAndUnicodeResolveWithoutCollisions() {
+        Set<String> unicodeForms = new HashSet<String>();
+        for (ChatEmoji emoji : ChatEmoji.values()) {
+            assertSame(emoji, ChatEmoji.fromInputName(emoji.getName()));
+            for (String alias : emoji.getAliases()) {
+                assertTrue(alias + " is not scan-safe",
+                        alias.matches("[a-z0-9_]+"));
+                assertTrue(alias + " exceeds the scan bound",
+                        alias.length() <= ChatEmoji.longestName());
+                // An alias is a way in only: input resolves it, the
+                // parser and the wire never accept it.
+                assertSame(alias, emoji, ChatEmoji.fromInputName(alias));
+                assertNull(alias, ChatEmoji.fromName(alias));
+            }
+            String unicode = emoji.getUnicode();
+            if (unicode.length() > 0) {
+                assertTrue(emoji + " duplicates a Unicode form",
+                        unicodeForms.add(unicode));
+                ChatEmoji.UnicodeMatch match =
+                        ChatEmoji.matchUnicode(unicode, 0);
+                assertNotNull(emoji + " does not match its own Unicode",
+                        match);
+                assertSame(emoji, match.emoji);
+                assertEquals(unicode.length(), match.length);
+            }
+        }
+        assertNull(ChatEmoji.fromInputName("does_not_exist"));
+        assertNull(ChatEmoji.matchUnicode("plain text", 0));
+        assertNull(ChatEmoji.matchUnicode(null, 0));
     }
 
     private static boolean cellHasOpaquePixels(

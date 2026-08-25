@@ -33,8 +33,9 @@ import org.lwjgl.input.Mouse;
  * the mouse instead of stepping by whole GUI pixels.</p>
  */
 public final class ChatWindowPlacement {
-    /** Height of a window's input bar: one text row with a margin. */
-    public static final int INPUT_HEIGHT = 13;
+    /** Height of a window's input bar: exactly the tab row's, so the
+     *  window is framed by two strips of one height. */
+    public static final int INPUT_HEIGHT = ChatChannelTabBar.ROW_HEIGHT;
     /**
      * How much of a window's width its messages may fill before they
      * wrap, measured from its left edge: the rest is clear margin at the
@@ -51,7 +52,7 @@ public final class ChatWindowPlacement {
         public final double y;
         public final int width;
         public final int height;
-        /** What hangs below the baseline: one line's gap and the bar. */
+        /** What hangs below the baseline: the padding and the bar. */
         public final int barHeight;
         /**
          * Pixels the box has for message lines. It is the height the
@@ -86,7 +87,7 @@ public final class ChatWindowPlacement {
             return this.y + this.height;
         }
 
-        /** Top of the input bar: one chat line below the baseline. */
+        /** Top of the input bar: directly under the bottom rule. */
         public double barTop() {
             return baseline() + this.barHeight - INPUT_HEIGHT;
         }
@@ -167,11 +168,6 @@ public final class ChatWindowPlacement {
         return Math.max(1, (int)Math.round(lineStride(minecraft)));
     }
 
-    /** Gap between the newest message and the input bar: one chat line. */
-    public static int inputGap(Minecraft minecraft) {
-        return lineHeight(minecraft);
-    }
-
     /** The backdrop padding above the top line and below the newest. */
     public static int linePadding(Minecraft minecraft) {
         GuiNewChat chat = chat(minecraft);
@@ -185,9 +181,10 @@ public final class ChatWindowPlacement {
         return ChatChannelTabBar.ROW_HEIGHT + linePadding(minecraft);
     }
 
-    /** What hangs below the baseline: padding, the gap and the bar. */
+    /** What hangs below the baseline: the padding and the bar, which
+     *  stands directly under the window's bottom rule. */
     public static int barHeight(Minecraft minecraft) {
-        return linePadding(minecraft) + inputGap(minecraft) + INPUT_HEIGHT;
+        return linePadding(minecraft) + INPUT_HEIGHT;
     }
 
     /** The smallest box: tab row, one empty line, gap, input bar. */

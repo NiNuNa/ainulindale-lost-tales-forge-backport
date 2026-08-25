@@ -18,7 +18,7 @@ import org.lwjgl.opengl.GL11;
  * fixed at sixteen pixels, so the icon is scaled on the matrix; eight
  * pixels (a clean 2:1) keeps item sprites crisp inside the eleven-pixel
  * chat band. The shadow pass renders the same icon in silhouette mode, so
- * items share the text and emote shadow colour instead of a tinted copy.
+ * items share the text and emoji shadow colour instead of a tinted copy.
  *
  * <p>The icon fades with its line. {@code RenderItem} resets the vertex
  * colour to full alpha in every branch it has, so the line's opacity is

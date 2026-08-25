@@ -121,50 +121,79 @@ public final class ChatWindowLayoutTest {
     }
 
     /**
-     * Mute is the whole preference; the feed and the cue can also be
-     * switched off one at a time, independently of each other and of
-     * mute, and all three survive closing and travel with the store.
+     * Mute (out of the feed) and mention-mute (cue silent) are two
+     * independent preferences: each changes only its own half, both
+     * survive closing, and both travel with the store.
      */
     @Test
-    public void feedAndPingPreferencesAreIndependentHalvesOfMute() {
+    public void muteAndMentionMuteAreIndependentPreferences() {
         ChatTab party = ChatTab.of(ChatChannel.PARTY);
         ChatTab ooc = ChatTab.of(ChatChannel.OOC);
         assertTrue(ChatWindowLayout.isInFeed(party));
         assertTrue(ChatWindowLayout.isPingAudible(party));
-        ChatWindowLayout.setFeedHidden(party, true);
+        ChatWindowLayout.setMuted(party, true);
         assertFalse(ChatWindowLayout.isInFeed(party));
         assertTrue(ChatWindowLayout.isPingAudible(party));
-        assertFalse(ChatWindowLayout.isMuted(party));
-        ChatWindowLayout.setPingSilenced(ooc, true);
+        assertFalse(ChatWindowLayout.isPingsMuted(party));
+        ChatWindowLayout.setPingsMuted(ooc, true);
         assertTrue(ChatWindowLayout.isInFeed(ooc));
         assertFalse(ChatWindowLayout.isPingAudible(ooc));
         assertFalse(ChatWindowLayout.isMuted(ooc));
-        ChatWindowLayout.setMuted(ooc, true);
-        assertFalse(ChatWindowLayout.isInFeed(ooc));
-        assertFalse(ChatWindowLayout.isPingAudible(ooc));
-        ChatWindowLayout.setMuted(ooc, false);
-        // Unmuting leaves the finer preference where it was.
-        assertFalse(ChatWindowLayout.isPingAudible(ooc));
-        assertTrue(ChatWindowLayout.isInFeed(ooc));
-        assertEquals(4, this.changes);
+        assertEquals(2, this.changes);
         // Setting what is already set is not a change.
-        ChatWindowLayout.setFeedHidden(party, true);
-        assertEquals(4, this.changes);
+        ChatWindowLayout.setMuted(party, true);
+        assertEquals(2, this.changes);
         assertTrue(ChatWindowLayout.close(ChatChannel.PARTY));
-        assertTrue(ChatWindowLayout.isFeedHidden(party));
+        assertTrue(ChatWindowLayout.isMuted(party));
         assertEquals(Collections.singletonList(party),
-                ChatWindowLayout.feedHiddenTabs());
+                ChatWindowLayout.mutedTabs());
         assertEquals(Collections.singletonList(ooc),
-                ChatWindowLayout.pingSilencedTabs());
+                ChatWindowLayout.pingsMutedTabs());
         // Conversations drop their preferences with their tabs.
         ChatTab whisper = ChatWindowLayout.openWhisper("Bilbo", null);
-        ChatWindowLayout.setFeedHidden(whisper, true);
-        ChatWindowLayout.setPingSilenced(whisper, true);
-        assertTrue(ChatWindowLayout.feedHiddenTabs().size() == 1);
+        ChatWindowLayout.setMuted(whisper, true);
+        ChatWindowLayout.setPingsMuted(whisper, true);
+        assertTrue(ChatWindowLayout.mutedTabs().size() == 1);
         ChatWindowLayout.closeConversations();
-        assertFalse(ChatWindowLayout.isFeedHidden(whisper));
-        assertFalse(ChatWindowLayout.isPingSilenced(whisper));
-        assertTrue(ChatWindowLayout.isFeedHidden(party));
+        assertFalse(ChatWindowLayout.isMuted(whisper));
+        assertFalse(ChatWindowLayout.isPingsMuted(whisper));
+        assertTrue(ChatWindowLayout.isMuted(party));
+    }
+
+    /**
+     * Hidden is its own concept: it neither mutes nor closes, it holds
+     * while the tab is open, survives closing and restoring, and a
+     * conversation drops it with its tab like every other preference.
+     */
+    @Test
+    public void hiddenIsIndependentOfMuteAndSurvivesRestore() {
+        ChatTab party = ChatTab.of(ChatChannel.PARTY);
+        assertFalse(ChatWindowLayout.isHidden(party));
+        ChatWindowLayout.setHidden(party, true);
+        assertTrue(ChatWindowLayout.isHidden(party));
+        assertTrue(ChatWindowLayout.isOpen(party));
+        assertFalse(ChatWindowLayout.isMuted(party));
+        assertTrue(ChatWindowLayout.isInFeed(party));
+        assertTrue(ChatWindowLayout.isPingAudible(party));
+        assertEquals(1, this.changes);
+        // Setting what is already set is not a change.
+        ChatWindowLayout.setHidden(party, true);
+        assertEquals(1, this.changes);
+        assertTrue(ChatWindowLayout.close(ChatChannel.PARTY));
+        assertTrue(ChatWindowLayout.isHidden(party));
+        assertEquals(Collections.singletonList(party),
+                ChatWindowLayout.hiddenTabs());
+        assertTrue(ChatWindowLayout.restore(ChatChannel.PARTY));
+        assertTrue(ChatWindowLayout.isHidden(party));
+        ChatWindowLayout.setHidden(party, false);
+        assertFalse(ChatWindowLayout.isHidden(party));
+        // Conversations drop the preference with their tabs.
+        ChatTab whisper = ChatWindowLayout.openWhisper("Bilbo", null);
+        ChatWindowLayout.setHidden(whisper, true);
+        assertTrue(ChatWindowLayout.isHidden(whisper));
+        assertTrue(ChatWindowLayout.hiddenTabs().isEmpty());
+        ChatWindowLayout.closeConversations();
+        assertFalse(ChatWindowLayout.isHidden(whisper));
     }
 
     /**

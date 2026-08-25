@@ -13,7 +13,7 @@ import org.lwjgl.opengl.GL13;
  * <ul>
  * <li><b>Silhouette</b> ({@link #begin(int)}): every textured fragment
  * takes its RGB from one constant colour and only its alpha from the
- * texture. This is how emotes, head icons, and item icons get the same
+ * texture. This is how emojis, head icons, and item icons get the same
  * solid drop shadow as text. Plain tinting cannot do this — multiplying
  * a sprite's own dark outline by the shadow colour yields near-black,
  * which is exactly the inconsistency this replaces.</li>

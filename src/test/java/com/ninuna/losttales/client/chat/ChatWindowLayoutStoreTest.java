@@ -32,8 +32,8 @@ public final class ChatWindowLayoutStoreTest {
         ChatWindowLayout.setLocked("w3", true);
         ChatWindowLayout.close(ChatChannel.ADMIN);
         ChatWindowLayout.setMuted(ChatChannel.OOC, true);
-        ChatWindowLayout.setFeedHidden(ChatTab.of(ChatChannel.PROXIMITY), true);
-        ChatWindowLayout.setPingSilenced(ChatTab.of(ChatChannel.PARTY), true);
+        ChatWindowLayout.setPingsMuted(ChatTab.of(ChatChannel.PARTY), true);
+        ChatWindowLayout.setHidden(ChatTab.of(ChatChannel.ADMIN), true);
         ChatWindowLayout.setActiveTab(ChatChannel.OOC);
         ChatWindowLayout.setPosition("w2", 3.0D, 97.5D, true);
         ChatWindowLayout.setFeedPosition(12.25D, 88.0D, true);
@@ -50,8 +50,8 @@ public final class ChatWindowLayoutStoreTest {
                 + "active=faction link=w2:above tabs=party,faction"));
         assertTrue(lines.contains("closed admin"));
         assertTrue(lines.contains("muted ooc"));
-        assertTrue(lines.contains("nofeed proximity"));
         assertTrue(lines.contains("noping party"));
+        assertTrue(lines.contains("hidden admin"));
 
         ChatWindowLayout.reset();
         ChatWindowLayoutStore.load(lines);
@@ -78,10 +78,11 @@ public final class ChatWindowLayoutStoreTest {
         assertEquals(Collections.singletonList(ChatChannel.ADMIN),
                 ChatWindowLayout.closedChannels());
         assertTrue(ChatWindowLayout.isMuted(ChatChannel.OOC));
-        assertTrue(ChatWindowLayout.isFeedHidden(ChatChannel.PROXIMITY));
-        assertFalse(ChatWindowLayout.isPingSilenced(ChatChannel.PROXIMITY));
-        assertTrue(ChatWindowLayout.isPingSilenced(ChatChannel.PARTY));
-        assertFalse(ChatWindowLayout.isFeedHidden(ChatChannel.PARTY));
+        assertFalse(ChatWindowLayout.isPingsMuted(ChatChannel.OOC));
+        assertTrue(ChatWindowLayout.isPingsMuted(ChatChannel.PARTY));
+        assertFalse(ChatWindowLayout.isMuted(ChatChannel.PARTY));
+        assertTrue(ChatWindowLayout.isHidden(ChatChannel.ADMIN));
+        assertFalse(ChatWindowLayout.isHidden(ChatChannel.OOC));
         assertEquals(lines, ChatWindowLayoutStore.describe());
     }
 
@@ -99,6 +100,7 @@ public final class ChatWindowLayoutStoreTest {
                 "closed admin",
                 "muted nothing",
                 "muted console",
+                "nofeed faction",
                 "input y=40 x=oops",
                 "feed y=40 x=oops",
                 "garbage line here"));
@@ -127,5 +129,7 @@ public final class ChatWindowLayoutStoreTest {
         assertEquals(Collections.singletonList(ChatChannel.ADMIN),
                 ChatWindowLayout.closedChannels());
         assertTrue(ChatWindowLayout.isMuted(ChatChannel.CONSOLE));
+        // An older file's feed-only mute reads as today's mute.
+        assertTrue(ChatWindowLayout.isMuted(ChatChannel.FACTION));
     }
 }

@@ -8,7 +8,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
-/** Every tab wears an emote; conversations with players and NPCs differ. */
+/** Every tab wears an emoji; conversations with players and NPCs differ. */
 public final class ChatChannelIconsTest {
 
     @Test
@@ -19,9 +19,10 @@ public final class ChatChannelIconsTest {
             assertEquals(ChatChannelIcons.iconOf(channel),
                     ChatChannelIcons.iconOf(ChatTab.of(channel)));
         }
-        assertEquals(ChatEmoji.SHY,
+        assertEquals(ChatEmoji.BLUSH,
                 ChatChannelIcons.iconOf(ChatTab.whisper("Bilbo")));
-        assertEquals(ChatEmoji.GRIN, ChatChannelIcons.iconOf(ChatTab.npc("Bilbo")));
+        assertEquals(ChatEmoji.GRINNING,
+                ChatChannelIcons.iconOf(ChatTab.npc("Bilbo")));
         assertNull(ChatChannelIcons.iconOf((ChatTab)null));
         assertNull(ChatChannelIcons.iconOf((ChatChannel)null));
     }

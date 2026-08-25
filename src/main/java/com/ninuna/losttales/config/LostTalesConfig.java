@@ -112,6 +112,8 @@ public final class LostTalesConfig {
     /** Client-only presentation preferences; neither affects recipients. */
     public static boolean showChatTimestamps = true;
     public static boolean enableChatEmojis = true;
+    public static boolean convertChatEmoticons = true;
+    public static boolean enableChatBackgroundBlur = true;
     public static boolean enableNpcChatStyling = true;
     public static boolean enableChatPings = true;
     /** Vanilla note-block pling: a short UI cue that exists on every client. */
@@ -904,7 +906,19 @@ public final class LostTalesConfig {
                     "enableChatEmojis",
                     CATEGORY_CLIENT,
                     enableChatEmojis,
-                    "Render supported :shortcodes: as inline emotes and show the chat emote picker."
+                    "Render supported :shortcodes: as inline emojis and show the chat emoji picker."
+            );
+            convertChatEmoticons = config.getBoolean(
+                    "convertChatEmoticons",
+                    CATEGORY_CLIENT,
+                    convertChatEmoticons,
+                    "Turn classic emoticons you type (:) :D <3 ...) into their emojis as the message is sent."
+            );
+            enableChatBackgroundBlur = config.getBoolean(
+                    "enableChatBackgroundBlur",
+                    CATEGORY_CLIENT,
+                    enableChatBackgroundBlur,
+                    "Blur the world inside each open chat window's box; the rest of the screen stays sharp. Needs enableGuiBackgroundBlur."
             );
             enableChatPings = config.getBoolean(
                     "enableChatPings",

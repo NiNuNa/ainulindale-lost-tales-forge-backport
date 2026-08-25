@@ -99,15 +99,15 @@ final class ChatInputField extends GuiTextField {
             cursorX = drawRuns(visible, colors, 0, headEnd, left, top);
         }
         // Vanilla puts the caret between characters while there is text
-        // to its right, and after the last one otherwise.
+        // to its right, and after the last one otherwise. The bar stands
+        // on the boundary between the two runs; the runs themselves are
+        // never shifted for it, so the text stays still as the caret
+        // walks through it.
         boolean caretBetween = getCursorPosition() < text.length()
                 || text.length() >= getMaxStringLength();
         int caretX = cursorX;
         if (!caretInside) {
             caretX = caret > 0 ? left + getWidth() : left;
-        } else if (caretBetween) {
-            caretX = cursorX - 1;
-            cursorX--;
         }
         if (visible.length() > 0 && caretInside && caret < visible.length()) {
             drawRuns(visible, colors, caret, visible.length(), cursorX, top);

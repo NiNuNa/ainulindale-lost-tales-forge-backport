@@ -24,10 +24,11 @@ public final class LostTalesNpcChatTest {
         LostTalesConfig.enableChatEmojis = true;
         try {
             UUID npcId = UUID.randomUUID();
+            int factionColor = 0x8A9A5B;
             IChatComponent line = LostTalesChatPresentation.buildNpcSpeech(
                     ChatTab.whisper("Grey Wanderer"), npcId, "Grey Wanderer",
                     "lotr:mob/wanderer.png",
-                    "Good day to you! :smile:", 123456789L);
+                    "Good day to you! :smile:", 123456789L, factionColor);
 
             StringBuilder plainText = new StringBuilder();
             ChatHeadMarker.Data marker = null;
@@ -54,8 +55,8 @@ public final class LostTalesNpcChatTest {
             assertEquals(npcId, marker.senderId);
             assertEquals("lotr:mob/wanderer.png", marker.skinId);
             assertEquals("Good day to you! :smile:", marker.copyText);
-            assertEquals(LostTalesColors.rgb(LostTalesColors.HONEY),
-                    marker.nameColor);
+            // The NPC speaks in its faction colour, as the hook resolved it.
+            assertEquals(factionColor, marker.nameColor);
             // Body text after the un-clickable NPC name must stay ivory.
             assertEquals(LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
                     marker.titleColor);

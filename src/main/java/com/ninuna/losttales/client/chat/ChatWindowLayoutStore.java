@@ -17,13 +17,13 @@ import java.util.Locale;
 
 /**
  * File-backed persistence for {@link ChatWindowLayout}: a per-installation
- * presentation preference like the emote favourites, kept under
+ * presentation preference like the emoji favourites, kept under
  * {@code config/} and never synchronized or cleared between worlds. The
  * file is a few plain lines — one per window, one per closed channel,
- * one per notification preference (muted, hidden from the feed, mention
- * cue silenced) — so a hand edit or a stale entry from an older version
- * cannot corrupt anything: whatever does not parse is skipped and the
- * layout repairs itself on load.
+ * one per preference (muted, mentions muted, hidden) — so a hand edit
+ * or a stale entry from an older version cannot corrupt anything:
+ * whatever does not parse is skipped and the layout repairs itself on
+ * load.
  *
  * <pre>
  * window w1 locked=false x=0.00 y=0.00 active=console tabs=console,admin
@@ -32,8 +32,8 @@ import java.util.Locale;
  * toolbar collapsed=false
  * closed faction
  * muted ooc
- * nofeed proximity
  * noping party
+ * hidden admin
  * </pre>
  */
 public final class ChatWindowLayoutStore {
@@ -67,8 +67,8 @@ public final class ChatWindowLayoutStore {
                 new ArrayList<ChatWindowLayout.WindowSpec>();
         EnumSet<ChatChannel> closed = EnumSet.noneOf(ChatChannel.class);
         List<ChatTab> muted = new ArrayList<ChatTab>();
-        List<ChatTab> feedHidden = new ArrayList<ChatTab>();
-        List<ChatTab> pingSilenced = new ArrayList<ChatTab>();
+        List<ChatTab> pingsMuted = new ArrayList<ChatTab>();
+        List<ChatTab> hidden = new ArrayList<ChatTab>();
         double feedX = 0.0D;
         double feedY = 100.0D;
         boolean collapsed = false;
@@ -83,12 +83,14 @@ public final class ChatWindowLayoutStore {
                 if (channel != null) {
                     closed.add(channel);
                 }
-            } else if (parts.length == 2 && "muted".equals(parts[0])) {
+            } else if (parts.length == 2 && ("muted".equals(parts[0])
+                    // An older file's feed-only mute is today's mute.
+                    || "nofeed".equals(parts[0]))) {
                 addTab(muted, parts[1]);
-            } else if (parts.length == 2 && "nofeed".equals(parts[0])) {
-                addTab(feedHidden, parts[1]);
             } else if (parts.length == 2 && "noping".equals(parts[0])) {
-                addTab(pingSilenced, parts[1]);
+                addTab(pingsMuted, parts[1]);
+            } else if (parts.length == 2 && "hidden".equals(parts[0])) {
+                addTab(hidden, parts[1]);
             } else if (parts.length >= 2 && "window".equals(parts[0])) {
                 ChatWindowLayout.WindowSpec spec = parseWindow(parts);
                 if (spec != null) {
@@ -111,7 +113,7 @@ public final class ChatWindowLayoutStore {
                 }
             }
         }
-        ChatWindowLayout.load(specs, closed, muted, feedHidden, pingSilenced,
+        ChatWindowLayout.load(specs, closed, muted, pingsMuted, hidden,
                 feedX, feedY, collapsed);
     }
 
@@ -258,11 +260,11 @@ public final class ChatWindowLayoutStore {
         for (ChatTab tab : ChatWindowLayout.mutedTabs()) {
             lines.add("muted " + tab.id());
         }
-        for (ChatTab tab : ChatWindowLayout.feedHiddenTabs()) {
-            lines.add("nofeed " + tab.id());
-        }
-        for (ChatTab tab : ChatWindowLayout.pingSilencedTabs()) {
+        for (ChatTab tab : ChatWindowLayout.pingsMutedTabs()) {
             lines.add("noping " + tab.id());
+        }
+        for (ChatTab tab : ChatWindowLayout.hiddenTabs()) {
+            lines.add("hidden " + tab.id());
         }
         return lines;
     }

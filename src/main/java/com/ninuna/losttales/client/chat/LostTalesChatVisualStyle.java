@@ -14,7 +14,7 @@ import org.lwjgl.opengl.GL11;
 
 /**
  * Lost Tales' ivory text and plum-black shadow treatment for chat. Every
- * chat element — text, emotes, head icons, item and marker icons — draws
+ * chat element — text, emojis, head icons, item and marker icons — draws
  * its shadow as a flat {@link #SHADOW} silhouette offset by one pixel at
  * half opacity, so the relationship between content and shadow is
  * identical at every GUI scale; inline glyphs share the box and baseline
@@ -317,6 +317,9 @@ final class LostTalesChatVisualStyle {
             int color;
             Integer prefixColor = ChatPrefixMarker.decode(part);
             Integer explicitColor = ChatColorMarker.decode(part);
+            if (explicitColor == null) {
+                explicitColor = ChatMentionMarker.colorOf(part);
+            }
             if (explicitColor == null) {
                 explicitColor = ChatTitleMarker.colorOf(part);
             }

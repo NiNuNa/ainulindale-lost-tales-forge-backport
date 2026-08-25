@@ -57,7 +57,7 @@ final class ChatMentionColors {
                 }
             }
         }
-        if (!namesAPlayer(name)) {
+        if (accountFor(name) == null) {
             return -1;
         }
         // A player who wears a role is named in it, so one name reads
@@ -76,11 +76,16 @@ final class ChatMentionColors {
         return role >= 0 ? role : LostTalesChatVisualStyle.IVORY;
     }
 
-    /** Whether the name is an online player's account or character name. */
-    private static boolean namesAPlayer(String name) {
+    /**
+     * The account the name reaches — the name itself when it is an
+     * online account, the owning account when it is a synced character
+     * name — or null when it names nobody this client can place.
+     */
+    static String accountFor(String name) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft == null || minecraft.thePlayer == null) {
-            return false;
+        if (minecraft == null || minecraft.thePlayer == null
+                || name == null || name.length() == 0) {
+            return null;
         }
         String wanted = name.toLowerCase(Locale.ROOT);
         if (minecraft.thePlayer.sendQueue != null
@@ -91,7 +96,7 @@ final class ChatMentionColors {
                         && ((GuiPlayerInfo)value).name != null
                         && ((GuiPlayerInfo)value).name
                                 .toLowerCase(Locale.ROOT).equals(wanted)) {
-                    return true;
+                    return ((GuiPlayerInfo)value).name;
                 }
             }
         }
@@ -99,10 +104,11 @@ final class ChatMentionColors {
                 : ClientCharacterAppearanceCache.snapshot().values()) {
             if (appearance != null && appearance.isPresent()
                     && appearance.getCharacterName()
-                            .toLowerCase(Locale.ROOT).equals(wanted)) {
-                return true;
+                            .toLowerCase(Locale.ROOT).equals(wanted)
+                    && appearance.getAccountName().length() > 0) {
+                return appearance.getAccountName();
             }
         }
-        return false;
+        return null;
     }
 }

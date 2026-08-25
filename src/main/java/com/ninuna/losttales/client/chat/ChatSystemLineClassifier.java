@@ -32,6 +32,12 @@ final class ChatSystemLineClassifier {
             "multiplayer.player.joined.renamed",
             "multiplayer.player.left",
             "chat.lotr.achievement",
+            // LOTR's travelling-trader notices go to every player in the
+            // world (LOTRSpeech.messageAllPlayersInWorld), so they are
+            // shared conversation, not private console output.
+            "lotr.travellingTrader.arrive",
+            "lotr.travellingTrader.arriveMP",
+            "lotr.travellingTrader.depart",
     };
     private static final String[] GLOBAL_KEY_PREFIXES = {
             "death.",

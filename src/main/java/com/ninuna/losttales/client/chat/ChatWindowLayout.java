@@ -14,15 +14,18 @@ import java.util.Set;
 /**
  * The one authoritative client chat layout: which windows exist, which
  * tabs each holds in what order, which tab is in front, whether a window
- * is locked, where each window sits, and each tab's notification
- * preferences — muted (out of the feed and silent), or only one half of
- * that: hidden from the feed, or its mention cue silenced. A tab is
- * a channel, or a whisper conversation with one account; a tab lives in
- * at most one window, and a plain channel in no window is <em>closed</em>
- * — hidden from every window, its history untouched, and restorable into
- * any window (a closed whisper simply reopens with the next message).
- * Closing is about tabs only: a closed channel keeps receiving, keeps
- * its history and unread counts, and keeps its mute setting. Every
+ * is locked, where each window sits, and each tab's three independent
+ * preferences: <em>muted</em> (its lines stay out of the closed-chat
+ * feed), <em>mentions muted</em> (its mention cue is silent), and
+ * <em>hidden</em> (once closed it stays closed when a message arrives).
+ * A tab is a channel, or a whisper conversation with one account; a tab
+ * lives in at most one window, and a plain channel in no window is
+ * <em>closed</em> — gone from every window, its history untouched, and
+ * restorable into any window. A closed tab reopens with its next message
+ * unless it is hidden; the presentation asks {@link #isHidden} before
+ * reopening. Closing is about tabs only: a closed channel keeps
+ * receiving, keeps its history and unread counts, and keeps its
+ * preferences. Every
  * window is equal: one that loses its last tab disappears, and the
  * last open tab of all can never be closed, so there is always
  * somewhere to type. The default layout is a console window (Console,
@@ -86,11 +89,12 @@ public final class ChatWindowLayout {
     private static final List<ChatWindow> WINDOWS = new ArrayList<ChatWindow>();
     private static final List<ChatWindow> WINDOWS_VIEW =
             Collections.unmodifiableList(WINDOWS);
+    /** Muted tabs: their lines stay out of the closed-chat feed. */
     private static final Set<ChatTab> MUTED = new HashSet<ChatTab>();
-    /** Tabs left out of the closed-chat feed; their cue still sounds. */
-    private static final Set<ChatTab> FEED_HIDDEN = new HashSet<ChatTab>();
     /** Tabs whose mention cue is silent; they still show in the feed. */
-    private static final Set<ChatTab> PINGS_SILENCED = new HashSet<ChatTab>();
+    private static final Set<ChatTab> PINGS_MUTED = new HashSet<ChatTab>();
+    /** Tabs a message may not reopen; they stay closed until restored. */
+    private static final Set<ChatTab> HIDDEN = new HashSet<ChatTab>();
     /**
      * Stacking order, back to front, by window id: the window last
      * brought to the front draws last and is hit first. Session state,
@@ -122,8 +126,8 @@ public final class ChatWindowLayout {
     public static synchronized void reset() {
         WINDOWS.clear();
         MUTED.clear();
-        FEED_HIDDEN.clear();
-        PINGS_SILENCED.clear();
+        PINGS_MUTED.clear();
+        HIDDEN.clear();
         STACK.clear();
         nextWindowNumber = 1;
         feedOffsetX = 0.0D;
@@ -329,8 +333,9 @@ public final class ChatWindowLayout {
     }
 
     /**
-     * Mute is a notification preference, the whole of it: the tab's lines
-     * stay out of the feed and its mention cue is silent. The history is
+     * Muting a channel keeps its new lines out of the closed-chat feed,
+     * and nothing else: the mention cue is its own preference, the tab
+     * still shows everything when selected, and the history is
      * untouched.
      */
     public static synchronized void setMuted(ChatTab tab, boolean muted) {
@@ -342,55 +347,63 @@ public final class ChatWindowLayout {
         setMuted(ChatTab.of(channel), muted);
     }
 
-    /** Whether the tab is kept out of the feed on its own, mute aside. */
-    public static synchronized boolean isFeedHidden(ChatTab tab) {
-        return tab != null && FEED_HIDDEN.contains(tab);
-    }
-
-    public static synchronized boolean isFeedHidden(ChatChannel channel) {
-        return isFeedHidden(ChatTab.of(channel));
-    }
-
-    /** Whether the tab's lines are shown in the feed: neither muted nor hidden. */
+    /** Whether the tab's lines are shown in the feed: not muted. */
     public static synchronized boolean isInFeed(ChatTab tab) {
-        return tab != null && !MUTED.contains(tab) && !FEED_HIDDEN.contains(tab);
+        return tab != null && !MUTED.contains(tab);
     }
 
-    /** Feed-hidden plain tabs in a stable order, for the store. */
-    public static synchronized List<ChatTab> feedHiddenTabs() {
-        return plainTabsOf(FEED_HIDDEN);
+    /** Whether the tab's mention cue is muted. */
+    public static synchronized boolean isPingsMuted(ChatTab tab) {
+        return tab != null && PINGS_MUTED.contains(tab);
     }
 
-    /** The feed half of a mute: the cue still sounds. */
-    public static synchronized void setFeedHidden(ChatTab tab,
-                                                  boolean hidden) {
-        setPreference(FEED_HIDDEN, tab, hidden);
+    public static synchronized boolean isPingsMuted(ChatChannel channel) {
+        return isPingsMuted(ChatTab.of(channel));
     }
 
-    /** Whether the tab's mention cue is silenced on its own, mute aside. */
-    public static synchronized boolean isPingSilenced(ChatTab tab) {
-        return tab != null && PINGS_SILENCED.contains(tab);
-    }
-
-    public static synchronized boolean isPingSilenced(ChatChannel channel) {
-        return isPingSilenced(ChatTab.of(channel));
-    }
-
-    /** Whether the tab's mention cue sounds: neither muted nor silenced. */
+    /** Whether the tab's mention cue sounds: its mentions are not muted. */
     public static synchronized boolean isPingAudible(ChatTab tab) {
-        return tab != null && !MUTED.contains(tab)
-                && !PINGS_SILENCED.contains(tab);
+        return tab != null && !PINGS_MUTED.contains(tab);
     }
 
-    /** Ping-silenced plain tabs in a stable order, for the store. */
-    public static synchronized List<ChatTab> pingSilencedTabs() {
-        return plainTabsOf(PINGS_SILENCED);
+    /** Mention-muted plain tabs in a stable order, for the store. */
+    public static synchronized List<ChatTab> pingsMutedTabs() {
+        return plainTabsOf(PINGS_MUTED);
     }
 
-    /** The cue half of a mute: the lines still show in the feed. */
-    public static synchronized void setPingSilenced(ChatTab tab,
-                                                    boolean silenced) {
-        setPreference(PINGS_SILENCED, tab, silenced);
+    /**
+     * Muting a channel's mentions silences its cue and nothing else:
+     * the lines still show in the feed, and mentions still count and
+     * highlight.
+     */
+    public static synchronized void setPingsMuted(ChatTab tab,
+                                                  boolean muted) {
+        setPreference(PINGS_MUTED, tab, muted);
+    }
+
+    /** Whether a message may not reopen the tab while it is closed. */
+    public static synchronized boolean isHidden(ChatTab tab) {
+        return tab != null && HIDDEN.contains(tab);
+    }
+
+    public static synchronized boolean isHidden(ChatChannel channel) {
+        return isHidden(ChatTab.of(channel));
+    }
+
+    /** Hidden plain tabs in a stable order, for the store. */
+    public static synchronized List<ChatTab> hiddenTabs() {
+        return plainTabsOf(HIDDEN);
+    }
+
+    /**
+     * Whether an arriving message may reopen the tab once it is closed:
+     * a closed tab reopens on its next message unless it is hidden.
+     * Hiding an open tab closes nothing and mutes nothing — it only
+     * takes effect once the tab is closed, and the channel keeps
+     * receiving, keeps its history and its unread counts either way.
+     */
+    public static synchronized void setHidden(ChatTab tab, boolean hidden) {
+        setPreference(HIDDEN, tab, hidden);
     }
 
     private static void setPreference(Set<ChatTab> set, ChatTab tab,
@@ -834,8 +847,8 @@ public final class ChatWindowLayout {
                 if (tab.isWhisper()) {
                     tabs.remove();
                     MUTED.remove(tab);
-                    FEED_HIDDEN.remove(tab);
-                    PINGS_SILENCED.remove(tab);
+                    PINGS_MUTED.remove(tab);
+                    HIDDEN.remove(tab);
                     changed = true;
                 }
             }
@@ -877,29 +890,20 @@ public final class ChatWindowLayout {
                                   Collection<ChatChannel> closed,
                                   Collection<?> muted,
                                   double feedX, double feedY) {
-        load(specs, closed, muted, feedX, feedY, false);
+        load(specs, closed, muted, null, null, feedX, feedY, false);
     }
 
     static synchronized void load(List<WindowSpec> specs,
                                   Collection<ChatChannel> closed,
                                   Collection<?> muted,
-                                  double feedX, double feedY,
-                                  boolean collapsedToolbar) {
-        load(specs, closed, muted, null, null, feedX, feedY,
-                collapsedToolbar);
-    }
-
-    static synchronized void load(List<WindowSpec> specs,
-                                  Collection<ChatChannel> closed,
-                                  Collection<?> muted,
-                                  Collection<?> feedHidden,
-                                  Collection<?> pingSilenced,
+                                  Collection<?> pingsMuted,
+                                  Collection<?> hidden,
                                   double feedX, double feedY,
                                   boolean collapsedToolbar) {
         WINDOWS.clear();
         MUTED.clear();
-        FEED_HIDDEN.clear();
-        PINGS_SILENCED.clear();
+        PINGS_MUTED.clear();
+        HIDDEN.clear();
         STACK.clear();
         toolbarCollapsed = collapsedToolbar;
         feedOffsetX = clampPercent(feedX);
@@ -985,8 +989,8 @@ public final class ChatWindowLayout {
             firstWindow().tabs().addAll(unplaced);
         }
         addPreferences(MUTED, muted);
-        addPreferences(FEED_HIDDEN, feedHidden);
-        addPreferences(PINGS_SILENCED, pingSilenced);
+        addPreferences(PINGS_MUTED, pingsMuted);
+        addPreferences(HIDDEN, hidden);
     }
 
     private static void addPreferences(Set<ChatTab> set,

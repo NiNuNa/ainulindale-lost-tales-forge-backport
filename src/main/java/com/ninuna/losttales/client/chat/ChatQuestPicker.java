@@ -8,7 +8,7 @@ import net.minecraft.util.StatCollector;
 
 /**
  * Quest browser on the shared picker frame, the fourth toolbar picker
- * beside emotes, items, and map markers. The frame gives it the button,
+ * beside emojis, items, and map markers. The frame gives it the button,
  * open/close easing, search field, section folding and pointer regions;
  * quest entries are not shared yet, so it shows a single empty-state
  * section. When quests become shareable they become {@link Entry} values

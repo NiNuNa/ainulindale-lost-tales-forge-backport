@@ -345,10 +345,22 @@ public final class LostTalesChatPresentationTest {
     }
 
     @Test
-    public void allAndPartyUseTheSharedGreenAndBluePalette() {
-        assertEquals(LostTalesColors.rgb(LostTalesColors.GREEN),
+    public void channelCatalogueColorsComeFromThePalette() {
+        assertEquals(LostTalesColors.rgb(LostTalesColors.FERN_GREEN),
                 ChatChannel.ALL.getDisplayColor());
-        assertEquals(LostTalesColors.rgb(LostTalesColors.BLUE),
+        assertEquals(LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN),
+                ChatChannel.PROXIMITY.getDisplayColor());
+        assertEquals(LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE),
+                ChatChannel.OOC.getDisplayColor());
+        assertEquals(LostTalesColors.rgb(LostTalesColors.PLUM_GRAY),
+                ChatChannel.CONSOLE.getDisplayColor());
+        assertEquals(LostTalesColors.rgb(LostTalesColors.TEAL),
+                ChatChannel.DISCORD.getDisplayColor());
+        assertEquals(LostTalesColors.rgb(LostTalesColors.CRIMSON),
+                ChatChannel.ADMIN.getDisplayColor());
+        // The catalogue colour is only the fallback: presentation shows
+        // the member's own party colour and the sender's faction colour.
+        assertEquals(LostTalesColors.rgb(LostTalesColors.SEAFOAM),
                 ChatChannel.PARTY.getDisplayColor());
     }
 

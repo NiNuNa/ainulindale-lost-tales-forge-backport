@@ -23,7 +23,7 @@ import net.minecraft.util.IChatComponent;
  * component's style formatting code plus its text), so inline formatting
  * codes never count as visible width. Text breaks at spaces, the break
  * space itself is dropped, and a word longer than a whole line is cut
- * hard so any input makes progress; inline emotes and showcase icons are
+ * hard so any input makes progress; inline emojis and showcase icons are
  * atomic words. Formatting codes active at a split are carried onto the
  * next piece.</p>
  *

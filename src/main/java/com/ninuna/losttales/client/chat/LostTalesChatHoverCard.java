@@ -280,6 +280,14 @@ final class LostTalesChatHoverCard {
                 }
                 int partWidth = LostTalesChatVisualStyle.partWidth(
                         minecraft.fontRenderer, part, true);
+                // A mention shows the card of whoever it reaches, not
+                // the line's sender.
+                ChatMentionMarker.Data mention =
+                        ChatMentionMarker.decode(part);
+                if (mention != null && band.localX >= cursor
+                        && band.localX < cursor + partWidth) {
+                    return targetForAccount(minecraft, mention.account);
+                }
                 ChatHeadMarker.Data decodedHead =
                         ChatHeadMarker.decode(part);
                 // NPCs have no account or character card to show.
@@ -301,6 +309,34 @@ final class LostTalesChatHoverCard {
             return null;
         }
         return null;
+    }
+
+    /**
+     * Card target for a mentioned account: the character the appearance
+     * sync knows for it, or the bare account; null when this client
+     * cannot place the name at all.
+     */
+    private static Target targetForAccount(Minecraft minecraft,
+                                           String account) {
+        UUID playerId = ChatChannelIcons.partnerId(minecraft, account);
+        if (playerId == null) {
+            return null;
+        }
+        CharacterAppearance appearance =
+                ClientCharacterAppearanceCache.getAuthoritative(playerId);
+        boolean accountIdentity = appearance == null
+                || !appearance.isPresent()
+                || appearance.getCharacterName().length() == 0;
+        if (accountIdentity) {
+            LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
+                    minecraft, playerId, account);
+        }
+        return new Target(playerId, accountIdentity,
+                appearance == null ? "" : appearance.getSkinId(),
+                accountIdentity ? account
+                        : appearance.getCharacterName(),
+                "", account,
+                LostTalesColors.rgb(LostTalesColors.HUD_LABEL));
     }
 
     private static Target targetForGroup(List<ChatLine> lines,

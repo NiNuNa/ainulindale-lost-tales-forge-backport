@@ -9,7 +9,7 @@ import net.minecraft.util.IChatComponent;
 
 /**
  * Invisible style marker carried by the two bold spaces reserved for an
- * inline emote sprite. Same mechanism as {@link ChatHeadMarker}: the click
+ * inline emoji sprite. Same mechanism as {@link ChatHeadMarker}: the click
  * event survives vanilla's wrapped-chat shallow style copies, while the bold
  * spaces reserve the ten pixels the sprite is drawn into.
  */

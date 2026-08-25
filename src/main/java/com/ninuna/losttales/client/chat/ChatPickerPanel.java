@@ -23,7 +23,7 @@ import org.lwjgl.opengl.GL11;
  * sections for a query, draw one cell, and say what a chosen cell inserts;
  * everything else — open/close easing, search input, section folding,
  * scrolling, hit testing, hover tooltip, pointer-region registration —
- * lives here so the emote, item, marker and quest pickers behave
+ * lives here so the emoji, item, marker and quest pickers behave
  * identically. The panel never grows past the middle of the screen: a
  * list taller than that scrolls inside it (mouse wheel over the panel),
  * clipped to the body below the search row. Geometry is derived from the
@@ -32,11 +32,14 @@ import org.lwjgl.opengl.GL11;
 abstract class ChatPickerPanel {
     static final int BUTTON_SIZE = 12;
     static final int BUTTON_MARGIN = 2;
+    /** The buttons stand this far below the anchor the caller passes. */
+    static final int BUTTON_ANCHOR_OFFSET = 14;
     static final int PADDING = 4;
     static final int SEARCH_HEIGHT = 12;
     static final int LABEL_HEIGHT = 10;
-    /** Gap between the panel's bottom edge and the input row. */
-    static final int PANEL_BOTTOM_MARGIN = 15;
+    /** Anchor-to-panel-bottom distance: the panel ends just above the
+     *  bar the buttons stand in. */
+    static final int PANEL_BOTTOM_MARGIN = BUTTON_ANCHOR_OFFSET + 3;
     /** Folded sections persist for the session, per picker and label. */
     private static final Set<String> COLLAPSED = new HashSet<String>();
 
@@ -109,14 +112,14 @@ abstract class ChatPickerPanel {
                 + BUTTON_MARGIN;
     }
 
-    static int buttonTop(int screenHeight) {
-        return screenHeight - 14;
+    static int buttonTop(int anchorY) {
+        return anchorY - BUTTON_ANCHOR_OFFSET;
     }
 
     boolean isInsideButton(int mouseX, int mouseY,
-                           int anchorRight, int screenHeight) {
+                           int anchorRight, int anchorY) {
         int left = buttonLeft(anchorRight);
-        int top = buttonTop(screenHeight);
+        int top = buttonTop(anchorY);
         return mouseX >= left && mouseX < left + BUTTON_SIZE
                 && mouseY >= top && mouseY < top + BUTTON_SIZE;
     }
@@ -394,7 +397,7 @@ abstract class ChatPickerPanel {
      * beyond that the body scrolls. Rebuilt on demand; candidate counts are
      * small enough that this costs nothing measurable per frame.
      */
-    private Layout buildLayout(int anchorRight, int screenHeight) {
+    private Layout buildLayout(int anchorRight, int anchorY) {
         Layout layout = new Layout();
         List<Section> sections = buildSections(searchQuery());
         int bodyHeight = 0;
@@ -409,11 +412,15 @@ abstract class ChatPickerPanel {
             bodyHeight += rowsOf(section) * cellHeight();
         }
         int frame = PADDING + SEARCH_HEIGHT + PADDING;
-        int maxHeight = Math.max(frame + cellHeight(),
-                screenHeight - PANEL_BOTTOM_MARGIN - screenHeight / 2);
-        layout.height = Math.min(frame + bodyHeight, maxHeight);
+        int minHeight = frame + cellHeight();
+        // The cap is a share of the real screen — the same size wherever
+        // the window's bar happens to sit; only the room actually left
+        // above the bar may shrink the panel below it.
+        int cap = Math.max(minHeight, screenCapHeight());
+        int room = Math.max(minHeight, anchorY - PANEL_BOTTOM_MARGIN - 2);
+        layout.height = Math.min(frame + bodyHeight, Math.min(cap, room));
         layout.left = anchorRight - panelWidth() - BUTTON_MARGIN;
-        layout.top = screenHeight - PANEL_BOTTOM_MARGIN - layout.height;
+        layout.top = anchorY - PANEL_BOTTOM_MARGIN - layout.height;
         layout.searchY = layout.top + PADDING + 1;
         layout.bodyTop = layout.top + PADDING + SEARCH_HEIGHT;
         layout.bodyBottom = layout.top + layout.height - PADDING;
@@ -454,6 +461,18 @@ abstract class ChatPickerPanel {
             return section.label == null ? 1 : 0;
         }
         return (section.entries.size() + columns() - 1) / columns();
+    }
+
+    /** Half the real screen: one panel size at every bar position. */
+    private static int screenCapHeight() {
+        try {
+            Minecraft minecraft = Minecraft.getMinecraft();
+            ScaledResolution resolution = new ScaledResolution(minecraft,
+                    minecraft.displayWidth, minecraft.displayHeight);
+            return resolution.getScaledHeight() / 2;
+        } catch (RuntimeException unavailable) {
+            return 120;
+        }
     }
 
     private float openProgress() {

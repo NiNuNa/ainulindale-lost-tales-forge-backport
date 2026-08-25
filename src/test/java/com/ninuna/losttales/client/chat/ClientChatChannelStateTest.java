@@ -186,12 +186,8 @@ public final class ClientChatChannelStateTest {
         assertTrue(ChatWindowFrame.feedFilter().accepts(whisper));
         ChatWindowLayout.setMuted(whisper, true);
         assertFalse(ChatWindowFrame.feedFilter().accepts(whisper));
-        // Hiding from the feed alone is enough to leave it; silencing
-        // the cue alone is not.
-        ChatWindowLayout.setFeedHidden(ooc, true);
-        assertFalse(ChatWindowFrame.feedFilter().accepts(ooc));
-        ChatWindowLayout.setFeedHidden(ooc, false);
-        ChatWindowLayout.setPingSilenced(ooc, true);
+        // Muting mentions alone never touches the feed.
+        ChatWindowLayout.setPingsMuted(ooc, true);
         assertTrue(ChatWindowFrame.feedFilter().accepts(ooc));
     }
 

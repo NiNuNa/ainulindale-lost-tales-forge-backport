@@ -12,6 +12,7 @@ import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
 import com.ninuna.losttales.compat.discord.DiscordAvatarUrl;
+import com.ninuna.losttales.compat.discord.DiscordMessageSanitizer;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.compat.lotr.LostTalesWaystonePermissionPolicy;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
@@ -197,12 +198,13 @@ public final class LostTalesChatService {
         }
         if (channel == ChatChannel.DISCORD) {
             // The bridge posts the line under the sender's name with their
-            // head as the picture; share tokens go as the text they were
+            // head as the picture; emoji shortcodes go as the Unicode
+            // emoji Discord renders, share tokens as the text they were
             // typed as.
             LostTalesDiscordBridge.getInstance().relay(identityName,
                     DiscordAvatarUrl.of(LostTalesConfig.discordAvatarUrlTemplate,
                             accountName, sender.getUniqueID()),
-                    message);
+                    DiscordMessageSanitizer.outbound(message));
         }
     }
 

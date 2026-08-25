@@ -193,7 +193,7 @@ final class ChatWindowFrame {
      * Starts the window's frame from its placement box. The box is
      * dragged in fractions of a GUI pixel so it follows the mouse
      * exactly, and laid on whole display pixels to be drawn: the text,
-     * the heads and the emotes in it are pixel art, and between two
+     * the heads and the emojis in it are pixel art, and between two
      * pixels they crawl. A display pixel is the finest step the screen
      * has, so the motion loses nothing by landing on one.
      */

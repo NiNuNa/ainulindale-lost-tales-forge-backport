@@ -19,10 +19,12 @@ import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.chat.emoji.ChatEmojiSuggester;
+import com.ninuna.losttales.chat.emoji.ChatEmoticonConverter;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -71,7 +73,7 @@ import org.lwjgl.opengl.GL11;
 /**
  * Vanilla chat input with a compact channel indicator, folder-style channel
  * tabs on top of every chat window, per-channel message views, and pickers
- * and completion popups for emotes, items, map markers, and quests. Tabs
+ * and completion popups for emojis, items, map markers, and quests. Tabs
  * can be dragged: along their row to reorder, away from it to detach into
  * a window of their own, onto another window's row to dock there; a
  * window is moved by its grip, its strip, or by dragging its messages —
@@ -110,14 +112,8 @@ public final class LostTalesChatGui extends GuiChat {
     private static final int RESIZE_BORDER = 4;
     /** How far along an edge from a corner still counts as that corner. */
     private static final int RESIZE_CORNER = 12;
-    /** The send arrow is the rightmost toolbar button. */
+    /** The send arrow is the rightmost bar control. */
     private static final int SEND_BUTTON_INDEX = 0;
-    /** The picker strip is one chat line tall, like the tabs' row body. */
-    private static final int TOOLBAR_HEIGHT =
-            LostTalesChatOverlayRenderer.LINE_HEIGHT;
-    private static final int TOOLBAR_TOGGLE_WIDTH = 9;
-    /** What is left of the strip once folded down: the handle alone. */
-    private static final int TOOLBAR_NUB_HEIGHT = 5;
     private static final float COUNTER_SCALE = 0.75F;
     private static final int COUNTER_RGB =
             LostTalesColors.rgb(LostTalesColors.SAND);
@@ -128,8 +124,8 @@ public final class LostTalesChatGui extends GuiChat {
     private static final String POPUP_SETTINGS = "settings";
     private static final String POPUP_RESTORE = "restore";
     private static final String ENTRY_MUTE = "mute";
-    private static final String ENTRY_FEED = "feed";
     private static final String ENTRY_PINGS = "pings";
+    private static final String ENTRY_HIDE = "hide";
     private static final String ENTRY_DETACH = "detach";
     private static final String ENTRY_CLOSE = "close";
     /** Where a detached window's row lands: a little below its old one. */
@@ -155,6 +151,11 @@ public final class LostTalesChatGui extends GuiChat {
     private final ChatPickerPanel[] pickers = new ChatPickerPanel[] {
             this.emojiPicker, this.itemPicker, this.markerPicker,
             this.questPicker};
+    /** The pickers the chevron folds away; the emoji picker stands apart. */
+    private final ChatPickerPanel[] insertPickers = new ChatPickerPanel[] {
+            this.itemPicker, this.markerPicker, this.questPicker};
+    /** Bar slot of the fold chevron, between the emoji and the inserts. */
+    private int toolbarToggleIndex;
     private final ChatEmojiSuggestionBox emojiSuggestions =
             new ChatEmojiSuggestionBox();
     private final ChatNameSuggestionBox nameSuggestions =
@@ -167,6 +168,9 @@ public final class LostTalesChatGui extends GuiChat {
     private WindowResize windowResize;
     /** Window a restore popup was opened from. */
     private String restoreWindowId;
+    /** How often the open {@code +} menu re-reads its rows. */
+    private static final long RESTORE_REFRESH_NANOS = 500L * 1000000L;
+    private long restoreRefreshedNanos;
     /**
      * The active window's input bar this frame — the window holding the
      * selected channel — in whole pixels plus the fractional remainder
@@ -222,13 +226,15 @@ public final class LostTalesChatGui extends GuiChat {
         // must accept the longer raw form; sending re-checks it.
         this.inputField.setMaxStringLength(
                 ChatMessageValidator.MAX_RAW_CHARACTERS);
-        // The pickers' buttons sit right to left in their own strip above
-        // the bar: emotes, items, markers, quests. The bar itself keeps
-        // only the send arrow at that end.
-        int index = 0;
+        // The bar's controls sit right to left: the send arrow, the
+        // emoji picker, the fold chevron, then the insert pickers —
+        // items, markers, quests — which the chevron folds away to the
+        // left. The emoji picker stands outside the fold.
+        int index = SEND_BUTTON_INDEX + 1;
         if (LostTalesConfig.enableChatEmojis) {
             this.emojiPicker.setButtonIndex(index++);
         }
+        this.toolbarToggleIndex = index++;
         this.itemPicker.setButtonIndex(index++);
         this.markerPicker.setButtonIndex(index++);
         this.questPicker.setButtonIndex(index);
@@ -355,11 +361,11 @@ public final class LostTalesChatGui extends GuiChat {
         }
         int room = (int)Math.round(frame.boxRight - frame.boxLeft) - 6;
         int x = (int)Math.floor(frame.boxLeft) + 3;
-        // Centred in the one-line gap between the bottom rule and the bar,
-        // riding the bar's entrance so the two arrive together.
-        int y = (int)Math.floor(frame.barTop()) - ChatWindowPlacement.inputGap(
-                this.mc) + (ChatWindowPlacement.inputGap(this.mc) - 8) / 2
-                + 1 + Math.round(entrance);
+        // Directly under the bar, the way other chats put it, riding the
+        // bar's entrance so the two arrive together.
+        int y = (int)Math.floor(frame.barTop())
+                + ChatWindowPlacement.INPUT_HEIGHT + 2
+                + Math.round(entrance);
         LostTalesChatVisualStyle.drawPlain(this.fontRendererObj,
                 "§o" + this.fontRendererObj.trimStringToWidth(text, room),
                 x, y, 255);
@@ -425,86 +431,90 @@ public final class LostTalesChatGui extends GuiChat {
         return this.barTop + INPUT_ANCHOR_BELOW_BAR;
     }
 
-    /**
-     * The pickers' floor: their buttons stand on the bar's top edge in a
-     * strip of their own, so they take the bar's top as the bottom of
-     * their button square and open their panels above that.
-     */
-    private int toolbarAnchor() {
-        // One above the strip's bottom edge so the ten-pixel glyphs sit
-        // centred in its eleven rows.
-        return inputAnchor() - TOOLBAR_HEIGHT - 1;
+    /** Top of the bar's square controls, centred in the bar's height. */
+    private int barControlTop() {
+        return this.barTop + (ChatWindowPlacement.INPUT_HEIGHT
+                - ChatPickerPanel.BUTTON_SIZE) / 2;
     }
 
-    /** The pickers' right edge: the strip's, less the fold handle. */
-    private int pickerRight(int barRight) {
-        return barRight - TOOLBAR_TOGGLE_WIDTH - 1;
+    /** The text row's top inside the bar, centred like the controls. */
+    private int barTextTop() {
+        return this.barTop + (ChatWindowPlacement.INPUT_HEIGHT - 8) / 2;
     }
 
-    /** The strip's top: its full height, or the handle's once folded. */
-    private int toolbarTop() {
-        return this.barTop - (ChatWindowLayout.isToolbarCollapsed()
-                ? TOOLBAR_NUB_HEIGHT : TOOLBAR_HEIGHT);
+    /** The anchor the pickers hang their buttons and panels from. */
+    private int pickerAnchor() {
+        return barControlTop() + ChatPickerPanel.BUTTON_ANCHOR_OFFSET;
     }
 
-    /**
-     * Left edge of the pickers' strip: the leftmost button's — or the
-     * fold handle's, which is all that is left of it once folded.
-     */
-    private int toolbarLeft(int barRight) {
-        return ChatWindowLayout.isToolbarCollapsed()
-                ? toolbarToggleLeft(barRight) - 1
-                : this.questPicker.buttonLeft(pickerRight(barRight)) - 1;
+    /** Left edge of the bar control in the given slot from the right. */
+    private static int barSlotLeft(int barRight, int index) {
+        return barRight - ChatPickerPanel.BUTTON_MARGIN
+                - (index + 1) * (ChatPickerPanel.BUTTON_SIZE
+                        + ChatPickerPanel.BUTTON_MARGIN)
+                + ChatPickerPanel.BUTTON_MARGIN;
     }
 
-    /** The fold handle stands at the strip's right end, on the corner. */
+    /** Left edge of the leftmost bar control; the counter ends here. */
+    private int controlsLeft(int barRight) {
+        int leftmost = this.toolbarToggleIndex
+                + (ChatWindowLayout.isToolbarCollapsed()
+                        ? 0 : this.insertPickers.length);
+        return barSlotLeft(barRight, leftmost);
+    }
+
     private int toolbarToggleLeft(int barRight) {
-        return barRight - TOOLBAR_TOGGLE_WIDTH - 1;
+        return barSlotLeft(barRight, this.toolbarToggleIndex);
     }
 
     private boolean isInsideToolbarToggle(int mouseX, int mouseY,
                                           int barRight) {
         int left = toolbarToggleLeft(barRight);
-        return mouseX >= left && mouseX < left + TOOLBAR_TOGGLE_WIDTH
-                && mouseY >= toolbarTop() && mouseY < this.barTop;
+        int top = barControlTop();
+        return mouseX >= left
+                && mouseX < left + ChatPickerPanel.BUTTON_SIZE
+                && mouseY >= top
+                && mouseY < top + ChatPickerPanel.BUTTON_SIZE;
     }
 
     /**
-     * The chevron that folds the strip down into the bar — pointing down
-     * while the buttons are out, up from the small handle left once they
-     * are folded away.
+     * The chevron between the emoji button and the insert buttons —
+     * pointing left while they are folded away (they open leftward),
+     * right while they are out (they fold back toward it). Lifted a
+     * pixel under the pointer like the buttons beside it.
      */
     private void drawToolbarToggle(int barRight, int mouseX, int mouseY) {
         boolean collapsed = ChatWindowLayout.isToolbarCollapsed();
         boolean hovered = isInsideToolbarToggle(mouseX, mouseY, barRight);
         int color = LostTalesChatVisualStyle.argb(
                 LostTalesChatVisualStyle.IVORY, hovered ? 255 : 0xB0);
-        int x = toolbarToggleLeft(barRight) + 2;
-        int y = toolbarTop() + (collapsed ? 1 : 4);
-        for (int step = 0; step < 3; step++) {
-            int reach = collapsed ? step : 2 - step;
-            drawRect(x + 2 - reach, y + step, x + 3 - reach, y + step + 1,
-                    color);
-            drawRect(x + 2 + reach, y + step, x + 3 + reach, y + step + 1,
-                    color);
+        int left = toolbarToggleLeft(barRight);
+        int x = left + (ChatPickerPanel.BUTTON_SIZE - 3) / 2;
+        int y = barControlTop() + (ChatPickerPanel.BUTTON_SIZE - 5) / 2
+                + (hovered ? 0 : 1);
+        for (int step = 0; step < 5; step++) {
+            int reach = step < 3 ? step : 4 - step;
+            int px = collapsed ? x + 2 - reach : x + reach;
+            drawRect(px, y + step, px + 1, y + step + 1, color);
+        }
+        this.regions.add(left, barControlTop(),
+                left + ChatPickerPanel.BUTTON_SIZE,
+                barControlTop() + ChatPickerPanel.BUTTON_SIZE);
+    }
+
+    /** Folds the insert pickers' panels with their buttons. */
+    private void closeInsertPickers() {
+        for (ChatPickerPanel picker : this.insertPickers) {
+            picker.setOpen(false);
         }
     }
 
-    /**
-     * The strip the picker buttons stand in, drawn like the channel tabs
-     * above: one chamfered body on the bar's top edge, right-aligned with
-     * the bar, so the buttons read as a small row of tabs.
-     */
-    private void drawToolbarStrip(int barRight, int mouseX, int mouseY) {
-        int top = toolbarTop();
-        int left = toolbarLeft(barRight);
-        int right = barRight;
-        int surface = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.SURFACE_RGB, 0x90);
-        drawRect(left + 1, top, right - 1, top + 1, surface);
-        drawRect(left, top + 1, right, this.barTop, surface);
-        this.regions.add(left, top, right, this.barTop);
-        drawToolbarToggle(barRight, mouseX, mouseY);
+    /** Whether the picker's button (and panel) is on the bar right now. */
+    private boolean isPickerShown(ChatPickerPanel picker) {
+        if (picker == this.emojiPicker) {
+            return LostTalesConfig.enableChatEmojis;
+        }
+        return !ChatWindowLayout.isToolbarCollapsed();
     }
 
     /**
@@ -578,11 +588,20 @@ public final class LostTalesChatGui extends GuiChat {
             cancelDrags();
             return;
         }
-        // Ctrl+Tab walks every window's tabs, Ctrl+W closes the selected
-        // one: neither clashes with autocomplete, so both work with text
-        // in the field (drafts belong to their tabs).
+        // Ctrl+Tab walks every window's tabs, Ctrl+Left/Right the
+        // selected window's, and Ctrl+W closes the selected one: none of
+        // them clashes with autocomplete, so all work with text in the
+        // field (drafts belong to their tabs).
         if (isCtrlKeyDown() && keyCode == Keyboard.KEY_TAB) {
             selectChannel(ClientChatChannelState.cycleAll(isShiftKeyDown()));
+            return;
+        }
+        if (isCtrlKeyDown() && keyCode == Keyboard.KEY_RIGHT) {
+            selectChannel(ClientChatChannelState.cycle());
+            return;
+        }
+        if (isCtrlKeyDown() && keyCode == Keyboard.KEY_LEFT) {
+            selectChannel(ClientChatChannelState.cycleBack());
             return;
         }
         if (isCtrlKeyDown() && keyCode == Keyboard.KEY_W) {
@@ -849,7 +868,7 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
-     * Inserts a token picked from a menu — an emote, an item or a
+     * Inserts a token picked from a menu — an emoji, an item or a
      * marker share — as a word of its own: a space is put before it
      * unless the text before the cursor is empty or already ends in one,
      * and one follows it, so two picks in a row never run together and
@@ -1070,26 +1089,44 @@ public final class LostTalesChatGui extends GuiChat {
             return;
         }
         this.mc.ingameGUI.getChatGUI().addToSentMessages(message);
+        // The sent history above keeps the raw text, so recalling it
+        // gives back exactly what was typed; what goes out may have its
+        // emoticons converted.
+        String outgoing = outgoingMessage(message);
         if (tab.isNpc()) {
             // Nobody is on the other end of an NPC's conversation: the
             // line is shown here as if whispered, and that is all. What
             // the player shared is resolved here too, since no server
             // will do it for them.
-            LostTalesChatPresentation.echoToNpc(tab, message,
-                    resolveLocalShowcases(message));
+            LostTalesChatPresentation.echoToNpc(tab, outgoing,
+                    resolveLocalShowcases(outgoing));
             return;
         }
         if (LostTalesConfig.enableChatEmojis) {
             for (ChatEmojiParser.Segment segment
-                    : ChatEmojiParser.split(message)) {
+                    : ChatEmojiParser.split(outgoing)) {
                 if (segment.isEmoji()) {
                     ChatEmojiUsageStore.recordUse(segment.getEmoji());
                 }
             }
         }
         LostTalesNetworkHandler.CHANNEL.sendToServer(
-                new LostTalesChatSendPacket(tab.getChannel(), message,
-                        resolveShareReferences(message), tab.getPartner()));
+                new LostTalesChatSendPacket(tab.getChannel(), outgoing,
+                        resolveShareReferences(outgoing), tab.getPartner()));
+    }
+
+    /**
+     * The message as it goes out: whole-token emoticons become their
+     * canonical shortcodes when the setting asks for it and the longer
+     * text still fits the limit; otherwise exactly what was typed.
+     */
+    private static String outgoingMessage(String message) {
+        if (!LostTalesConfig.enableChatEmojis
+                || !LostTalesConfig.convertChatEmoticons) {
+            return message;
+        }
+        String converted = ChatEmoticonConverter.convert(message);
+        return ChatMessageValidator.isValid(converted) ? converted : message;
     }
 
     /**
@@ -1139,9 +1176,11 @@ public final class LostTalesChatGui extends GuiChat {
         String text = parts.length > 2 ? parts[2].trim() : "";
         if (text.length() > 0 && ChatMessageValidator.isValid(text)) {
             this.mc.ingameGUI.getChatGUI().addToSentMessages(command);
+            String outgoing = outgoingMessage(text);
             LostTalesNetworkHandler.CHANNEL.sendToServer(
-                    new LostTalesChatSendPacket(ChatChannel.WHISPER, text,
-                            resolveShareReferences(text), tab.getPartner()));
+                    new LostTalesChatSendPacket(ChatChannel.WHISPER, outgoing,
+                            resolveShareReferences(outgoing),
+                            tab.getPartner()));
         }
         return true;
     }
@@ -1279,6 +1318,16 @@ public final class LostTalesChatGui extends GuiChat {
         if (wheel == 0) {
             return;
         }
+        // A wheel turn over the open menu scrolls its rows.
+        if (this.popup.isOpen()) {
+            int mouseX = Mouse.getEventX() * this.width / this.mc.displayWidth;
+            int mouseY = this.height - Mouse.getEventY() * this.height
+                    / this.mc.displayHeight - 1;
+            if (this.popup.contains(mouseX, mouseY)) {
+                this.popup.scrollBy(wheel > 0 ? -1 : 1);
+                return;
+            }
+        }
         // A wheel turn over an open picker scrolls that picker's list;
         // anywhere else it scrolls the history as before.
         ChatPickerPanel picker = openPicker();
@@ -1288,7 +1337,7 @@ public final class LostTalesChatGui extends GuiChat {
                     / this.mc.displayHeight - 1;
             int adjustedMouseY = mouseY - Math.round(inputEntranceOffset());
             if (picker.isInsidePanel(mouseX, adjustedMouseY,
-                    pickerRight(inputBarRight()), toolbarAnchor())) {
+                    inputBarRight(), pickerAnchor())) {
                 picker.scrollBy((wheel > 0 ? -1 : 1) * picker.cellHeight());
                 return;
             }
@@ -1351,20 +1400,38 @@ public final class LostTalesChatGui extends GuiChat {
         int adjustedMouseY = mouseY - entranceOffset;
         this.regions.reset();
         this.hoverTip = "";
+        // The frame as drawn so far — world and HUD — is captured and
+        // blurred once, before anything of the chat is on it; each
+        // window then pastes its own rectangle of the result under its
+        // backdrop while the rest of the screen stays sharp.
+        if (LostTalesConfig.enableChatBackgroundBlur
+                && LostTalesConfig.enableGuiBackgroundBlur) {
+            LostTalesGuiRegionBlur.getInstance().capture(this.mc,
+                    partialTicks, (float)LostTalesConfig.guiBlurStrength);
+        }
+        // Mouse events reach mouseClickMove at tick rate; a live drag is
+        // re-read from the pointer every drawn frame so the window, the
+        // outline and the dock target stay under the cursor.
+        if (this.windowResize != null && this.windowResize.active) {
+            updateResize(mouseX, mouseY);
+        } else if (this.windowDrag != null && this.windowDrag.active) {
+            moveDraggedWindow(mouseX, mouseY);
+        } else if (this.tabDrag != null && this.tabDrag.active) {
+            updateDropTarget(mouseX, mouseY);
+        }
         drawWindows(mouseX, mouseY, entrance);
         // The field follows the active window's bar as just drawn.
         updateInputBounds();
+        refreshRestorePopup();
         this.popup.registerRegion(this.regions);
         int barRight = inputBarRight();
         int anchor = inputAnchor();
-        int toolbar = toolbarAnchor();
-        int pickerRight = pickerRight(barRight);
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(this.barFracX, this.barFracY + entrance, 0.0F);
             drawInputBar(barRight);
             drawIndicator(mouseX, adjustedMouseY);
-            drawToolbarStrip(barRight, mouseX, adjustedMouseY);
+            drawToolbarToggle(barRight, mouseX, adjustedMouseY);
             if (isInsideToolbarToggle(mouseX, adjustedMouseY, barRight)
                     && !isDragging()) {
                 this.hoverTip = StatCollector.translateToLocal(
@@ -1374,14 +1441,10 @@ public final class LostTalesChatGui extends GuiChat {
                 this.hoverTipX = mouseX;
                 this.hoverTipY = mouseY;
             }
-            if (!ChatWindowLayout.isToolbarCollapsed()) {
-                for (ChatPickerPanel picker : this.pickers) {
-                    if (picker == this.emojiPicker
-                            && !LostTalesConfig.enableChatEmojis) {
-                        continue;
-                    }
-                    picker.draw(this.mc, this.regions, pickerRight, toolbar,
-                            mouseX, adjustedMouseY);
+            for (ChatPickerPanel picker : this.pickers) {
+                if (isPickerShown(picker)) {
+                    picker.draw(this.mc, this.regions, barRight,
+                            pickerAnchor(), mouseX, adjustedMouseY);
                 }
             }
             drawSendButton(barRight, mouseX, adjustedMouseY);
@@ -1583,7 +1646,8 @@ public final class LostTalesChatGui extends GuiChat {
         // itself is refused anyway, so the control would only mislead.
         row.closable = ClientChatChannelState.isClosable(row.selected);
         row.showRestore = !window.isLocked()
-                && !restorableChannels().isEmpty();
+                && (!restorableChannels().isEmpty()
+                        || hasWhisperCandidates());
         row.closedUnread = row.showRestore ? closedUnreadCount() : 0;
         if (this.tabDrag != null && this.tabDrag.active) {
             if (window.contains(this.tabDrag.tab)) {
@@ -1690,8 +1754,9 @@ public final class LostTalesChatGui extends GuiChat {
                 // Italic says "not the input"; the text stays at full
                 // opacity like every other.
                 String label = "§o" + indicatorLabel(front);
+                int labelY = y + (ChatWindowPlacement.INPUT_HEIGHT - 8) / 2;
                 LostTalesChatVisualStyle.drawColored(this.fontRendererObj,
-                        label, x + 3, y + 3,
+                        label, x + 3, labelY,
                         ClientChatChannelState.displayColor(front), 255);
                 // Unsent text stays on show where it was typed; only
                 // the controls leave with the input.
@@ -1706,7 +1771,7 @@ public final class LostTalesChatGui extends GuiChat {
                                 this.fontRendererObj,
                                 this.fontRendererObj.trimStringToWidth(
                                         draft, room),
-                                textLeft, y + 3,
+                                textLeft, labelY,
                                 LostTalesChatVisualStyle.IVORY, 255);
                     }
                 }
@@ -1874,11 +1939,6 @@ public final class LostTalesChatGui extends GuiChat {
             ChatPopupMenu.Entry entry = this.popup.entryAt(mouseX, mouseY);
             boolean inside = this.popup.contains(mouseX, mouseY);
             if (entry != null && button == 0) {
-                if (this.popup.isOnAction(mouseX, mouseY)) {
-                    // A row's action changes the row; the list stays.
-                    handlePopupAction(entry);
-                    return;
-                }
                 handlePopupEntry(entry);
             }
             this.popup.close();
@@ -1886,9 +1946,8 @@ public final class LostTalesChatGui extends GuiChat {
                 return;
             }
         }
+        int barRight = inputBarRight();
         int anchor = inputAnchor();
-        int toolbar = toolbarAnchor();
-        int pickerRight = pickerRight(barRight);
         if (LostTalesConfig.enableChatEmojis && button == 0
                 && emojiSuggestions.isActive()) {
             ChatEmoji suggested = emojiSuggestions.suggestionAt(
@@ -1919,25 +1978,24 @@ public final class LostTalesChatGui extends GuiChat {
                 return;
             }
         }
-        int barRight = inputBarRight();
         ChatPickerPanel picker = openPicker();
         if (picker != null && picker.isInsidePanel(mouseX, adjustedMouseY,
-                pickerRight, toolbar)) {
+                barRight, pickerAnchor())) {
             if (picker.mouseClicked(mouseX, adjustedMouseY, button,
-                    pickerRight, toolbar)) {
+                    barRight, pickerAnchor())) {
                 return;
             }
             ChatPickerPanel.Entry entry = picker.entryAt(
-                    mouseX, adjustedMouseY, pickerRight, toolbar);
+                    mouseX, adjustedMouseY, barRight, pickerAnchor());
             if (button == 0 && entry != null) {
                 insertToken(picker.insertionText(entry));
                 this.inputField.setFocused(true);
             } else if (button == 1 && picker == this.emojiPicker) {
                 this.emojiPicker.toggleFavoriteAt(
-                        mouseX, adjustedMouseY, pickerRight, toolbar);
+                        mouseX, adjustedMouseY, barRight, pickerAnchor());
             } else if (button == 1 && picker == this.markerPicker) {
                 this.markerPicker.toggleFavoriteAt(
-                        mouseX, adjustedMouseY, pickerRight, toolbar);
+                        mouseX, adjustedMouseY, barRight, pickerAnchor());
             }
             return;
         }
@@ -1975,19 +2033,17 @@ public final class LostTalesChatGui extends GuiChat {
         }
         if (button == 0 && isInsideToolbarToggle(mouseX, adjustedMouseY,
                 barRight)) {
-            closePickers();
+            // Folding the inserts takes their panels with them; the
+            // emoji picker is outside the fold and keeps its own.
+            closeInsertPickers();
             ChatWindowLayout.setToolbarCollapsed(
                     !ChatWindowLayout.isToolbarCollapsed());
             return;
         }
-        if (button == 0 && !ChatWindowLayout.isToolbarCollapsed()) {
+        if (button == 0) {
             for (ChatPickerPanel candidate : this.pickers) {
-                if (candidate == this.emojiPicker
-                        && !LostTalesConfig.enableChatEmojis) {
-                    continue;
-                }
-                if (candidate.isInsideButton(mouseX, adjustedMouseY,
-                        pickerRight, toolbar)) {
+                if (isPickerShown(candidate) && candidate.isInsideButton(
+                        mouseX, adjustedMouseY, barRight, pickerAnchor())) {
                     boolean open = candidate.isOpen();
                     closePickers();
                     candidate.setOpen(!open);
@@ -2331,11 +2387,10 @@ public final class LostTalesChatGui extends GuiChat {
                 || isInsideSendButton(mouseX, mouseY, barRight)) {
             return true;
         }
-        int pickerRight = pickerRight(barRight);
-        int toolbar = toolbarAnchor();
+        int anchor = pickerAnchor();
         for (ChatPickerPanel picker : this.pickers) {
-            if (picker.isInsideButton(mouseX, mouseY, pickerRight,
-                    toolbar)) {
+            if (isPickerShown(picker) && picker.isInsideButton(
+                    mouseX, mouseY, barRight, anchor)) {
                 return true;
             }
         }
@@ -2386,17 +2441,19 @@ public final class LostTalesChatGui extends GuiChat {
             return;
         }
         // Shown from the press, so the size the window would take is
-        // there before the pointer has travelled anywhere.
+        // there before the pointer has travelled anywhere. The rules lie
+        // just outside the box, so no edge of the window pokes out past
+        // the outline while it is being dragged.
         int left = (int)Math.round(resize.left);
         int right = (int)Math.round(resize.right);
         int top = (int)Math.round(resize.top);
         int bottom = (int)Math.round(resize.bottom);
         int color = LostTalesChatVisualStyle.argb(
                 LostTalesChatVisualStyle.IVORY, 0xC0);
-        drawRect(left, top, right, top + 1, color);
-        drawRect(left, bottom - 1, right, bottom, color);
-        drawRect(left, top, left + 1, bottom, color);
-        drawRect(right - 1, top, right, bottom, color);
+        drawRect(left - 1, top - 1, right + 1, top, color);
+        drawRect(left - 1, bottom, right + 1, bottom + 1, color);
+        drawRect(left - 1, top, left, bottom, color);
+        drawRect(right, top, right + 1, bottom, color);
     }
 
     /** Arms a resize from the pointer's position on an edge. */
@@ -2768,29 +2825,30 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
-     * The cog menu: mute (feed and cue together), and the two halves on
-     * their own — out of the feed but still pinging, or pinging silenced
-     * but still in the feed.
+     * The cog menu's five entries, each its own independent preference
+     * or action: Mute Channel (out of the feed), Mute Mentions (cue
+     * silent), Hide Channel (stays closed when messaged), Move to its
+     * own Window, and Close Channel.
      */
     private void openSettingsPopup(ChatTab channel, int anchorX,
                                    int anchorBottom) {
         List<ChatPopupMenu.Entry> entries =
-                new ArrayList<ChatPopupMenu.Entry>(3);
+                new ArrayList<ChatPopupMenu.Entry>(5);
         entries.add(new ChatPopupMenu.Entry(ENTRY_MUTE,
                 StatCollector.translateToLocal(
                         ChatWindowLayout.isMuted(channel)
                                 ? "gui.losttales.chat.tab.unmute"
                                 : "gui.losttales.chat.tab.mute")));
-        entries.add(new ChatPopupMenu.Entry(ENTRY_FEED,
-                StatCollector.translateToLocal(
-                        ChatWindowLayout.isFeedHidden(channel)
-                                ? "gui.losttales.chat.tab.show_feed"
-                                : "gui.losttales.chat.tab.hide_feed")));
         entries.add(new ChatPopupMenu.Entry(ENTRY_PINGS,
                 StatCollector.translateToLocal(
-                        ChatWindowLayout.isPingSilenced(channel)
-                                ? "gui.losttales.chat.tab.sound_pings"
-                                : "gui.losttales.chat.tab.silence_pings")));
+                        ChatWindowLayout.isPingsMuted(channel)
+                                ? "gui.losttales.chat.tab.unmute_mentions"
+                                : "gui.losttales.chat.tab.mute_mentions")));
+        entries.add(new ChatPopupMenu.Entry(ENTRY_HIDE,
+                StatCollector.translateToLocal(
+                        ChatWindowLayout.isHidden(channel)
+                                ? "gui.losttales.chat.tab.unhide"
+                                : "gui.losttales.chat.tab.hide")));
         // Layout actions the row may have no room for: a window of its
         // own, and closing, offered whenever the layout would allow it.
         ChatWindow window = ChatWindowLayout.windowOf(channel);
@@ -2813,39 +2871,143 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     private void openRestorePopup(int anchorX, int anchorBottom) {
+        this.restoreRefreshedNanos = System.nanoTime();
         this.popup.open(POPUP_RESTORE, null, restoreEntries(),
                 this.fontRendererObj, anchorX - 4, anchorBottom,
                 this.width, this.height);
     }
 
     /**
-     * The closed channels, each with the same unread indicator its tab
+     * Keeps the open {@code +} menu current: its rows follow players
+     * joining and leaving and counts changing, rebuilt on an interval
+     * rather than per frame. A menu whose rows have all gone closes.
+     */
+    private void refreshRestorePopup() {
+        if (!this.popup.isOpen()
+                || !POPUP_RESTORE.equals(this.popup.kind())) {
+            return;
+        }
+        long now = System.nanoTime();
+        if (now - this.restoreRefreshedNanos < RESTORE_REFRESH_NANOS) {
+            return;
+        }
+        this.restoreRefreshedNanos = now;
+        this.popup.replaceEntries(restoreEntries(), this.fontRendererObj,
+                this.width, this.height);
+    }
+
+    /**
+     * The {@code +} menu: a channel-opening list in two sections. The
+     * closed channels come first, each with the unread indicator its tab
      * would carry ({@code Trade [3]}) — a closed channel keeps
-     * receiving, and the count is the one the tab shows once restored —
-     * and a mute action in the second column, so a closed channel that
-     * floods the feed can be quieted without restoring it first. A muted
-     * one reads italic, like its tab would.
+     * receiving, and the count is the one the tab shows once restored; a
+     * muted one reads italic, like its tab would. The online players
+     * follow, each opening (or selecting) the whisper conversation with
+     * them, wearing the same head its tab wears and the conversation's
+     * unread count. A section absent of rows is left out altogether.
      */
     private List<ChatPopupMenu.Entry> restoreEntries() {
-        List<ChatChannel> closed = restorableChannels();
         List<ChatPopupMenu.Entry> entries =
-                new ArrayList<ChatPopupMenu.Entry>(closed.size());
-        for (ChatChannel channel : closed) {
-            String counter = ClientChatChannelViews.counterText(
-                    ClientChatChannelViews.unreadCount(channel));
-            boolean muted = ChatWindowLayout.isMuted(channel);
-            entries.add(new ChatPopupMenu.Entry(channel.getId(),
-                    counter.length() == 0
-                            ? ClientChatChannelState.displayName(channel)
-                            : ClientChatChannelState.displayName(channel)
-                                    + " " + counter,
-                    StatCollector.translateToLocal(muted
-                            ? "gui.losttales.chat.tab.unmute"
-                            : "gui.losttales.chat.tab.mute"),
-                    muted, ClientChatChannelState.displayColor(channel),
-                    ChatTab.of(channel)));
+                new ArrayList<ChatPopupMenu.Entry>();
+        List<ChatChannel> closed = restorableChannels();
+        if (!closed.isEmpty()) {
+            entries.add(ChatPopupMenu.Entry.header(
+                    StatCollector.translateToLocal(
+                            "gui.losttales.chat.open.channels")));
+            for (ChatChannel channel : closed) {
+                entries.add(new ChatPopupMenu.Entry(channel.getId(),
+                        withCounter(
+                                ClientChatChannelState.displayName(channel),
+                                ClientChatChannelViews.unreadCount(channel)),
+                        ChatWindowLayout.isMuted(channel),
+                        ClientChatChannelState.displayColor(channel),
+                        ChatTab.of(channel)));
+            }
+        }
+        List<String> players = whisperCandidates();
+        if (!players.isEmpty()) {
+            entries.add(ChatPopupMenu.Entry.header(
+                    StatCollector.translateToLocal(
+                            "gui.losttales.chat.open.players")));
+            for (String name : players) {
+                ChatTab conversation = ChatTab.whisper(name);
+                entries.add(new ChatPopupMenu.Entry(conversation.id(),
+                        withCounter(name,
+                                ClientChatChannelViews.unreadCount(
+                                        conversation)),
+                        ChatWindowLayout.isMuted(conversation),
+                        -1, conversation));
+            }
         }
         return entries;
+    }
+
+    /** {@code Name [3]} while anything is unread; the bare name otherwise. */
+    private static String withCounter(String name, int unread) {
+        String counter = ClientChatChannelViews.counterText(unread);
+        return counter.length() == 0 ? name : name + " " + counter;
+    }
+
+    /**
+     * Whether any other account is online to open a conversation with.
+     * Asked per frame for the {@code +} control, so it only scans; the
+     * menu itself builds the sorted list.
+     */
+    private boolean hasWhisperCandidates() {
+        if (this.mc.thePlayer == null
+                || this.mc.thePlayer.sendQueue == null
+                || this.mc.thePlayer.sendQueue.playerInfoList == null) {
+            return false;
+        }
+        String self = this.mc.thePlayer.getCommandSenderName();
+        for (Object value : this.mc.thePlayer.sendQueue.playerInfoList) {
+            if (value instanceof GuiPlayerInfo) {
+                String account = ((GuiPlayerInfo)value).name;
+                if (account != null && account.trim().length() > 0
+                        && !account.equalsIgnoreCase(self)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The accounts a conversation could be opened with: every other
+     * online player, alphabetically. Read fresh on every build, so the
+     * menu follows joins and leaves while it is open.
+     */
+    private List<String> whisperCandidates() {
+        List<String> result = new ArrayList<String>();
+        if (this.mc.thePlayer == null
+                || this.mc.thePlayer.sendQueue == null
+                || this.mc.thePlayer.sendQueue.playerInfoList == null) {
+            return result;
+        }
+        String self = this.mc.thePlayer.getCommandSenderName();
+        for (Object value : this.mc.thePlayer.sendQueue.playerInfoList) {
+            if (!(value instanceof GuiPlayerInfo)) {
+                continue;
+            }
+            String account = ((GuiPlayerInfo)value).name;
+            if (account == null || account.trim().length() == 0
+                    || account.equalsIgnoreCase(self)) {
+                continue;
+            }
+            String name = account.trim();
+            boolean seen = false;
+            for (int index = 0; index < result.size(); index++) {
+                if (result.get(index).equalsIgnoreCase(name)) {
+                    seen = true;
+                    break;
+                }
+            }
+            if (!seen) {
+                result.add(name);
+            }
+        }
+        Collections.sort(result, String.CASE_INSENSITIVE_ORDER);
+        return result;
     }
 
     /** Sum of the unread counts of the channels the {@code +} would list. */
@@ -2857,19 +3019,6 @@ public final class LostTalesChatGui extends GuiChat {
         return Math.min(ClientChatChannelViews.MAX_UNREAD + 1, total);
     }
 
-    /** A row's second-column action; the menu stays open, redrawn. */
-    private void handlePopupAction(ChatPopupMenu.Entry entry) {
-        if (POPUP_RESTORE.equals(this.popup.kind())) {
-            ChatChannel channel = ChatChannel.fromId(entry.id);
-            if (channel != null) {
-                ChatWindowLayout.setMuted(channel,
-                        !ChatWindowLayout.isMuted(channel));
-                this.popup.replaceEntries(restoreEntries(),
-                        this.fontRendererObj, this.width, this.height);
-            }
-        }
-    }
-
     private void handlePopupEntry(ChatPopupMenu.Entry entry) {
         if (POPUP_SETTINGS.equals(this.popup.kind())) {
             ChatTab channel = this.popup.channel();
@@ -2879,24 +3028,37 @@ public final class LostTalesChatGui extends GuiChat {
             if (ENTRY_MUTE.equals(entry.id)) {
                 ChatWindowLayout.setMuted(channel,
                         !ChatWindowLayout.isMuted(channel));
-            } else if (ENTRY_FEED.equals(entry.id)) {
-                ChatWindowLayout.setFeedHidden(channel,
-                        !ChatWindowLayout.isFeedHidden(channel));
             } else if (ENTRY_PINGS.equals(entry.id)) {
-                ChatWindowLayout.setPingSilenced(channel,
-                        !ChatWindowLayout.isPingSilenced(channel));
-                        } else if (ENTRY_DETACH.equals(entry.id)) {
+                ChatWindowLayout.setPingsMuted(channel,
+                        !ChatWindowLayout.isPingsMuted(channel));
+            } else if (ENTRY_HIDE.equals(entry.id)) {
+                ChatWindowLayout.setHidden(channel,
+                        !ChatWindowLayout.isHidden(channel));
+            } else if (ENTRY_DETACH.equals(entry.id)) {
                 detachChannel(channel);
             } else if (ENTRY_CLOSE.equals(entry.id)) {
                 closeChannel(channel);
             }
         } else if (POPUP_RESTORE.equals(this.popup.kind())) {
-            ChatChannel channel = ChatChannel.fromId(entry.id);
             String target = this.restoreWindowId != null
                     ? this.restoreWindowId
                     : ChatWindowLayout.firstWindow().getId();
-            if (channel != null && ChatWindowLayout.restore(channel, target)) {
-                selectChannel(channel);
+            ChatChannel channel = ChatChannel.fromId(entry.id);
+            if (channel != null) {
+                if (ChatWindowLayout.restore(channel, target)) {
+                    selectChannel(channel);
+                }
+                return;
+            }
+            // A player row opens (or finds) the conversation with them,
+            // in the window whose row the menu was opened from.
+            ChatTab conversation = ChatTab.fromId(entry.id);
+            if (conversation != null && conversation.isWhisper()
+                    && !conversation.isNpc()) {
+                ChatTab tab = ChatWindowLayout.openTab(conversation, target);
+                if (tab != null) {
+                    selectChannel(tab);
+                }
             }
         }
     }
@@ -3165,9 +3327,11 @@ public final class LostTalesChatGui extends GuiChat {
             if (row == null || !ChatChannelTabBar.inRowBand(row, mouseY)) {
                 continue;
             }
+            // The whole strip docks, end controls and grip included: a
+            // tab carried to the row's far end lands after the last tab
+            // rather than the drag being cancelled there.
             int left = row.offsetX + row.left - DOCK_SLACK;
-            int right = frame.tabBar.tabsRight(this.fontRendererObj, row)
-                    + DOCK_SLACK;
+            int right = row.offsetX + row.right + DOCK_SLACK;
             if (mouseX < left || mouseX >= right) {
                 continue;
             }
@@ -3191,9 +3355,27 @@ public final class LostTalesChatGui extends GuiChat {
             return;
         }
         if (drag.targetWindowId != null) {
-            int index = drag.targetIndex;
+            ChatWindow target = ChatWindowLayout.window(drag.targetWindowId);
+            if (target == null) {
+                return;
+            }
+            // The drop index counts the row's visible tabs; the window's
+            // own list also holds open tabs the player cannot currently
+            // see (Party outside a party, Faction without one), sitting
+            // between them. The insertion point is translated onto the
+            // full list, or the move lands beside the wrong neighbour.
+            List<ChatTab> visible = ChatWindowFrame.visibleTabs(target);
+            List<ChatTab> all = target.getTabs();
+            int index;
+            if (visible.isEmpty()) {
+                index = all.size();
+            } else if (drag.targetIndex >= visible.size()) {
+                index = all.indexOf(visible.get(visible.size() - 1)) + 1;
+            } else {
+                index = all.indexOf(visible.get(drag.targetIndex));
+            }
             if (drag.targetWindowId.equals(source.getId())) {
-                int from = source.getTabs().indexOf(drag.tab);
+                int from = all.indexOf(drag.tab);
                 if (index > from) {
                     index--;
                 }
@@ -3236,7 +3418,7 @@ public final class LostTalesChatGui extends GuiChat {
     /**
      * Vanilla component-click behaviour resolved against this mod's line
      * layout. The head marker acts as the sender like the visible name
-     * does; a shared marker opens the map on its location; colour, emote,
+     * does; a shared marker opens the map on its location; colour, emoji,
      * and item markers are internal metadata and never a user-facing
      * action.
      */
@@ -3251,6 +3433,14 @@ public final class LostTalesChatGui extends GuiChat {
             if (reply != null) {
                 openWhisperTab(replyAccount(reply.getValue()));
             }
+            return true;
+        }
+        ChatMentionMarker.Data mention =
+                ChatMentionMarker.decode(hit.component);
+        if (mention != null) {
+            // A mention answers like a name: it opens the conversation
+            // with whoever it reaches.
+            openWhisperTab(mention.account);
             return true;
         }
         ChatShowcaseMarker.Data share =
@@ -3383,7 +3573,7 @@ public final class LostTalesChatGui extends GuiChat {
         int color = hovered ? LostTalesChatVisualStyle.IVORY
                 : ClientChatChannelState.displayColor(channel);
         LostTalesChatVisualStyle.drawColored(this.fontRendererObj,
-                label, this.barLeft + 3, top + 3, color, 255);
+                label, this.barLeft + 3, barTextTop(), color, 255);
         this.regions.add(this.barLeft, top, this.barLeft + width,
                 top + ChatWindowPlacement.INPUT_HEIGHT);
     }
@@ -3507,7 +3697,7 @@ public final class LostTalesChatGui extends GuiChat {
 
     private boolean isInsideSendButton(int mouseX, int mouseY, int barRight) {
         int left = sendButtonLeft(barRight);
-        int top = this.barTop;
+        int top = barControlTop();
         return mouseX >= left && mouseX < left + ChatPickerPanel.BUTTON_SIZE
                 && mouseY >= top && mouseY < top + ChatPickerPanel.BUTTON_SIZE;
     }
@@ -3519,7 +3709,7 @@ public final class LostTalesChatGui extends GuiChat {
      */
     private void drawSendButton(int barRight, int mouseX, int mouseY) {
         int left = sendButtonLeft(barRight);
-        int top = this.barTop;
+        int top = barControlTop();
         boolean hovered = isInsideSendButton(mouseX, mouseY, barRight);
         boolean ready = this.inputField.getText().trim().length() > 0;
         // Text and glyphs are always fully opaque; the arrow says
@@ -3563,7 +3753,7 @@ public final class LostTalesChatGui extends GuiChat {
         int width = text.length() == 0 ? 0
                 : (int)Math.ceil(this.fontRendererObj.getStringWidth(text)
                         * COUNTER_SCALE) + 3;
-        return sendButtonLeft(barRight) - width;
+        return controlsLeft(barRight) - width;
     }
 
     /** The counter in the timestamp's sand, salmon once the limit is hit. */
@@ -3579,7 +3769,8 @@ public final class LostTalesChatGui extends GuiChat {
         // on the bar like the full-size text was.
         GL11.glPushMatrix();
         try {
-            GL11.glTranslatef(counterLeft(barRight), this.barTop + 4, 0.0F);
+            GL11.glTranslatef(counterLeft(barRight), barTextTop() + 1,
+                    0.0F);
             GL11.glScalef(COUNTER_SCALE, COUNTER_SCALE, 1.0F);
             LostTalesChatVisualStyle.drawColored(this.fontRendererObj, text,
                     0, 0, full ? COUNTER_FULL_RGB : COUNTER_RGB, 255,
@@ -3604,7 +3795,7 @@ public final class LostTalesChatGui extends GuiChat {
         // The counter sits left of the send arrow; the field ends before it.
         int right = counterLeft(inputBarRight()) - 3;
         this.inputField.xPosition = left;
-        this.inputField.yPosition = this.barTop + 3;
+        this.inputField.yPosition = barTextTop();
         this.inputField.width = Math.max(20, right - left);
     }
 }

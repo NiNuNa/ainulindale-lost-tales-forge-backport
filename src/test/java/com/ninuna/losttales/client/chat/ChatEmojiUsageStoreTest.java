@@ -49,8 +49,8 @@ public final class ChatEmojiUsageStoreTest {
         List<ChatEmoji> favorites = ChatEmojiUsageStore.getFavorites();
         assertEquals(2, favorites.size());
         // Registry order keeps the grid stable regardless of toggle order.
-        assertSame(ChatEmoji.SMILE, favorites.get(0));
-        assertSame(ChatEmoji.SOB, favorites.get(1));
+        assertSame(ChatEmoji.SOB, favorites.get(0));
+        assertSame(ChatEmoji.SMILE, favorites.get(1));
 
         ChatEmojiUsageStore.toggleFavorite(ChatEmoji.SOB);
         ChatEmojiUsageStore.initialize(configDir);
@@ -65,13 +65,13 @@ public final class ChatEmojiUsageStoreTest {
         ChatEmojiUsageStore.recordUse(ChatEmoji.JOY);
         ChatEmojiUsageStore.recordUse(ChatEmoji.JOY);
         ChatEmojiUsageStore.recordUse(ChatEmoji.SMILE);
-        ChatEmojiUsageStore.recordUse(ChatEmoji.SAD);
+        ChatEmojiUsageStore.recordUse(ChatEmoji.PENSIVE);
 
         List<ChatEmoji> frequent = ChatEmojiUsageStore.getFrequentlyUsed(6);
         assertEquals(3, frequent.size());
         assertSame(ChatEmoji.JOY, frequent.get(0));
         assertSame(ChatEmoji.SMILE, frequent.get(1));
-        assertSame(ChatEmoji.SAD, frequent.get(2));
+        assertSame(ChatEmoji.PENSIVE, frequent.get(2));
 
         assertEquals(1, ChatEmojiUsageStore.getFrequentlyUsed(1).size());
         assertTrue(ChatEmojiUsageStore.getFrequentlyUsed(0).isEmpty());
@@ -94,7 +94,7 @@ public final class ChatEmojiUsageStoreTest {
             writer.write("count smile 4\n");
             writer.write("count smile not_a_number\n");
             writer.write("count does_not_exist 9\n");
-            writer.write("count sad -3\n");
+            writer.write("count pensive -3\n");
             writer.write("garbage line that means nothing\n");
             writer.write("\n");
         } finally {

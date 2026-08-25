@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -48,7 +49,7 @@ final class LostTalesChatOverlayRenderer {
             LostTalesColors.rgb(LostTalesColors.WINE);
     /**
      * Vertical distance between chat lines. Vanilla uses the 9px font
-     * height, which cannot contain a 10px emote sprite; an 11px stride
+     * height, which cannot contain a 10px emoji sprite; an 11px stride
      * gives the sprite room. Bands are contiguous — each line's backdrop
      * fills the full stride.
      */
@@ -105,7 +106,7 @@ final class LostTalesChatOverlayRenderer {
 
     private LostTalesChatOverlayRenderer() {}
 
-    static boolean draw(Minecraft minecraft) {
+    static boolean draw(Minecraft minecraft, float partialTicks) {
         if (minecraft == null || minecraft.ingameGUI == null
                 || minecraft.gameSettings.chatVisibility
                 == EntityPlayer.EnumChatVisibility.HIDDEN
@@ -134,7 +135,8 @@ final class LostTalesChatOverlayRenderer {
             List<ChatWindow> windows = ChatWindowLayout.windows();
             ChatWindowFrame.prune(windows);
             if (!open) {
-                drawFeed(minecraft, chat, drawn, screenWidth, screenHeight);
+                drawFeed(minecraft, chat, drawn, screenWidth, screenHeight,
+                        partialTicks);
                 return true;
             }
             ChatWindowFrame.feed().drawn = false;
@@ -236,18 +238,40 @@ final class LostTalesChatOverlayRenderer {
         frame.begin(box, scale, opening.getTranslationX(),
                 opening.getTranslationY());
         frame.drawn = true;
+        // The window's own rectangle of the blurred frame, under the
+        // backdrop; drawn only while the chat screen captured one this
+        // frame, so every other path keeps the plain backdrop. The
+        // history band thins out to the right exactly as its backdrop
+        // does; the tab row's band and the bar's stay whole.
+        LostTalesGuiRegionBlur blur = LostTalesGuiRegionBlur.getInstance();
+        double blurLeft = frame.drawnLeft();
+        double blurRight = blurLeft + (frame.boxRight - frame.boxLeft);
+        double blurTop = frame.boxTop + frame.motionY;
+        double blurBottom = frame.boxBottom + frame.motionY;
+        double padding = LINE_PADDING * (double)scale;
+        double historyTop = frame.drawnBaseline() - box.room - padding;
+        double historyBottom = frame.drawnBaseline() + padding;
+        float blurOpacity = opening.getOpacity();
+        blur.drawRegion(blurLeft, blurTop, blurRight, historyTop,
+                screenWidth, screenHeight, blurOpacity);
+        blur.drawFadedRegion(blurLeft, historyTop, blurRight, historyBottom,
+                blurLeft + (blurRight - blurLeft) * BACKDROP_FADE_START,
+                screenWidth, screenHeight, blurOpacity);
+        blur.drawRegion(blurLeft, historyBottom, blurRight, blurBottom,
+                screenWidth, screenHeight, blurOpacity);
         // The newest line sits on the baseline; the whole window rides
         // the opening motion, tabs and bar included. The origin is the
         // frame's, not the placement box's: the box is where the window
         // was dragged to, in fractions of a pixel, and the frame is
         // where it is drawn, on whole display pixels. Measuring the
-        // messages from the box would leave every head and emote in
+        // messages from the box would leave every head and emoji in
         // them half a pixel off its own texels.
         float originX = (float)ChatWindowFrame.snapToDisplayPixels(
                 frame.drawnLeft() + 2.0F * scale);
         float originY = (float)frame.drawnBaseline();
         drawWindow(minecraft, chat, frame, filter, lines, scroll, lineLimit,
-                box.room, originX, originY, true, opening, chatWidth);
+                box.room, originX, originY, true, opening, chatWidth,
+                screenWidth, screenHeight);
     }
 
     /**
@@ -296,7 +320,7 @@ final class LostTalesChatOverlayRenderer {
      */
     private static void drawFeed(Minecraft minecraft, GuiNewChat chat,
                                  List<ChatLine> drawn, int screenWidth,
-                                 int screenHeight) {
+                                 int screenHeight, float partialTicks) {
         List<ChatWindow> windows = ChatWindowLayout.windows();
         for (int index = 0; index < windows.size(); index++) {
             ChatWindowFrame.of(windows.get(index)).drawn = false;
@@ -307,6 +331,17 @@ final class LostTalesChatOverlayRenderer {
                 drawn, filter);
         frame.lines = lines;
         frame.view = null;
+        // The frame is captured and blurred only while the feed has a
+        // line still on screen; the rest of the time gameplay pays
+        // nothing for the feed's blur.
+        if (LostTalesConfig.enableChatBackgroundBlur
+                && LostTalesConfig.enableGuiBackgroundBlur
+                && !lines.isEmpty() && lines.get(0) != null
+                && minecraft.ingameGUI.getUpdateCounter()
+                        - lines.get(0).getUpdatedCounter() < 200) {
+            LostTalesGuiRegionBlur.getInstance().capture(minecraft,
+                    partialTicks, (float)LostTalesConfig.guiBlurStrength);
+        }
         ChatWindowPlacement.Box box = ChatWindowPlacement.feedBounds(
                 minecraft, screenWidth, screenHeight);
         float scale = chat.func_146244_h();
@@ -318,7 +353,8 @@ final class LostTalesChatOverlayRenderer {
                         frame.drawnLeft() + 2.0F * scale),
                 (float)frame.drawnBaseline(), false,
                 LostTalesGuiAnimationSample.SETTLED,
-                ChatWindowPlacement.chatWidth(minecraft));
+                ChatWindowPlacement.chatWidth(minecraft),
+                screenWidth, screenHeight);
     }
 
     static List<ChatLine> getDrawnLines(GuiNewChat chat)
@@ -551,7 +587,8 @@ final class LostTalesChatOverlayRenderer {
             ChatLineFilter filter, List<ChatLine> lines,
             double scrollLines, int lineLimit, int room, float restingX,
             float restingY, boolean open,
-            LostTalesGuiAnimationSample opening, int chatWidth) {
+            LostTalesGuiAnimationSample opening, int chatWidth,
+            int screenWidth, int screenHeight) {
         // The offset is in lines and fractions of one: whole lines pick
         // where the stack starts, the fraction slides it, and one more
         // line is drawn so the gap the slide opens is filled.
@@ -587,7 +624,7 @@ final class LostTalesChatOverlayRenderer {
         // Everything the message stack is moved by, and nothing else is:
         // the entrance of a new message, and the scroll's part of a
         // line. Rounded to whole display pixels, because the heads and
-        // the emote sprites are pixel art sampled one texel to one
+        // the emoji sprites are pixel art sampled one texel to one
         // pixel, and at a fraction of a pixel their texels crawl; a
         // display pixel is finer than a GUI pixel at every scale above
         // one, so the motion stays smooth.
@@ -704,6 +741,22 @@ final class LostTalesChatOverlayRenderer {
                     // with its text so a new message enters as one piece.
                     GL11.glPushMatrix();
                     GL11.glTranslatef(entry, 0.0F, 0.0F);
+                    if (!open) {
+                        // A feed line softens the world behind its own
+                        // band: the blur rides the line, fades with its
+                        // age, and thins to the right like its backdrop.
+                        // Without a fresh capture nothing is drawn.
+                        LostTalesGuiRegionBlur.getInstance()
+                                .drawFadedRegionInTransform(
+                                        -2.0D, y - LINE_HEIGHT,
+                                        unscaledWidth + 4.0D, y,
+                                        -2.0D + (unscaledWidth + 6.0D)
+                                                * BACKDROP_FADE_START,
+                                        originX + entry * scale,
+                                        originY + stackOffset, scale,
+                                        screenWidth, screenHeight,
+                                        alpha / 255.0F);
+                    }
                     if (!open || color != CHAT_BACKDROP_RGB) {
                         drawChatBackdrop(-2.0F, y - LINE_HEIGHT,
                                 unscaledWidth + 4.0F, y, alpha / 2, color);

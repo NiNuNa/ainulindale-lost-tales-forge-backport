@@ -2,8 +2,10 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.render.EntityRenderTextureAccess;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import cpw.mods.fml.common.FMLLog;
 import lotr.common.entity.npc.LOTREntityNPC;
+import lotr.common.fac.LOTRFaction;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
@@ -51,12 +53,36 @@ public final class LostTalesNpcChatHook {
             return false;
         }
         // LOTR addresses its speech to this one player, so it is a
-        // whisper from the NPC: a tab of its own, named after it.
+        // whisper from the NPC: a tab of its own, named after it, in the
+        // NPC's own faction colour like a role-playing character's line.
         ResourceLocation texture =
                 EntityRenderTextureAccess.resolveEntityTexture(npc);
         return LostTalesChatPresentation.receiveNpcSpeech(
                 ChatTab.npc(name), npc.getUniqueID(), name,
-                texture == null ? "" : texture.toString(), speech);
+                texture == null ? "" : texture.toString(), speech,
+                nameColor(npc));
+    }
+
+    /**
+     * The colour the NPC speaks in: its faction's, exactly as the
+     * faction explorer and player lines colour it. Factionless
+     * wanderers belong to LOTR's UNALIGNED faction, whose colour is
+     * pure black and unreadable on the chat — they speak in the
+     * palette's light grey instead — and an NPC whose faction cannot be
+     * read at all keeps LOTR's yellow-name honey.
+     */
+    private static int nameColor(LOTREntityNPC npc) {
+        try {
+            LOTRFaction faction = npc.getFaction();
+            if (faction != null) {
+                int color = faction.getFactionColor() & 0xFFFFFF;
+                return color != 0 ? color
+                        : LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
+            }
+        } catch (LinkageError ignored) {
+        } catch (RuntimeException ignored) {
+        }
+        return LostTalesColors.rgb(LostTalesColors.HONEY);
     }
 
     /**

@@ -1,10 +1,14 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+import cpw.mods.fml.common.gameevent.TickEvent;
 import java.lang.reflect.Field;
+import java.util.List;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.GuiChat;
 import net.minecraftforge.client.event.ClientChatReceivedEvent;
 import net.minecraftforge.client.event.GuiOpenEvent;
@@ -17,9 +21,15 @@ import net.minecraftforge.common.MinecraftForge;
  */
 public final class LostTalesChatClientHandler {
     private static final Field DEFAULT_INPUT = findDefaultInputField();
+    /** Newest messages inspected for stray lines before giving up. */
+    private static final int UNTRACKED_SCAN_LIMIT = 16;
+
+    /** The newest history entry the stray-line watcher has seen. */
+    private ChatLine watchedHead;
 
     public LostTalesChatClientHandler() {
         MinecraftForge.EVENT_BUS.register(this);
+        FMLCommonHandler.instance().bus().register(this);
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -63,10 +73,69 @@ public final class LostTalesChatClientHandler {
                 && event instanceof RenderGameOverlayEvent.Chat) {
             // Windows are placed by the chat layout, not by the vanilla
             // anchor Forge passes; the event still marks the chat pass.
-            if (!LostTalesChatOverlayRenderer.draw(Minecraft.getMinecraft())) {
+            if (!LostTalesChatOverlayRenderer.draw(Minecraft.getMinecraft(),
+                    event.partialTicks)) {
                 return;
             }
             event.setCanceled(true);
+        }
+    }
+
+    /**
+     * Notices lines printed straight into the chat without passing
+     * through the received-chat event — a screenshot's saved-as notice,
+     * another mod's local print. They live in the console view, so the
+     * console reopens for them like it does for any message, unless it
+     * is hidden. Once per tick over the newest few history entries;
+     * everything Lost Tales routed is already filed by the time the tick
+     * runs, so only genuinely stray lines match.
+     */
+    @SubscribeEvent
+    public void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event == null || event.phase != TickEvent.Phase.END) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.theWorld == null
+                || minecraft.ingameGUI == null) {
+            this.watchedHead = null;
+            return;
+        }
+        try {
+            List<ChatLine> messages = ChatWindowLines.messageHistory(
+                    minecraft.ingameGUI.getChatGUI());
+            if (messages == null) {
+                return;
+            }
+            ChatLine head = messages.isEmpty() ? null : messages.get(0);
+            ChatLine previous = this.watchedHead;
+            this.watchedHead = head;
+            if (head == null || head == previous) {
+                return;
+            }
+            boolean stray = false;
+            for (int index = 0; index < messages.size()
+                    && index < UNTRACKED_SCAN_LIMIT; index++) {
+                ChatLine line = messages.get(index);
+                if (line == previous) {
+                    break;
+                }
+                if (line != null && ClientChatChannelViews.tabOf(
+                        line.getChatLineID()) == null) {
+                    stray = true;
+                    break;
+                }
+            }
+            if (!stray) {
+                return;
+            }
+            ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
+            if (!ChatWindowLayout.isOpen(console)
+                    && !ChatWindowLayout.isHidden(console)) {
+                ChatWindowLayout.openTab(console, null);
+            }
+        } catch (RuntimeException ignored) {
+            // Watching is best-effort; the chat itself is untouched.
         }
     }
 

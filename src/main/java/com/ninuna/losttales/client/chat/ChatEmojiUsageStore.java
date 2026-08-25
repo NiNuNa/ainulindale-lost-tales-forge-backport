@@ -20,15 +20,15 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Client-side emote preferences: favorites and how often each emote has been
+ * Client-side emoji preferences: favorites and how often each emoji has been
  * sent. This is a per-installation presentation preference like the camera
  * presets, not world state, so it is file-backed under {@code config/} and
- * never synchronized or cleared between worlds. Unknown emote names are kept
+ * never synchronized or cleared between worlds. Unknown emoji names are kept
  * out of memory but simply dropped on save, so a registry change cannot
  * corrupt the file or crash the client.
  */
 public final class ChatEmojiUsageStore {
-    static final String FILE_PATH = "losttales/chat_emotes.txt";
+    static final String FILE_PATH = "losttales/chat_emojis.txt";
     private static final Charset UTF_8 = Charset.forName("UTF-8");
     private static final int MAX_COUNT = 1000000;
 
@@ -72,7 +72,7 @@ public final class ChatEmojiUsageStore {
         save();
     }
 
-    /** Favorited emotes in registry order, for a stable picker grid. */
+    /** Favorited emojis in registry order, for a stable picker grid. */
     public static synchronized List<ChatEmoji> getFavorites() {
         List<ChatEmoji> result = new ArrayList<ChatEmoji>();
         for (ChatEmoji emoji : ChatEmoji.values()) {
@@ -83,7 +83,7 @@ public final class ChatEmojiUsageStore {
         return result;
     }
 
-    /** Most-sent emotes, ties broken by registry order. */
+    /** Most-sent emojis, ties broken by registry order. */
     public static synchronized List<ChatEmoji> getFrequentlyUsed(int limit) {
         List<ChatEmoji> used = new ArrayList<ChatEmoji>();
         for (ChatEmoji emoji : ChatEmoji.values()) {

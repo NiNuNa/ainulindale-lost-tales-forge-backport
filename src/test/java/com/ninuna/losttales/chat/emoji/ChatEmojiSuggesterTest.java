@@ -48,7 +48,7 @@ public final class ChatEmojiSuggesterTest {
         assertNull(ChatEmojiSuggester.findQuery(":smile:", 7));
         // Anchoring on :smile:'s closing colon would consume it on accept.
         assertNull(ChatEmojiSuggester.findQuery(":smile:s", 8));
-        // A colon-bounded non-emote is not a completed shortcode, so its
+        // A colon-bounded non-emoji is not a completed shortcode, so its
         // trailing colon may open a fresh query.
         ChatEmojiSuggester.Query afterJunk =
                 ChatEmojiSuggester.findQuery(":xyz:s", 6);
@@ -58,8 +58,8 @@ public final class ChatEmojiSuggesterTest {
     }
 
     @Test
-    public void itemShowcaseOpenerDoesNotOpenAnEmoteQuery() {
-        // "{i:s" belongs to the item completion list, not the emote one.
+    public void itemShowcaseOpenerDoesNotOpenAnEmojiQuery() {
+        // "{i:s" belongs to the item completion list, not the emoji one.
         assertNull(ChatEmojiSuggester.findQuery("[i:s", 4));
         assertNull(ChatEmojiSuggester.findQuery("look [m:sm", 10));
         assertNotNull(ChatEmojiSuggester.findQuery("[i:Bow] :sm", 11));
@@ -82,16 +82,31 @@ public final class ChatEmojiSuggesterTest {
         assertSame(ChatEmoji.FLUSHED, fl.get(0));
 
         List<ChatEmoji> sm = ChatEmojiSuggester.matches("sm", 8);
-        assertEquals(2, sm.size());
-        assertSame(ChatEmoji.SMILE, sm.get(0));
-        assertSame(ChatEmoji.SMUG, sm.get(1));
+        assertEquals(4, sm.size());
+        assertSame(ChatEmoji.SMIRK, sm.get(0));
+        assertSame(ChatEmoji.SMILE, sm.get(1));
+        assertSame(ChatEmoji.SMILING_FACE_WITH_TEAR, sm.get(2));
+        assertSame(ChatEmoji.SMILEY, sm.get(3));
 
+        // "s" also reaches LAUGHING and FROWNING through their aliases
+        // (satisfied, slight_frown), so the limit fills.
         List<ChatEmoji> s = ChatEmojiSuggester.matches("s", 8);
         assertEquals(8, s.size());
-        assertSame(ChatEmoji.SMILE, s.get(0));
+        assertSame(ChatEmoji.SLIGHT_SMILE, s.get(0));
 
         assertTrue(ChatEmojiSuggester.matches("", 8).isEmpty());
         assertTrue(ChatEmojiSuggester.matches("zz", 8).isEmpty());
         assertTrue(ChatEmojiSuggester.matches("s", 0).isEmpty());
+    }
+
+    @Test
+    public void aliasesReachTheirCanonicalEmoji() {
+        List<ChatEmoji> flushed = ChatEmojiSuggester.matches("flushed_f", 8);
+        assertEquals(1, flushed.size());
+        assertSame(ChatEmoji.FLUSHED, flushed.get(0));
+
+        List<ChatEmoji> satisfied = ChatEmojiSuggester.matches("satisfied", 8);
+        assertEquals(1, satisfied.size());
+        assertSame(ChatEmoji.LAUGHING, satisfied.get(0));
     }
 }

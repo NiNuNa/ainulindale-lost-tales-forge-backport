@@ -9,12 +9,12 @@ import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The chat's own control artwork, one sprite sheet: the emote button,
+ * The chat's own control artwork, one sprite sheet: the emoji button,
  * the tab row's controls and their hover states, and the window grip.
  * Each constant is a cell of {@code textures/gui/chat.png} in texels;
  * the sheet is drawn 1:1 in GUI pixels, so a sprite's width and height
  * are also its size on screen. {@code ChatIconSheetTest} locks the
- * constants to the bundled PNG the way the emote sheet is locked.
+ * constants to the bundled PNG the way the emoji sheet is locked.
  */
 enum ChatIconSheet {
     EMOJI(0, 0, 10, 10),

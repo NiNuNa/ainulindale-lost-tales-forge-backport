@@ -14,13 +14,15 @@ import java.util.Locale;
 public enum ChatChannel {
     ALL("all", "Global", ChatIdentityType.CHARACTER,
             ChatRecipientRule.GLOBAL,
-            LostTalesColors.rgb(LostTalesColors.GREEN)),
+            LostTalesColors.rgb(LostTalesColors.FERN_GREEN)),
     PROXIMITY("proximity", "Proximity", ChatIdentityType.CHARACTER,
             ChatRecipientRule.PROXIMITY,
-            LostTalesColors.rgb(LostTalesColors.TEAL)),
+            LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN)),
+    // Presentation shows the member's own party colour; this seafoam is
+    // only the fallback outside a party.
     PARTY("party", "Party", ChatIdentityType.CHARACTER,
             ChatRecipientRule.PARTY,
-            LostTalesColors.rgb(LostTalesColors.BLUE)),
+            LostTalesColors.rgb(LostTalesColors.SEAFOAM)),
     // Presentation shows the sender's LOTR faction colour; this palette
     // honey is only the indicator/selector fallback.
     FACTION("faction", "Faction", ChatIdentityType.CHARACTER,
@@ -28,7 +30,7 @@ public enum ChatChannel {
             LostTalesColors.rgb(LostTalesColors.HONEY)),
     OOC("ooc", "OOC", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.GLOBAL,
-            LostTalesColors.rgb(LostTalesColors.ORCHID)),
+            LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE)),
     /** Staff channel: operators only, account identity; the wire id stays. */
     ADMIN("admin", "Operator", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.OPERATORS,
@@ -40,7 +42,7 @@ public enum ChatChannel {
      */
     CONSOLE("console", "Console", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.SELF,
-            LostTalesColors.rgb(LostTalesColors.ROSE_GRAY)),
+            LostTalesColors.rgb(LostTalesColors.PLUM_GRAY)),
     /**
      * A private conversation between two accounts. Not a tab of its own:
      * every whisper partner is one tab on this channel, and the client
@@ -56,7 +58,7 @@ public enum ChatChannel {
      */
     DISCORD("discord", "Discord", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.GLOBAL,
-            LostTalesColors.rgb(LostTalesColors.STEEL_BLUE));
+            LostTalesColors.rgb(LostTalesColors.TEAL));
 
     /** Tab, indicator, and cycle order: the two global channels bracket
      *  the scoped role-play ones, Discord beside OOC as the other account

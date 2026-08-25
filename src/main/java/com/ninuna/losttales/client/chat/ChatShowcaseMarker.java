@@ -17,7 +17,7 @@ import net.minecraft.util.IChatComponent;
  */
 final class ChatShowcaseMarker {
     private static final String PREFIX = "losttales-chat-share:";
-    /** Two bold spaces measure ten pixels, matching the emote slot. */
+    /** Two bold spaces measure ten pixels, matching the emoji slot. */
     private static final String PLACEHOLDER = "  ";
 
     private ChatShowcaseMarker() {}

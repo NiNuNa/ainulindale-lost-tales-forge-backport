@@ -1,7 +1,7 @@
 package com.ninuna.losttales.chat.share;
 
 /**
- * The things a player can share inline in a message besides emotes. Each
+ * The things a player can share inline in a message besides emojis. Each
  * kind owns a short opener ({@code [i:} for an item from the sender's
  * inventory, {@code [m:} for a map marker the sender can see); the opener
  * and the wire code are protocol surface and must stay stable.

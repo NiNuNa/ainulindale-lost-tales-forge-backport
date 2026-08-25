@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Finds the emote shortcode being typed at the input cursor and the emotes
+ * Finds the emoji shortcode being typed at the input cursor and the emojis
  * that could complete it. Pure text logic so the client GUI stays a thin
  * presentation layer and this behaviour is unit-testable.
  */
@@ -45,7 +45,7 @@ public final class ChatEmojiSuggester {
     /**
      * True when the colon at {@code colonIndex} terminates a completed,
      * registered shortcode. Completing a query anchored on such a colon
-     * would consume it and corrupt the already-typed emote, so it must not
+     * would consume it and corrupt the already-typed emoji, so it must not
      * open a new query.
      */
     private static boolean closesShortcode(String text, int colonIndex) {
@@ -67,7 +67,11 @@ public final class ChatEmojiSuggester {
         return ChatShareTokenParser.opensShareToken(text, colonIndex);
     }
 
-    /** Registry-ordered emotes whose name starts with the prefix. */
+    /**
+     * Registry-ordered emojis whose canonical name — or one of whose
+     * aliases — starts with the prefix. Completion always inserts the
+     * canonical shortcode, so an alias is a way in, never a way out.
+     */
     public static List<ChatEmoji> matches(String prefix, int limit) {
         if (prefix == null || prefix.length() == 0 || limit <= 0) {
             return Collections.emptyList();
@@ -75,7 +79,7 @@ public final class ChatEmojiSuggester {
         String query = prefix.toLowerCase(Locale.ROOT);
         List<ChatEmoji> result = new ArrayList<ChatEmoji>();
         for (ChatEmoji emoji : ChatEmoji.values()) {
-            if (emoji.getName().startsWith(query)) {
+            if (matchesPrefix(emoji, query)) {
                 result.add(emoji);
                 if (result.size() >= limit) {
                     break;
@@ -83,6 +87,19 @@ public final class ChatEmojiSuggester {
             }
         }
         return result;
+    }
+
+    private static boolean matchesPrefix(ChatEmoji emoji, String query) {
+        if (emoji.getName().startsWith(query)) {
+            return true;
+        }
+        List<String> aliases = emoji.getAliases();
+        for (int index = 0; index < aliases.size(); index++) {
+            if (aliases.get(index).startsWith(query)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isPrefixCharacter(char character) {

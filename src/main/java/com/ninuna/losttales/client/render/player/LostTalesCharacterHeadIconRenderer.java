@@ -201,6 +201,13 @@ public final class LostTalesCharacterHeadIconRenderer {
             // reference width the 8x8 face region is defined against.
             float unit = imageWidth / 64.0F;
             minecraft.getTextureManager().bindTexture(location);
+            // A head is drawn wherever a caller wants one, and a GUI
+            // panel drawn just before it may have left blending off —
+            // vanilla's drawRect does. Without it a head at half opacity,
+            // a shadow above all, would land solid.
+            GL11.glEnable(GL11.GL_BLEND);
+            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
+                    GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
             GL11.glColor4f(
                     Math.min(1.0F, red), Math.min(1.0F, green),
                     Math.min(1.0F, blue), Math.min(1.0F, alpha));

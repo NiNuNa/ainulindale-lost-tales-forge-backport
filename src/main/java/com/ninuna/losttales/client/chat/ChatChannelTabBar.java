@@ -1,12 +1,10 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
@@ -21,9 +19,10 @@ import org.lwjgl.opengl.GL11;
  * The tabs of one chat window, laid out the way a browser lays out
  * its tabs. Tabs stand side by side with a one-pixel seam on the
  * window's top rule; the selected tab is drawn last, lifted, and
- * brighter. Each tab eases its own prominence
- * toward its target from wherever it currently is, so rapid switching
- * never waits on a previous transition. A tab with unread messages
+ * brighter. Switching is a hard cut: the picked tab is forward the
+ * frame it is picked, however the pick happened — a click, the
+ * keyboard, or a command bringing the console forward — so nothing
+ * sweeps across the tabs between. A tab with unread messages
  * carries textual counters after its name: {@code [p]} pings in salmon,
  * then {@code [x]} other unread lines in honey; a muted tab is drawn
  * dim and italic. The channel's colour runs along each tab's top edge,
@@ -77,25 +76,12 @@ final class ChatChannelTabBar {
      * against and no control crosses.
      */
     private static final int GRIP_INSET = 3;
-    /** Easing state is kept for this many tabs before the oldest go. */
-    private static final int MAX_EASED_TABS = 32;
     private static final int PING_COUNTER_RGB =
             LostTalesColors.rgb(LostTalesColors.SALMON);
     private static final int UNREAD_COUNTER_RGB =
             LostTalesColors.rgb(LostTalesColors.HONEY);
     private static final int DROP_RGB =
             LostTalesColors.rgb(LostTalesColors.HONEY);
-
-    /** Per-tab easing toward selected (1) or resting (0). */
-    private static final class Ease {
-        float prominence;
-        float fromValue;
-        boolean target;
-        long startNanos;
-    }
-
-    private final Map<ChatTab, Ease> eases = new HashMap<ChatTab, Ease>();
-    private boolean initialized;
 
     private List<Tab> cachedTabs = Collections.emptyList();
     private List<ChatTab> cachedChannels = Collections.emptyList();
@@ -170,56 +156,6 @@ final class ChatChannelTabBar {
         ChatTab dragging;
         /** Insertion index to indicate during a drag, or -1. */
         int dropIndex = -1;
-    }
-
-    /** Advances every tab's easing toward the current selection. */
-    private void update(List<ChatTab> tabs, ChatTab selected) {
-        long now = System.nanoTime();
-        for (ChatTab tab : tabs) {
-            boolean wanted = tab.equals(selected);
-            Ease ease = this.eases.get(tab);
-            if (ease == null || !this.initialized) {
-                if (ease == null) {
-                    ease = new Ease();
-                    this.eases.put(tab, ease);
-                }
-                ease.target = wanted;
-                ease.prominence = wanted ? 1.0F : 0.0F;
-                ease.fromValue = ease.prominence;
-                ease.startNanos = 0L;
-                continue;
-            }
-            if (ease.target != wanted) {
-                ease.target = wanted;
-                ease.fromValue = ease.prominence;
-                ease.startNanos = now;
-            }
-            float goal = wanted ? 1.0F : 0.0F;
-            if (!LostTalesConfig.enableChatAnimations
-                    || ease.startNanos == 0L) {
-                ease.prominence = goal;
-                continue;
-            }
-            long duration = Math.max(1,
-                    LostTalesConfig.chatSelectorAnimationDurationMillis)
-                    * 1000000L;
-            float elapsed = Math.min(1.0F,
-                    (now - ease.startNanos) / (float)duration);
-            float eased = LostTalesChatMotion.menuProgress(elapsed);
-            ease.prominence = ease.fromValue
-                    + (goal - ease.fromValue) * eased;
-        }
-        this.initialized = true;
-        while (this.eases.size() > MAX_EASED_TABS) {
-            Iterator<ChatTab> iterator = this.eases.keySet().iterator();
-            iterator.next();
-            iterator.remove();
-        }
-    }
-
-    private float prominence(ChatTab tab) {
-        Ease ease = this.eases.get(tab);
-        return ease == null ? 0.0F : ease.prominence;
     }
 
     /** Highest pixel any tab can reach (the selected tab fully lifted). */
@@ -297,8 +233,11 @@ final class ChatChannelTabBar {
     }
 
     /**
-     * Insertion index for a tab dropped at {@code mouseX}: before the
-     * first tab whose centre lies right of the pointer, else at the end.
+     * Insertion index for a tab dropped at {@code mouseX}, into the
+     * row's <em>full</em> tab list: before the first drawn tab whose
+     * centre lies right of the pointer, and past everything — trimmed
+     * trailing tabs included — right of the drawn run, so a crowded row
+     * can still take a tab to its very end.
      */
     int dropIndexAt(FontRenderer font, Row row, int mouseX) {
         List<Tab> tabs = layout(font, row);
@@ -306,16 +245,10 @@ final class ChatChannelTabBar {
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
             if (localX < tab.x + tab.width / 2) {
-                return index;
+                return tab.rowIndex;
             }
         }
-        return tabs.size();
-    }
-
-    /** Screen x where the row's tabs end, before the end controls. */
-    int tabsRight(FontRenderer font, Row row) {
-        layout(font, row);
-        return row.offsetX + this.tabsRight;
+        return row.tabs.size();
     }
 
     /**
@@ -325,7 +258,6 @@ final class ChatChannelTabBar {
      */
     void draw(FontRenderer font, ChatPointerRegions regions, Row row,
               int mouseX, int mouseY, float alphaScale) {
-        update(row.tabs, row.selected);
         List<Tab> tabs = layout(font, row);
         if (tabs.isEmpty()) {
             return;
@@ -444,7 +376,9 @@ final class ChatChannelTabBar {
                          int rowBottom, Hit hovered, boolean selected) {
         boolean hoveredTab = hovered != null && tab.tab.equals(hovered.tab);
         boolean faint = tab.tab.equals(row.dragging);
-        float rise = prominence(tab.tab);
+        // Selection is a hard cut: the picked tab is forward at once,
+        // nothing sweeps across the tabs between.
+        float rise = selected ? 1.0F : 0.0F;
         int lift = Math.round(LIFT * rise);
         int top = rowBottom - HEIGHT - lift;
         // Every tab reaches the strip's bottom, under the top rule that
@@ -569,12 +503,20 @@ final class ChatChannelTabBar {
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
+    /**
+     * The insertion bar for a full-list {@code dropIndex}: before the
+     * drawn tab holding that index, or after the run's last tab when the
+     * index lies past everything drawn.
+     */
     private void drawDropIndicator(List<Tab> tabs, Row row, int rowBottom) {
-        int index = Math.max(0, Math.min(tabs.size(), row.dropIndex));
-        int x = index < tabs.size()
-                ? tabs.get(index).x
-                : tabs.get(tabs.size() - 1).x
-                        + tabs.get(tabs.size() - 1).width;
+        Tab last = tabs.get(tabs.size() - 1);
+        int x = last.x + last.width;
+        for (int index = 0; index < tabs.size(); index++) {
+            if (tabs.get(index).rowIndex >= row.dropIndex) {
+                x = tabs.get(index).x;
+                break;
+            }
+        }
         Gui.drawRect(row.offsetX + x - 1, rowTop(rowBottom),
                 row.offsetX + x + 1, rowBottom,
                 LostTalesChatVisualStyle.argb(DROP_RGB, scaled(0xFF)));
@@ -773,8 +715,8 @@ final class ChatChannelTabBar {
                 }
             }
             Boolean muted = this.cachedMuted.get(channel);
-            tabs.add(new Tab(channel, icon, label, labelWidth, pingText,
-                    pingWidth, otherText, otherWidth, x, width,
+            tabs.add(new Tab(channel, index, icon, label, labelWidth,
+                    pingText, pingWidth, otherText, otherWidth, x, width,
                     settingsX, closeX, muted != null && muted.booleanValue()));
             x += width + TAB_GAP;
         }
@@ -974,7 +916,9 @@ final class ChatChannelTabBar {
 
     static final class Tab {
         final ChatTab tab;
-        /** The channel's emote before the label, or null. */
+        /** The tab's index in the row's full list; a trimmed run skips some. */
+        final int rowIndex;
+        /** The channel's emoji before the label, or null. */
         final ChatEmoji icon;
         final String label;
         final int labelWidth;
@@ -993,11 +937,12 @@ final class ChatChannelTabBar {
         final int closeX;
         final boolean muted;
 
-        Tab(ChatTab tab, ChatEmoji icon, String label, int labelWidth,
-            String pingText, int pingWidth, String otherText,
+        Tab(ChatTab tab, int rowIndex, ChatEmoji icon, String label,
+            int labelWidth, String pingText, int pingWidth, String otherText,
             int otherWidth, int x, int width, int settingsX, int closeX,
             boolean muted) {
             this.tab = tab;
+            this.rowIndex = rowIndex;
             this.icon = icon;
             this.label = label;
             this.labelWidth = labelWidth;

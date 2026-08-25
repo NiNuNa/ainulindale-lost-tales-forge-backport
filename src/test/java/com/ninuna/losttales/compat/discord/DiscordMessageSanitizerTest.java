@@ -39,6 +39,48 @@ public final class DiscordMessageSanitizerTest {
     }
 
     @Test
+    public void unicodeEmojiBecomeCanonicalShortcodes() {
+        assertEquals("hi :flushed: there",
+                DiscordMessageSanitizer.inbound(
+                        "hi 😳 there", null));
+        // Adjacent emoji, and the heart with and without its selector.
+        assertEquals(":joy::slight_smile:",
+                DiscordMessageSanitizer.inbound(
+                        "😂🙂", null));
+        assertEquals(":heart: :heart:", DiscordMessageSanitizer.inbound(
+                "❤️ ❤", null));
+    }
+
+    @Test
+    public void aliasesResolveAndUnknownEmojiAreDropped() {
+        // A literal alias shortcode, and a custom emoji named by one.
+        assertEquals("well :flushed: then",
+                DiscordMessageSanitizer.inbound(
+                        "well :flushed_face: then", null));
+        assertEquals(":laughing:", DiscordMessageSanitizer.inbound(
+                "<:Satisfied:12345>", null));
+        // An emoji the registry does not carry is dropped, not shown as
+        // broken glyphs — a ZWJ sequence whole, even where its base is
+        // known, so it never becomes the wrong emoji.
+        assertEquals("look here", DiscordMessageSanitizer.inbound(
+                "look 🤖 here", null));
+        assertEquals("so dizzy", DiscordMessageSanitizer.inbound(
+                "so 😵‍💫 dizzy", null));
+    }
+
+    @Test
+    public void outboundTurnsCanonicalShortcodesIntoUnicode() {
+        assertEquals("hi 😳 there 😂",
+                DiscordMessageSanitizer.outbound("hi :flushed: there :joy:"));
+        // The mod's own sprites and everything unknown stay as typed.
+        assertEquals("a :discord: b :console: c :nope: :sm",
+                DiscordMessageSanitizer.outbound(
+                        "a :discord: b :console: c :nope: :sm"));
+        assertEquals("", DiscordMessageSanitizer.outbound(null));
+        assertEquals("plain", DiscordMessageSanitizer.outbound("plain"));
+    }
+
+    @Test
     public void namesAreBoundedAndCleaned() {
         assertEquals("Sam Gamgee",
                 DiscordMessageSanitizer.inboundName(" Sam\n§lGamgee "));

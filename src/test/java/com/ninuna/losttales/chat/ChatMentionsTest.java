@@ -63,4 +63,24 @@ public final class ChatMentionsTest {
         assertEquals("plain", ChatFormattingCodes
                 .translateAmpersand("plain"));
     }
+@Test
+    public void mentionNamesTagsBareNamesAtWordBoundaries() {
+        java.util.List<String> names = java.util.Arrays.asList(
+                "Player500", "Aragorn");
+        assertEquals("Good day to you, @Player500!",
+                ChatMentions.mentionNames(
+                        "Good day to you, Player500!", names));
+        // Already-tagged names keep their one @; case is preserved.
+        assertEquals("hello @Player500 and @aragorn",
+                ChatMentions.mentionNames(
+                        "hello @Player500 and aragorn", names));
+        // Word boundaries: no name inside a longer word.
+        assertEquals("Player5000 and xPlayer500",
+                ChatMentions.mentionNames(
+                        "Player5000 and xPlayer500", names));
+        assertEquals("unchanged", ChatMentions.mentionNames(
+                "unchanged", names));
+        assertEquals("", ChatMentions.mentionNames(null, names));
+        assertEquals("text", ChatMentions.mentionNames("text", null));
+    }
 }

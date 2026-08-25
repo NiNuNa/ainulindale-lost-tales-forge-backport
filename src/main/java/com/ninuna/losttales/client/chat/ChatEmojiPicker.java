@@ -9,10 +9,10 @@ import net.minecraft.client.gui.Gui;
 import net.minecraft.util.StatCollector;
 
 /**
- * Emote browser on the shared picker frame: a Favorites section
+ * Emoji browser on the shared picker frame: a Favorites section
  * (right-click a cell to toggle), a Frequently Used section, and the full
  * grid, each collapsible, with a shortcode tooltip on hover. Selection
- * returns the emote; inserting its shortcode is the chat screen's job.
+ * returns the emoji; inserting its shortcode is the chat screen's job.
  */
 final class ChatEmojiPicker extends ChatPickerPanel {
     static final int FREQUENT_LIMIT = 6;
@@ -40,7 +40,7 @@ final class ChatEmojiPicker extends ChatPickerPanel {
         if (query.length() > 0) {
             List<Entry> filtered = new ArrayList<Entry>();
             for (ChatEmoji emoji : ChatEmoji.values()) {
-                if (emoji.getName().contains(query)) {
+                if (matchesQuery(emoji, query)) {
                     filtered.add(new Entry(emoji));
                 }
             }
@@ -50,14 +50,14 @@ final class ChatEmojiPicker extends ChatPickerPanel {
         List<ChatEmoji> favorites = ChatEmojiUsageStore.getFavorites();
         if (!favorites.isEmpty()) {
             sections.add(new Section(StatCollector.translateToLocal(
-                    "gui.losttales.chat.emotes.favorites"), true,
+                    "gui.losttales.chat.emojis.favorites"), true,
                     entries(favorites)));
         }
         List<ChatEmoji> frequent =
                 ChatEmojiUsageStore.getFrequentlyUsed(FREQUENT_LIMIT);
         if (!frequent.isEmpty()) {
             sections.add(new Section(StatCollector.translateToLocal(
-                    "gui.losttales.chat.emotes.frequent"), true,
+                    "gui.losttales.chat.emojis.frequent"), true,
                     entries(frequent)));
         }
         List<ChatEmoji> all = new ArrayList<ChatEmoji>();
@@ -65,7 +65,7 @@ final class ChatEmojiPicker extends ChatPickerPanel {
             all.add(emoji);
         }
         sections.add(new Section(StatCollector.translateToLocal(
-                "gui.losttales.chat.emotes.all"), true, entries(all)));
+                "gui.losttales.chat.emojis.all"), true, entries(all)));
         return sections;
     }
 
@@ -95,9 +95,33 @@ final class ChatEmojiPicker extends ChatPickerPanel {
         }
     }
 
+    /** The search reaches an emoji by its canonical name or any alias. */
+    private static boolean matchesQuery(ChatEmoji emoji, String query) {
+        if (emoji.getName().contains(query)) {
+            return true;
+        }
+        List<String> aliases = emoji.getAliases();
+        for (int index = 0; index < aliases.size(); index++) {
+            if (aliases.get(index).contains(query)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** {@code :flushed: :flushed_face:} — the canonical name, then every alias. */
     @Override
     String tooltip(Entry entry) {
-        return ((ChatEmoji)entry.value).getShortcode();
+        ChatEmoji emoji = (ChatEmoji)entry.value;
+        List<String> aliases = emoji.getAliases();
+        if (aliases.isEmpty()) {
+            return emoji.getShortcode();
+        }
+        StringBuilder label = new StringBuilder(emoji.getShortcode());
+        for (int index = 0; index < aliases.size(); index++) {
+            label.append(" :").append(aliases.get(index)).append(':');
+        }
+        return label.toString();
     }
 
     @Override
@@ -114,7 +138,7 @@ final class ChatEmojiPicker extends ChatPickerPanel {
                 top + (BUTTON_SIZE - icon.getHeight()) / 2, 255);
     }
 
-    /** The emote cell under the mouse while the picker is open, else null. */
+    /** The emoji cell under the mouse while the picker is open, else null. */
     ChatEmoji emojiAt(int mouseX, int mouseY,
                       int screenWidth, int screenHeight) {
         Entry entry = entryAt(mouseX, mouseY, screenWidth, screenHeight);

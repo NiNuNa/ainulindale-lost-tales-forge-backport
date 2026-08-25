@@ -8,6 +8,9 @@ import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
+import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.party.model.PartyColor;
+import com.ninuna.losttales.party.sync.PartyMemberSnapshot;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -321,14 +324,44 @@ public final class ClientChatChannelState {
     }
 
     public static synchronized int displayColor(ChatChannel channel) {
-        if (channel != ChatChannel.FACTION) {
-            return channel == null ? 0xFFFFFF : channel.getDisplayColor();
+        if (channel == null) {
+            return 0xFFFFFF;
         }
-        CharacterSummary active = activeCharacter();
-        return active == null ? channel.getDisplayColor()
-                : LotrCharacterAdapter.getInstance().getFactionColor(
-                        active.getStartingFactionId(),
-                        channel.getDisplayColor());
+        if (channel == ChatChannel.FACTION) {
+            CharacterSummary active = activeCharacter();
+            return active == null ? channel.getDisplayColor()
+                    : LotrCharacterAdapter.getInstance().getFactionColor(
+                            active.getStartingFactionId(),
+                            channel.getDisplayColor());
+        }
+        if (channel == ChatChannel.PARTY) {
+            // The party speaks in the colour the player wears in it —
+            // the one the party HUD and management screen show them in.
+            PartyStateSnapshot snapshot = ClientPartyStateCache.getSnapshot();
+            if (snapshot != null && snapshot.getParty() != null
+                    && snapshot.getActiveCharacterId() != null) {
+                PartyMemberSnapshot member = snapshot.getParty().getMember(
+                        snapshot.getActiveCharacterId());
+                if (member != null) {
+                    return partyColorRgb(member.getColor());
+                }
+            }
+        }
+        return channel.getDisplayColor();
+    }
+
+    /** The chat's RGB for a party colour, as the party screens map it. */
+    private static int partyColorRgb(PartyColor color) {
+        if (color == PartyColor.GREEN) {
+            return LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN);
+        }
+        if (color == PartyColor.YELLOW) {
+            return LostTalesColors.rgb(LostTalesColors.HONEY);
+        }
+        if (color == PartyColor.PURPLE) {
+            return LostTalesColors.rgb(LostTalesColors.ORCHID);
+        }
+        return LostTalesColors.rgb(LostTalesColors.SEAFOAM);
     }
 
     /** Visible label for a tab: the partner's name for a whisper. */

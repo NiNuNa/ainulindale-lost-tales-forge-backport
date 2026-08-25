@@ -111,6 +111,7 @@ public final class LostTalesGuiAnimationHandler
     @Override
     public void onResourceManagerReload(IResourceManager resourceManager) {
         this.blurRenderer.resetAfterResourceReload();
+        LostTalesGuiRegionBlur.getInstance().resetAfterResourceReload();
     }
 
     @SubscribeEvent
@@ -125,6 +126,7 @@ public final class LostTalesGuiAnimationHandler
         this.contentTransformPushed = false;
         LostTalesGuiAnimations.clear();
         this.blurRenderer.release();
+        LostTalesGuiRegionBlur.getInstance().release();
     }
 
     private boolean isCurrent(GuiScreen screen) {
@@ -153,9 +155,9 @@ public final class LostTalesGuiAnimationHandler
     /**
      * Screens the automatic fade never touches. Chat is one of them: it
      * is opened and closed constantly during play and is meant to read
-     * over the world rather than in front of it, so the world behind it
-     * is neither blurred nor dimmed. Its windows carry their own opening
-     * motion instead.
+     * over the world rather than in front of it, so the full-screen
+     * fade and blur leave it alone; its windows carry their own opening
+     * motion and blur only their own boxes ({@link LostTalesGuiRegionBlur}).
      */
     private static boolean isExcluded(GuiScreen screen) {
         return screen instanceof GuiChat

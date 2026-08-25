@@ -30,6 +30,57 @@ public final class ChatMentions {
         return false;
     }
 
+    /**
+     * The text with an {@code @} put before every bare occurrence of one
+     * of the names — an NPC speaking the player's name reads as the
+     * mention it is. Word boundaries on both sides; a name already
+     * carrying an {@code @} keeps its one.
+     */
+    public static String mentionNames(String message, List<String> names) {
+        if (message == null) {
+            return "";
+        }
+        if (names == null || names.isEmpty()) {
+            return message;
+        }
+        String result = message;
+        for (int nameIndex = 0; nameIndex < names.size(); nameIndex++) {
+            String name = names.get(nameIndex);
+            String wanted = name == null ? "" : name.trim();
+            if (wanted.length() == 0) {
+                continue;
+            }
+            String haystack = result.toLowerCase(Locale.ROOT);
+            String needle = wanted.toLowerCase(Locale.ROOT);
+            StringBuilder built = null;
+            int copied = 0;
+            int from = 0;
+            int at;
+            while ((at = haystack.indexOf(needle, from)) >= 0) {
+                from = at + 1;
+                char before = at == 0 ? ' ' : haystack.charAt(at - 1);
+                int end = at + needle.length();
+                if (isNameCharacter(before) || before == '@'
+                        || (end < haystack.length()
+                                && isNameCharacter(haystack.charAt(end)))) {
+                    continue;
+                }
+                if (built == null) {
+                    built = new StringBuilder(result.length() + 4);
+                }
+                built.append(result, copied, at).append('@')
+                        .append(result, at, end);
+                copied = end;
+                from = end;
+            }
+            if (built != null) {
+                built.append(result.substring(copied));
+                result = built.toString();
+            }
+        }
+        return result;
+    }
+
     private static boolean mentions(String haystack, String name) {
         int from = 0;
         int at;

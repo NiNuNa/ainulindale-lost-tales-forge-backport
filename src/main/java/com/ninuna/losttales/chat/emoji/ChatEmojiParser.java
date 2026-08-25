@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * Splits player conversation text into literal-text runs and recognized
- * emote shortcodes. Anything that is not a complete {@code :name:} match for
+ * emoji shortcodes. Anything that is not a complete {@code :name:} match for
  * a registered {@link ChatEmoji} stays literal text, so unknown or truncated
  * shortcodes remain readable and nothing here can fail on malformed input.
  */
@@ -15,7 +15,7 @@ public final class ChatEmojiParser {
 
     /**
      * Tokenizes once per message, not per frame; the result is either a
-     * single literal segment or an ordered mix of text and emote segments
+     * single literal segment or an ordered mix of text and emoji segments
      * whose concatenated shortcodes/text reproduce the input exactly.
      */
     public static List<Segment> split(String message) {
@@ -58,6 +58,50 @@ public final class ChatEmojiParser {
             segments.add(Segment.text(message));
         }
         return segments;
+    }
+
+    /**
+     * Replaces every complete {@code :name:} whose name is a registered
+     * alias with the canonical shortcode; canonical shortcodes and
+     * everything else stay exactly as typed. Input normalization only:
+     * the wire, copies, and the renderer never see an alias.
+     */
+    public static String normalizeAliases(String message) {
+        if (message == null || message.indexOf(':') < 0) {
+            return message == null ? "" : message;
+        }
+        StringBuilder result = null;
+        int literalStart = 0;
+        int index = 0;
+        int length = message.length();
+        while (index < length) {
+            if (message.charAt(index) != ':') {
+                index++;
+                continue;
+            }
+            int nameEnd = scanName(message, index + 1);
+            ChatEmoji emoji = nameEnd > index + 1 && nameEnd < length
+                    && message.charAt(nameEnd) == ':'
+                    ? ChatEmoji.fromInputName(
+                            message.substring(index + 1, nameEnd))
+                    : null;
+            if (emoji == null) {
+                index++;
+                continue;
+            }
+            if (result == null) {
+                result = new StringBuilder(length);
+            }
+            result.append(message, literalStart, index);
+            result.append(emoji.getShortcode());
+            index = nameEnd + 1;
+            literalStart = index;
+        }
+        if (result == null) {
+            return message;
+        }
+        result.append(message, literalStart, length);
+        return result.toString();
     }
 
     private static int scanName(String message, int start) {

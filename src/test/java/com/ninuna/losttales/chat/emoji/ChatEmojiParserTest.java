@@ -44,9 +44,9 @@ public final class ChatEmojiParserTest {
         assertEquals(" hello", start.get(1).getText());
 
         List<ChatEmojiParser.Segment> end =
-                ChatEmojiParser.split("goodbye :sad:");
+                ChatEmojiParser.split("goodbye :sob:");
         assertEquals("goodbye ", end.get(0).getText());
-        assertSame(ChatEmoji.SAD, end.get(1).getEmoji());
+        assertSame(ChatEmoji.SOB, end.get(1).getEmoji());
     }
 
     @Test
@@ -98,9 +98,9 @@ public final class ChatEmojiParserTest {
     public void segmentsAlwaysReconstructTheOriginalMessage() {
         String[] messages = new String[] {
                 "Hello :smile: everyone!", ":smile: hello",
-                "goodbye :sad:", ":smile::joy:", ":smile: :smile:",
+                "goodbye :sob:", ":smile::joy:", ":smile: :smile:",
                 ":does_not_exist: and :sm and :", "::smile::",
-                "just text", ":frown::unknown::frown:"
+                "just text", ":frowning::unknown::frowning:"
         };
         for (String message : messages) {
             StringBuilder rebuilt = new StringBuilder();
@@ -112,6 +112,23 @@ public final class ChatEmojiParserTest {
             }
             assertEquals(message, rebuilt.toString());
         }
+    }
+
+    @Test
+    public void aliasShortcodesNormalizeToCanonical() {
+        assertEquals("well :flushed: then",
+                ChatEmojiParser.normalizeAliases("well :flushed_face: then"));
+        assertEquals(":laughing::frowning:",
+                ChatEmojiParser.normalizeAliases(
+                        ":satisfied::slightly_frowning_face:"));
+        // Canonical shortcodes and everything unknown stay as typed.
+        String untouched = "hi :flushed: and :does_not_exist: and :sm";
+        assertEquals(untouched, ChatEmojiParser.normalizeAliases(untouched));
+        assertEquals("", ChatEmojiParser.normalizeAliases(null));
+        // The parser itself never accepts an alias: the wire and the
+        // renderer stay canonical-only.
+        assertFalse(ChatEmojiParser.split(":flushed_face:")
+                .get(0).isEmoji());
     }
 
     @Test

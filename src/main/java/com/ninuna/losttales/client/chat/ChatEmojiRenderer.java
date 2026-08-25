@@ -10,7 +10,7 @@ import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
 
 /**
- * Draws emote sprites from the bundled sheet. Quad size and texel region are
+ * Draws emoji sprites from the bundled sheet. Quad size and texel region are
  * independent so a degraded slot (chat colours disabled strips the bold codes
  * and reserves only eight pixels) scales the sprite down instead of cropping.
  */
@@ -27,7 +27,7 @@ final class ChatEmojiRenderer {
     }
 
     /**
-     * Solid-colour shadow of the sprite's outline, the emote equivalent of
+     * Solid-colour shadow of the sprite's outline, the emoji equivalent of
      * the font's shadow pass. A tinted copy would keep the sprite's own
      * shading and turn its dark outline black; the silhouette replaces RGB
      * outright and keeps only the sprite's alpha.

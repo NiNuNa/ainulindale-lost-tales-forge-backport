@@ -17,14 +17,14 @@ import net.minecraft.item.ItemStack;
 
 /**
  * The icon each tab wears before its name — on its tab, in the restore
- * menu, wherever the name stands alone: an emote per channel, for the
+ * menu, wherever the name stands alone: an emoji per channel, for the
  * faction channel the LOTR banner of the active character's faction
  * (the Stewards' banner when the faction has none), for a whisper with
  * a player the partner's own head, exactly as their lines show it, and
  * for an NPC conversation the NPC's portrait as its speech showed it. A
  * whisper whose partner this client cannot place yet, an NPC whose
  * portrait has not been seen, or a faction tab without LOTR's banner
- * item wears an emote. Purely decorative: the catalogue names and ids
+ * item wears an emoji. Purely decorative: the catalogue names and ids
  * are untouched.
  */
 final class ChatChannelIcons {
@@ -69,7 +69,7 @@ final class ChatChannelIcons {
     /**
      * Draws the tab's icon with its top-left at the point: the partner's
      * head for a whisper with a player the client can place, the tab's
-     * emote otherwise.
+     * emoji otherwise.
      */
     static void draw(Minecraft minecraft, ChatTab tab, float x, float y,
                      int alpha) {
@@ -143,9 +143,10 @@ final class ChatChannelIcons {
     /**
      * The account the name belongs to, from the players in the world or
      * the appearance the server syncs for every online player; null when
-     * neither knows the name.
+     * neither knows the name. Shared with the hover card, which places
+     * a mentioned account the same way.
      */
-    private static UUID partnerId(Minecraft minecraft, String name) {
+    static UUID partnerId(Minecraft minecraft, String name) {
         if (name == null || name.length() == 0) {
             return null;
         }
@@ -173,10 +174,10 @@ final class ChatChannelIcons {
             return null;
         }
         if (tab.isNpc()) {
-            return ChatEmoji.GRIN;
+            return ChatEmoji.GRINNING;
         }
         if (tab.isWhisper()) {
-            return ChatEmoji.SHY;
+            return ChatEmoji.BLUSH;
         }
         return iconOf(tab.getChannel());
     }
@@ -187,25 +188,25 @@ final class ChatChannelIcons {
         }
         switch (channel) {
             case ALL:
-                return ChatEmoji.SMILE;
+                return ChatEmoji.SLIGHT_SMILE;
             case PROXIMITY:
-                return ChatEmoji.CALM;
+                return ChatEmoji.SMILEY;
             case FACTION:
-                return ChatEmoji.SMUG;
+                return ChatEmoji.SMIRK;
             case OOC:
-                return ChatEmoji.SILLY;
+                return ChatEmoji.ZANY_FACE;
             case PARTY:
                 return ChatEmoji.JOY;
             case ADMIN:
-                return ChatEmoji.STARE;
+                return ChatEmoji.EXPRESSIONLESS;
             case CONSOLE:
-                return ChatEmoji.CONFUSED;
+                return ChatEmoji.CONSOLE;
             case WHISPER:
-                return ChatEmoji.SHY;
+                return ChatEmoji.BLUSH;
             case DISCORD:
-                return ChatEmoji.AWE;
+                return ChatEmoji.DISCORD;
             default:
-                return ChatEmoji.SMILE;
+                return ChatEmoji.SLIGHT_SMILE;
         }
     }
 }

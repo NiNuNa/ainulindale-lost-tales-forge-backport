@@ -94,6 +94,15 @@ final class ChatWindowLines {
         CACHE.clear();
     }
 
+    /**
+     * Vanilla's unwrapped message history, newest first, or null when it
+     * cannot be read. Shared with the watcher that notices lines printed
+     * straight into the chat.
+     */
+    static List<ChatLine> messageHistory(GuiNewChat chat) {
+        return chat == null ? null : messages(chat);
+    }
+
 
     /**
      * What the history looks like right now: enough of it to notice a

@@ -18,7 +18,7 @@ import net.minecraft.util.StatCollector;
 /**
  * Map-marker browser on the shared picker frame: a search field and every
  * marker the map would show, each row an icon and the name. Like the
- * emote picker it opens with a Favourites section (right-click a row to
+ * emoji picker it opens with a Favourites section (right-click a row to
  * toggle) and a Recently Travelled To section, then one collapsible
  * section per marker type — the glyph the marker is drawn with, which is
  * the taxonomy the atlas already defines, so a settlement, a port and a
@@ -190,7 +190,7 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
                 x + 1 + ChatInlineIcons.SLOT_WIDTH + 4, y + 2,
                 hovered ? alpha : Math.min(alpha, 220));
         if (LostTalesClientMapMarkerUsageStore.isFavorite(data.getId())) {
-            // Same gold dot the emote picker marks favourites with.
+            // Same gold dot the emoji picker marks favourites with.
             Gui.drawRect(x + ROW_WIDTH - 4, y + 2, x + ROW_WIDTH - 2, y + 4,
                     (alpha << 24) | LostTalesSkyrimUiStyle.rgb(
                             LostTalesSkyrimUiStyle.GOLD));

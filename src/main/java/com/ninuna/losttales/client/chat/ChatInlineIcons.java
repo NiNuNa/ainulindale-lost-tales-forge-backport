@@ -6,7 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemStack;
 
 /**
- * The one set of rules every inline chat glyph — emote, item icon, map
+ * The one set of rules every inline chat glyph — emoji, item icon, map
  * marker — is drawn by, in the message lines, the pickers, the completion
  * lists, and the toolbar buttons alike.
  *
@@ -14,7 +14,7 @@ import net.minecraft.item.ItemStack;
  * <li>Inline, a glyph occupies a {@link #SLOT_WIDTH}-pixel slot (the two
  * bold spaces reserved in the message) and fills a {@link #CONTENT_SIZE}
  * square content box centred in it, so every kind reads at the same
- * apparent size: the emote sheet is drawn 1:1, an item's 16px sprite is
+ * apparent size: the emoji sheet is drawn 1:1, an item's 16px sprite is
  * scaled onto the box, and a marker's opaque artwork (not its padded
  * atlas cell) is fitted into it by its larger edge, never stretched.</li>
  * <li>The box sits {@link #CONTENT_TOP_OFFSET} above the text's top edge,
@@ -22,9 +22,9 @@ import net.minecraft.item.ItemStack;
  * text's baseline relationship.</li>
  * <li>On the toolbar buttons every glyph fills the same
  * {@link #CONTENT_SIZE} box centred in the button square, fitted by its
- * larger edge exactly as it is inline — the emote 1:1, the item sprite
+ * larger edge exactly as it is inline — the emoji 1:1, the item sprite
  * scaled onto the box, the marker artwork fitted uniformly — so the
- * emote, item, marker and quest buttons read at one size on one baseline
+ * emoji, item, marker and quest buttons read at one size on one baseline
  * and nothing is stretched.</li>
  * <li>Shadows are flat {@link LostTalesChatVisualStyle#SHADOW}
  * silhouettes offset by {@link LostTalesChatVisualStyle#SHADOW_OFFSET}
@@ -55,7 +55,7 @@ final class ChatInlineIcons {
     static final float HEAD_SLOT_INSET = 1.0F;
     /** The clear space a name keeps from what is written either side. */
     static final int NAME_GAP = 2;
-    /** Common inline content box edge; also the emote sprite's native size. */
+    /** Common inline content box edge; also the emoji sprite's native size. */
     static final float CONTENT_SIZE = 10.0F;
     /** Box top relative to the text top: centred in the 11px line band. */
     static final int CONTENT_TOP_OFFSET = -2;
