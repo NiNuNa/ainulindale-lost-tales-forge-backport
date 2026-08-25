@@ -31,7 +31,26 @@ enum ChatIconSheet {
     LOCKED(20, 17, 5, 7),
     LOCKED_HOVER(26, 17, 5, 7),
     GRIP(0, 25, 6, 8),
-    GRIP_HOVER(7, 25, 6, 8);
+    GRIP_HOVER(7, 25, 6, 8),
+    /** The favourite heart: plain, and filled in the palette's wine. */
+    HEART(36, 11, 5, 5),
+    HEART_FAVORITE(42, 11, 5, 5),
+    /**
+     * The insert-toolbar chevron's animation, five frames from pointing
+     * right (the inserts are out and fold back toward it) to pointing
+     * left (they are away and open leftward), each cell exactly its own
+     * artwork so a frame centres on the control however wide it is.
+     */
+    TOGGLE_1(0, 34, 3, 5),
+    TOGGLE_2(4, 34, 2, 5),
+    TOGGLE_3(7, 34, 1, 5),
+    TOGGLE_4(9, 34, 2, 5),
+    TOGGLE_5(12, 34, 3, 5),
+    TOGGLE_1_HOVER(16, 34, 3, 5),
+    TOGGLE_2_HOVER(20, 34, 2, 5),
+    TOGGLE_3_HOVER(23, 34, 1, 5),
+    TOGGLE_4_HOVER(25, 34, 2, 5),
+    TOGGLE_5_HOVER(28, 34, 3, 5);
 
     static final String TEXTURE_PATH = "textures/gui/chat.png";
     static final int SHEET_WIDTH = 54;

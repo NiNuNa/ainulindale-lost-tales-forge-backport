@@ -18,9 +18,11 @@ final class LostTalesChatClipboard {
             return false;
         }
         try {
+            // A whole-pixel press samples the pixel's centre, the best
+            // estimate of where inside it the pointer actually was.
             LostTalesChatOverlayRenderer.Band band =
                     LostTalesChatOverlayRenderer.bandAt(
-                            minecraft, mouseX, mouseY);
+                            minecraft, mouseX + 0.5F, mouseY + 0.5F);
             List<ChatLine> lines = band == null ? null : band.lines;
             if (band == null || lines == null
                     || band.viewIndex >= lines.size()

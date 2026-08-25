@@ -301,10 +301,22 @@ public final class ClientChatChannelViews {
     }
 
     /**
+     * While a window resize is in progress the scroll never glides: the
+     * clamp moves with the room every frame, and easing after a moving
+     * clamp reads as the stack wobbling against the drag. The screen
+     * raises this for exactly the frames a resize is active.
+     */
+    private static volatile boolean scrollEasingSuppressed;
+
+    public static void setScrollEasingSuppressed(boolean suppressed) {
+        scrollEasingSuppressed = suppressed;
+    }
+
+    /**
      * The offset the view is drawn at this frame: the target once it has
      * arrived, and on the way there a value easing toward it. Called
-     * once per window draw; with chat animation switched off it is the
-     * target itself.
+     * once per window draw; with chat animation switched off, or while
+     * a resize holds the clamp in motion, it is the target itself.
      */
     public static synchronized double renderedScroll(ChatTab view,
                                                      double target) {
@@ -318,7 +330,8 @@ public final class ClientChatChannelViews {
             RENDERED.put(view, ease);
             return target;
         }
-        if (!LostTalesConfig.enableChatAnimations) {
+        if (!LostTalesConfig.enableChatAnimations
+                || scrollEasingSuppressed) {
             ease.value = target;
             ease.nanos = now;
             return target;

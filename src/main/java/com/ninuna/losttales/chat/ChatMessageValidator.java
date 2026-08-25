@@ -12,7 +12,7 @@ import net.minecraft.util.ChatAllowedCharacters;
  */
 public final class ChatMessageValidator {
     /** Visible characters, with every share token counted once. */
-    public static final int MAX_CHARACTERS = 100;
+    public static final int MAX_CHARACTERS = 256;
     /** Longest token: opener, name, ordinal suffix, and closer. */
     private static final int MAX_TOKEN_LENGTH =
             3 + ChatShareTokenParser.MAX_NAME_LENGTH + 4;

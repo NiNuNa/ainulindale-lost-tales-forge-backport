@@ -30,6 +30,16 @@ public final class LostTalesGuiRegionBlur {
     private int blurredTexture = -1;
     private int width = -1;
     private int height = -1;
+    /**
+     * The GUI projection's exact fractional size at capture time. The
+     * capture fills the display, and the ortho maps this size onto the
+     * display exactly, so sampling with it keeps a pasted region on the
+     * very pixels the world drew — the ceil-rounded integer size would
+     * shift the content up to a pixel at display sizes the scale factor
+     * does not divide.
+     */
+    private double guiWidth = 1.0D;
+    private double guiHeight = 1.0D;
     private long capturedNanos;
 
     private LostTalesGuiRegionBlur() {}
@@ -56,6 +66,12 @@ public final class LostTalesGuiRegionBlur {
         }
         try {
             ensureTextures(minecraft);
+            ScaledResolution resolution = new ScaledResolution(minecraft,
+                    minecraft.displayWidth, minecraft.displayHeight);
+            this.guiWidth = Math.max(1.0D,
+                    resolution.getScaledWidth_double());
+            this.guiHeight = Math.max(1.0D,
+                    resolution.getScaledHeight_double());
             copyFrameInto(this.sharpTexture, minecraft);
             if (!this.blur.render(minecraft, partialTicks, strength)) {
                 return false;
@@ -82,10 +98,8 @@ public final class LostTalesGuiRegionBlur {
      * whether the blur is available at all.
      */
     public void drawRegion(double left, double top, double right,
-                           double bottom, int screenWidth, int screenHeight,
-                           float opacity) {
-        drawFadedRegion(left, top, right, bottom, Double.NaN,
-                screenWidth, screenHeight, opacity);
+                           double bottom, float opacity) {
+        drawFadedRegion(left, top, right, bottom, Double.NaN, opacity);
     }
 
     /**
@@ -95,11 +109,9 @@ public final class LostTalesGuiRegionBlur {
      */
     public void drawFadedRegion(double left, double top, double right,
                                 double bottom, double fadeStartX,
-                                int screenWidth, int screenHeight,
                                 float opacity) {
         drawMapped(left, top, right, bottom, fadeStartX,
-                left, top, right, bottom, screenWidth, screenHeight,
-                opacity);
+                left, top, right, bottom, opacity);
     }
 
     /**
@@ -113,8 +125,7 @@ public final class LostTalesGuiRegionBlur {
     public void drawFadedRegionInTransform(
             double localLeft, double localTop, double localRight,
             double localBottom, double localFadeStartX, double screenLeft,
-            double screenTop, double scale, int screenWidth,
-            int screenHeight, float opacity) {
+            double screenTop, double scale, float opacity) {
         if (scale <= 0.0D) {
             return;
         }
@@ -124,25 +135,26 @@ public final class LostTalesGuiRegionBlur {
                 screenTop + (localTop) * scale,
                 screenLeft + (localRight) * scale,
                 screenTop + (localBottom) * scale,
-                screenWidth, screenHeight, opacity);
+                opacity);
     }
 
     private void drawMapped(double vertexLeft, double vertexTop,
                             double vertexRight, double vertexBottom,
                             double fadeStartVertexX, double screenLeft,
                             double screenTop, double screenRight,
-                            double screenBottom, int screenWidth,
-                            int screenHeight, float opacity) {
-        if (!isFresh() || this.blurredTexture < 0 || screenWidth <= 0
-                || screenHeight <= 0 || vertexRight <= vertexLeft
+                            double screenBottom, float opacity) {
+        if (!isFresh() || this.blurredTexture < 0
+                || vertexRight <= vertexLeft
                 || vertexBottom <= vertexTop || opacity <= 0.0F) {
             return;
         }
-        double u0 = clamp01(screenLeft / screenWidth);
-        double u1 = clamp01(screenRight / screenWidth);
+        // Sampled against the projection's exact size, so a region lands
+        // on the very pixels the world drew; see {@link #guiWidth}.
+        double u0 = clamp01(screenLeft / this.guiWidth);
+        double u1 = clamp01(screenRight / this.guiWidth);
         // The capture reads bottom-up; GUI space counts down from the top.
-        double v0 = clamp01(1.0D - screenBottom / screenHeight);
-        double v1 = clamp01(1.0D - screenTop / screenHeight);
+        double v0 = clamp01(1.0D - screenBottom / this.guiHeight);
+        double v1 = clamp01(1.0D - screenTop / this.guiHeight);
         int alpha = Math.max(0, Math.min(255,
                 (int)Math.round(255.0D * opacity)));
         boolean faded = !Double.isNaN(fadeStartVertexX)
@@ -201,12 +213,20 @@ public final class LostTalesGuiRegionBlur {
         this.capturedNanos = 0L;
     }
 
-    /** The whole sharp frame back over the blurred one, one to one. */
+    /**
+     * The whole sharp frame back over the blurred one, one to one. The
+     * quad's extent is the GUI projection's exact fractional size: the
+     * ortho maps that — not the ceil-rounded integer size — onto the
+     * display, so an integer-sized quad at a display size the scale
+     * factor does not divide would stretch the frame a pixel down and
+     * right, and the whole world would appear to shift while the chat
+     * is open.
+     */
     private static void drawFullFrame(int texture, Minecraft minecraft) {
         ScaledResolution resolution = new ScaledResolution(minecraft,
                 minecraft.displayWidth, minecraft.displayHeight);
-        int width = resolution.getScaledWidth();
-        int height = resolution.getScaledHeight();
+        double width = resolution.getScaledWidth_double();
+        double height = resolution.getScaledHeight_double();
         GL11.glEnable(GL11.GL_TEXTURE_2D);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture);
         GL11.glDisable(GL11.GL_BLEND);

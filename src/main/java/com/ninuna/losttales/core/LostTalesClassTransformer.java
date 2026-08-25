@@ -270,6 +270,13 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.chatDelete.active";
     /** Vanilla's history limit, as the literal its trimming loops test. */
     private static final int VANILLA_CHAT_HISTORY = 100;
+    private static final String MENU_FRAMERATE_HOOK_OWNER =
+            "com/ninuna/losttales/client/gui/animation/"
+                    + "LostTalesMenuFramerateHook";
+    public static final String MENU_FRAMERATE_ACTIVE_PROPERTY =
+            "losttales.menuFramerate.active";
+    /** Vanilla's menu framerate cap, as the literal the getter returns. */
+    private static final int VANILLA_MENU_FRAMERATE = 30;
     private static final String LOTR_PLAYER_DATA =
             "lotr.common.LOTRPlayerData";
     private static final String FAST_TRAVEL_ARRIVAL_HOOK_OWNER =
@@ -301,7 +308,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return transformGuiContainer(basicClass);
         }
         if (MINECRAFT.equals(transformedName)) {
-            return transformMinecraftPickBlock(basicClass);
+            return transformMinecraftMenuFramerate(
+                    transformMinecraftPickBlock(basicClass));
         }
         if (PLAYER_CONTROLLER.equals(transformedName)) {
             return transformPlayerController(basicClass);
@@ -2470,6 +2478,70 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return basicClass;
         } catch (Throwable throwable) {
             warn("Failed to patch chat history capacity: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Frees the menus from vanilla's thirty-frame cap.
+     *
+     * <p>{@code Minecraft.getLimitFramerate} answers a literal thirty
+     * while no world is loaded and a screen is open — the main menu and
+     * every screen reached from it. That literal becomes a call to
+     * {@code LostTalesMenuFramerateHook.menuFramerateLimit()}, which
+     * answers the player's own framerate limit, so the pointer and the
+     * animated screens move as smoothly in the menus as in game. Without
+     * the patch vanilla's thirty stays.</p>
+     */
+    private static byte[] transformMinecraftMenuFramerate(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("getLimitFramerate".equals(method.name)
+                        || "func_90020_K".equals(method.name))
+                        || !"()I".equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, MENU_FRAMERATE_HOOK_OWNER,
+                        "menuFramerateLimit")) {
+                    System.setProperty(MENU_FRAMERATE_ACTIVE_PROPERTY,
+                            "true");
+                    return basicClass;
+                }
+                int replaced = 0;
+                for (AbstractInsnNode instruction =
+                     method.instructions.getFirst();
+                     instruction != null;
+                     instruction = instruction.getNext()) {
+                    if (instruction.getOpcode() == Opcodes.BIPUSH
+                            && ((IntInsnNode)instruction).operand
+                                    == VANILLA_MENU_FRAMERATE) {
+                        MethodInsnNode hook = new MethodInsnNode(
+                                Opcodes.INVOKESTATIC,
+                                MENU_FRAMERATE_HOOK_OWNER,
+                                "menuFramerateLimit", "()I");
+                        method.instructions.set(instruction, hook);
+                        instruction = hook;
+                        replaced++;
+                    }
+                }
+                if (replaced != 1) {
+                    warn("Expected one menu framerate literal in "
+                            + "Minecraft#getLimitFramerate, found "
+                            + replaced + "; the menus keep vanilla's "
+                            + "thirty frames");
+                    return basicClass;
+                }
+                System.setProperty(MENU_FRAMERATE_ACTIVE_PROPERTY, "true");
+                info("Patched menu framerate cap");
+                return write(owner);
+            }
+            warn("Could not locate Minecraft#getLimitFramerate; the menus "
+                    + "keep vanilla's thirty frames");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch the menu framerate cap: " + throwable);
             return basicClass;
         }
     }

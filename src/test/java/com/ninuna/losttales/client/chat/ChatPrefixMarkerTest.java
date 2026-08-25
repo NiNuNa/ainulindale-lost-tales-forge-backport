@@ -9,9 +9,10 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A line's header runs each belong to one chat state: the channel prefix
- * to the closed feed, the timestamp to the open screen. Both carry their
- * exact colour, and neither is ever shown in the other's state.
+ * A line's header runs: the channel prefix belongs to the closed feed,
+ * and the timestamp never takes inline width at all — the open screen
+ * draws it in the timestamp column instead. Both carry their exact
+ * colour.
  */
 public final class ChatPrefixMarkerTest {
 
@@ -22,11 +23,14 @@ public final class ChatPrefixMarkerTest {
         ChatComponentText time = ChatPrefixMarker.timestamp(
                 new ChatComponentText("[12:34] "), 0xDBC9B4);
 
-        // The feed shows the channel and no time; the screen the reverse.
+        // The feed shows the channel; the timestamp is never inline —
+        // the open screen draws it in the column at the window's edge.
         assertFalse(ChatPrefixMarker.isHidden(channel, false));
         assertTrue(ChatPrefixMarker.isHidden(channel, true));
         assertTrue(ChatPrefixMarker.isHidden(time, false));
-        assertFalse(ChatPrefixMarker.isHidden(time, true));
+        assertTrue(ChatPrefixMarker.isHidden(time, true));
+        assertTrue(ChatPrefixMarker.isTimestamp(time));
+        assertFalse(ChatPrefixMarker.isTimestamp(channel));
     }
 
     @Test

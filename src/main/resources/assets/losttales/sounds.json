@@ -65,5 +65,11 @@
         "sounds": [
             "map_marker/marker_hover"
         ]
+    },
+    "chat.ping": {
+        "category": "master",
+        "sounds": [
+            "ui/chat_ping"
+        ]
     }
 }

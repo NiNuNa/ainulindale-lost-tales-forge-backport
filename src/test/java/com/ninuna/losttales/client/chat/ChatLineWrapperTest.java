@@ -88,10 +88,12 @@ public final class ChatLineWrapperTest {
     }
 
     /**
-     * Neither state pays for the header run the other one draws: the
-     * closed feed reserves the channel prefix and not the timestamp, the
-     * open screen the timestamp and not the channel prefix. "Global: "
-     * and "[12:34] " are 48px each, "&lt;N&gt; " is 24.
+     * Each state pays only for the header runs it draws inline: the
+     * closed feed reserves the channel prefix and never the timestamp,
+     * and the open screen reserves neither — its timestamp lives in the
+     * column at the window's edge, so the whole width belongs to the
+     * name and body. "Global: " and "[12:34] " are 48px each,
+     * "&lt;N&gt; " is 24.
      */
     @Test
     public void eachStateReservesOnlyTheHeaderRunsItDraws() {
@@ -102,13 +104,12 @@ public final class ChatLineWrapperTest {
                 timedLine("[12:34] ", "<N> ", "aaa bbb ccc ddd"),
                 150, true);
         // Closed: 48 + 24 = 72 taken, 78 left — two words of 18 and a
-        // space. Open: the same 72, since the timestamp replaces the
-        // channel prefix exactly.
+        // space. Open: only the name's 24 taken, so the 90px body fits
+        // on the first line whole.
         assertEquals(2, closed.size());
-        assertEquals(2, open.size());
+        assertEquals(1, open.size());
         // The continuation indent is the header each state draws.
         assertEquals(72, indentOf(closed.get(1), false));
-        assertEquals(72, indentOf(open.get(1), true));
     }
 
     private static String plain(IChatComponent line) {

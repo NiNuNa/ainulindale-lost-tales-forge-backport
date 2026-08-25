@@ -171,7 +171,20 @@ public final class LostTalesChatPresentation {
         if (ChatWindowLayout.openTab(tab, windowIdOfSelection()) == null) {
             return false;
         }
-        print(minecraft, packet, tab, false);
+        // An NPC conversation never passes through the server, so the
+        // mention check the served channels get on receipt runs here:
+        // naming yourself pings you in this tab exactly as anywhere
+        // else.
+        boolean mentioned = LostTalesConfig.enableChatPings
+                && isLocalPlayerMentioned(minecraft, ChatChannel.WHISPER,
+                        message);
+        int chatLineId = print(minecraft, packet, tab, mentioned);
+        if (mentioned) {
+            markPinged(chatLineId);
+            if (ChatWindowLayout.isPingAudible(tab)) {
+                playPingSound(minecraft);
+            }
+        }
         return true;
     }
 
@@ -242,9 +255,10 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * The local account name, the active character's name, and — on the
-     * account channels only — the name of every role this player holds,
-     * so {@code @Operator} reaches the operators and nobody else. A role
+     * Whether the message names this player: any of their own names
+     * ({@link #localMentionNames}) in every channel alike, plus — on the
+     * account channels only — the name of every role they hold, so
+     * {@code @Operator} reaches the operators and nobody else. A role
      * is an account fact and means nothing in character, so it is not
      * addressable in the role-playing channels. Which roles the player
      * holds is the server's word, sent with the chat access; nothing
@@ -252,10 +266,7 @@ public final class LostTalesChatPresentation {
      */
     private static boolean isLocalPlayerMentioned(
             Minecraft minecraft, ChatChannel channel, String message) {
-        List<String> names = new ArrayList<String>(2);
-        if (minecraft.thePlayer != null) {
-            names.add(minecraft.thePlayer.getCommandSenderName());
-        }
+        List<String> names = localMentionNames(minecraft);
         if (channel != null
                 && channel.getIdentityType() == ChatIdentityType.ACCOUNT) {
             for (ChatAccountRole role
@@ -265,13 +276,6 @@ public final class LostTalesChatPresentation {
                             role.getNameKey()));
                 }
             }
-        }
-        CharacterRosterSnapshot snapshot =
-                ClientCharacterRosterCache.getSnapshot();
-        CharacterSummary active = snapshot == null
-                ? null : snapshot.getActiveCharacter();
-        if (active != null) {
-            names.add(active.getName());
         }
         return ChatMentions.mentionsAny(message, names);
     }
@@ -535,19 +539,27 @@ public final class LostTalesChatPresentation {
         return true;
     }
 
-    /** The names a line may address this client by: account, character. */
+    /**
+     * The names a line may address this client by, the same set in every
+     * channel: the account, and every character of the roster — whoever
+     * this player is currently speaking as, every other name they own is
+     * an alias of them, so a mention of any of their names reaches them
+     * wherever it is said.
+     */
     private static List<String> localMentionNames(Minecraft minecraft) {
-        List<String> names = new ArrayList<String>(2);
+        List<String> names = new ArrayList<String>(4);
         if (minecraft != null && minecraft.thePlayer != null) {
             names.add(minecraft.thePlayer.getCommandSenderName());
         }
         CharacterRosterSnapshot snapshot =
                 ClientCharacterRosterCache.getSnapshot();
-        CharacterSummary active = snapshot == null
-                ? null : snapshot.getActiveCharacter();
-        if (active != null && active.getName() != null
-                && active.getName().trim().length() > 0) {
-            names.add(active.getName().trim());
+        if (snapshot != null) {
+            for (CharacterSummary summary : snapshot.getCharacters()) {
+                if (summary != null && summary.getName() != null
+                        && summary.getName().trim().length() > 0) {
+                    names.add(summary.getName().trim());
+                }
+            }
         }
         return names;
     }
@@ -684,19 +696,26 @@ public final class LostTalesChatPresentation {
         }
         // The character channels sign every line with the sender's
         // active role-playing character; a system line naming the
-        // account shows the same identity when the client knows it.
+        // account shows the same identity when the client knows it —
+        // the character's name, in the character's own name colour, so
+        // an achievement names its player exactly as their lines do.
         String shown = text;
+        boolean characterIdentity = false;
         if (account != null && channel != null
                 && channel.getIdentityType() == ChatIdentityType.CHARACTER) {
             String characterName =
                     ChatMentionColors.characterNameFor(account);
             if (characterName != null) {
                 shown = characterName;
+                characterIdentity = true;
             }
         }
         int color = ChatMentionColors.colorOf(text, channel);
         if (color < 0) {
             color = LostTalesColors.rgb(LostTalesColors.HONEY);
+        }
+        if (characterIdentity) {
+            color = ChatMentionColors.characterColorFor(account, color);
         }
         if (local) {
             localMentioned[0] = true;
@@ -876,10 +895,11 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * {@code [HH:mm] } in the palette's sand with the time itself — digits
-     * and their colon — italic; the brackets stay upright. Marked as a
-     * timestamp run, so the closed feed leaves it out: the feed is a
-     * glance at what was just said, not a log to read times off.
+     * {@code [HH:mm] } in the palette's rose beige — a quiet grey a step
+     * below the sand body text — with the time itself — digits and their
+     * colon — italic; the brackets stay upright. Marked as a timestamp
+     * run, so the closed feed leaves it out: the feed is a glance at
+     * what was just said, not a log to read times off.
      */
     private static void appendTimestamp(ChatComponentText root,
                                         long timestampMillis) {
@@ -888,7 +908,7 @@ public final class LostTalesChatPresentation {
         }
         String formatted = "[" + ChatTimestampFormatter.format(
                 timestampMillis) + "] ";
-        int color = LostTalesColors.rgb(LostTalesColors.SAND);
+        int color = LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE);
         int index = 0;
         while (index < formatted.length()) {
             boolean time = isTimeCharacter(formatted.charAt(index));
@@ -975,7 +995,10 @@ public final class LostTalesChatPresentation {
         if (marker == null) {
             return false;
         }
-        int rgb = ChatInlineIcons.markerRgb(marker.colorName);
+        // The brackets and the name read in the marker's text colour —
+        // white becomes the chat's ivory — while the icon itself keeps
+        // the marker's exact artwork colour.
+        int rgb = ChatInlineIcons.markerTextRgb(marker.colorName);
         appendShowcaseParts(root, kind, showcaseId,
                 ChatShareTokenParser.plainName(marker.name),
                 nearestFormatting(rgb), rgb);

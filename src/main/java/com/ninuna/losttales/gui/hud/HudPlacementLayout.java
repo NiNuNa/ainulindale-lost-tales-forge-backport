@@ -2,9 +2,11 @@ package com.ninuna.losttales.gui.hud;
 
 /**
  * Shared, resolution-independent positioning rules for movable HUD panels.
+ * The margin is zero by design: a panel's travel reaches the screen edge
+ * exactly, so 0% and 100% place it flush against the border.
  */
 public final class HudPlacementLayout {
-    public static final int SCREEN_MARGIN = 4;
+    public static final int SCREEN_MARGIN = 0;
 
     private HudPlacementLayout() {}
 

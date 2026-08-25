@@ -26,8 +26,8 @@ public final class HudPlacementLayoutTest {
                 800, 450, 280, 150, 100, 100,
                 SCREEN_PERCENT, SCREEN_PERCENT);
 
-        assertEquals(516, bounds.x);
-        assertEquals(296, bounds.y);
+        assertEquals(520, bounds.x);
+        assertEquals(300, bounds.y);
         assertEquals(800 - HudPlacementLayout.SCREEN_MARGIN,
                 bounds.x + bounds.width);
         assertEquals(450 - HudPlacementLayout.SCREEN_MARGIN,
@@ -89,8 +89,8 @@ public final class HudPlacementLayoutTest {
                 HudPlacementLayout.constrainDrag(
                         -200, 900, 200, 80, 1000, 600, 6);
 
-        assertEquals(4, result.x);
-        assertEquals(516, result.y);
+        assertEquals(0, result.x);
+        assertEquals(520, result.y);
         assertFalse(result.snappedX);
         assertFalse(result.snappedY);
     }

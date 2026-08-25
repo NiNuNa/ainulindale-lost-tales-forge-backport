@@ -179,7 +179,8 @@ public class LostTalesHudPlacementGui extends GuiScreen {
                                 - this.dragOffsetX,
                         ChatWindowPlacement.preciseMouseY(this.mc, this.height)
                                 - this.dragOffsetY,
-                        box.width, box.height, this.width, this.height,
+                        box.width, (int)Math.round(box.height),
+                        this.width, this.height,
                         CENTER_SNAP_THRESHOLD);
         this.snappedToCenterX = position.snappedX;
         this.snappedToCenterY = position.snappedY;
@@ -357,7 +358,8 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             ChatWindowPlacement.Box box = this.selected.preciseBounds(this);
             HudPlacementLayout.PreciseDragResult position =
                     HudPlacementLayout.constrainDrag(
-                            box.x + dx, box.y + dy, box.width, box.height,
+                            box.x + dx, box.y + dy, box.width,
+                            (int)Math.round(box.height),
                             this.width, this.height, 0);
             this.selected.moveTo(position.x, position.y, this);
             this.selected.persist();
@@ -388,7 +390,8 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         if (element.precise()) {
             ChatWindowPlacement.Box box = element.preciseBounds(this);
             return HudPlacementLayout.bounds((int)Math.floor(box.x),
-                    (int)Math.floor(box.y), box.width, box.height);
+                    (int)Math.floor(box.y), box.width,
+                    (int)Math.round(box.height));
         }
         return HudPlacementLayout.calculate(
                 this.width,
@@ -455,7 +458,7 @@ public class LostTalesHudPlacementGui extends GuiScreen {
 
         @Override
         public int height(LostTalesHudPlacementGui gui) {
-            return preciseBounds(gui).height;
+            return (int)Math.round(preciseBounds(gui).height);
         }
 
         @Override

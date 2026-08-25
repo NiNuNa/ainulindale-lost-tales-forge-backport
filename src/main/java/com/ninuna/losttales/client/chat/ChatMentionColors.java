@@ -8,6 +8,7 @@ import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.Locale;
@@ -115,6 +116,42 @@ final class ChatMentionColors {
     private static String normalized(String name) {
         String trimmed = name == null ? "" : name.trim();
         return trimmed.length() == 0 ? null : trimmed;
+    }
+
+    /**
+     * The colour the account's active role-playing character signs its
+     * lines with — its starting faction's, exactly as the server
+     * resolves it for the character's own messages — or {@code fallback}
+     * when this client knows no active character or no faction for the
+     * account. A system line shown under the character's name wears
+     * this, so the mention and the character's own lines read alike.
+     */
+    static int characterColorFor(String account, int fallback) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (account == null || account.length() == 0) {
+            return fallback;
+        }
+        if (minecraft != null && minecraft.thePlayer != null
+                && account.equalsIgnoreCase(
+                        minecraft.thePlayer.getCommandSenderName())) {
+            CharacterRosterSnapshot snapshot =
+                    ClientCharacterRosterCache.getSnapshot();
+            CharacterSummary active = snapshot == null
+                    ? null : snapshot.getActiveCharacter();
+            return active == null ? fallback
+                    : LotrCharacterAdapter.getInstance().getFactionColor(
+                            active.getStartingFactionId(), fallback);
+        }
+        for (CharacterAppearance appearance
+                : ClientCharacterAppearanceCache.snapshot().values()) {
+            if (appearance != null && appearance.isPresent()
+                    && account.equalsIgnoreCase(
+                            appearance.getAccountName())) {
+                return LotrCharacterAdapter.getInstance().getFactionColor(
+                        appearance.getStartingFactionId(), fallback);
+            }
+        }
+        return fallback;
     }
 
     /**

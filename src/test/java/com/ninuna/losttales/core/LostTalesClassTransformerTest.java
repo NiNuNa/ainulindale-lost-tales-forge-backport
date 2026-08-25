@@ -43,6 +43,9 @@ public final class LostTalesClassTransformerTest {
             "com/ninuna/losttales/client/chat/LostTalesChatHistoryHooks";
     private static final String CHAT_WRAP_HOOK_OWNER =
             "com/ninuna/losttales/client/chat/LostTalesChatWrapHooks";
+    private static final String MENU_FRAMERATE_HOOK_OWNER =
+            "com/ninuna/losttales/client/gui/animation/"
+                    + "LostTalesMenuFramerateHook";
     private static final String FAST_TRAVEL_ARRIVAL_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/LostTalesLotrFastTravelArrivalHook";
     private static final String DEBUG_HOOK_OWNER =
@@ -146,6 +149,14 @@ public final class LostTalesClassTransformerTest {
                 transformed, "getMouseOver",
                 THIRD_PERSON_TARGETING_HOOK_OWNER,
                 "resolveMouseOver"));
+    }
+
+    @Test
+    public void menusFollowThePlayersFramerateLimit() throws Exception {
+        ClassNode minecraft = transform("net.minecraft.client.Minecraft");
+        assertTrue(containsStaticHook(
+                minecraft, "getLimitFramerate",
+                MENU_FRAMERATE_HOOK_OWNER, "menuFramerateLimit"));
     }
 
     @Test

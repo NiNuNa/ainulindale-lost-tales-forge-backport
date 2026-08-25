@@ -16,8 +16,10 @@ import net.minecraft.util.IChatComponent;
  * carries every channel and the prefix is what tells them apart. The open
  * screen has tabs for that, so it is skipped there.</li>
  * <li>The <b>timestamp</b> is for the open screen, where the player is
- * reading the history. The feed is a glance at what was just said, so it
- * is skipped there whatever the timestamp setting says.</li>
+ * reading the history — but it is never part of the line's own flow: the
+ * open screen draws it in the timestamp column at the window's left edge
+ * ({@link ChatTimestampColumn}), and the feed is a glance at what was
+ * just said, so inline it takes no width in either state.</li>
  * </ul>
  *
  * <p>{@link #isHidden} is the one answer to "does this component take any
@@ -70,18 +72,25 @@ final class ChatPrefixMarker {
         return value != null && value.startsWith(CHANNEL);
     }
 
+    /** Whether the component is part of the timestamp specifically. */
+    static boolean isTimestamp(IChatComponent component) {
+        String value = payload(component);
+        return value != null && value.startsWith(TIMESTAMP);
+    }
+
     /**
-     * True when the component contributes nothing on screen right now:
-     * the channel prefix while the chat screen is open, the timestamp
-     * while it is closed.
+     * True when the component contributes nothing to the line's own flow
+     * right now: the channel prefix while the chat screen is open, and
+     * the timestamp always — the open screen draws it in the timestamp
+     * column instead, and the closed feed does not show it at all.
      */
     static boolean isHidden(IChatComponent component, boolean chatOpen) {
         String value = payload(component);
         if (value == null) {
             return false;
         }
-        return chatOpen ? value.startsWith(CHANNEL)
-                : value.startsWith(TIMESTAMP);
+        return value.startsWith(TIMESTAMP)
+                || (chatOpen && value.startsWith(CHANNEL));
     }
 
     private static ChatComponentText mark(ChatComponentText component,

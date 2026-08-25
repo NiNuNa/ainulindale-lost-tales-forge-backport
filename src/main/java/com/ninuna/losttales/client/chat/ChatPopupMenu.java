@@ -44,6 +44,9 @@ final class ChatPopupMenu {
         final String label;
         /** A section label over a hairline; never hovered, never clicked. */
         final boolean header;
+        /** A display row: shown like a row, but it answers to nothing —
+         *  only a control it carries, such as the lock, does. */
+        final boolean passive;
         /** Drawn italic: a muted channel, like its tab. */
         final boolean dim;
         /** The channel's colour, shown as a small bar before the name; -1 for none. */
@@ -52,22 +55,25 @@ final class ChatPopupMenu {
         final ChatTab icon;
         /** Player whose head stands before the name, or null for none. */
         ChatHeadOwner head;
-        /** A sheet sprite before the name — the appearance lock — or null. */
+        /** A sheet sprite before the name, or null. */
         ChatIconSheet sprite;
+        /** The lock control at the row's end: its state, or null for none. */
+        Boolean lockControl;
 
         Entry(String id, String label) {
-            this(id, label, false, false, -1, null);
+            this(id, label, false, false, false, -1, null);
         }
 
         Entry(String id, String label, boolean dim, int color, ChatTab icon) {
-            this(id, label, false, dim, color, icon);
+            this(id, label, false, false, dim, color, icon);
         }
 
-        private Entry(String id, String label, boolean header, boolean dim,
-                      int color, ChatTab icon) {
+        private Entry(String id, String label, boolean header,
+                      boolean passive, boolean dim, int color, ChatTab icon) {
             this.id = id;
             this.label = label == null ? "" : label;
             this.header = header;
+            this.passive = passive;
             this.dim = dim;
             this.color = color;
             this.icon = icon;
@@ -75,7 +81,12 @@ final class ChatPopupMenu {
 
         /** A section label: {@code Channels}, {@code Direct Messages}. */
         static Entry header(String label) {
-            return new Entry("", label, true, false, -1, null);
+            return new Entry("", label, true, false, false, -1, null);
+        }
+
+        /** A display row that only its own controls answer for. */
+        static Entry passive(String label) {
+            return new Entry("", label, false, true, false, -1, null);
         }
 
         Entry withHead(java.util.UUID owner, String skinId) {
@@ -85,6 +96,12 @@ final class ChatPopupMenu {
 
         Entry withSprite(ChatIconSheet sprite) {
             this.sprite = sprite;
+            return this;
+        }
+
+        /** Puts the lock control at the row's end, in the given state. */
+        Entry withLockControl(boolean locked) {
+            this.lockControl = Boolean.valueOf(locked);
             return this;
         }
     }
@@ -109,6 +126,8 @@ final class ChatPopupMenu {
     private int height;
     /** Left edge of the labels inside the menu, past any swatch column. */
     private int labelX = PADDING_X;
+    /** Room the lock column takes at the right, or 0 without one. */
+    private int lockWidth;
     /** First row asked for — the wheel's target; rows above it lie past
      *  the top edge. */
     private int scrollRows;
@@ -156,17 +175,23 @@ final class ChatPopupMenu {
         int widest = 0;
         boolean swatches = false;
         boolean icons = false;
+        boolean locks = false;
         for (Entry entry : this.entries) {
             widest = Math.max(widest, font.getStringWidth(entry.label));
             swatches |= entry.color >= 0;
             icons |= entry.icon != null || entry.head != null
                     || entry.sprite != null;
+            locks |= entry.lockControl != null;
         }
         // One swatch column and one icon column for the whole list, so
         // the names line up; headers hang left of them with the padding.
+        // A lock control keeps its own column at the right end.
         this.labelX = PADDING_X + (swatches ? SWATCH_WIDTH + SWATCH_GAP : 0)
                 + (icons ? ChatChannelIcons.SIZE + ChatChannelIcons.GAP : 0);
-        this.width = Math.max(MIN_WIDTH, this.labelX + widest + PADDING_X);
+        this.lockWidth = locks
+                ? SWATCH_GAP + ChatChannelTabBar.END_CONTROL_SIZE : 0;
+        this.width = Math.max(MIN_WIDTH,
+                this.labelX + widest + this.lockWidth + PADDING_X);
         // As many rows as the cap and the room above the anchor allow.
         int roomRows = (anchorBottom - 2 - PADDING_Y * 2) / ROW_HEIGHT;
         this.visibleRows = Math.max(1, Math.min(this.entries.size(),
@@ -201,6 +226,7 @@ final class ChatPopupMenu {
         this.scrollRows = 0;
         this.renderedScrollRows = 0.0D;
         this.visibleRows = 0;
+        this.lockWidth = 0;
     }
 
     boolean contains(int mouseX, int mouseY) {
@@ -239,9 +265,36 @@ final class ChatPopupMenu {
     }
 
     /** The clickable entry under the point, resolved against the drawn
-     *  offset so a gliding list answers for what is on screen; headers
-     *  and the padding bands are nobody's. */
+     *  offset so a gliding list answers for what is on screen; headers,
+     *  display rows and the padding bands are nobody's. */
     Entry entryAt(int mouseX, int mouseY) {
+        Entry entry = rowAt(mouseX, mouseY);
+        return entry == null || entry.header || entry.passive ? null : entry;
+    }
+
+    /**
+     * The entry whose lock control lies under the point, or null. The
+     * lock answers wherever its row is — a display row included — and
+     * only on its own square, so the row around it keeps its meaning.
+     */
+    Entry lockControlAt(int mouseX, int mouseY) {
+        Entry entry = rowAt(mouseX, mouseY);
+        if (entry == null || entry.lockControl == null) {
+            return null;
+        }
+        int left = lockLeft();
+        return mouseX >= left
+                && mouseX < left + ChatChannelTabBar.END_CONTROL_SIZE
+                ? entry : null;
+    }
+
+    private int lockLeft() {
+        return this.x + this.width - PADDING_X
+                - ChatChannelTabBar.END_CONTROL_SIZE;
+    }
+
+    /** The entry drawn under the point, whatever kind it is, or null. */
+    private Entry rowAt(int mouseX, int mouseY) {
         if (!contains(mouseX, mouseY)
                 || mouseY < this.y + PADDING_Y
                 || mouseY >= this.y + this.height - PADDING_Y) {
@@ -249,9 +302,8 @@ final class ChatPopupMenu {
         }
         int index = (int)Math.floor((mouseY - this.y - PADDING_Y)
                 / (double)ROW_HEIGHT + this.renderedScrollRows);
-        Entry entry = index >= 0 && index < this.entries.size()
+        return index >= 0 && index < this.entries.size()
                 ? this.entries.get(index) : null;
-        return entry == null || entry.header ? null : entry;
     }
 
     /**
@@ -356,6 +408,20 @@ final class ChatPopupMenu {
             LostTalesChatVisualStyle.drawPlain(font,
                     entry.dim ? "§o" + entry.label : entry.label,
                     this.x + this.labelX, rowY + 2, 255);
+            if (entry.lockControl != null) {
+                // The lock at the row's end, with the hover state the
+                // window's own lock uses.
+                boolean locked = entry.lockControl.booleanValue();
+                boolean lockHovered =
+                        lockControlAt(mouseX, mouseY) == entry;
+                ChatIconSheet lock = locked
+                        ? (lockHovered ? ChatIconSheet.LOCKED_HOVER
+                                : ChatIconSheet.LOCKED)
+                        : (lockHovered ? ChatIconSheet.UNLOCKED_HOVER
+                                : ChatIconSheet.UNLOCKED);
+                lock.drawWithShadow(lockLeft() + 1,
+                        rowY + (ROW_HEIGHT - lock.getHeight()) / 2, 255);
+            }
             rowY += ROW_HEIGHT;
         }
         } finally {

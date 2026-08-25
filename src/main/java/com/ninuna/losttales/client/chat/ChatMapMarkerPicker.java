@@ -12,7 +12,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.util.StatCollector;
 
 /**
@@ -189,11 +188,16 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
         LostTalesChatVisualStyle.drawPlain(minecraft.fontRenderer, label,
                 x + 1 + ChatInlineIcons.SLOT_WIDTH + 4, y + 2,
                 hovered ? alpha : Math.min(alpha, 220));
+        // The favourite heart at the row's end, exactly as the emoji
+        // picker marks its cells: filled while the marker is one, plain
+        // under the pointer as the control a right-click toggles.
         if (LostTalesClientMapMarkerUsageStore.isFavorite(data.getId())) {
-            // Same gold dot the emoji picker marks favourites with.
-            Gui.drawRect(x + ROW_WIDTH - 4, y + 2, x + ROW_WIDTH - 2, y + 4,
-                    (alpha << 24) | LostTalesSkyrimUiStyle.rgb(
-                            LostTalesSkyrimUiStyle.GOLD));
+            ChatIconSheet.HEART_FAVORITE.drawWithShadow(x + ROW_WIDTH
+                    - ChatIconSheet.HEART_FAVORITE.getWidth() - 2, y + 3,
+                    alpha);
+        } else if (hovered) {
+            ChatIconSheet.HEART.drawWithShadow(x + ROW_WIDTH
+                    - ChatIconSheet.HEART.getWidth() - 2, y + 3, alpha);
         }
     }
 

@@ -45,10 +45,16 @@ public final class LostTalesChatHitHooks {
                 return null;
             }
             LostTalesChatGui screen = (LostTalesChatGui)minecraft.currentScreen;
-            int guiX = rawMouseX * screen.width / minecraft.displayWidth;
-            int guiY = screen.height
-                    - rawMouseY * screen.height / minecraft.displayHeight - 1;
-            if (screen.isPointerOwnedByOverlay(guiX, guiY)) {
+            // The exact fractional GUI position, so third parties get
+            // the same answer the drawn cursor tip stands on; the
+            // overlay check keeps vanilla's whole-pixel arithmetic,
+            // which is how the regions were registered.
+            float guiX = rawMouseX * (float)screen.width
+                    / minecraft.displayWidth;
+            float guiY = screen.height
+                    - rawMouseY * (float)screen.height
+                            / minecraft.displayHeight - 1.0F;
+            if (screen.isPointerOwnedByOverlay((int)guiX, (int)guiY)) {
                 return null;
             }
             LostTalesChatOverlayRenderer.Hit hit =

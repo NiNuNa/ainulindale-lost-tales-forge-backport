@@ -92,14 +92,26 @@ final class ChatInlineIcons {
     }
 
     /**
-     * The colour a marker is drawn and named with in chat: its map colour,
-     * with the map's plain white swapped for the chat's ivory.
+     * The colour a marker's artwork is drawn with in chat: its exact map
+     * colour. Plain white is a real choice, not a placeholder — a white
+     * marker keeps its sprite's own pixels untinted.
      */
     static int markerRgb(String colorName) {
         float[] color = LostTalesCompassMarker.parseColor(colorName);
-        int rgb = (Math.round(color[0] * 255.0F) << 16)
+        return (Math.round(color[0] * 255.0F) << 16)
                 | (Math.round(color[1] * 255.0F) << 8)
                 | Math.round(color[2] * 255.0F);
+    }
+
+    /**
+     * The colour a marker is <em>named</em> with — its bracketed name in
+     * a message and in the input preview: the same map colour, with
+     * plain white swapped for the chat's ivory, so a white marker's text
+     * reads in the one white every other word does. Only the artwork
+     * keeps pure white.
+     */
+    static int markerTextRgb(String colorName) {
+        int rgb = markerRgb(colorName);
         return rgb == 0xFFFFFF ? LostTalesChatVisualStyle.IVORY : rgb;
     }
 

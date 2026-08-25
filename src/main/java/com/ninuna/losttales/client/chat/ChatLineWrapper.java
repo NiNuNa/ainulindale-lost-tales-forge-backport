@@ -96,9 +96,9 @@ final class ChatLineWrapper {
         if (bodyIndex < 0) {
             return null;
         }
-        // Each state pays only for the header runs it draws: the
-        // closed feed for the channel prefix, the open screen for the
-        // timestamp.
+        // Each state pays only for the header runs it draws inline: the
+        // closed feed for the channel prefix, the open screen for none —
+        // its timestamp lives in the column at the window's edge.
         int closedPrefix = 0;
         int openPrefix = 0;
         for (int index = 0; index < bodyIndex; index++) {

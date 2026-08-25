@@ -64,6 +64,16 @@ public final class ChatIconSheetTest {
         assertSameSize(ChatIconSheet.UNLOCKED, ChatIconSheet.UNLOCKED_HOVER);
         assertSameSize(ChatIconSheet.LOCKED, ChatIconSheet.LOCKED_HOVER);
         assertSameSize(ChatIconSheet.GRIP, ChatIconSheet.GRIP_HOVER);
+        assertSameSize(ChatIconSheet.HEART, ChatIconSheet.HEART_FAVORITE);
+        assertSameSize(ChatIconSheet.TOGGLE_1, ChatIconSheet.TOGGLE_1_HOVER);
+        assertSameSize(ChatIconSheet.TOGGLE_2, ChatIconSheet.TOGGLE_2_HOVER);
+        assertSameSize(ChatIconSheet.TOGGLE_3, ChatIconSheet.TOGGLE_3_HOVER);
+        assertSameSize(ChatIconSheet.TOGGLE_4, ChatIconSheet.TOGGLE_4_HOVER);
+        assertSameSize(ChatIconSheet.TOGGLE_5, ChatIconSheet.TOGGLE_5_HOVER);
+        // The chevron's end frames mirror each other, so the flip stays
+        // centred on the control from either side.
+        assertSameSize(ChatIconSheet.TOGGLE_1, ChatIconSheet.TOGGLE_5);
+        assertSameSize(ChatIconSheet.TOGGLE_2, ChatIconSheet.TOGGLE_4);
         // The tab controls share one square; the lock's body is the
         // width of the locked sprite.
         assertEquals(ChatIconSheet.CLOSE.getWidth(),

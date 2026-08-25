@@ -59,8 +59,12 @@ final class ChatWindowFrame {
      * still filling up sits on the lines it has.
      */
     double stackTop;
-    /** Message-line room of the box drawn this frame, in pixels. */
-    int room;
+    /** Message-line room of the box drawn this frame, in pixels,
+     *  measured so that {@code baseline - room} is itself a snapped
+     *  display position: the content top is snapped as one value rather
+     *  than as the difference of two snapped ones, so it never wobbles
+     *  against a moving baseline while a resize runs. */
+    double room;
     /**
      * The scroll offset the window was drawn at this frame, in lines.
      * The typing line reads it: the trailing strip belongs to the
@@ -215,11 +219,13 @@ final class ChatWindowFrame {
         this.scale = chatScale <= 0.0F ? 1.0F : chatScale;
         this.motionX = openingMotionX;
         this.motionY = openingMotionY;
-        this.room = box.room;
+        // The content top snapped as one value; see {@link #room}.
+        this.room = this.baseline
+                - snapToDisplayPixels(box.baseline() - box.room);
         this.renderedScrollLines = 0.0D;
         // Until the draw says otherwise the stack fills the box; an
         // empty window is corrected to its one placeholder line.
-        this.stackTop = this.baseline + this.motionY - box.room;
+        this.stackTop = this.baseline + this.motionY - this.room;
     }
 
     /**
@@ -237,7 +243,7 @@ final class ChatWindowFrame {
      * is asked several times for every window of every frame, and the
      * answer only changes when the window does.
      */
-    private static int displayScaleFactor() {
+    static int displayScaleFactor() {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft == null || minecraft.displayWidth <= 0
                 || minecraft.displayHeight <= 0) {
@@ -290,16 +296,16 @@ final class ChatWindowFrame {
     }
 
     /**
-     * Bottom of the tab row (screen y, fractional): the top of the drawn
-     * message stack, which the row stands directly on — its last pixel
-     * row is the window's top rule, and the first content pixel lies
-     * directly below it. A full window's stack ends on its box's own
-     * edge, so the row and the box top never drift apart whatever the
-     * chat scale is; a window with fewer lines than it has room for
-     * carries its row down onto them.
+     * Bottom of the tab row (screen y, fractional): the top margin above
+     * the drawn message stack — the row's last pixel row is the window's
+     * top rule, and the first content pixel lies the margin below it, so
+     * the topmost line keeps clear of the rule. A full window's stack
+     * ends on its box's own edge, so the row and the box top never drift
+     * apart whatever the chat scale is; a window with fewer lines than
+     * it has room for carries its row down onto them.
      */
     double tabRowBottom() {
-        return this.stackTop;
+        return this.stackTop - ChatWindowPlacement.HISTORY_TOP_MARGIN;
     }
 
     /** Whether the point is inside this window's box. */

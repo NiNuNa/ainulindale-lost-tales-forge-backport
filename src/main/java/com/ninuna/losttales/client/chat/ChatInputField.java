@@ -41,9 +41,16 @@ import org.lwjgl.opengl.GL11;
  * — {@code [i:Stone Sword]}, {@code [m:Northgate]} — is shown as the
  * preview it will be in chat: the bracket, the icon, the real name, in
  * the rarity's or marker's colour. The raw text is untouched — it is
- * what goes on the wire — so the token stays one editable run of
- * characters; the caret walks through it, clicking it lands on its
- * nearer edge, and everything drawn, measured and hit is one model.</p>
+ * what goes on the wire — but while it is edited a resolved token
+ * behaves as one character: the caret can stand on either side of it
+ * and never inside, Left and Right step across it whole, Backspace
+ * behind it and Delete before it remove all of it, a click lands on its
+ * nearer edge, and a selection takes it whole or not at all. All of
+ * that is one rule — {@link #snapOutsideTokens} — applied where every
+ * caret and selection movement already converges
+ * ({@link #setCursorPosition}, {@link #setSelectionPos}), so no key
+ * needs handling of its own; an incomplete or unresolvable token is
+ * plain text and edits as such.</p>
  *
  * <p>Two of vanilla's fields have no accessor — how far the text is
  * scrolled and the caret's blink — so they are read reflectively by both
@@ -256,13 +263,16 @@ final class ChatInputField extends GuiTextField {
         final ItemStack stack;
         final String markerIcon;
         final String name;
+        /** The brackets' and name's colour (white reads as ivory). */
         final int rgb;
+        /** The marker artwork's exact colour; white stays untinted. */
+        final int iconRgb;
         /** Display width: bracket, icon slot, name, closing bracket. */
         final int width;
 
         TokenPreview(int start, int end, ChatShareKind kind,
                      ItemStack stack, String markerIcon, String name,
-                     int rgb, int width) {
+                     int rgb, int iconRgb, int width) {
             this.start = start;
             this.end = end;
             this.kind = kind;
@@ -270,6 +280,7 @@ final class ChatInputField extends GuiTextField {
             this.markerIcon = markerIcon;
             this.name = name;
             this.rgb = rgb;
+            this.iconRgb = iconRgb;
             this.width = width;
         }
     }
@@ -319,12 +330,14 @@ final class ChatInputField extends GuiTextField {
             } else {
                 for (ChatShareCandidates.MarkerEntry entry : markers) {
                     if (entry.matchesToken(token)) {
-                        int rgb = ChatInlineIcons.markerRgb(
-                                entry.marker.getColorName());
                         result.add(preview(token, null,
                                 entry.marker.getIconName(),
                                 ChatShareTokenParser.plainName(
-                                        entry.marker.getName()), rgb));
+                                        entry.marker.getName()),
+                                ChatInlineIcons.markerTextRgb(
+                                        entry.marker.getColorName()),
+                                ChatInlineIcons.markerRgb(
+                                        entry.marker.getColorName())));
                         break;
                     }
                 }
@@ -339,19 +352,20 @@ final class ChatInputField extends GuiTextField {
         EnumChatFormatting formatting = rarity == null
                 || rarity.rarityColor == null
                 ? EnumChatFormatting.WHITE : rarity.rarityColor;
+        int rgb = LostTalesChatPresentation.rarityRgb(formatting);
         return preview(token, stack, "",
                 ChatShareTokenParser.plainName(stack.getDisplayName()),
-                LostTalesChatPresentation.rarityRgb(formatting));
+                rgb, rgb);
     }
 
     private TokenPreview preview(ChatShareTokenParser.Token token,
                                  ItemStack stack, String markerIcon,
-                                 String name, int rgb) {
+                                 String name, int rgb, int iconRgb) {
         int width = this.font.getStringWidth("[")
                 + ChatInlineIcons.SLOT_WIDTH
                 + this.font.getStringWidth(" " + name + "]");
         return new TokenPreview(token.start, token.end, token.kind, stack,
-                markerIcon, name, rgb, width);
+                markerIcon, name, rgb, iconRgb, width);
     }
 
     /**
@@ -447,7 +461,7 @@ final class ChatInputField extends GuiTextField {
                     size, 255);
         } else {
             ChatInlineIcons.drawMarker(minecraft, preview.markerIcon,
-                    preview.rgb, boxX, boxY, size, 255);
+                    preview.iconRgb, boxX, boxY, size, 255);
         }
         x += ChatInlineIcons.SLOT_WIDTH;
         String tail = " " + preview.name + "]";
@@ -561,6 +575,72 @@ final class ChatInputField extends GuiTextField {
             cursor++;
         }
         return text.length();
+    }
+
+    /**
+     * The nearest position outside every resolved token: a position
+     * strictly inside one moves to the edge the motion came from — past
+     * the whole token for a step that entered it — and, when there is no
+     * motion to read a direction from, to the nearer edge, the same rule
+     * a click uses. Positions already on a boundary stay exactly where
+     * they are.
+     */
+    private int snapOutsideTokens(int position, int from) {
+        List<TokenPreview> resolved = previewsFor(getText());
+        for (int index = 0; index < resolved.size(); index++) {
+            TokenPreview preview = resolved.get(index);
+            if (position > preview.start && position < preview.end) {
+                if (position > from) {
+                    return preview.end;
+                }
+                if (position < from) {
+                    return preview.start;
+                }
+                return (position - preview.start) * 2
+                        > preview.end - preview.start
+                        ? preview.end : preview.start;
+            }
+        }
+        return position;
+    }
+
+    @Override
+    public void setCursorPosition(int position) {
+        super.setCursorPosition(
+                snapOutsideTokens(position, getCursorPosition()));
+    }
+
+    @Override
+    public void setSelectionPos(int position) {
+        super.setSelectionPos(
+                snapOutsideTokens(position, getSelectionEnd()));
+    }
+
+    /**
+     * Backspace directly after a resolved token, and Delete directly
+     * before one, remove the whole token; with a selection present the
+     * selection is deleted exactly as vanilla deletes it, already
+     * token-whole because its ends can only rest on boundaries.
+     */
+    @Override
+    public void deleteFromCursor(int amount) {
+        int adjusted = amount;
+        if (getCursorPosition() == getSelectionEnd()) {
+            int cursor = getCursorPosition();
+            List<TokenPreview> resolved = previewsFor(getText());
+            for (int index = 0; index < resolved.size(); index++) {
+                TokenPreview preview = resolved.get(index);
+                if (adjusted < 0 && cursor == preview.end) {
+                    adjusted = preview.start - preview.end;
+                    break;
+                }
+                if (adjusted > 0 && cursor == preview.start) {
+                    adjusted = preview.end - preview.start;
+                    break;
+                }
+            }
+        }
+        super.deleteFromCursor(adjusted);
     }
 
     @Override

@@ -27,6 +27,7 @@ import com.ninuna.losttales.chat.emoji.ChatEmojiSuggester;
 import com.ninuna.losttales.chat.emoji.ChatEmoticonConverter;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
+import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
@@ -113,13 +114,6 @@ public final class LostTalesChatGui extends GuiChat {
     private static final int FIELD_HEIGHT = 12;
     /** How far outside its edge a window still answers to a resize. */
     private static final int RESIZE_BORDER = 4;
-    /**
-     * How close (in pixels) a resize preview must come to the size the
-     * drag started from for the axis to snap back to it, each axis on
-     * its own. Small enough that deliberate one-line resizes never
-     * fight it; the line stride is eleven.
-     */
-    private static final int RESIZE_START_SNAP = 4;
     /** How far along an edge from a corner still counts as that corner. */
     private static final int RESIZE_CORNER = 12;
     /** The send arrow is the rightmost bar control. */
@@ -132,6 +126,7 @@ public final class LostTalesChatGui extends GuiChat {
     private static final int LINK_HIGHLIGHT_RGB =
             LostTalesColors.rgb(LostTalesColors.HONEY);
     private static final String POPUP_SETTINGS = "settings";
+    private static final String POPUP_CHARACTERS = "characters";
     private static final String POPUP_RESTORE = "restore";
     private static final String ENTRY_MUTE = "mute";
     private static final String ENTRY_PINGS = "pings";
@@ -166,6 +161,17 @@ public final class LostTalesChatGui extends GuiChat {
             this.itemPicker, this.markerPicker, this.questPicker};
     /** Bar slot of the fold chevron, between the emoji and the inserts. */
     private int toolbarToggleIndex;
+    /** When the chevron last flipped; its frames play from here. */
+    private long toolbarToggleNanos;
+    /** The chevron's frames, pointing right through upright to left. */
+    private static final ChatIconSheet[] TOGGLE_FRAMES = {
+            ChatIconSheet.TOGGLE_1, ChatIconSheet.TOGGLE_2,
+            ChatIconSheet.TOGGLE_3, ChatIconSheet.TOGGLE_4,
+            ChatIconSheet.TOGGLE_5};
+    private static final ChatIconSheet[] TOGGLE_FRAMES_HOVER = {
+            ChatIconSheet.TOGGLE_1_HOVER, ChatIconSheet.TOGGLE_2_HOVER,
+            ChatIconSheet.TOGGLE_3_HOVER, ChatIconSheet.TOGGLE_4_HOVER,
+            ChatIconSheet.TOGGLE_5_HOVER};
     private final ChatEmojiSuggestionBox emojiSuggestions =
             new ChatEmojiSuggestionBox();
     private final ChatNameSuggestionBox nameSuggestions =
@@ -290,6 +296,7 @@ public final class LostTalesChatGui extends GuiChat {
         super.onGuiClosed();
         ClientChatChannelState.setDraft(
                 this.sent ? "" : this.inputField.getText());
+        ClientChatChannelViews.setScrollEasingSuppressed(false);
         stopTyping();
     }
 
@@ -505,26 +512,46 @@ public final class LostTalesChatGui extends GuiChat {
     /**
      * The chevron between the emoji button and the insert buttons —
      * pointing left while they are folded away (they open leftward),
-     * right while they are out (they fold back toward it). Lifted a
-     * pixel under the pointer like the buttons beside it.
+     * right while they are out (they fold back toward it), and playing
+     * the sheet's frames between the two when it is flipped, on the same
+     * duration and easing as the chat's other motion. Lifted a pixel
+     * under the pointer like the buttons beside it, with the sheet's
+     * hover state.
      */
     private void drawToolbarToggle(int barRight, int mouseX, int mouseY) {
         boolean collapsed = ChatWindowLayout.isToolbarCollapsed();
         boolean hovered = isInsideToolbarToggle(mouseX, mouseY, barRight);
-        int color = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.IVORY, hovered ? 255 : 0xB0);
         int left = toolbarToggleLeft(barRight);
-        int x = left + (ChatPickerPanel.BUTTON_SIZE - 3) / 2;
-        int y = barControlTop() + (ChatPickerPanel.BUTTON_SIZE - 5) / 2
+        ChatIconSheet icon = toggleFrame(collapsed, hovered);
+        int x = left + (ChatPickerPanel.BUTTON_SIZE - icon.getWidth()) / 2;
+        int y = barControlTop()
+                + (ChatPickerPanel.BUTTON_SIZE - icon.getHeight()) / 2
                 + (hovered ? 0 : 1);
-        for (int step = 0; step < 5; step++) {
-            int reach = step < 3 ? step : 4 - step;
-            int px = collapsed ? x + 2 - reach : x + reach;
-            drawRect(px, y + step, px + 1, y + step + 1, color);
-        }
+        icon.drawWithShadow(x, y, 255);
         this.regions.add(left, barControlTop(),
                 left + ChatPickerPanel.BUTTON_SIZE,
                 barControlTop() + ChatPickerPanel.BUTTON_SIZE);
+    }
+
+    /**
+     * The chevron frame for this moment: settled on the last frame of
+     * its direction, or partway through the flip that is still playing.
+     * With chat animations off it is always settled.
+     */
+    private ChatIconSheet toggleFrame(boolean collapsed, boolean hovered) {
+        float progress = 1.0F;
+        if (LostTalesConfig.enableChatAnimations
+                && this.toolbarToggleNanos > 0L) {
+            long duration = Math.max(1,
+                    LostTalesConfig.chatAnimationDurationMillis) * 1000000L;
+            progress = Math.min(1.0F,
+                    (System.nanoTime() - this.toolbarToggleNanos)
+                            / (float)duration);
+        }
+        int step = Math.round(LostTalesChatMotion.smoothStep(progress)
+                * (TOGGLE_FRAMES.length - 1));
+        int index = collapsed ? step : TOGGLE_FRAMES.length - 1 - step;
+        return (hovered ? TOGGLE_FRAMES_HOVER : TOGGLE_FRAMES)[index];
     }
 
     /** Folds the insert pickers' panels with their buttons. */
@@ -1442,8 +1469,11 @@ public final class LostTalesChatGui extends GuiChat {
                     partialTicks, (float)LostTalesConfig.guiBlurStrength);
         }
         // Mouse events reach mouseClickMove at tick rate; a live drag is
-        // re-read from the pointer every drawn frame so the window, the
-        // outline and the dock target stay under the cursor.
+        // re-read from the pointer every drawn frame so the window and
+        // the dock target stay under the cursor. While a resize runs the
+        // scroll follows its clamp rigidly instead of gliding after it.
+        ClientChatChannelViews.setScrollEasingSuppressed(
+                this.windowResize != null && this.windowResize.active);
         if (this.windowResize != null && this.windowResize.active) {
             updateResize(mouseX, mouseY);
         } else if (this.windowDrag != null && this.windowDrag.active) {
@@ -1462,7 +1492,7 @@ public final class LostTalesChatGui extends GuiChat {
         try {
             GL11.glTranslatef(this.barFracX, this.barFracY + entrance, 0.0F);
             drawInputBar(barRight);
-            drawAppearanceButton(mouseX, adjustedMouseY);
+            drawCharacterSelectionButton(mouseX, adjustedMouseY);
             drawIndicator(mouseX, adjustedMouseY);
             drawToolbarToggle(barRight, mouseX, adjustedMouseY);
             if (isInsideToolbarToggle(mouseX, adjustedMouseY, barRight)
@@ -1502,8 +1532,16 @@ public final class LostTalesChatGui extends GuiChat {
         } finally {
             GL11.glPopMatrix();
         }
+        // The pointer's exact GUI position: hover resolves against the
+        // same fractional coordinate the drawn cursor tip stands on, so
+        // a hitbox never reads shifted by the integer conversion's
+        // truncation.
+        float pointerX = (float)ChatWindowPlacement.preciseMouseX(
+                this.mc, this.width);
+        float pointerY = (float)ChatWindowPlacement.preciseMouseY(
+                this.mc, this.height);
         if (!this.regions.contains(mouseX, mouseY)) {
-            drawChatLineHover(mouseX, mouseY, mouseY);
+            drawChatLineHover(pointerX, pointerY, mouseX, mouseY);
         }
         drawNotice();
         ChatMentionCandidate hoveredCandidate = LostTalesConfig.enableChatPings
@@ -1516,11 +1554,24 @@ public final class LostTalesChatGui extends GuiChat {
                     hoveredCandidate, mouseX, mouseY,
                     this.width, this.height);
         } else if (!this.regions.contains(mouseX, mouseY)) {
-            LostTalesChatHoverCard.draw(this.mc, mouseX, mouseY,
+            LostTalesChatHoverCard.draw(this.mc, pointerX, pointerY,
                     this.width, this.height);
         }
         drawLinkHighlight();
         this.popup.draw(this.fontRendererObj, this.regions, mouseX, mouseY);
+        ChatPopupMenu.Entry hoveredLock =
+                this.popup.lockControlAt(mouseX, mouseY);
+        if (hoveredLock != null && !isDragging()) {
+            // The lock in the character selection menu answers with the
+            // same tip its states answer with everywhere else.
+            this.hoverTip = StatCollector.translateToLocal(
+                    ClientChatAppearances.isLocked()
+                            ? "gui.losttales.chat.character_selection.unlock"
+                            : "gui.losttales.chat.character_selection.lock");
+            this.hoverTipX = mouseX;
+            this.hoverTipY = mouseY;
+            drawHoverTip();
+        }
         if (this.tabDrag != null && this.tabDrag.active) {
             // The ghost follows the raw pointer at display-pixel
             // granularity like the cursor: laid out in whole pixels and
@@ -1545,9 +1596,6 @@ public final class LostTalesChatGui extends GuiChat {
             drawHoverTip();
         }
         updatePointerFeedback(mouseX, mouseY);
-        // Last of everything the chat draws: the edge being dragged is
-        // never covered by the window it belongs to.
-        drawResizePreview();
     }
 
     private static ChatWindowFrame frameFor(ChatWindow window) {
@@ -1610,6 +1658,8 @@ public final class LostTalesChatGui extends GuiChat {
             }
             drawTypingLine(window, frame, opening);
             LostTalesChatOverlayRenderer.drawBottomRule(this.mc, frame,
+                    opening);
+            LostTalesChatOverlayRenderer.drawWindowLeftEdge(this.mc, frame,
                     opening);
         }
         this.hoveredRowHit = hoveredHit;
@@ -1799,6 +1849,12 @@ public final class LostTalesChatGui extends GuiChat {
                     y + ChatWindowPlacement.INPUT_HEIGHT,
                     LostTalesSkyrimUiStyle.withAlpha(
                             LostTalesSkyrimUiStyle.PLUM_BLACK, 0x80));
+            // The frame edges beside and under the bar are the bar's
+            // own, exactly as on the active bar, so they ride this bar's
+            // entrance too.
+            drawBarLeftEdge(frame, x, y);
+            LostTalesChatOverlayRenderer.drawBarBottomEdge(x, x + width,
+                    y + ChatWindowPlacement.INPUT_HEIGHT - 1, 255);
             ChatTab front = ChatWindowFrame.activeTab(window,
                     ChatWindowFrame.visibleTabs(window));
             if (front != null) {
@@ -1876,31 +1932,54 @@ public final class LostTalesChatGui extends GuiChat {
                 this.barTop + ChatWindowPlacement.INPUT_HEIGHT,
                 LostTalesSkyrimUiStyle.withAlpha(
                         LostTalesSkyrimUiStyle.PLUM_BLACK, 0x80));
+        // The window's frame edges beside and under the bar are the
+        // bar's own: drawn over its fill, so nothing darkens them, and
+        // arriving with the bar's fly-in.
+        drawBarLeftEdge(activeFrame(), this.barLeft, this.barTop);
+        LostTalesChatOverlayRenderer.drawBarBottomEdge(this.barLeft,
+                barRight, this.barTop + ChatWindowPlacement.INPUT_HEIGHT
+                        - 1, 255);
         this.inputField.drawTextBox();
+    }
+
+    /**
+     * The bar's stretch of the window's left frame edge, on the same
+     * ramp as the window's own stretch above it.
+     */
+    private static void drawBarLeftEdge(ChatWindowFrame frame, int barLeft,
+                                        int barTop) {
+        if (frame == null) {
+            return;
+        }
+        float rampBottom = barTop + ChatWindowPlacement.INPUT_HEIGHT - 1;
+        LostTalesChatOverlayRenderer.drawLeftEdgeSegment(barLeft, barTop,
+                rampBottom, rampBottom,
+                (float)(frame.boxBottom - frame.boxTop) - 1.0F, 255);
     }
 
     /**
      * Hover cards for item, text, and achievement components reproduced
      * from vanilla, plus the tooltips of shared items and markers, drawn
-     * after the popups so they layer above everything in the stack.
+     * after the popups so they layer above everything in the stack. The
+     * hit position is the pointer's fractional coordinate; the tooltip
+     * itself anchors on the whole-pixel one.
      */
-    private void drawChatLineHover(int mouseX, int hitMouseY,
-                                   int drawMouseY) {
+    private void drawChatLineHover(float hitX, float hitY,
+                                   int drawMouseX, int drawMouseY) {
         LostTalesChatOverlayRenderer.Hit hovered =
-                LostTalesChatOverlayRenderer.hitAt(
-                        this.mc, mouseX, hitMouseY);
+                LostTalesChatOverlayRenderer.hitAt(this.mc, hitX, hitY);
         if (hovered == null) {
             return;
         }
         ChatShowcaseMarker.Data share =
                 ChatShowcaseMarker.decode(hovered.component);
         if (share != null) {
-            drawShareTooltip(share, mouseX, drawMouseY);
+            drawShareTooltip(share, drawMouseX, drawMouseY);
             return;
         }
         if (hovered.component.getChatStyle().getChatHoverEvent() != null) {
             drawComponentHoverCard(hovered.component.getChatStyle()
-                    .getChatHoverEvent(), mouseX, drawMouseY);
+                    .getChatHoverEvent(), drawMouseX, drawMouseY);
             GL11.glDisable(GL11.GL_LIGHTING);
         }
     }
@@ -1992,18 +2071,22 @@ public final class LostTalesChatGui extends GuiChat {
         String closedPopupKind = "";
         if (this.popup.isOpen()) {
             closedPopupKind = this.popup.kind();
+            if (button == 0
+                    && this.popup.lockControlAt(mouseX, mouseY) != null) {
+                // The lock is a switch, not a pick: the menu stays open,
+                // its rows refreshed, so the padlock answers in place.
+                ClientChatAppearances.toggleLocked(
+                        ClientChatChannelState.getSelected());
+                this.popup.replaceEntries(characterSelectionEntries(),
+                        this.fontRendererObj, this.width, this.height);
+                return;
+            }
             ChatPopupMenu.Entry entry = this.popup.entryAt(mouseX, mouseY);
             boolean inside = this.popup.contains(mouseX, mouseY);
             if (entry != null && button == 0) {
                 handlePopupEntry(entry);
             }
             this.popup.close();
-            if (entry != null && button == 0
-                    && "appearance:lock".equals(entry.id)) {
-                // The lock is a switch, not a pick: the menu stays open,
-                // its rows refreshed, so the padlock answers in place.
-                openAppearancePopup();
-            }
             if (inside) {
                 return;
             }
@@ -2084,11 +2167,11 @@ public final class LostTalesChatGui extends GuiChat {
         if (button == 0 && handleBarClick(mouseX, mouseY)) {
             return;
         }
-        if (button == 0 && isInsideAppearanceButton(mouseX, adjustedMouseY)) {
+        if (button == 0 && isInsideCharacterButton(mouseX, adjustedMouseY)) {
             // A click on the button while its own menu was open has just
             // closed it above; only then does the click not reopen it.
-            if (!"appearance".equals(closedPopupKind)) {
-                openAppearancePopup();
+            if (!POPUP_CHARACTERS.equals(closedPopupKind)) {
+                openCharacterSelectionMenu();
             }
             return;
         }
@@ -2108,6 +2191,7 @@ public final class LostTalesChatGui extends GuiChat {
             closeInsertPickers();
             ChatWindowLayout.setToolbarCollapsed(
                     !ChatWindowLayout.isToolbarCollapsed());
+            this.toolbarToggleNanos = System.nanoTime();
             return;
         }
         if (button == 0) {
@@ -2157,9 +2241,11 @@ public final class LostTalesChatGui extends GuiChat {
     /** Component clicks on the lines, then the input field's own click. */
     private void clickLines(int mouseX, int mouseY, int adjustedMouseY,
                             int button) {
+        // Whole-pixel press coordinates sample the pixel's centre, the
+        // best estimate of where inside it the pointer actually was.
         if (button == 0 && handleComponentClick(
                 LostTalesChatOverlayRenderer.hitAt(
-                        this.mc, mouseX, mouseY))) {
+                        this.mc, mouseX + 0.5F, mouseY + 0.5F))) {
             return;
         }
         // GuiChat's own component handling relies on GuiNewChat's 9px hit
@@ -2290,9 +2376,11 @@ public final class LostTalesChatGui extends GuiChat {
 
     /**
      * A window being resized by one of its edges or corners. The window
-     * keeps its anchors — the edges the drag does not touch — and only
-     * an outline follows the pointer: the size is applied on release,
-     * once, because a width change lays the whole history out again.
+     * keeps its anchors — the edges the drag does not touch — and the
+     * window itself follows the pointer: the temporary size is written
+     * into the layout without persisting it, so the history reflows and
+     * redraws live, the file is written once on release, and Escape
+     * puts the remembered dimensions back exactly.
      */
     private static final class WindowResize {
         final String windowId;
@@ -2302,6 +2390,11 @@ public final class LostTalesChatGui extends GuiChat {
         final double startRight;
         final double startTop;
         final double startBottom;
+        /** The stored (committed) state to restore when it is cancelled. */
+        final double storedLines;
+        final int storedWidth;
+        final double storedOffsetX;
+        final double storedOffsetY;
         /** Pointer's offset from the edge it took hold of. */
         final double grabX;
         final double grabY;
@@ -2318,7 +2411,8 @@ public final class LostTalesChatGui extends GuiChat {
 
         WindowResize(String windowId, ResizeEdge edge, double left,
                      double right, double top, double bottom, double grabX,
-                     double grabY, int pressX, int pressY, double lines) {
+                     double grabY, int pressX, int pressY, double lines,
+                     ChatWindow window) {
             this.windowId = windowId;
             this.edge = edge;
             this.startLeft = left;
@@ -2334,6 +2428,10 @@ public final class LostTalesChatGui extends GuiChat {
             this.pressX = pressX;
             this.pressY = pressY;
             this.lines = lines;
+            this.storedLines = window.getMaxLines();
+            this.storedWidth = window.getWidth();
+            this.storedOffsetX = window.getOffsetX();
+            this.storedOffsetY = window.getOffsetY();
         }
     }
 
@@ -2499,61 +2597,6 @@ public final class LostTalesChatGui extends GuiChat {
         }
     }
 
-    /**
-     * The outline of the size the pointer is asking for, in the chat's
-     * own ivory. Drawn last of everything the chat puts on screen, so no
-     * part of the window it belongs to — its bar least of all — covers
-     * the edge the player is dragging.
-     */
-    private void drawResizePreview() {
-        WindowResize resize = this.windowResize;
-        if (resize == null) {
-            return;
-        }
-        // Shown from the press, so the size the window would take is
-        // there before the pointer has travelled anywhere. The rules lie
-        // just outside the box, so no edge of the window pokes out past
-        // the outline while it is being dragged. The edges follow the
-        // pointer at display-pixel granularity, like the cursor and the
-        // window itself, so nothing steps by whole GUI pixels.
-        double left = ChatWindowFrame.snapToDisplayPixels(resize.left);
-        double right = ChatWindowFrame.snapToDisplayPixels(resize.right);
-        double top = ChatWindowFrame.snapToDisplayPixels(resize.top);
-        double bottom = ChatWindowFrame.snapToDisplayPixels(resize.bottom);
-        int color = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.IVORY, 0xC0);
-        fillFractional(left - 1, top - 1, right + 1, top, color);
-        fillFractional(left - 1, bottom, right + 1, bottom + 1, color);
-        fillFractional(left - 1, top, left, bottom, color);
-        fillFractional(right, top, right + 1, bottom, color);
-    }
-
-    /** A flat quad at fractional edges; {@code drawRect} takes whole ones. */
-    private static void fillFractional(double left, double top, double right,
-                                       double bottom, int argb) {
-        int alpha = argb >>> 24;
-        if (alpha <= 0 || right <= left || bottom <= top) {
-            return;
-        }
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_BLEND);
-        OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
-                GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
-        GL11.glColor4f((argb >> 16 & 0xFF) / 255.0F,
-                (argb >> 8 & 0xFF) / 255.0F, (argb & 0xFF) / 255.0F,
-                alpha / 255.0F);
-        Tessellator tessellator = Tessellator.instance;
-        tessellator.startDrawingQuads();
-        tessellator.addVertex(left, bottom, 0.0D);
-        tessellator.addVertex(right, bottom, 0.0D);
-        tessellator.addVertex(right, top, 0.0D);
-        tessellator.addVertex(left, top, 0.0D);
-        tessellator.draw();
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glDisable(GL11.GL_BLEND);
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-    }
-
     /** Arms a resize from the pointer's position on an edge. */
     private WindowResize resizeFrom(ResizeTarget target, ChatWindow window,
                                     int mouseX, int mouseY) {
@@ -2571,16 +2614,18 @@ public final class LostTalesChatGui extends GuiChat {
                 pointerX - (target.edge.fromLeft ? left : right),
                 pointerY - (target.edge.fromTop ? top : bottom),
                 mouseX, mouseY,
-                ChatWindowPlacement.currentLines(window, this.mc));
+                ChatWindowPlacement.currentLines(window, this.mc), window);
     }
 
     /**
-     * Follows the pointer with the outline: the edges the drag holds
-     * move, the opposite ones stay, and neither size may leave the
+     * Follows the pointer with the window itself: the edges the drag
+     * holds move, the opposite ones stay, and neither size may leave the
      * screen or fall below what a window needs to be readable. Height is
      * as continuous as width — the window keeps the pixel height it is
      * dragged to and clips its topmost line rather than snapping to a
-     * whole one.
+     * whole one. The size and position are written into the layout
+     * without persisting, so the window reflows live and nothing is
+     * saved or synchronized until the drag commits.
      */
     private void updateResize(int mouseX, int mouseY) {
         WindowResize resize = this.windowResize;
@@ -2607,64 +2652,62 @@ public final class LostTalesChatGui extends GuiChat {
                 resize.right = Math.min(this.width - margin, Math.max(
                         resize.startLeft + minWidth, pointerX));
             }
-            // Back within a few pixels of the width the drag started
-            // from, the moving edge snaps home, so a nudge that was
-            // never meant as a resize undoes itself exactly.
-            if (Math.abs(resize.right - resize.left
-                    - (resize.startRight - resize.startLeft))
-                    <= RESIZE_START_SNAP) {
-                resize.left = resize.startLeft;
-                resize.right = resize.startRight;
-            }
         }
         resize.lines = ChatWindowPlacement.currentLines(window, this.mc);
         resize.top = resize.startTop;
         resize.bottom = resize.startBottom;
         if (resize.edge.vertical) {
-            // The margin bounds the height the way it bounds the width.
+            // The screen bounds the height the way it bounds the width.
             double room = resize.edge.fromTop
                     ? resize.startBottom - margin
                     : this.height - margin - resize.startTop;
             double height = Math.min(room, resize.edge.fromTop
                     ? resize.startBottom - pointerY
                     : pointerY - resize.startTop);
-            // The same snap on this axis, independent of the other: a
-            // corner drag can give one axis back and keep the other.
-            if (Math.abs(height - (resize.startBottom - resize.startTop))
-                    <= RESIZE_START_SNAP) {
-                height = resize.startBottom - resize.startTop;
-            }
-            resize.lines = Math.max(ChatWindowLayout.MIN_WINDOW_LINES,
-                    Math.min(ChatWindowLayout.MAX_WINDOW_LINES,
-                            ChatWindowPlacement.linesForHeight(height,
-                                    this.mc)));
-            int applied = ChatWindowPlacement.heightForLines(resize.lines,
+            // The dragged edge follows the pointer continuously between
+            // the smallest and largest window; only the far edge is laid
+            // on the rounded room, so nothing under the pointer steps or
+            // jitters while the drag runs.
+            double stride = ChatWindowPlacement.lineStride(this.mc);
+            double chrome = ChatWindowPlacement.rowHeight(this.mc)
+                    + ChatWindowPlacement.HISTORY_TOP_MARGIN
+                    + ChatWindowPlacement.barHeight(this.mc);
+            height = Math.max(chrome
+                            + ChatWindowLayout.MIN_WINDOW_LINES * stride,
+                    Math.min(height, chrome
+                            + ChatWindowLayout.MAX_WINDOW_LINES * stride));
+            resize.lines = ChatWindowPlacement.linesForHeight(height,
                     this.mc);
             if (resize.edge.fromTop) {
-                resize.top = resize.startBottom - applied;
+                resize.top = resize.startBottom - height;
             } else {
-                resize.bottom = resize.startTop + applied;
+                resize.bottom = resize.startTop + height;
             }
         }
+        applyLiveResize(resize, window);
     }
 
-    /** Gives the window the size the outline shows and writes it down. */
-    private void applyResize(WindowResize resize) {
-        ChatWindow window = ChatWindowLayout.window(resize.windowId);
-        if (window == null) {
-            return;
-        }
+    /**
+     * Gives the window the dimensions under the pointer, unpersisted, so
+     * the next frame draws and reflows the real window at them.
+     */
+    private void applyLiveResize(WindowResize resize, ChatWindow window) {
         if (resize.edge.vertical) {
             ChatWindowLayout.setWindowLines(resize.windowId, resize.lines,
-                    true);
+                    false);
         }
         // The width goes first: a window's stored position is a percent
         // of the travel its own width leaves, so the percent has to be
         // worked out against the width the window is about to have.
         if (resize.edge.horizontal) {
-            ChatWindowPlacement.applyWindowWidth(this.mc, window,
-                    ChatWindowPlacement.chatWidthForBox(
-                            resize.right - resize.left, this.mc));
+            if (ChatWindowLines.isAvailable()) {
+                ChatWindowLayout.setWindowWidth(resize.windowId,
+                        ChatWindowPlacement.chatWidthForBox(
+                                resize.right - resize.left, this.mc),
+                        false);
+            } else {
+                ChatWindowLines.logUnavailableOnce();
+            }
         }
         // The window keeps the corner the drag did not hold: its left
         // edge and its baseline are what the layout stores, so a drag
@@ -2676,7 +2719,32 @@ public final class LostTalesChatGui extends GuiChat {
                 ChatWindowPlacement.windowPercentX(window, resize.left,
                         this.mc, this.width),
                 ChatWindowPlacement.windowPercentY(baseline, this.mc,
-                        this.height), true);
+                        this.height), false);
+        updateInputBounds();
+    }
+
+    /** Writes the dimensions the drag ends on down, once. */
+    private void commitResize(WindowResize resize) {
+        ChatWindow window = ChatWindowLayout.window(resize.windowId);
+        if (window == null) {
+            return;
+        }
+        applyLiveResize(resize, window);
+        ChatWindowLayout.persist();
+    }
+
+    /** Puts the dimensions from before the resize back, cancelling it. */
+    private void restoreResize(WindowResize resize) {
+        ChatWindow window = ChatWindowLayout.window(resize.windowId);
+        if (window == null) {
+            return;
+        }
+        ChatWindowLayout.setWindowLines(resize.windowId, resize.storedLines,
+                false);
+        ChatWindowLayout.setWindowWidth(resize.windowId, resize.storedWidth,
+                false);
+        ChatWindowLayout.setPosition(resize.windowId, resize.storedOffsetX,
+                resize.storedOffsetY, false);
         updateInputBounds();
     }
 
@@ -2688,7 +2756,16 @@ public final class LostTalesChatGui extends GuiChat {
 
     private void cancelDrags() {
         this.tabDrag = null;
-        this.windowResize = null;
+        if (this.windowResize != null) {
+            WindowResize resize = this.windowResize;
+            this.windowResize = null;
+            if (resize.active) {
+                // Escape means "as it was": the unpersisted live
+                // dimensions give way to the stored ones, and nothing
+                // is written.
+                restoreResize(resize);
+            }
+        }
         if (this.windowDrag != null) {
             if (this.windowDrag.active) {
                 ChatWindowLayout.persist();
@@ -3133,8 +3210,8 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     private void handlePopupEntry(ChatPopupMenu.Entry entry) {
-        if ("appearance".equals(this.popup.kind())) {
-            handleAppearanceEntry(entry);
+        if (POPUP_CHARACTERS.equals(this.popup.kind())) {
+            handleCharacterSelectionEntry(entry);
             return;
         }
         if (POPUP_SETTINGS.equals(this.popup.kind())) {
@@ -3241,7 +3318,7 @@ public final class LostTalesChatGui extends GuiChat {
                 WindowResize resize = this.windowResize;
                 this.windowResize = null;
                 if (resize.active) {
-                    applyResize(resize);
+                    commitResize(resize);
                 }
             }
             if (this.windowDrag != null) {
@@ -3333,7 +3410,7 @@ public final class LostTalesChatGui extends GuiChat {
                                    ChatWindowPlacement.Anchor anchor) {
         int margin = HudPlacementLayout.SCREEN_MARGIN;
         int width = ChatWindowPlacement.windowWidth(window, this.mc);
-        int height = ChatWindowPlacement.currentHeight(window, this.mc);
+        double height = ChatWindowPlacement.currentHeight(window, this.mc);
         int barHeight = ChatWindowPlacement.barHeight(this.mc);
         double top = anchor.baseline - (height - barHeight);
         double bottom = anchor.baseline + barHeight;
@@ -3696,35 +3773,37 @@ public final class LostTalesChatGui extends GuiChat {
                 top + ChatWindowPlacement.INPUT_HEIGHT);
     }
 
-    /** Left edge of the appearance button, the bar's first control. */
-    private int appearanceButtonLeft() {
+    /** Left edge of the character-selection button, the bar's first
+     *  control. */
+    private int characterButtonLeft() {
         return this.barLeft + 2;
     }
 
-    /** Left edge of the channel indicator, past the appearance button. */
+    /** Left edge of the channel indicator, past the character button. */
     private int indicatorLeft() {
         return this.barLeft + 2 + ChatPickerPanel.BUTTON_SIZE + 2;
     }
 
-    private boolean isInsideAppearanceButton(int mouseX, int mouseY) {
-        int left = appearanceButtonLeft();
+    private boolean isInsideCharacterButton(int mouseX, int mouseY) {
+        int left = characterButtonLeft();
         int top = barControlTop();
         return mouseX >= left && mouseX < left + ChatPickerPanel.BUTTON_SIZE
                 && mouseY >= top && mouseY < top + ChatPickerPanel.BUTTON_SIZE;
     }
 
     /**
-     * The appearance button: the head of whoever the selected tab would
-     * currently speak as, lifted a pixel under the pointer like the
-     * picker buttons, with the padlock in its corner while the choice is
-     * locked. Clicking opens the appearance menu.
+     * The character-selection button: the head of whoever the selected
+     * tab would currently speak as, over the project's flat shadow like
+     * every other head in the chat, lifted a pixel under the pointer
+     * like the picker buttons, with the padlock in its corner while the
+     * choice is locked. Clicking opens the character selection menu.
      */
-    private void drawAppearanceButton(int mouseX, int mouseY) {
-        int left = appearanceButtonLeft();
+    private void drawCharacterSelectionButton(int mouseX, int mouseY) {
+        int left = characterButtonLeft();
         int top = barControlTop();
         boolean open = this.popup.isOpen()
-                && "appearance".equals(this.popup.kind());
-        boolean hovered = isInsideAppearanceButton(mouseX, mouseY);
+                && POPUP_CHARACTERS.equals(this.popup.kind());
+        boolean hovered = isInsideCharacterButton(mouseX, mouseY);
         int lift = open || hovered ? 1 : 0;
         ClientChatAppearances.Appearance shown =
                 ClientChatAppearances.effectiveFor(
@@ -3733,8 +3812,13 @@ public final class LostTalesChatGui extends GuiChat {
                 : this.mc.thePlayer.getUniqueID();
         if (self != null) {
             float headX = left + 2;
-            float headY = top + 2 - lift;
-            if (shown.account || shown.skinId.length() == 0) {
+            // A pixel above the button's arithmetic centre: the head is
+            // one row taller than the text caps beside it, so this is
+            // what reads as level with them.
+            float headY = top + 1 - lift;
+            boolean account = shown.account || shown.skinId.length() == 0;
+            drawButtonHeadShadow(self, account, shown.skinId, headX, headY);
+            if (account) {
                 LostTalesCharacterHeadIconRenderer.drawAccountHead(
                         this.mc, self, headX, headY, 8.0F, 1.0F, 1.0F);
             } else {
@@ -3752,7 +3836,7 @@ public final class LostTalesChatGui extends GuiChat {
         }
         if (hovered && !isDragging()) {
             this.hoverTip = StatCollector.translateToLocal(
-                    "gui.losttales.chat.appearance.tip");
+                    "gui.losttales.chat.character_selection.tip");
             this.hoverTipX = mouseX;
             this.hoverTipY = mouseY;
         }
@@ -3760,40 +3844,73 @@ public final class LostTalesChatGui extends GuiChat {
                 top + ChatPickerPanel.BUTTON_SIZE);
     }
 
-    /** The appearance menu, anchored above its button. */
-    private void openAppearancePopup() {
-        this.popup.open("appearance", null, appearanceEntries(),
-                this.fontRendererObj, appearanceButtonLeft(),
+    /**
+     * The head's flat silhouette shadow, one pixel down-right at half
+     * opacity: the treatment every comparable head in the chat carries.
+     */
+    private void drawButtonHeadShadow(UUID self, boolean account,
+                                      String skinId, float x, float y) {
+        LostTalesSilhouetteRenderState.begin(LostTalesChatVisualStyle.SHADOW);
+        try {
+            if (account) {
+                LostTalesCharacterHeadIconRenderer.drawTintedAccountHeadBase(
+                        this.mc, self,
+                        x + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                        y + LostTalesChatVisualStyle.SHADOW_OFFSET, 8.0F,
+                        1.0F, 1.0F, 1.0F,
+                        LostTalesChatVisualStyle.SHADOW_OPACITY);
+            } else {
+                LostTalesCharacterHeadIconRenderer.drawTintedSnapshotHeadBase(
+                        this.mc, self, skinId,
+                        x + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                        y + LostTalesChatVisualStyle.SHADOW_OFFSET, 8.0F,
+                        1.0F, 1.0F, 1.0F,
+                        LostTalesChatVisualStyle.SHADOW_OPACITY);
+            }
+        } finally {
+            LostTalesSilhouetteRenderState.end();
+        }
+    }
+
+    /** The character selection menu, anchored above its button. */
+    private void openCharacterSelectionMenu() {
+        this.popup.open(POPUP_CHARACTERS, null, characterSelectionEntries(),
+                this.fontRendererObj, characterButtonLeft(),
                 barControlTop() - 2, this.width, this.height);
     }
 
-    private List<ChatPopupMenu.Entry> appearanceEntries() {
+    /**
+     * The menu's rows: the selected character on top — the identity the
+     * tab currently speaks as, with the lock control beside it — then
+     * the account and every roster character to choose from.
+     */
+    private List<ChatPopupMenu.Entry> characterSelectionEntries() {
         ChatTab selected = ClientChatChannelState.getSelected();
         UUID self = this.mc.thePlayer == null ? null
                 : this.mc.thePlayer.getUniqueID();
         boolean locked = ClientChatAppearances.isLocked();
+        ClientChatAppearances.Appearance current =
+                ClientChatAppearances.effectiveFor(selected);
         List<ChatPopupMenu.Entry> entries =
                 new ArrayList<ChatPopupMenu.Entry>();
-        entries.add(new ChatPopupMenu.Entry("appearance:lock",
-                StatCollector.translateToLocal(locked
-                        ? "gui.losttales.chat.appearance.unlock"
-                        : "gui.losttales.chat.appearance.lock"))
-                .withSprite(locked ? ChatIconSheet.LOCKED
-                        : ChatIconSheet.UNLOCKED));
+        entries.add(ChatPopupMenu.Entry.passive(current.name)
+                .withHead(self, current.account ? "" : current.skinId)
+                .withLockControl(locked));
         entries.add(ChatPopupMenu.Entry.header(
                 StatCollector.translateToLocal(
-                        "gui.losttales.chat.appearance.account")));
-        entries.add(appearanceEntry("appearance:account",
+                        "gui.losttales.chat.character_selection.account")));
+        entries.add(characterEntry("characters:account",
                 ClientChatAppearances.accountAppearance(), selected, self));
         List<ClientChatAppearances.Appearance> characters =
                 ClientChatAppearances.characterAppearances();
         if (!characters.isEmpty()) {
             entries.add(ChatPopupMenu.Entry.header(
                     StatCollector.translateToLocal(
-                            "gui.losttales.chat.appearance.characters")));
+                            "gui.losttales.chat.character_selection"
+                                    + ".characters")));
             for (ClientChatAppearances.Appearance appearance : characters) {
-                entries.add(appearanceEntry(
-                        "appearance:char:" + appearance.characterId,
+                entries.add(characterEntry(
+                        "characters:char:" + appearance.characterId,
                         appearance, selected, self));
             }
         }
@@ -3802,10 +3919,10 @@ public final class LostTalesChatGui extends GuiChat {
         if (!lore.isEmpty()) {
             entries.add(ChatPopupMenu.Entry.header(
                     StatCollector.translateToLocal(
-                            "gui.losttales.chat.appearance.lore")));
+                            "gui.losttales.chat.character_selection.lore")));
             for (ClientChatAppearances.Appearance appearance : lore) {
-                entries.add(appearanceEntry(
-                        "appearance:char:" + appearance.characterId,
+                entries.add(characterEntry(
+                        "characters:char:" + appearance.characterId,
                         appearance, selected, self));
             }
         }
@@ -3814,7 +3931,7 @@ public final class LostTalesChatGui extends GuiChat {
 
     /** One choosable identity: its head, its name, and the mention honey
      *  as the swatch of the one the tab currently speaks as. */
-    private ChatPopupMenu.Entry appearanceEntry(
+    private ChatPopupMenu.Entry characterEntry(
             String id, ClientChatAppearances.Appearance appearance,
             ChatTab selected, UUID self) {
         boolean effective = ClientChatAppearances.isEffective(
@@ -3824,24 +3941,19 @@ public final class LostTalesChatGui extends GuiChat {
                 null).withHead(self, appearance.skinId);
     }
 
-    private void handleAppearanceEntry(ChatPopupMenu.Entry entry) {
-        if ("appearance:lock".equals(entry.id)) {
-            ClientChatAppearances.toggleLocked(
-                    ClientChatChannelState.getSelected());
-            return;
-        }
-        if ("appearance:account".equals(entry.id)) {
+    private void handleCharacterSelectionEntry(ChatPopupMenu.Entry entry) {
+        if ("characters:account".equals(entry.id)) {
             ClientChatAppearances.select(
                     ClientChatAppearances.accountAppearance());
             return;
         }
-        if (!entry.id.startsWith("appearance:char:")) {
+        if (!entry.id.startsWith("characters:char:")) {
             return;
         }
         UUID characterId;
         try {
             characterId = UUID.fromString(
-                    entry.id.substring("appearance:char:".length()));
+                    entry.id.substring("characters:char:".length()));
         } catch (IllegalArgumentException ignored) {
             return;
         }
@@ -4032,11 +4144,24 @@ public final class LostTalesChatGui extends GuiChat {
                 + "/" + ChatMessageValidator.MAX_CHARACTERS;
     }
 
+    /**
+     * The counter's scale, snapped so every font pixel is a whole number
+     * of display pixels: as close to the wanted three quarters as the
+     * display can draw without mixed-size pixels — half at GUI scale 2,
+     * two thirds at 3, three quarters at 4, and full size at 1, which
+     * has no smaller whole step at all.
+     */
+    private float counterScale() {
+        int factor = ChatWindowFrame.displayScaleFactor();
+        return Math.max(1, (int)Math.floor(COUNTER_SCALE * factor))
+                / (float)factor;
+    }
+
     private int counterLeft(int barRight) {
         String text = counterText();
         int width = text.length() == 0 ? 0
                 : (int)Math.ceil(this.fontRendererObj.getStringWidth(text)
-                        * COUNTER_SCALE) + 3;
+                        * counterScale()) + 3;
         return controlsLeft(barRight) - width;
     }
 
@@ -4049,16 +4174,17 @@ public final class LostTalesChatGui extends GuiChat {
         boolean full = ChatMessageValidator.visibleLength(
                 this.inputField.getText())
                 >= ChatMessageValidator.MAX_CHARACTERS;
-        // Drawn at three quarters: a footnote beside the arrow, centred
-        // on the bar like the full-size text was.
+        // A footnote beside the arrow, centred on the bar like the
+        // full-size text was.
+        float scale = counterScale();
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(counterLeft(barRight), barTextTop() + 1,
                     0.0F);
-            GL11.glScalef(COUNTER_SCALE, COUNTER_SCALE, 1.0F);
+            GL11.glScalef(scale, scale, 1.0F);
             LostTalesChatVisualStyle.drawColored(this.fontRendererObj, text,
                     0, 0, full ? COUNTER_FULL_RGB : COUNTER_RGB, 255,
-                    COUNTER_SCALE);
+                    scale);
         } finally {
             GL11.glPopMatrix();
         }

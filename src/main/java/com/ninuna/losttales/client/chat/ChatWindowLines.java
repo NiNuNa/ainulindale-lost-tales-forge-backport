@@ -78,7 +78,14 @@ final class ChatWindowLines {
         }
         float scale = chat.func_146244_h();
         boolean colours = LostTalesChatVisualStyle.chatColoursEnabled();
-        int wrapWidth = ChatWindowPlacement.wrapWidth(chatWidth, scale);
+        // The timestamp column at the window's left edge comes out of
+        // the room the messages may wrap to, so a line never runs out
+        // under the window's right edge to pay for it.
+        ChatTimestampColumn columns =
+                ChatTimestampColumn.current(minecraft.fontRenderer);
+        int wrapWidth = Math.max(1,
+                ChatWindowPlacement.wrapWidth(chatWidth, scale)
+                        - (columns.messageX() - 2));
         Cached cached = CACHE.get(window.getId());
         if (cached == null || !cached.describes(wrapWidth, colours, filter)) {
             cached = new Cached(wrapWidth, colours, filter);

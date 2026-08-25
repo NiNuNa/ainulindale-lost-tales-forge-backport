@@ -29,7 +29,7 @@ public final class DiscordMessageSanitizerTest {
     @Test
     public void longMessagesAreCutToTheChatLimit() {
         StringBuilder text = new StringBuilder();
-        for (int index = 0; index < 40; index++) {
+        for (int index = 0; index < 80; index++) {
             text.append("word ");
         }
         String cut = DiscordMessageSanitizer.inbound(text.toString(), null);

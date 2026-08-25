@@ -1,11 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.util.StatCollector;
 
 /**
@@ -87,11 +85,16 @@ final class ChatEmojiPicker extends ChatPickerPanel {
                 y + (CELL_SIZE - ChatInlineIcons.CONTENT_SIZE) / 2.0F
                         - (hovered ? 1.0F : 0.0F),
                 ChatInlineIcons.CONTENT_SIZE, alpha);
+        // The favourite heart in the cell's corner: filled while the
+        // emoji is one, plain under the pointer as the control a
+        // right-click toggles.
         if (ChatEmojiUsageStore.isFavorite(emoji)) {
-            Gui.drawRect(x + CELL_SIZE - 4, y + 2,
-                    x + CELL_SIZE - 2, y + 4,
-                    (alpha << 24) | LostTalesSkyrimUiStyle.rgb(
-                            LostTalesSkyrimUiStyle.GOLD));
+            ChatIconSheet.HEART_FAVORITE.drawWithShadow(x + CELL_SIZE
+                    - ChatIconSheet.HEART_FAVORITE.getWidth() - 1, y + 1,
+                    alpha);
+        } else if (hovered) {
+            ChatIconSheet.HEART.drawWithShadow(x + CELL_SIZE
+                    - ChatIconSheet.HEART.getWidth() - 1, y + 1, alpha);
         }
     }
 

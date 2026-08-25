@@ -42,11 +42,11 @@ final class LostTalesChatHoverCard {
 
     private LostTalesChatHoverCard() {}
 
-    static void draw(Minecraft minecraft, int mouseX, int mouseY,
+    static void draw(Minecraft minecraft, float mouseX, float mouseY,
                      int screenWidth, int screenHeight) {
         Target target = find(minecraft, mouseX, mouseY);
         if (target != null) {
-            drawCard(minecraft, target, mouseX, mouseY,
+            drawCard(minecraft, target, (int)mouseX, (int)mouseY,
                     screenWidth, screenHeight);
         }
     }
@@ -252,7 +252,8 @@ final class LostTalesChatHoverCard {
         }
     }
 
-    private static Target find(Minecraft minecraft, int mouseX, int mouseY) {
+    private static Target find(Minecraft minecraft, float mouseX,
+                               float mouseY) {
         if (minecraft == null || minecraft.ingameGUI == null
                 || minecraft.fontRenderer == null) {
             return null;
@@ -330,14 +331,27 @@ final class LostTalesChatHoverCard {
                         }
                     }
                 }
+                // The span's last part is the closing bracket run, whose
+                // trailing space belongs to the gap before the message,
+                // not to the name: the span ends on the bracket's own
+                // glyphs, so the hitbox matches what is drawn.
+                boolean closesSpan = identitySpan && decodedHead == null
+                        && text.startsWith(">");
+                int spanWidth = partWidth;
+                if (closesSpan) {
+                    String raw = part.getUnformattedTextForChat();
+                    int trimmed = raw.length();
+                    while (trimmed > 0 && raw.charAt(trimmed - 1) == ' ') {
+                        trimmed--;
+                    }
+                    spanWidth -= minecraft.fontRenderer.getCharWidth(' ')
+                            * (raw.length() - trimmed);
+                }
                 if (inSpan && band.localX >= cursor
-                        && band.localX < cursor + partWidth) {
+                        && band.localX < cursor + spanWidth) {
                     return targetForGroup(lines, band.viewIndex);
                 }
-                if (identitySpan && decodedHead == null
-                        && text.startsWith(">")) {
-                    // The closing bracket ends the span; itself still
-                    // inside it, answered just above.
+                if (closesSpan) {
                     identitySpan = false;
                 }
                 previousStart = cursor;

@@ -116,13 +116,15 @@ public final class LostTalesConfig {
     public static boolean enableChatBackgroundBlur = true;
     public static boolean enableNpcChatStyling = true;
     public static boolean enableChatPings = true;
-    /** Vanilla note-block pling: a short UI cue that exists on every client. */
-    static final String DEFAULT_CHAT_PING_SOUND = "note.pling";
+    /** The chat's own mention cue, bundled with the mod. */
+    static final String DEFAULT_CHAT_PING_SOUND = "losttales:chat.ping";
     /**
-     * The first backport shipped LOTR's horn as the ping and config files
-     * written then still carry it; it is migrated back to the note sound.
+     * Sounds earlier builds shipped as the ping — LOTR's horn, then
+     * vanilla's note pling; config files written then still carry them,
+     * and both are migrated to the bundled cue.
      */
-    private static final String LEGACY_CHAT_PING_SOUND = "lotr:item.horn";
+    private static final String[] LEGACY_CHAT_PING_SOUNDS = {
+            "lotr:item.horn", "note.pling"};
     public static String chatPingSound = DEFAULT_CHAT_PING_SOUND;
     public static boolean enableChatAnimations = true;
     /**
@@ -1568,8 +1570,15 @@ public final class LostTalesConfig {
     }
 
     static boolean isLegacyChatPingSound(String sound) {
-        return sound != null
-                && LEGACY_CHAT_PING_SOUND.equalsIgnoreCase(sound.trim());
+        if (sound == null) {
+            return false;
+        }
+        for (String legacy : LEGACY_CHAT_PING_SOUNDS) {
+            if (legacy.equalsIgnoreCase(sound.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static double migrateLegacyQuickLootOffsetX(double legacyOffsetX) {

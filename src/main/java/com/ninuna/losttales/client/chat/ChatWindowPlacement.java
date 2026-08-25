@@ -44,6 +44,13 @@ public final class ChatWindowPlacement {
      *  asymmetry is a decision, not an oversight.</p> */
     public static final int INPUT_HEIGHT = ChatChannelTabBar.ROW_HEIGHT;
     /**
+     * Head-room between the window's top rule and the topmost line's
+     * glyphs, owned by that line — its band extends up through it to the
+     * rule. Chrome like the strips, so it keeps its size at every chat
+     * scale.
+     */
+    public static final int HISTORY_TOP_MARGIN = 2;
+    /**
      * How much of a window's width its messages may fill before they
      * wrap, measured from its left edge: the rest is clear margin at the
      * right. A share rather than a fixed inset, so a wide window and a
@@ -58,22 +65,25 @@ public final class ChatWindowPlacement {
         public final double x;
         public final double y;
         public final int width;
-        public final int height;
+        /** Fractional: the box is exactly as tall as its lines ask. */
+        public final double height;
         /** What hangs below the baseline: the padding and the bar. */
         public final int barHeight;
         /**
-         * Pixels the box has for message lines. It is the height the
-         * window was resized to rather than a whole number of lines, so
-         * the topmost line is clipped where the room ends.
+         * Pixels the box has for message lines, fractions included: the
+         * height the window was resized to rather than a whole number of
+         * lines, so nothing anywhere rounds it and no edge of the box
+         * wobbles against another while a resize runs. The topmost line
+         * is clipped where the room ends.
          */
-        public final int room;
+        public final double room;
 
-        Box(double x, double y, int width, int height, int barHeight) {
-            this(x, y, width, height, barHeight, 0);
+        Box(double x, double y, int width, double height, int barHeight) {
+            this(x, y, width, height, barHeight, 0.0D);
         }
 
-        Box(double x, double y, int width, int height, int barHeight,
-            int room) {
+        Box(double x, double y, int width, double height, int barHeight,
+            double room) {
             this.x = x;
             this.y = y;
             this.width = width;
@@ -191,10 +201,10 @@ public final class ChatWindowPlacement {
         return lineHeight(minecraft) + INPUT_HEIGHT;
     }
 
-    /** The smallest box: tab row, one empty line, trailing strip, bar. */
+    /** The smallest box: row, top margin, one line, trailing strip, bar. */
     public static int minHeight(Minecraft minecraft) {
-        return rowHeight(minecraft) + lineHeight(minecraft)
-                + barHeight(minecraft);
+        return rowHeight(minecraft) + HISTORY_TOP_MARGIN
+                + lineHeight(minecraft) + barHeight(minecraft);
     }
 
     /**
@@ -215,15 +225,19 @@ public final class ChatWindowPlacement {
     }
 
     /**
-     * The lines the window currently shows: those its view holds, at
-     * least one, at most its {@link #lineCap}. A window still filling up
-     * is as tall as the whole lines it holds; a full one keeps the
-     * fraction of a line the player dragged it to. A window not drawn
-     * yet shows one.
+     * The lines the window currently shows. A window given a height of
+     * its own keeps exactly that height: fewer messages than it has room
+     * for show as empty rows above them, so resizing never moves the
+     * window. One following the game setting is as tall as the whole
+     * lines it holds, at least one, at most its {@link #lineCap}; a
+     * window not drawn yet shows one.
      */
     public static double currentLines(ChatWindow window,
                                       Minecraft minecraft) {
         double cap = lineCap(window, minecraft);
+        if (window != null && window.getMaxLines() > 0.0D) {
+            return Math.max(1.0D, cap);
+        }
         ChatWindowFrame frame = window == null ? null
                 : ChatWindowFrame.find(window.getId());
         if (frame == null || frame.lines == null) {
@@ -232,20 +246,21 @@ public final class ChatWindowPlacement {
         return Math.max(1.0D, Math.min(cap, frame.lines.size()));
     }
 
-    /** Pixels of message room {@code lines} lines take at this scale. */
-    public static int roomForLines(double lines, Minecraft minecraft) {
-        return Math.max(1, (int)Math.round(
-                Math.max(1.0D, lines) * lineStride(minecraft)));
+    /** Pixels of message room {@code lines} lines take at this scale,
+     *  fractions included: nothing rounds, so no edge of the box ever
+     *  wobbles against another while a resize runs. */
+    public static double roomForLines(double lines, Minecraft minecraft) {
+        return Math.max(1.0D, Math.max(1.0D, lines) * lineStride(minecraft));
     }
 
     /** The box height a window with {@code room} pixels of lines takes. */
-    public static int heightForRoom(int room, Minecraft minecraft) {
-        return rowHeight(minecraft) + Math.max(1, room)
-                + barHeight(minecraft);
+    public static double heightForRoom(double room, Minecraft minecraft) {
+        return rowHeight(minecraft) + HISTORY_TOP_MARGIN
+                + Math.max(1.0D, room) + barHeight(minecraft);
     }
 
     /** The box height a window of {@code lines} message lines takes. */
-    public static int heightForLines(double lines, Minecraft minecraft) {
+    public static double heightForLines(double lines, Minecraft minecraft) {
         return heightForRoom(roomForLines(lines, minecraft), minecraft);
     }
 
@@ -255,11 +270,13 @@ public final class ChatWindowPlacement {
      */
     public static double linesForHeight(double height, Minecraft minecraft) {
         return Math.max(1.0D, (height - rowHeight(minecraft)
-                - barHeight(minecraft)) / lineStride(minecraft));
+                - HISTORY_TOP_MARGIN - barHeight(minecraft))
+                / lineStride(minecraft));
     }
 
     /** The box height the window currently shows: row, lines and bar. */
-    public static int currentHeight(ChatWindow window, Minecraft minecraft) {
+    public static double currentHeight(ChatWindow window,
+                                       Minecraft minecraft) {
         return heightForLines(currentLines(window, minecraft), minecraft);
     }
 
@@ -285,7 +302,7 @@ public final class ChatWindowPlacement {
         int barHeight = barHeight(minecraft);
         double[] x = new double[count];
         double[] baseline = new double[count];
-        int[] room = new int[count];
+        double[] room = new double[count];
         int[] widths = new int[count];
         for (int i = 0; i < count; i++) {
             Box box = anchoredBounds(windows.get(i), minecraft, screenWidth,
@@ -326,9 +343,11 @@ public final class ChatWindowPlacement {
                     continue;
                 }
                 double wanted = linked.isLinkedAbove()
-                        ? baseline[t] - room[t] - row - margin - barHeight
-                        : baseline[t] + barHeight + margin + room[i] + row;
-                double ceiling = margin + room[i] + row;
+                        ? baseline[t] - room[t] - HISTORY_TOP_MARGIN - row
+                                - margin - barHeight
+                        : baseline[t] + barHeight + margin + room[i]
+                                + HISTORY_TOP_MARGIN + row;
+                double ceiling = margin + room[i] + HISTORY_TOP_MARGIN + row;
                 wanted = Math.max(ceiling,
                         Math.min(screenHeight - margin - barHeight, wanted));
                 if (wanted != baseline[i]) {
@@ -340,7 +359,7 @@ public final class ChatWindowPlacement {
                 break;
             }
         }
-        int height = heightForRoom(room[index], minecraft);
+        double height = heightForRoom(room[index], minecraft);
         return new Box(x[index], baseline[index] - (height - barHeight),
                 widths[index], height, barHeight, room[index]);
     }
@@ -358,8 +377,9 @@ public final class ChatWindowPlacement {
     static Box anchoredBounds(ChatWindow window, Minecraft minecraft,
                               int screenWidth, int screenHeight) {
         int width = windowWidth(window, minecraft);
-        int room = roomForLines(currentLines(window, minecraft), minecraft);
-        int height = heightForRoom(room, minecraft);
+        double room = roomForLines(currentLines(window, minecraft),
+                minecraft);
+        double height = heightForRoom(room, minecraft);
         int barHeight = barHeight(minecraft);
         double baseline = keepOnScreen(baselineFor(window.getOffsetY(),
                 minecraft, screenHeight), height, barHeight, screenHeight);
@@ -373,7 +393,7 @@ public final class ChatWindowPlacement {
      * margin, as far as the bottom margin allows, so growth that would
      * leave the screen turns downward instead.
      */
-    static double keepOnScreen(double baseline, int height, int barHeight,
+    static double keepOnScreen(double baseline, double height, int barHeight,
                                int screenHeight) {
         int margin = HudPlacementLayout.SCREEN_MARGIN;
         double minBaseline = margin + height - barHeight;
@@ -424,7 +444,7 @@ public final class ChatWindowPlacement {
                                          int screenWidth, int screenHeight) {
         int margin = HudPlacementLayout.SCREEN_MARGIN;
         int width = windowWidth(window, minecraft);
-        int height = window == null ? minHeight(minecraft)
+        double height = window == null ? minHeight(minecraft)
                 : currentHeight(window, minecraft);
         int barHeight = barHeight(minecraft);
         double maxX = Math.max(margin, screenWidth - width - margin);
@@ -440,7 +460,7 @@ public final class ChatWindowPlacement {
      * The feed is not resizable, so it is always a whole number of them,
      * measured with the same stride the renderer draws them at.
      */
-    public static int feedHeight(Minecraft minecraft) {
+    public static double feedHeight(Minecraft minecraft) {
         GuiNewChat chat = chat(minecraft);
         ChatWindowFrame frame = ChatWindowFrame.feed();
         int lines = 1;
@@ -456,7 +476,7 @@ public final class ChatWindowPlacement {
     public static Box feedBounds(Minecraft minecraft, int screenWidth,
                                  int screenHeight) {
         int width = windowWidth(minecraft);
-        int height = feedHeight(minecraft);
+        double height = feedHeight(minecraft);
         double baseline = keepOnScreen(feedBaselineFor(
                 ChatWindowLayout.feedOffsetY(), minecraft, screenHeight),
                 height, 0, screenHeight);
