@@ -240,8 +240,20 @@ public final class LostTalesMapCursor {
         int sheetWidth = sheetWidth(minecraft);
         Pose pose = asked != null && asked.fitsSheet(sheetWidth)
                 ? asked : (interactable ? Pose.HAND : Pose.ARROW);
-        int x = mouseX - pose.hotspotX;
-        int y = mouseY - pose.hotspotY;
+        // The GUI's mouse coordinate is a whole GUI pixel, but the raw
+        // pointer moves display pixel by display pixel — the same
+        // granularity a dragged chat window moves at. Drawn at the GUI
+        // coordinate the sprite would step several display pixels at a
+        // time at higher GUI scales and jitter against whatever it is
+        // dragging, so the fraction the GUI's integer conversion
+        // discarded is put back: the caller's coordinate is kept — a
+        // screen animating its content passes a transformed one — and
+        // the sub-pixel remainder is added to it, which lands the
+        // sprite on a whole display pixel and keeps the pixel art
+        // crisp. Hit testing keeps the whole-pixel coordinate; the two
+        // never differ by as much as one GUI pixel.
+        float x = preciseMouseX(minecraft, mouseX) - pose.hotspotX;
+        float y = preciseMouseY(minecraft, mouseY) - pose.hotspotY;
         float minU = pose.u / (float)sheetWidth;
         float maxU = (pose.u + pose.spriteWidth) / (float)sheetWidth;
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT
@@ -289,11 +301,44 @@ public final class LostTalesMapCursor {
     }
 
     /**
+     * The caller's mouse x with the raw pointer's sub-GUI-pixel
+     * remainder restored: the GUI derives its coordinate with integer
+     * division, and the fraction it drops is exactly how far into the
+     * GUI pixel the real pointer stands. Falls back to the whole-pixel
+     * coordinate when the raw mouse cannot be read.
+     */
+    private static float preciseMouseX(Minecraft minecraft, int mouseX) {
+        if (!Mouse.isCreated() || minecraft.displayWidth <= 0
+                || minecraft.currentScreen == null) {
+            return mouseX;
+        }
+        int raw = Mouse.getX();
+        int width = minecraft.currentScreen.width;
+        double exact = raw * (double)width / minecraft.displayWidth;
+        int whole = raw * width / minecraft.displayWidth;
+        return (float)(mouseX + exact - whole);
+    }
+
+    /** As above for y; the raw axis counts up from the display's bottom. */
+    private static float preciseMouseY(Minecraft minecraft, int mouseY) {
+        if (!Mouse.isCreated() || minecraft.displayHeight <= 0
+                || minecraft.currentScreen == null) {
+            return mouseY;
+        }
+        int raw = Mouse.getY();
+        int height = minecraft.currentScreen.height;
+        double exact = height - raw * (double)height
+                / minecraft.displayHeight - 1.0D;
+        int whole = height - raw * height / minecraft.displayHeight - 1;
+        return (float)(mouseY + exact - whole);
+    }
+
+    /**
      * One pose's quad, turned as the pose asks. Both turns keep the
      * sprite's own pixels square: a quarter turn swaps the corners
      * round, a mirror swaps them left for right.
      */
-    private static void drawSprite(Pose pose, int x, int y,
+    private static void drawSprite(Pose pose, float x, float y,
                                    float minU, float maxU) {
         int width = pose.drawnWidth();
         int height = pose.drawnHeight();

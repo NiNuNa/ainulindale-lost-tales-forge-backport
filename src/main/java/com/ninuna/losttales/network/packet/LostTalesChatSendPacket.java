@@ -16,6 +16,7 @@ import io.netty.buffer.ByteBuf;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 /**
@@ -26,6 +27,13 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * message.
  */
 public final class LostTalesChatSendPacket implements IMessage {
+    /** Speak as the channel's default identity. */
+    public static final int APPEARANCE_DEFAULT = 0;
+    /** Speak as the Minecraft account, wherever the message goes. */
+    public static final int APPEARANCE_ACCOUNT = 1;
+    /** Speak as one of the sender's own roster characters. */
+    public static final int APPEARANCE_CHARACTER = 2;
+
     private static final int MAX_PACKET_BYTES = 1024
             + ChatMessageValidator.MAX_UTF8_BYTES
             + ChatShareTokenParser.MAX_TOKENS
@@ -38,6 +46,13 @@ public final class LostTalesChatSendPacket implements IMessage {
     private List<ChatShareReference> references = Collections.emptyList();
     /** Account name a whisper is for; empty for every other channel. */
     private String target = "";
+    /**
+     * The identity the sender asks to speak as. A request, never a
+     * fact: the server resolves a character id against the sender's own
+     * roster and refuses one it does not hold.
+     */
+    private int appearanceKind = APPEARANCE_DEFAULT;
+    private UUID appearanceCharacterId;
     private boolean malformed;
 
     public LostTalesChatSendPacket() {}
@@ -54,6 +69,13 @@ public final class LostTalesChatSendPacket implements IMessage {
     public LostTalesChatSendPacket(ChatChannel channel, String message,
                                    List<ChatShareReference> references,
                                    String target) {
+        this(channel, message, references, target, APPEARANCE_DEFAULT, null);
+    }
+
+    public LostTalesChatSendPacket(ChatChannel channel, String message,
+                                   List<ChatShareReference> references,
+                                   String target, int appearanceKind,
+                                   UUID appearanceCharacterId) {
         this.target = target == null ? "" : target.trim();
         this.channelId = channel == null ? "" : channel.getId();
         this.message = message == null ? "" : message;
@@ -61,6 +83,8 @@ public final class LostTalesChatSendPacket implements IMessage {
                 ? Collections.<ChatShareReference>emptyList()
                 : Collections.unmodifiableList(
                         new ArrayList<ChatShareReference>(references));
+        this.appearanceKind = appearanceKind;
+        this.appearanceCharacterId = appearanceCharacterId;
         validate();
     }
 
@@ -101,12 +125,19 @@ public final class LostTalesChatSendPacket implements IMessage {
             this.references = Collections.unmodifiableList(decoded);
             this.target = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_TARGET_BYTES).trim();
+            this.appearanceKind = buffer.readUnsignedByte();
+            this.appearanceCharacterId =
+                    this.appearanceKind == APPEARANCE_CHARACTER
+                            ? new UUID(buffer.readLong(), buffer.readLong())
+                            : null;
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.target = "";
             this.references = Collections.emptyList();
+            this.appearanceKind = APPEARANCE_DEFAULT;
+            this.appearanceCharacterId = null;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -131,10 +162,21 @@ public final class LostTalesChatSendPacket implements IMessage {
         }
         LostTalesPacketCodec.writeUtf8String(buffer, this.target,
                 MAX_TARGET_BYTES);
+        buffer.writeByte(this.appearanceKind);
+        if (this.appearanceKind == APPEARANCE_CHARACTER) {
+            buffer.writeLong(
+                    this.appearanceCharacterId.getMostSignificantBits());
+            buffer.writeLong(
+                    this.appearanceCharacterId.getLeastSignificantBits());
+        }
     }
 
     private void validate() {
-        if (ChatChannel.fromId(this.channelId) == null
+        if (this.appearanceKind < APPEARANCE_DEFAULT
+                || this.appearanceKind > APPEARANCE_CHARACTER
+                || (this.appearanceKind == APPEARANCE_CHARACTER
+                        && this.appearanceCharacterId == null)
+                || ChatChannel.fromId(this.channelId) == null
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.target, MAX_TARGET_BYTES)
                 || (ChatChannel.fromId(this.channelId) == ChatChannel.WHISPER
@@ -162,6 +204,12 @@ public final class LostTalesChatSendPacket implements IMessage {
     public List<ChatShareReference> getReferences() { return this.references; }
     /** The whisper's account name; empty otherwise. */
     public String getTarget() { return this.target; }
+    /** One of the {@code APPEARANCE_*} constants. */
+    public int getAppearanceKind() { return this.appearanceKind; }
+    /** The asked-for roster character; null unless the kind names one. */
+    public UUID getAppearanceCharacterId() {
+        return this.appearanceCharacterId;
+    }
     public boolean isMalformed() { return this.malformed; }
 
     public static final class Handler implements IMessageHandler<
@@ -186,7 +234,9 @@ public final class LostTalesChatSendPacket implements IMessage {
                                     livePlayer, message.getChannel(),
                                     message.getMessage(),
                                     message.getReferences(),
-                                    message.getTarget());
+                                    message.getTarget(),
+                                    message.getAppearanceKind(),
+                                    message.getAppearanceCharacterId());
                         }
                     });
             return null;

@@ -38,6 +38,13 @@ final class ChatChannelIcons {
     private static final int MAX_PORTRAITS = 64;
     private static final Map<ChatTab, String> NPC_PORTRAITS =
             new LinkedHashMap<ChatTab, String>();
+    /**
+     * Faction names remembered per NPC, captured when it spoke: what the
+     * hover card names as the NPC's faction, so an NPC's card reads like
+     * a player's without asking LOTR anything at hover time.
+     */
+    private static final Map<UUID, String> NPC_FACTIONS =
+            new LinkedHashMap<UUID, String>();
 
     private ChatChannelIcons() {}
 
@@ -61,9 +68,30 @@ final class ChatChannelIcons {
         return tab == null ? null : NPC_PORTRAITS.get(tab);
     }
 
+    /** Remembers the faction an NPC spoke for, for its hover card. */
+    static synchronized void rememberNpcFaction(UUID npcId,
+                                                String factionName) {
+        if (npcId == null || factionName == null
+                || factionName.length() == 0) {
+            return;
+        }
+        NPC_FACTIONS.remove(npcId);
+        NPC_FACTIONS.put(npcId, factionName);
+        while (NPC_FACTIONS.size() > MAX_PORTRAITS) {
+            Iterator<UUID> oldest = NPC_FACTIONS.keySet().iterator();
+            oldest.next();
+            oldest.remove();
+        }
+    }
+
+    static synchronized String npcFaction(UUID npcId) {
+        return npcId == null ? null : NPC_FACTIONS.get(npcId);
+    }
+
     /** Conversations end with the session, and so do their portraits. */
     static synchronized void forgetPortraits() {
         NPC_PORTRAITS.clear();
+        NPC_FACTIONS.clear();
     }
 
     /**
@@ -82,7 +110,8 @@ final class ChatChannelIcons {
             ItemStack banner = LotrFactionBannerResolver.bannerFor(
                     ClientChatChannelState.activeFactionId());
             if (banner != null) {
-                // The banner fills the icon box like a toolbar item does.
+                // The banner fills the icon box exactly as a shared
+                // item's icon fills its inline content box.
                 ChatInlineIcons.drawItem(minecraft, banner, x, y, SIZE, alpha);
                 return;
             }

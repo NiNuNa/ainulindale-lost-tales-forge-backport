@@ -42,7 +42,7 @@ public enum ChatChannel {
      */
     CONSOLE("console", "Console", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.SELF,
-            LostTalesColors.rgb(LostTalesColors.PLUM_GRAY)),
+            LostTalesColors.rgb(LostTalesColors.MAUVE)),
     /**
      * A private conversation between two accounts. Not a tab of its own:
      * every whisper partner is one tab on this channel, and the client
@@ -58,7 +58,7 @@ public enum ChatChannel {
      */
     DISCORD("discord", "Discord", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.GLOBAL,
-            LostTalesColors.rgb(LostTalesColors.TEAL));
+            LostTalesColors.rgb(LostTalesColors.STEEL_BLUE));
 
     /** Tab, indicator, and cycle order: the two global channels bracket
      *  the scoped role-play ones, Discord beside OOC as the other account

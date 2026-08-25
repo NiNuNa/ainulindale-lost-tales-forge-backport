@@ -63,7 +63,8 @@ public final class LostTalesChatRoleMaskTest {
                 0xFFFFFF, 0xFFFFFF, "hello", 1L, "");
         ByteBuf buffer = Unpooled.buffer();
         plain.toBytes(buffer);
-        buffer.setByte(buffer.writerIndex() - 1, 0x80);
+        // The roles byte sits before the trailing account-line flag.
+        buffer.setByte(buffer.writerIndex() - 2, 0x80);
         LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
         decoded.fromBytes(buffer);
         assertTrue(decoded.isMalformed());

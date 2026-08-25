@@ -352,9 +352,9 @@ public final class LostTalesChatPresentationTest {
                 ChatChannel.PROXIMITY.getDisplayColor());
         assertEquals(LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE),
                 ChatChannel.OOC.getDisplayColor());
-        assertEquals(LostTalesColors.rgb(LostTalesColors.PLUM_GRAY),
+        assertEquals(LostTalesColors.rgb(LostTalesColors.MAUVE),
                 ChatChannel.CONSOLE.getDisplayColor());
-        assertEquals(LostTalesColors.rgb(LostTalesColors.TEAL),
+        assertEquals(LostTalesColors.rgb(LostTalesColors.STEEL_BLUE),
                 ChatChannel.DISCORD.getDisplayColor());
         assertEquals(LostTalesColors.rgb(LostTalesColors.CRIMSON),
                 ChatChannel.ADMIN.getDisplayColor());

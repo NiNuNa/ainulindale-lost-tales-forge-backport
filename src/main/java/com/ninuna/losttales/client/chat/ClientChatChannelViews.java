@@ -57,12 +57,6 @@ public final class ClientChatChannelViews {
     /** Where each view is drawn right now, easing toward its target. */
     private static final Map<ChatTab, Ease> RENDERED =
             new HashMap<ChatTab, Ease>();
-    /**
-     * How long the drawn offset takes to cover most of the distance to
-     * its target: short enough to feel immediate, long enough to read as
-     * motion rather than a jump.
-     */
-    private static final double SCROLL_EASE_SECONDS = 0.06D;
     /** Closer than this to the target and the offset simply arrives. */
     private static final double SCROLL_SNAP_LINES = 0.01D;
     /**
@@ -276,7 +270,6 @@ public final class ClientChatChannelViews {
         return result;
     }
 
-    /** Scroll offset (in lines) for the view, clamped to its content. */
     /**
      * The view's scroll target in message lines, clamped to what the
      * window can actually reach: nothing below the newest line, and no
@@ -330,15 +323,13 @@ public final class ClientChatChannelViews {
             ease.nanos = now;
             return target;
         }
-        double elapsed = Math.max(0.0D,
-                Math.min(0.25D, (now - ease.nanos) / 1.0E9D));
+        double elapsed = (now - ease.nanos) / 1.0E9D;
         ease.nanos = now;
-        double remaining = target - ease.value;
-        if (Math.abs(remaining) <= SCROLL_SNAP_LINES) {
+        if (Math.abs(target - ease.value) <= SCROLL_SNAP_LINES) {
             ease.value = target;
         } else {
-            ease.value += remaining * (1.0D - Math.exp(
-                    -elapsed / SCROLL_EASE_SECONDS));
+            ease.value = LostTalesChatMotion.approach(ease.value, target,
+                    elapsed, LostTalesChatMotion.SCROLL_EASE_SECONDS);
         }
         while (RENDERED.size() > MAX_EASED_VIEWS) {
             Iterator<ChatTab> oldest = RENDERED.keySet().iterator();
@@ -429,6 +420,7 @@ public final class ClientChatChannelViews {
         ChatWindowLines.clear();
         ChatWindowFrame.clear();
         ClientChatAccountRoles.clear();
+        ClientChatAppearances.clear();
         // The history is gone with the world, and so are its conversations.
         ChatWindowLayout.closeConversations();
         ChatChannelIcons.forgetPortraits();

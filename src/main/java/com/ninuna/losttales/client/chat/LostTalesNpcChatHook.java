@@ -60,7 +60,23 @@ public final class LostTalesNpcChatHook {
         return LostTalesChatPresentation.receiveNpcSpeech(
                 ChatTab.npc(name), npc.getUniqueID(), name,
                 texture == null ? "" : texture.toString(), speech,
-                nameColor(npc));
+                nameColor(npc), factionName(npc));
+    }
+
+    /**
+     * The faction the NPC speaks for, as LOTR displays it, captured for
+     * the hover card while the entity is at hand; empty when it cannot
+     * be read.
+     */
+    private static String factionName(LOTREntityNPC npc) {
+        try {
+            LOTRFaction faction = npc.getFaction();
+            String name = faction == null ? null : faction.factionName();
+            return name == null ? "" : name.trim();
+        } catch (LinkageError ignored) {
+        } catch (RuntimeException ignored) {
+        }
+        return "";
     }
 
     /**

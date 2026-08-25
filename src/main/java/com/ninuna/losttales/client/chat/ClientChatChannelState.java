@@ -2,7 +2,6 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
@@ -22,10 +21,12 @@ import net.minecraft.util.EnumChatFormatting;
 
 /**
  * Session-local selected tab with deterministic availability fallback.
- * A channel can be <em>viewable</em> without being <em>sendable</em>: Global
- * is always readable because achievements and other vanilla lines live in
- * its tab, but only an active role-playing character may talk there. The
- * server enforces the same rule; this only keeps the client honest. The
+ * A channel can be <em>viewable</em> without being <em>sendable</em>:
+ * anyone may talk anywhere with whatever appearance they choose (see
+ * {@link ClientChatAppearances}), so only membership closes a channel —
+ * Faction and Party need the active character to belong somewhere, and
+ * the staff and Discord channels need the server's word. The server
+ * enforces the same rules; this only keeps the client honest. The
  * selection is also kept to tabs that are open in the
  * {@link ChatWindowLayout}: a closed channel cannot be the input target,
  * and {@code TAB} cycles through the tabs of the selected tab's own
@@ -41,6 +42,13 @@ public final class ClientChatChannelState {
     private static final int MAX_PARTNER_COLORS = 64;
     private static final LinkedHashMap<ChatTab, Integer> PARTNER_COLORS =
             new LinkedHashMap<ChatTab, Integer>();
+    /**
+     * How a conversation's tab names its partner: the appearance their
+     * last line wore, the account in brackets behind it when the two
+     * differ. Remembered like the colours, from their lines alone.
+     */
+    private static final LinkedHashMap<ChatTab, String> PARTNER_NAMES =
+            new LinkedHashMap<ChatTab, String>();
     private static String cachedFactionId = "";
     private static String cachedFactionName = "";
     private static long cachedFactionNanos;
@@ -243,7 +251,13 @@ public final class ClientChatChannelState {
         return tab != null && canSend(tab.getChannel());
     }
 
-    /** Whether the local player may currently send into the channel. */
+    /**
+     * Whether the local player may currently send into the channel.
+     * Identity no longer gates a channel — any channel is spoken with
+     * any appearance, the account included — so only membership does:
+     * Faction and Party need the active character to belong somewhere,
+     * and the staff and Discord channels need the server's word.
+     */
     public static synchronized boolean canSend(ChatChannel channel) {
         if (channel == null) {
             return false;
@@ -254,16 +268,9 @@ public final class ClientChatChannelState {
         if (channel == ChatChannel.DISCORD) {
             return discordAccess;
         }
-        if (channel == ChatChannel.WHISPER) {
-            return true;
-        }
-        CharacterSummary active = activeCharacter();
-        if (channel.getIdentityType() == ChatIdentityType.CHARACTER
-                && active == null) {
-            return false;
-        }
         if (channel == ChatChannel.FACTION) {
-            return LotrCharacterAdapter.normalizeFactionId(
+            CharacterSummary active = activeCharacter();
+            return active != null && LotrCharacterAdapter.normalizeFactionId(
                     active.getStartingFactionId()).length() > 0;
         }
         if (channel != ChatChannel.PARTY) {
@@ -323,6 +330,29 @@ public final class ClientChatChannelState {
         }
     }
 
+    /**
+     * Remembers the identity the partner's last line wore, so the
+     * conversation's tab names them the way they speak: the appearance,
+     * the account in brackets behind it when the two differ.
+     */
+    public static synchronized void rememberPartnerName(ChatTab tab,
+                                                        String identityName,
+                                                        String accountName) {
+        if (tab == null || !tab.isWhisper() || identityName == null
+                || accountName == null || identityName.length() == 0) {
+            return;
+        }
+        String shown = identityName.equalsIgnoreCase(accountName)
+                ? accountName
+                : identityName + " (" + accountName + ")";
+        PARTNER_NAMES.put(tab, shown);
+        while (PARTNER_NAMES.size() > MAX_PARTNER_COLORS) {
+            Iterator<ChatTab> oldest = PARTNER_NAMES.keySet().iterator();
+            oldest.next();
+            oldest.remove();
+        }
+    }
+
     public static synchronized int displayColor(ChatChannel channel) {
         if (channel == null) {
             return 0xFFFFFF;
@@ -364,13 +394,17 @@ public final class ClientChatChannelState {
         return LostTalesColors.rgb(LostTalesColors.SEAFOAM);
     }
 
-    /** Visible label for a tab: the partner's name for a whisper. */
+    /** Visible label for a tab: the partner's name for a whisper —
+     *  the appearance their last line wore, when one is remembered. */
     public static synchronized String displayName(ChatTab tab) {
         if (tab == null) {
             return "";
         }
-        return tab.isWhisper() ? tab.getPartner()
-                : displayName(tab.getChannel());
+        if (tab.isWhisper()) {
+            String remembered = PARTNER_NAMES.get(tab);
+            return remembered != null ? remembered : tab.getPartner();
+        }
+        return displayName(tab.getChannel());
     }
 
     /**
@@ -488,6 +522,7 @@ public final class ClientChatChannelState {
     public static synchronized void clear() {
         selected = ChatTab.of(ChatChannel.ALL);
         PARTNER_COLORS.clear();
+        PARTNER_NAMES.clear();
         cachedFactionId = "";
         cachedFactionName = "";
         cachedFactionNanos = 0L;

@@ -46,6 +46,29 @@ final class LostTalesChatMotion {
         return menuProgress((clamp(progress) - delay) / (1.0F - delay));
     }
 
+    /**
+     * How long the shared scroll easing takes to cover most of the
+     * distance to its target: short enough to feel immediate, long
+     * enough to read as motion rather than a jump.
+     */
+    static final double SCROLL_EASE_SECONDS = 0.06D;
+
+    /**
+     * One step of the chat's shared scroll easing: the drawn value moves
+     * toward its target by an exponential share of the remaining
+     * distance, so the glide covers most of the gap in
+     * {@code easeSeconds} and looks the same at every frame rate. The
+     * elapsed time is capped so a long-hidden view steps rather than
+     * leaps. The history's per-view offset and the pickers' body scroll
+     * both step with this.
+     */
+    static double approach(double current, double target,
+                           double elapsedSeconds, double easeSeconds) {
+        double elapsed = Math.max(0.0D, Math.min(0.25D, elapsedSeconds));
+        return current + (target - current)
+                * (1.0D - Math.exp(-elapsed / easeSeconds));
+    }
+
     static float smoothStep(float value) {
         float p = clamp(value);
         return p * p * (3.0F - 2.0F * p);

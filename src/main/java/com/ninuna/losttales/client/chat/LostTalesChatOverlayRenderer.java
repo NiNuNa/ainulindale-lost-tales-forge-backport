@@ -59,7 +59,7 @@ final class LostTalesChatOverlayRenderer {
      * caps and two below them, so the 7px cap height is centred in the
      * 11px band; heads (8px at -0.5) land exactly centred as well.
      */
-    private static final int TEXT_OFFSET = 9;
+    static final int TEXT_OFFSET = 9;
     /**
      * Where a head sits against the text it stands beside: a pixel above
      * the glyph box, which reads level once the glyphs' own bearing is
@@ -77,20 +77,18 @@ final class LostTalesChatOverlayRenderer {
             ChatInlineIcons.HEAD_SLOT_INSET;
     private static final float BACKDROP_FADE_START = 2.0F / 3.0F;
     /**
-     * Depth of the shade along the backdrop's top and bottom edges — one
-     * line, measured inward from the edge. Independent of
-     * {@link #LINE_PADDING}: the padding moves where a fade starts,
-     * never how far it reaches.
+     * Depth of the shade hanging from the window's top edge: one line,
+     * so the line passing under the top rule has faded most of the way
+     * out before the clip cuts it.
      */
-    private static final int EDGE_FADE_HEIGHT = LINE_HEIGHT;
+    private static final float TOP_EDGE_FADE_HEIGHT = LINE_HEIGHT;
     /**
-     * Backdrop above the topmost line and below the newest one — a third
-     * of a line — so the text does not touch the tab row or the window's
-     * bottom edge.
+     * Depth of the shade hanging from the bottom edge: two lines, so it
+     * reaches through the trailing strip and over the newest message.
      */
-    static final int LINE_PADDING = LINE_HEIGHT / 3;
-    /** Opacity of an edge fade on the edge it hangs from: a third. */
-    private static final int EDGE_FADE_ALPHA = 0x55;
+    private static final float BOTTOM_EDGE_FADE_HEIGHT = LINE_HEIGHT * 2.0F;
+    /** Opacity of an edge fade on the edge it hangs from: half. */
+    private static final int EDGE_FADE_ALPHA = 0x80;
     /**
      * Mesh resolution of an edge fade. The horizontal ramp is linear, so
      * two columns carry it exactly; the vertical one is eased, and each
@@ -102,6 +100,12 @@ final class LostTalesChatOverlayRenderer {
      */
     private static final int EDGE_FADE_ROWS = 32;
     private static final int EDGE_FADE_COLUMNS = 1;
+    /**
+     * Slack for the clip's display-pixel conversion: far above any
+     * floating-point error the conversion can accumulate, far below the
+     * smallest genuine fraction of a display pixel an edge can carry.
+     */
+    private static final double CLIP_EDGE_EPSILON = 1.0E-3D;
     private static final Field DRAWN_LINES = findField("field_146253_i");
 
     private LostTalesChatOverlayRenderer() {}
@@ -237,6 +241,7 @@ final class LostTalesChatOverlayRenderer {
                                 roomLines));
         frame.begin(box, scale, opening.getTranslationX(),
                 opening.getTranslationY());
+        frame.renderedScrollLines = scroll;
         frame.drawn = true;
         // The window's own rectangle of the blurred frame, under the
         // backdrop; drawn only while the chat screen captured one this
@@ -248,9 +253,9 @@ final class LostTalesChatOverlayRenderer {
         double blurRight = blurLeft + (frame.boxRight - frame.boxLeft);
         double blurTop = frame.boxTop + frame.motionY;
         double blurBottom = frame.boxBottom + frame.motionY;
-        double padding = LINE_PADDING * (double)scale;
-        double historyTop = frame.drawnBaseline() - box.room - padding;
-        double historyBottom = frame.drawnBaseline() + padding;
+        double historyTop = frame.drawnBaseline() - box.room;
+        double historyBottom = frame.drawnBaseline()
+                + ChatWindowPlacement.lineHeight(minecraft);
         float blurOpacity = opening.getOpacity();
         blur.drawRegion(blurLeft, blurTop, blurRight, historyTop,
                 screenWidth, screenHeight, blurOpacity);
@@ -276,9 +281,12 @@ final class LostTalesChatOverlayRenderer {
 
     /**
      * The window's bottom hairline, drawn by the chat screen after the
-     * bar so it lies over the edge shade: the row directly under the
-     * bottom padding. The top one is the tab row's, drawn with the row
-     * as its last pixel row so row and rule never drift apart.
+     * bar so it lies over the edge shade: one GUI pixel tall exactly
+     * like the top rule — the bar strip's first row, mirroring the tab
+     * strip whose last row is the top rule. Between the baseline and
+     * this row lies the window's trailing strip, one line of always
+     * visible room the typing line lives in; the message clip ends on
+     * the baseline, so no message ever enters the strip.
      */
     static void drawBottomRule(Minecraft minecraft, ChatWindowFrame frame,
                                LostTalesGuiAnimationSample opening) {
@@ -286,29 +294,17 @@ final class LostTalesChatOverlayRenderer {
                 || frame == null || !frame.drawn || opening == null) {
             return;
         }
-        GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
-        float scale = chat.func_146244_h();
         // The window's own width, not the game's: the rule is the same
         // rule the strip draws along the top, so it ends where that ends.
-        int unscaledWidth = MathHelper.ceiling_float_int(
-                (float)(frame.boxRight - frame.boxLeft - 2.0D
-                        - 4.0F * scale) / scale);
-        float originX = (float)ChatWindowFrame.snapToDisplayPixels(
-                frame.drawnLeft() + 2.0F * scale);
-        float originY = (float)frame.drawnBaseline();
-        GL11.glPushMatrix();
-        try {
-            GL11.glTranslatef(originX, originY, 0.0F);
-            GL11.glScalef(scale, scale, 1.0F);
-            drawBackdropRow(-2.0F, LINE_PADDING, unscaledWidth + 4.0F,
-                    LINE_PADDING + 1.0F,
-                    Math.round(backdropRowAlpha(minecraft)
-                            * opening.getOpacity()));
-            drawEdgeRule(unscaledWidth, LINE_PADDING,
-                    Math.round(255.0F * opening.getOpacity()));
-        } finally {
-            GL11.glPopMatrix();
-        }
+        float left = (float)frame.drawnLeft();
+        float right = left + (float)(frame.boxRight - frame.boxLeft);
+        float top = (float)frame.drawnBaseline()
+                + ChatWindowPlacement.lineHeight(minecraft);
+        drawBackdropRow(left, top, right, top + 1.0F,
+                Math.round(backdropRowAlpha(minecraft)
+                        * opening.getOpacity()));
+        drawRule(left, right, top, top + 1.0F,
+                Math.round(255.0F * opening.getOpacity()));
     }
 
     /**
@@ -541,9 +537,19 @@ final class LostTalesChatOverlayRenderer {
      * rectangle is converted with the display's own pixels per GUI
      * pixel, which is exact at every GUI scale and window size; the
      * whole scissor state is pushed so nothing outlives the clip.
+     *
+     * <p>A fractional edge is rounded to a whole display pixel, never to
+     * the nearest — that would flip between two rows as the stack
+     * slides, and the row it gave up would flicker. {@code inward} says
+     * which way: the message stack rounds inward, so not one display
+     * pixel of a line ever lands on a rule (what it gives up shows the
+     * window's own panel, drawn unclipped behind it); a caller whose
+     * background continues past the clip rounds outward. The epsilon
+     * absorbs floating-point noise, so an edge that lands exactly on a
+     * display pixel is cut exactly there either way.</p>
      */
     static boolean beginVerticalClip(Minecraft minecraft, double topY,
-                                     double bottomY) {
+                                     double bottomY, boolean inward) {
         try {
             ScaledResolution resolution = new ScaledResolution(minecraft,
                     minecraft.displayWidth, minecraft.displayHeight);
@@ -551,16 +557,16 @@ final class LostTalesChatOverlayRenderer {
             double pixelsPerGuiPixel =
                     minecraft.displayHeight / (double)scaledHeight;
             // Scissor space counts up from the bottom of the display, so
-            // the GUI's lower edge is the rectangle's origin. Each edge
-            // is taken outward to a whole display pixel: rounding it to
-            // the nearest would flip between two rows as the stack
-            // slides, and the row it gave up flickers. Whatever the band
-            // gains this way lies under a rule, which is drawn over it.
-            int top = Double.isNaN(bottomY) ? 0 : (int)Math.floor(
-                    (scaledHeight - bottomY) * pixelsPerGuiPixel);
+            // the GUI's lower edge is the rectangle's origin.
+            double lowEdge = (scaledHeight - bottomY) * pixelsPerGuiPixel;
+            double highEdge = (scaledHeight - topY) * pixelsPerGuiPixel;
+            int top = Double.isNaN(bottomY) ? 0 : (int)(inward
+                    ? Math.ceil(lowEdge - CLIP_EDGE_EPSILON)
+                    : Math.floor(lowEdge + CLIP_EDGE_EPSILON));
             int bottom = Double.isNaN(topY) ? minecraft.displayHeight
-                    : (int)Math.ceil(
-                            (scaledHeight - topY) * pixelsPerGuiPixel);
+                    : (int)(inward
+                            ? Math.floor(highEdge + CLIP_EDGE_EPSILON)
+                            : Math.ceil(highEdge - CLIP_EDGE_EPSILON));
             top = Math.max(0, top);
             bottom = Math.min(minecraft.displayHeight, bottom);
             if (bottom <= top) {
@@ -638,21 +644,29 @@ final class LostTalesChatOverlayRenderer {
         int plannedLineCount = Math.max(0, Math.min(visibleLineCount,
                 totalLineCount - scrollPosition));
         float roomUnscaled = room / scale;
-        float padding = LINE_PADDING * scale;
-        // The window's rules are its hard edges: everything the stack
-        // draws is cut on them, so a line passing under one ends on the
-        // rule and not a few pixels short of it. Between them lie the
-        // room the window was dragged to and a padding strip at each
-        // end. In the window's own units the resting baseline is zero,
-        // which is where the stack stands before it is offset.
-        float clipTop = restingY - room - padding;
-        float clipBottom = restingY + padding;
-        float topEdge = -roomUnscaled - LINE_PADDING;
-        float bottomEdge = LINE_PADDING;
-        // A full window's row stands on the window's own top edge, so it
-        // does not move as the stack scrolls under it; one still filling
-        // up carries its row down onto its last line.
-        boolean full = plannedLineCount * (float)LINE_HEIGHT
+        // The window's edges are hard: everything the stack draws is cut
+        // on them. The first content pixel sits directly below the top
+        // rule; below the baseline lies the trailing strip — one line of
+        // room between the newest message and the bottom rule, where the
+        // typing line lives while the view rests on the newest message.
+        // Scrolling back hands the strip to the history: the first line
+        // of scroll slides the stack down into it, so a scrolled view
+        // fills the window to the bottom rule and shows no blank line.
+        // The clip follows that reveal; the backdrop and the bottom
+        // shade always span the strip, since it is part of the panel.
+        // In the window's own units the resting baseline is zero, which
+        // is where the stack stands before it is offset.
+        float stripReveal = (float)Math.min(1.0D,
+                Math.max(0.0D, scrollLines)) * LINE_HEIGHT * scale;
+        float clipTop = restingY - room;
+        float clipBottom = restingY + stripReveal;
+        float topEdge = -roomUnscaled;
+        float bottomEdge = LINE_HEIGHT;
+        // A window whose history can fill its room keeps its row on the
+        // window's own top edge, so it does not move as the stack
+        // scrolls under it — the trailing scroll room included; one
+        // still filling up carries its row down onto its last line.
+        boolean full = totalLineCount * (float)LINE_HEIGHT
                 >= roomUnscaled - 0.01F;
         frame.setStackTop(full ? restingY - room
                 : restingY + stackOffset
@@ -680,14 +694,20 @@ final class LostTalesChatOverlayRenderer {
             GL11.glPushMatrix();
             try {
                 GL11.glTranslatef(0.0F, offset, 0.0F);
+                // Inward: a line never touches a rule row; whatever the
+                // cut gives up shows the panel drawn unclipped above.
                 clipped = open && beginVerticalClip(minecraft, clipTop,
-                        clipBottom);
+                        clipBottom, true);
 
-                for (int index = 0;
-                     index + scrollPosition < lines.size()
-                             && index < visibleLineCount;
-                     index++) {
-                    ChatLine line = lines.get(index + scrollPosition);
+                // A scrolled view starts one line earlier: the line the
+                // first turn of scroll slid into the trailing strip,
+                // clipped where the strip's reveal ends.
+                int firstLine = Math.max(0, scrollPosition - 1);
+                for (int lineIndex = firstLine;
+                     lineIndex < lines.size()
+                             && lineIndex - scrollPosition < visibleLineCount;
+                     lineIndex++) {
+                    ChatLine line = lines.get(lineIndex);
                     if (line == null) {
                         continue;
                     }
@@ -705,7 +725,7 @@ final class LostTalesChatOverlayRenderer {
                     alpha = (int)(alpha * entryOpacity(line));
                     alpha = (int)(alpha * opening.getOpacity());
                     eligibleLineCount++;
-                    int y = -index * LINE_HEIGHT;
+                    int y = -(lineIndex - scrollPosition) * LINE_HEIGHT;
                     float entry = entrySlide(line);
                     if (open) {
                         // Recorded exactly as drawn: the same translate, slide
@@ -722,7 +742,7 @@ final class LostTalesChatOverlayRenderer {
                         float bandBottom = Math.min(clipBottom,
                                 originY + stackOffset + y * scale);
                         if (bandBottom > bandTop) {
-                            bands.add(index + scrollPosition, bandLeft,
+                            bands.add(lineIndex, bandLeft,
                                     bandLeft + unscaledWidth * scale, bandTop,
                                     bandBottom);
                         }
@@ -792,8 +812,10 @@ final class LostTalesChatOverlayRenderer {
                         * opening.getOpacity());
                 // The shades hang from the rules themselves, so a line
                 // passing under one fades out before it is cut.
-                drawEdgeFade(unscaledWidth, topEdge, bottomEdge, fadeAlpha);
-                drawEdgeFade(unscaledWidth, bottomEdge, topEdge, fadeAlpha);
+                drawEdgeFade(unscaledWidth, topEdge, bottomEdge,
+                        TOP_EDGE_FADE_HEIGHT, fadeAlpha);
+                drawEdgeFade(unscaledWidth, bottomEdge, topEdge,
+                        BOTTOM_EDGE_FADE_HEIGHT, fadeAlpha);
             }
         } finally {
             GL11.glPopMatrix();
@@ -841,14 +863,13 @@ final class LostTalesChatOverlayRenderer {
         try {
             GL11.glTranslatef(originX, originY, 0.0F);
             GL11.glScalef(scale, scale, 1.0F);
-            drawChatBackdrop(-2, -LINE_HEIGHT - LINE_PADDING,
-                    unscaledWidth + 4, LINE_PADDING,
-                    alpha / 2, CHAT_BACKDROP_RGB);
+            drawChatBackdrop(-2, -LINE_HEIGHT, unscaledWidth + 4,
+                    LINE_HEIGHT, alpha / 2, CHAT_BACKDROP_RGB);
             int fadeAlpha = Math.round(EDGE_FADE_ALPHA * opacity);
-            drawEdgeFade(unscaledWidth, -LINE_HEIGHT - LINE_PADDING,
-                    LINE_PADDING, fadeAlpha);
-            drawEdgeFade(unscaledWidth, LINE_PADDING,
-                    -LINE_HEIGHT - LINE_PADDING, fadeAlpha);
+            drawEdgeFade(unscaledWidth, -LINE_HEIGHT, LINE_HEIGHT,
+                    TOP_EDGE_FADE_HEIGHT, fadeAlpha);
+            drawEdgeFade(unscaledWidth, LINE_HEIGHT, -LINE_HEIGHT,
+                    BOTTOM_EDGE_FADE_HEIGHT, fadeAlpha);
             GL11.glEnable(GL11.GL_BLEND);
             LostTalesChatVisualStyle.drawColored(minecraft.fontRenderer,
                     "\u00a7o" + StatCollector.translateToLocal(
@@ -865,10 +886,10 @@ final class LostTalesChatOverlayRenderer {
 
     /**
      * The shade along one edge of the backdrop: the backdrop's plum
-     * black at half opacity on the edge, fading to nothing two lines
-     * inward ({@link #EDGE_FADE_HEIGHT}) — downward from the top edge
-     * the tab row stands on, upward from the bottom edge the newest
-     * message stands on — and never past {@code limit}, the opposite
+     * black at half opacity on the edge, fading to nothing
+     * {@code height} pixels inward — downward from the top edge the tab
+     * row stands on, upward from the bottom edge the bottom rule stands
+     * on — and never past {@code limit}, the opposite
      * edge. That vertical fade is then masked by a second, horizontal
      * one — full at the band's left edge, nothing at its right, across
      * the whole width — the two multiplied, so the shade is strongest in
@@ -877,15 +898,15 @@ final class LostTalesChatOverlayRenderer {
      * quad would put a visible seam along its diagonal.
      */
     private static void drawEdgeFade(int unscaledWidth, float edge,
-                                     float limit, int alpha) {
+                                     float limit, float height, int alpha) {
         int safeAlpha = Math.max(0, Math.min(255, alpha));
         if (safeAlpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
         boolean downward = limit > edge;
         float far = downward
-                ? Math.min(limit, edge + EDGE_FADE_HEIGHT)
-                : Math.max(limit, edge - EDGE_FADE_HEIGHT);
+                ? Math.min(limit, edge + height)
+                : Math.max(limit, edge - height);
         // Exactly the backdrop band's span, so the two ramps coincide.
         float left = -2.0F;
         float right = unscaledWidth + 4.0F;
@@ -977,20 +998,12 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * A hairline along one edge of the backdrop band — the row directly
-     * under the bottom padding — its full width, in the window's own
-     * units: {@code top} is the row's y.
-     */
-    private static void drawEdgeRule(int unscaledWidth, int top, int alpha) {
-        drawRule(-2, unscaledWidth + 4, top, top + 1, alpha);
-    }
-
-    /**
      * The chat's rule: a band of the chat's ivory between {@code left}
      * and {@code right}, opaque at the centre and fading to nothing at
      * either end, so the edges the messages stand between read as
      * edges. The tab row draws the window's top rule with this as its
-     * last pixel row; the bottom rule is drawn under the bottom padding.
+     * last pixel row; the bottom rule is drawn directly under the
+     * baseline as the bar strip's first row.
      */
     static void drawRule(float left, float right, float top, float bottom,
                          int alpha) {

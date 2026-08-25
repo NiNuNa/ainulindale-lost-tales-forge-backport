@@ -43,13 +43,28 @@ abstract class ChatPickerPanel {
     /** Folded sections persist for the session, per picker and label. */
     private static final Set<String> COLLAPSED = new HashSet<String>();
 
+    /** Closer than this to the target and the drawn scroll arrives. */
+    private static final double SCROLL_SNAP_PIXELS = 0.5D;
+
     private boolean targetOpen;
     private long transitionNanos;
     private GuiTextField searchField;
     private int buttonIndex;
     private Entry hoveredEntry;
-    /** Pixels the body is scrolled up by; clamped on every layout. */
+    /**
+     * Pixels the body is asked to be scrolled up by — the wheel's
+     * target; clamped on every layout.
+     */
     private int scroll;
+    /**
+     * Pixels the body is drawn scrolled up by, easing toward
+     * {@link #scroll} with the same shared motion the history glides
+     * with, so a wheel turn slides the rows instead of jumping them.
+     * The layout is built from this, so hit testing always answers for
+     * what is on screen.
+     */
+    private double renderedScroll;
+    private long scrollNanos;
 
     /** Position from the right edge: 0 is the rightmost button. */
     void setButtonIndex(int buttonIndex) {
@@ -65,6 +80,7 @@ abstract class ChatPickerPanel {
             this.targetOpen = open;
             this.transitionNanos = System.nanoTime();
             this.scroll = 0;
+            this.renderedScroll = 0.0D;
             if (this.searchField != null) {
                 this.searchField.setText("");
                 this.searchField.setFocused(false);
@@ -100,9 +116,33 @@ abstract class ChatPickerPanel {
                 && this.searchField.textboxKeyTyped(typedChar, keyCode);
     }
 
-    /** Scrolls the body; positive moves the list up (shows later rows). */
+    /**
+     * Scrolls the body; positive moves the list up (shows later rows).
+     * Only the target moves here — the drawn rows glide after it, so
+     * rapid wheel turns accumulate and stay responsive.
+     */
     void scrollBy(int pixels) {
         this.scroll = Math.max(0, this.scroll + pixels);
+    }
+
+    /**
+     * Advances the drawn scroll toward its target, once per drawn
+     * frame; with chat animations off it simply arrives. Time-based, so
+     * the glide reads the same at every frame rate.
+     */
+    private void advanceScrollEasing() {
+        long now = System.nanoTime();
+        double elapsed = (now - this.scrollNanos) / 1.0E9D;
+        this.scrollNanos = now;
+        if (!LostTalesConfig.enableChatAnimations
+                || Math.abs(this.scroll - this.renderedScroll)
+                        <= SCROLL_SNAP_PIXELS) {
+            this.renderedScroll = this.scroll;
+            return;
+        }
+        this.renderedScroll = LostTalesChatMotion.approach(
+                this.renderedScroll, this.scroll, elapsed,
+                LostTalesChatMotion.SCROLL_EASE_SECONDS);
     }
 
     /** Button left edge; {@code anchorRight} is the input bar's right edge. */
@@ -212,6 +252,7 @@ abstract class ChatPickerPanel {
         }
         FontRenderer font = minecraft.fontRenderer;
         ensureSearchField(font);
+        advanceScrollEasing();
         Layout layout = buildLayout(anchorRight, screenHeight);
         positionSearchField(layout);
         int slide = Math.round((1.0F - progress) * 5.0F);
@@ -273,8 +314,11 @@ abstract class ChatPickerPanel {
         int bodyHeight = layout.bodyBottom - layout.bodyTop;
         int contentHeight = bodyHeight + layout.maxScroll;
         int thumbHeight = Math.max(4, bodyHeight * bodyHeight / contentHeight);
+        // The thumb follows the drawn offset, so it glides with the rows.
         int thumbTop = layout.bodyTop + slide
-                + (bodyHeight - thumbHeight) * this.scroll / layout.maxScroll;
+                + (bodyHeight - thumbHeight)
+                        * (int)Math.round(this.renderedScroll)
+                        / layout.maxScroll;
         int x = layout.left + panelWidth() - 2;
         Gui.drawRect(x, layout.bodyTop + slide, x + 1,
                 layout.bodyBottom + slide,
@@ -427,8 +471,13 @@ abstract class ChatPickerPanel {
         layout.maxScroll = Math.max(0,
                 bodyHeight - (layout.bodyBottom - layout.bodyTop));
         this.scroll = Math.max(0, Math.min(layout.maxScroll, this.scroll));
+        // The drawn offset is bounded too, so shrinking content — a
+        // narrower search, a folded section — never leaves the rows
+        // gliding through space the list no longer has.
+        this.renderedScroll = Math.max(0.0D,
+                Math.min(layout.maxScroll, this.renderedScroll));
 
-        int cursorY = layout.bodyTop - this.scroll;
+        int cursorY = layout.bodyTop - (int)Math.round(this.renderedScroll);
         for (Section section : sections) {
             if (section.label != null) {
                 layout.labels.add(new Label(section.label,

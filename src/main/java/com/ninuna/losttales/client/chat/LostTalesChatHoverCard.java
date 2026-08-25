@@ -26,7 +26,10 @@ import org.lwjgl.opengl.GL11;
  * identity; the details — race, starting faction, level, gender, age, and
  * biography — come from the public appearance the server already synced
  * for that player, and are only shown when they describe the character
- * the line names.
+ * the line names. An NPC's head and name carry the same card — the
+ * portrait, the name in its faction's colour, and the faction its
+ * speech was captured with — so an NPC reads as a player that happens
+ * not to exist.
  */
 final class LostTalesChatHoverCard {
     private static final int PADDING = 6;
@@ -134,7 +137,10 @@ final class LostTalesChatHoverCard {
                 details == null ? "" : ClientCharacterDisplayNames.race(
                         details.getRaceId()));
         addDetail(lines, "gui.losttales.chat.card.faction",
-                details == null || details.getStartingFactionId().length() == 0
+                target.npcIdentity
+                        ? ChatChannelIcons.npcFaction(target.playerId)
+                        : details == null
+                                || details.getStartingFactionId().length() == 0
                         ? "" : ClientCharacterDisplayNames.faction(
                                 details.getStartingFactionId()));
         addDetail(lines, "gui.losttales.chat.card.level",
@@ -268,7 +274,15 @@ final class LostTalesChatHoverCard {
             // The band already answers the vertical question exactly as
             // drawn; only the horizontal component walk remains, in the
             // line's own text space, skipping what the renderer skipped.
+            // The sender's identity is one span — the opening bracket,
+            // the head with its clear pixels, the name, the title, the
+            // spacers, the closing bracket — and every pixel of it
+            // answers with the card, so the card never blinks out in the
+            // hairline gaps between two of its parts.
             int cursor = 0;
+            boolean identitySpan = false;
+            float previousStart = 0.0F;
+            String previousText = null;
             for (Object value
                     : lines.get(band.viewIndex).func_151461_a()) {
                 if (!(value instanceof IChatComponent)) {
@@ -290,19 +304,44 @@ final class LostTalesChatHoverCard {
                 }
                 ChatHeadMarker.Data decodedHead =
                         ChatHeadMarker.decode(part);
-                // NPCs have no account or character card to show.
-                boolean head = decodedHead != null
-                        && !decodedHead.npcIdentity;
-                boolean identity = isReplyIdentity(part);
-                if (head || identity) {
-                    float left = head
-                            ? cursor + ChatInlineIcons.HEAD_SLOT_INSET
-                            : cursor;
-                    float right = left + (head ? 8.0F : partWidth);
-                    if (band.localX >= left && band.localX < right) {
-                        return targetForGroup(lines, band.viewIndex);
+                String text = decodedHead != null ? ""
+                        : LostTalesChatVisualStyle.removeColorCodes(
+                                part.getUnformattedTextForChat()).trim();
+                boolean inSpan = identitySpan;
+                if (isReplyIdentity(part) && !identitySpan) {
+                    // A player's opening bracket carries the reply
+                    // identity and starts the span.
+                    identitySpan = true;
+                    inSpan = true;
+                }
+                if (decodedHead != null) {
+                    inSpan = true;
+                    if (decodedHead.npcIdentity && !identitySpan) {
+                        // An NPC's brackets carry no reply identity —
+                        // nobody is on the other end of a /msg — so its
+                        // span opens at its head and reaches back over
+                        // the bracket standing just before it.
+                        identitySpan = true;
+                        if (previousText != null
+                                && previousText.startsWith("<")
+                                && band.localX >= previousStart
+                                && band.localX < cursor) {
+                            return targetForGroup(lines, band.viewIndex);
+                        }
                     }
                 }
+                if (inSpan && band.localX >= cursor
+                        && band.localX < cursor + partWidth) {
+                    return targetForGroup(lines, band.viewIndex);
+                }
+                if (identitySpan && decodedHead == null
+                        && text.startsWith(">")) {
+                    // The closing bracket ends the span; itself still
+                    // inside it, answered just above.
+                    identitySpan = false;
+                }
+                previousStart = cursor;
+                previousText = decodedHead == null ? text : null;
                 cursor += partWidth;
             }
         } catch (RuntimeException ignored) {
@@ -369,11 +408,21 @@ final class LostTalesChatHoverCard {
                 IChatComponent part = (IChatComponent)value;
                 ChatHeadMarker.Data decoded = ChatHeadMarker.decode(part);
                 if (decoded != null) {
-                    if (decoded.npcIdentity) {
-                        return null;
-                    }
                     marker = decoded;
                     afterHead = true;
+                    continue;
+                }
+                // An NPC's name is the first bare text after its head:
+                // the brackets around it are told apart by their text,
+                // since nothing in the line answers to a /msg.
+                if (marker != null && marker.npcIdentity && afterHead
+                        && identity.length() == 0) {
+                    String text = LostTalesChatVisualStyle.removeColorCodes(
+                            part.getUnformattedTextForChat()).trim();
+                    if (text.length() > 0 && !text.startsWith("<")
+                            && !text.startsWith(">")) {
+                        identity = text;
+                    }
                     continue;
                 }
                 if (isReplyIdentity(part)) {
@@ -396,8 +445,16 @@ final class LostTalesChatHoverCard {
                 }
             }
         }
-        return marker == null || identity.length() == 0
-                || account.length() == 0 ? null
+        if (marker == null || identity.length() == 0) {
+            return null;
+        }
+        if (marker.npcIdentity) {
+            // A fake player's card: the portrait, the name in the
+            // faction's colour, no account behind it.
+            return new Target(marker.senderId, false, true, marker.skinId,
+                    identity, "", "", marker.nameColor);
+        }
+        return account.length() == 0 ? null
                 : new Target(marker.senderId, marker.accountIdentity,
                         marker.skinId, identity, title, account,
                         marker.nameColor);
@@ -426,6 +483,11 @@ final class LostTalesChatHoverCard {
      * identity after a switch.
      */
     private static CharacterAppearance detailsFor(Target target) {
+        if (target.npcIdentity) {
+            // Nothing in the appearance sync describes an NPC; its card
+            // carries what its speech was captured with instead.
+            return null;
+        }
         CharacterAppearance appearance =
                 ClientCharacterAppearanceCache.getAuthoritative(
                         target.playerId);
@@ -443,7 +505,10 @@ final class LostTalesChatHoverCard {
 
     private static void drawHead(Minecraft minecraft, Target target,
                                  float x, float y) {
-        if (target.accountIdentity) {
+        if (target.npcIdentity) {
+            LostTalesCharacterHeadIconRenderer.drawNpcHead(minecraft,
+                    target.skinId, x, y, HEAD_SIZE, 1.0F, 1.0F);
+        } else if (target.accountIdentity) {
             LostTalesCharacterHeadIconRenderer.drawAccountHead(
                     minecraft, target.playerId, x, y,
                     HEAD_SIZE, 1.0F, 1.0F);
@@ -497,6 +562,11 @@ final class LostTalesChatHoverCard {
     private static final class Target {
         final UUID playerId;
         final boolean accountIdentity;
+        /** An NPC's card: the portrait for a head, no account, and the
+         *  faction its speech was captured with — a player's card in
+         *  everything but the data behind it. */
+        final boolean npcIdentity;
+        /** The skin snapshot id, or the portrait path for an NPC. */
         final String skinId;
         final String identityName;
         final String title;
@@ -506,8 +576,16 @@ final class LostTalesChatHoverCard {
         Target(UUID playerId, boolean accountIdentity, String skinId,
                String identityName, String title, String accountName,
                int nameColor) {
+            this(playerId, accountIdentity, false, skinId, identityName,
+                    title, accountName, nameColor);
+        }
+
+        Target(UUID playerId, boolean accountIdentity, boolean npcIdentity,
+               String skinId, String identityName, String title,
+               String accountName, int nameColor) {
             this.playerId = playerId;
             this.accountIdentity = accountIdentity;
+            this.npcIdentity = npcIdentity;
             this.skinId = skinId == null ? "" : skinId;
             this.identityName = identityName;
             this.title = title;

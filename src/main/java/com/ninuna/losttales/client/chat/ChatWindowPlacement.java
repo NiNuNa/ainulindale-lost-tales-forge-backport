@@ -33,8 +33,15 @@ import org.lwjgl.input.Mouse;
  * the mouse instead of stepping by whole GUI pixels.</p>
  */
 public final class ChatWindowPlacement {
-    /** Height of a window's input bar: exactly the tab row's, so the
-     *  window is framed by two strips of one height. */
+    /** Height of a window's bar strip: exactly the tab row's, so the
+     *  window is framed by two strips of one height, each carrying its
+     *  rule on the edge facing the messages — the tab strip's last row
+     *  is the top rule, the bar strip's first row the bottom one.
+     *  <p>The strips are deliberately UI chrome and do not follow the
+     *  vanilla chat-scale setting, exactly as vanilla's own input line
+     *  does not: the setting scales what is read (the message stride,
+     *  and with it the trailing strip), never what is operated. That
+     *  asymmetry is a decision, not an oversight.</p> */
     public static final int INPUT_HEIGHT = ChatChannelTabBar.ROW_HEIGHT;
     /**
      * How much of a window's width its messages may fill before they
@@ -87,7 +94,8 @@ public final class ChatWindowPlacement {
             return this.y + this.height;
         }
 
-        /** Top of the input bar: directly under the bottom rule. */
+        /** Top of the bar strip: the bottom rule is its first pixel
+         *  row, and the bar's own furniture starts one row below it. */
         public double barTop() {
             return baseline() + this.barHeight - INPUT_HEIGHT;
         }
@@ -168,26 +176,22 @@ public final class ChatWindowPlacement {
         return Math.max(1, (int)Math.round(lineStride(minecraft)));
     }
 
-    /** The backdrop padding above the top line and below the newest. */
-    public static int linePadding(Minecraft minecraft) {
-        GuiNewChat chat = chat(minecraft);
-        float scale = chat == null ? 1.0F : chat.func_146244_h();
-        return Math.max(1, Math.round(
-                LostTalesChatOverlayRenderer.LINE_PADDING * scale));
-    }
-
-    /** What stands above the lines: the tab row and the top padding. */
+    /** What stands above the lines: the tab row, whose last pixel row
+     *  is the window's top rule. Chrome, so it keeps its size at every
+     *  chat scale; see {@link #INPUT_HEIGHT}. */
     public static int rowHeight(Minecraft minecraft) {
-        return ChatChannelTabBar.ROW_HEIGHT + linePadding(minecraft);
+        return ChatChannelTabBar.ROW_HEIGHT;
     }
 
-    /** What hangs below the baseline: the padding and the bar, which
-     *  stands directly under the window's bottom rule. */
+    /** What hangs below the baseline: the trailing strip — one line of
+     *  always visible room between the newest message and the bottom
+     *  rule, where the typing line lives — and the bar strip, whose
+     *  first pixel row is the window's bottom rule. */
     public static int barHeight(Minecraft minecraft) {
-        return linePadding(minecraft) + INPUT_HEIGHT;
+        return lineHeight(minecraft) + INPUT_HEIGHT;
     }
 
-    /** The smallest box: tab row, one empty line, gap, input bar. */
+    /** The smallest box: tab row, one empty line, trailing strip, bar. */
     public static int minHeight(Minecraft minecraft) {
         return rowHeight(minecraft) + lineHeight(minecraft)
                 + barHeight(minecraft);

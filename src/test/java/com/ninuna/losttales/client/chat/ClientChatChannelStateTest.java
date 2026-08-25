@@ -55,36 +55,46 @@ public final class ClientChatChannelStateTest {
     }
 
     @Test
-    public void accountOnlyPlayersReadGlobalButOnlyTalkInOoc() {
-        // Global stays readable (achievements live there) but not sendable.
+    public void accountOnlyPlayersTalkAnywhereWithTheAccount() {
+        // Identity no longer gates a channel: without a character, Global
+        // and Proximity are spoken with the account appearance. Only
+        // membership channels stay closed — Faction and Party need the
+        // active character to belong somewhere.
         assertTrue(ClientChatChannelState.isAvailable(ChatChannel.ALL));
-        assertFalse(ClientChatChannelState.canSend(ChatChannel.ALL));
-        assertFalse(ClientChatChannelState.isAvailable(
+        assertTrue(ClientChatChannelState.canSend(ChatChannel.ALL));
+        assertTrue(ClientChatChannelState.isAvailable(
                 ChatChannel.PROXIMITY));
+        assertTrue(ClientChatChannelState.canSend(ChatChannel.PROXIMITY));
+        assertFalse(ClientChatChannelState.canSend(ChatChannel.FACTION));
+        assertFalse(ClientChatChannelState.canSend(ChatChannel.PARTY));
         assertTrue(ClientChatChannelState.isAvailable(ChatChannel.OOC));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.OOC));
         // The console is always there; Admin only once the server says so.
-        assertEquals(java.util.Arrays.asList(ChatChannel.ALL, ChatChannel.OOC,
-                ChatChannel.CONSOLE),
+        assertEquals(java.util.Arrays.asList(ChatChannel.ALL,
+                ChatChannel.PROXIMITY, ChatChannel.OOC, ChatChannel.CONSOLE),
                 ClientChatChannelState.getAvailableChannels());
-        // TAB cycles inside the selected channel's own window: Global and
-        // OOC share the conversation window, the console lives elsewhere.
+        // TAB cycles inside the selected channel's own window: Global,
+        // OOC and Proximity share the conversation window, the console
+        // lives elsewhere.
         ClientChatChannelState.select(ChatChannel.OOC);
         assertEquals(ChatChannel.ALL, ClientChatChannelState.cycle().getChannel());
+        assertEquals(ChatChannel.PROXIMITY,
+                ClientChatChannelState.cycle().getChannel());
         assertEquals(ChatChannel.OOC, ClientChatChannelState.cycle().getChannel());
         ClientChatChannelState.select(ChatChannel.CONSOLE);
         assertEquals(ChatChannel.CONSOLE, ClientChatChannelState.cycle().getChannel());
         assertFalse(ClientChatChannelState.canSend(ChatChannel.ADMIN));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.CONSOLE));
         ClientChatChannelState.setAdminAccess(true);
-        assertEquals(java.util.Arrays.asList(ChatChannel.ALL, ChatChannel.OOC,
-                ChatChannel.ADMIN, ChatChannel.CONSOLE),
+        assertEquals(java.util.Arrays.asList(ChatChannel.ALL,
+                ChatChannel.PROXIMITY, ChatChannel.OOC, ChatChannel.ADMIN,
+                ChatChannel.CONSOLE),
                 ClientChatChannelState.getAvailableChannels());
         ClientChatChannelState.select(ChatChannel.ADMIN);
         ClientChatChannelState.setAdminAccess(false);
         // Losing op status drops the selection back to a channel the
-        // player can talk in: OOC, since there is no character here.
-        assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelectedChannel());
+        // player can talk in: Global, sendable with the account now.
+        assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
         ClientChatChannelState.setDraft("unsent text");
         assertEquals("unsent text", ClientChatChannelState.getDraft());
         // Drafts belong to the tab they were typed in.
@@ -99,12 +109,13 @@ public final class ClientChatChannelStateTest {
         assertEquals("unsent text", ClientChatChannelState.getDraft());
         ClientChatChannelState.clear();
         assertEquals("", ClientChatChannelState.getDraft());
-        // Global is the readable default; OOC is where the player can talk.
         assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
         ClientChatChannelState.select(ChatChannel.OOC);
         assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelectedChannel());
+        // Proximity is selectable without a character now.
         ClientChatChannelState.select(ChatChannel.PROXIMITY);
-        assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelectedChannel());
+        assertEquals(ChatChannel.PROXIMITY,
+                ClientChatChannelState.getSelectedChannel());
     }
 
     @Test
@@ -202,11 +213,15 @@ public final class ClientChatChannelStateTest {
                 ClientChatChannelState.cycle().getChannel());
         assertEquals(ChatChannel.ALL,
                 ClientChatChannelState.cycleAll(false).getChannel());
+        assertEquals(ChatChannel.PROXIMITY,
+                ClientChatChannelState.cycleAll(false).getChannel());
         assertEquals(ChatChannel.OOC,
                 ClientChatChannelState.cycleAll(false).getChannel());
         assertEquals(ChatChannel.CONSOLE,
                 ClientChatChannelState.cycleAll(false).getChannel());
         assertEquals(ChatChannel.OOC,
+                ClientChatChannelState.cycleAll(true).getChannel());
+        assertEquals(ChatChannel.PROXIMITY,
                 ClientChatChannelState.cycleAll(true).getChannel());
         assertEquals(ChatChannel.ALL,
                 ClientChatChannelState.cycleAll(true).getChannel());

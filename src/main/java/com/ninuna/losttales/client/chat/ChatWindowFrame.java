@@ -61,6 +61,13 @@ final class ChatWindowFrame {
     double stackTop;
     /** Message-line room of the box drawn this frame, in pixels. */
     int room;
+    /**
+     * The scroll offset the window was drawn at this frame, in lines.
+     * The typing line reads it: the trailing strip belongs to the
+     * history while the view is scrolled back, and to the typing line
+     * only while the view rests on the newest message.
+     */
+    double renderedScrollLines;
     /** Top of the input bar at rest, one chat line below the baseline. */
     private double restingBarTop;
     /** Chat scale the box was drawn at; sizes one empty line. */
@@ -209,6 +216,7 @@ final class ChatWindowFrame {
         this.motionX = openingMotionX;
         this.motionY = openingMotionY;
         this.room = box.room;
+        this.renderedScrollLines = 0.0D;
         // Until the draw says otherwise the stack fills the box; an
         // empty window is corrected to its one placeholder line.
         this.stackTop = this.baseline + this.motionY - box.room;
@@ -282,15 +290,16 @@ final class ChatWindowFrame {
     }
 
     /**
-     * Bottom of the tab row (screen y, fractional): the padding above
-     * the drawn message stack. A full window's stack ends on its box's
-     * own edge, so the row and the box top never drift apart whatever
-     * the chat scale is; a window with fewer lines than it has room for
+     * Bottom of the tab row (screen y, fractional): the top of the drawn
+     * message stack, which the row stands directly on — its last pixel
+     * row is the window's top rule, and the first content pixel lies
+     * directly below it. A full window's stack ends on its box's own
+     * edge, so the row and the box top never drift apart whatever the
+     * chat scale is; a window with fewer lines than it has room for
      * carries its row down onto them.
      */
     double tabRowBottom() {
-        return this.stackTop - LostTalesChatOverlayRenderer.LINE_PADDING
-                * this.scale;
+        return this.stackTop;
     }
 
     /** Whether the point is inside this window's box. */

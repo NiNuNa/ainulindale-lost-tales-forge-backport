@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -48,6 +50,10 @@ final class ChatPopupMenu {
         final int color;
         /** The tab whose icon stands before the name, or null for none. */
         final ChatTab icon;
+        /** Player whose head stands before the name, or null for none. */
+        ChatHeadOwner head;
+        /** A sheet sprite before the name — the appearance lock — or null. */
+        ChatIconSheet sprite;
 
         Entry(String id, String label) {
             this(id, label, false, false, -1, null);
@@ -71,6 +77,27 @@ final class ChatPopupMenu {
         static Entry header(String label) {
             return new Entry("", label, true, false, -1, null);
         }
+
+        Entry withHead(java.util.UUID owner, String skinId) {
+            this.head = new ChatHeadOwner(owner, skinId);
+            return this;
+        }
+
+        Entry withSprite(ChatIconSheet sprite) {
+            this.sprite = sprite;
+            return this;
+        }
+    }
+
+    /** The head a row wears: an account's, or a character skin's. */
+    static final class ChatHeadOwner {
+        final java.util.UUID owner;
+        final String skinId;
+
+        ChatHeadOwner(java.util.UUID owner, String skinId) {
+            this.owner = owner;
+            this.skinId = skinId == null ? "" : skinId;
+        }
     }
 
     private String kind = "";
@@ -82,8 +109,17 @@ final class ChatPopupMenu {
     private int height;
     /** Left edge of the labels inside the menu, past any swatch column. */
     private int labelX = PADDING_X;
-    /** First row on show; rows above it lie past the top edge. */
+    /** First row asked for — the wheel's target; rows above it lie past
+     *  the top edge. */
     private int scrollRows;
+    /**
+     * The row offset the list is drawn at, easing toward
+     * {@link #scrollRows} with the chat's shared scroll motion so a
+     * wheel turn glides the rows instead of jumping them. Hit testing
+     * reads this too, so it always answers for what is on screen.
+     */
+    private double renderedScrollRows;
+    private long scrollNanos;
     /** Rows the menu has room for; the rest scroll. */
     private int visibleRows;
 
@@ -123,7 +159,8 @@ final class ChatPopupMenu {
         for (Entry entry : this.entries) {
             widest = Math.max(widest, font.getStringWidth(entry.label));
             swatches |= entry.color >= 0;
-            icons |= entry.icon != null;
+            icons |= entry.icon != null || entry.head != null
+                    || entry.sprite != null;
         }
         // One swatch column and one icon column for the whole list, so
         // the names line up; headers hang left of them with the padding.
@@ -139,6 +176,11 @@ final class ChatPopupMenu {
         this.y = Math.max(0, Math.min(screenHeight - this.height,
                 anchorBottom - this.height));
         this.scrollRows = clampScroll(keptScroll);
+        if (!samePlace) {
+            // A fresh opening starts where it is asked; only wheel turns
+            // on the open list glide.
+            this.renderedScrollRows = this.scrollRows;
+        }
     }
 
     /**
@@ -157,6 +199,7 @@ final class ChatPopupMenu {
         this.kind = "";
         this.channel = null;
         this.scrollRows = 0;
+        this.renderedScrollRows = 0.0D;
         this.visibleRows = 0;
     }
 
@@ -165,7 +208,8 @@ final class ChatPopupMenu {
                 && mouseY >= this.y && mouseY < this.y + this.height;
     }
 
-    /** Moves the list by whole rows; beyond either end it stays put. */
+    /** Moves the list's target by whole rows; beyond either end it stays
+     *  put. The drawn rows glide after the target. */
     void scrollBy(int rows) {
         this.scrollRows = clampScroll(this.scrollRows + rows);
     }
@@ -175,17 +219,37 @@ final class ChatPopupMenu {
                 this.entries.size() - this.visibleRows, rows));
     }
 
-    /** The clickable entry under the point; headers are nobody's. */
+    /**
+     * Advances the drawn offset toward its target, once per drawn
+     * frame; with chat animations off it simply arrives.
+     */
+    private void advanceScrollEasing() {
+        long now = System.nanoTime();
+        double elapsed = (now - this.scrollNanos) / 1.0E9D;
+        this.scrollNanos = now;
+        if (!LostTalesConfig.enableChatAnimations
+                || Math.abs(this.scrollRows - this.renderedScrollRows)
+                        <= 0.01D) {
+            this.renderedScrollRows = this.scrollRows;
+            return;
+        }
+        this.renderedScrollRows = LostTalesChatMotion.approach(
+                this.renderedScrollRows, this.scrollRows, elapsed,
+                LostTalesChatMotion.SCROLL_EASE_SECONDS);
+    }
+
+    /** The clickable entry under the point, resolved against the drawn
+     *  offset so a gliding list answers for what is on screen; headers
+     *  and the padding bands are nobody's. */
     Entry entryAt(int mouseX, int mouseY) {
-        if (!contains(mouseX, mouseY)) {
+        if (!contains(mouseX, mouseY)
+                || mouseY < this.y + PADDING_Y
+                || mouseY >= this.y + this.height - PADDING_Y) {
             return null;
         }
-        int row = (mouseY - this.y - PADDING_Y) / ROW_HEIGHT;
-        if (row < 0 || row >= this.visibleRows) {
-            return null;
-        }
-        int index = this.scrollRows + row;
-        Entry entry = index < this.entries.size()
+        int index = (int)Math.floor((mouseY - this.y - PADDING_Y)
+                / (double)ROW_HEIGHT + this.renderedScrollRows);
+        Entry entry = index >= 0 && index < this.entries.size()
                 ? this.entries.get(index) : null;
         return entry == null || entry.header ? null : entry;
     }
@@ -219,11 +283,22 @@ final class ChatPopupMenu {
                 outline);
         Gui.drawRect(this.x + this.width - 1, this.y, this.x + this.width,
                 this.y + this.height, outline);
+        advanceScrollEasing();
         Entry hovered = entryAt(mouseX, mouseY);
-        int rowY = this.y + PADDING_Y;
+        // Rows are laid out from the drawn offset — whole rows pick where
+        // the list starts, the fraction slides it — and clipped to the
+        // menu's interior so the glide never paints over its frame; one
+        // extra row fills the gap the slide opens.
+        int firstRow = (int)Math.floor(this.renderedScrollRows);
+        int rowY = this.y + PADDING_Y - (int)Math.round(
+                (this.renderedScrollRows - firstRow) * ROW_HEIGHT);
         int last = Math.min(this.entries.size(),
-                this.scrollRows + this.visibleRows);
-        for (int index = this.scrollRows; index < last; index++) {
+                firstRow + this.visibleRows + 1);
+        boolean clipped = LostTalesChatOverlayRenderer.beginVerticalClip(
+                Minecraft.getMinecraft(), this.y + PADDING_Y - 1.0D,
+                this.y + this.height - PADDING_Y + 1.0D, false);
+        try {
+        for (int index = Math.max(0, firstRow); index < last; index++) {
             Entry entry = this.entries.get(index);
             if (entry.header) {
                 // The section's name over a hairline, in the sand the
@@ -255,6 +330,26 @@ final class ChatPopupMenu {
                         this.x + this.labelX - ChatChannelIcons.SIZE
                                 - ChatChannelIcons.GAP,
                         rowY + 0.5F, 255);
+            } else if (entry.head != null) {
+                // A head drawn as the tabs draw theirs: eight pixels,
+                // centred in the icon column.
+                float headX = this.x + this.labelX - ChatChannelIcons.SIZE
+                        - ChatChannelIcons.GAP + 1.0F;
+                if (entry.head.skinId.length() == 0) {
+                    LostTalesCharacterHeadIconRenderer.drawAccountHead(
+                            Minecraft.getMinecraft(), entry.head.owner,
+                            headX, rowY + 1.5F, 8.0F, 1.0F, 1.0F);
+                } else {
+                    LostTalesCharacterHeadIconRenderer.drawSnapshotHead(
+                            Minecraft.getMinecraft(), entry.head.owner,
+                            entry.head.skinId, headX, rowY + 1.5F, 8.0F,
+                            1.0F, 1.0F);
+                }
+            } else if (entry.sprite != null) {
+                entry.sprite.drawWithShadow(
+                        this.x + this.labelX - ChatChannelIcons.SIZE
+                                - ChatChannelIcons.GAP + 1,
+                        rowY + 2, 255);
             }
             // Text at full opacity always; a muted channel is italic, the
             // hovered row is told by its highlight.
@@ -262,6 +357,9 @@ final class ChatPopupMenu {
                     entry.dim ? "§o" + entry.label : entry.label,
                     this.x + this.labelX, rowY + 2, 255);
             rowY += ROW_HEIGHT;
+        }
+        } finally {
+            LostTalesChatOverlayRenderer.endVerticalClip(clipped);
         }
         // A hairline on an edge the list continues past.
         if (this.scrollRows > 0) {

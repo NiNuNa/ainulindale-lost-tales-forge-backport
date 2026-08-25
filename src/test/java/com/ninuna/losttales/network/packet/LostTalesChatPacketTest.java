@@ -65,6 +65,46 @@ public final class LostTalesChatPacketTest {
     }
 
     @Test
+    public void sendRequestCarriesTheAskedForAppearance() {
+        assertEquals(LostTalesChatSendPacket.APPEARANCE_DEFAULT,
+                new LostTalesChatSendPacket(ChatChannel.ALL, "hello")
+                        .getAppearanceKind());
+        java.util.UUID characterId = java.util.UUID.randomUUID();
+        LostTalesChatSendPacket original = new LostTalesChatSendPacket(
+                ChatChannel.OOC, "hello", null, "",
+                LostTalesChatSendPacket.APPEARANCE_CHARACTER, characterId);
+        ByteBuf buffer = Unpooled.buffer();
+        original.toBytes(buffer);
+        LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(LostTalesChatSendPacket.APPEARANCE_CHARACTER,
+                decoded.getAppearanceKind());
+        assertEquals(characterId, decoded.getAppearanceCharacterId());
+
+        LostTalesChatSendPacket account = new LostTalesChatSendPacket(
+                ChatChannel.ALL, "hello", null, "",
+                LostTalesChatSendPacket.APPEARANCE_ACCOUNT, null);
+        ByteBuf accountBuffer = Unpooled.buffer();
+        account.toBytes(accountBuffer);
+        LostTalesChatSendPacket decodedAccount =
+                new LostTalesChatSendPacket();
+        decodedAccount.fromBytes(accountBuffer);
+        assertFalse(decodedAccount.isMalformed());
+        assertEquals(LostTalesChatSendPacket.APPEARANCE_ACCOUNT,
+                decodedAccount.getAppearanceKind());
+        assertNull(decodedAccount.getAppearanceCharacterId());
+
+        // A kind the catalogue does not know is malformed on arrival.
+        ByteBuf badKind = Unpooled.buffer();
+        account.toBytes(badKind);
+        badKind.setByte(badKind.writerIndex() - 1, 9);
+        LostTalesChatSendPacket rejected = new LostTalesChatSendPacket();
+        rejected.fromBytes(badKind);
+        assertTrue(rejected.isMalformed());
+    }
+
+    @Test
     public void sendRequestCarriesBoundedShareReferences() {
         LostTalesChatSendPacket original = new LostTalesChatSendPacket(
                 ChatChannel.ALL, "see [i:Sword] [m:Bree] [i:Bow]",

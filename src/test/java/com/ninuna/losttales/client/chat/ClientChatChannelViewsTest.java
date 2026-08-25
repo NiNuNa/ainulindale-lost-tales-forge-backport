@@ -252,6 +252,21 @@ public final class ClientChatChannelViewsTest {
         ClientChatChannelViews.resetScroll();
     }
 
+    /**
+     * A view whose lines all fit its window does not scroll at all, so
+     * no scroll can push the newest message off the baseline.
+     */
+    @Test
+    public void aViewThatFitsItsWindowDoesNotScroll() {
+        ClientChatChannelViews.scroll(ChatChannel.ALL, 100, 10, 10.0D);
+        assertEquals(0.0D, ClientChatChannelViews.getScroll(
+                ChatChannel.ALL, 10, 10.0D), 0.0D);
+        ClientChatChannelViews.scroll(ChatChannel.ALL, 100, 8, 12.5D);
+        assertEquals(0.0D, ClientChatChannelViews.getScroll(
+                ChatChannel.ALL, 8, 12.5D), 0.0D);
+        ClientChatChannelViews.resetScroll();
+    }
+
     /** The bound follows the history's capacity, so every kept line has its tab. */
     @Test
     public void trackingIsBoundedByTheHistoryCapacity() {

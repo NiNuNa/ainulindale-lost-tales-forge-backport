@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
@@ -57,6 +58,13 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * lines, where the server also colours the name by the primary role.
      */
     private int roles;
+    /**
+     * Whether the line wears the account identity. With appearances the
+     * channel no longer decides this — a character may speak in OOC and
+     * the account in Global — so the line says it itself; heads and skin
+     * caching follow it.
+     */
+    private boolean accountLine;
     private boolean malformed;
 
     public LostTalesChatMessagePacket() {}
@@ -112,6 +120,21 @@ public final class LostTalesChatMessagePacket implements IMessage {
             String message, long timestampMillis, String skinId,
             List<ChatShowcase> showcases, String factionName,
             String partner, int roles) {
+        this(channel, senderId, identityName, accountName, title,
+                titleColor, nameColor, message, timestampMillis, skinId,
+                showcases, factionName, partner, roles,
+                channel != null && channel.getIdentityType()
+                        == ChatIdentityType.ACCOUNT);
+    }
+
+    public LostTalesChatMessagePacket(
+            ChatChannel channel, UUID senderId, String identityName,
+            String accountName, String title,
+            int titleColor, int nameColor,
+            String message, long timestampMillis, String skinId,
+            List<ChatShowcase> showcases, String factionName,
+            String partner, int roles, boolean accountLine) {
+        this.accountLine = accountLine;
         this.roles = roles;
         this.partner = partner == null ? "" : partner.trim();
         this.channelId = channel == null ? "" : channel.getId();
@@ -171,6 +194,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.partner = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_ACCOUNT_NAME_BYTES).trim();
             this.roles = buffer.readUnsignedByte();
+            this.accountLine = buffer.readBoolean();
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -179,6 +203,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.factionName = "";
             this.partner = "";
             this.roles = 0;
+            this.accountLine = false;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -260,6 +285,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.partner, MAX_ACCOUNT_NAME_BYTES);
         buffer.writeByte(this.roles);
+        buffer.writeBoolean(this.accountLine);
     }
 
     private void validate() {
@@ -323,6 +349,9 @@ public final class LostTalesChatMessagePacket implements IMessage {
     public String getPartner() { return this.partner; }
     /** The sender's role mask, as the server states it; see {@link ChatAccountRole}. */
     public int getRoles() { return this.roles; }
+    /** Whether the line wears the account identity rather than a
+     *  character's; heads and skin caching follow this. */
+    public boolean isAccountLine() { return this.accountLine; }
     /** Validated showcases keyed by token index; never null. */
     public List<ChatShowcase> getShowcases() { return this.showcases; }
     public boolean isMalformed() { return this.malformed; }

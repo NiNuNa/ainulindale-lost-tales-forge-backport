@@ -265,21 +265,25 @@ final class ChatChannelTabBar {
         this.alphaScale = Math.max(0.0F, Math.min(1.0F, alphaScale));
         Hit hovered = hitAt(font, row, mouseX, mouseY);
         int bottom = row.rowBottom;
-        // Everything the strip draws stops short of the rule it ends
-        // on: a sprite's shadow falls a pixel down and right, and the
-        // rule is a hairline the window is bounded by, not something
-        // to cast onto. The rule itself is drawn after the clip.
+        // The window's title strip, ending exactly on the rule row:
+        // drawn outside the clip below, so the inward-rounded cut can
+        // never open a bright seam — anything a tab gives up to the cut
+        // shows this same surface.
+        Gui.drawRect(row.offsetX + row.left - 2, rowTop(bottom),
+                row.offsetX + row.right + 2, bottom - 1,
+                LostTalesChatVisualStyle.argb(
+                        LostTalesChatVisualStyle.SURFACE_RGB,
+                        scaled(LostTalesChatVisualStyle.SURFACE_ALPHA)));
+        // Everything else the strip draws stops short of the rule it
+        // ends on: a sprite's shadow falls a pixel down and right, and
+        // the rule is a hairline the window is bounded by, not something
+        // to cast onto. Inward, so not one display pixel of a tab or a
+        // shadow ever lands on the rule row; the rule itself is drawn
+        // after the clip.
         boolean clipped = LostTalesChatOverlayRenderer.beginVerticalClip(
                 Minecraft.getMinecraft(), Double.NaN,
-                row.rowBottomExact - 1.0D);
+                row.rowBottomExact - 1.0D, true);
         try {
-            // The window's title strip: tabs stand on it and the empty
-            // stretch after the controls is the grip.
-            Gui.drawRect(row.offsetX + row.left - 2, rowTop(bottom),
-                    row.offsetX + row.right + 2, bottom,
-                    LostTalesChatVisualStyle.argb(
-                            LostTalesChatVisualStyle.SURFACE_RGB,
-                            scaled(LostTalesChatVisualStyle.SURFACE_ALPHA)));
             // A window being dragged holds the grip's highlight wherever the
             // pointer has gone, the way a control keeps its pressed look.
             drawGrip(row.offsetX + this.controlsRight, row.offsetX + row.right,
