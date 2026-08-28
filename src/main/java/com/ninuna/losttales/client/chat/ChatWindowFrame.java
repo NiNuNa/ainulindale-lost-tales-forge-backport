@@ -79,6 +79,27 @@ final class ChatWindowFrame {
     /** Opening motion the window was drawn with this frame. */
     float motionX;
     float motionY;
+    /**
+     * The jump-to-present button drawn this frame, in screen GUI
+     * pixels; width zero while none was drawn. Recorded from the draw
+     * itself, like the bands, so the click and the pixels cannot
+     * disagree.
+     */
+    float jumpPillLeft;
+    float jumpPillTop;
+    float jumpPillRight;
+    float jumpPillBottom;
+    /** How far the button has flown in from below the rule, 0..1. */
+    float jumpButtonProgress;
+    /** When the fly-in was last advanced. */
+    long jumpButtonNanos;
+
+    /** Whether the point lies on the pill drawn this frame. */
+    boolean jumpPillContains(float x, float y) {
+        return this.drawn && this.jumpPillRight > this.jumpPillLeft
+                && x >= this.jumpPillLeft && x < this.jumpPillRight
+                && y >= this.jumpPillTop && y < this.jumpPillBottom;
+    }
 
     private ChatWindowFrame(String windowId) {
         this.windowId = windowId;

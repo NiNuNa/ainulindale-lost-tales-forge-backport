@@ -6,7 +6,9 @@ import net.minecraft.util.ChatComponentTranslation;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import static com.ninuna.losttales.chat.ChatChannel.CONSOLE;
 
@@ -65,5 +67,31 @@ public final class ChatSystemLineClassifierTest {
         // The key decides, never the rendered text.
         assertEquals(CONSOLE, ChatSystemLineClassifier.classify(
                 new ChatComponentText("death.attack.mob")));
+    }
+
+    @Test
+    public void achievementMentionsAreSilentButOthersSound() {
+        // Announcements name their player without addressing them: the
+        // mention highlights, the cue stays quiet.
+        assertTrue(ChatSystemLineClassifier.isMentionCueSilent(
+                new ChatComponentTranslation("chat.type.achievement",
+                        "Steve", new ChatComponentText("Taking Inventory"))));
+        assertTrue(ChatSystemLineClassifier.isMentionCueSilent(
+                new ChatComponentTranslation("chat.type.achievement.taken",
+                        "Steve", "x")));
+        assertTrue(ChatSystemLineClassifier.isMentionCueSilent(
+                new ChatComponentTranslation("chat.lotr.achievement",
+                        "Steve", "Middle-earth",
+                        new ChatComponentText("[First Steps]"))));
+        // Everything else keeps the audible cue.
+        assertFalse(ChatSystemLineClassifier.isMentionCueSilent(
+                new ChatComponentTranslation("death.attack.mob", "Steve",
+                        "Zombie")));
+        assertFalse(ChatSystemLineClassifier.isMentionCueSilent(
+                new ChatComponentTranslation("multiplayer.player.joined",
+                        "Steve")));
+        assertFalse(ChatSystemLineClassifier.isMentionCueSilent(
+                new ChatComponentText("plain text")));
+        assertFalse(ChatSystemLineClassifier.isMentionCueSilent(null));
     }
 }

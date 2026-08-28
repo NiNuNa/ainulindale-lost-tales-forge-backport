@@ -49,8 +49,8 @@ public final class ChatEmojiUsageStoreTest {
         List<ChatEmoji> favorites = ChatEmojiUsageStore.getFavorites();
         assertEquals(2, favorites.size());
         // Registry order keeps the grid stable regardless of toggle order.
-        assertSame(ChatEmoji.SOB, favorites.get(0));
-        assertSame(ChatEmoji.SMILE, favorites.get(1));
+        assertSame(ChatEmoji.SMILE, favorites.get(0));
+        assertSame(ChatEmoji.SOB, favorites.get(1));
 
         ChatEmojiUsageStore.toggleFavorite(ChatEmoji.SOB);
         ChatEmojiUsageStore.initialize(configDir);

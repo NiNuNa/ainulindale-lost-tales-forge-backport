@@ -2,24 +2,25 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import cpw.mods.fml.common.FMLLog;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiTextField;
-import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.item.EnumRarity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumChatFormatting;
-import org.lwjgl.opengl.GL11;
 
 /**
  * The chat's input field, drawn the way the rest of the chat is drawn.
@@ -40,17 +41,18 @@ import org.lwjgl.opengl.GL11;
  * <p>A share token whose item or marker the client can already resolve
  * — {@code [i:Stone Sword]}, {@code [m:Northgate]} — is shown as the
  * preview it will be in chat: the bracket, the icon, the real name, in
- * the rarity's or marker's colour. The raw text is untouched — it is
- * what goes on the wire — but while it is edited a resolved token
- * behaves as one character: the caret can stand on either side of it
- * and never inside, Left and Right step across it whole, Backspace
- * behind it and Delete before it remove all of it, a click lands on its
- * nearer edge, and a selection takes it whole or not at all. All of
- * that is one rule — {@link #snapOutsideTokens} — applied where every
- * caret and selection movement already converges
- * ({@link #setCursorPosition}, {@link #setSelectionPos}), so no key
- * needs handling of its own; an incomplete or unresolvable token is
- * plain text and edits as such.</p>
+ * the rarity's or marker's colour. A complete emoji shortcode —
+ * {@code :smile:} — is shown the same way, as the sprite it will be.
+ * The raw text is untouched — it is what goes on the wire — but while
+ * it is edited a resolved token behaves as one character: the caret can
+ * stand on either side of it and never inside, Left and Right step
+ * across it whole, Backspace behind it and Delete before it remove all
+ * of it, a click lands on its nearer edge, and a selection takes it
+ * whole or not at all. All of that is one rule —
+ * {@link #snapOutsideTokens} — applied where every caret and selection
+ * movement already converges ({@link #setCursorPosition},
+ * {@link #setSelectionPos}), so no key needs handling of its own; an
+ * incomplete or unresolvable token is plain text and edits as such.</p>
  *
  * <p>Two of vanilla's fields have no accessor — how far the text is
  * scrolled and the caret's blink — so they are read reflectively by both
@@ -111,6 +113,23 @@ final class ChatInputField extends GuiTextField {
         }
         List<TokenPreview> resolved = previewsFor(text);
         if (!resolved.isEmpty()) {
+            // Vanilla scrolls by raw character widths, but a token is
+            // drawn as one narrow element — ":creeper:" measures nine
+            // characters and draws ten pixels — so vanilla scrolls far
+            // too early and can rest inside a shortcode. The offset is
+            // recomputed from the drawn widths every frame and written
+            // back, so the field scrolls by what is actually on it and
+            // vanilla continues from the corrected position.
+            int corrected = correctedScrollOffset(text, resolved,
+                    scrollOffset);
+            if (corrected != scrollOffset) {
+                scrollOffset = corrected;
+                try {
+                    LINE_SCROLL_OFFSET.setInt(this, corrected);
+                } catch (IllegalAccessException ignored) {
+                    // The drawn frame still uses the corrected value.
+                }
+            }
             drawWithPreviews(text, resolved, scrollOffset, blink);
             return;
         }
@@ -159,9 +178,24 @@ final class ChatInputField extends GuiTextField {
         if (selection != caret && caretInside) {
             int selectionX = left + this.font.getStringWidth(
                     visible.substring(0, Math.max(0, selection)));
-            drawSelection(caretX, top - 1, selectionX - 1,
-                    top + 1 + this.font.FONT_HEIGHT);
+            drawSelection(caretX, selectionBandTop(top), selectionX - 1,
+                    selectionBandBottom(top));
         }
+    }
+
+    /**
+     * The wash spans the line band the content actually occupies —
+     * emoji boxes reach two rows above the glyph tops, descenders one
+     * below — so it sits centred on what is selected instead of
+     * hanging low on the glyphs alone.
+     */
+    private static int selectionBandTop(int textTop) {
+        return textTop + ChatInlineIcons.CONTENT_TOP_OFFSET;
+    }
+
+    private static int selectionBandBottom(int textTop) {
+        return textTop + ChatInlineIcons.CONTENT_TOP_OFFSET
+                + LostTalesChatOverlayRenderer.LINE_HEIGHT;
     }
 
     /** The caret in the palette's ivory, like the text it stands in. */
@@ -228,9 +262,14 @@ final class ChatInputField extends GuiTextField {
         return cursor;
     }
 
+    /** The selection band's wash: the palette's steel blue, translucent. */
+    private static final int SELECTION_ARGB = LostTalesChatVisualStyle.argb(
+            LostTalesColors.rgb(LostTalesColors.STEEL_BLUE), 0x66);
+
     /**
-     * The selection band, as vanilla draws it: an inverting quad, so the
-     * text under it stays legible whatever colour it is.
+     * The selection band: a translucent wash laid over the text — and
+     * over an emoji or token preview — rather than vanilla's colour
+     * inversion, which turned sprites into their negatives.
      */
     private void drawSelection(int left, int top, int right, int bottom) {
         int fromX = Math.min(left, right);
@@ -239,23 +278,13 @@ final class ChatInputField extends GuiTextField {
         int toY = Math.max(top, bottom);
         toX = Math.min(toX, this.xPosition + getWidth());
         fromX = Math.min(fromX, this.xPosition + getWidth());
-        Tessellator tessellator = Tessellator.instance;
-        GL11.glColor4f(0.0F, 0.0F, 1.0F, 1.0F);
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_COLOR_LOGIC_OP);
-        GL11.glLogicOp(GL11.GL_OR_REVERSE);
-        tessellator.startDrawingQuads();
-        tessellator.addVertex(toX, fromY, 0.0D);
-        tessellator.addVertex(fromX, fromY, 0.0D);
-        tessellator.addVertex(fromX, toY, 0.0D);
-        tessellator.addVertex(toX, toY, 0.0D);
-        tessellator.draw();
-        GL11.glDisable(GL11.GL_COLOR_LOGIC_OP);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        Gui.drawRect(fromX, fromY, toX, toY, SELECTION_ARGB);
     }
 
-    /** One resolved token: its raw span and its chat preview. */
+    /**
+     * One resolved token: its raw span and its chat preview — a share
+     * token's bracketed icon and name, or an emoji shortcode's sprite.
+     */
     private static final class TokenPreview {
         final int start;
         final int end;
@@ -263,6 +292,8 @@ final class ChatInputField extends GuiTextField {
         final ItemStack stack;
         final String markerIcon;
         final String name;
+        /** The emoji this span previews as; null for a share token. */
+        final ChatEmoji emoji;
         /** The brackets' and name's colour (white reads as ivory). */
         final int rgb;
         /** The marker artwork's exact colour; white stays untinted. */
@@ -279,9 +310,23 @@ final class ChatInputField extends GuiTextField {
             this.stack = stack;
             this.markerIcon = markerIcon;
             this.name = name;
+            this.emoji = null;
             this.rgb = rgb;
             this.iconRgb = iconRgb;
             this.width = width;
+        }
+
+        TokenPreview(int start, int end, ChatEmoji emoji) {
+            this.start = start;
+            this.end = end;
+            this.kind = null;
+            this.stack = null;
+            this.markerIcon = "";
+            this.name = "";
+            this.emoji = emoji;
+            this.rgb = 0;
+            this.iconRgb = 0;
+            this.width = ChatInlineIcons.SLOT_WIDTH;
         }
     }
 
@@ -300,6 +345,17 @@ final class ChatInputField extends GuiTextField {
     }
 
     private List<TokenPreview> buildPreviews(String text) {
+        List<TokenPreview> result = buildSharePreviews(text);
+        // A command never previews: what is typed is what runs, and a
+        // completed shortcode in one is an argument, not an emoji.
+        if (LostTalesConfig.enableChatEmojis && !text.startsWith("/")
+                && text.indexOf(':') >= 0) {
+            result = mergeEmojiPreviews(text, result);
+        }
+        return result;
+    }
+
+    private List<TokenPreview> buildSharePreviews(String text) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft == null || minecraft.thePlayer == null
                 || text.indexOf('[') < 0) {
@@ -344,6 +400,76 @@ final class ChatInputField extends GuiTextField {
             }
         }
         return result;
+    }
+
+    /**
+     * Adds a preview for every complete {@code :name:} of a registered
+     * emoji, exactly the spans the sent message will draw as sprites —
+     * an alias or an unfinished name stays the literal text it is —
+     * merged in span order with the share previews, whose tokens a
+     * shortcode can never overlap ({@code :} is not a share-name
+     * character, so a share token's span never parses as an emoji).
+     */
+    private static List<TokenPreview> mergeEmojiPreviews(
+            String text, List<TokenPreview> shares) {
+        List<TokenPreview> merged = new ArrayList<TokenPreview>(shares);
+        int index = 0;
+        int length = text.length();
+        while (index < length) {
+            if (text.charAt(index) != ':') {
+                index++;
+                continue;
+            }
+            int nameEnd = scanEmojiName(text, index + 1);
+            ChatEmoji emoji = nameEnd > index + 1 && nameEnd < length
+                    && text.charAt(nameEnd) == ':'
+                    ? ChatEmoji.fromName(text.substring(index + 1, nameEnd))
+                    : null;
+            if (emoji == null || overlapsAny(shares, index, nameEnd + 1)) {
+                index++;
+                continue;
+            }
+            merged.add(new TokenPreview(index, nameEnd + 1, emoji));
+            index = nameEnd + 1;
+        }
+        if (merged.size() == shares.size()) {
+            return shares;
+        }
+        Collections.sort(merged, new Comparator<TokenPreview>() {
+            @Override
+            public int compare(TokenPreview left, TokenPreview right) {
+                return left.start - right.start;
+            }
+        });
+        return merged;
+    }
+
+    /** The parser's name scan: lowercase, digits, underscores, bounded. */
+    private static int scanEmojiName(String text, int start) {
+        int limit = Math.min(text.length(),
+                start + ChatEmoji.longestName());
+        int index = start;
+        while (index < limit && isEmojiNameCharacter(text.charAt(index))) {
+            index++;
+        }
+        return index;
+    }
+
+    private static boolean isEmojiNameCharacter(char character) {
+        return (character >= 'a' && character <= 'z')
+                || (character >= '0' && character <= '9')
+                || character == '_';
+    }
+
+    private static boolean overlapsAny(List<TokenPreview> previews,
+                                       int start, int end) {
+        for (int index = 0; index < previews.size(); index++) {
+            TokenPreview preview = previews.get(index);
+            if (start < preview.end && end > preview.start) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private TokenPreview itemPreview(ChatShareTokenParser.Token token,
@@ -422,8 +548,8 @@ final class ChatInputField extends GuiTextField {
                     Math.min(selection, visibleEnd));
             int selectionX = left + displayedX(text, resolved, scrollOffset,
                     clamped);
-            drawSelection(caretX, top - 1, selectionX - 1,
-                    top + 1 + this.font.FONT_HEIGHT);
+            drawSelection(caretX, selectionBandTop(top), selectionX - 1,
+                    selectionBandBottom(top));
         }
     }
 
@@ -450,6 +576,16 @@ final class ChatInputField extends GuiTextField {
     /** The token as chat will show it: bracket, icon, name, bracket. */
     private int drawPreview(TokenPreview preview, int x, int y) {
         Minecraft minecraft = Minecraft.getMinecraft();
+        if (preview.emoji != null) {
+            // The shortcode as the sprite it will be in chat, in the
+            // same slot and box the message lines give it.
+            ChatInlineIcons.drawEmoji(minecraft, preview.emoji,
+                    ChatInlineIcons.boxLeft(x, ChatInlineIcons.SLOT_WIDTH),
+                    ChatInlineIcons.boxTop(y, ChatInlineIcons.SLOT_WIDTH),
+                    ChatInlineIcons.contentSize(ChatInlineIcons.SLOT_WIDTH),
+                    255);
+            return x + preview.width;
+        }
         LostTalesChatVisualStyle.drawColored(this.font, "[", x, y,
                 preview.rgb, 255);
         x += this.font.getStringWidth("[");
@@ -575,6 +711,71 @@ final class ChatInputField extends GuiTextField {
             cursor++;
         }
         return text.length();
+    }
+
+    /** The scroll offset moved off any token it came to rest inside. */
+    private static int snapScrollOutsideTokens(List<TokenPreview> previews,
+                                               int offset) {
+        for (int index = 0; index < previews.size(); index++) {
+            TokenPreview preview = previews.get(index);
+            if (offset > preview.start && offset < preview.end) {
+                return preview.start;
+            }
+        }
+        return offset;
+    }
+
+    /**
+     * The scroll offset the drawn field actually needs: zero while the
+     * whole text fits the box as drawn, otherwise the least offset —
+     * always on a token boundary — that keeps the caret visible and
+     * leaves no empty tail while text remains scrolled out on the left.
+     * Vanilla's own value is only the starting point; the field's
+     * previews make drawn and raw widths disagree, so the display model
+     * decides for itself.
+     */
+    private int correctedScrollOffset(String text,
+                                      List<TokenPreview> resolved,
+                                      int scrollOffset) {
+        int offset = snapScrollOutsideTokens(resolved, Math.max(0,
+                Math.min(scrollOffset, text.length())));
+        int room = getWidth();
+        if (displayedX(text, resolved, 0, text.length()) <= room) {
+            return 0;
+        }
+        int caret = Math.max(0,
+                Math.min(getCursorPosition(), text.length()));
+        if (caret < offset) {
+            offset = snapScrollOutsideTokens(resolved, caret);
+        }
+        while (offset < text.length() && caret > offset
+                + fittingRawCount(text, resolved, offset, room)) {
+            offset = stepOverTokens(resolved, offset + 1, true);
+        }
+        // Fill the box from the right: while everything from one step
+        // earlier to the end still fits as drawn, show it.
+        while (offset > 0) {
+            int previous = stepOverTokens(resolved, offset - 1, false);
+            if (displayedX(text, resolved, previous, text.length())
+                    <= room) {
+                offset = previous;
+            } else {
+                break;
+            }
+        }
+        return offset;
+    }
+
+    /** A position moved off any token, forward or back along the step. */
+    private static int stepOverTokens(List<TokenPreview> previews,
+                                      int position, boolean forward) {
+        for (int index = 0; index < previews.size(); index++) {
+            TokenPreview preview = previews.get(index);
+            if (position > preview.start && position < preview.end) {
+                return forward ? preview.end : preview.start;
+            }
+        }
+        return position;
     }
 
     /**

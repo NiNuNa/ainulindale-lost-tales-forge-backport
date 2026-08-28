@@ -58,6 +58,13 @@ public final class ClientChatChannelState {
     private static boolean discordAccess;
     /** Server-stated roles of this player; what {@code @Operator} reaches. */
     private static int roleMask;
+    /**
+     * Server-stated online role holders, account name to mask, in the
+     * order the server listed them: what the role hover card names its
+     * members from. Replaced whole with every access packet.
+     */
+    private static final LinkedHashMap<String, Integer> ROLE_HOLDERS =
+            new LinkedHashMap<String, Integer>();
     /** Unsent input kept across closing and reopening the chat screen. */
     /** Unsent text per tab, oldest first; bounded, whispers included. */
     private static final Map<ChatTab, String> DRAFTS =
@@ -445,7 +452,6 @@ public final class ClientChatChannelState {
                 ? channel.getDisplayName() : cachedFactionName;
     }
 
-    /** Applies the server's statement of operator status. */
     /**
      * The roles the server says this player holds. Only used to notice
      * that a role mention was addressed to this client: nothing here
@@ -464,6 +470,56 @@ public final class ClientChatChannelState {
         return ChatAccountRole.fromMask(roleMask);
     }
 
+    /** Replaces the online role roster with the server's statement. */
+    public static synchronized void setRoleHolders(
+            Map<String, Integer> holders) {
+        ROLE_HOLDERS.clear();
+        if (holders != null) {
+            for (Map.Entry<String, Integer> entry : holders.entrySet()) {
+                if (entry.getKey() != null && entry.getValue() != null
+                        && entry.getKey().trim().length() > 0
+                        && ChatAccountRole.isValidMask(
+                                entry.getValue().intValue())
+                        && entry.getValue().intValue() != 0) {
+                    ROLE_HOLDERS.put(entry.getKey().trim(),
+                            entry.getValue());
+                }
+            }
+        }
+    }
+
+    /** Online accounts holding the role, in the server's order. */
+    public static synchronized List<String> roleHolders(
+            ChatAccountRole role) {
+        if (role == null || role == ChatAccountRole.NONE) {
+            return Collections.emptyList();
+        }
+        List<String> names = new ArrayList<String>();
+        for (Map.Entry<String, Integer> entry : ROLE_HOLDERS.entrySet()) {
+            if ((entry.getValue().intValue() & role.bit()) != 0) {
+                names.add(entry.getKey());
+            }
+        }
+        return names;
+    }
+
+    /**
+     * The roles the roster says an online account holds; zero for one it
+     * does not list. Case-insensitive, like every account-name match.
+     */
+    public static synchronized int rosterRolesOf(String account) {
+        if (account == null || account.trim().length() == 0) {
+            return 0;
+        }
+        for (Map.Entry<String, Integer> entry : ROLE_HOLDERS.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(account.trim())) {
+                return entry.getValue().intValue();
+            }
+        }
+        return 0;
+    }
+
+    /** Applies the server's statement of operator status. */
     public static synchronized void setAdminAccess(boolean access) {
         adminAccess = access;
         ensureAvailable();
@@ -529,6 +585,7 @@ public final class ClientChatChannelState {
         adminAccess = false;
         discordAccess = false;
         roleMask = 0;
+        ROLE_HOLDERS.clear();
         DRAFTS.clear();
     }
 

@@ -38,6 +38,8 @@ public final class CharacterPlayerEventHandler {
         CharacterSwitchCoordinator.getInstance().saveActiveStateOnLogout(player);
         AccessoryInventorySyncManager.clearPlayer(player.getUniqueID());
         CharacterAppearanceSyncManager.broadcastRemoval(player.getUniqueID());
+        // The remaining players' role rosters follow the leave.
+        LostTalesChatService.sendAccessToAll(player);
         CharacterNetworkSecurity.clearPlayer(player.getUniqueID());
         CharacterSwitchCoordinator.getInstance().clearRuntimeState(player.getUniqueID());
     }
@@ -142,7 +144,13 @@ public final class CharacterPlayerEventHandler {
                 CharacterSyncManager.UNSOLICITED_REQUEST_ID,
                 result.getRoster());
         CharacterAppearanceSyncManager.sendFullSnapshot(serverPlayer);
-        LostTalesChatService.sendAccess(serverPlayer);
+        if (action == LifecycleAction.LOGIN) {
+            // Everyone's role roster follows the join, the joiner's own
+            // access included.
+            LostTalesChatService.sendAccessToAll(null);
+        } else {
+            LostTalesChatService.sendAccess(serverPlayer);
+        }
         CharacterRaceGameplayHandler.apply(serverPlayer);
         CharacterAppearanceSyncManager.broadcastPlayer(serverPlayer, result.getRoster());
         AccessoryRecoveryService.recover(serverPlayer);

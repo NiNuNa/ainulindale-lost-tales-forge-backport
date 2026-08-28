@@ -113,6 +113,7 @@ public final class LostTalesConfig {
     public static boolean showChatTimestamps = true;
     public static boolean enableChatEmojis = true;
     public static boolean convertChatEmoticons = true;
+    public static boolean enableChatMessageGrouping = true;
     public static boolean enableChatBackgroundBlur = true;
     public static boolean enableNpcChatStyling = true;
     public static boolean enableChatPings = true;
@@ -915,6 +916,12 @@ public final class LostTalesConfig {
                     CATEGORY_CLIENT,
                     convertChatEmoticons,
                     "Turn classic emoticons you type (:) :D <3 ...) into their emojis as the message is sent."
+            );
+            enableChatMessageGrouping = config.getBoolean(
+                    "enableChatMessageGrouping",
+                    CATEGORY_CLIENT,
+                    enableChatMessageGrouping,
+                    "Drop the repeated head and name when the same identity sends several messages in a row."
             );
             enableChatBackgroundBlur = config.getBoolean(
                     "enableChatBackgroundBlur",

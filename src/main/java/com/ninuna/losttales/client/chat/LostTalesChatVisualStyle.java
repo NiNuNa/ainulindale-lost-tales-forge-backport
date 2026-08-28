@@ -318,7 +318,11 @@ final class LostTalesChatVisualStyle {
             Integer prefixColor = ChatPrefixMarker.decode(part);
             Integer explicitColor = ChatColorMarker.decode(part);
             if (explicitColor == null) {
-                explicitColor = ChatMentionMarker.colorOf(part);
+                // A mention re-resolves as it is drawn, so one built
+                // before this client learned the roles behind the name
+                // catches up instead of keeping the fallback forever.
+                explicitColor = ChatMentionColors.liveMentionColor(
+                        ChatMentionMarker.decode(part));
             }
             if (explicitColor == null) {
                 explicitColor = ChatTitleMarker.colorOf(part);

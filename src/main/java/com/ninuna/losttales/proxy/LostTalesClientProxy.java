@@ -438,6 +438,14 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             ClientChatChannelState.setAdminAccess(packet.hasAdminAccess());
             ClientChatChannelState.setDiscordAccess(packet.hasDiscordAccess());
             ClientChatChannelState.setRoleMask(packet.getRoleMask());
+            java.util.LinkedHashMap<String, Integer> holders =
+                    new java.util.LinkedHashMap<String, Integer>();
+            for (LostTalesChatAccessPacket.RoleHolder holder
+                    : packet.getRoleHolders()) {
+                holders.put(holder.getName(),
+                        Integer.valueOf(holder.getMask()));
+            }
+            ClientChatChannelState.setRoleHolders(holders);
             // So a mention of this player is coloured from the first
             // frame, rather than only once they have said something.
             if (Minecraft.getMinecraft().thePlayer != null) {

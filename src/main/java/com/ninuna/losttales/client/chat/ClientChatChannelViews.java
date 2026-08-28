@@ -68,6 +68,15 @@ public final class ClientChatChannelViews {
             new HashMap<ChatTab, Integer>();
     private static final Map<ChatTab, Integer> UNREAD_OTHER =
             new HashMap<ChatTab, Integer>();
+    /**
+     * Where each tab's latest unread run begins: the divider the view
+     * draws above that line — "new since you last looked". Set when the
+     * first unread line of a run arrives, kept while the tab is being
+     * read (so the divider does not vanish the moment the tab opens),
+     * and replaced by the next run once this one has been seen.
+     */
+    private static final Map<ChatTab, UnreadDivider> UNREAD_DIVIDERS =
+            new HashMap<ChatTab, UnreadDivider>();
 
     private static long openedNanos;
     private static final LostTalesGuiAnimationState OPEN_STATE =
@@ -99,6 +108,10 @@ public final class ClientChatChannelViews {
                     ? UNREAD_PINGS : UNREAD_OTHER;
             counter.put(tab, Integer.valueOf(
                     Math.min(MAX_UNREAD + 1, count(counter, tab) + 1)));
+            UnreadDivider divider = UNREAD_DIVIDERS.get(tab);
+            if (divider == null || divider.seen) {
+                UNREAD_DIVIDERS.put(tab, new UnreadDivider(chatLineId));
+            }
         }
     }
 
@@ -140,6 +153,86 @@ public final class ClientChatChannelViews {
         if (tab != null) {
             UNREAD_PINGS.remove(tab);
             UNREAD_OTHER.remove(tab);
+            UnreadDivider divider = UNREAD_DIVIDERS.get(tab);
+            if (divider != null) {
+                // The divider stays while the tab is read; the next
+                // unread run replaces it.
+                divider.seen = true;
+            }
+        }
+    }
+
+    /**
+     * The line the tab's unread divider stands above, or null: the first
+     * line of the latest unread run.
+     */
+    public static synchronized Integer unreadDividerLine(ChatTab tab) {
+        UnreadDivider divider = tab == null ? null
+                : UNREAD_DIVIDERS.get(tab);
+        return divider == null ? null : Integer.valueOf(divider.lineId);
+    }
+
+    /** The divider's date label: the day its unread run began. */
+    public static synchronized String unreadDividerLabel(ChatTab tab) {
+        UnreadDivider divider = tab == null ? null
+                : UNREAD_DIVIDERS.get(tab);
+        return divider == null ? "" : divider.label;
+    }
+
+    /**
+     * Removes the tab's divider once its run has been seen: called when
+     * the player moves on — the tab is deselected, or the screen closes
+     * — so the divider shows while the new messages are being read and
+     * is gone the next time the tab opens, the way Discord's is.
+     */
+    public static synchronized void dismissSeenDivider(ChatTab tab) {
+        UnreadDivider divider = tab == null ? null
+                : UNREAD_DIVIDERS.get(tab);
+        if (divider != null && divider.seen) {
+            UNREAD_DIVIDERS.remove(tab);
+        }
+    }
+
+    /**
+     * Removes the tab's divider outright, seen or not: sending a
+     * message there says the conversation has moved on, the way it does
+     * on Discord.
+     */
+    public static synchronized void dismissDivider(ChatTab tab) {
+        if (tab != null) {
+            UNREAD_DIVIDERS.remove(tab);
+        }
+    }
+
+    /** As above for every tab at once; what closing the screen calls. */
+    public static synchronized void dismissSeenDividers() {
+        Iterator<Map.Entry<ChatTab, UnreadDivider>> iterator =
+                UNREAD_DIVIDERS.entrySet().iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next().getValue().seen) {
+                iterator.remove();
+            }
+        }
+    }
+
+    /** Sends the view back to the newest line; it glides there. */
+    public static synchronized void scrollHome(ChatTab view) {
+        if (view != null) {
+            SCROLL.remove(view);
+        }
+    }
+
+    /** One tab's divider: where the latest unread run starts. */
+    private static final class UnreadDivider {
+        final int lineId;
+        /** The run's day, formatted once when it began. */
+        final String label;
+        boolean seen;
+
+        UnreadDivider(int lineId) {
+            this.lineId = lineId;
+            this.label = java.text.DateFormat.getDateInstance(
+                    java.text.DateFormat.LONG).format(new java.util.Date());
         }
     }
 
@@ -428,6 +521,7 @@ public final class ClientChatChannelViews {
         RENDERED.clear();
         UNREAD_PINGS.clear();
         UNREAD_OTHER.clear();
+        UNREAD_DIVIDERS.clear();
         openedNanos = 0L;
         invalidateCache();
         ChatWindowLines.clear();

@@ -12,14 +12,29 @@ import net.minecraft.util.IChatComponent;
 import net.minecraft.util.ResourceLocation;
 
 /**
- * Called by the coremod in place of the plain chat print inside LOTR's
- * client-side NPC speech packet handler. Purely presentational: recipients,
- * speech content, immersive floating speech, and NPC behaviour are LOTR's.
- * LOTR sends speech to one player, so it shows as a whisper from the NPC.
- * Any failure falls back to LOTR's original yellow chat line.
+ * Called by the coremod inside LOTR's client-side NPC speech packet
+ * handler. Purely presentational: recipients, speech content, immersive
+ * floating speech, and NPC behaviour are LOTR's. LOTR sends speech to one
+ * player, so it shows as a whisper from the NPC — from the chat print
+ * when LOTR prints one, and from the immersive floating speech when it
+ * does not, so the words above an NPC's head are also kept where
+ * conversations are kept. Any failure of the chat-print path falls back
+ * to LOTR's original yellow chat line; a failure of the immersive path
+ * simply adds nothing.
  */
 public final class LostTalesNpcChatHook {
+    /**
+     * One packet can take both paths — immersive speech shown, then the
+     * chat log printed — microseconds apart; anything filed longer ago
+     * is a genuine repeat.
+     */
+    private static final long DUPLICATE_WINDOW_NANOS = 50L * 1000000L;
+
     private static volatile boolean failureLogged;
+    /** What the immersive path last filed, so the chat log never doubles it. */
+    private static int lastFiledEntityId = -1;
+    private static String lastFiledSpeech = "";
+    private static long lastFiledNanos;
 
     private LostTalesNpcChatHook() {}
 
@@ -28,30 +43,71 @@ public final class LostTalesNpcChatHook {
                                          LOTREntityNPC npc) {
         try {
             if (LostTalesConfig.enableNpcChatStyling && player != null
-                    && npc != null && original != null
-                    && printStyled(player, original, npc)) {
-                return;
+                    && npc != null && original != null) {
+                String name = npc.getCommandSenderName();
+                String speech = extractSpeech(
+                        original.getUnformattedText(), name);
+                if (isJustFiled(npc, speech)) {
+                    // The immersive path of this very packet already
+                    // delivered these words to the conversation.
+                    return;
+                }
+                if (name != null && name.length() > 0
+                        && speech.length() > 0
+                        && fileSpeech(npc, name, speech)) {
+                    return;
+                }
             }
         } catch (Throwable throwable) {
-            if (!failureLogged) {
-                failureLogged = true;
-                FMLLog.warning("[LostTales] Styled NPC chat failed; "
-                        + "falling back to LOTR's chat line: %s", throwable);
-            }
+            logFailureOnce(throwable);
         }
         if (player != null && original != null) {
             player.addChatMessage(original);
         }
     }
 
-    private static boolean printStyled(EntityPlayer player,
-                                       IChatComponent original,
-                                       LOTREntityNPC npc) {
-        String name = npc.getCommandSenderName();
-        String speech = extractSpeech(original.getUnformattedText(), name);
-        if (name == null || name.length() == 0 || speech.length() == 0) {
-            return false;
+    /**
+     * Called by the coremod right after LOTR shows its immersive
+     * floating speech: the same words are filed into the NPC's
+     * conversation tab, which is the only chat delivery this player gets
+     * while LOTR's chat log is off. The floating speech itself, and
+     * whether LOTR also prints a chat line, are untouched.
+     */
+    public static void addImmersiveSpeech(EntityPlayer player,
+                                          LOTREntityNPC npc,
+                                          String speech) {
+        try {
+            if (!LostTalesConfig.enableNpcChatStyling || player == null
+                    || npc == null || speech == null) {
+                return;
+            }
+            String plain = EnumChatFormatting.getTextWithoutFormattingCodes(
+                    speech);
+            plain = plain == null ? "" : plain.trim();
+            String name = npc.getCommandSenderName();
+            if (name == null || name.length() == 0 || plain.length() == 0) {
+                return;
+            }
+            if (fileSpeech(npc, name, plain)) {
+                lastFiledEntityId = npc.getEntityId();
+                lastFiledSpeech = plain;
+                lastFiledNanos = System.nanoTime();
+            }
+        } catch (Throwable throwable) {
+            logFailureOnce(throwable);
         }
+    }
+
+    /** Whether the immersive path filed exactly this speech just now. */
+    private static boolean isJustFiled(LOTREntityNPC npc, String speech) {
+        return npc.getEntityId() == lastFiledEntityId
+                && lastFiledSpeech.equals(speech)
+                && System.nanoTime() - lastFiledNanos
+                        < DUPLICATE_WINDOW_NANOS;
+    }
+
+    private static boolean fileSpeech(LOTREntityNPC npc, String name,
+                                      String speech) {
         // LOTR addresses its speech to this one player, so it is a
         // whisper from the NPC: a tab of its own, named after it, in the
         // NPC's own faction colour like a role-playing character's line.
@@ -61,6 +117,15 @@ public final class LostTalesNpcChatHook {
                 ChatTab.npc(name), npc.getUniqueID(), name,
                 texture == null ? "" : texture.toString(), speech,
                 nameColor(npc), factionName(npc));
+    }
+
+    private static void logFailureOnce(Throwable throwable) {
+        if (!failureLogged) {
+            failureLogged = true;
+            FMLLog.warning("[LostTales] Styled NPC chat failed; "
+                    + "falling back to LOTR's own presentation: %s",
+                    throwable);
+        }
     }
 
     /**

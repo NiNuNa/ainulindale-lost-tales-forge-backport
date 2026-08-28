@@ -83,16 +83,16 @@ public final class ChatEmojiSuggesterTest {
 
         List<ChatEmoji> sm = ChatEmojiSuggester.matches("sm", 8);
         assertEquals(4, sm.size());
-        assertSame(ChatEmoji.SMIRK, sm.get(0));
+        assertSame(ChatEmoji.SMILEY, sm.get(0));
         assertSame(ChatEmoji.SMILE, sm.get(1));
         assertSame(ChatEmoji.SMILING_FACE_WITH_TEAR, sm.get(2));
-        assertSame(ChatEmoji.SMILEY, sm.get(3));
+        assertSame(ChatEmoji.SMIRK, sm.get(3));
 
         // "s" also reaches LAUGHING and FROWNING through their aliases
         // (satisfied, slight_frown), so the limit fills.
         List<ChatEmoji> s = ChatEmojiSuggester.matches("s", 8);
         assertEquals(8, s.size());
-        assertSame(ChatEmoji.SLIGHT_SMILE, s.get(0));
+        assertSame(ChatEmoji.SMILEY, s.get(0));
 
         assertTrue(ChatEmojiSuggester.matches("", 8).isEmpty());
         assertTrue(ChatEmojiSuggester.matches("zz", 8).isEmpty());

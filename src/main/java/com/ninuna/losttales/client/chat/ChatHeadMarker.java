@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.nio.charset.Charset;
 import java.util.Base64;
 import java.util.UUID;
@@ -130,6 +131,18 @@ final class ChatHeadMarker {
         final String copyText;
         final int titleColor;
         final int nameColor;
+
+        /**
+         * Whether the line's sender is the Discord bridge, not an
+         * account: its head slot holds the Discord mark — the 10px
+         * emoji drawn 1:1 — and so is declared two pixels wider than a
+         * player head's.
+         */
+        boolean isDiscordSender() {
+            return this.accountIdentity
+                    && LostTalesChatMessagePacket.DISCORD_SENDER_ID.equals(
+                            this.senderId);
+        }
 
         private Data(UUID senderId, boolean accountIdentity,
                      boolean npcIdentity, String skinId,

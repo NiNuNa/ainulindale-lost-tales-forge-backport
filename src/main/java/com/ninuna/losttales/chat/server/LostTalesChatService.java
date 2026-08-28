@@ -32,7 +32,6 @@ import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyMember;
 import com.ninuna.losttales.party.server.PartyService;
 import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -45,14 +44,6 @@ import net.minecraft.util.ChatComponentTranslation;
 
 /** Authoritative recipient resolution and presentation snapshot for player chat. */
 public final class LostTalesChatService {
-    /**
-     * The sender every Discord line carries: a fixed id no account owns,
-     * so heads resolve to the default skin and nothing is looked up.
-     */
-    private static final UUID DISCORD_SENDER_ID = UUID.nameUUIDFromBytes(
-            "losttales:discord".getBytes(Charset.forName("UTF-8")));
-
-
     private LostTalesChatService() {}
 
     public static void send(EntityPlayerMP sender,
@@ -258,7 +249,8 @@ public final class LostTalesChatService {
         }
         int ivory = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
-                ChatChannel.DISCORD, DISCORD_SENDER_ID, displayName,
+                ChatChannel.DISCORD,
+                LostTalesChatMessagePacket.DISCORD_SENDER_ID, displayName,
                 displayName, "", ivory, ivory, message,
                 System.currentTimeMillis(), "", null, "", "", 0);
         FMLLog.info("[losttales/chat/discord] <%s (discord)> %s", displayName,
@@ -394,9 +386,16 @@ public final class LostTalesChatService {
      * message is refused, so the Admin tab follows the server's view of
      * op status without the client ever deciding it; the roles travel
      * with it so the client can notice a mention addressed to one of
-     * them.
+     * them. The roster of every online role holder rides along, which
+     * is what the role hover card names its members from.
      */
     public static void sendAccess(EntityPlayerMP player) {
+        sendAccess(player, roleHolders(null));
+    }
+
+    private static void sendAccess(
+            EntityPlayerMP player,
+            List<LostTalesChatAccessPacket.RoleHolder> roleHolders) {
         if (player == null || player.worldObj == null
                 || player.worldObj.isRemote) {
             return;
@@ -405,8 +404,84 @@ public final class LostTalesChatService {
                 new LostTalesChatAccessPacket(
                         LostTalesWaystonePermissionPolicy.isOperator(player),
                         LostTalesConfig.discordEnabled,
-                        ChatAccountRoleResolver.resolve(player)),
+                        ChatAccountRoleResolver.resolve(player),
+                        roleHolders),
                 player);
+    }
+
+    /**
+     * Sends every online player their access, all with one shared role
+     * roster: what a join or a leave calls, so each client's role card
+     * follows who is actually on. {@code leaving} is left out of the
+     * roster — a logging-out player may still be listed while the event
+     * runs — and receives nothing.
+     */
+    public static void sendAccessToAll(EntityPlayerMP leaving) {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null
+                || server.getConfigurationManager().playerEntityList == null) {
+            return;
+        }
+        List<LostTalesChatAccessPacket.RoleHolder> holders =
+                roleHolders(leaving);
+        LostTalesChatRoleRosterWatcher.noteBroadcast(signatureOf(holders));
+        @SuppressWarnings("unchecked")
+        List<EntityPlayerMP> online =
+                server.getConfigurationManager().playerEntityList;
+        for (EntityPlayerMP recipient : online) {
+            if (recipient != null && recipient != leaving) {
+                sendAccess(recipient, holders);
+            }
+        }
+    }
+
+    /** Fingerprint of the current roster, for the change watcher. */
+    static String roleRosterSignature() {
+        return signatureOf(roleHolders(null));
+    }
+
+    private static String signatureOf(
+            List<LostTalesChatAccessPacket.RoleHolder> holders) {
+        List<String> entries = new ArrayList<String>(holders.size());
+        for (LostTalesChatAccessPacket.RoleHolder holder : holders) {
+            entries.add(holder.getName().toLowerCase(java.util.Locale.ROOT)
+                    + ':' + holder.getMask());
+        }
+        Collections.sort(entries);
+        StringBuilder signature = new StringBuilder();
+        for (int index = 0; index < entries.size(); index++) {
+            signature.append(entries.get(index)).append(';');
+        }
+        return signature.toString();
+    }
+
+    /** Every online account holding a role, {@code excluded} left out. */
+    private static List<LostTalesChatAccessPacket.RoleHolder> roleHolders(
+            EntityPlayerMP excluded) {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null
+                || server.getConfigurationManager().playerEntityList == null) {
+            return Collections.emptyList();
+        }
+        @SuppressWarnings("unchecked")
+        List<EntityPlayerMP> online =
+                server.getConfigurationManager().playerEntityList;
+        List<LostTalesChatAccessPacket.RoleHolder> holders =
+                new ArrayList<LostTalesChatAccessPacket.RoleHolder>();
+        for (EntityPlayerMP player : online) {
+            if (player == null || player == excluded) {
+                continue;
+            }
+            int mask = ChatAccountRoleResolver.resolve(player);
+            if (mask != 0) {
+                holders.add(new LostTalesChatAccessPacket.RoleHolder(
+                        player.getGameProfile() == null
+                                ? player.getCommandSenderName()
+                                : player.getGameProfile().getName(),
+                        mask));
+            }
+        }
+        return holders;
     }
 
     /**

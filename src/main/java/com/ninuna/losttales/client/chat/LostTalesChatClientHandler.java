@@ -61,7 +61,8 @@ public final class LostTalesChatClientHandler {
         }
         ChatChannel channel = ChatSystemLineClassifier.classify(event.message);
         if (channel != null && LostTalesChatPresentation.receiveSystemLine(
-                event.message, channel)) {
+                event.message, channel,
+                !ChatSystemLineClassifier.isMentionCueSilent(event.message))) {
             event.setCanceled(true);
         }
     }
@@ -83,12 +84,18 @@ public final class LostTalesChatClientHandler {
 
     /**
      * Notices lines printed straight into the chat without passing
-     * through the received-chat event — a screenshot's saved-as notice,
-     * another mod's local print. They live in the console view, so the
-     * console reopens for them like it does for any message, unless it
-     * is hidden. Once per tick over the newest few history entries;
-     * everything Lost Tales routed is already filed by the time the tick
-     * runs, so only genuinely stray lines match.
+     * through the received-chat event — a game-mode change notice, a
+     * screenshot's saved-as notice, another mod's local print. Each one
+     * is adopted into the console: rebuilt in place as a system line
+     * with the channel prefix, the timestamp and a tracked id, and the
+     * history laid out again once, so a local print reads exactly like
+     * routed console output. The console reopens for them like it does
+     * for any message, unless it is hidden. Once per tick over the
+     * newest few history entries; everything Lost Tales routed is
+     * already filed by the time the tick runs, so only genuinely stray
+     * lines match. A stray printed under a deletable id of its own is
+     * left as it is — its printer may still replace it by that id — and
+     * only brings the console tab back.
      */
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
@@ -114,6 +121,7 @@ public final class LostTalesChatClientHandler {
                 return;
             }
             boolean stray = false;
+            boolean adopted = false;
             for (int index = 0; index < messages.size()
                     && index < UNTRACKED_SCAN_LIMIT; index++) {
                 ChatLine line = messages.get(index);
@@ -123,16 +131,30 @@ public final class LostTalesChatClientHandler {
                 if (line != null && ClientChatChannelViews.tabOf(
                         line.getChatLineID()) == null) {
                     stray = true;
-                    break;
+                    adopted |= LostTalesChatPresentation.adoptStrayLine(
+                            messages, index);
                 }
             }
             if (!stray) {
                 return;
             }
+            if (adopted) {
+                // The drawn lines are rebuilt from the adopted history,
+                // and the new head is remembered so the next tick does
+                // not rescan what was just adopted.
+                minecraft.ingameGUI.getChatGUI().refreshChat();
+                this.watchedHead = messages.isEmpty()
+                        ? null : messages.get(0);
+            }
             ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
             if (!ChatWindowLayout.isOpen(console)
                     && !ChatWindowLayout.isHidden(console)) {
-                ChatWindowLayout.openTab(console, null);
+                // The active window takes the tab first, like any other
+                // reopening channel.
+                ChatWindow selectedWindow = ChatWindowLayout.windowOf(
+                        ClientChatChannelState.getSelected());
+                ChatWindowLayout.openTab(console, selectedWindow == null
+                        ? null : selectedWindow.getId());
             }
         } catch (RuntimeException ignored) {
             // Watching is best-effort; the chat itself is untouched.

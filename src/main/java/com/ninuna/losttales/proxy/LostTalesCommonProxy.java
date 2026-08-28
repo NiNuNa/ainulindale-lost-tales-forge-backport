@@ -96,6 +96,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
+import com.ninuna.losttales.chat.server.LostTalesChatRoleRosterWatcher;
 import com.ninuna.losttales.world.waystone.LostTalesWaystoneGenerationHandler;
 import software.bernie.geckolib3.GeckoLib;
 
@@ -130,6 +131,8 @@ public class LostTalesCommonProxy {
                 new LostTalesChargeService();
         LostTalesWaystoneGenerationHandler waystoneGenerationHandler =
                 new LostTalesWaystoneGenerationHandler();
+        LostTalesChatRoleRosterWatcher chatRoleRosterWatcher =
+                new LostTalesChatRoleRosterWatcher();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
         MinecraftForge.EVENT_BUS.register(accessoryPlayerEventHandler);
         MinecraftForge.EVENT_BUS.register(accessoryConcealmentEventHandler);
@@ -159,6 +162,7 @@ public class LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(chargeService);
         FMLCommonHandler.instance().bus().register(
                 waystoneGenerationHandler);
+        FMLCommonHandler.instance().bus().register(chatRoleRosterWatcher);
 
         ELostTalesItem.initAndRegisterItems();
         AccessoryBootstrap.initialize();
@@ -299,6 +303,7 @@ public class LostTalesCommonProxy {
         PartySyncManager.clear();
         PartyMemberStatusSyncManager.clear();
         PartyTrackingSyncManager.clear();
+        LostTalesChatRoleRosterWatcher.clear();
         ELostTalesCommand.initAndRegisterCommands(event);
         LostTalesDiscordBridge.getInstance().start();
     }
@@ -362,6 +367,7 @@ public class LostTalesCommonProxy {
         PartySyncManager.clear();
         PartyMemberStatusSyncManager.clear();
         PartyTrackingSyncManager.clear();
+        LostTalesChatRoleRosterWatcher.clear();
         LostTalesMobAggroEventHandler.clearAll();
     }
 }

@@ -407,6 +407,14 @@ public final class LostTalesClassTransformerTest {
         assertTrue(containsStaticHook(
                 transformed, "onMessage", NPC_CHAT_HOOK_OWNER,
                 "addNpcChatMessage"));
+        // The immersive-speech insertion needs the handler's
+        // clientReceiveSpeech call, its speech accessor and its player
+        // local to keep their shape; a dependency bump that changes any
+        // of them must fail here rather than silently costing the
+        // conversation copy of floating speech.
+        assertTrue(containsStaticHook(
+                transformed, "onMessage", NPC_CHAT_HOOK_OWNER,
+                "addImmersiveSpeech"));
     }
 
     @Test

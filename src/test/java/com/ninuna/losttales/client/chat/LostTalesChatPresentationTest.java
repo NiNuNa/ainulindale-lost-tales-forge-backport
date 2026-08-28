@@ -442,10 +442,13 @@ public final class LostTalesChatPresentationTest {
                 IChatComponent part = (IChatComponent)value;
                 String text = part.getUnformattedTextForChat();
                 plain.append(text);
+                // The tags carry the role mention marker (for the role
+                // hover card); the colour rides it exactly as it rode
+                // the plain colour marker.
                 if (operatorTag.equals(text)) {
-                    operatorRgb = ChatColorMarker.decode(part);
+                    operatorRgb = ChatMentionMarker.colorOf(part);
                 } else if (developerTag.equals(text)) {
-                    developerRgb = ChatColorMarker.decode(part);
+                    developerRgb = ChatMentionMarker.colorOf(part);
                 } else if ("<".equals(text)) {
                     openingBracketRgb = replyOf(part);
                 }

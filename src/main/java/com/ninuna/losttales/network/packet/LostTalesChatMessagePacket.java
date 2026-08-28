@@ -23,6 +23,16 @@ import java.util.UUID;
  * recipients never have to trust the sender for them.
  */
 public final class LostTalesChatMessagePacket implements IMessage {
+    /**
+     * The sender id every line arriving from Discord carries: a fixed
+     * id derived from a name no account owns. The server signs inbound
+     * bridge lines with it, and clients recognise it to draw the
+     * Discord mark where a player line would draw the sender's head.
+     */
+    public static final UUID DISCORD_SENDER_ID = UUID.nameUUIDFromBytes(
+            "losttales:discord".getBytes(
+                    java.nio.charset.Charset.forName("UTF-8")));
+
     private static final int MAX_SHOWCASE_BYTES = Math.max(
             ChatShowcase.MAX_STACK_BYTES,
             ChatShowcase.MAX_MARKER_ID_BYTES

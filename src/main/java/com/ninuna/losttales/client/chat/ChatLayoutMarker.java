@@ -95,10 +95,6 @@ final class ChatLayoutMarker {
         return data != null && data.anchor;
     }
 
-    static boolean isMarker(IChatComponent component) {
-        return decode(component) != null;
-    }
-
     static final class Data {
         static final Data ANCHOR = new Data(true, 0, 0, -1, -1);
 

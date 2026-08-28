@@ -84,10 +84,6 @@ final class ChatShowcaseMarker {
         }
     }
 
-    static boolean isMarker(IChatComponent component) {
-        return decode(component) != null;
-    }
-
     private static String colorHex(int color) {
         String hex = Integer.toHexString(color & 0xFFFFFF);
         StringBuilder padded = new StringBuilder(6);

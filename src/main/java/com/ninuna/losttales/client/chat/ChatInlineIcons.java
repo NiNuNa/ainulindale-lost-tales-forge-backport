@@ -51,6 +51,12 @@ final class ChatInlineIcons {
      * between should be even.
      */
     static final int HEAD_SLOT_WIDTH = 11;
+    /**
+     * The slot a Discord-bridge line's head marker reserves: the 10px
+     * Discord mark drawn 1:1 — never scaled — with the same clear
+     * pixels around it a head keeps, so the slot is two pixels wider.
+     */
+    static final int DISCORD_HEAD_SLOT_WIDTH = 13;
     /** Where the face starts inside that slot. */
     static final float HEAD_SLOT_INSET = 1.0F;
     /** The clear space a name keeps from what is written either side. */
@@ -69,8 +75,13 @@ final class ChatInlineIcons {
      * about where the next glyph starts.
      */
     static int declaredWidth(net.minecraft.util.IChatComponent part) {
-        if (ChatHeadMarker.isMarker(part)) {
-            return HEAD_SLOT_WIDTH;
+        ChatHeadMarker.Data head = ChatHeadMarker.decode(part);
+        if (head != null) {
+            return head.isDiscordSender()
+                    ? DISCORD_HEAD_SLOT_WIDTH : HEAD_SLOT_WIDTH;
+        }
+        if (ChatGroupMarker.isMarker(part)) {
+            return ChatGroupMarker.SLOT_WIDTH;
         }
         return ChatSpacerMarker.decode(part);
     }

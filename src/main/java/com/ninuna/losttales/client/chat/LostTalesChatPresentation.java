@@ -22,8 +22,10 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.GuiNewChat;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.ChatComponentTranslation;
@@ -48,6 +50,31 @@ public final class LostTalesChatPresentation {
     private static final LinkedHashSet<Integer> pingedChatLineIds =
             new LinkedHashSet<Integer>();
     private static final int[] NO_SHOWCASES = new int[0];
+    /**
+     * One cue stands for every ping inside this window. A burst of
+     * mentions — an achievement naming half the server, two lines
+     * arriving in one tick — reads as one notification, so it sounds as
+     * one; the window is short enough that pings a player would perceive
+     * as separate events stay separately audible.
+     */
+    private static final long PING_SOUND_WINDOW_NANOS = 200L * 1000000L;
+    private static long lastPingSoundNanos;
+    /**
+     * How long a sender keeps their run: a message this close behind the
+     * previous one from the same identity in the same tab drops the
+     * repeated head and name, Discord-style. Short on purpose — chat
+     * moves fast, and a header returning after a couple of quiet
+     * minutes reads better than one missing after them.
+     */
+    private static final long GROUP_WINDOW_MILLIS = 120L * 1000L;
+    /**
+     * The very last line printed anywhere, while it was a groupable one:
+     * what the next line's grouping is decided against. One tail for the
+     * whole chat, not one per tab, because the closed feed interleaves
+     * every channel — a message in any other channel, a system line, an
+     * adopted stray, all end the run.
+     */
+    private static GroupTail lastGroupTail;
 
     private LostTalesChatPresentation() {}
 
@@ -72,8 +99,7 @@ public final class LostTalesChatPresentation {
         ClientChatAccountRoles.remember(packet.getIdentityName(),
                 packet.getRoles());
         boolean mentioned = LostTalesConfig.enableChatPings
-                && isLocalPlayerMentioned(minecraft, channel,
-                        packet.getMessage());
+                && isLocalPlayerMentioned(minecraft, packet.getMessage());
         // A whisper lands in the tab of its conversation, opened on the
         // first message in the window the player is typing in; a plain
         // channel the player closed reopens the same way. A hidden tab
@@ -128,9 +154,86 @@ public final class LostTalesChatPresentation {
         int chatLineId = allocateChatLineId();
         GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
         chat.printChatMessageWithOptionalDeletion(
-                build(packet, tab, decodeShowcases(packet)), chatLineId);
+                build(packet, tab, decodeShowcases(packet),
+                        isGroupContinuation(tab, packet)), chatLineId);
+        rememberGroupTail(tab, packet);
         noteLinePrinted(minecraft, chat, chatLineId, tab, mentioned);
         return chatLineId;
+    }
+
+    /**
+     * Whether the packet continues the tab's current run: the same
+     * sender speaking as the same identity, close enough behind their
+     * previous message, with nothing else printed into the tab between.
+     */
+    private static boolean isGroupContinuation(
+            ChatTab tab, LostTalesChatMessagePacket packet) {
+        return continuesGroup(tab, packet.getSenderId(),
+                packet.getIdentityName(), packet.isAccountLine(),
+                packet.getTimestampMillis());
+    }
+
+    private static boolean continuesGroup(ChatTab tab, UUID senderId,
+                                          String identityName,
+                                          boolean accountLine,
+                                          long timestampMillis) {
+        if (!LostTalesConfig.enableChatMessageGrouping || tab == null) {
+            return false;
+        }
+        GroupTail tail = lastGroupTail;
+        long elapsed = tail == null ? 0L
+                : timestampMillis - tail.timestampMillis;
+        return tail != null
+                && tail.tab.equals(tab)
+                && tail.senderId.equals(senderId)
+                && tail.accountLine == accountLine
+                && tail.identityName.equalsIgnoreCase(identityName)
+                && elapsed >= 0L && elapsed <= GROUP_WINDOW_MILLIS;
+    }
+
+    private static void rememberGroupTail(ChatTab tab,
+                                          LostTalesChatMessagePacket packet) {
+        rememberGroupTail(tab, packet.getSenderId(),
+                packet.getIdentityName(), packet.isAccountLine(),
+                packet.getTimestampMillis());
+    }
+
+    private static void rememberGroupTail(ChatTab tab, UUID senderId,
+                                          String identityName,
+                                          boolean accountLine,
+                                          long timestampMillis) {
+        if (tab != null) {
+            lastGroupTail = new GroupTail(tab, senderId, identityName,
+                    accountLine, timestampMillis);
+        }
+    }
+
+    /**
+     * Ends the current run: whatever prints next opens with a header.
+     * Called for every non-groupable print — a system line, an adopted
+     * stray — since any line between two of a sender's messages breaks
+     * their run wherever it landed.
+     */
+    private static void breakGroup() {
+        lastGroupTail = null;
+    }
+
+    /** The last groupable line printed anywhere. */
+    private static final class GroupTail {
+        final ChatTab tab;
+        final UUID senderId;
+        final String identityName;
+        final boolean accountLine;
+        final long timestampMillis;
+
+        GroupTail(ChatTab tab, UUID senderId, String identityName,
+                  boolean accountLine, long timestampMillis) {
+            this.tab = tab;
+            this.senderId = senderId;
+            this.identityName = identityName;
+            this.accountLine = accountLine;
+            this.timestampMillis = timestampMillis;
+        }
     }
 
     /**
@@ -176,8 +279,7 @@ public final class LostTalesChatPresentation {
         // naming yourself pings you in this tab exactly as anywhere
         // else.
         boolean mentioned = LostTalesConfig.enableChatPings
-                && isLocalPlayerMentioned(minecraft, ChatChannel.WHISPER,
-                        message);
+                && isLocalPlayerMentioned(minecraft, message);
         int chatLineId = print(minecraft, packet, tab, mentioned);
         if (mentioned) {
             markPinged(chatLineId);
@@ -206,6 +308,15 @@ public final class LostTalesChatPresentation {
         if (sound.length() == 0 || minecraft.getSoundHandler() == null) {
             return;
         }
+        // Audio only: every caller has already recorded its visual ping.
+        // This is the one place the cue sounds, so the collapse of
+        // near-simultaneous copies needs no cooldown in any producer.
+        long now = System.nanoTime();
+        if (lastPingSoundNanos != 0L
+                && now - lastPingSoundNanos < PING_SOUND_WINDOW_NANOS) {
+            return;
+        }
+        lastPingSoundNanos = now;
         minecraft.getSoundHandler().playSound(
                 new LostTalesChatPingSound(new ResourceLocation(sound)));
     }
@@ -256,25 +367,20 @@ public final class LostTalesChatPresentation {
 
     /**
      * Whether the message names this player: any of their own names
-     * ({@link #localMentionNames}) in every channel alike, plus — on the
-     * account channels only — the name of every role they hold, so
-     * {@code @Operator} reaches the operators and nobody else. A role
-     * is an account fact and means nothing in character, so it is not
-     * addressable in the role-playing channels. Which roles the player
-     * holds is the server's word, sent with the chat access; nothing
-     * here is decided from the message.
+     * ({@link #localMentionNames}) in every channel alike, plus the
+     * name of every mentionable role they hold — in every channel too,
+     * since an operator is worth calling wherever the call is made — so
+     * {@code @Operator} reaches the operators and nobody else. Which
+     * roles the player holds is the server's word, sent with the chat
+     * access; nothing here is decided from the message.
      */
     private static boolean isLocalPlayerMentioned(
-            Minecraft minecraft, ChatChannel channel, String message) {
+            Minecraft minecraft, String message) {
         List<String> names = localMentionNames(minecraft);
-        if (channel != null
-                && channel.getIdentityType() == ChatIdentityType.ACCOUNT) {
-            for (ChatAccountRole role
-                    : ClientChatChannelState.localRoles()) {
-                if (role.isMentionable()) {
-                    names.add(StatCollector.translateToLocal(
-                            role.getNameKey()));
-                }
+        for (ChatAccountRole role : ClientChatChannelState.localRoles()) {
+            if (role.isMentionable()) {
+                names.add(StatCollector.translateToLocal(
+                        role.getNameKey()));
             }
         }
         return ChatMentions.mentionsAny(message, names);
@@ -312,6 +418,8 @@ public final class LostTalesChatPresentation {
         lastMessageTab = null;
         nextChatLineId = Integer.MIN_VALUE;
         pingedChatLineIds.clear();
+        lastPingSoundNanos = 0L;
+        lastGroupTail = null;
     }
 
     private static int allocateChatLineId() {
@@ -340,9 +448,35 @@ public final class LostTalesChatPresentation {
      */
     static IChatComponent build(LostTalesChatMessagePacket packet,
                                 ChatTab tab, int[] showcaseIds) {
+        return build(packet, tab, showcaseIds, false);
+    }
+
+    /**
+     * As above; a <em>grouped</em> line continues its sender's run and
+     * drops the repeated header — the channel prefix, tags, brackets,
+     * head, name and title — keeping only the timestamp and the body,
+     * which starts on the anchor exactly where a wrapped continuation
+     * line starts, so a run reads as one voice speaking in paragraphs.
+     * The prefix goes with the rest: in the closed feed the run's
+     * header line already named the channel, so its continuations do
+     * not say it again.
+     */
+    static IChatComponent build(LostTalesChatMessagePacket packet,
+                                ChatTab tab, int[] showcaseIds,
+                                boolean grouped) {
         ChatChannel channel = packet.getChannel();
         ChatComponentText root = new ChatComponentText("");
         ChatTab named = tab == null ? tabOf(packet) : tab;
+        if (grouped) {
+            appendTimestamp(root, packet.getTimestampMillis());
+            // The junction slot stands ahead of the anchor, so open
+            // continuation lines align under the shifted body text.
+            root.appendSibling(ChatGroupMarker.create());
+            root.appendSibling(ChatLayoutMarker.anchor());
+            appendMessageBody(root, packet.getMessage(), showcaseIds,
+                    channel);
+            return root;
+        }
         // The prefix names the tab, so it is the colour the tab is drawn
         // in: a conversation speaks in the other party's colour, every
         // other channel in its own. Nothing in the feed may name a
@@ -364,14 +498,16 @@ public final class LostTalesChatPresentation {
         // holds, tagged ahead of the name in the role's own colour. The
         // name's colour is the primary role's too, but that is already
         // the packet's name colour — the server set it when it built the
-        // line, so nothing here decides what a role looks like.
+        // line, so nothing here decides what a role looks like. The tag
+        // carries the role mention marker, so hovering it shows the
+        // role's card exactly as hovering @Operator does.
         for (ChatAccountRole role : ChatAccountRole.fromMask(
                 packet.getRoles())) {
-            root.appendSibling(ChatColorMarker.apply(
+            root.appendSibling(ChatMentionMarker.applyRole(
                     text(StatCollector.translateToLocal(role.getTagKey())
                             + " ", nearestFormatting(role.getColor()),
                             false),
-                    role.getColor()));
+                    role.getColor(), role));
         }
         // The brackets are part of the name: they answer to a hover
         // and a click exactly as it does, so the card comes up wherever
@@ -487,9 +623,16 @@ public final class LostTalesChatPresentation {
      * every other line carries and a tracked line id, so the feed names
      * its channel and the tabs can file it. The component itself is the
      * server's, untouched; no head, no mention check.
+     *
+     * <p>{@code audibleMentionCue} says whether a mention of this player
+     * inside the line may sound as well as highlight: an announcement —
+     * an achievement above all — names its player without addressing
+     * them, so its mention stays visual. The highlight, the unread ping
+     * count and the line's tint are the same either way.</p>
      */
     public static boolean receiveSystemLine(IChatComponent message,
-                                            ChatChannel channel) {
+                                            ChatChannel channel,
+                                            boolean audibleMentionCue) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (message == null || channel == null || minecraft == null
                 || minecraft.ingameGUI == null) {
@@ -499,6 +642,7 @@ public final class LostTalesChatPresentation {
         // message does — an achievement brings Global back, a command's
         // answer the console — unless the channel is hidden.
         ChatTab tab = ChatTab.of(channel);
+        breakGroup();
         if (!ChatWindowLayout.isOpen(tab)
                 && !ChatWindowLayout.isHidden(tab)) {
             ChatWindowLayout.openTab(tab, windowIdOfSelection());
@@ -529,13 +673,43 @@ public final class LostTalesChatPresentation {
                         chat, chatLineId));
         if (mentioned) {
             markPinged(chatLineId);
-            if (ChatWindowLayout.isPingAudible(tab)) {
+            if (audibleMentionCue && ChatWindowLayout.isPingAudible(tab)) {
                 playPingSound(minecraft);
             }
         }
         if (channel == ChatChannel.CONSOLE && chat.getChatOpen()) {
             frontConsole();
         }
+        return true;
+    }
+
+    /**
+     * Adopts a line printed straight into the chat without passing
+     * through the received-chat event — a game-mode change notice, a
+     * saved-screenshot line, another mod's local print. The entry is
+     * rebuilt in place as a console system line, so it carries the
+     * channel prefix, the timestamp and a tracked line id exactly like
+     * everything else the console shows; the caller lays the history
+     * out again once it has adopted what it found. Only a plain print
+     * (chat line id zero) is adopted: a line printed under an id of its
+     * own may be replaced or deleted by that id later and must keep it.
+     */
+    static boolean adoptStrayLine(List<ChatLine> messages, int index) {
+        if (messages == null || index < 0 || index >= messages.size()) {
+            return false;
+        }
+        ChatLine line = messages.get(index);
+        if (line == null || line.getChatLineID() != 0) {
+            return false;
+        }
+        int chatLineId = allocateChatLineId();
+        messages.set(index, new ChatLine(line.getUpdatedCounter(),
+                buildSystemLine(line.func_151461_a(), ChatChannel.CONSOLE,
+                        System.currentTimeMillis()), chatLineId));
+        breakGroup();
+        ClientChatChannelViews.record(chatLineId,
+                ChatTab.of(ChatChannel.CONSOLE),
+                ClientChatChannelState.getSelected(), false);
         return true;
     }
 
@@ -697,25 +871,23 @@ public final class LostTalesChatPresentation {
         // The character channels sign every line with the sender's
         // active role-playing character; a system line naming the
         // account shows the same identity when the client knows it —
-        // the character's name, in the character's own name colour, so
-        // an achievement names its player exactly as their lines do.
+        // the character's name, in the colour the mention resolution
+        // below gives every mention of that identity, so an achievement
+        // names its player exactly as their lines do.
         String shown = text;
-        boolean characterIdentity = false;
         if (account != null && channel != null
                 && channel.getIdentityType() == ChatIdentityType.CHARACTER) {
             String characterName =
                     ChatMentionColors.characterNameFor(account);
             if (characterName != null) {
                 shown = characterName;
-                characterIdentity = true;
             }
         }
         int color = ChatMentionColors.colorOf(text, channel);
         if (color < 0) {
+            // One of this client's own names the public caches cannot
+            // place; the shared accent stands in.
             color = LostTalesColors.rgb(LostTalesColors.HONEY);
-        }
-        if (characterIdentity) {
-            color = ChatMentionColors.characterColorFor(account, color);
         }
         if (local) {
             localMentioned[0] = true;
@@ -814,18 +986,21 @@ public final class LostTalesChatPresentation {
         }
         // An NPC speaking this player's name is addressing them: the
         // name reads as the mention it is, the line highlights, and the
-        // cue sounds.
+        // cue sounds. An NPC keeps a run exactly as a player does: its
+        // next line inside the window drops the repeated header.
         List<String> localNames = localMentionNames(minecraft);
         boolean mentioned = LostTalesConfig.enableChatPings
                 && ChatMentions.mentionsAny(ChatMentions.mentionNames(
                         message, localNames), localNames);
         int chatLineId = allocateChatLineId();
+        long now = System.currentTimeMillis();
+        boolean grouped = continuesGroup(tab, npcId, npcName, false, now);
         GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
         chat.printChatMessageWithOptionalDeletion(
                 buildNpcSpeech(tab, npcId, npcName,
-                        texturePath, message,
-                        System.currentTimeMillis(), nameColor),
+                        texturePath, message, now, nameColor, grouped),
                 chatLineId);
+        rememberGroupTail(tab, npcId, npcName, false, now);
         noteLinePrinted(minecraft, chat, chatLineId, tab, mentioned);
         if (mentioned) {
             markPinged(chatLineId);
@@ -842,7 +1017,35 @@ public final class LostTalesChatPresentation {
                                          String message,
                                          long timestampMillis,
                                          int nameColor) {
+        return buildNpcSpeech(tab, npcId, npcName, texturePath, message,
+                timestampMillis, nameColor, false);
+    }
+
+    /**
+     * As above; a <em>grouped</em> line continues the NPC's run and
+     * drops the repeated header, exactly as a player's grouped line
+     * does.
+     */
+    static IChatComponent buildNpcSpeech(ChatTab tab, UUID npcId,
+                                         String npcName,
+                                         String texturePath,
+                                         String message,
+                                         long timestampMillis,
+                                         int nameColor, boolean grouped) {
         ChatComponentText root = new ChatComponentText("");
+        if (grouped) {
+            // A grouped line drops the channel prefix with the rest of
+            // the header, so the feed's run names its channel once; the
+            // junction slot stands ahead of the anchor, so open
+            // continuation lines align under the shifted body text.
+            appendTimestamp(root, timestampMillis);
+            root.appendSibling(ChatGroupMarker.create());
+            root.appendSibling(ChatLayoutMarker.anchor());
+            appendMessageBody(root, ChatMentions.mentionNames(message,
+                            localMentionNames(Minecraft.getMinecraft())),
+                    NO_SHOWCASES, ChatChannel.WHISPER);
+            return root;
+        }
         appendChannelPrefix(root, tab,
                 ClientChatChannelState.displayColor(tab));
         appendTimestamp(root, timestampMillis);
@@ -880,14 +1083,19 @@ public final class LostTalesChatPresentation {
      * (the tabs separate channels there) and show it in the closed HUD's
      * combined feed. Faction shows the local active character's faction
      * name, which is the sender's faction too because the server only
-     * routes faction chat to members.
+     * routes faction chat to members. A conversation names its
+     * <em>channel</em>, not its partner: the line itself already opens
+     * with the sender, so the feed reads {@code Whisper: <Name> ...}
+     * instead of saying the name twice.
      */
     private static void appendChannelPrefix(ChatComponentText root,
                                             ChatTab tab,
                                             int channelColor) {
+        String label = tab != null && tab.isWhisper()
+                ? ChatChannel.WHISPER.getDisplayName()
+                : ClientChatChannelState.displayName(tab);
         root.appendSibling(ChatPrefixMarker.channel(
-                text(ClientChatChannelState.displayName(tab),
-                        nearestFormatting(channelColor), false),
+                text(label, nearestFormatting(channelColor), false),
                 channelColor));
         root.appendSibling(ChatPrefixMarker.channel(
                 text(": ", nearestFormatting(channelColor), false),
@@ -1024,7 +1232,7 @@ public final class LostTalesChatPresentation {
         // display time; the wire and copy text keep the ampersand form.
         String displayed = ChatFormattingCodes.translateAmpersand(rawText);
         if (!LostTalesConfig.enableChatEmojis) {
-            appendMentions(root, displayed, channel);
+            appendLinksAndMentions(root, displayed, channel);
             return;
         }
         for (ChatEmojiParser.Segment segment
@@ -1033,9 +1241,105 @@ public final class LostTalesChatPresentation {
                 root.appendSibling(ChatEmojiMarker.create(
                         segment.getEmoji()));
             } else {
-                appendMentions(root, segment.getText(), channel);
+                appendLinksAndMentions(root, segment.getText(), channel);
             }
         }
+    }
+
+    /**
+     * Splits a run of message text so every web address in it becomes a
+     * clickable link — underlined, in the palette's blue, opening
+     * through the same confirm dialog every other chat link opens
+     * through — and hands everything around the addresses to the
+     * mention pass. Only whole {@code http(s)://} words that open at a
+     * word boundary count, trailing punctuation stays ordinary text,
+     * and with Minecraft's own chat-links option off nothing is touched
+     * at all, exactly as vanilla leaves links inert then.
+     */
+    private static void appendLinksAndMentions(ChatComponentText root,
+                                               String text,
+                                               ChatChannel channel) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.gameSettings == null
+                || !minecraft.gameSettings.chatLinks
+                || text.indexOf(':') < 0) {
+            appendMentions(root, text, channel);
+            return;
+        }
+        String lowered = text.toLowerCase(Locale.ROOT);
+        int literalStart = 0;
+        int cursor = 0;
+        while (cursor < text.length()) {
+            int at = indexOfLink(lowered, cursor);
+            if (at < 0) {
+                break;
+            }
+            int end = at;
+            while (end < text.length()
+                    && !Character.isWhitespace(text.charAt(end))) {
+                end++;
+            }
+            while (end > at && isTrailingPunctuation(text.charAt(end - 1))) {
+                end--;
+            }
+            String url = text.substring(at, end);
+            int scheme = lowered.startsWith("https", at)
+                    ? "https://".length() : "http://".length();
+            if (url.length() <= scheme) {
+                // A bare scheme is only text.
+                cursor = at + 1;
+                continue;
+            }
+            if (literalStart < at) {
+                appendMentions(root, text.substring(literalStart, at),
+                        channel);
+            }
+            ChatComponentText link = new ChatComponentText(url);
+            ChatStyle style = link.getChatStyle()
+                    .setColor(EnumChatFormatting.BLUE)
+                    .setUnderlined(Boolean.TRUE);
+            style.setChatClickEvent(new ClickEvent(
+                    ClickEvent.Action.OPEN_URL, url));
+            link.setChatStyle(style);
+            root.appendSibling(link);
+            literalStart = end;
+            cursor = end;
+        }
+        if (literalStart < text.length()) {
+            appendMentions(root, text.substring(literalStart), channel);
+        }
+    }
+
+    /**
+     * The next {@code http://}/{@code https://} that opens a word, in
+     * the already-lowercased text.
+     */
+    private static int indexOfLink(String lowered, int from) {
+        int cursor = from;
+        while (cursor < lowered.length()) {
+            int at = lowered.indexOf("http", cursor);
+            if (at < 0) {
+                return -1;
+            }
+            boolean opensWord = at == 0
+                    || Character.isWhitespace(lowered.charAt(at - 1));
+            int schemeEnd = at + 4;
+            if (schemeEnd < lowered.length()
+                    && lowered.charAt(schemeEnd) == 's') {
+                schemeEnd++;
+            }
+            if (opensWord && lowered.regionMatches(schemeEnd, "://", 0, 3)) {
+                return at;
+            }
+            cursor = at + 1;
+        }
+        return -1;
+    }
+
+    private static boolean isTrailingPunctuation(char character) {
+        return character == '.' || character == ',' || character == ';'
+                || character == ':' || character == '!' || character == '?'
+                || character == ')' || character == '"' || character == '\'';
     }
 
     /**
@@ -1072,17 +1376,25 @@ public final class LostTalesChatPresentation {
                             text.substring(literalStart, at),
                             EnumChatFormatting.WHITE, false));
                 }
-                // A player mention carries who it reaches, so it answers
-                // to the pointer — card on hover, conversation on click
-                // — the way the sender's name does; a role mention is
-                // colour alone, since a role is nobody in particular.
-                String account = ChatMentionColors.accountFor(
-                        text.substring(at + 1, end));
+                // A mention carries whom it reaches, so it answers to
+                // the pointer: a player mention with their card on
+                // hover and the conversation on a click, a role mention
+                // with the role's card naming everyone holding it.
+                String name = text.substring(at + 1, end);
+                String account = ChatMentionColors.accountFor(name);
+                ChatAccountRole role = account == null
+                        ? ChatMentionColors.roleFor(name) : null;
                 ChatComponentText piece = text(text.substring(at, end),
                         nearestFormatting(color), false);
-                root.appendSibling(account != null
-                        ? ChatMentionMarker.apply(piece, color, account)
-                        : ChatColorMarker.apply(piece, color));
+                if (account != null) {
+                    root.appendSibling(ChatMentionMarker.apply(
+                            piece, color, account));
+                } else if (role != null) {
+                    root.appendSibling(ChatMentionMarker.applyRole(
+                            piece, color, role));
+                } else {
+                    root.appendSibling(ChatColorMarker.apply(piece, color));
+                }
                 literalStart = end;
             }
             cursor = Math.max(end, at + 1);

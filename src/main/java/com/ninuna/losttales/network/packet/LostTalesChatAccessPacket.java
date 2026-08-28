@@ -6,6 +6,9 @@ import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Server-to-client: which restricted chat channels the player may use,
@@ -16,13 +19,24 @@ import io.netty.buffer.ByteBuf;
  * send regardless. The role mask is presentation only — it is what lets
  * this client notice that {@code @Operator} was addressed to it — and,
  * like every other role fact, it is the server's word alone.
+ *
+ * <p>Appended after the personal fields travels the <em>role roster</em>:
+ * every online account that holds a role, with its mask. Account names
+ * and role marks are public on the tab list and on every line those
+ * players send, so nothing here widens what a client can learn; it only
+ * lets the role hover card name a role's members, and a mention of a
+ * role holder wear their colour before they have spoken.</p>
  */
 public final class LostTalesChatAccessPacket implements IMessage {
-    private static final int MAX_PACKET_BYTES = 16;
+    private static final int MAX_HOLDERS = 256;
+    private static final int MAX_HOLDER_NAME_BYTES = 64;
+    private static final int MAX_PACKET_BYTES = 16
+            + MAX_HOLDERS * (MAX_HOLDER_NAME_BYTES + 8);
 
     private boolean adminAccess;
     private boolean discordAccess;
     private int roleMask;
+    private List<RoleHolder> roleHolders = Collections.emptyList();
     private boolean malformed;
 
     public LostTalesChatAccessPacket() {}
@@ -34,9 +48,23 @@ public final class LostTalesChatAccessPacket implements IMessage {
 
     public LostTalesChatAccessPacket(boolean adminAccess,
                                      boolean discordAccess, int roleMask) {
+        this(adminAccess, discordAccess, roleMask,
+                Collections.<RoleHolder>emptyList());
+    }
+
+    public LostTalesChatAccessPacket(boolean adminAccess,
+                                     boolean discordAccess, int roleMask,
+                                     List<RoleHolder> roleHolders) {
         this.adminAccess = adminAccess;
         this.discordAccess = discordAccess;
         this.roleMask = roleMask;
+        this.roleHolders = roleHolders == null || roleHolders.isEmpty()
+                ? Collections.<RoleHolder>emptyList()
+                : Collections.unmodifiableList(
+                        new ArrayList<RoleHolder>(roleHolders.size()
+                                > MAX_HOLDERS
+                                ? roleHolders.subList(0, MAX_HOLDERS)
+                                : roleHolders));
     }
 
     @Override
@@ -56,12 +84,38 @@ public final class LostTalesChatAccessPacket implements IMessage {
             if (!ChatAccountRole.isValidMask(this.roleMask)) {
                 this.roleMask = 0;
             }
+            // Appended again: the online role holders. A packet written
+            // before the roster existed ends here and names none.
+            if (buffer.readableBytes() >= 2) {
+                int count = buffer.readUnsignedShort();
+                if (count > MAX_HOLDERS) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "too many role holders");
+                }
+                List<RoleHolder> decoded = new ArrayList<RoleHolder>(count);
+                for (int index = 0; index < count; index++) {
+                    String name = LostTalesPacketCodec.readUtf8String(
+                            buffer, MAX_HOLDER_NAME_BYTES);
+                    int mask = buffer.readInt();
+                    if (name.trim().length() == 0
+                            || !ChatAccountRole.isValidMask(mask)
+                            || mask == 0) {
+                        throw new LostTalesPacketCodec.DecodeException(
+                                "invalid role holder");
+                    }
+                    decoded.add(new RoleHolder(name.trim(), mask));
+                }
+                this.roleHolders = Collections.unmodifiableList(decoded);
+            } else {
+                this.roleHolders = Collections.emptyList();
+            }
             LostTalesPacketCodec.requireFinished(buffer);
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.adminAccess = false;
             this.discordAccess = false;
             this.roleMask = 0;
+            this.roleHolders = Collections.emptyList();
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -71,6 +125,12 @@ public final class LostTalesChatAccessPacket implements IMessage {
         buffer.writeBoolean(this.adminAccess);
         buffer.writeBoolean(this.discordAccess);
         buffer.writeInt(this.roleMask);
+        buffer.writeShort(this.roleHolders.size());
+        for (RoleHolder holder : this.roleHolders) {
+            LostTalesPacketCodec.writeUtf8String(buffer, holder.getName(),
+                    MAX_HOLDER_NAME_BYTES);
+            buffer.writeInt(holder.getMask());
+        }
     }
 
     public boolean hasAdminAccess() { return this.adminAccess; }
@@ -78,7 +138,23 @@ public final class LostTalesChatAccessPacket implements IMessage {
     public int getRoleMask() { return this.roleMask; }
     /** Whether the server bridges the Discord channel right now. */
     public boolean hasDiscordAccess() { return this.discordAccess; }
+    /** Every online account holding a role, as the server states it. */
+    public List<RoleHolder> getRoleHolders() { return this.roleHolders; }
     public boolean isMalformed() { return this.malformed; }
+
+    /** One online account and the roles it holds; masks are never zero. */
+    public static final class RoleHolder {
+        private final String name;
+        private final int mask;
+
+        public RoleHolder(String name, int mask) {
+            this.name = name == null ? "" : name;
+            this.mask = mask;
+        }
+
+        public String getName() { return this.name; }
+        public int getMask() { return this.mask; }
+    }
 
     public static final class Handler implements IMessageHandler<
             LostTalesChatAccessPacket, IMessage> {

@@ -42,6 +42,17 @@ final class ChatSystemLineClassifier {
     private static final String[] GLOBAL_KEY_PREFIXES = {
             "death.",
     };
+    /**
+     * Lines whose mention of a player is the server announcing them, not
+     * somebody addressing them: the name still highlights, but the cue
+     * stays silent — an achievement is not a conversation waiting for an
+     * answer.
+     */
+    private static final String[] SILENT_MENTION_KEYS = {
+            "chat.type.achievement",
+            "chat.type.achievement.taken",
+            "chat.lotr.achievement",
+    };
 
     private ChatSystemLineClassifier() {}
 
@@ -65,6 +76,20 @@ final class ChatSystemLineClassifier {
             }
         }
         return ChatChannel.CONSOLE;
+    }
+
+    /** Whether a mention inside the line highlights without sounding. */
+    static boolean isMentionCueSilent(IChatComponent message) {
+        String key = translationKey(message);
+        if (key == null) {
+            return false;
+        }
+        for (String silent : SILENT_MENTION_KEYS) {
+            if (silent.equals(key)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The root component's translation key, or null for anything else. */

@@ -191,6 +191,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "(Lnet/minecraft/entity/player/EntityPlayer;"
                     + "Lnet/minecraft/util/IChatComponent;"
                     + "Llotr/common/entity/npc/LOTREntityNPC;)V";
+    private static final String NPC_IMMERSIVE_HOOK_DESC =
+            "(Lnet/minecraft/entity/player/EntityPlayer;"
+                    + "Llotr/common/entity/npc/LOTREntityNPC;"
+                    + "Ljava/lang/String;)V";
     private static final String ROLEPLAY_IDENTITY_HOOK_OWNER =
             "com/ninuna/losttales/character/identity/"
                     + "RoleplayCharacterIdentityHook";
@@ -1738,10 +1742,14 @@ public final class LostTalesClassTransformer implements IClassTransformer {
 
     /**
      * Reroutes the client-side chat print of NPC speech through the Lost
-     * Tales chat presentation. Only the final addChatMessage call is
-     * replaced; LOTR's immersive floating speech, recipients, and speech
-     * content are untouched. The hook falls back to the original component,
-     * so a partial failure degrades to LOTR's plain yellow line.
+     * Tales chat presentation, and adds a call after LOTR's immersive
+     * floating speech so the same words are filed into the NPC's
+     * conversation tab even while LOTR prints no chat line at all. Only
+     * the final addChatMessage call is replaced; LOTR's immersive
+     * floating speech, recipients, and speech content are untouched. The
+     * chat hook falls back to the original component, so a partial
+     * failure degrades to LOTR's plain yellow line; the immersive hook
+     * is additive and its absence only costs the conversation copy.
      */
     private static byte[] transformLotrNpcSpeechHandler(byte[] basicClass) {
         try {
@@ -1796,6 +1804,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 chatCall.owner = NPC_CHAT_HOOK_OWNER;
                 chatCall.name = "addNpcChatMessage";
                 chatCall.desc = NPC_CHAT_HOOK_DESC;
+                insertImmersiveSpeechHook(method, npcLocal);
                 System.setProperty(NPC_CHAT_ACTIVE_PROPERTY, "true");
                 info("Patched LOTR NPC speech chat lines into the "
                         + "Lost Tales chat presentation");
@@ -1808,6 +1817,74 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             warn("Failed to patch LOTR NPC speech chat: " + throwable);
             return basicClass;
         }
+    }
+
+    /**
+     * Adds, directly after {@code clientReceiveSpeech(npc, speech)}, a
+     * call filing the same speech into the Lost Tales conversation tab:
+     * with LOTR's immersive speech on and its chat log off, the floating
+     * text is the only delivery LOTR makes, and this is the only point
+     * the words pass through. The speech string is re-read through the
+     * same synthetic accessor LOTR itself calls one instruction earlier;
+     * a handler shaped differently simply keeps the chat patch alone.
+     */
+    private static void insertImmersiveSpeechHook(MethodNode method,
+                                                  int npcLocal) {
+        int playerLocal = findNpcSpeechHandlerPlayerLocal(method);
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof MethodInsnNode)) {
+                continue;
+            }
+            MethodInsnNode call = (MethodInsnNode)instruction;
+            if (call.getOpcode() != Opcodes.INVOKEVIRTUAL
+                    || !"clientReceiveSpeech".equals(call.name)) {
+                continue;
+            }
+            AbstractInsnNode before = previousCode(call);
+            if (playerLocal < 0 || !(before instanceof MethodInsnNode)) {
+                break;
+            }
+            MethodInsnNode speechAccessor = (MethodInsnNode)before;
+            if (speechAccessor.getOpcode() != Opcodes.INVOKESTATIC
+                    || !speechAccessor.desc.endsWith(
+                            ")Ljava/lang/String;")) {
+                break;
+            }
+            InsnList added = new InsnList();
+            added.add(new VarInsnNode(Opcodes.ALOAD, playerLocal));
+            added.add(new VarInsnNode(Opcodes.ALOAD, npcLocal));
+            added.add(new VarInsnNode(Opcodes.ALOAD, 1));
+            added.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                    speechAccessor.owner, speechAccessor.name,
+                    speechAccessor.desc, false));
+            added.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                    NPC_CHAT_HOOK_OWNER, "addImmersiveSpeech",
+                    NPC_IMMERSIVE_HOOK_DESC, false));
+            method.instructions.insert(call, added);
+            return;
+        }
+        warn("Could not add the immersive NPC speech hook; floating "
+                + "speech will not reach the conversation tab");
+    }
+
+    private static int findNpcSpeechHandlerPlayerLocal(MethodNode method) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof MethodInsnNode)) {
+                continue;
+            }
+            MethodInsnNode call = (MethodInsnNode)instruction;
+            if (!"getClientPlayer".equals(call.name)) {
+                continue;
+            }
+            AbstractInsnNode store = nextCode(instruction);
+            if (store instanceof VarInsnNode
+                    && store.getOpcode() == Opcodes.ASTORE) {
+                return ((VarInsnNode)store).var;
+            }
+        }
+        return -1;
     }
 
     private static int findNpcSpeechHandlerNpcLocal(MethodNode method) {

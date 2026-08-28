@@ -132,13 +132,43 @@ public final class ChatWindowPlacement {
      * The chat width one window is drawn and wrapped at: the width the
      * player gave it, or the game's while it has none. A window can only
      * hold a width of its own while its lines can be laid out to it.
+     * A stored width the current screen cannot hold — the GUI scale
+     * changed under a window resized large — is capped to what keeps
+     * the box inside the screen margins, wrap and box together so no
+     * line runs past the edge; the stored width itself is untouched, so
+     * scaling back restores it.
      */
     public static int chatWidth(ChatWindow window, Minecraft minecraft) {
         int own = window == null ? 0 : window.getWidth();
         if (own > 0 && ChatWindowLines.isAvailable()) {
-            return own;
+            return Math.min(own, maxOwnChatWidth(minecraft));
         }
         return chatWidth(minecraft);
+    }
+
+    /**
+     * The widest chat width a window of its own may be drawn at on the
+     * current screen: its box at that width just fits between the two
+     * screen margins. Unbounded when the screen cannot be measured.
+     */
+    private static int maxOwnChatWidth(Minecraft minecraft) {
+        int screenWidth = scaledScreenWidth(minecraft);
+        if (screenWidth <= 0) {
+            return Integer.MAX_VALUE;
+        }
+        return Math.max(1, chatWidthForBox(
+                screenWidth - 2 * HudPlacementLayout.SCREEN_MARGIN,
+                minecraft));
+    }
+
+    private static int scaledScreenWidth(Minecraft minecraft) {
+        try {
+            return new net.minecraft.client.gui.ScaledResolution(minecraft,
+                    minecraft.displayWidth, minecraft.displayHeight)
+                    .getScaledWidth();
+        } catch (RuntimeException unavailable) {
+            return 0;
+        }
     }
 
     /** The box width of the feed, and of a window without one of its own. */
@@ -147,13 +177,14 @@ public final class ChatWindowPlacement {
         return chat == null ? 160 : ChatWindowFrame.boxWidth(chat);
     }
 
-    /** The box width of one window, at its own chat width. */
+    /** The box width of one window, at its own (screen-capped) chat width. */
     public static int windowWidth(ChatWindow window, Minecraft minecraft) {
         int own = window == null ? 0 : window.getWidth();
         if (own <= 0 || !ChatWindowLines.isAvailable()) {
             return windowWidth(minecraft);
         }
-        return (int)Math.round(boxWidthForChatWidth(own, minecraft));
+        return (int)Math.round(boxWidthForChatWidth(
+                chatWidth(window, minecraft), minecraft));
     }
 
     /**
@@ -380,10 +411,48 @@ public final class ChatWindowPlacement {
         double room = roomForLines(currentLines(window, minecraft),
                 minecraft);
         double height = heightForRoom(room, minecraft);
+        // A stored height the current screen cannot hold — the GUI
+        // scale changed under a window resized tall — is capped to what
+        // fits between the screen margins by giving up message room; the
+        // stored height itself is untouched, so scaling back restores it.
+        double maxHeight = Math.max(minHeight(minecraft),
+                screenHeight - 2.0D * HudPlacementLayout.SCREEN_MARGIN);
+        if (height > maxHeight) {
+            room = Math.max(1.0D, room - (height - maxHeight));
+            height = heightForRoom(room, minecraft);
+        }
         int barHeight = barHeight(minecraft);
         double baseline = keepOnScreen(baselineFor(window.getOffsetY(),
                 minecraft, screenHeight), height, barHeight, screenHeight);
         return new Box(position(window.getOffsetX(), screenWidth, width),
+                baseline - (height - barHeight), width, height, barHeight,
+                room);
+    }
+
+    /**
+     * The box the window would occupy at the given anchor percents once
+     * it has grown to its full line cap: what the auto-open placement
+     * measures candidate spots with, so a fresh window is judged by the
+     * room it is about to take rather than by the one empty line it
+     * starts with.
+     */
+    static Box prospectiveBounds(ChatWindow window, double offsetX,
+                                 double offsetY, Minecraft minecraft,
+                                 int screenWidth, int screenHeight) {
+        int width = windowWidth(window, minecraft);
+        double room = roomForLines(Math.max(1.0D,
+                lineCap(window, minecraft)), minecraft);
+        double height = heightForRoom(room, minecraft);
+        double maxHeight = Math.max(minHeight(minecraft),
+                screenHeight - 2.0D * HudPlacementLayout.SCREEN_MARGIN);
+        if (height > maxHeight) {
+            room = Math.max(1.0D, room - (height - maxHeight));
+            height = heightForRoom(room, minecraft);
+        }
+        int barHeight = barHeight(minecraft);
+        double baseline = keepOnScreen(baselineFor(offsetY, minecraft,
+                screenHeight), height, barHeight, screenHeight);
+        return new Box(position(offsetX, screenWidth, width),
                 baseline - (height - barHeight), width, height, barHeight,
                 room);
     }

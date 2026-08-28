@@ -27,6 +27,7 @@ import com.ninuna.losttales.chat.emoji.ChatEmojiSuggester;
 import com.ninuna.losttales.chat.emoji.ChatEmoticonConverter;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
+import com.google.common.collect.ObjectArrays;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -65,11 +66,14 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.stats.Achievement;
 import net.minecraft.stats.StatBase;
 import net.minecraft.stats.StatList;
+import net.minecraft.network.play.client.C14PacketTabComplete;
 import net.minecraft.util.ChatAllowedCharacters;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.StatCollector;
+import net.minecraftforge.client.ClientCommandHandler;
+import org.apache.commons.lang3.StringUtils;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
@@ -178,6 +182,26 @@ public final class LostTalesChatGui extends GuiChat {
             new ChatNameSuggestionBox();
     private final ChatShareSuggestionBox shareSuggestions =
             new ChatShareSuggestionBox();
+    /**
+     * Command tab completion, owned here rather than left to vanilla:
+     * the suggestions belong to the input they were asked from, so the
+     * candidate list is filed under the tab that was selected when Tab
+     * was pressed instead of falling into the console as an untracked
+     * line. The states mirror {@code GuiChat}'s private completion
+     * fields, which a subclass cannot reach.
+     */
+    private final List<String> completionCandidates = new ArrayList<String>();
+    /** Index of the candidate standing in the field; -1 for none yet. */
+    private int completionCycleIndex = -1;
+    /** Set while further Tabs walk {@link #completionCandidates}. */
+    private boolean completionCycling;
+    /** Set between sending a completion request and its answer. */
+    private boolean completionWaiting;
+    /** The tab whose input the pending or walked completion belongs to. */
+    private ChatTab completionTab;
+    /** The candidates as a popup over the input, never a chat line. */
+    private final ChatCommandSuggestionBox commandSuggestions =
+            new ChatCommandSuggestionBox();
     private final ChatPopupMenu popup = new ChatPopupMenu();
     private TabDrag tabDrag;
     private WindowDrag windowDrag;
@@ -297,6 +321,8 @@ public final class LostTalesChatGui extends GuiChat {
         ClientChatChannelState.setDraft(
                 this.sent ? "" : this.inputField.getText());
         ClientChatChannelViews.setScrollEasingSuppressed(false);
+        // Every divider that was on a viewed tab has done its job.
+        ClientChatChannelViews.dismissSeenDividers();
         stopTyping();
     }
 
@@ -601,7 +627,11 @@ public final class LostTalesChatGui extends GuiChat {
         if (!selected.equals(this.lastSelected)) {
             ChatTab previous = this.lastSelected;
             this.lastSelected = selected;
-            // The window being typed in comes to the front.
+            // The window being typed in comes to the front, a completion
+            // walked in the tab just left is over, and so is its read
+            // unread divider: it was there to be seen, and it was.
+            dismissCompletion();
+            ClientChatChannelViews.dismissSeenDivider(previous);
             ChatWindow selectedWindow = ChatWindowLayout.windowOf(selected);
             if (selectedWindow != null) {
                 ChatWindowLayout.raise(selectedWindow.getId());
@@ -637,6 +667,29 @@ public final class LostTalesChatGui extends GuiChat {
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) {
+        // Vanilla's own rule: any key ends a pending completion request,
+        // and any key but Tab ends the walk through the candidates —
+        // except that while the candidate popup is open, Up and Down
+        // walk it too, and Escape only closes it.
+        this.completionWaiting = false;
+        if (this.commandSuggestions.isActive()) {
+            if (keyCode == Keyboard.KEY_UP) {
+                stepCompletion(-1);
+                return;
+            }
+            if (keyCode == Keyboard.KEY_DOWN) {
+                stepCompletion(1);
+                return;
+            }
+            if (keyCode == Keyboard.KEY_ESCAPE) {
+                dismissCompletion();
+                return;
+            }
+        }
+        if (keyCode != Keyboard.KEY_TAB) {
+            this.completionCycling = false;
+            this.commandSuggestions.clear();
+        }
         if (keyCode == Keyboard.KEY_ESCAPE
                 && (this.popup.isOpen() || isDragging())) {
             this.popup.close();
@@ -707,10 +760,19 @@ public final class LostTalesChatGui extends GuiChat {
             submitInput();
             return;
         }
+        if (keyCode == Keyboard.KEY_TAB) {
+            // With text in the field Tab is command completion. Handled
+            // here, never by super: vanilla's completion would print the
+            // candidate list as an untracked chat line, which files as
+            // console output.
+            completeInput();
+            return;
+        }
         if (refusesCharacter(typedChar, keyCode)) {
             return;
         }
         super.keyTyped(typedChar, keyCode);
+        maybeSpaceTypedShortcode(typedChar);
         enforceLimit();
         if (LostTalesConfig.enableChatEmojis) {
             emojiSuggestions.update(this.inputField.getText(),
@@ -736,6 +798,10 @@ public final class LostTalesChatGui extends GuiChat {
         boolean command = text.length() > 0 && isServerCommand(text);
         if (text.length() > 0) {
             func_146403_a(text);
+            // Speaking moves the conversation on: the unread divider
+            // has done its job, exactly as it does on Discord.
+            ClientChatChannelViews.dismissDivider(
+                    ClientChatChannelState.getSelected());
         }
         this.inputField.setText("");
         this.sent = false;
@@ -750,6 +816,175 @@ public final class LostTalesChatGui extends GuiChat {
             // command that has just gone out is not one.
             showConsole();
         }
+    }
+
+    /**
+     * A hand-typed closing colon that completes a canonical shortcode
+     * gets the same trailing space every inserted token gets — from the
+     * pickers, the completion lists and the emoji list alike — so the
+     * next word stands apart from the emoji however it was put there.
+     * Only the exact typed colon triggers this; nothing rewrites text
+     * that is already standing.
+     */
+    private void maybeSpaceTypedShortcode(char typedChar) {
+        if (typedChar != ':' || !LostTalesConfig.enableChatEmojis
+                || isCommand()) {
+            return;
+        }
+        String text = this.inputField.getText();
+        int cursor = this.inputField.getCursorPosition();
+        if (cursor < 3 || cursor > text.length()
+                || text.charAt(cursor - 1) != ':'
+                || (cursor < text.length() && text.charAt(cursor) == ' ')) {
+            return;
+        }
+        int open = cursor - 2;
+        while (open > 0 && isShortcodeNameCharacter(text.charAt(open))) {
+            open--;
+        }
+        if (text.charAt(open) != ':' || open >= cursor - 2) {
+            return;
+        }
+        if (ChatEmoji.fromName(text.substring(open + 1, cursor - 1))
+                != null) {
+            this.inputField.writeText(" ");
+        }
+    }
+
+    /** The shortcode alphabet, exactly as the parser scans it. */
+    private static boolean isShortcodeNameCharacter(char character) {
+        return (character >= 'a' && character <= 'z')
+                || (character >= '0' && character <= '9')
+                || character == '_';
+    }
+
+    /**
+     * Tab in a non-empty field: walk an answered candidate list, or ask
+     * for one. The request path is vanilla's — client commands complete
+     * locally through {@code ClientCommandHandler}, everything else is
+     * asked of the server — but the answer comes back to
+     * {@link #func_146406_a}, which files the candidate list under the
+     * tab the request was typed in.
+     */
+    private void completeInput() {
+        if (this.completionCycling && !this.completionCandidates.isEmpty()) {
+            if (ClientChatChannelState.getSelected().equals(
+                    this.completionTab)) {
+                insertCompletion((this.completionCycleIndex + 1)
+                        % this.completionCandidates.size());
+                return;
+            }
+            // The walked list belongs to another tab's input; the field
+            // now holds this tab's draft, so start over on it.
+            dismissCompletion();
+        }
+        String beforeCursor = this.inputField.getText().substring(0,
+                this.inputField.getCursorPosition());
+        if (beforeCursor.length() < 1 || this.mc.thePlayer == null
+                || this.mc.thePlayer.sendQueue == null) {
+            return;
+        }
+        int wordStart = this.inputField.func_146197_a(-1,
+                this.inputField.getCursorPosition(), false);
+        ClientCommandHandler.instance.autoComplete(beforeCursor,
+                this.inputField.getText().substring(wordStart)
+                        .toLowerCase(Locale.ROOT));
+        this.mc.thePlayer.sendQueue.addToSendQueue(
+                new C14PacketTabComplete(beforeCursor));
+        this.completionWaiting = true;
+        this.completionTab = ClientChatChannelState.getSelected();
+    }
+
+    /**
+     * The completion answer. Inserts the candidates' common prefix, or —
+     * when the word already is that prefix — starts walking the list and
+     * shows it as a popup over the input. An answer arriving after the
+     * selection moved is dropped: the field holds another tab's draft,
+     * and splicing into that would corrupt it.
+     */
+    @Override
+    public void func_146406_a(String[] serverCompletions) {
+        if (!this.completionWaiting || serverCompletions == null) {
+            return;
+        }
+        this.completionWaiting = false;
+        this.completionCycling = false;
+        this.completionCandidates.clear();
+        this.completionCycleIndex = -1;
+        this.commandSuggestions.clear();
+        ChatTab owner = this.completionTab;
+        if (owner == null
+                || !owner.equals(ClientChatChannelState.getSelected())) {
+            return;
+        }
+        String[] merged = serverCompletions;
+        String[] client = ClientCommandHandler.instance.latestAutoComplete;
+        if (client != null) {
+            merged = ObjectArrays.concat(client, serverCompletions,
+                    String.class);
+        }
+        for (String candidate : merged) {
+            if (candidate != null && candidate.length() > 0) {
+                this.completionCandidates.add(candidate);
+            }
+        }
+        // Vanilla's shape: the prefix is the server candidates' alone.
+        String word = this.inputField.getText().substring(
+                this.inputField.func_146197_a(-1,
+                        this.inputField.getCursorPosition(), false));
+        String prefix = EnumChatFormatting.getTextWithoutFormattingCodes(
+                StringUtils.getCommonPrefix(serverCompletions));
+        if (prefix != null && prefix.length() > 0
+                && !word.equalsIgnoreCase(prefix)) {
+            this.inputField.deleteFromCursor(
+                    this.inputField.func_146197_a(-1,
+                            this.inputField.getCursorPosition(), false)
+                            - this.inputField.getCursorPosition());
+            this.inputField.writeText(prefix);
+            // The prefix leaves several ways forward; the popup shows
+            // them, nothing highlighted until the walk starts.
+            if (this.completionCandidates.size() > 1) {
+                this.commandSuggestions.show(this.completionCandidates);
+            }
+        } else if (!this.completionCandidates.isEmpty()) {
+            this.completionCycling = true;
+            if (this.completionCandidates.size() > 1) {
+                this.commandSuggestions.show(this.completionCandidates);
+            }
+            insertCompletion(0);
+        }
+    }
+
+    /** Replaces the word at the cursor with the indexed candidate. */
+    private void insertCompletion(int index) {
+        this.inputField.deleteFromCursor(
+                this.inputField.func_146197_a(-1,
+                        this.inputField.getCursorPosition(), false)
+                        - this.inputField.getCursorPosition());
+        this.inputField.writeText(
+                EnumChatFormatting.getTextWithoutFormattingCodes(
+                        this.completionCandidates.get(index)));
+        this.completionCycleIndex = index;
+        this.commandSuggestions.setSelected(index);
+    }
+
+    /** Up or Down while the popup is open: walk the list either way. */
+    private void stepCompletion(int delta) {
+        if (this.completionCandidates.isEmpty()) {
+            return;
+        }
+        this.completionCycling = true;
+        int size = this.completionCandidates.size();
+        int index = this.completionCycleIndex < 0
+                ? (delta > 0 ? 0 : size - 1)
+                : ((this.completionCycleIndex + delta) % size + size) % size;
+        insertCompletion(index);
+    }
+
+    /** Closes the popup and ends the walk; the field keeps its text. */
+    private void dismissCompletion() {
+        this.completionCycling = false;
+        this.commandSuggestions.clear();
     }
 
     /** Whether the field holds a command rather than a message. */
@@ -915,11 +1150,36 @@ public final class LostTalesChatGui extends GuiChat {
     /** Replaces the open share opener at the cursor with a full token. */
     private void acceptShareSuggestion(ChatShareCandidates.Entry entry) {
         ChatShareSuggester.Query query = shareSuggestions.getQuery();
-        if (entry == null || query == null) {
+        if (entry == null || query == null
+                || refusesAnotherShareToken(entry.token())) {
             return;
         }
         replaceAtCursor(query.openIndex, entry.token() + " ");
         refreshShareSuggestions();
+    }
+
+    /**
+     * The share-token ceiling is a wall like the character counter's:
+     * the server attaches at most {@link ChatShareTokenParser#MAX_TOKENS}
+     * showcases to a message and delivers anything beyond them as the
+     * literal text, so a pick that would become dead text is refused
+     * with a notice instead of inserted. Only complete tokens count —
+     * the opener being completed is not one yet — and only share tokens
+     * are walled; an emoji is no showcase.
+     */
+    private boolean refusesAnotherShareToken(String insertion) {
+        if (insertion == null
+                || ChatShareTokenParser.parse(insertion).isEmpty()) {
+            return false;
+        }
+        if (ChatShareTokenParser.parse(this.inputField.getText()).size()
+                < ChatShareTokenParser.MAX_TOKENS) {
+            return false;
+        }
+        showNotice(StatCollector.translateToLocalFormatted(
+                "gui.losttales.chat.too_many_shares",
+                Integer.valueOf(ChatShareTokenParser.MAX_TOKENS)));
+        return true;
     }
 
     /**
@@ -931,7 +1191,7 @@ public final class LostTalesChatGui extends GuiChat {
      */
     private void insertToken(String token) {
         String word = token == null ? "" : token.trim();
-        if (word.length() == 0) {
+        if (word.length() == 0 || refusesAnotherShareToken(word)) {
             return;
         }
         String text = this.inputField.getText();
@@ -990,17 +1250,16 @@ public final class LostTalesChatGui extends GuiChat {
         boolean accountIdentity =
                 channel.getIdentityType() == ChatIdentityType.ACCOUNT;
         // Roles stand above the players: addressing a whole group is
-        // never buried under a list of names. They are an account fact,
-        // so they are offered on the account channels alone.
-        if (accountIdentity) {
-            for (ChatAccountRole role : ChatAccountRole.mentionable()) {
-                String name = StatCollector.translateToLocal(
-                        role.getNameKey());
-                if (name.length() > 0 && !name.equals(role.getNameKey())) {
-                    result.add(ChatMentionCandidate.role(
-                            "role:" + role.name().toLowerCase(Locale.ROOT),
-                            name, role.getColor()));
-                }
+        // never buried under a list of names. They answer in every
+        // channel — an operator is worth calling wherever the call is
+        // made.
+        for (ChatAccountRole role : ChatAccountRole.mentionable()) {
+            String name = StatCollector.translateToLocal(
+                    role.getNameKey());
+            if (name.length() > 0 && !name.equals(role.getNameKey())) {
+                result.add(ChatMentionCandidate.role(
+                        "role:" + role.name().toLowerCase(Locale.ROOT),
+                        name, role.getColor()));
             }
         }
         Map<String, CharacterAppearance> byAccount =
@@ -1111,13 +1370,17 @@ public final class LostTalesChatGui extends GuiChat {
         return false;
     }
 
-    /** Replaces the {@code :prefix} at the cursor with the full shortcode. */
+    /**
+     * Replaces the {@code :prefix} at the cursor with the full
+     * shortcode, a space behind it like every other inserted token, so
+     * the next word stands apart from the emoji.
+     */
     private void acceptSuggestion(ChatEmoji emoji) {
         ChatEmojiSuggester.Query query = emojiSuggestions.getQuery();
         if (emoji == null || query == null) {
             return;
         }
-        replaceAtCursor(query.colonIndex, emoji.getShortcode());
+        replaceAtCursor(query.colonIndex, emoji.getShortcode() + " ");
         emojiSuggestions.update(this.inputField.getText(),
                 this.inputField.getCursorPosition());
     }
@@ -1481,7 +1744,18 @@ public final class LostTalesChatGui extends GuiChat {
         } else if (this.tabDrag != null && this.tabDrag.active) {
             updateDropTarget(mouseX, mouseY);
         }
-        drawWindows(mouseX, mouseY, entrance);
+        drawWindows(mouseX, mouseY, entrance, partialTicks);
+        if (!isDragging()) {
+            for (ChatWindowFrame frame : ChatWindowFrame.drawnFrames()) {
+                if (frame.jumpPillContains(mouseX, mouseY)) {
+                    this.hoverTip = StatCollector.translateToLocal(
+                            "gui.losttales.chat.jump_to_present");
+                    this.hoverTipX = mouseX;
+                    this.hoverTipY = mouseY;
+                    break;
+                }
+            }
+        }
         // The field follows the active window's bar as just drawn.
         updateInputBounds();
         refreshRestorePopup();
@@ -1528,6 +1802,9 @@ public final class LostTalesChatGui extends GuiChat {
             refreshShareSuggestions();
             shareSuggestions.draw(this.mc, this.fontRendererObj,
                     this.regions, anchor, this.inputField.xPosition,
+                    mouseX, adjustedMouseY);
+            commandSuggestions.draw(this.fontRendererObj, this.regions,
+                    anchor, this.inputField.xPosition,
                     mouseX, adjustedMouseY);
         } finally {
             GL11.glPopMatrix();
@@ -1602,6 +1879,21 @@ public final class LostTalesChatGui extends GuiChat {
         return ChatWindowFrame.of(window);
     }
 
+    /** Whether the box crosses any of the boxes already drawn. */
+    private static boolean overlapsAny(List<ChatWindowPlacement.Box> boxes,
+                                       ChatWindowPlacement.Box box) {
+        for (int index = 0; index < boxes.size(); index++) {
+            ChatWindowPlacement.Box other = boxes.get(index);
+            if (box.x < other.x + other.width
+                    && box.x + box.width > other.x
+                    && box.y < other.y + other.height
+                    && box.y + box.height > other.y) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Every window, back to front, each complete before the next: its
      * history — drawn here rather than in the HUD pass, so the open chat
@@ -1613,7 +1905,8 @@ public final class LostTalesChatGui extends GuiChat {
      * The row is the window's title strip and is there while the window
      * has a tab the player can see.
      */
-    private void drawWindows(int mouseX, int mouseY, float entrance) {
+    private void drawWindows(int mouseX, int mouseY, float entrance,
+                             float partialTicks) {
         LostTalesGuiAnimationSample opening =
                 ClientChatChannelViews.openSample();
         ChatWindowFrame active = activeFrame();
@@ -1621,8 +1914,32 @@ public final class LostTalesChatGui extends GuiChat {
         ChatChannelTabBar.Hit hoveredHit = null;
         ChatWindow hoveredWindow = null;
         boolean hoveredGrip = false;
+        boolean blurActive = LostTalesConfig.enableChatBackgroundBlur
+                && LostTalesConfig.enableGuiBackgroundBlur;
+        List<ChatWindowPlacement.Box> drawnBoxes = blurActive
+                ? new ArrayList<ChatWindowPlacement.Box>(windows.size())
+                : null;
         for (int index = 0; index < windows.size(); index++) {
             ChatWindow window = windows.get(index);
+            if (drawnBoxes != null
+                    && !ChatWindowFrame.visibleTabs(window).isEmpty()) {
+                // A window over another one pastes its rectangle of the
+                // blurred frame; captured before any window, that
+                // rectangle holds only the world and would erase what
+                // was just drawn behind it. Re-capturing here puts the
+                // windows already drawn into the front window's blur, so
+                // an overlapped window stays visible — softened —
+                // behind the one in front.
+                ChatWindowPlacement.Box box = ChatWindowPlacement
+                        .windowBounds(window, this.mc, this.width,
+                                this.height);
+                if (overlapsAny(drawnBoxes, box)) {
+                    LostTalesGuiRegionBlur.getInstance().capture(this.mc,
+                            partialTicks,
+                            (float)LostTalesConfig.guiBlurStrength);
+                }
+                drawnBoxes.add(box);
+            }
             LostTalesChatOverlayRenderer.drawWindowForScreen(this.mc, window,
                     this.width, this.height, opening);
             ChatWindowFrame frame = frameFor(window);
@@ -2123,6 +2440,16 @@ public final class LostTalesChatGui extends GuiChat {
                 return;
             }
         }
+        if (button == 0 && commandSuggestions.isActive()) {
+            int candidate = commandSuggestions.candidateAt(
+                    this.fontRendererObj, mouseX, adjustedMouseY,
+                    anchor, this.inputField.xPosition);
+            if (candidate >= 0) {
+                this.completionCycling = true;
+                insertCompletion(candidate);
+                return;
+            }
+        }
         ChatPickerPanel picker = openPicker();
         if (picker != null && picker.isInsidePanel(mouseX, adjustedMouseY,
                 barRight, pickerAnchor())) {
@@ -2215,7 +2542,26 @@ public final class LostTalesChatGui extends GuiChat {
             // message stack underneath must not receive the click.
             return;
         }
-        if (button == 1 && LostTalesChatClipboard.copy(
+        if (button == 0) {
+            // The jump-to-newest pill floats over the stack; a click on
+            // it glides the scrolled view home. Front to back, so the
+            // front window's pill wins where windows overlap.
+            List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
+            for (int index = frames.size() - 1; index >= 0; index--) {
+                ChatWindowFrame frame = frames.get(index);
+                if (frame.jumpPillContains(mouseX, mouseY)) {
+                    ClientChatChannelViews.scrollHome(frame.view);
+                    return;
+                }
+            }
+        }
+        // A right-click copies the message, not the people in it: over
+        // the sender's identity or a mention — wherever the card shows —
+        // the click belongs to the person and copies nothing.
+        if (button == 1
+                && !LostTalesChatHoverCard.isPointerOnPerson(this.mc,
+                        mouseX, mouseY)
+                && LostTalesChatClipboard.copy(
                 this.mc.ingameGUI.getChatGUI(), this.mc, mouseX, mouseY)) {
             showNotice(StatCollector.translateToLocal(
                     "gui.losttales.chat.copied"));
@@ -2564,6 +2910,11 @@ public final class LostTalesChatGui extends GuiChat {
         }
         if (isInsideToolbarToggle(mouseX, mouseY, barRight)) {
             return true;
+        }
+        for (ChatWindowFrame drawnFrame : ChatWindowFrame.drawnFrames()) {
+            if (drawnFrame.jumpPillContains(mouseX, mouseY)) {
+                return true;
+            }
         }
         // A window that is not the one being typed in answers to a
         // click by becoming it, so the pointer says so over all of it.
@@ -3632,9 +3983,12 @@ public final class LostTalesChatGui extends GuiChat {
         ChatMentionMarker.Data mention =
                 ChatMentionMarker.decode(hit.component);
         if (mention != null) {
-            // A mention answers like a name: it opens the conversation
-            // with whoever it reaches.
-            openWhisperTab(mention.account);
+            // A player mention answers like a name: it opens the
+            // conversation with whoever it reaches. A role is nobody to
+            // whisper, so its mention spends the click on its card.
+            if (mention.role() == null) {
+                openWhisperTab(mention.account);
+            }
             return true;
         }
         ChatShowcaseMarker.Data share =

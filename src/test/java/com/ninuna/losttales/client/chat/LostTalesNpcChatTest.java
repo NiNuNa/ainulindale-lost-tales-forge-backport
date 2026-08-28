@@ -45,8 +45,9 @@ public final class LostTalesNpcChatTest {
             }
 
             String rendered = plainText.toString();
-            // NPC speech is a whisper from the NPC: its tab bears its name.
-            assertTrue(rendered.startsWith("Grey Wanderer: ["));
+            // NPC speech is a whisper from the NPC: the feed prefix
+            // names the channel, since the line already names the NPC.
+            assertTrue(rendered.startsWith("Whisper: ["));
             assertTrue(rendered.contains("] <"));
             assertTrue(rendered.contains("Grey Wanderer> Good day"));
             assertNotNull(marker);

@@ -108,8 +108,9 @@ public final class ChatLineWrapperTest {
         // on the first line whole.
         assertEquals(2, closed.size());
         assertEquals(1, open.size());
-        // The continuation indent is the header each state draws.
-        assertEquals(72, indentOf(closed.get(1), false));
+        // Closed continuation lines start at the left edge: the feed is
+        // a glance, and full width reads better than a prefix indent.
+        assertEquals(0, indentOf(closed.get(1), false));
     }
 
     private static String plain(IChatComponent line) {
@@ -143,20 +144,20 @@ public final class ChatLineWrapperTest {
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
                 line("<Name> ", "one two three four five six"), 150);
         assertNotNull(lines);
-        assertEquals(3, lines.size());
+        assertEquals(2, lines.size());
         assertEquals("Global: <Name> one two", plain(lines.get(0)));
-        assertEquals("three four", plain(lines.get(1)));
-        assertEquals("five six", plain(lines.get(2)));
+        // Closed continuation lines start at the left edge with the
+        // whole width; the marker still carries the open indent for the
+        // screen, which aligns under the sender.
+        assertEquals("three four five six", plain(lines.get(1)));
         assertEquals(-1, indentOf(lines.get(0), false));
-        assertEquals(75, indentOf(lines.get(1), false));
+        assertEquals(0, indentOf(lines.get(1), false));
         assertEquals(42, indentOf(lines.get(1), true));
-        assertEquals(75, indentOf(lines.get(2), false));
-        // Nothing exceeds the width in the closed state, the wider one,
-        // and the next word would not have fit on either line.
+        // Nothing exceeds the width in the closed state, and the next
+        // word would not have fit on the first line.
         assertTrue(90 + METRICS.width("one two") <= 150);
         assertTrue(90 + METRICS.width("one two three") > 150);
-        assertTrue(75 + METRICS.width("three four") <= 150);
-        assertTrue(75 + METRICS.width("three four five") > 150);
+        assertTrue(METRICS.width("three four five six") <= 150);
     }
 
     /**
@@ -181,7 +182,7 @@ public final class ChatLineWrapperTest {
         // The marker still carries both offsets: the renderer picks the
         // one the state it draws in needs.
         assertEquals(42, indentOf(open.get(1), true));
-        assertEquals(75, indentOf(open.get(1), false));
+        assertEquals(0, indentOf(open.get(1), false));
         // Nothing exceeds the width the open screen actually draws in.
         assertTrue(42 + METRICS.width("one two three four") <= 150);
         assertTrue(42 + METRICS.width("one two three four five") > 150);
@@ -192,12 +193,11 @@ public final class ChatLineWrapperTest {
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
                 line("<N> ", "aaaa bbbb cccc dddd eeee"), 140);
         // Prefix 48 + 24 = 72 leaves 68: "aaaa bbbb" (54) fits, a third
-        // word would not; continuation lines have 70.
-        assertEquals(3, lines.size());
+        // word would not; the continuation line has the whole width.
+        assertEquals(2, lines.size());
         assertEquals("Global: <N> aaaa bbbb", plain(lines.get(0)));
         assertFalse(plain(lines.get(1)).startsWith(" "));
-        assertEquals("cccc dddd", plain(lines.get(1)));
-        assertEquals("eeee", plain(lines.get(2)));
+        assertEquals("cccc dddd eeee", plain(lines.get(1)));
     }
 
     @Test
@@ -294,13 +294,13 @@ public final class ChatLineWrapperTest {
         }
         name.append("> ");
         // Prefix 48 + 102 = 150 of 160: no room, body starts a line down
-        // with the indent capped at half the width.
+        // at the left edge, whatever the prefix measured.
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
                 line(name.toString(), "short"), 160);
         assertEquals(2, lines.size());
         assertEquals("Global: " + name, plain(lines.get(0)));
         assertEquals("short", plain(lines.get(1)));
-        assertEquals(80, indentOf(lines.get(1), false));
+        assertEquals(0, indentOf(lines.get(1), false));
         // And one that does not even fit the width goes back to vanilla.
         assertNull(ChatLineWrapper.wrap(METRICS,
                 line(name.toString(), "short"), 100));
@@ -331,9 +331,9 @@ public final class ChatLineWrapperTest {
             assertEquals("Global: <  Arathorn> The road goes ever on and on, "
                     + "down from the door where it began.",
                     joined.toString().trim());
-            // With timestamps off the anchor sits right after the channel
-            // prefix: 48px closed, nothing when the prefix is hidden.
-            assertEquals(48, indentOf(lines.get(1), false));
+            // Closed continuation lines start at the left edge; with the
+            // prefix hidden the open state starts there anyway.
+            assertEquals(0, indentOf(lines.get(1), false));
             assertEquals(0, indentOf(lines.get(1), true));
         } finally {
             LostTalesConfig.showChatTimestamps = originalTimestamps;

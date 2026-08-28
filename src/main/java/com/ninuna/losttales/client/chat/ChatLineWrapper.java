@@ -119,8 +119,11 @@ final class ChatLineWrapper {
         }
         int maxIndent = Math.max(0, Math.min(
                 Math.round(width * MAX_INDENT_RATIO), width - MIN_BODY_WIDTH));
-        Builder builder = new Builder(metrics, width,
-                Math.min(closedPrefix, maxIndent),
+        // Closed-feed continuation lines start at the left edge rather
+        // than under the channel prefix: the feed is a glance, and a
+        // full-width continuation reads better there than an indent
+        // aligning with a prefix several lines up.
+        Builder builder = new Builder(metrics, width, 0,
                 Math.min(openPrefix, maxIndent), chatOpen, nameColor,
                 titleColor);
         for (int index = 0; index <= bodyIndex; index++) {
@@ -159,7 +162,8 @@ final class ChatLineWrapper {
     /** Glyph slots are single indivisible words, spaces or not. */
     private static boolean isAtomic(IChatComponent part) {
         if (ChatEmojiMarker.isMarker(part) || ChatHeadMarker.isMarker(part)
-                || ChatSpacerMarker.isMarker(part)) {
+                || ChatSpacerMarker.isMarker(part)
+                || ChatGroupMarker.isMarker(part)) {
             return true;
         }
         ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);

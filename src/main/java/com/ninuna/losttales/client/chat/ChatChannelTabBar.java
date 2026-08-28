@@ -907,6 +907,70 @@ final class ChatChannelTabBar {
                 + (otherWidth > 0 ? COUNTER_GAP + otherWidth : 0);
     }
 
+    /**
+     * Whether the window's row is already shortening its tab names: the
+     * same width model {@link #layout} draws with — the end controls'
+     * reserved room, each tab's padding, icon and counters (given up
+     * first, exactly as the layout gives them up), the controls the
+     * crowded row keeps on the selected tab alone — measured against
+     * the window's own width. This is what the auto-open policy asks
+     * before filing a new tab into a window: a row whose names are
+     * whole takes the tab, one already ellipsizing is full and the
+     * channel opens elsewhere. The restore control's room is always
+     * counted, so the answer does not flap as the {@code +} comes and
+     * goes. Without a renderer to measure with the answer is "not
+     * crowded", which keeps the layout usable headlessly.
+     */
+    static boolean rowIsCrowded(Minecraft minecraft, ChatWindow window) {
+        if (minecraft == null || minecraft.fontRenderer == null
+                || window == null) {
+            return false;
+        }
+        FontRenderer font = minecraft.fontRenderer;
+        List<ChatTab> tabs = ChatWindowFrame.visibleTabs(window);
+        if (tabs.isEmpty()) {
+            return false;
+        }
+        net.minecraft.client.gui.ScaledResolution resolution =
+                new net.minecraft.client.gui.ScaledResolution(minecraft,
+                        minecraft.displayWidth, minecraft.displayHeight);
+        ChatWindowPlacement.Box box = ChatWindowPlacement.windowBounds(
+                window, minecraft, resolution.getScaledWidth(),
+                resolution.getScaledHeight());
+        // The row spans the window minus the two-pixel insets the screen
+        // lays it out with.
+        int rowWidth = box.width - 4;
+        int endControls = END_CONTROL_GAP + END_CONTROL_SIZE
+                + END_CONTROL_GAP + END_CONTROL_SIZE + END_CONTROL_GAP
+                + MIN_GRIP_WIDTH;
+        int available = rowWidth - endControls
+                - TAB_GAP * (tabs.size() - 1);
+        int fixedWithCounters = controlsWidth(true);
+        int fixedWithout = controlsWidth(true);
+        int labels = 0;
+        for (int index = 0; index < tabs.size(); index++) {
+            ChatTab tab = tabs.get(index);
+            int base = PADDING_X * 2 + iconWidth(tab);
+            fixedWithCounters += base + countersWidth(
+                    font.getStringWidth(
+                            ClientChatChannelViews.counterText(
+                                    ClientChatChannelViews
+                                            .unreadPingCount(tab))),
+                    font.getStringWidth(
+                            ClientChatChannelViews.counterText(
+                                    ClientChatChannelViews
+                                            .unreadOtherCount(tab))));
+            fixedWithout += base;
+            labels += font.getStringWidth(
+                    ClientChatChannelState.displayName(tab));
+        }
+        // Counters go before labels shorten, so a row that only had to
+        // give them up still counts as whole-named.
+        int fixed = fixedWithCounters > available
+                ? fixedWithout : fixedWithCounters;
+        return labels > available - fixed;
+    }
+
     private static int blend(int fromRgb, int toRgb, float amount) {
         float t = Math.max(0.0F, Math.min(1.0F, amount));
         int red = Math.round(((fromRgb >> 16) & 0xFF)
