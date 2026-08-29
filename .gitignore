@@ -42,3 +42,6 @@ logs/
 Thumbs.db
 *.swp
 *.swo
+
+# Docs kept out of the repo for now
+/docs/

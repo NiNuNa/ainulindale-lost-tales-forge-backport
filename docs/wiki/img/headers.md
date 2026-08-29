@@ -1,1 +1,0 @@
-The images for these headers were taken on the [Aeons of Ainulindalë](https://lotrminecraftmod.fandom.com/wiki/Servers/Ainulindal%C3%AB_Official_Server "Aeons of Ainulindalë Minecraft Server") Minecraft server and provided to us by members of its community Discord server.
