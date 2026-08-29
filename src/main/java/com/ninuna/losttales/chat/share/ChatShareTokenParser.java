@@ -21,8 +21,21 @@ import java.util.Locale;
  * dedicated server and testable without a game runtime.</p>
  */
 public final class ChatShareTokenParser {
-    /** Upper bound on shared things per message; later tokens stay text. */
-    public static final int MAX_TOKENS = 3;
+    /**
+     * Defensive bound on shared things per message; later tokens stay
+     * text. Not an interface rule — a message may show as many things
+     * as it has room for, wrapping over as many lines as that takes —
+     * but a ceiling the bounded collections behind it need, and one the
+     * request has to fit: the reference for each travels a
+     * client-to-server custom payload, which 1.7.10 refuses outright
+     * past 32767 bytes. What the *delivered* line costs is bounded by
+     * bytes rather than by count, in {@link
+     * com.ninuna.losttales.chat.share.ChatShowcase#MAX_TOTAL_BYTES},
+     * since a marker costs a fraction of what an enchanted stack does.
+     * Both bounds are asserted against the real codecs in the packet
+     * tests.
+     */
+    public static final int MAX_TOKENS = 32;
     /** Item names are bounded by vanilla's anvil (35); marker names are longer. */
     public static final int MAX_NAME_LENGTH = 64;
     public static final int MAX_ORDINAL = 99;

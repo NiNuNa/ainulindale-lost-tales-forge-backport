@@ -127,6 +127,21 @@ public enum ChatAccountRole {
         return held;
     }
 
+    /**
+     * The colour an account line's sender name is drawn in: the primary
+     * role's, or the chat's plain ivory when the sender holds none.
+     * Every account line takes its name colour from here, wherever it is
+     * built — the server signing a routed line, the client signing its
+     * own half of a conversation nothing is sent for — so one account
+     * reads the same in every channel it speaks in.
+     */
+    public static int nameColor(int mask) {
+        ChatAccountRole primary = primary(mask);
+        return primary == NONE
+                ? LostTalesColors.rgb(LostTalesColors.HUD_LABEL)
+                : primary.getColor();
+    }
+
     /** The highest-precedence role in a mask, or {@link #NONE}. */
     public static ChatAccountRole primary(int mask) {
         for (ChatAccountRole role : TAGGED) {

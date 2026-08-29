@@ -17,31 +17,38 @@ import net.minecraft.client.gui.GuiNewChat;
 import net.minecraft.util.IChatComponent;
 
 /**
- * The lines one window shows, laid out at that window's own width.
+ * The lines one view shows, laid out for that view alone: every open
+ * window at its own width, and the closed-chat feed.
  *
  * <p>Minecraft wraps a message once, at one width, and keeps the result
- * in the list every chat draw reads — so windows of different widths
+ * in the list every chat draw reads — so views of different widths
  * cannot share it. The unwrapped messages behind that list can, though:
- * this reads them, keeps the ones the window's view accepts, and lays
- * each out again at the window's width, in the same order vanilla files
- * its own — newest message first, and within a message its last line
- * first, because that is the order the renderer walks upward from the
+ * this reads them, keeps the ones the view accepts, and lays each out
+ * again at the view's width, in the same order vanilla files its own —
+ * newest message first, and within a message its last line first,
+ * because that is the order the renderer walks upward from the
  * baseline.</p>
  *
- * <p>Every open window is laid out here, whatever width it has. The
- * shared list is wrapped for the closed-chat feed, which shows the
- * channel prefix on every line; the open screen hides that prefix — the
- * tabs already name the channel — so a window laid out here gives its
- * width back to the message body instead of leaving it blank at the end
- * of each line. A window whose history cannot be read falls back to the
- * shared list.</p>
+ * <p>The view also decides its own <em>grouping</em>, which is why the
+ * feed is laid out here rather than reading the shared list: a run is
+ * broken by the message before it <em>in this view</em>, and a channel's
+ * own window and the interleaved feed do not see the same one. Vanilla's
+ * history keeps every message in full; {@link ChatGroupRuns} holds the
+ * grouped form beside it, and each view picks between them message by
+ * message.</p>
  *
- * <p>Results are cached per window and rebuilt only when the width, the
- * chat scale, the colour setting or the history itself changes, and a
- * rebuild costs only the messages it has not seen: each message's own
- * lines are kept against the message, so an arriving message lays out
- * one message rather than the whole history. Only the open chat screen
- * asks here at all, so nothing of this runs during normal play.</p>
+ * <p>The feed shows the channel prefix on every line; the open screen
+ * hides it — the tabs already name the channel — so a window gives that
+ * width back to the message body instead of leaving it blank at the end
+ * of each line. A view whose history cannot be read falls back to the
+ * shared list, where every message keeps its header.</p>
+ *
+ * <p>Results are cached per view and rebuilt only when the width, the
+ * colour setting, the drawn state or the history itself changes, and a
+ * rebuild costs only the messages whose layout it has not already seen:
+ * each message's lines are kept against the message and the form it was
+ * laid out in, so an arriving message lays out one message rather than
+ * the whole history.</p>
  */
 final class ChatWindowLines {
     /** Vanilla's unwrapped history, newest first. */
@@ -49,6 +56,13 @@ final class ChatWindowLines {
     private static final Map<String, Cached> CACHE =
             new HashMap<String, Cached>();
     private static boolean unavailableLogged;
+    /**
+     * Bumped whenever the history is changed in place rather than added
+     * to. The signature below notices messages arriving and leaving by
+     * counting them and reading the ends; a message rewritten where it
+     * stands changes neither, so it says so itself.
+     */
+    private static long revision;
 
     private ChatWindowLines() {}
 
@@ -67,29 +81,69 @@ final class ChatWindowLines {
                                                  ChatWindow window,
                                                  ChatLineFilter filter,
                                                  int chatWidth) {
+        if (minecraft == null || minecraft.fontRenderer == null
+                || chat == null || window == null || chatWidth <= 0) {
+            return null;
+        }
+        // The timestamp column at the window's left edge comes out of
+        // the room the messages may wrap to, so a line never runs out
+        // under the window's right edge to pay for it.
+        ChatTimestampColumn columns =
+                ChatTimestampColumn.current(minecraft.fontRenderer);
+        return forView(minecraft, chat, window.getId(), filter,
+                ChatWindowPlacement.wrapWidth(chatWidth,
+                        chat.func_146244_h()) - (columns.messageX() - 2),
+                true, false);
+    }
+
+    /**
+     * The closed-chat feed's lines, laid out at the game's own chat
+     * width — exactly the width vanilla wraps the shared list to, since
+     * the feed shows the same channel prefixes on the same messages and
+     * only their grouping is its own.
+     */
+    static synchronized List<ChatLine> forFeed(Minecraft minecraft,
+                                               GuiNewChat chat,
+                                               ChatLineFilter filter) {
+        if (minecraft == null || chat == null) {
+            return null;
+        }
+        return forView(minecraft, chat, ChatWindowFrame.feed().windowId,
+                filter, ChatWindowPlacement.wrapWidth(
+                        ChatWindowPlacement.chatWidth(minecraft),
+                        chat.func_146244_h()), false, true);
+    }
+
+    /**
+     * One view's lines, or null when the unwrapped history cannot be
+     * read and the view should fall back to the shared list. A
+     * {@code fading} view drops its lines a few seconds after they
+     * arrive, and drops a whole run at once: its runs are held to a
+     * span of their own, and every line of a run is given the arrival
+     * tick of the run's newest message, which is the clock the renderer
+     * fades each line on.
+     */
+    private static List<ChatLine> forView(Minecraft minecraft,
+                                          GuiNewChat chat, String viewId,
+                                          ChatLineFilter filter,
+                                          int wrapWidth, boolean chatOpen,
+                                          boolean fading) {
         if (CHAT_LINES == null || minecraft == null
-                || minecraft.fontRenderer == null || chat == null
-                || window == null || filter == null || chatWidth <= 0) {
+                || minecraft.fontRenderer == null || filter == null
+                || viewId == null) {
             return null;
         }
         List<ChatLine> messages = messages(chat);
         if (messages == null) {
             return null;
         }
-        float scale = chat.func_146244_h();
+        int width = Math.max(1, wrapWidth);
         boolean colours = LostTalesChatVisualStyle.chatColoursEnabled();
-        // The timestamp column at the window's left edge comes out of
-        // the room the messages may wrap to, so a line never runs out
-        // under the window's right edge to pay for it.
-        ChatTimestampColumn columns =
-                ChatTimestampColumn.current(minecraft.fontRenderer);
-        int wrapWidth = Math.max(1,
-                ChatWindowPlacement.wrapWidth(chatWidth, scale)
-                        - (columns.messageX() - 2));
-        Cached cached = CACHE.get(window.getId());
-        if (cached == null || !cached.describes(wrapWidth, colours, filter)) {
-            cached = new Cached(wrapWidth, colours, filter);
-            CACHE.put(window.getId(), cached);
+        Cached cached = CACHE.get(viewId);
+        if (cached == null || !cached.describes(width, colours, chatOpen,
+                fading, filter)) {
+            cached = new Cached(width, colours, chatOpen, fading, filter);
+            CACHE.put(viewId, cached);
         }
         cached.refresh(minecraft.fontRenderer, messages, filter,
                 signatureOf(messages));
@@ -99,6 +153,56 @@ final class ChatWindowLines {
     /** Forgotten with the rest of the client's chat state. */
     static synchronized void clear() {
         CACHE.clear();
+    }
+
+    /**
+     * Rewrites the message drawn under {@code chatLineId} where it
+     * stands, so an edited line stays in the order it was said in
+     * rather than jumping to the end of the conversation — which is
+     * what printing it again would do, since vanilla files every
+     * printed line as the newest.
+     *
+     * <p>Answers whether the history could be reached at all. It cannot
+     * only when the same reflection every window's own width depends on
+     * has already failed, and the chat has said so once.</p>
+     */
+    static boolean replaceMessage(GuiNewChat chat, int chatLineId,
+                                  IChatComponent replacement) {
+        List<ChatLine> messages = chat == null || replacement == null ? null
+                : messages(chat);
+        if (messages == null) {
+            return false;
+        }
+        for (int index = 0; index < messages.size(); index++) {
+            ChatLine line = messages.get(index);
+            if (line != null && line.getChatLineID() == chatLineId) {
+                messages.set(index, new ChatLine(line.getUpdatedCounter(),
+                        replacement, chatLineId));
+                revision++;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Drops the message drawn under {@code chatLineId} from the history. */
+    static boolean removeMessage(GuiNewChat chat, int chatLineId) {
+        List<ChatLine> messages = chat == null ? null : messages(chat);
+        if (messages == null) {
+            return false;
+        }
+        boolean removed = false;
+        for (int index = messages.size() - 1; index >= 0; index--) {
+            ChatLine line = messages.get(index);
+            if (line != null && line.getChatLineID() == chatLineId) {
+                messages.remove(index);
+                removed = true;
+            }
+        }
+        if (removed) {
+            revision++;
+        }
+        return removed;
     }
 
     /**
@@ -116,7 +220,7 @@ final class ChatWindowLines {
      * message arriving, leaving, or being replaced.
      */
     private static long signatureOf(List<ChatLine> messages) {
-        long signature = messages.size();
+        long signature = messages.size() * 31L + revision;
         if (!messages.isEmpty()) {
             ChatLine head = messages.get(0);
             if (head != null) {
@@ -177,35 +281,42 @@ final class ChatWindowLines {
                 LostTalesMetaData.MOD_ID);
     }
 
-    /** One window's laid-out lines and what they were laid out for. */
+    /** One view's laid-out lines and what they were laid out for. */
     private static final class Cached {
         private final int wrapWidth;
         private final boolean colours;
+        private final boolean chatOpen;
+        /** Whether this view drops its lines a few seconds after they arrive. */
+        private final boolean fading;
         private final ChatLineFilter filter;
         /** The history this layout describes; unchanged means reusable. */
         private long signature = Long.MIN_VALUE;
         /** Each message's own lines, held against the message itself. */
-        private Map<ChatLine, List<ChatLine>> wrapped =
-                new IdentityHashMap<ChatLine, List<ChatLine>>();
+        private Map<ChatLine, Piece> wrapped =
+                new IdentityHashMap<ChatLine, Piece>();
         List<ChatLine> lines = Collections.emptyList();
 
-        Cached(int wrapWidth, boolean colours, ChatLineFilter filter) {
+        Cached(int wrapWidth, boolean colours, boolean chatOpen,
+               boolean fading, ChatLineFilter filter) {
             this.wrapWidth = wrapWidth;
             this.colours = colours;
+            this.chatOpen = chatOpen;
+            this.fading = fading;
             this.filter = filter;
         }
 
-        boolean describes(int wrapWidth, boolean colours,
-                          ChatLineFilter filter) {
+        boolean describes(int wrapWidth, boolean colours, boolean chatOpen,
+                          boolean fading, ChatLineFilter filter) {
             return this.wrapWidth == wrapWidth && this.colours == colours
+                    && this.chatOpen == chatOpen && this.fading == fading
                     && this.filter.equals(filter);
         }
 
         /**
          * Brings the layout up to date with the history. Messages
-         * already laid out keep the lines they had; only ones this
-         * layout has not seen are wrapped, and messages the history has
-         * dropped go with them.
+         * already laid out in the form this view still wants keep the
+         * lines they had; only the rest are wrapped, and messages the
+         * history has dropped go with them.
          */
         void refresh(FontRenderer font, List<ChatLine> messages,
                      ChatLineFilter filter, long signature) {
@@ -213,24 +324,52 @@ final class ChatWindowLines {
                 return;
             }
             this.signature = signature;
-            Map<ChatLine, List<ChatLine>> kept =
-                    new IdentityHashMap<ChatLine, List<ChatLine>>(
-                            this.wrapped.size() + 1);
-            List<ChatLine> result =
+            List<ChatLine> visible =
                     new ArrayList<ChatLine>(messages.size());
             for (int index = 0; index < messages.size(); index++) {
                 ChatLine message = messages.get(index);
-                if (message == null || !filter.accepts(
+                if (message != null && filter.accepts(
                         ClientChatChannelViews.tabOf(
                                 message.getChatLineID()))) {
-                    continue;
+                    visible.add(message);
                 }
-                List<ChatLine> pieces = this.wrapped.get(message);
-                if (pieces == null) {
-                    pieces = layOut(font, message);
+            }
+            // Grouping is this view's own: the same rule, run over the
+            // messages the view shows and no others, and held to the
+            // span this view lets a run go on for.
+            int[] lineIds = new int[visible.size()];
+            for (int index = 0; index < visible.size(); index++) {
+                lineIds[index] = visible.get(index).getChatLineID();
+            }
+            boolean[] grouped = this.fading
+                    ? ChatGroupRuns.continuationsInFeed(lineIds)
+                    : ChatGroupRuns.continuationsOf(lineIds);
+            Map<ChatLine, Piece> kept = new IdentityHashMap<ChatLine, Piece>(
+                    this.wrapped.size() + 1);
+            List<ChatLine> result =
+                    new ArrayList<ChatLine>(messages.size());
+            // A fading view fades a run as one, so every line of a run
+            // carries the arrival tick of the run's newest message —
+            // the clock the renderer ages each line on. Walking newest
+            // first, that is the newest message met since the last line
+            // that opened a run.
+            int runNewest = 0;
+            for (int index = 0; index < visible.size(); index++) {
+                ChatLine message = visible.get(index);
+                if (this.fading && index > 0 && !grouped[index - 1]) {
+                    runNewest = index;
                 }
-                kept.put(message, pieces);
-                result.addAll(pieces);
+                int counter = this.fading
+                        ? visible.get(runNewest).getUpdatedCounter()
+                        : message.getUpdatedCounter();
+                Piece piece = this.wrapped.get(message);
+                if (piece == null || piece.grouped != grouped[index]) {
+                    piece = layOut(font, message, grouped[index], counter);
+                } else if (piece.updatedCounter != counter) {
+                    piece = piece.on(counter);
+                }
+                kept.put(message, piece);
+                result.addAll(piece.lines);
             }
             this.wrapped = kept;
             this.lines = Collections.unmodifiableList(result);
@@ -238,19 +377,56 @@ final class ChatWindowLines {
 
         /**
          * One message laid out at the width, its last line first: the
-         * renderer draws index zero on the baseline and works upward.
+         * renderer draws index zero on the baseline and works upward. A
+         * grouped message is laid out from the headerless form kept for
+         * it, and from the full one when the history outlived that.
          */
-        private List<ChatLine> layOut(FontRenderer font, ChatLine message) {
+        private Piece layOut(FontRenderer font, ChatLine message,
+                             boolean grouped, int updatedCounter) {
+            ChatGroupRuns.Entry entry = grouped
+                    ? ChatGroupRuns.of(message.getChatLineID()) : null;
+            IChatComponent root = entry == null ? message.func_151461_a()
+                    : entry.groupedLine;
             List<IChatComponent> wrappedLines = ChatMessageWrapper.wrap(font,
-                    message.func_151461_a(), this.wrapWidth, this.colours,
-                    true);
-            List<ChatLine> pieces =
+                    root, this.wrapWidth, this.colours, this.chatOpen);
+            return new Piece(grouped, updatedCounter, wrappedLines,
+                    message.getChatLineID());
+        }
+    }
+
+    /**
+     * One message's lines, the form they were laid out in, and the
+     * arrival tick they are drawn with — a fading view's whole run
+     * shares the newest one, so the run fades out together.
+     */
+    private static final class Piece {
+        final boolean grouped;
+        final int updatedCounter;
+        private final List<IChatComponent> wrappedLines;
+        private final int chatLineId;
+        final List<ChatLine> lines;
+
+        Piece(boolean grouped, int updatedCounter,
+              List<IChatComponent> wrappedLines, int chatLineId) {
+            this.grouped = grouped;
+            this.updatedCounter = updatedCounter;
+            this.wrappedLines = wrappedLines;
+            this.chatLineId = chatLineId;
+            // Last line first: the renderer draws index zero on the
+            // baseline and works upward.
+            List<ChatLine> built =
                     new ArrayList<ChatLine>(wrappedLines.size());
-            for (int piece = wrappedLines.size() - 1; piece >= 0; piece--) {
-                pieces.add(new ChatLine(message.getUpdatedCounter(),
-                        wrappedLines.get(piece), message.getChatLineID()));
+            for (int index = wrappedLines.size() - 1; index >= 0; index--) {
+                built.add(new ChatLine(updatedCounter,
+                        wrappedLines.get(index), chatLineId));
             }
-            return pieces;
+            this.lines = built;
+        }
+
+        /** The same layout on another clock; nothing is wrapped again. */
+        Piece on(int updatedCounter) {
+            return new Piece(this.grouped, updatedCounter, this.wrappedLines,
+                    this.chatLineId);
         }
     }
 }

@@ -327,6 +327,9 @@ final class LostTalesChatVisualStyle {
             if (explicitColor == null) {
                 explicitColor = ChatTitleMarker.colorOf(part);
             }
+            if (explicitColor == null) {
+                explicitColor = ChatReplyMarker.colorOf(part);
+            }
             boolean replyIdentity = isReplyIdentity(part);
             boolean identityBracket = "<".equals(text)
                     || (identitySeen && text.startsWith(">"));

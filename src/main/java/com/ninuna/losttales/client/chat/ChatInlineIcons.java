@@ -80,9 +80,6 @@ final class ChatInlineIcons {
             return head.isDiscordSender()
                     ? DISCORD_HEAD_SLOT_WIDTH : HEAD_SLOT_WIDTH;
         }
-        if (ChatGroupMarker.isMarker(part)) {
-            return ChatGroupMarker.SLOT_WIDTH;
-        }
         return ChatSpacerMarker.decode(part);
     }
 

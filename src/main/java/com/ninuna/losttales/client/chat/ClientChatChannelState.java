@@ -409,7 +409,10 @@ public final class ClientChatChannelState {
         }
         if (tab.isWhisper()) {
             String remembered = PARTNER_NAMES.get(tab);
-            return remembered != null ? remembered : tab.getPartner();
+            // The identity is what the conversation is with; the account
+            // behind it only shows when the two differ.
+            return remembered != null ? remembered
+                    : tab.getPartnerIdentity();
         }
         return displayName(tab.getChannel());
     }

@@ -184,6 +184,18 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         }
     }
 
+    /**
+     * Gives up on messages shown early that the server never answered
+     * for, so a dropped one is visibly dropped rather than sitting
+     * faint in the history looking like it is still on its way.
+     */
+    @SubscribeEvent
+    public void expirePendingChatEchoes(TickEvent.ClientTickEvent event) {
+        if (event != null && event.phase == TickEvent.Phase.END) {
+            LostTalesChatPresentation.expirePendingEchoes();
+        }
+    }
+
     @SubscribeEvent
     public void updateWraithWorldEffect(TickEvent.ClientTickEvent event) {
         WraithWorldVisualEffect.onClientTick(event);

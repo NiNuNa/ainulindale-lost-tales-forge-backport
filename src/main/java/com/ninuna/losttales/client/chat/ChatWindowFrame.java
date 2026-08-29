@@ -91,8 +91,70 @@ final class ChatWindowFrame {
     float jumpPillBottom;
     /** How far the button has flown in from below the rule, 0..1. */
     float jumpButtonProgress;
+    /**
+     * The hovered message's toolbar as drawn this frame, in screen GUI
+     * pixels; width zero while none was drawn. Recorded from the draw
+     * itself, like the jump button, so the click and the pixels cannot
+     * disagree. {@link #toolbarKinds} says which control each equal
+     * share of its width is, left to right, so a message offering fewer
+     * of them needs no separate bookkeeping.
+     */
+    float toolbarLeft;
+    float toolbarTop;
+    float toolbarRight;
+    float toolbarBottom;
+    int[] toolbarKinds = NO_KINDS;
+    /** The message the toolbar belongs to, by chat line id. */
+    int toolbarChatLineId;
+
+    private static final int[] NO_KINDS = new int[0];
+
+    /** Whether the point lies on the toolbar drawn this frame. */
+    boolean toolbarContains(float x, float y) {
+        return this.drawn && this.toolbarRight > this.toolbarLeft
+                && this.toolbarKinds.length > 0
+                && x >= this.toolbarLeft && x < this.toolbarRight
+                && y >= this.toolbarTop && y < this.toolbarBottom;
+    }
+
+    /** The control under the point, or -1 when the point is not on one. */
+    int toolbarKindAt(float x, float y) {
+        if (!toolbarContains(x, y)) {
+            return -1;
+        }
+        float share = (this.toolbarRight - this.toolbarLeft)
+                / this.toolbarKinds.length;
+        int index = (int)((x - this.toolbarLeft) / Math.max(1.0F, share));
+        return this.toolbarKinds[Math.max(0,
+                Math.min(this.toolbarKinds.length - 1, index))];
+    }
     /** When the fly-in was last advanced. */
     long jumpButtonNanos;
+    /**
+     * The scrollbar's thumb as drawn this frame, in screen GUI pixels;
+     * width zero while none was drawn. The track it slides in is the
+     * message area's own height, recorded with it so a drag can map the
+     * pointer onto the history without measuring the window again.
+     */
+    float scrollbarLeft;
+    float scrollbarRight;
+    float scrollbarTrackTop;
+    float scrollbarTrackBottom;
+    float scrollbarThumbTop;
+    float scrollbarThumbBottom;
+    /** How far the bar has faded in while the pointer rests here, 0..1. */
+    float scrollbarProgress;
+    long scrollbarNanos;
+    /** Whether the pointer is in this window, so the bar should show. */
+    boolean scrollbarWanted;
+
+    /** Whether the point lies on the scrollbar's track drawn this frame. */
+    boolean scrollbarContains(float x, float y) {
+        return this.drawn && this.scrollbarRight > this.scrollbarLeft
+                && x >= this.scrollbarLeft && x < this.scrollbarRight
+                && y >= this.scrollbarTrackTop
+                && y < this.scrollbarTrackBottom;
+    }
 
     /** Whether the point lies on the pill drawn this frame. */
     boolean jumpPillContains(float x, float y) {

@@ -445,6 +445,20 @@ public final class ClientChatChannelViews {
         return ease.value;
     }
 
+    /**
+     * Sends the view to a line, clamped to what the window can reach:
+     * what a jump to a quoted message asks for. The offset is a target
+     * like any other, so the view glides to it rather than snapping.
+     */
+    public static synchronized void scrollTo(ChatTab view, double lines,
+                                             int totalLines,
+                                             double roomLines) {
+        if (view != null) {
+            SCROLL.put(view, Double.valueOf(Math.max(0.0D, lines)));
+            getScroll(view, totalLines, roomLines);
+        }
+    }
+
     public static synchronized void scroll(ChatTab view, int delta,
                                            int totalLines,
                                            double roomLines) {
@@ -524,6 +538,10 @@ public final class ClientChatChannelViews {
         UNREAD_DIVIDERS.clear();
         openedNanos = 0L;
         invalidateCache();
+        ChatGroupRuns.clear();
+        ClientChatMessageIds.clear();
+        ClientChatMessages.clear();
+        ClientChatPendingEchoes.clear();
         ChatWindowLines.clear();
         ChatWindowFrame.clear();
         ClientChatAccountRoles.clear();

@@ -211,6 +211,27 @@ public final class ClientChatChannelViewsTest {
         }
     }
 
+    /**
+     * A jump to a quoted message asks for an offset outright, clamped to
+     * what the window can reach like any other.
+     */
+    @Test
+    public void scrollToPlacesTheViewAtALineAndClamps() {
+        ChatTab tab = ChatTab.of(ChatChannel.ALL);
+        ClientChatChannelViews.scrollTo(tab, 12.0D, 30, 10.0D);
+        assertEquals(12.0D, ClientChatChannelViews.getScroll(tab, 30, 10.0D),
+                0.0001D);
+        // Past the oldest line it comes to rest on the oldest line.
+        ClientChatChannelViews.scrollTo(tab, 500.0D, 30, 10.0D);
+        assertEquals(20.0D, ClientChatChannelViews.getScroll(tab, 30, 10.0D),
+                0.0001D);
+        // A target above the newest line is simply the newest line.
+        ClientChatChannelViews.scrollTo(tab, -5.0D, 30, 10.0D);
+        assertEquals(0.0D, ClientChatChannelViews.getScroll(tab, 30, 10.0D),
+                0.0001D);
+        ClientChatChannelViews.resetScroll();
+    }
+
     @Test
     public void scrollIsPerChannelClampedAndStableUnderInsertions() {
         ClientChatChannelViews.scroll(ChatChannel.ALL, 7, 30, 10.0D);

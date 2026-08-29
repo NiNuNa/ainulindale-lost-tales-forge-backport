@@ -5,6 +5,8 @@ import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
@@ -33,14 +35,11 @@ public final class LostTalesChatMessagePacket implements IMessage {
             "losttales:discord".getBytes(
                     java.nio.charset.Charset.forName("UTF-8")));
 
-    private static final int MAX_SHOWCASE_BYTES = Math.max(
-            ChatShowcase.MAX_STACK_BYTES,
-            ChatShowcase.MAX_MARKER_ID_BYTES
-                    + ChatShowcase.MAX_MARKER_NAME_BYTES
-                    + ChatShowcase.MAX_MARKER_STYLE_BYTES * 2 + 32);
     private static final int MAX_PACKET_BYTES = 2048
             + ChatMessageValidator.MAX_UTF8_BYTES
-            + ChatShareTokenParser.MAX_TOKENS * (MAX_SHOWCASE_BYTES + 8);
+            + ChatShowcase.MAX_TOTAL_BYTES
+            + ChatReplyReference.MAX_AUTHOR_BYTES
+            + ChatReplyReference.MAX_EXCERPT_BYTES;
     private static final int MAX_CHANNEL_BYTES = 16;
     private static final int MAX_IDENTITY_BYTES = 256;
     private static final int MAX_ACCOUNT_NAME_BYTES = 64;
@@ -64,6 +63,19 @@ public final class LostTalesChatMessagePacket implements IMessage {
     /** For a whisper, the other party's account name as this recipient sees it. */
     private String partner = "";
     /**
+     * For a whisper, the identity of that other party the conversation
+     * is with — the character they were speaking as, or their account's
+     * own name. What the tab is kept under, so one player's characters
+     * are separate conversations.
+     */
+    private String partnerIdentity = "";
+    /**
+     * The sender's own name for this message, handed back so they can
+     * recognise the line they already have on screen. Set only on the
+     * copy that goes to the sender; every other copy carries zero.
+     */
+    private long echoNonce;
+    /**
      * The sender's {@link ChatAccountRole}s as a mask; set only on account
      * lines, where the server also colours the name by the primary role.
      */
@@ -75,6 +87,21 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * caching follow it.
      */
     private boolean accountLine;
+    /**
+     * The server's name for this message, or {@link ChatMessageIds#NONE}
+     * for a line nobody can name. Anything that refers to a message
+     * afterwards refers to it by this rather than by a chat line id,
+     * which is each client's own and reused as its history trims.
+     */
+    private long messageId;
+    /**
+     * The message this line replies to, quoted as the server resolved
+     * it; {@link ChatReplyReference#NONE} when the line replies to
+     * nothing. The quote travels here rather than being looked up by
+     * each client, so every recipient is shown the same one whether or
+     * not they hold the original.
+     */
+    private ChatReplyReference reply = ChatReplyReference.NONE;
     private boolean malformed;
 
     public LostTalesChatMessagePacket() {}
@@ -144,6 +171,68 @@ public final class LostTalesChatMessagePacket implements IMessage {
             String message, long timestampMillis, String skinId,
             List<ChatShowcase> showcases, String factionName,
             String partner, int roles, boolean accountLine) {
+        this(channel, senderId, identityName, accountName, title, titleColor,
+                nameColor, message, timestampMillis, skinId, showcases,
+                factionName, partner, roles, accountLine,
+                ChatMessageIds.NONE);
+    }
+
+    public LostTalesChatMessagePacket(
+            ChatChannel channel, UUID senderId, String identityName,
+            String accountName, String title,
+            int titleColor, int nameColor,
+            String message, long timestampMillis, String skinId,
+            List<ChatShowcase> showcases, String factionName,
+            String partner, int roles, boolean accountLine,
+            long messageId) {
+        this(channel, senderId, identityName, accountName, title, titleColor,
+                nameColor, message, timestampMillis, skinId, showcases,
+                factionName, partner, roles, accountLine, messageId, null);
+    }
+
+    public LostTalesChatMessagePacket(
+            ChatChannel channel, UUID senderId, String identityName,
+            String accountName, String title,
+            int titleColor, int nameColor,
+            String message, long timestampMillis, String skinId,
+            List<ChatShowcase> showcases, String factionName,
+            String partner, int roles, boolean accountLine,
+            long messageId, ChatReplyReference reply) {
+        this(channel, senderId, identityName, accountName, title, titleColor,
+                nameColor, message, timestampMillis, skinId, showcases,
+                factionName, partner, roles, accountLine, messageId, reply,
+                "");
+    }
+
+    public LostTalesChatMessagePacket(
+            ChatChannel channel, UUID senderId, String identityName,
+            String accountName, String title,
+            int titleColor, int nameColor,
+            String message, long timestampMillis, String skinId,
+            List<ChatShowcase> showcases, String factionName,
+            String partner, int roles, boolean accountLine,
+            long messageId, ChatReplyReference reply,
+            String partnerIdentity) {
+        this(channel, senderId, identityName, accountName, title, titleColor,
+                nameColor, message, timestampMillis, skinId, showcases,
+                factionName, partner, roles, accountLine, messageId, reply,
+                partnerIdentity, 0L);
+    }
+
+    public LostTalesChatMessagePacket(
+            ChatChannel channel, UUID senderId, String identityName,
+            String accountName, String title,
+            int titleColor, int nameColor,
+            String message, long timestampMillis, String skinId,
+            List<ChatShowcase> showcases, String factionName,
+            String partner, int roles, boolean accountLine,
+            long messageId, ChatReplyReference reply,
+            String partnerIdentity, long echoNonce) {
+        this.echoNonce = echoNonce;
+        this.partnerIdentity = partnerIdentity == null ? ""
+                : partnerIdentity.trim();
+        this.reply = reply == null ? ChatReplyReference.NONE : reply;
+        this.messageId = messageId;
         this.accountLine = accountLine;
         this.roles = roles;
         this.partner = partner == null ? "" : partner.trim();
@@ -205,6 +294,35 @@ public final class LostTalesChatMessagePacket implements IMessage {
                     buffer, MAX_ACCOUNT_NAME_BYTES).trim();
             this.roles = buffer.readUnsignedByte();
             this.accountLine = buffer.readBoolean();
+            this.messageId = buffer.readLong();
+            long replyTo = buffer.readLong();
+            // Read before the quote so the layout stays append-only.
+            this.partnerIdentity = LostTalesPacketCodec.readUtf8String(
+                    buffer, MAX_IDENTITY_BYTES).trim();
+            this.echoNonce = buffer.readLong();
+            this.reply = replyTo == ChatMessageIds.NONE
+                    ? ChatReplyReference.NONE
+                    : ChatReplyReference.of(replyTo,
+                            LostTalesPacketCodec.readUtf8String(buffer,
+                                    ChatReplyReference.MAX_AUTHOR_BYTES),
+                            LostTalesPacketCodec.readUtf8String(buffer,
+                                    ChatReplyReference.MAX_EXCERPT_BYTES));
+            if (ChatMessageIds.isLocalId(replyTo)
+                    || (replyTo != ChatMessageIds.NONE
+                            && !this.reply.exists())) {
+                // A local id is a client's own name for a line it wrote
+                // itself; one arriving here names nothing this server
+                // ever distributed.
+                throw new LostTalesPacketCodec.DecodeException(
+                        "invalid chat reply reference");
+            }
+            if (this.messageId < ChatMessageIds.NONE) {
+                // Negative ids are the receiving client's own, for lines
+                // it wrote itself; one arriving over the wire is not a
+                // message this server ever named.
+                throw new LostTalesPacketCodec.DecodeException(
+                        "invalid chat message id");
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -214,6 +332,10 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.partner = "";
             this.roles = 0;
             this.accountLine = false;
+            this.messageId = ChatMessageIds.NONE;
+            this.reply = ChatReplyReference.NONE;
+            this.partnerIdentity = "";
+            this.echoNonce = 0L;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -296,6 +418,19 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 buffer, this.partner, MAX_ACCOUNT_NAME_BYTES);
         buffer.writeByte(this.roles);
         buffer.writeBoolean(this.accountLine);
+        buffer.writeLong(this.messageId);
+        buffer.writeLong(this.reply.getMessageId());
+        LostTalesPacketCodec.writeUtf8String(buffer, this.partnerIdentity,
+                MAX_IDENTITY_BYTES);
+        buffer.writeLong(this.echoNonce);
+        if (this.reply.exists()) {
+            LostTalesPacketCodec.writeUtf8String(buffer,
+                    this.reply.getAuthor(),
+                    ChatReplyReference.MAX_AUTHOR_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer,
+                    this.reply.getExcerpt(),
+                    ChatReplyReference.MAX_EXCERPT_BYTES);
+        }
     }
 
     private void validate() {
@@ -321,7 +456,9 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || this.timestampMillis <= 0L
                 || this.roles < 0 || this.roles > 0xFF
                 || !ChatAccountRole.isValidMask(this.roles)
-                || this.showcases.size() > ChatShareTokenParser.MAX_TOKENS) {
+                || this.showcases.size() > ChatShareTokenParser.MAX_TOKENS
+                || ChatShowcase.serializedBytes(this.showcases)
+                        > ChatShowcase.MAX_TOTAL_BYTES) {
             throw new IllegalArgumentException("invalid chat message");
         }
         // Each token index may carry one showcase of the token's own kind,
@@ -341,6 +478,21 @@ public final class LostTalesChatMessagePacket implements IMessage {
         }
     }
 
+    /**
+     * The same message saying something else: what an edit hands the
+     * client so the line can be built again exactly as it was, down to
+     * the colours and the head, with only the words replaced.
+     */
+    public LostTalesChatMessagePacket withMessage(String message) {
+        return new LostTalesChatMessagePacket(getChannel(), this.senderId,
+                this.identityName, this.accountName, this.title,
+                this.titleColor, this.nameColor, message,
+                this.timestampMillis, this.skinId, this.showcases,
+                this.factionName, this.partner, this.roles,
+                this.accountLine, this.messageId, this.reply,
+                this.partnerIdentity, this.echoNonce);
+    }
+
     public ChatChannel getChannel() {
         return ChatChannel.fromId(this.channelId);
     }
@@ -357,11 +509,47 @@ public final class LostTalesChatMessagePacket implements IMessage {
     public String getFactionName() { return this.factionName; }
     /** For a whisper, the other party's account name; empty otherwise. */
     public String getPartner() { return this.partner; }
+    /**
+     * For a whisper, the identity of that other party; empty when the
+     * conversation is with their account rather than a character.
+     */
+    public String getPartnerIdentity() { return this.partnerIdentity; }
+    /** The sender's own name for this message; zero on every other copy. */
+    public long getEchoNonce() { return this.echoNonce; }
+
+    /**
+     * The same line with the sender's private name for it taken off:
+     * what everyone but the sender is sent, since the name means
+     * nothing to them and is not theirs to carry.
+     */
+    public LostTalesChatMessagePacket withoutEcho() {
+        return this.echoNonce == 0L ? this
+                : new LostTalesChatMessagePacket(getChannel(), this.senderId,
+                        this.identityName, this.accountName, this.title,
+                        this.titleColor, this.nameColor, this.message,
+                        this.timestampMillis, this.skinId, this.showcases,
+                        this.factionName, this.partner, this.roles,
+                        this.accountLine, this.messageId, this.reply,
+                        this.partnerIdentity, 0L);
+    }
     /** The sender's role mask, as the server states it; see {@link ChatAccountRole}. */
     public int getRoles() { return this.roles; }
     /** Whether the line wears the account identity rather than a
      *  character's; heads and skin caching follow this. */
     public boolean isAccountLine() { return this.accountLine; }
+    /**
+     * The server's name for this message, {@link ChatMessageIds#NONE}
+     * when it has none. Stable across every recipient, so it is what
+     * anything referring to a message refers to it by.
+     */
+    public long getMessageId() { return this.messageId; }
+    /**
+     * The message this line replies to, with the author and excerpt the
+     * server resolved for it; never null, and
+     * {@link ChatReplyReference#exists()} is false when the line replies
+     * to nothing.
+     */
+    public ChatReplyReference getReply() { return this.reply; }
     /** Validated showcases keyed by token index; never null. */
     public List<ChatShowcase> getShowcases() { return this.showcases; }
     public boolean isMalformed() { return this.malformed; }

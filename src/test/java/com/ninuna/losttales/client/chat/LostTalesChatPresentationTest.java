@@ -487,6 +487,113 @@ public final class LostTalesChatPresentationTest {
         }
     }
 
+    /**
+     * A direct message follows the same identity rules every other
+     * channel does: an account line tags its roles and takes the
+     * primary role's colour there too, and a character-signed one names
+     * the account behind it without tagging anything.
+     */
+    @Test
+    public void directMessagesFollowTheCommonIdentityRules() {
+        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
+        LostTalesConfig.showChatTimestamps = false;
+        try {
+            int roles = ChatAccountRole.maskOf(ChatAccountRole.OPERATOR);
+            LostTalesChatMessagePacket whisper =
+                    new LostTalesChatMessagePacket(
+                            ChatChannel.WHISPER, UUID.randomUUID(), "Steve",
+                            "Steve", "", 0xFCECD1,
+                            ChatAccountRole.nameColor(roles), "hello",
+                            123456789L, "", null, "", "Alex", roles, true);
+            String operatorTag = StatCollector.translateToLocal(
+                    ChatAccountRole.OPERATOR.getTagKey()) + " ";
+            StringBuilder plain = new StringBuilder();
+            Integer operatorRgb = null;
+            for (Object value : LostTalesChatPresentation.build(whisper)) {
+                IChatComponent part = (IChatComponent)value;
+                plain.append(part.getUnformattedTextForChat());
+                if (operatorTag.equals(part.getUnformattedTextForChat())) {
+                    operatorRgb = ChatMentionMarker.colorOf(part);
+                }
+            }
+            assertTrue(plain.indexOf(operatorTag) >= 0);
+            assertTrue(plain.indexOf(operatorTag) < plain.indexOf("<"));
+            assertEquals(Integer.valueOf(
+                    ChatAccountRole.OPERATOR.getColor()), operatorRgb);
+            assertEquals(ChatAccountRole.OPERATOR.getColor(),
+                    markerOf(LostTalesChatPresentation.build(whisper))
+                            .nameColor);
+
+            // Signed with a character instead: no tag, the character's
+            // own colour, and the account named in brackets behind it.
+            LostTalesChatMessagePacket asCharacter =
+                    new LostTalesChatMessagePacket(
+                            ChatChannel.WHISPER, UUID.randomUUID(),
+                            "Aldric", "Steve", "", 0xFCECD1, 0x55AA55,
+                            "hello", 123456789L, "skin", null, "", "Alex",
+                            0, false);
+            StringBuilder character = new StringBuilder();
+            for (Object value
+                    : LostTalesChatPresentation.build(asCharacter)) {
+                character.append(((IChatComponent)value)
+                        .getUnformattedTextForChat());
+            }
+            assertFalse(character.toString().contains(operatorTag));
+            assertTrue(character.toString().contains("Aldric (Steve)"));
+            assertEquals(0x55AA55,
+                    markerOf(LostTalesChatPresentation.build(asCharacter))
+                            .nameColor);
+        } finally {
+            LostTalesConfig.showChatTimestamps = originalTimestamps;
+        }
+    }
+
+    /**
+     * Markup styles the body and leaves the text: the markers are gone
+     * from what is shown, and nothing else about the line changes.
+     */
+    @Test
+    public void markupStylesTheBodyAndDropsItsMarkers() {
+        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
+        LostTalesConfig.showChatTimestamps = false;
+        try {
+            IChatComponent message = LostTalesChatPresentation.build(
+                    new LostTalesChatMessagePacket(
+                            ChatChannel.ALL, UUID.randomUUID(), "Aldric",
+                            "Steve", "", 0x55AA55, 0x336633,
+                            "a **bold** and `code` word", 123456789L, ""));
+            StringBuilder body = new StringBuilder();
+            boolean sawBold = false;
+            boolean sawCode = false;
+            boolean started = false;
+            for (Object value : message) {
+                IChatComponent part = (IChatComponent)value;
+                String text = part.getUnformattedTextForChat();
+                if ("> ".equals(text)) {
+                    started = true;
+                    continue;
+                }
+                if (!started) {
+                    continue;
+                }
+                body.append(text);
+                if ("bold".equals(text)) {
+                    sawBold = Boolean.TRUE.equals(
+                            part.getChatStyle().getBold());
+                }
+                if ("code".equals(text)) {
+                    sawCode = part.getChatStyle().getColor()
+                            == EnumChatFormatting.GRAY;
+                }
+            }
+            assertEquals("a bold and code word", body.toString());
+            assertTrue("bold run is not bold", sawBold);
+            assertTrue("code run is not marked", sawCode);
+        } finally {
+            LostTalesConfig.showChatTimestamps = originalTimestamps;
+        }
+    }
+
     private static ChatHeadMarker.Data markerOf(IChatComponent message) {
         for (Object value : message) {
             ChatHeadMarker.Data marker = ChatHeadMarker.decode(

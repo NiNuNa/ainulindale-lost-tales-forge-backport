@@ -53,12 +53,35 @@ public final class ChatShareTokenParserTest {
         assertEquals(10, tokens.get(0).start);
     }
 
+    /**
+     * Tokens are read as far as the defensive bound and no further: a
+     * message may hold as many as it has room for, and everything past
+     * the bound stays literal text.
+     */
     @Test
-    public void tokenCountIsBoundedAcrossKinds() {
-        List<ChatShareTokenParser.Token> tokens = ChatShareTokenParser.parse(
-                "[i:a] [m:b] [i:c] [m:d]");
+    public void tokensAreReadUpToTheDefensiveBoundAndNoFurther() {
+        StringBuilder many = new StringBuilder();
+        for (int index = 0; index < ChatShareTokenParser.MAX_TOKENS + 4;
+                index++) {
+            many.append(index % 2 == 0 ? "[i:a" : "[m:b").append(index)
+                    .append("] ");
+        }
+        List<ChatShareTokenParser.Token> tokens =
+                ChatShareTokenParser.parse(many.toString().trim());
         assertEquals(ChatShareTokenParser.MAX_TOKENS, tokens.size());
+        assertEquals(ChatShareKind.ITEM, tokens.get(0).kind);
+        assertEquals("b1", tokens.get(1).name);
+        assertEquals("a2", tokens.get(2).name);
+    }
+
+    /** Well past the three a message used to be held to. */
+    @Test
+    public void severalMixedTokensAreAllRead() {
+        List<ChatShareTokenParser.Token> tokens = ChatShareTokenParser.parse(
+                "[i:a] [m:b] [i:c] [m:d] [i:e] [m:f]");
+        assertEquals(6, tokens.size());
         assertEquals("c", tokens.get(2).name);
+        assertEquals(ChatShareKind.MARKER, tokens.get(5).kind);
     }
 
     @Test

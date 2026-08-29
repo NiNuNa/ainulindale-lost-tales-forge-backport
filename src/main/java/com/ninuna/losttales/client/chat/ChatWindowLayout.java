@@ -564,7 +564,14 @@ public final class ChatWindowLayout {
      */
     public static synchronized ChatTab openWhisper(String partner,
                                                    String preferredWindowId) {
-        return openTab(ChatTab.whisper(partner), preferredWindowId);
+        return openWhisper(partner, "", preferredWindowId);
+    }
+
+    /** As above for one identity of that account; empty is its own. */
+    public static synchronized ChatTab openWhisper(
+            String partner, String identity, String preferredWindowId) {
+        return openTab(ChatTab.whisper(partner, identity),
+                preferredWindowId);
     }
 
     /** Opens a conversation tab (a player's or an NPC's) the same way. */

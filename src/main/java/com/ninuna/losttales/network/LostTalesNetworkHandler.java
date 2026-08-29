@@ -21,6 +21,9 @@ import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatDeletePacket;
+import com.ninuna.losttales.network.packet.LostTalesChatEditPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
@@ -100,5 +103,8 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesChatAccessPacket.Handler.class, LostTalesChatAccessPacket.class, 37, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesFastTravelArrivalPacket.Handler.class, LostTalesFastTravelArrivalPacket.class, 38, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesChatTypingSyncPacket.Handler.class, LostTalesChatTypingSyncPacket.class, 40, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesChatEditPacket.Handler.class, LostTalesChatEditPacket.class, 41, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesChatDeletePacket.Handler.class, LostTalesChatDeletePacket.class, 42, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesChatUpdatePacket.Handler.class, LostTalesChatUpdatePacket.class, 43, Side.CLIENT);
     }
 }

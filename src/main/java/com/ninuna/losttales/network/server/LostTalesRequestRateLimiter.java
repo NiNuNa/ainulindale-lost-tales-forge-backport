@@ -36,7 +36,10 @@ public final class LostTalesRequestRateLimiter {
         CHAT_MESSAGE(20, 5000L),
         // A typing client repeats itself every 2.5 s and sends one stop:
         // three in five seconds in normal use.
-        CHAT_TYPING(8, 5000L);
+        CHAT_TYPING(8, 5000L),
+        // Correcting a typo or taking a line back is deliberate and rare
+        // next to sending; a handful in five seconds covers a fumbled edit.
+        CHAT_REVISION(10, 5000L);
 
         private final int maximumRequests;
         private final long windowMillis;

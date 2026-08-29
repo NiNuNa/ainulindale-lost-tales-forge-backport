@@ -17,6 +17,18 @@ import net.minecraft.nbt.NBTTagCompound;
 public final class ChatShowcase {
     /** Compressed NBT bytes per stack; enchanted and named gear fits easily. */
     public static final int MAX_STACK_BYTES = 1024;
+    /**
+     * Every showcase one message carries, together. A message may share
+     * as many things as it has tokens for, but the set of them is what
+     * the server sends to every recipient of the line, so the bytes are
+     * what is bounded rather than the count: a line of markers costs
+     * almost nothing, a line of fully enchanted stacks stops being
+     * attached once it reaches this. The server drops the ones past it
+     * and leaves their tokens as the text they were typed as.
+     */
+    public static final int MAX_TOTAL_BYTES = 8192;
+    /** Wire overhead of one showcase: its token index, kind and lengths. */
+    private static final int SHOWCASE_OVERHEAD_BYTES = 16;
     /** Decompressed NBT budget in bits, the unit {@link NBTSizeTracker} counts. */
     private static final long MAX_DECOMPRESSED_BITS = 16384L * 8L;
     public static final int MAX_MARKER_ID_BYTES =
@@ -102,6 +114,33 @@ public final class ChatShowcase {
         } catch (java.io.UnsupportedEncodingException exception) {
             return value.length() * 3;
         }
+    }
+
+    /**
+     * What this showcase costs on the wire, its framing included: what
+     * {@link #MAX_TOTAL_BYTES} is counted in.
+     */
+    public int serializedBytes() {
+        if (this.kind == ChatShareKind.ITEM) {
+            return SHOWCASE_OVERHEAD_BYTES + this.stackData.length;
+        }
+        return SHOWCASE_OVERHEAD_BYTES + utf8Length(this.markerId)
+                + utf8Length(this.markerName) + utf8Length(this.markerIcon)
+                + utf8Length(this.markerColor) + 4 + 8 + 8;
+    }
+
+    /** The wire cost of a whole set of showcases. */
+    public static int serializedBytes(
+            java.util.List<ChatShowcase> showcases) {
+        int total = 0;
+        if (showcases != null) {
+            for (ChatShowcase showcase : showcases) {
+                if (showcase != null) {
+                    total += showcase.serializedBytes();
+                }
+            }
+        }
+        return total;
     }
 
     public ChatShareKind getKind() { return this.kind; }

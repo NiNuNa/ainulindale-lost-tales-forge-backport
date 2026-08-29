@@ -395,4 +395,61 @@ public final class ChatLineWrapperTest {
         }
         return null;
     }
+
+    /** A line opening with a row of its own: quote, break, then the message. */
+    private static ChatComponentText quoted(String quote, String body) {
+        ChatComponentText root = new ChatComponentText("");
+        root.appendSibling(text(quote));
+        root.appendSibling(ChatLayoutMarker.lineBreak());
+        root.appendSibling(ChatPrefixMarker.channel(
+                text("Global: "), 0x00FF00));
+        root.appendSibling(ChatLayoutMarker.anchor());
+        root.appendSibling(text(body));
+        return root;
+    }
+
+    /**
+     * The quote a reply opens with takes a row of its own, and the
+     * message lays out on the next exactly as an unbroken line would —
+     * the channel prefix still measured as its prefix, not as part of
+     * the quote.
+     */
+    @Test
+    public void aLeadingRowStandsAboveTheMessage() {
+        List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
+                quoted("to Aldric: hello", "answering"), 400, false);
+        assertNotNull(lines);
+        assertEquals(2, lines.size());
+        assertEquals("to Aldric: hello", plain(lines.get(0)));
+        assertEquals("Global: answering", plain(lines.get(1)));
+    }
+
+    /**
+     * The row is cut to one line rather than wrapped: a long quote must
+     * never push the answer down the window.
+     */
+    @Test
+    public void aLeadingRowIsCutRatherThanWrapped() {
+        StringBuilder quote = new StringBuilder();
+        for (int index = 0; index < 200; index++) {
+            quote.append('x');
+        }
+        int width = METRICS.width("xxxxxxxxxx");
+        List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
+                quoted(quote.toString(), "hi"), width, false);
+        assertNotNull(lines);
+        // One row for the cut quote; the message follows on its own.
+        assertEquals(10, plain(lines.get(0)).length());
+        assertTrue(plain(lines.get(1)).startsWith("Global: "));
+    }
+
+    /** Without a break marker nothing changes: one line, as before. */
+    @Test
+    public void aLineWithoutABreakIsUnaffected() {
+        List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
+                line("Global: ", "hello"), 400, false);
+        assertNotNull(lines);
+        assertEquals(1, lines.size());
+    }
+
 }

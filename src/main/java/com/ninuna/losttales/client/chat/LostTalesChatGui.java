@@ -2,6 +2,8 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatMessageValidator;
@@ -35,6 +37,8 @@ import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
+import com.ninuna.losttales.network.packet.LostTalesChatDeletePacket;
+import com.ninuna.losttales.network.packet.LostTalesChatEditPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingPacket;
 import java.net.URI;
@@ -129,9 +133,19 @@ public final class LostTalesChatGui extends GuiChat {
             LostTalesColors.rgb(LostTalesColors.SALMON);
     private static final int LINK_HIGHLIGHT_RGB =
             LostTalesColors.rgb(LostTalesColors.HONEY);
+    /** The quiet mauve the reply line is named in. */
+    private static final int REPLY_CHIP_RGB = 0x9C807E;
+    private static final String POPUP_MESSAGE = "message";
     private static final String POPUP_SETTINGS = "settings";
     private static final String POPUP_CHARACTERS = "characters";
     private static final String POPUP_RESTORE = "restore";
+    private static final String ENTRY_MESSAGE = "message_player";
+    private static final String ENTRY_REPLY = "reply";
+    private static final String ENTRY_COPY = "copy";
+    private static final String ENTRY_EDIT = "edit";
+    private static final String ENTRY_DELETE = "delete";
+    /** The second half of deleting: the row that is the confirmation. */
+    private static final String ENTRY_DELETE_CONFIRM = "delete_confirm";
     private static final String ENTRY_MUTE = "mute";
     private static final String ENTRY_PINGS = "pings";
     private static final String ENTRY_HIDE = "hide";
@@ -147,6 +161,47 @@ public final class LostTalesChatGui extends GuiChat {
     private boolean sent;
     /** How often a typing player repeats itself to the server. */
     private static final long TYPING_HEARTBEAT_NANOS = 2500L * 1000000L;
+    /** The message the open message menu was opened over. */
+    private long menuMessageId = ChatMessageIds.NONE;
+    private String menuMessageAccount = "";
+    /** The identity that message was signed with: who a whisper reaches. */
+    private String menuMessageIdentity = "";
+    /** Whether it came over the Discord bridge, where nobody can be reached. */
+    private boolean menuMessageFromDiscord;
+    private String menuMessageText = "";
+    /** Where the menu was opened, so the delete confirmation lands there too. */
+    private int menuX;
+    private int menuY;
+    private int menuChatLineId;
+    /**
+     * The message being replied to, the name it is shown under, and the
+     * tab it is being answered in. Cleared when the reply is sent, when
+     * the tab changes, and on Escape — a reply belongs to the message in
+     * front of you, so it never survives moving away from it.
+     */
+    private long replyToMessageId = ChatMessageIds.NONE;
+    private String replyToName = "";
+    /**
+     * What the answered message said, taken off the line when the reply
+     * was started. The server resolves its own quote and this goes
+     * unused there; an NPC's conversation has no server, so this is the
+     * only record the quote can be built from.
+     */
+    private String replyToExcerpt = "";
+    private ChatTab replyTab;
+    /**
+     * The message being rewritten, and the tab it was said in. Editing
+     * and replying are the same gesture aimed at different ends of a
+     * message, so they share the strip above the bar and never both
+     * hold it: starting one puts the other down.
+     */
+    private long editingMessageId = ChatMessageIds.NONE;
+    private ChatTab editingTab;
+    /** The reply chip drawn this frame, for the click that dismisses it. */
+    private int composerChipLeft;
+    private int composerChipTop;
+    private int composerChipRight;
+    private int composerChipBottom;
     /** The tab the server last heard this player typing into, or null. */
     private ChatTab typingTab;
     private long typingSentNanos;
@@ -370,13 +425,82 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
+     * What the bar is composing, in the gap between the history and the
+     * bar: {@code Replying to Name} or {@code Editing message}, with a
+     * cross to drop it. It stands where the typing line does and takes
+     * the strip while it shows — what you are answering, or correcting,
+     * matters more while you are doing it than who else is talking.
+     * Returns whether it drew, so the typing line knows to stand down.
+     */
+    private boolean drawComposerChip(ChatWindow window, ChatWindowFrame frame,
+                                  LostTalesGuiAnimationSample opening,
+                                  int mouseX, int mouseY) {
+        this.composerChipRight = 0;
+        ChatTab composing = isEditing() ? this.editingTab
+                : isReplying() ? this.replyTab : null;
+        if (composing == null || !composing.equals(
+                ChatWindowFrame.activeTab(window,
+                        ChatWindowFrame.visibleTabs(window)))) {
+            return false;
+        }
+        int alpha = Math.round(255.0F * opening.getOpacity());
+        if (alpha < 4) {
+            return false;
+        }
+        // The line begins where the messages above it do: past the
+        // timestamp column, not across it.
+        ChatTimestampColumn columns =
+                ChatTimestampColumn.current(this.fontRendererObj);
+        int inset = Math.round(columns.messageX() * frame.scale);
+        int x = (int)Math.floor(frame.drawnLeft()) + inset;
+        int room = (int)Math.round(frame.boxRight - frame.boxLeft)
+                - inset - 6;
+        int y = (int)Math.floor(frame.drawnBaseline())
+                + LostTalesChatOverlayRenderer.LINE_HEIGHT
+                - LostTalesChatOverlayRenderer.TEXT_OFFSET;
+        String label = this.fontRendererObj.trimStringToWidth(
+                isEditing()
+                        ? StatCollector.translateToLocal(
+                                "gui.losttales.chat.editing")
+                        : StatCollector.translateToLocalFormatted(
+                                "gui.losttales.chat.message.replying",
+                                this.replyToName),
+                Math.max(20, room - ChatIconSheet.CLOSE.getWidth() - 6));
+        int width = this.fontRendererObj.getStringWidth(label);
+        // The cross is the control, so its own box is what answers to
+        // the pointer — a little wider than the sprite, so a five-pixel
+        // glyph is not a five-pixel target.
+        int crossX = x + width + 3;
+        int crossY = y + 1;
+        this.composerChipLeft = crossX - 2;
+        this.composerChipTop = crossY - 2;
+        this.composerChipRight = crossX + ChatIconSheet.CLOSE.getWidth() + 2;
+        this.composerChipBottom = crossY + ChatIconSheet.CLOSE.getHeight() + 2;
+        LostTalesChatVisualStyle.drawColored(this.fontRendererObj, label,
+                x, y, REPLY_CHIP_RGB, alpha);
+        ChatIconSheet cross = composerChipContains(mouseX, mouseY)
+                ? ChatIconSheet.CLOSE_HOVER : ChatIconSheet.CLOSE;
+        cross.drawWithShadow(crossX, crossY, alpha);
+        return true;
+    }
+
+    /** Whether the point lies on the reply chip drawn this frame. */
+    private boolean composerChipContains(int x, int y) {
+        return this.composerChipRight > this.composerChipLeft
+                && x >= this.composerChipLeft && x < this.composerChipRight
+                && y >= this.composerChipTop && y < this.composerChipBottom;
+    }
+
+    /**
      * Who is typing into the window's front tab, in the gap between the
      * history and the bar: one or two names, three names, or a count
      * past that. Nothing is drawn while nobody is.
      */
     private void drawTypingLine(ChatWindow window, ChatWindowFrame frame,
-                                LostTalesGuiAnimationSample opening) {
-        if (!LostTalesConfig.showChatTypingIndicators) {
+                                LostTalesGuiAnimationSample opening,
+                                int mouseX, int mouseY) {
+        if (drawComposerChip(window, frame, opening, mouseX, mouseY)
+                || !LostTalesConfig.showChatTypingIndicators) {
             return;
         }
         ChatTab front = ChatWindowFrame.activeTab(window,
@@ -412,8 +536,14 @@ public final class LostTalesChatGui extends GuiChat {
         if (alpha < 4) {
             return;
         }
-        int room = (int)Math.round(frame.boxRight - frame.boxLeft) - 6;
-        int x = (int)Math.floor(frame.drawnLeft()) + 3;
+        // The line begins where the messages above it do, as the reply
+        // chip that shares this row does.
+        ChatTimestampColumn columns =
+                ChatTimestampColumn.current(this.fontRendererObj);
+        int inset = Math.round(columns.messageX() * frame.scale);
+        int x = (int)Math.floor(frame.drawnLeft()) + inset;
+        int room = (int)Math.round(frame.boxRight - frame.boxLeft)
+                - inset - 6;
         // In the window's trailing strip, on the metrics a message
         // line's glyphs would take there.
         int y = (int)Math.floor(frame.drawnBaseline())
@@ -694,6 +824,13 @@ public final class LostTalesChatGui extends GuiChat {
                 && (this.popup.isOpen() || isDragging())) {
             this.popup.close();
             cancelDrags();
+            return;
+        }
+        // Escape with nothing else open drops the reply before it closes
+        // the chat: backing out of an answer should not cost the screen.
+        if (keyCode == Keyboard.KEY_ESCAPE
+                && (isReplying() || isEditing())) {
+            cancelComposing();
             return;
         }
         // Ctrl+Tab walks every window's tabs, Ctrl+Left/Right the
@@ -1411,13 +1548,28 @@ public final class LostTalesChatGui extends GuiChat {
         // gives back exactly what was typed; what goes out may have its
         // emoticons converted.
         String outgoing = outgoingMessage(message);
+        // A message being rewritten is not a new one: it goes back to
+        // the server as a correction to the line it came from, and the
+        // bar returns to composing from scratch.
+        if (isEditing()) {
+            long edited = this.editingMessageId;
+            cancelEdit();
+            LostTalesNetworkHandler.CHANNEL.sendToServer(
+                    new LostTalesChatEditPacket(edited, outgoing));
+            return;
+        }
         if (tab.isNpc()) {
             // Nobody is on the other end of an NPC's conversation: the
             // line is shown here as if whispered, and that is all. What
             // the player shared is resolved here too, since no server
             // will do it for them.
             LostTalesChatPresentation.echoToNpc(tab, outgoing,
-                    resolveLocalShowcases(outgoing));
+                    resolveLocalShowcases(outgoing),
+                    isReplying()
+                            ? ChatReplyReference.of(this.replyToMessageId,
+                                    this.replyToName, this.replyToExcerpt)
+                            : ChatReplyReference.NONE);
+            cancelReply();
             return;
         }
         if (LostTalesConfig.enableChatEmojis) {
@@ -1428,11 +1580,27 @@ public final class LostTalesChatGui extends GuiChat {
                 }
             }
         }
+        // Shown before it is sent, and named so the copy that comes
+        // back replaces it rather than arriving underneath it.
+        long echoNonce = LostTalesChatPresentation.echoPending(tab, outgoing,
+                resolveLocalShowcases(outgoing),
+                isReplying()
+                        ? ChatReplyReference.of(this.replyToMessageId,
+                                this.replyToName, this.replyToExcerpt)
+                        : ChatReplyReference.NONE);
         LostTalesNetworkHandler.CHANNEL.sendToServer(
                 new LostTalesChatSendPacket(tab.getChannel(), outgoing,
                         resolveShareReferences(outgoing), tab.getPartner(),
                         ClientChatAppearances.wireKind(),
-                        ClientChatAppearances.wireCharacterId()));
+                        ClientChatAppearances.wireCharacterId(),
+                        isReplying() && ChatMessageIds.isServerId(
+                                this.replyToMessageId)
+                                        ? this.replyToMessageId
+                                        : ChatMessageIds.NONE,
+                        tab.isWhisper() ? tab.getPartnerIdentity() : "",
+                        echoNonce));
+        // Answered: the next message is a message of its own.
+        cancelReply();
     }
 
     /**
@@ -1502,7 +1670,9 @@ public final class LostTalesChatGui extends GuiChat {
                             resolveShareReferences(outgoing),
                             tab.getPartner(),
                             ClientChatAppearances.wireKind(),
-                            ClientChatAppearances.wireCharacterId()));
+                            ClientChatAppearances.wireCharacterId(),
+                            ChatMessageIds.NONE,
+                            tab.getPartnerIdentity()));
         }
         return true;
     }
@@ -1513,6 +1683,11 @@ public final class LostTalesChatGui extends GuiChat {
      * own name opens nothing.
      */
     private ChatTab openWhisperTab(String account) {
+        return openWhisperTab(account, "");
+    }
+
+    /** As above with one identity of that account; empty is its own. */
+    private ChatTab openWhisperTab(String account, String identity) {
         String name = account == null ? "" : account.trim();
         if (name.length() == 0) {
             return null;
@@ -1525,7 +1700,7 @@ public final class LostTalesChatGui extends GuiChat {
         }
         ChatWindow current = ChatWindowLayout.windowOf(
                 ClientChatChannelState.getSelected());
-        ChatTab tab = ChatWindowLayout.openWhisper(name,
+        ChatTab tab = ChatWindowLayout.openWhisper(name, identity,
                 current == null ? null : current.getId());
         if (tab != null) {
             selectChannel(tab);
@@ -1744,6 +1919,9 @@ public final class LostTalesChatGui extends GuiChat {
         } else if (this.tabDrag != null && this.tabDrag.active) {
             updateDropTarget(mouseX, mouseY);
         }
+        LostTalesChatPresentation.setHoveredLine(
+                hoveredMessageLine(mouseX, mouseY));
+        markScrollbarsWanted(mouseX, mouseY);
         drawWindows(mouseX, mouseY, entrance, partialTicks);
         if (!isDragging()) {
             for (ChatWindowFrame frame : ChatWindowFrame.drawnFrames()) {
@@ -1754,6 +1932,22 @@ public final class LostTalesChatGui extends GuiChat {
                     this.hoverTipY = mouseY;
                     break;
                 }
+            }
+            // The reply chip's cross, and then the message toolbar's
+            // controls, which are drawn as glyphs and say nothing on
+            // their own. Asked in the order a click resolves them —
+            // after the jump-to-present button, which is drawn over
+            // both where they meet, and from the front window back — so
+            // the tip always names what a click would actually reach.
+            if (this.hoverTip.length() == 0
+                    && composerChipContains(mouseX, mouseY)) {
+                this.hoverTip = StatCollector.translateToLocal(
+                        "gui.losttales.chat.message.cancel_reply");
+                this.hoverTipX = mouseX;
+                this.hoverTipY = mouseY;
+            }
+            if (this.hoverTip.length() == 0) {
+                nameToolbarControl(mouseX, mouseY);
             }
         }
         // The field follows the active window's bar as just drawn.
@@ -1973,7 +2167,7 @@ public final class LostTalesChatGui extends GuiChat {
             if (frame != active) {
                 drawInactiveBar(window, frame, entrance);
             }
-            drawTypingLine(window, frame, opening);
+            drawTypingLine(window, frame, opening, mouseX, mouseY);
             LostTalesChatOverlayRenderer.drawBottomRule(this.mc, frame,
                     opening);
             LostTalesChatOverlayRenderer.drawWindowLeftEdge(this.mc, frame,
@@ -2400,8 +2594,12 @@ public final class LostTalesChatGui extends GuiChat {
             }
             ChatPopupMenu.Entry entry = this.popup.entryAt(mouseX, mouseY);
             boolean inside = this.popup.contains(mouseX, mouseY);
-            if (entry != null && button == 0) {
-                handlePopupEntry(entry);
+            if (entry != null && button == 0
+                    && handlePopupEntry(entry)) {
+                // The entry asked a question of its own and the menu is
+                // showing it: closing here would close the question
+                // along with the menu that asked it.
+                return;
             }
             this.popup.close();
             if (inside) {
@@ -2554,17 +2752,25 @@ public final class LostTalesChatGui extends GuiChat {
                     return;
                 }
             }
+            if (composerChipContains(mouseX, mouseY)) {
+                cancelComposing();
+                return;
+            }
+            if (clickMessageToolbar(mouseX, mouseY)) {
+                return;
+            }
+            if (grabScrollbar(mouseX, mouseY)) {
+                return;
+            }
         }
-        // A right-click copies the message, not the people in it: over
-        // the sender's identity or a mention — wherever the card shows —
-        // the click belongs to the person and copies nothing.
+        // A right-click opens the message's own menu — reply, copy —
+        // not the people in it: over the sender's identity or a mention
+        // — wherever the card shows — the click belongs to the person
+        // and the menu does not open.
         if (button == 1
                 && !LostTalesChatHoverCard.isPointerOnPerson(this.mc,
                         mouseX, mouseY)
-                && LostTalesChatClipboard.copy(
-                this.mc.ingameGUI.getChatGUI(), this.mc, mouseX, mouseY)) {
-            showNotice(StatCollector.translateToLocal(
-                    "gui.losttales.chat.copied"));
+                && openMessagePopup(mouseX, mouseY)) {
             return;
         }
         if (button == 0) {
@@ -2589,6 +2795,12 @@ public final class LostTalesChatGui extends GuiChat {
                             int button) {
         // Whole-pixel press coordinates sample the pixel's centre, the
         // best estimate of where inside it the pointer actually was.
+        // The quote a reply opens with goes first: it is the one click
+        // that acts on the window rather than on what it points at, and
+        // it answers whatever the chat-links option says.
+        if (button == 0 && jumpToQuotedMessage(mouseX, mouseY)) {
+            return;
+        }
         if (button == 0 && handleComponentClick(
                 LostTalesChatOverlayRenderer.hitAt(
                         this.mc, mouseX + 0.5F, mouseY + 0.5F))) {
@@ -2598,6 +2810,333 @@ public final class LostTalesChatGui extends GuiChat {
         // testing, which no longer matches the 11px layout; only the input
         // field still needs the vanilla click path.
         this.inputField.mouseClicked(mouseX, adjustedMouseY, button);
+    }
+
+    /**
+     * Names the toolbar control under the pointer, if it is on one: what
+     * a glyph would say if it could. The same words the message's menu
+     * offers, so the two ways to the same action read the same.
+     */
+    private void nameToolbarControl(int mouseX, int mouseY) {
+        List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
+        for (int index = frames.size() - 1; index >= 0; index--) {
+            int kind = frames.get(index).toolbarKindAt(mouseX, mouseY);
+            if (kind < 0) {
+                continue;
+            }
+            this.hoverTip = StatCollector.translateToLocal(
+                    kind == LostTalesChatOverlayRenderer.TOOLBAR_REPLY
+                            ? "gui.losttales.chat.message.reply"
+                            : "gui.losttales.chat.message.copy");
+            this.hoverTipX = mouseX;
+            this.hoverTipY = mouseY;
+            return;
+        }
+    }
+
+    /**
+     * The hovered message's own controls: reply to it, or copy it. The
+     * same two the message's menu offers, acting on the message the
+     * toolbar was drawn for rather than on whatever lies under the
+     * pointer now — the toolbar covers its own message, so the two
+     * agree, but the id is the one the draw recorded either way.
+     */
+    private boolean clickMessageToolbar(int mouseX, int mouseY) {
+        List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
+        for (int index = frames.size() - 1; index >= 0; index--) {
+            ChatWindowFrame frame = frames.get(index);
+            if (!frame.toolbarContains(mouseX, mouseY)) {
+                continue;
+            }
+            int chatLineId = frame.toolbarChatLineId;
+            int kind = frame.toolbarKindAt(mouseX, mouseY);
+            if (kind == LostTalesChatOverlayRenderer.TOOLBAR_REPLY) {
+                replyToLine(frame, chatLineId);
+            } else if (LostTalesChatClipboard.copy(
+                    messageTextOf(frame, chatLineId))) {
+                showNotice(StatCollector.translateToLocal(
+                        "gui.losttales.chat.copied"));
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /** The whole body of the message drawn on {@code chatLineId}. */
+    private String messageTextOf(ChatWindowFrame frame, int chatLineId) {
+        if (frame.lines == null) {
+            return "";
+        }
+        for (int index = 0; index < frame.lines.size(); index++) {
+            if (frame.lines.get(index) != null && frame.lines.get(index)
+                    .getChatLineID() == chatLineId) {
+                return LostTalesChatClipboard.messageTextOf(
+                        frame.lines, index);
+            }
+        }
+        return "";
+    }
+
+    /**
+     * The identity the message was signed with: the name that answers to
+     * the pointer first after the head, which is the sender's own. Empty
+     * when the message names nobody.
+     */
+    private String messageIdentity(List<ChatLine> lines, int index,
+                                   int chatLineId) {
+        if (lines == null) {
+            return "";
+        }
+        for (int step = 0; step < lines.size(); step++) {
+            for (int side = 0; side < 2; side++) {
+                int at = side == 0 ? index - step : index + step;
+                if (at < 0 || at >= lines.size() || lines.get(at) == null
+                        || lines.get(at).getChatLineID() != chatLineId) {
+                    continue;
+                }
+                String name = identityOfLine(lines.get(at).func_151461_a());
+                if (name.length() > 0) {
+                    return name;
+                }
+            }
+        }
+        return "";
+    }
+
+    /** The first name-run after the head marker on one drawn line. */
+    private static String identityOfLine(IChatComponent line) {
+        boolean afterHead = false;
+        for (Object value : line) {
+            IChatComponent part = (IChatComponent)value;
+            if (ChatHeadMarker.decode(part) != null) {
+                afterHead = true;
+                continue;
+            }
+            if (!afterHead) {
+                continue;
+            }
+            ClickEvent click = part.getChatStyle() == null ? null
+                    : part.getChatStyle().getChatClickEvent();
+            if (click != null && click.getValue() != null
+                    && click.getValue().startsWith("/msg ")) {
+                return part.getUnformattedTextForChat().trim();
+            }
+        }
+        return "";
+    }
+
+    /** Whether the message came over the Discord bridge. */
+    private static boolean isFromDiscord(List<ChatLine> lines, int index,
+                                         int chatLineId) {
+        for (int at = 0; at < lines.size(); at++) {
+            if (lines.get(at) == null
+                    || lines.get(at).getChatLineID() != chatLineId) {
+                continue;
+            }
+            for (Object value : lines.get(at).func_151461_a()) {
+                ChatHeadMarker.Data head = ChatHeadMarker.decode(
+                        (IChatComponent)value);
+                if (head != null) {
+                    return head.isDiscordSender();
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Answers the message on a line, in the tab that line lives in. The
+     * frame is the one the line was drawn in, so the sender is read from
+     * the very lines that were on screen.
+     */
+    private void replyToLine(ChatWindowFrame frame, int chatLineId) {
+        ChatTab tab = ClientChatChannelViews.tabOf(chatLineId);
+        if (!LostTalesChatPresentation.isRepliable(chatLineId)
+                || tab == null) {
+            return;
+        }
+        long id = ClientChatMessageIds.messageIdOf(chatLineId);
+        String name = "";
+        String excerpt = "";
+        if (frame.lines != null) {
+            for (int index = 0; index < frame.lines.size(); index++) {
+                if (frame.lines.get(index) != null && frame.lines.get(index)
+                        .getChatLineID() == chatLineId) {
+                    name = messageAccount(frame.lines, index, chatLineId);
+                    excerpt = LostTalesChatClipboard.messageTextOf(
+                            frame.lines, index);
+                    break;
+                }
+            }
+        }
+        // Composing happens where the message lives, and selecting a tab
+        // clears any reply, so the target is set after the move.
+        selectChannel(tab);
+        this.replyToMessageId = id;
+        this.replyToName = name;
+        this.replyToExcerpt = excerpt;
+        this.replyTab = tab;
+    }
+
+    /**
+     * Which window's scrollbar should be showing: the one the pointer is
+     * in, or the one whose bar is being dragged, so the bar does not
+     * fade out from under a drag that has wandered off it. Set before
+     * the windows draw, since the draw is what eases it in and out.
+     */
+    private void markScrollbarsWanted(int mouseX, int mouseY) {
+        for (ChatWindowFrame frame : ChatWindowFrame.drawnFrames()) {
+            frame.scrollbarWanted = this.scrollbarDrag != null
+                    ? frame.windowId.equals(this.scrollbarDrag.windowId)
+                    : mouseX >= frame.boxLeft && mouseX < frame.boxRight
+                            && mouseY >= frame.boxTop
+                            && mouseY < frame.boxBottom;
+        }
+    }
+
+    /** A scrollbar being dragged: which window, and where it was grabbed. */
+    private static final class ScrollbarDrag {
+        final String windowId;
+        /** Pointer offset inside the thumb when it was grabbed. */
+        final float grabOffset;
+
+        ScrollbarDrag(String windowId, float grabOffset) {
+            this.windowId = windowId;
+            this.grabOffset = grabOffset;
+        }
+    }
+
+    private ScrollbarDrag scrollbarDrag;
+
+    /**
+     * Grabs a scrollbar. Pressing the thumb carries it from where it was
+     * taken hold of; pressing the track above or below jumps to there
+     * and then carries it, the way a scrollbar anywhere else does.
+     */
+    private boolean grabScrollbar(int mouseX, int mouseY) {
+        List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
+        for (int index = frames.size() - 1; index >= 0; index--) {
+            ChatWindowFrame frame = frames.get(index);
+            if (!frame.scrollbarContains(mouseX, mouseY)) {
+                continue;
+            }
+            float thumbHeight = frame.scrollbarThumbBottom
+                    - frame.scrollbarThumbTop;
+            float offset = mouseY >= frame.scrollbarThumbTop
+                    && mouseY < frame.scrollbarThumbBottom
+                            ? mouseY - frame.scrollbarThumbTop
+                            : thumbHeight / 2.0F;
+            this.scrollbarDrag =
+                    new ScrollbarDrag(frame.windowId, offset);
+            dragScrollbar(mouseY);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Maps the pointer onto the history: where the thumb's top sits in
+     * the travel it has is where the view sits in what it can reach.
+     */
+    private void dragScrollbar(int mouseY) {
+        ChatWindowFrame frame = this.scrollbarDrag == null ? null
+                : ChatWindowFrame.find(this.scrollbarDrag.windowId);
+        if (frame == null || frame.view == null || frame.lines == null) {
+            return;
+        }
+        float thumbHeight = frame.scrollbarThumbBottom
+                - frame.scrollbarThumbTop;
+        float travel = (frame.scrollbarTrackBottom
+                - frame.scrollbarTrackTop) - thumbHeight;
+        if (travel <= 0.0F) {
+            return;
+        }
+        float top = mouseY - this.scrollbarDrag.grabOffset;
+        float taken = (frame.scrollbarTrackBottom - thumbHeight - top)
+                / travel;
+        double roomLines = frame.room / Math.max(1.0F,
+                LostTalesChatOverlayRenderer.LINE_HEIGHT * frame.scale);
+        double reach = Math.max(0.0D, frame.lines.size() - roomLines);
+        ClientChatChannelViews.scrollTo(frame.view,
+                reach * Math.max(0.0F, Math.min(1.0F, taken)),
+                frame.lines.size(), roomLines);
+    }
+
+    /**
+     * The message the pointer rests on, by chat line id, or zero for
+     * none. Resolved against the bands the last frame recorded, which is
+     * what every other pointer question here asks; a hover a frame
+     * behind the pointer is not something an eye can catch. Nothing is
+     * hovered while a menu is open or something is being dragged: the
+     * pointer is on that, whatever lies under it.
+     */
+    private int hoveredMessageLine(int mouseX, int mouseY) {
+        if (this.popup.isOpen() || isDragging()) {
+            return 0;
+        }
+        LostTalesChatOverlayRenderer.Band band =
+                LostTalesChatOverlayRenderer.bandAt(this.mc,
+                        mouseX + 0.5F, mouseY + 0.5F);
+        if (band == null || band.lines == null
+                || band.viewIndex >= band.lines.size()
+                || band.lines.get(band.viewIndex) == null) {
+            return 0;
+        }
+        return band.lines.get(band.viewIndex).getChatLineID();
+    }
+
+    /**
+     * A click on a reply's quote takes the view to the message it
+     * quotes, and lights it so the eye finds where the view landed.
+     * The quote names the message by the server's id; which line that
+     * is drawn on — if it is still drawn at all — is this client's own
+     * business, and a message the history has trimmed past says so
+     * rather than moving the view somewhere arbitrary.
+     *
+     * <p>Returns whether the click was a quote's, spent or not: a quote
+     * that leads nowhere still belongs to the quote.</p>
+     */
+    private boolean jumpToQuotedMessage(int mouseX, int mouseY) {
+        LostTalesChatOverlayRenderer.Hit hit =
+                LostTalesChatOverlayRenderer.hitAt(this.mc,
+                        mouseX + 0.5F, mouseY + 0.5F);
+        long messageId = hit == null ? 0L
+                : ChatReplyMarker.messageIdOf(hit.component);
+        if (messageId == 0L) {
+            return false;
+        }
+        LostTalesChatOverlayRenderer.Band band =
+                LostTalesChatOverlayRenderer.bandAt(this.mc,
+                        mouseX + 0.5F, mouseY + 0.5F);
+        Integer target = ClientChatMessageIds.chatLineIdOf(messageId);
+        if (band == null || band.lines == null || target == null) {
+            showNotice(StatCollector.translateToLocal(
+                    "gui.losttales.chat.message.gone"));
+            return true;
+        }
+        int index = -1;
+        for (int at = 0; at < band.lines.size(); at++) {
+            if (band.lines.get(at) != null && band.lines.get(at)
+                    .getChatLineID() == target.intValue()) {
+                index = at;
+                break;
+            }
+        }
+        if (index < 0) {
+            // Named, but not in this view: the message is in another
+            // channel, or below what this window shows.
+            showNotice(StatCollector.translateToLocal(
+                    "gui.losttales.chat.message.gone"));
+            return true;
+        }
+        double roomLines = band.frame.room / (double)Math.max(1.0F,
+                LostTalesChatOverlayRenderer.LINE_HEIGHT * band.frame.scale);
+        // Landed near the middle of the window rather than at its edge,
+        // so what was said around it is readable too.
+        ClientChatChannelViews.scrollTo(band.frame.view,
+                index - roomLines / 2.0D, band.lines.size(), roomLines);
+        LostTalesChatPresentation.flashLine(target.intValue());
+        return true;
     }
 
     /**
@@ -2622,6 +3161,15 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     private void selectChannel(ChatTab tab) {
+        // A reply, and an edit, belong to the tab they were started
+        // in; moving away from that tab abandons them rather than
+        // carrying them along.
+        if (this.replyTab != null && !this.replyTab.equals(tab)) {
+            cancelReply();
+        }
+        if (this.editingTab != null && !this.editingTab.equals(tab)) {
+            cancelEdit();
+        }
         ClientChatChannelState.select(tab);
         syncSelection();
         closePickers();
@@ -3107,6 +3655,7 @@ public final class LostTalesChatGui extends GuiChat {
 
     private void cancelDrags() {
         this.tabDrag = null;
+        this.scrollbarDrag = null;
         if (this.windowResize != null) {
             WindowResize resize = this.windowResize;
             this.windowResize = null;
@@ -3560,15 +4109,289 @@ public final class LostTalesChatGui extends GuiChat {
         return Math.min(ClientChatChannelViews.MAX_UNREAD + 1, total);
     }
 
-    private void handlePopupEntry(ChatPopupMenu.Entry entry) {
+    /**
+     * The menu over a message: reply to it, or copy it. What it acts on
+     * is resolved now, while the pointer is still on the line, since by
+     * the time an entry is chosen the pointer has moved to the menu.
+     * Nothing opens over a line that carries no message.
+     */
+    private boolean openMessagePopup(int mouseX, int mouseY) {
+        String text = LostTalesChatClipboard.messageTextAt(
+                this.mc.ingameGUI.getChatGUI(), this.mc, mouseX, mouseY);
+        if (text.length() == 0) {
+            return false;
+        }
+        LostTalesChatOverlayRenderer.Band band =
+                LostTalesChatOverlayRenderer.bandAt(this.mc,
+                        mouseX + 0.5F, mouseY + 0.5F);
+        int chatLineId = band == null || band.lines == null
+                || band.viewIndex >= band.lines.size()
+                || band.lines.get(band.viewIndex) == null
+                ? 0 : band.lines.get(band.viewIndex).getChatLineID();
+        this.menuMessageText = text;
+        this.menuMessageId = band == null ? ChatMessageIds.NONE
+                : ClientChatMessageIds.messageIdOf(chatLineId);
+        this.menuMessageAccount = band == null ? ""
+                : messageAccount(band.lines, band.viewIndex, chatLineId);
+        this.menuMessageIdentity = band == null ? ""
+                : messageIdentity(band.lines, band.viewIndex, chatLineId);
+        this.menuMessageFromDiscord = band != null
+                && isFromDiscord(band.lines, band.viewIndex, chatLineId);
+        this.menuChatLineId = chatLineId;
+        this.menuX = mouseX;
+        this.menuY = mouseY;
+        List<ChatPopupMenu.Entry> entries =
+                new ArrayList<ChatPopupMenu.Entry>();
+        // Only a message the server named can be replied to: a console
+        // notice, an adopted stray and this client's own NPC lines are
+        // nobody's to answer.
+        if (LostTalesChatPresentation.isRepliable(chatLineId)) {
+            entries.add(new ChatPopupMenu.Entry(ENTRY_REPLY,
+                    StatCollector.translateToLocal(
+                            "gui.losttales.chat.message.reply")));
+        }
+        entries.add(new ChatPopupMenu.Entry(ENTRY_COPY,
+                StatCollector.translateToLocal(
+                        "gui.losttales.chat.message.copy")));
+        // Your own words are yours to correct or take back. The server
+        // decides that too — this only offers what it would allow.
+        if (isOwnMessage()) {
+            if (ClientChatMessages.get(this.menuMessageId) != null) {
+                // Editable only while this client still remembers what
+                // was typed: the field is filled with the original text,
+                // markup and all, not with the line as it reads.
+                entries.add(new ChatPopupMenu.Entry(ENTRY_EDIT,
+                        StatCollector.translateToLocal(
+                                "gui.losttales.chat.message.edit")));
+            }
+            entries.add(new ChatPopupMenu.Entry(ENTRY_DELETE,
+                    StatCollector.translateToLocal(
+                            "gui.losttales.chat.message.delete")));
+        }
+        // Opening a conversation with the sender lives here now: a name
+        // in the chat is a person to read, not a link to press.
+        // Not for yourself, and not for Discord: a name on the bridge
+        // belongs to somebody this server cannot reach, so offering to
+        // message them would offer something that cannot work.
+        if (this.menuMessageAccount.length() > 0
+                && !this.menuMessageFromDiscord
+                && (this.mc.thePlayer == null
+                        || !this.menuMessageAccount.equalsIgnoreCase(
+                                this.mc.thePlayer.getCommandSenderName()))) {
+            entries.add(new ChatPopupMenu.Entry(ENTRY_MESSAGE,
+                    StatCollector.translateToLocalFormatted(
+                            "gui.losttales.chat.message.whisper",
+                            this.menuMessageIdentity.length() > 0
+                                    ? this.menuMessageIdentity
+                                    : this.menuMessageAccount)));
+        }
+        this.popup.open(POPUP_MESSAGE,
+                ClientChatChannelViews.tabOf(chatLineId), entries,
+                this.fontRendererObj, mouseX, mouseY, this.width,
+                this.height);
+        return true;
+    }
+
+    /**
+     * The account behind the message the band names: the reply target
+     * every part of a sender's name carries, looked for over the whole
+     * message rather than the one wrapped line that was clicked.
+     */
+    private String messageAccount(List<ChatLine> lines, int index,
+                                  int chatLineId) {
+        if (lines == null) {
+            return "";
+        }
+        for (int step = 0; step < lines.size(); step++) {
+            for (int side = 0; side < 2; side++) {
+                int at = side == 0 ? index - step : index + step;
+                if (at < 0 || at >= lines.size() || lines.get(at) == null
+                        || lines.get(at).getChatLineID() != chatLineId) {
+                    continue;
+                }
+                ClickEvent reply = findReplySuggestion(
+                        lines.get(at).func_151461_a());
+                if (reply != null) {
+                    return replyAccount(reply.getValue());
+                }
+            }
+        }
+        return "";
+    }
+
+    /** Answers the message the menu was opened over, in its own tab. */
+    private void startReply() {
+        ChatTab tab = this.popup.channel();
+        if (!ChatMessageIds.isServerId(this.menuMessageId) || tab == null) {
+            return;
+        }
+        long id = this.menuMessageId;
+        String name = this.menuMessageAccount;
+        // The menu resolved the message when it opened, which is also
+        // the quote an NPC's conversation has to build for itself.
+        String excerpt = this.menuMessageText;
+        // Composing happens where the message lives, and selecting a tab
+        // clears any reply, so the target is set after the move.
+        selectChannel(tab);
+        this.replyToMessageId = id;
+        this.replyToName = name;
+        this.replyToExcerpt = excerpt;
+        this.replyTab = tab;
+    }
+
+    /**
+     * Whether the message the menu was opened over is this player's
+     * own, and one the server can still be asked about. A line from the
+     * Discord bridge never is, whatever name it carries.
+     */
+    private boolean isOwnMessage() {
+        return ChatMessageIds.isServerId(this.menuMessageId)
+                && !this.menuMessageFromDiscord
+                && this.mc.thePlayer != null
+                && this.menuMessageAccount.equalsIgnoreCase(
+                        this.mc.thePlayer.getCommandSenderName());
+    }
+
+    /**
+     * Puts the message back in the bar to be rewritten. What goes into
+     * the field is the text that was <em>sent</em> — the markup as it
+     * was typed, not the line as it reads — so editing a formatted
+     * message does not quietly flatten it.
+     */
+    private void startEdit() {
+        ChatTab tab = this.popup.channel();
+        ClientChatMessages.Remembered remembered =
+                ClientChatMessages.get(this.menuMessageId);
+        if (!isOwnMessage() || tab == null || remembered == null) {
+            return;
+        }
+        long id = this.menuMessageId;
+        // Composing happens where the message lives, and selecting a tab
+        // puts down whatever was being composed, so the target is set
+        // after the move.
+        selectChannel(tab);
+        cancelReply();
+        this.editingMessageId = id;
+        this.editingTab = tab;
+        this.inputField.setText(remembered.packet.getMessage());
+        ClientChatChannelState.setDraft(remembered.packet.getMessage());
+    }
+
+    /**
+     * Asks before taking a message back, because it is taken back from
+     * everyone who was sent it and there is no putting it there again.
+     * The menu the asking came from becomes the question, so it stands
+     * exactly where the pointer already is; answering it anywhere else,
+     * or with the Escape that closes any menu, is declining. Answers
+     * whether the menu is now showing that question.
+     */
+    private boolean askToDelete() {
+        if (!isOwnMessage()) {
+            return false;
+        }
+        List<ChatPopupMenu.Entry> entries =
+                new ArrayList<ChatPopupMenu.Entry>();
+        entries.add(new ChatPopupMenu.Entry(ENTRY_DELETE_CONFIRM,
+                StatCollector.translateToLocal(
+                        "gui.losttales.chat.message.delete.confirm")));
+        this.popup.replaceEntries(entries, this.fontRendererObj,
+                this.width, this.height);
+        return true;
+    }
+
+    /**
+     * Asks the server to take the message back. Nothing is removed
+     * here: the line goes when the server says it has gone, so every
+     * screen showing it — this one included — loses it for the same
+     * reason and at the same time.
+     */
+    private void confirmDelete() {
+        if (!ChatMessageIds.isServerId(this.menuMessageId)) {
+            return;
+        }
+        if (this.editingMessageId == this.menuMessageId) {
+            cancelEdit();
+        }
+        LostTalesNetworkHandler.CHANNEL.sendToServer(
+                new LostTalesChatDeletePacket(this.menuMessageId));
+    }
+
+    /** Whether a message is being rewritten in the tab now selected. */
+    private boolean isEditing() {
+        return ChatMessageIds.isServerId(this.editingMessageId)
+                && this.editingTab != null
+                && this.editingTab.equals(
+                        ClientChatChannelState.getSelected());
+    }
+
+    /** Forgets the message being rewritten; the field keeps what is in it. */
+    private void cancelEdit() {
+        this.editingMessageId = ChatMessageIds.NONE;
+        this.editingTab = null;
+    }
+
+    /** Puts down whichever of the two the strip is holding. */
+    private void cancelComposing() {
+        if (isEditing()) {
+            cancelEdit();
+            this.inputField.setText("");
+            ClientChatChannelState.setDraft("");
+            return;
+        }
+        cancelReply();
+    }
+
+    /** Forgets the message being replied to; the chip goes with it. */
+    private void cancelReply() {
+        this.replyToMessageId = ChatMessageIds.NONE;
+        this.replyToName = "";
+        this.replyToExcerpt = "";
+        this.replyTab = null;
+    }
+
+    /** Whether a reply is being composed in the tab now selected. */
+    private boolean isReplying() {
+        return ChatMessageIds.isServerId(this.replyToMessageId)
+                && this.replyTab != null
+                && this.replyTab.equals(
+                        ClientChatChannelState.getSelected());
+    }
+
+    /**
+     * Acts on a chosen entry, answering whether the menu should stay
+     * open: all but one entry are done with the menu once they have
+     * been chosen, and the caller closes it. Deleting is the exception —
+     * it asks first, and the question is put in the menu the asking
+     * came from.
+     */
+    private boolean handlePopupEntry(ChatPopupMenu.Entry entry) {
+        if (POPUP_MESSAGE.equals(this.popup.kind())) {
+            if (ENTRY_REPLY.equals(entry.id)) {
+                startReply();
+            } else if (ENTRY_MESSAGE.equals(entry.id)) {
+                openWhisperTab(this.menuMessageAccount,
+                        this.menuMessageIdentity);
+            } else if (ENTRY_EDIT.equals(entry.id)) {
+                startEdit();
+            } else if (ENTRY_DELETE.equals(entry.id)) {
+                return askToDelete();
+            } else if (ENTRY_DELETE_CONFIRM.equals(entry.id)) {
+                confirmDelete();
+            } else if (ENTRY_COPY.equals(entry.id)
+                    && LostTalesChatClipboard.copy(this.menuMessageText)) {
+                showNotice(StatCollector.translateToLocal(
+                        "gui.losttales.chat.copied"));
+            }
+            return false;
+        }
         if (POPUP_CHARACTERS.equals(this.popup.kind())) {
             handleCharacterSelectionEntry(entry);
-            return;
+            return false;
         }
         if (POPUP_SETTINGS.equals(this.popup.kind())) {
             ChatTab channel = this.popup.channel();
             if (channel == null) {
-                return;
+                return false;
             }
             if (ENTRY_MUTE.equals(entry.id)) {
                 ChatWindowLayout.setMuted(channel,
@@ -3593,7 +4416,7 @@ public final class LostTalesChatGui extends GuiChat {
                 if (ChatWindowLayout.restore(channel, target)) {
                     selectChannel(channel);
                 }
-                return;
+                return false;
             }
             // A player row opens (or finds) the conversation with them,
             // in the window whose row the menu was opened from.
@@ -3606,6 +4429,7 @@ public final class LostTalesChatGui extends GuiChat {
                 }
             }
         }
+        return false;
     }
 
     @Override
@@ -3615,6 +4439,10 @@ public final class LostTalesChatGui extends GuiChat {
         if (clickedMouseButton != 0) {
             super.mouseClickMove(mouseX, mouseY, clickedMouseButton,
                     timeSinceLastClick);
+            return;
+        }
+        if (this.scrollbarDrag != null) {
+            dragScrollbar(mouseY);
             return;
         }
         if (this.windowResize != null) {
@@ -3665,6 +4493,7 @@ public final class LostTalesChatGui extends GuiChat {
     @Override
     protected void mouseMovedOrUp(int mouseX, int mouseY, int mouseButton) {
         if (mouseButton == 0) {
+            this.scrollbarDrag = null;
             if (this.windowResize != null) {
                 WindowResize resize = this.windowResize;
                 this.windowResize = null;
@@ -3973,22 +4802,11 @@ public final class LostTalesChatGui extends GuiChat {
             return false;
         }
         if (ChatHeadMarker.isMarker(hit.component)) {
-            // The head, like the name, opens a whisper with the sender.
-            ClickEvent reply = findReplySuggestion(hit.line);
-            if (reply != null) {
-                openWhisperTab(replyAccount(reply.getValue()));
-            }
+            // A person is not a link: hovering names them, and what to
+            // do about them is the message menu's to offer.
             return true;
         }
-        ChatMentionMarker.Data mention =
-                ChatMentionMarker.decode(hit.component);
-        if (mention != null) {
-            // A player mention answers like a name: it opens the
-            // conversation with whoever it reaches. A role is nobody to
-            // whisper, so its mention spends the click on its card.
-            if (mention.role() == null) {
-                openWhisperTab(mention.account);
-            }
+        if (ChatMentionMarker.decode(hit.component) != null) {
             return true;
         }
         ChatShowcaseMarker.Data share =
@@ -4007,7 +4825,8 @@ public final class LostTalesChatGui extends GuiChat {
         if (ChatColorMarker.isMarker(hit.component)
                 || ChatPrefixMarker.isMarker(hit.component)
                 || ChatEmojiMarker.isMarker(hit.component)
-                || ChatTitleMarker.isMarker(hit.component)) {
+                || ChatTitleMarker.isMarker(hit.component)
+                || ChatReplyMarker.isMarker(hit.component)) {
             return true;
         }
         ClickEvent event =
@@ -4022,7 +4841,8 @@ public final class LostTalesChatGui extends GuiChat {
         }
         if (event.getAction() == ClickEvent.Action.SUGGEST_COMMAND
                 && event.getValue().startsWith("/msg ")) {
-            openWhisperTab(replyAccount(event.getValue()));
+            // The sender's own name and brackets: a person, not a link.
+            return true;
         } else if (event.getAction() == ClickEvent.Action.SUGGEST_COMMAND) {
             this.inputField.setText(event.getValue());
         } else if (event.getAction() == ClickEvent.Action.RUN_COMMAND) {
@@ -4127,15 +4947,55 @@ public final class LostTalesChatGui extends GuiChat {
                 top + ChatWindowPlacement.INPUT_HEIGHT);
     }
 
+    /**
+     * The bar's own left frame edge: drawn on the border, one pixel
+     * wide, so the gap after it starts a pixel in.
+     */
+    private static final int BAR_BORDER_WIDTH = 1;
+    /**
+     * Clear space between the things standing on the bar, and before
+     * the first of them. Measured in ink, like every other gap the chat
+     * keeps: what the eye reads as the gap is the space between the
+     * pixels that were actually drawn, not between the boxes they were
+     * drawn in. The character button's square is wider than the head
+     * inside it and the indicator's is wider than its label, so both
+     * are asked where their ink is rather than where their box is.
+     */
+    private static final int BAR_GAP = 3;
+    /** The head's inset inside the character button's square, and its size. */
+    private static final int CHARACTER_HEAD_INSET = 2;
+    private static final int CHARACTER_HEAD_SIZE = 8;
+    /** The indicator's label is drawn a pixel inside its box. */
+    private static final int INDICATOR_TEXT_INSET = 1;
+
     /** Left edge of the character-selection button, the bar's first
      *  control. */
     private int characterButtonLeft() {
-        return this.barLeft + 2;
+        return this.barLeft + BAR_BORDER_WIDTH + BAR_GAP
+                - CHARACTER_HEAD_INSET;
+    }
+
+    /** Past the last pixel of the character button's head. */
+    private int characterButtonInkRight() {
+        return characterButtonLeft() + CHARACTER_HEAD_INSET
+                + CHARACTER_HEAD_SIZE;
     }
 
     /** Left edge of the channel indicator, past the character button. */
     private int indicatorLeft() {
-        return this.barLeft + 2 + ChatPickerPanel.BUTTON_SIZE + 2;
+        return characterButtonInkRight() + BAR_GAP - INDICATOR_TEXT_INSET;
+    }
+
+    /**
+     * Past the last pixel of the indicator's label. Its own width is a
+     * click target and carries padding on both sides; this is where the
+     * writing stops. The last glyph's width includes a column of
+     * spacing after it, which is not ink.
+     */
+    private int indicatorInkRight() {
+        return indicatorLeft() + INDICATOR_TEXT_INSET
+                + this.fontRendererObj.getStringWidth(indicatorLabel(
+                        ClientChatChannelState.getSelected())) - 1;
     }
 
     private boolean isInsideCharacterButton(int mouseX, int mouseY) {
@@ -4555,7 +5415,7 @@ public final class LostTalesChatGui extends GuiChat {
         // frame's fraction makes the text jump about while the window
         // is dragged.
         updateInputBox();
-        int left = indicatorLeft() + indicatorWidth() + 3;
+        int left = indicatorInkRight() + BAR_GAP;
         // The counter sits left of the send arrow; the field ends before it.
         int right = counterLeft(inputBarRight()) - 3;
         this.inputField.xPosition = left;

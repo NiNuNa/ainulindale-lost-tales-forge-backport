@@ -122,4 +122,39 @@ public final class ChatTabTest {
         }
         return count;
     }
+
+    /**
+     * A conversation is with a person as they present themselves: one
+     * player's characters are separate threads, and neither is the one
+     * with their account.
+     */
+    @Test
+    public void eachIdentityIsItsOwnConversation() {
+        ChatTab account = ChatTab.whisper("Steve");
+        ChatTab aldric = ChatTab.whisper("Steve", "Aldric");
+        ChatTab beren = ChatTab.whisper("Steve", "Beren");
+        assertFalse(account.equals(aldric));
+        assertFalse(aldric.equals(beren));
+        assertEquals("Steve", aldric.getPartner());
+        assertEquals("Aldric", aldric.getPartnerIdentity());
+        assertTrue(account.isAccountConversation());
+        assertFalse(aldric.isAccountConversation());
+        // Naming the account as the identity is the account's own.
+        assertEquals(account, ChatTab.whisper("Steve", "Steve"));
+        assertEquals(account, ChatTab.whisper("Steve", ""));
+        assertEquals("Steve", account.getPartnerIdentity());
+    }
+
+    /** Ids round-trip, and one stored before identities existed still reads. */
+    @Test
+    public void identityIdsRoundTripAndOlderIdsStillRead() {
+        ChatTab aldric = ChatTab.whisper("Steve", "Aldric");
+        assertEquals(aldric, ChatTab.fromId(aldric.id()));
+        assertEquals(ChatTab.whisper("Steve"),
+                ChatTab.fromId("whisper:Steve"));
+        // An identity may hold the separator; the account never can.
+        ChatTab odd = ChatTab.whisper("Steve", "A|B");
+        assertEquals(odd, ChatTab.fromId(odd.id()));
+        assertEquals("A|B", ChatTab.fromId(odd.id()).getPartnerIdentity());
+    }
 }

@@ -72,6 +72,17 @@ final class ChatLineWrapper {
             return null;
         }
         List<IChatComponent> parts = flatten(root);
+        // A row of its own above the message — the quote a reply opens
+        // with — ends at the break marker. It is cut to one line rather
+        // than wrapped: a quote is a glance at what is being answered,
+        // and a long one must not push the answer down the window.
+        int breakIndex = -1;
+        for (int index = 0; index < parts.size(); index++) {
+            if (ChatLayoutMarker.isLineBreak(parts.get(index))) {
+                breakIndex = index;
+                break;
+            }
+        }
         // The head marker sits on the first line only, and it is where
         // the renderer reads the sender's colours from; the continuation
         // lines are given them so a wrapped name keeps its colour.
@@ -87,7 +98,7 @@ final class ChatLineWrapper {
             }
         }
         int bodyIndex = -1;
-        for (int index = 0; index < parts.size(); index++) {
+        for (int index = breakIndex + 1; index < parts.size(); index++) {
             if (ChatLayoutMarker.isAnchor(parts.get(index))) {
                 bodyIndex = index;
                 break;
@@ -101,7 +112,7 @@ final class ChatLineWrapper {
         // its timestamp lives in the column at the window's edge.
         int closedPrefix = 0;
         int openPrefix = 0;
-        for (int index = 0; index < bodyIndex; index++) {
+        for (int index = breakIndex + 1; index < bodyIndex; index++) {
             IChatComponent part = parts.get(index);
             int partWidth = partWidth(metrics, part);
             if (!ChatPrefixMarker.isHidden(part, false)) {
@@ -126,7 +137,11 @@ final class ChatLineWrapper {
         Builder builder = new Builder(metrics, width, 0,
                 Math.min(openPrefix, maxIndent), chatOpen, nameColor,
                 titleColor);
-        for (int index = 0; index <= bodyIndex; index++) {
+        if (breakIndex >= 0) {
+            placeLeadingRow(builder, metrics, parts, breakIndex, width);
+            builder.breakLine();
+        }
+        for (int index = breakIndex + 1; index <= bodyIndex; index++) {
             builder.place(copy(parts.get(index)), 0);
         }
         builder.used = prefix;
@@ -143,6 +158,34 @@ final class ChatLineWrapper {
             }
         }
         return builder.finish();
+    }
+
+    /**
+     * The row above the message, cut to the width rather than wrapped:
+     * parts are placed while they fit whole, the one that does not is
+     * trimmed to what is left, and anything after it is dropped.
+     */
+    private static void placeLeadingRow(Builder builder,
+                                        TextMetrics metrics,
+                                        List<IChatComponent> parts,
+                                        int breakIndex, int width) {
+        int used = 0;
+        for (int index = 0; index < breakIndex; index++) {
+            IChatComponent part = parts.get(index);
+            int partWidth = partWidth(metrics, part);
+            if (used + partWidth <= width) {
+                builder.place(copy(part), 0);
+                used += partWidth;
+                continue;
+            }
+            String text = part.getUnformattedTextForChat();
+            String formatting = part.getChatStyle().getFormattingCode();
+            int fits = fitLength(metrics, formatting, text, width - used);
+            if (fits > 0) {
+                builder.place(copy(part, text.substring(0, fits)), 0);
+            }
+            return;
+        }
     }
 
     /** Width of one component as the renderer advances past it. */
@@ -162,8 +205,7 @@ final class ChatLineWrapper {
     /** Glyph slots are single indivisible words, spaces or not. */
     private static boolean isAtomic(IChatComponent part) {
         if (ChatEmojiMarker.isMarker(part) || ChatHeadMarker.isMarker(part)
-                || ChatSpacerMarker.isMarker(part)
-                || ChatGroupMarker.isMarker(part)) {
+                || ChatSpacerMarker.isMarker(part)) {
             return true;
         }
         ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
@@ -278,6 +320,20 @@ final class ChatLineWrapper {
             this.current.appendSibling(piece);
             this.used += pieceWidth;
             this.fresh = false;
+        }
+
+        /**
+         * Ends the row above the message and opens the message's own:
+         * no indent marker, since what follows is a first line rather
+         * than a continuation of one.
+         */
+        void breakLine() {
+            this.lines.add(this.current);
+            this.current = new ChatComponentText("");
+            this.used = 0;
+            this.lineStart = 0;
+            this.firstLine = true;
+            this.fresh = true;
         }
 
         private void newLine() {

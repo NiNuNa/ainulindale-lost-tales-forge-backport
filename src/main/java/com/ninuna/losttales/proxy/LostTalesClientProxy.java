@@ -63,6 +63,7 @@ import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.client.chat.ClientChatAccountRoles;
@@ -460,6 +461,11 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleChatTyping(LostTalesChatTypingSyncPacket packet) {
         ClientChatTypingState.accept(packet);
+    }
+
+    @Override
+    public void handleChatUpdate(LostTalesChatUpdatePacket packet) {
+        LostTalesChatPresentation.applyUpdate(packet);
     }
 
     @Override

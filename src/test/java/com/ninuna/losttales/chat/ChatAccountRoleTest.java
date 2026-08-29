@@ -61,4 +61,20 @@ public final class ChatAccountRoleTest {
         assertEquals(Collections.singletonList(ChatAccountRole.OPERATOR),
                 ChatAccountRole.fromMask(mask));
     }
+
+    /**
+     * The one rule every account line's name colour comes from: the
+     * primary role's colour, and the chat's ivory without a role.
+     */
+    @Test
+    public void nameColourFollowsThePrimaryRole() {
+        assertEquals(LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
+                ChatAccountRole.nameColor(0));
+        assertEquals(ChatAccountRole.OPERATOR.getColor(),
+                ChatAccountRole.nameColor(ChatAccountRole.OPERATOR.bit()));
+        assertEquals(ChatAccountRole.DEVELOPER.getColor(),
+                ChatAccountRole.nameColor(ChatAccountRole.maskOf(
+                        ChatAccountRole.OPERATOR,
+                        ChatAccountRole.DEVELOPER)));
+    }
 }

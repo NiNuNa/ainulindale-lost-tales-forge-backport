@@ -63,11 +63,40 @@ public final class LostTalesChatRoleMaskTest {
                 0xFFFFFF, 0xFFFFFF, "hello", 1L, "");
         ByteBuf buffer = Unpooled.buffer();
         plain.toBytes(buffer);
-        // The roles byte sits before the trailing account-line flag.
-        buffer.setByte(buffer.writerIndex() - 2, 0x80);
+        // Where the roles are written is found rather than counted to:
+        // encoding the same line twice, once carrying a role and once
+        // carrying none, leaves exactly one byte different, and that
+        // byte is the mask. Counting back from the end instead would
+        // have to be recounted every time the layout grows a field.
+        LostTalesChatMessagePacket roled = new LostTalesChatMessagePacket(
+                ChatChannel.OOC, plain.getSenderId(), "Steve", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "hello", 1L, "", null, "", "",
+                ChatAccountRole.maskOf(ChatAccountRole.OPERATOR));
+        ByteBuf withRole = Unpooled.buffer();
+        roled.toBytes(withRole);
+        buffer.setByte(onlyDifference(buffer, withRole), 0x80);
         LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
         decoded.fromBytes(buffer);
         assertTrue(decoded.isMalformed());
         assertEquals(0, decoded.getRoles());
+    }
+
+    /**
+     * The one index at which two encodings of the same message differ.
+     * Fails the test rather than guessing if they differ anywhere else,
+     * since then the byte found would not be the one meant.
+     */
+    private static int onlyDifference(ByteBuf first, ByteBuf second) {
+        assertEquals("the two encodings should be the same length",
+                first.writerIndex(), second.writerIndex());
+        int found = -1;
+        for (int index = 0; index < first.writerIndex(); index++) {
+            if (first.getByte(index) != second.getByte(index)) {
+                assertEquals("exactly one byte should differ", -1, found);
+                found = index;
+            }
+        }
+        assertTrue("no byte differed", found >= 0);
+        return found;
     }
 }

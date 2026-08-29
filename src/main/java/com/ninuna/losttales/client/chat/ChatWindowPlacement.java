@@ -171,6 +171,16 @@ public final class ChatWindowPlacement {
         }
     }
 
+    private static int scaledScreenHeight(Minecraft minecraft) {
+        try {
+            return new net.minecraft.client.gui.ScaledResolution(minecraft,
+                    minecraft.displayWidth, minecraft.displayHeight)
+                    .getScaledHeight();
+        } catch (RuntimeException unavailable) {
+            return 0;
+        }
+    }
+
     /** The box width of the feed, and of a window without one of its own. */
     public static int windowWidth(Minecraft minecraft) {
         GuiNewChat chat = chat(minecraft);
@@ -524,18 +534,41 @@ public final class ChatWindowPlacement {
                 Math.max(minBaseline, Math.min(maxBaseline, baseline)));
     }
 
+    /** The share of the screen the closed feed may fill at most. */
+    private static final double FEED_HEIGHT_SHARE = 1.0D / 3.0D;
+
     /**
-     * The feed's box height: the lines it currently holds, at least one.
-     * The feed is not resizable, so it is always a whole number of them,
-     * measured with the same stride the renderer draws them at.
+     * The most message lines the closed feed shows: as many whole ones
+     * as fit in {@link #FEED_HEIGHT_SHARE} of the screen, measured with
+     * the stride the renderer draws them at, so the feed grows with the
+     * screen and the GUI scale without any line changing height. The
+     * fraction rarely divides evenly, and the remainder is left as
+     * margin rather than spent on a line that would be clipped. Falls
+     * back to the game's own chat height when the screen cannot be
+     * measured. Windows are unaffected: they follow {@link #lineCap}.
+     */
+    public static int feedLineCapacity(Minecraft minecraft) {
+        int screenHeight = scaledScreenHeight(minecraft);
+        if (screenHeight <= 0) {
+            GuiNewChat chat = chat(minecraft);
+            return chat == null ? 10
+                    : LostTalesChatOverlayRenderer.visibleLineCount(chat);
+        }
+        return Math.max(1, (int)(screenHeight * FEED_HEIGHT_SHARE
+                / lineStride(minecraft)));
+    }
+
+    /**
+     * The feed's box height: the lines it currently holds, at least one
+     * and at most its {@link #feedLineCapacity}. The feed is not
+     * resizable, so it is always a whole number of them, measured with
+     * the same stride the renderer draws them at.
      */
     public static double feedHeight(Minecraft minecraft) {
-        GuiNewChat chat = chat(minecraft);
         ChatWindowFrame frame = ChatWindowFrame.feed();
         int lines = 1;
-        if (frame.lines != null && chat != null) {
-            lines = Math.max(1, Math.min(
-                    LostTalesChatOverlayRenderer.visibleLineCount(chat),
+        if (frame.lines != null) {
+            lines = Math.max(1, Math.min(feedLineCapacity(minecraft),
                     frame.lines.size()));
         }
         return roomForLines(lines, minecraft);

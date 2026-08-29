@@ -14,7 +14,10 @@ import net.minecraft.util.IChatComponent;
  * <p>The <em>anchor</em> marker sits where continuation lines align: after
  * the channel prefix and timestamp, in front of the opening bracket of
  * the sender, so a wrapped message reads as one block under its header.
- * {@link ChatLineWrapper} measures everything before it. An <em>indent</em>
+ * {@link ChatLineWrapper} measures everything before it. A <em>line
+ * break</em> marker ahead of the anchor closes a row of its own above
+ * the message — the quote a reply opens with — and the rest of the line
+ * is laid out after it exactly as an unbroken one would be. An <em>indent</em>
  * marker opens every continuation line of a wrapped message and records
  * the anchor's offset twice — for the closed HUD (channel prefix shown)
  * and the open screen (prefix hidden) — so continuation lines land under
@@ -24,12 +27,22 @@ import net.minecraft.util.IChatComponent;
 final class ChatLayoutMarker {
     private static final String PREFIX = "losttales-chat-layout:";
     private static final String ANCHOR = "anchor";
+    private static final String BREAK = "break";
     private static final String INDENT = "indent:";
 
     private ChatLayoutMarker() {}
 
     static ChatComponentText anchor() {
         return marker(PREFIX + ANCHOR);
+    }
+
+    /**
+     * Closes a row of its own above the message. Everything before it is
+     * laid out on that row and cut to one line; the message itself
+     * begins on the next.
+     */
+    static ChatComponentText lineBreak() {
+        return marker(PREFIX + BREAK);
     }
 
     static ChatComponentText indent(int closedWidth, int openWidth) {
@@ -73,6 +86,9 @@ final class ChatLayoutMarker {
         if (ANCHOR.equals(payload)) {
             return Data.ANCHOR;
         }
+        if (BREAK.equals(payload)) {
+            return Data.BREAK;
+        }
         if (!payload.startsWith(INDENT)) {
             return null;
         }
@@ -95,10 +111,17 @@ final class ChatLayoutMarker {
         return data != null && data.anchor;
     }
 
+    static boolean isLineBreak(IChatComponent component) {
+        Data data = decode(component);
+        return data != null && data.lineBreak;
+    }
+
     static final class Data {
-        static final Data ANCHOR = new Data(true, 0, 0, -1, -1);
+        static final Data ANCHOR = new Data(true, false, 0, 0, -1, -1);
+        static final Data BREAK = new Data(false, true, 0, 0, -1, -1);
 
         final boolean anchor;
+        final boolean lineBreak;
         private final int closedIndent;
         private final int openIndent;
         /** The sender's colours, or -1 when the line carries none. */
@@ -107,7 +130,14 @@ final class ChatLayoutMarker {
 
         private Data(boolean anchor, int closedIndent, int openIndent,
                      int nameColor, int titleColor) {
+            this(anchor, false, closedIndent, openIndent, nameColor,
+                    titleColor);
+        }
+
+        private Data(boolean anchor, boolean lineBreak, int closedIndent,
+                     int openIndent, int nameColor, int titleColor) {
             this.anchor = anchor;
+            this.lineBreak = lineBreak;
             this.closedIndent = Math.max(0, closedIndent);
             this.openIndent = Math.max(0, openIndent);
             this.nameColor = nameColor;

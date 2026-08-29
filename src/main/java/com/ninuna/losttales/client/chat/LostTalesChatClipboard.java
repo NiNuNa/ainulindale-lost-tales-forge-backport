@@ -14,8 +14,32 @@ final class LostTalesChatClipboard {
     /** {@code mouseX}/{@code mouseY} are GUI coordinates, as the screen sees them. */
     static boolean copy(GuiNewChat chat, Minecraft minecraft,
                         int mouseX, int mouseY) {
-        if (chat == null || minecraft == null || !chat.getChatOpen()) {
+        String text = messageTextAt(chat, minecraft, mouseX, mouseY);
+        if (text.length() == 0) {
             return false;
+        }
+        GuiScreen.setClipboardString(text);
+        return true;
+    }
+
+    /** Copies text already resolved from a line; empty copies nothing. */
+    static boolean copy(String text) {
+        if (text == null || text.length() == 0) {
+            return false;
+        }
+        GuiScreen.setClipboardString(text);
+        return true;
+    }
+
+    /**
+     * The whole message body under the pointer, empty when there is
+     * none. Resolved once so a menu opened over a line can act on the
+     * message later, when the pointer has moved on.
+     */
+    static String messageTextAt(GuiNewChat chat, Minecraft minecraft,
+                                int mouseX, int mouseY) {
+        if (chat == null || minecraft == null || !chat.getChatOpen()) {
+            return "";
         }
         try {
             // A whole-pixel press samples the pixel's centre, the best
@@ -27,21 +51,29 @@ final class LostTalesChatClipboard {
             if (band == null || lines == null
                     || band.viewIndex >= lines.size()
                     || lines.get(band.viewIndex) == null) {
-                return false;
+                return "";
             }
-            String text = resolveChannelMessage(lines, band.viewIndex);
-            if (text.length() == 0) {
-                text = plainText(lines.get(band.viewIndex).func_151461_a())
-                        .trim();
-            }
-            if (text.length() == 0) {
-                return false;
-            }
-            GuiScreen.setClipboardString(text);
-            return true;
+            return messageTextOf(lines, band.viewIndex);
         } catch (RuntimeException ignored) {
-            return false;
+            return "";
         }
+    }
+
+    /**
+     * The whole body of the message one of whose lines is at
+     * {@code index}, empty when it has none: what a control acting on a
+     * message already known copies, rather than hit-testing for it again.
+     */
+    static String messageTextOf(List<ChatLine> lines, int index) {
+        if (lines == null || index < 0 || index >= lines.size()
+                || lines.get(index) == null) {
+            return "";
+        }
+        String text = resolveChannelMessage(lines, index);
+        if (text.length() == 0) {
+            text = plainText(lines.get(index).func_151461_a()).trim();
+        }
+        return text;
     }
 
     private static String resolveChannelMessage(List<ChatLine> lines,

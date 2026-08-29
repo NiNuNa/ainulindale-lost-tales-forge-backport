@@ -55,6 +55,7 @@ import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
@@ -96,6 +97,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
+import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
+import com.ninuna.losttales.chat.server.ChatMessageLog;
 import com.ninuna.losttales.chat.server.LostTalesChatRoleRosterWatcher;
 import com.ninuna.losttales.world.waystone.LostTalesWaystoneGenerationHandler;
 import software.bernie.geckolib3.GeckoLib;
@@ -285,6 +288,8 @@ public class LostTalesCommonProxy {
 
     public void handleChatTyping(LostTalesChatTypingSyncPacket packet) {}
 
+    public void handleChatUpdate(LostTalesChatUpdatePacket packet) {}
+
     public void handleFastTravelArrival(
             LostTalesFastTravelArrivalPacket packet) {}
 
@@ -304,6 +309,8 @@ public class LostTalesCommonProxy {
         PartyMemberStatusSyncManager.clear();
         PartyTrackingSyncManager.clear();
         LostTalesChatRoleRosterWatcher.clear();
+        ChatMessageIdAllocator.reset();
+        ChatMessageLog.clear();
         ELostTalesCommand.initAndRegisterCommands(event);
         LostTalesDiscordBridge.getInstance().start();
     }
@@ -368,6 +375,8 @@ public class LostTalesCommonProxy {
         PartyMemberStatusSyncManager.clear();
         PartyTrackingSyncManager.clear();
         LostTalesChatRoleRosterWatcher.clear();
+        ChatMessageIdAllocator.reset();
+        ChatMessageLog.clear();
         LostTalesMobAggroEventHandler.clearAll();
     }
 }
