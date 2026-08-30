@@ -81,6 +81,70 @@ final class LostTalesChatVisualStyle {
      * chat's sprite drawing, so no call site has to know what the last
      * rectangle left behind.
      */
+    /** Width of the hairline the chat divides two controls with. */
+    static final int DIVIDER_WIDTH = 1;
+    /** Quiet enough to divide without reading as an edge of its own. */
+    static final int DIVIDER_ALPHA = 0x66;
+
+    /**
+     * A divider between two controls: a one-pixel column of the chat's
+     * ivory, strongest at its middle and fading to nothing at both ends,
+     * so it parts them without drawing an edge across their strip. The
+     * tab row and the input bar both come through here, so their
+     * dividers cannot drift apart.
+     */
+    static void drawDivider(int x, int top, int height, int alpha) {
+        LostTalesChatOverlayRenderer.drawVerticalRule(x, x + DIVIDER_WIDTH,
+                top, top + height, alpha);
+    }
+
+    /**
+     * How long a control takes to cross from its resting artwork to its
+     * hovered one. Quick enough to feel like an answer to the pointer
+     * rather than an animation, slow enough not to be the hard swap it
+     * would otherwise be.
+     */
+    private static final double HOVER_FADE_SECONDS = 0.05D;
+
+    /**
+     * One step of a control's crossfade toward {@code hovered}: 0 while
+     * it rests, 1 while the pointer is on it, and on the way between
+     * them the share of the hovered artwork to lay over the resting one.
+     * Every control the chat draws in two states steps with this, so
+     * they all answer the pointer at the same pace.
+     */
+    static float hoverFade(float progress, boolean hovered,
+                           double elapsed) {
+        float target = hovered ? 1.0F : 0.0F;
+        float value = (float)LostTalesChatMotion.approach(progress, target,
+                elapsed, HOVER_FADE_SECONDS);
+        return Math.abs(target - value) < 0.02F ? target : value;
+    }
+
+    /**
+     * One colour a share of the way to another, so a control's tones
+     * cross with its artwork rather than snapping at the same moment.
+     */
+    static int blend(int fromRgb, int toRgb, float progress) {
+        if (progress <= 0.0F) {
+            return fromRgb;
+        }
+        if (progress >= 1.0F) {
+            return toRgb;
+        }
+        int red = channel(fromRgb, toRgb, progress, 16);
+        int green = channel(fromRgb, toRgb, progress, 8);
+        int blue = channel(fromRgb, toRgb, progress, 0);
+        return (red << 16) | (green << 8) | blue;
+    }
+
+    private static int channel(int fromRgb, int toRgb, float progress,
+                               int shift) {
+        int from = (fromRgb >> shift) & 0xFF;
+        int to = (toRgb >> shift) & 0xFF;
+        return from + Math.round((to - from) * progress);
+    }
+
     static void beginContent() {
         GL11.glEnable(GL11.GL_BLEND);
         OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
@@ -317,6 +381,10 @@ final class LostTalesChatVisualStyle {
             int color;
             Integer prefixColor = ChatPrefixMarker.decode(part);
             Integer explicitColor = ChatColorMarker.decode(part);
+            if (explicitColor == null) {
+                // The chevron a body opens with wears the sender's colour.
+                explicitColor = ChatBodyMarker.decode(part);
+            }
             if (explicitColor == null) {
                 // A mention re-resolves as it is drawn, so one built
                 // before this client learned the roles behind the name

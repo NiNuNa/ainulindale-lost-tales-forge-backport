@@ -47,6 +47,10 @@ final class ChatLockAnimation {
             {10, 50, 5, 8}, {10, 42, 5, 7}, {10, 35, 5, 6}, {10, 27, 5, 7}};
 
     /** Sheet column each colourway's block starts at. */
+    /** How far the lock has crossed to its hovered colourway, and when. */
+    private float hoverFade;
+    private long hoverFadeNanos;
+
     private static final int RESTING_U = 50;
     private static final int OPEN_HOVER_U = 66;
     private static final int SHUT_HOVER_U = 82;
@@ -56,6 +60,13 @@ final class ChatLockAnimation {
     static final int HEIGHT = 8;
     /** Width of the shut padlock, which is narrower than that box. */
     static final int SHUT_WIDTH = FRAMES[FRAMES.length - 1][2];
+    /**
+     * Height of the padlock at rest, which is shorter than the box the
+     * swing needs: the frames stand on the box's floor and the open
+     * shackle reaches up out of it. A control centres the lock on this,
+     * not on the box, or the resting padlock sits low in its strip.
+     */
+    static final int SHUT_HEIGHT = FRAMES[FRAMES.length - 1][3];
 
     /** The wind-up against the way it is about to travel. */
     private static final long TURN_ANTICIPATE_NANOS = 55000000L;
@@ -127,16 +138,21 @@ final class ChatLockAnimation {
         }
         begin(pose, x, top, false);
         try {
-            if (!hovered) {
-                drawFrame(frame, RESTING_U, x, top, alpha);
+            // The resting colourway always, with the hovered one laid
+            // over it as far as the pointer has brought it: the lock
+            // crosses to its lit tones rather than swapping to them, as
+            // every other control the chat draws in two states does.
+            drawFrame(frame, RESTING_U, x, top, alpha);
+            int lit = Math.round(alpha * this.hoverFade);
+            if (lit < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
                 return;
             }
             // Green under the open padlock, wine under the shut one: the
             // shut colourway is laid over the open one as far as the
             // shackle has come, so the two cross over with the swing.
-            drawFrame(frame, OPEN_HOVER_U, x, top, alpha);
+            drawFrame(frame, OPEN_HOVER_U, x, top, lit);
             drawFrame(frame, SHUT_HOVER_U, x, top,
-                    Math.round(alpha * this.swing));
+                    Math.round(lit * this.swing));
         } finally {
             end();
         }
@@ -222,6 +238,11 @@ final class ChatLockAnimation {
             this.turnStartedNanos = nowNanos;
         }
         this.previouslyHovered = hovered;
+        double sinceDrawn = this.hoverFadeNanos == 0L ? 0.0D
+                : (nowNanos - this.hoverFadeNanos) / 1.0E9D;
+        this.hoverFadeNanos = nowNanos;
+        this.hoverFade = LostTalesChatVisualStyle.hoverFade(this.hoverFade,
+                hovered, sinceDrawn);
         if (!hovered) {
             this.hoverStartedNanos = 0L;
         } else if (this.hoverStartedNanos == 0L) {

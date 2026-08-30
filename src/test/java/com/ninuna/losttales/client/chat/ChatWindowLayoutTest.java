@@ -226,38 +226,126 @@ public final class ChatWindowLayoutTest {
         assertEquals(ChatWindowLayout.windows(), ChatWindowLayout.stacked());
     }
 
-    /** There is always at least one open tab, however the layout is cut. */
+    /** Every tab closes, down to no tab and no window at all. */
     @Test
-    public void theLastOpenTabOfAllIsNeverClosable() {
+    public void everyTabClosesAndTheEmptyLayoutIsValid() {
         assertEquals(8, ChatWindowLayout.openTabCount());
         List<ChatChannel> order = new ArrayList<ChatChannel>(
                 ChatWindowLayout.orderChannels());
-        for (int index = 0; index < order.size() - 1; index++) {
+        for (int index = 0; index < order.size(); index++) {
             assertTrue(ChatWindowLayout.isClosable(order.get(index)));
             assertTrue(ChatWindowLayout.close(order.get(index)));
-            assertTrue(ChatWindowLayout.openTabCount() >= 1);
         }
-        ChatChannel last = order.get(order.size() - 1);
-        assertEquals(1, ChatWindowLayout.openTabCount());
-        assertEquals(1, ChatWindowLayout.windows().size());
-        assertFalse(ChatWindowLayout.isClosable(last));
-        assertFalse(ChatWindowLayout.close(last));
-        assertTrue(ChatWindowLayout.isOpen(last));
-        // A closed tab is not closable either; a second open one makes
-        // both closable again.
+        assertEquals(0, ChatWindowLayout.openTabCount());
+        assertTrue(ChatWindowLayout.isEmpty());
+        assertTrue(ChatWindowLayout.windows().isEmpty());
+        assertNull(ChatWindowLayout.firstWindow());
+        assertEquals(order.size(),
+                ChatWindowLayout.closedChannels().size());
+        // A closed tab is not closable, and a message finds no window to
+        // open itself in: the channel keeps receiving, closed.
         assertFalse(ChatWindowLayout.isClosable(order.get(0)));
-        assertTrue(ChatWindowLayout.restore(order.get(0)));
-        assertTrue(ChatWindowLayout.isClosable(last));
-        assertTrue(ChatWindowLayout.isClosable(order.get(0)));
+        assertFalse(ChatWindowLayout.close(order.get(0)));
+        assertFalse(ChatWindowLayout.restore(order.get(0)));
+        assertNull(ChatWindowLayout.openTab(ChatTab.whisper("Someone"),
+                null));
+        assertTrue(ChatWindowLayout.isEmpty());
+        // The + opens one back into a window of its own.
+        assertNotNull(ChatWindowLayout.openInNewWindow(
+                ChatTab.of(order.get(0))));
+        assertEquals(1, ChatWindowLayout.windows().size());
+        assertEquals(Collections.singletonList(order.get(0)),
+                ChatWindowLayout.orderChannels());
+        assertEquals(order.get(0),
+                ChatWindowLayout.firstWindow().getActiveChannel());
         // Repeated closing and reopening leaves a consistent layout.
         for (int round = 0; round < 5; round++) {
             assertTrue(ChatWindowLayout.close(order.get(0)));
-            assertFalse(ChatWindowLayout.close(last));
-            assertTrue(ChatWindowLayout.restore(order.get(0)));
+            assertTrue(ChatWindowLayout.isEmpty());
+            assertNotNull(ChatWindowLayout.openInNewWindow(
+                    ChatTab.of(order.get(0))));
         }
-        assertEquals(2, ChatWindowLayout.openTabCount());
-        assertEquals(Arrays.asList(last, order.get(0)),
-                ChatWindowLayout.orderChannels());
+        assertEquals(1, ChatWindowLayout.openTabCount());
+    }
+
+    /** A whole window closes at once, and its channels survive it. */
+    @Test
+    public void closingAWindowKeepsItsChannels() {
+        assertFalse(ChatWindowLayout.closeWindow("nope"));
+        assertTrue(ChatWindowLayout.setLocked("w1", true));
+        assertFalse(ChatWindowLayout.closeWindow("w1"));
+        assertTrue(ChatWindowLayout.setLocked("w1", false));
+        assertTrue(ChatWindowLayout.link("w2", "w1", true));
+        assertTrue(ChatWindowLayout.closeWindow("w1"));
+        assertNull(ChatWindowLayout.window("w1"));
+        assertEquals(1, ChatWindowLayout.windows().size());
+        // The window that was stuck to it lets go.
+        assertFalse(ChatWindowLayout.window("w2").isLinked());
+        // Its channels are closed, not gone: still restorable, and
+        // still carrying whatever preferences they had.
+        assertTrue(ChatWindowLayout.closedChannels()
+                .contains(ChatChannel.CONSOLE));
+        assertTrue(ChatWindowLayout.restore(ChatChannel.CONSOLE, "w2"));
+        assertTrue(ChatWindowLayout.closeWindow("w2"));
+        assertTrue(ChatWindowLayout.isEmpty());
+    }
+
+    /** A marked group moves as one and keeps its order. */
+    @Test
+    public void groupsOfTabsMoveTogetherAndKeepTheirOrder() {
+        List<ChatChannel> start = ChatWindowLayout.window("w2")
+                .getChannels();
+        // A non-contiguous pair from the conversation window, moved to
+        // its front: they arrive as one run, in row order.
+        List<ChatTab> group = Arrays.asList(
+                ChatTab.of(start.get(3)), ChatTab.of(start.get(1)));
+        assertTrue(ChatWindowLayout.moveTabs(group, "w2", 0));
+        List<ChatChannel> moved = ChatWindowLayout.window("w2")
+                .getChannels();
+        assertEquals(start.size(), moved.size());
+        assertEquals(start.get(1), moved.get(0));
+        assertEquals(start.get(3), moved.get(1));
+        assertEquals(start.get(0), moved.get(2));
+        // Across windows: the group leaves one row and joins another.
+        assertTrue(ChatWindowLayout.moveTabs(group, "w1", 0));
+        assertEquals(Arrays.asList(start.get(1), start.get(3),
+                ChatChannel.CONSOLE, ChatChannel.ADMIN),
+                ChatWindowLayout.window("w1").getChannels());
+        assertEquals(start.get(3),
+                ChatWindowLayout.window("w1").getActiveChannel());
+        assertFalse(ChatWindowLayout.window("w2").contains(start.get(1)));
+        // A group detaches into a window of its own the same way.
+        ChatWindow detached = ChatWindowLayout.detach(group, 20.0D, 30.0D);
+        assertNotNull(detached);
+        assertEquals(Arrays.asList(start.get(1), start.get(3)),
+                detached.getChannels());
+        assertEquals(Arrays.asList(ChatChannel.CONSOLE, ChatChannel.ADMIN),
+                ChatWindowLayout.window("w1").getChannels());
+        // Tabs from two windows are not a group, and neither is a closed
+        // one: both are refused whole rather than half-applied.
+        assertFalse(ChatWindowLayout.moveTabs(Arrays.asList(
+                ChatTab.of(start.get(1)), ChatTab.of(ChatChannel.CONSOLE)),
+                "w1", 0));
+        assertEquals(Arrays.asList(start.get(1), start.get(3)),
+                detached.getChannels());
+    }
+
+    /**
+     * A tab taken out of a window is read in a window the same shape:
+     * the height and width the player gave the one it came from, not
+     * whatever the game's own chat settings say.
+     */
+    @Test
+    public void aDetachedWindowKeepsTheSizeOfTheOneItCameFrom() {
+        assertTrue(ChatWindowLayout.setWindowLines("w1", 27.5D, false));
+        assertTrue(ChatWindowLayout.setWindowWidth("w1", 240, false));
+        ChatWindow source = ChatWindowLayout.window("w1");
+        ChatWindow detached = ChatWindowLayout.detach(ChatChannel.CONSOLE,
+                20.0D, 30.0D);
+        assertNotNull(detached);
+        assertTrue(detached != source);
+        assertEquals(source.getMaxLines(), detached.getMaxLines(), 0.0D);
+        assertEquals(source.getWidth(), detached.getWidth());
     }
 
     @Test
@@ -276,7 +364,7 @@ public final class ChatWindowLayoutTest {
     }
 
     @Test
-    public void everyWindowIsEqualAndOnlyTheLastOneKeepsItsLastTab() {
+    public void everyWindowIsEqualAndTheLastOneIsNoDifferent() {
         // Emptying the console window by docking drops it.
         assertTrue(ChatWindowLayout.moveTab(ChatChannel.CONSOLE, "w2", 0));
         assertTrue(ChatWindowLayout.moveTab(ChatChannel.ADMIN, "w2", 99));
@@ -285,11 +373,12 @@ public final class ChatWindowLayoutTest {
         assertEquals(ChatChannel.CONSOLE,
                 ChatWindowLayout.firstWindow().getChannels().get(0));
         for (ChatChannel channel : ChatChannel.presentationOrder()) {
-            ChatWindowLayout.close(channel);
+            if (channel != ChatChannel.CONSOLE) {
+                ChatWindowLayout.close(channel);
+            }
         }
         assertEquals(1, ChatWindowLayout.firstWindow().getChannels().size());
         ChatChannel last = ChatWindowLayout.firstWindow().getChannels().get(0);
-        assertFalse(ChatWindowLayout.close(last));
         // Its only tab dragged out moves the window like any other.
         assertSame(ChatWindowLayout.firstWindow(),
                 ChatWindowLayout.detach(last, 10.0D, 20.0D));
@@ -537,10 +626,11 @@ public final class ChatWindowLayoutTest {
     public void loadWithNothingUsableFallsBackSensibly() {
         ChatWindowLayout.load(Collections.<ChatWindowLayout.WindowSpec>emptyList(),
                 EnumSet.allOf(ChatChannel.class), null, 0.0D, 100.0D);
-        // Everything closed is no layout: the default comes back.
-        assertEquals(2, ChatWindowLayout.windows().size());
-        assertEquals(ChatChannel.CONSOLE,
-                ChatWindowLayout.firstWindow().getActiveChannel());
+        // Everything closed is a layout of its own: the file described
+        // no window, so none is opened.
+        assertTrue(ChatWindowLayout.isEmpty());
+        assertNull(ChatWindowLayout.firstWindow());
+        assertEquals(0.0D, ChatWindowLayout.feedOffsetX(), 0.0D);
         ChatWindowLayout.load(Collections.<ChatWindowLayout.WindowSpec>emptyList(),
                 EnumSet.of(ChatChannel.ADMIN), null, 0.0D, 100.0D);
         // No windows at all: one window with everything still open.

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
@@ -7,7 +8,17 @@ import net.minecraft.client.gui.GuiNewChat;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.util.IChatComponent;
 
-/** Resolves a clicked wrapped line back to its full channel message. */
+/**
+ * Resolves a clicked wrapped line back to the message it belongs to.
+ *
+ * <p>A message is copied as it was <em>said</em>, not as it is drawn:
+ * the words alone, without the timestamp, the channel prefix, the
+ * sender or the chevron the chat opens a body with. The client already
+ * keeps the packet each line was built from, so that is what is read
+ * first; a line with no packet behind it — an NPC's speech, a stray
+ * line adopted from vanilla's own chat — falls back to the text its
+ * sender marker carries, and then to the drawn rows themselves.</p>
+ */
 final class LostTalesChatClipboard {
     private LostTalesChatClipboard() {}
 
@@ -71,7 +82,7 @@ final class LostTalesChatClipboard {
         }
         String text = resolveChannelMessage(lines, index);
         if (text.length() == 0) {
-            text = plainText(lines.get(index).func_151461_a()).trim();
+            text = wordsOfMessage(lines, index);
         }
         return text;
     }
@@ -80,6 +91,10 @@ final class LostTalesChatClipboard {
                                                 int clickedIndex) {
         int counter = lines.get(clickedIndex).getUpdatedCounter();
         int chatLineId = lines.get(clickedIndex).getChatLineID();
+        String remembered = rememberedMessage(chatLineId);
+        if (remembered.length() > 0) {
+            return remembered;
+        }
         ChatHeadMarker.Data direct = findMarker(
                 lines.get(clickedIndex).func_151461_a());
         if (direct != null && direct.copyText.length() > 0) {
@@ -113,6 +128,20 @@ final class LostTalesChatClipboard {
         return "";
     }
 
+    /**
+     * The message the packet behind this line was sent with, empty when
+     * the client keeps no packet for it. This is the message itself
+     * rather than a reading of what was drawn, so a grouped
+     * continuation — which carries no sender marker of its own — copies
+     * exactly what an ungrouped one does, emoji shortcodes and all.
+     */
+    private static String rememberedMessage(int chatLineId) {
+        ClientChatMessages.Remembered remembered =
+                ClientChatMessages.get(
+                        ClientChatMessageIds.messageIdOf(chatLineId));
+        return remembered == null ? "" : remembered.packet.getMessage();
+    }
+
     private static boolean sameMessage(ChatLine line, int chatLineId,
                                        int updateCounter) {
         return line != null && (chatLineId != 0
@@ -131,11 +160,63 @@ final class LostTalesChatClipboard {
         return null;
     }
 
-    private static String plainText(IChatComponent line) {
+    /**
+     * The words of every row of the message at {@code index}, top row
+     * first: what a message with no head marker to answer for it — a
+     * grouped continuation — is read back as. A message's rows are
+     * contiguous in the list and its own last row comes first there, so
+     * the run is walked from its far end back to this one.
+     */
+    private static String wordsOfMessage(List<ChatLine> lines, int index) {
+        int counter = lines.get(index).getUpdatedCounter();
+        int chatLineId = lines.get(index).getChatLineID();
+        int top = index;
+        while (top + 1 < lines.size()
+                && sameMessage(lines.get(top + 1), chatLineId, counter)) {
+            top++;
+        }
+        StringBuilder text = new StringBuilder();
+        for (int row = top; row >= 0; row--) {
+            if (!sameMessage(lines.get(row), chatLineId, counter)) {
+                break;
+            }
+            String words = words(lines.get(row).func_151461_a()).trim();
+            if (words.length() == 0) {
+                continue;
+            }
+            if (text.length() > 0) {
+                // The space a line break dropped, put back.
+                text.append(' ');
+            }
+            text.append(words);
+        }
+        return text.toString();
+    }
+
+    /**
+     * A row's own words: everything the chat itself puts around a
+     * message — the channel prefix, the timestamp, the chevron a body
+     * opens with — is left out, and an emoji is read back as the
+     * shortcode it was typed as rather than as the blank slot its
+     * sprite is drawn into.
+     */
+    private static String words(IChatComponent line) {
         StringBuilder text = new StringBuilder();
         for (Object value : line) {
-            text.append(((IChatComponent)value)
-                    .getUnformattedTextForChat());
+            IChatComponent part = (IChatComponent)value;
+            if (ChatPrefixMarker.isMarker(part)
+                    || ChatBodyMarker.isMarker(part)) {
+                continue;
+            }
+            ChatEmoji emoji = ChatEmojiMarker.decode(part);
+            if (emoji != null) {
+                if (ChatEmojiMarker.reservesFullSlot(
+                        part.getUnformattedTextForChat())) {
+                    text.append(':').append(emoji.getName()).append(':');
+                }
+                continue;
+            }
+            text.append(part.getUnformattedTextForChat());
         }
         return text.toString();
     }

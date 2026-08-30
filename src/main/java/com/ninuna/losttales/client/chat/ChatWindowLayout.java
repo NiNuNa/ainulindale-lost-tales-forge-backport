@@ -27,8 +27,10 @@ import java.util.Set;
  * receiving, keeps its history and unread counts, and keeps its
  * preferences. Every
  * window is equal: one that loses its last tab disappears, and the
- * last open tab of all can never be closed, so there is always
- * somewhere to type. The default layout is a console window (Console,
+ * layout with no windows left at all is a valid state — the chat is
+ * simply not shown, every channel keeps receiving, and the screen's
+ * empty state offers them back. Nothing is ever kept open to stand in
+ * for one. The default layout is a console window (Console,
  * Admin) in the top-left corner and a conversation window with every
  * other channel in the bottom-left corner. A window dropped against
  * another's top or bottom edge <em>links</em> to it and from then on
@@ -53,6 +55,15 @@ public final class ChatWindowLayout {
     public static final int MAX_WINDOWS = 8;
     /** Fewest message lines a window may be resized to. */
     public static final int MIN_WINDOW_LINES = 1;
+    /**
+     * The height a window is given when its size is reset: whole lines,
+     * so the topmost row is never a clipped one, and enough of them to
+     * read a conversation back without scrolling. The width is not reset
+     * to a number of its own; a window without one follows the game's
+     * chat-width setting, which is the player's own answer to how wide
+     * the chat should be.
+     */
+    public static final int DEFAULT_WINDOW_LINES = 10;
     /** Most message lines a window may be resized to. */
     public static final int MAX_WINDOW_LINES = 64;
     /**
@@ -209,7 +220,7 @@ public final class ChatWindowLayout {
         }
     }
 
-    /** Windows in order. Live, read-only view; never empty. */
+    /** Windows in order, empty when every one has been closed. */
     public static synchronized List<ChatWindow> windows() {
         return WINDOWS_VIEW;
     }
@@ -251,9 +262,14 @@ public final class ChatWindowLayout {
         }
     }
 
-    /** The first window: where restored and unplaced channels land. */
+    /** Whether no window is left; a valid state, not an error. */
+    public static synchronized boolean isEmpty() {
+        return WINDOWS.isEmpty();
+    }
+
+    /** The first window, or null once every one has been closed. */
     public static synchronized ChatWindow firstWindow() {
-        return WINDOWS.get(0);
+        return isEmpty() ? null : WINDOWS.get(0);
     }
 
     public static synchronized ChatWindow window(String id) {
@@ -433,7 +449,7 @@ public final class ChatWindowLayout {
         return result;
     }
 
-    /** Open tabs across every window; never below one. */
+    /** Open tabs across every window; zero once they are all closed. */
     public static synchronized int openTabCount() {
         int count = 0;
         for (int index = 0; index < WINDOWS.size(); index++) {
@@ -443,15 +459,15 @@ public final class ChatWindowLayout {
     }
 
     /**
-     * Whether {@link #close} would remove the tab: it is open, not the
-     * last open tab of all, and its window is unlocked. A locked window
-     * keeps the tabs it has — that is what locking it is for — so no
-     * cross is offered on its row and no shortcut closes one either.
+     * Whether {@link #close} would remove the tab: it is open and its
+     * window is unlocked. A locked window keeps the tabs it has — that
+     * is what locking it is for — so no cross is offered on its row and
+     * no shortcut closes one either. Nothing else is refused: the last
+     * tab of the last window closes like any other.
      */
     public static synchronized boolean isClosable(ChatTab tab) {
         ChatWindow window = windowOf(tab);
-        return isOpen(tab) && openTabCount() > 1
-                && window != null && !window.isLocked();
+        return window != null && !window.isLocked();
     }
 
     public static synchronized boolean isClosable(ChatChannel channel) {
@@ -460,9 +476,9 @@ public final class ChatWindowLayout {
 
     /**
      * Removes the tab from its window; a window emptied this way is
-     * dropped. The last open tab of all is refused, so the layout never
-     * reaches zero open tabs. Muting is untouched: a closed tab keeps
-     * its setting for when it is restored.
+     * dropped, and the layout may end up with no windows at all.
+     * Muting is untouched: a closed tab keeps its setting for when it
+     * is restored.
      */
     public static synchronized boolean close(ChatTab tab) {
         if (!isClosable(tab)) {
@@ -478,6 +494,25 @@ public final class ChatWindowLayout {
     }
 
     /**
+     * Closes a whole window: every tab it holds leaves it and the window
+     * itself goes, windows stuck to it letting go. The channels behind
+     * the tabs are untouched — they keep receiving, keep their history
+     * and keep their preferences — and closing the last window is
+     * allowed. A locked window is refused, as its individual tabs are.
+     */
+    public static synchronized boolean closeWindow(String windowId) {
+        ChatWindow window = window(windowId);
+        if (window == null || window.isLocked()) {
+            return false;
+        }
+        window.tabs().clear();
+        window.setActiveTab(null);
+        dropWindow(window);
+        changed();
+        return true;
+    }
+
+    /**
      * Reopens a closed channel as the last tab of a window that will
      * have it: an unlocked one, or a new one when every window is
      * locked.
@@ -489,7 +524,8 @@ public final class ChatWindowLayout {
         if (tab == null || channel == ChatChannel.WHISPER || isOpen(tab)) {
             return false;
         }
-        return restore(channel, receivingWindow().getId());
+        ChatWindow window = receivingWindow();
+        return window != null && restore(channel, window.getId());
     }
 
     /**
@@ -498,8 +534,16 @@ public final class ChatWindowLayout {
      * or a new one when every window is locked and the layout has room
      * for another. With no room left the first window takes it anyway,
      * since losing the message would be worse than crossing a lock.
+     *
+     * <p>Null once every window has been closed: a message never opens
+     * the chat back up by itself. Its channel still receives it, counts
+     * it unread and shows it in the closed-chat feed; the player decides
+     * when a window comes back.</p>
      */
     static synchronized ChatWindow receivingWindow() {
+        if (isEmpty()) {
+            return null;
+        }
         // A window already ellipsizing its tab names is full: the first
         // unlocked one with whole names takes the tab, and when every
         // unlocked window is crowded a new window opens instead of
@@ -593,6 +637,11 @@ public final class ChatWindowLayout {
             // room, or in a new one of its own.
             window = receivingWindow();
         }
+        if (window == null) {
+            // No window left to open it in; the tab stays closed and its
+            // channel keeps receiving.
+            return null;
+        }
         window.tabs().add(tab);
         if (window.getActiveTab() == null) {
             window.setActiveTab(tab);
@@ -602,38 +651,128 @@ public final class ChatWindowLayout {
     }
 
     /**
-     * Moves a tab to {@code index} of the target window (clamped), which
-     * may be its own window — a reorder — or another one — a dock. A
+     * Opens a tab in a window of its own, placed clear of the others:
+     * how a channel comes back when no window is left to put it in, and
+     * what the screen's empty state offers. Refused for a tab that is
+     * already open and once {@link #MAX_WINDOWS} exist.
+     */
+    public static synchronized ChatTab openInNewWindow(ChatTab tab) {
+        if (tab == null || isOpen(tab) || WINDOWS.size() >= MAX_WINDOWS) {
+            return null;
+        }
+        ChatWindow created = newWindow();
+        placeClearOfOthers(created);
+        created.tabs().add(tab);
+        created.setActiveTab(tab);
+        WINDOWS.add(created);
+        changed();
+        return tab;
+    }
+
+    /**
+     * Moves a tab to {@code index} of the target window: the place it
+     * ends up at once the move is done, clamped to the row, in a window
+     * that may be its own — a reorder — or another one — a dock. A
      * locked source or target refuses. A source emptied by the move
      * disappears.
      */
     public static synchronized boolean moveTab(ChatTab tab,
                                                String targetWindowId,
                                                int index) {
-        ChatWindow source = windowOf(tab);
+        return moveTabs(Collections.singletonList(tab), targetWindowId,
+                index);
+    }
+
+    /**
+     * Moves a run of tabs to {@code index} of the target window, keeping
+     * their relative order — what dragging a group of marked tabs
+     * does. The index is the place the run ends up at once the tabs have
+     * been lifted out, so a non-contiguous selection lands as one run
+     * and a reorder is described by where the tabs go rather than by
+     * which neighbour they land beside. Every tab must be open in one
+     * and the same source window; a locked source or target refuses, and
+     * a source emptied by the move disappears.
+     */
+    public static synchronized boolean moveTabs(List<ChatTab> tabs,
+                                                String targetWindowId,
+                                                int index) {
+        return moveTabs(tabs, targetWindowId, index, true);
+    }
+
+    /**
+     * As above; {@code persist} is false while a drag is in progress, so
+     * a tab sliding along its row writes the file once, on release,
+     * rather than every time it passes a neighbour.
+     */
+    public static synchronized boolean moveTabs(List<ChatTab> tabs,
+                                                String targetWindowId,
+                                                int index, boolean persist) {
+        List<ChatTab> moved = sameWindowTabs(tabs);
         ChatWindow target = window(targetWindowId);
-        if (source == null || target == null || source.isLocked()
-                || target.isLocked()) {
+        if (moved.isEmpty() || target == null || target.isLocked()) {
             return false;
         }
+        ChatWindow source = windowOf(moved.get(0));
+        if (source.isLocked()) {
+            return false;
+        }
+        ChatTab active = source.getActiveTab();
+        List<ChatTab> list = source.tabs();
         if (source == target) {
-            List<ChatTab> tabs = source.tabs();
-            int from = tabs.indexOf(tab);
-            int to = Math.max(0, Math.min(tabs.size() - 1, index));
-            if (from == to) {
+            List<ChatTab> reordered = new ArrayList<ChatTab>(list);
+            reordered.removeAll(moved);
+            reordered.addAll(Math.max(0,
+                    Math.min(reordered.size(), index)), moved);
+            if (reordered.equals(list)) {
+                // The tabs are already where the drop asked for them;
+                // nothing moved, so nothing is written.
                 return false;
             }
-            tabs.remove(from);
-            tabs.add(to, tab);
-            changed();
+            list.clear();
+            list.addAll(reordered);
+            source.setActiveTab(active);
+            if (persist) {
+                changed();
+            }
             return true;
         }
-        removeTab(source, tab);
+        list.removeAll(moved);
+        if (list.isEmpty()) {
+            dropWindow(source);
+        } else if (active != null && moved.contains(active)) {
+            source.setActiveTab(null);
+        }
         int to = Math.max(0, Math.min(target.tabs().size(), index));
-        target.tabs().add(to, tab);
-        target.setActiveTab(tab);
-        changed();
+        target.tabs().addAll(to, moved);
+        target.setActiveTab(moved.get(moved.size() - 1));
+        if (persist) {
+            changed();
+        }
         return true;
+    }
+
+    /**
+     * The given tabs in their window's own row order, or empty when any
+     * of them is closed or they do not all live in one window. The order
+     * is the window's, never the caller's, so a group keeps the order it
+     * was shown in however it came to be selected.
+     */
+    private static List<ChatTab> sameWindowTabs(List<ChatTab> tabs) {
+        List<ChatTab> result = new ArrayList<ChatTab>();
+        if (tabs == null || tabs.isEmpty()) {
+            return result;
+        }
+        ChatWindow window = windowOf(tabs.get(0));
+        if (window == null) {
+            return result;
+        }
+        for (ChatTab tab : window.tabs()) {
+            if (tabs.contains(tab)) {
+                result.add(tab);
+            }
+        }
+        return result.size() == new HashSet<ChatTab>(tabs).size()
+                ? result : new ArrayList<ChatTab>();
     }
 
     public static synchronized boolean moveTab(ChatChannel channel,
@@ -644,18 +783,31 @@ public final class ChatWindowLayout {
 
     /**
      * Takes the tab out of its window into a new window at the given
-     * percent position. A window's only tab dragged out just moves that
-     * window. Refused for a locked source and once {@link #MAX_WINDOWS}
-     * exist.
+     * percent position, as tall and as wide as the window it came from.
+     * A window's only tab dragged out just moves that window. Refused
+     * for a locked source and once {@link #MAX_WINDOWS} exist.
      */
     public static synchronized ChatWindow detach(ChatTab tab,
                                                  double offsetX,
                                                  double offsetY) {
-        ChatWindow source = windowOf(tab);
-        if (source == null || source.isLocked()) {
+        return detach(Collections.singletonList(tab), offsetX, offsetY);
+    }
+
+    /** As above for a group of tabs, which keep their relative order. */
+    public static synchronized ChatWindow detach(List<ChatTab> tabs,
+                                                 double offsetX,
+                                                 double offsetY) {
+        List<ChatTab> moved = sameWindowTabs(tabs);
+        if (moved.isEmpty()) {
             return null;
         }
-        if (source.tabs().size() == 1) {
+        ChatWindow source = windowOf(moved.get(0));
+        if (source.isLocked()) {
+            return null;
+        }
+        if (source.tabs().size() == moved.size()) {
+            // Everything the window held: the window itself moves,
+            // rather than an empty one being left behind.
             source.setOffsets(clampPercent(offsetX), clampPercent(offsetY));
             changed();
             return source;
@@ -663,10 +815,19 @@ public final class ChatWindowLayout {
         if (WINDOWS.size() >= MAX_WINDOWS) {
             return null;
         }
-        removeTab(source, tab);
+        ChatTab active = source.getActiveTab();
+        source.tabs().removeAll(moved);
+        if (active != null && moved.contains(active)) {
+            source.setActiveTab(null);
+        }
         ChatWindow window = newWindow();
-        window.tabs().add(tab);
-        window.setActiveTab(tab);
+        // The size the player gave the window the tabs came out of, so
+        // a tab taken out of a tall window is read in a window as tall,
+        // rather than in whatever the game's own chat settings say.
+        window.setMaxLines(source.getMaxLines());
+        window.setWidth(source.getWidth());
+        window.tabs().addAll(moved);
+        window.setActiveTab(moved.get(moved.size() - 1));
         window.setOffsets(clampPercent(offsetX), clampPercent(offsetY));
         WINDOWS.add(window);
         changed();
@@ -871,7 +1032,7 @@ public final class ChatWindowLayout {
     /**
      * Closes every whisper and NPC tab: a conversation ends with the
      * session it was held in, and so does its tab. A window left empty
-     * goes; the very last window keeps the console instead.
+     * goes, the last one included.
      */
     public static synchronized void closeConversations() {
         boolean changed = false;
@@ -890,15 +1051,11 @@ public final class ChatWindowLayout {
                 }
             }
             if (window.tabs().isEmpty()) {
-                if (WINDOWS.size() > 1) {
-                    iterator.remove();
-                    for (ChatWindow other : WINDOWS) {
-                        if (window.getId().equals(other.getLinkTarget())) {
-                            other.setLink(null, false);
-                        }
+                iterator.remove();
+                for (ChatWindow other : WINDOWS) {
+                    if (window.getId().equals(other.getLinkTarget())) {
+                        other.setLink(null, false);
                     }
-                } else {
-                    window.tabs().add(ChatTab.of(ChatChannel.CONSOLE));
                 }
             }
             if (window.getActiveTab() == null
@@ -919,8 +1076,9 @@ public final class ChatWindowLayout {
      * channel that is neither placed nor listed as closed is appended to
      * the first window so a channel added after the file was written is
      * never silently lost. A file from before every window was equal
-     * names one {@code main}; it becomes an ordinary window. With nothing
-     * usable, the default layout is used. The listener is not notified;
+     * names one {@code main}; it becomes an ordinary window. A file that
+     * names no window and closes every channel describes the empty
+     * layout and is loaded as one. The listener is not notified;
      * the caller decides whether a repaired layout is written back.
      */
     static synchronized void load(List<WindowSpec> specs,
@@ -1010,10 +1168,10 @@ public final class ChatWindowLayout {
             }
         }
         if (WINDOWS.isEmpty()) {
-            if (unplaced.isEmpty()) {
-                // Every channel closed is not a usable layout.
-                reset();
-            } else {
+            if (!unplaced.isEmpty()) {
+                // Channels the file placed nowhere and did not close
+                // need somewhere to live, so one window opens for them.
+                // Everything closed needs no window at all.
                 ChatWindow window = newWindow();
                 window.tabs().addAll(unplaced);
                 ChatTab global = ChatTab.of(ChatChannel.ALL);
@@ -1085,9 +1243,12 @@ public final class ChatWindowLayout {
      * itself knows.
      */
     private static void placeClearOfOthers(ChatWindow created) {
-        double wantedX = firstWindow().getOffsetX();
-        double wantedY = clampPercent(
-                firstWindow().getOffsetY() + NEW_WINDOW_DROP);
+        ChatWindow first = firstWindow();
+        // With no window to keep clear of, the first one lands where the
+        // default layout puts its conversation window.
+        double wantedX = first == null ? 0.0D : first.getOffsetX();
+        double wantedY = first == null ? 100.0D
+                : clampPercent(first.getOffsetY() + NEW_WINDOW_DROP);
         if (placeByBoxes(created, wantedX, wantedY)) {
             return;
         }
@@ -1214,19 +1375,24 @@ public final class ChatWindowLayout {
     private static void removeTab(ChatWindow window, ChatTab tab) {
         window.tabs().remove(tab);
         if (window.tabs().isEmpty()) {
-            Iterator<ChatWindow> iterator = WINDOWS.iterator();
-            while (iterator.hasNext()) {
-                ChatWindow other = iterator.next();
-                if (other == window) {
-                    iterator.remove();
-                } else if (window.getId().equals(other.getLinkTarget())) {
-                    other.setLink(null, false);
-                }
-            }
+            dropWindow(window);
             return;
         }
         if (tab.equals(window.getActiveTab())) {
             window.setActiveTab(null);
+        }
+    }
+
+    /** Takes an emptied window out of the layout; its holders let go. */
+    private static void dropWindow(ChatWindow window) {
+        Iterator<ChatWindow> iterator = WINDOWS.iterator();
+        while (iterator.hasNext()) {
+            ChatWindow other = iterator.next();
+            if (other == window) {
+                iterator.remove();
+            } else if (window.getId().equals(other.getLinkTarget())) {
+                other.setLink(null, false);
+            }
         }
     }
 

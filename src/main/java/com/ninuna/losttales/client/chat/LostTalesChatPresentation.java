@@ -99,26 +99,18 @@ public final class LostTalesChatPresentation {
                 && isLocalPlayerMentioned(minecraft, packet.getMessage());
         // A whisper lands in the tab of its conversation, opened on the
         // first message in the window the player is typing in; a plain
-        // channel the player closed reopens the same way. A hidden tab
-        // stays closed: its lines are still filed and counted unread,
-        // and the tab shows them all once it is restored.
-        ChatTab tab;
-        if (channel == ChatChannel.WHISPER) {
-            ChatTab conversation = ChatTab.whisper(packet.getPartner(),
-                    packet.getPartnerIdentity());
-            tab = conversation != null
-                    && !ChatWindowLayout.isOpen(conversation)
-                    && ChatWindowLayout.isHidden(conversation)
-                    ? conversation
-                    : ChatWindowLayout.openWhisper(packet.getPartner(),
-                            packet.getPartnerIdentity(),
-                            windowIdOfSelection());
-        } else {
-            tab = ChatTab.of(channel);
-            if (tab != null && !ChatWindowLayout.isOpen(tab)
-                    && !ChatWindowLayout.isHidden(tab)) {
-                ChatWindowLayout.openTab(tab, windowIdOfSelection());
-            }
+        // channel the player closed reopens the same way. A tab that is
+        // hidden, or that has no window left to open in, stays closed:
+        // its lines are still filed and counted unread, they still show
+        // in the closed-chat feed, and the tab shows them all once it is
+        // opened again.
+        ChatTab tab = channel == ChatChannel.WHISPER
+                ? ChatTab.whisper(packet.getPartner(),
+                        packet.getPartnerIdentity())
+                : ChatTab.of(channel);
+        if (tab != null && !ChatWindowLayout.isOpen(tab)
+                && !ChatWindowLayout.isHidden(tab)) {
+            ChatWindowLayout.openTab(tab, windowIdOfSelection());
         }
         if (tab == null) {
             return;
@@ -718,8 +710,8 @@ public final class LostTalesChatPresentation {
      * As above; a <em>grouped</em> line continues its sender's run and
      * drops the repeated header — the channel prefix, tags, brackets,
      * head, name and title — keeping only the timestamp and the body,
-     * which starts on the anchor exactly where a wrapped continuation
-     * line starts, so a run reads as one voice speaking in paragraphs.
+     * which starts behind the same chevron the run's first body row
+     * does, so a run reads as one voice speaking in paragraphs.
      * The prefix goes with the rest: in the closed feed the run's
      * header line already named the channel, so its continuations do
      * not say it again.
@@ -733,6 +725,8 @@ public final class LostTalesChatPresentation {
         if (grouped) {
             appendTimestamp(root, packet.getTimestampMillis());
             root.appendSibling(ChatLayoutMarker.anchor());
+            root.appendSibling(ChatLayoutMarker.bodyBreak(
+                    packet.getNameColor()));
             appendMessageBody(root, packet.getMessage(), showcaseIds,
                     channel);
             return root;
@@ -833,6 +827,9 @@ public final class LostTalesChatPresentation {
                 ChatInlineIcons.NAME_GAP - 1));
         root.appendSibling(reply(text("> ", nearestFormatting(
                 packet.getNameColor()), false), whisper));
+        // The header ends here; the body stands on the next row.
+        root.appendSibling(ChatLayoutMarker.bodyBreak(
+                packet.getNameColor()));
         appendMessageBody(root, packet.getMessage(), showcaseIds,
                 channel);
         return root;
@@ -1332,6 +1329,7 @@ public final class LostTalesChatPresentation {
             // the header, so the feed's run names its channel once.
             appendTimestamp(root, timestampMillis);
             root.appendSibling(ChatLayoutMarker.anchor());
+            root.appendSibling(ChatLayoutMarker.bodyBreak(nameColor));
             appendMessageBody(root, ChatMentions.mentionNames(message,
                             localMentionNames(Minecraft.getMinecraft())),
                     NO_SHOWCASES, ChatChannel.WHISPER);
@@ -1359,6 +1357,7 @@ public final class LostTalesChatPresentation {
         root.appendSibling(ChatColorMarker.apply(
                 text("> ", nearestFormatting(nameColor), false),
                 nameColor));
+        root.appendSibling(ChatLayoutMarker.bodyBreak(nameColor));
         // The player's bare name in the speech is shown as the mention
         // it is; the head marker above keeps the words as spoken, so a
         // copy is untouched.

@@ -30,6 +30,9 @@ import org.lwjgl.opengl.GL11;
  * live screen size, so GUI scale and resolution changes are handled.
  */
 abstract class ChatPickerPanel {
+    /** How far the button has crossed to its hovered artwork, and when. */
+    private float buttonFade;
+    private long buttonFadeNanos;
     static final int BUTTON_SIZE = 12;
     static final int BUTTON_MARGIN = 2;
     /** The buttons stand this far below the anchor the caller passes. */
@@ -237,9 +240,17 @@ abstract class ChatPickerPanel {
         int top = buttonTop(screenHeight);
         boolean lifted = this.targetOpen || isInsideButton(mouseX, mouseY,
                 anchorRight, screenHeight);
+        long now = System.nanoTime();
+        double elapsed = this.buttonFadeNanos == 0L ? 0.0D
+                : (now - this.buttonFadeNanos) / 1.0E9D;
+        this.buttonFadeNanos = now;
+        this.buttonFade = LostTalesChatVisualStyle.hoverFade(this.buttonFade,
+                lifted, elapsed);
         // A bare icon with the shared shadow; hover and open states lift it
-        // a pixel rather than painting a backdrop.
-        drawButtonIcon(minecraft, left, top - (lifted ? 1 : 0), lifted);
+        // a pixel rather than painting a backdrop, and the icon crosses to
+        // its lit artwork rather than swapping to it.
+        drawButtonIcon(minecraft, left, top - (lifted ? 1 : 0),
+                this.buttonFade);
         regions.add(left, top, left + BUTTON_SIZE, top + BUTTON_SIZE);
     }
 
@@ -562,8 +573,13 @@ abstract class ChatPickerPanel {
     abstract String insertionText(Entry entry);
 
     /** The button's icon; {@code lifted} while hovered or open. */
+    /**
+     * The button's own glyph. {@code lit} is how far it has crossed to
+     * its hovered artwork, 0 at rest and 1 under the pointer; a button
+     * whose glyph has only one state ignores it.
+     */
     abstract void drawButtonIcon(Minecraft minecraft, int left, int top,
-                                 boolean lifted);
+                                 float lit);
 
     static final class Section {
         final String label;

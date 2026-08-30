@@ -76,7 +76,10 @@ enum ChatIconSheet {
      * cell in both directions, so whole cells meet seamlessly wherever
      * the region is tiled with them.
      */
-    EMPTY_HATCH(0, 26, 16, 16);
+    EMPTY_HATCH(0, 26, 16, 16),
+    /** The chevron a control opens a list below itself with. */
+    CHEVRON_DOWN(0, 43, 5, 3),
+    CHEVRON_DOWN_HOVER(6, 43, 5, 3);
 
     static final String TEXTURE_PATH = "textures/gui/chat.png";
     static final int SHEET_WIDTH = 97;
@@ -118,6 +121,24 @@ enum ChatIconSheet {
             draw(x, y, alpha);
         } finally {
             LostTalesSilhouetteRenderState.end();
+        }
+    }
+
+    /**
+     * A control that has both a resting and a hovered artwork, drawn a
+     * share of the way from one to the other: the resting sprite whole,
+     * with the hovered one laid over it as far as it has come. One
+     * shadow, from the resting sprite, since the two are the same shape
+     * and a second would darken it twice.
+     */
+    static void drawPairWithShadow(ChatIconSheet resting,
+                                   ChatIconSheet hovered, float progress,
+                                   int x, int y, int alpha) {
+        resting.drawWithShadow(x, y, alpha);
+        int over = Math.round(alpha * Math.max(0.0F, Math.min(1.0F,
+                progress)));
+        if (over >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+            hovered.draw(x, y, over);
         }
     }
 

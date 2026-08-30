@@ -228,7 +228,7 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
 
     @Override
     void drawButtonIcon(Minecraft minecraft, int left, int top,
-                        boolean lifted) {
+                        float lit) {
         ChatInlineIcons.drawMarkerButton(minecraft, BUTTON_ICON,
                 LostTalesChatVisualStyle.IVORY, left, top, BUTTON_SIZE);
     }

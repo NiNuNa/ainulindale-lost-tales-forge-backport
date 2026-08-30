@@ -25,6 +25,31 @@ public final class ChatWindowLayoutStoreTest {
         ChatWindowLayout.reset();
     }
 
+    /**
+     * A layout with nothing open describes itself as one — no window
+     * lines, every channel closed — and comes back the same way rather
+     * than as the defaults.
+     */
+    @Test
+    public void theEmptyLayoutRoundTripsThroughLoad() {
+        for (ChatChannel channel : ChatChannel.presentationOrder()) {
+            ChatWindowLayout.close(channel);
+        }
+        ChatWindowLayout.setMuted(ChatChannel.OOC, true);
+        assertTrue(ChatWindowLayout.isEmpty());
+        List<String> described = ChatWindowLayoutStore.describe();
+        for (String line : described) {
+            assertFalse(line.startsWith("window "));
+        }
+        ChatWindowLayout.reset();
+        assertFalse(ChatWindowLayout.isEmpty());
+        ChatWindowLayoutStore.load(described);
+        assertTrue(ChatWindowLayout.isEmpty());
+        assertEquals(ChatChannel.presentationOrder().size(),
+                ChatWindowLayout.closedChannels().size());
+        assertTrue(ChatWindowLayout.isMuted(ChatChannel.OOC));
+    }
+
     @Test
     public void describeRoundTripsThroughLoad() {
         ChatWindowLayout.detach(ChatChannel.PARTY, 62.5D, 8.0D);

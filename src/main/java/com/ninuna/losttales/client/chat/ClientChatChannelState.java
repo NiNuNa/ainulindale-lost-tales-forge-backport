@@ -196,13 +196,12 @@ public final class ClientChatChannelState {
     }
 
     /**
-     * Whether the player may close the tab: the layout must keep one
-     * open tab, and the player must keep one they can actually see, so
-     * a tab hidden by availability (Admin without operator status) does
-     * not count as the remaining one.
+     * Whether the player may close the tab: it is open and its window is
+     * unlocked. Nothing is held back — the last tab of the last window
+     * closes like any other, and the screen shows its empty state.
      */
     public static synchronized boolean isClosable(ChatTab tab) {
-        return ChatWindowLayout.isClosable(tab) && getOpenTabs().size() > 1;
+        return ChatWindowLayout.isClosable(tab);
     }
 
     /**
@@ -221,6 +220,22 @@ public final class ClientChatChannelState {
     /** Whether the tab's history is readable and its tab shown. */
     public static synchronized boolean isAvailable(ChatTab tab) {
         return tab != null && isAvailable(tab.getChannel());
+    }
+
+    /**
+     * Whether any window has a tab the player can currently see. The one
+     * question the chat screen asks to tell its two states apart: with
+     * windows it draws them and takes input for the selected tab, and
+     * without it shows its empty state. Channels exist either way.
+     */
+    public static synchronized boolean hasVisibleWindow() {
+        List<ChatWindow> windows = ChatWindowLayout.windows();
+        for (int index = 0; index < windows.size(); index++) {
+            if (isVisible(windows.get(index))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

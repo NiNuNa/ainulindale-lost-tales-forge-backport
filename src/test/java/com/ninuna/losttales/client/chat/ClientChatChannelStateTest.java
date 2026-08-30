@@ -134,13 +134,14 @@ public final class ClientChatChannelStateTest {
     }
 
     /**
-     * The player keeps one tab they can see: without operator status
-     * the Admin tab is hidden, so with only Global and Admin open,
-     * Global is the last visible tab and cannot be closed even though
-     * the layout alone would allow it.
+     * Every tab the player can see closes, the last one included, and
+     * the state that leaves — no visible window at all — is a state the
+     * chat reports rather than one it prevents. Without operator status
+     * the Admin tab is hidden, so a window holding only Admin is a
+     * window with nothing to show.
      */
     @Test
-    public void theLastVisibleTabCannotBeClosedEvenWhenHiddenTabsRemain() {
+    public void everyVisibleTabClosesAndTheEmptyStateIsReported() {
         for (ChatChannel channel : ChatChannel.presentationOrder()) {
             if (channel != ChatChannel.ALL && channel != ChatChannel.ADMIN) {
                 assertTrue(ClientChatChannelState.close(ChatTab.of(channel)));
@@ -149,19 +150,18 @@ public final class ClientChatChannelStateTest {
         assertEquals(2, ChatWindowLayout.openTabCount());
         assertEquals(Collections.singletonList(ChatChannel.ALL),
                 ClientChatChannelState.getOpenChannels());
-        assertTrue(ChatWindowLayout.isClosable(ChatChannel.ALL));
-        assertFalse(ClientChatChannelState.isClosable(ChatTab.of(ChatChannel.ALL)));
-        assertFalse(ClientChatChannelState.close(ChatTab.of(ChatChannel.ALL)));
-        assertTrue(ChatWindowLayout.isOpen(ChatChannel.ALL));
-        // Closing the selected tab moves the selection to what is left.
-        ChatWindowLayout.restore(ChatChannel.OOC);
+        assertTrue(ClientChatChannelState.isClosable(ChatTab.of(ChatChannel.ALL)));
+        assertTrue(ClientChatChannelState.close(ChatTab.of(ChatChannel.ALL)));
+        assertFalse(ChatWindowLayout.isOpen(ChatChannel.ALL));
+        assertFalse(ClientChatChannelState.hasVisibleWindow());
+        // Reopening one makes the chat visible again, and closing the
+        // selected tab moves the selection to what is left.
+        assertTrue(ChatWindowLayout.restore(ChatChannel.ALL));
+        assertTrue(ChatWindowLayout.restore(ChatChannel.OOC));
+        assertTrue(ClientChatChannelState.hasVisibleWindow());
         ClientChatChannelState.select(ChatChannel.OOC);
-        assertTrue(ClientChatChannelState.isClosable(ChatTab.of(ChatChannel.OOC)));
         assertTrue(ClientChatChannelState.close(ChatTab.of(ChatChannel.OOC)));
         assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
-        // With operator status Admin is a tab the player could keep.
-        ClientChatChannelState.setAdminAccess(true);
-        assertTrue(ClientChatChannelState.isClosable(ChatTab.of(ChatChannel.ALL)));
     }
 
     /**

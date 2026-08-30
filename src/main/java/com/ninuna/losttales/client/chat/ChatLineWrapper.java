@@ -7,17 +7,30 @@ import net.minecraft.util.IChatComponent;
 
 /**
  * Line layout for Lost Tales chat messages, replacing vanilla's wrapping
- * for them. A message is a header (channel, timestamp) followed by the
- * sender and body; the wrapper measures the header up to the
- * {@link ChatLayoutMarker#anchor() anchor marker}, lays the rest out
- * against the remaining width, and opens every continuation line with an
- * {@link ChatLayoutMarker#indent indent marker} of the header's width, so
- * wrapped text lines up under the sender's opening bracket:
+ * for them. A message is a header (channel, timestamp, then the sender)
+ * followed by its body, and the two stand on rows of their own: the
+ * wrapper measures the header up to the
+ * {@link ChatLayoutMarker#anchor() anchor marker}, lays the sender out
+ * against the remaining width, and opens the body on the next row at
+ * the left edge behind a chevron in the sender's colour
+ * ({@link ChatBodyMarker}). Every continuation line of the body opens
+ * with an {@link ChatLayoutMarker#indent indent marker} of the
+ * chevron's width, so a wrapped body reads as one block beside it:
  *
  * <pre>
- * [12:34] &lt;Aragorn&gt; This is a long message that
- *         continues under the sender
+ * [12:34] &lt;Aragorn&gt;
+ * &gt; This is a long message that
+ *   continues beside the chevron
  * </pre>
+ *
+ * <p>The rows are one message: they share a chat line id, so identity,
+ * grouping, hover, scrolling and removal all still see a single
+ * message. A grouped continuation carries no sender at all and so has
+ * no header row; its body starts on the row it is already on, behind
+ * the same chevron, and the run stays aligned. The chevron is the
+ * chat's own punctuation rather than the sender's words: it is added
+ * here, so the stored message never holds it and copying a line copies
+ * what was said.</p>
  *
  * <p>Widths come from the same measure the renderer draws with (the
  * component's style formatting code plus its text), so inline formatting
@@ -40,6 +53,13 @@ import net.minecraft.util.IChatComponent;
 final class ChatLineWrapper {
     /** Room the body must have on a line before it is worth starting there. */
     static final int MIN_BODY_WIDTH = 40;
+    /**
+     * What a message body opens with: the chat's chevron and one space,
+     * drawn in the sender's colour. Its measured width is also the inset
+     * every continuation line of that body takes, so a wrapped body
+     * lines up beside the chevron rather than under it.
+     */
+    static final String BODY_SEPARATOR = "> ";
     /** A very long prefix indents continuation lines by at most this share. */
     static final float MAX_INDENT_RATIO = 0.5F;
     private static final char FORMATTING_ESCAPE = 167;
@@ -151,7 +171,11 @@ final class ChatLineWrapper {
         }
         for (int index = bodyIndex + 1; index < parts.size(); index++) {
             IChatComponent part = parts.get(index);
-            if (isAtomic(part)) {
+            if (ChatLayoutMarker.isBodyBreak(part)) {
+                int senderColor = ChatLayoutMarker.bodyColor(part);
+                builder.beginBody(senderColor < 0 ? nameColor
+                        : senderColor);
+            } else if (isAtomic(part)) {
                 builder.appendAtomic(part);
             } else {
                 builder.appendText(part);
@@ -286,10 +310,16 @@ final class ChatLineWrapper {
     private static final class Builder {
         private final TextMetrics metrics;
         private final int width;
-        private final int closedIndent;
-        private final int openIndent;
+        /**
+         * Inset every continuation line of the run being laid out opens
+         * with, in each of the two states. The header's own
+         * continuations align under the header; from the body break on,
+         * both are {@link #BODY_INDENT}.
+         */
+        private int closedIndent;
+        private int openIndent;
         /** The one of the two this layout reserves on every line. */
-        private final int indent;
+        private int indent;
         /** The sender's colours, carried onto every continuation line. */
         private final int nameColor;
         private final int titleColor;
@@ -314,6 +344,32 @@ final class ChatLineWrapper {
             this.indent = chatOpen ? openIndent : closedIndent;
             this.nameColor = nameColor;
             this.titleColor = titleColor;
+        }
+
+        /**
+         * Ends the header and opens the message body at the left edge,
+         * behind the chevron. A header that drew nothing — a grouped
+         * continuation, whose runs are all hidden in this state — keeps
+         * the row it is on, so the body of a run always begins in the
+         * same place. From here on every continuation line is inset by
+         * the chevron's width.
+         */
+        void beginBody(int senderColor) {
+            int separator = this.metrics.width(BODY_SEPARATOR);
+            this.closedIndent = separator;
+            this.openIndent = separator;
+            this.indent = separator;
+            if (this.used > 0) {
+                // The header's row is finished; the body opens the next
+                // one, at the edge rather than at an indent.
+                this.lines.add(this.current);
+                this.current = new ChatComponentText("");
+                this.firstLine = false;
+            }
+            this.used = 0;
+            place(ChatBodyMarker.separator(BODY_SEPARATOR, senderColor),
+                    separator);
+            this.lineStart = separator;
         }
 
         void place(IChatComponent piece, int pieceWidth) {

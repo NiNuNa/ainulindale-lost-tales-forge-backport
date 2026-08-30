@@ -118,11 +118,11 @@ final class ChatItemPicker extends ChatPickerPanel {
     }
 
     @Override
-    void drawButtonIcon(Minecraft minecraft, int left, int top,
-                        boolean lifted) {
-        ChatIconSheet icon = lifted
-                ? ChatIconSheet.ITEM_HOVER : ChatIconSheet.ITEM;
-        icon.drawWithShadow(left + (BUTTON_SIZE - icon.getWidth()) / 2,
-                top + (BUTTON_SIZE - icon.getHeight()) / 2, 255);
+    void drawButtonIcon(Minecraft minecraft, int left, int top, float lit) {
+        ChatIconSheet.drawPairWithShadow(ChatIconSheet.ITEM,
+                ChatIconSheet.ITEM_HOVER, lit,
+                left + (BUTTON_SIZE - ChatIconSheet.ITEM.getWidth()) / 2,
+                top + (BUTTON_SIZE - ChatIconSheet.ITEM.getHeight()) / 2,
+                255);
     }
 }
