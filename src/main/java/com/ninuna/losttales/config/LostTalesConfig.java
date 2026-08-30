@@ -116,6 +116,7 @@ public final class LostTalesConfig {
     public static boolean enableChatMessageGrouping = true;
     public static boolean enableChatBackgroundBlur = true;
     public static boolean enableNpcChatStyling = true;
+    public static boolean showChatSpeechBubbles = true;
     public static boolean enableChatPings = true;
     /** The chat's own mention cue, bundled with the mod. */
     static final String DEFAULT_CHAT_PING_SOUND = "losttales:chat.ping";
@@ -971,6 +972,12 @@ public final class LostTalesConfig {
                     CATEGORY_CLIENT,
                     enableNpcChatStyling,
                     "Show LOTR NPC speech through the Lost Tales chat style with head icons, timestamps, and channels."
+            );
+            showChatSpeechBubbles = config.getBoolean(
+                    "showChatSpeechBubbles",
+                    CATEGORY_CLIENT,
+                    showChatSpeechBubbles,
+                    "Show what a player says in character over their head, the way LOTR shows an NPC's speech. In-character channels only (Global, Proximity, Party, Faction); never OOC, whispers, the operator channel, the console or the Discord bridge."
             );
             enableChatAnimations = config.getBoolean(
                     "enableChatAnimations",

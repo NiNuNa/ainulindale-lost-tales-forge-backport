@@ -61,8 +61,7 @@ public final class ChatIconSheetTest {
         assertSameSize(ChatIconSheet.PLUS, ChatIconSheet.PLUS_HOVER);
         assertSameSize(ChatIconSheet.COG, ChatIconSheet.COG_HOVER);
         assertSameSize(ChatIconSheet.CLOSE, ChatIconSheet.CLOSE_HOVER);
-        assertSameSize(ChatIconSheet.UNLOCKED, ChatIconSheet.UNLOCKED_HOVER);
-        assertSameSize(ChatIconSheet.LOCKED, ChatIconSheet.LOCKED_HOVER);
+        assertSameSize(ChatIconSheet.ITEM, ChatIconSheet.ITEM_HOVER);
         assertSameSize(ChatIconSheet.GRIP, ChatIconSheet.GRIP_HOVER);
         assertSameSize(ChatIconSheet.HEART, ChatIconSheet.HEART_FAVORITE);
         assertSameSize(ChatIconSheet.TOGGLE_1, ChatIconSheet.TOGGLE_1_HOVER);
@@ -74,12 +73,38 @@ public final class ChatIconSheetTest {
         // centred on the control from either side.
         assertSameSize(ChatIconSheet.TOGGLE_1, ChatIconSheet.TOGGLE_5);
         assertSameSize(ChatIconSheet.TOGGLE_2, ChatIconSheet.TOGGLE_4);
-        // The tab controls share one square; the lock's body is the
-        // width of the locked sprite.
+        // The tab controls share one square.
         assertEquals(ChatIconSheet.CLOSE.getWidth(),
                 ChatIconSheet.COG.getWidth());
-        assertEquals(ChatIconSheet.LOCKED.getHeight(),
-                ChatIconSheet.UNLOCKED.getHeight());
+    }
+
+    /**
+     * A tab is built from a left and a right border piece with its
+     * interior filling the span between them, so the two must be the
+     * same size within a state, and the pieces of every state the same
+     * width — the layout reserves one border width per end. The
+     * selected pair is taller by the lift the row already makes room
+     * for.
+     */
+    @Test
+    public void tabBordersPairUpAcrossStates() {
+        assertSameSize(ChatIconSheet.TAB_LEFT, ChatIconSheet.TAB_RIGHT);
+        assertSameSize(ChatIconSheet.TAB_HOVER_LEFT,
+                ChatIconSheet.TAB_HOVER_RIGHT);
+        assertSameSize(ChatIconSheet.TAB_SELECTED_LEFT,
+                ChatIconSheet.TAB_SELECTED_RIGHT);
+        assertSameSize(ChatIconSheet.TAB_LEFT, ChatIconSheet.TAB_HOVER_LEFT);
+        assertEquals(ChatIconSheet.TAB_LEFT.getWidth(),
+                ChatIconSheet.TAB_SELECTED_LEFT.getWidth());
+        assertEquals(ChatChannelTabBar.LIFT,
+                ChatIconSheet.TAB_SELECTED_LEFT.getHeight()
+                        - ChatIconSheet.TAB_LEFT.getHeight());
+        // A tab draws its pieces whole and stands on the window's top
+        // rule, so the row is one row taller than the artwork; a
+        // re-export at another height moves the row with it.
+        assertEquals("A tab is its pieces whole, plus the rule they stand on",
+                ChatChannelTabBar.HEIGHT,
+                ChatIconSheet.TAB_LEFT.getHeight() + 1);
     }
 
     private static void assertSameSize(ChatIconSheet a, ChatIconSheet b) {

@@ -126,6 +126,8 @@ public final class LostTalesChatGui extends GuiChat {
     private static final int RESIZE_CORNER = 12;
     /** The send arrow is the rightmost bar control. */
     private static final int SEND_BUTTON_INDEX = 0;
+    /** Gap between the typing line's bubble and its words. */
+    private static final int TYPING_BUBBLE_GAP = 3;
     private static final float COUNTER_SCALE = 0.75F;
     private static final int COUNTER_RGB =
             LostTalesColors.rgb(LostTalesColors.SAND);
@@ -134,7 +136,10 @@ public final class LostTalesChatGui extends GuiChat {
     private static final int LINK_HIGHLIGHT_RGB =
             LostTalesColors.rgb(LostTalesColors.HONEY);
     /** The quiet mauve the reply line is named in. */
-    private static final int REPLY_CHIP_RGB = 0x9C807E;
+    /** The chat's asides — the reply chip, the typing line, the
+     *  timestamps — all wear this one quiet tone. */
+    private static final int REPLY_CHIP_RGB =
+            LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
     private static final String POPUP_MESSAGE = "message";
     private static final String POPUP_SETTINGS = "settings";
     private static final String POPUP_CHARACTERS = "characters";
@@ -549,9 +554,15 @@ public final class LostTalesChatGui extends GuiChat {
         int y = (int)Math.floor(frame.drawnBaseline())
                 + LostTalesChatOverlayRenderer.LINE_HEIGHT
                 - LostTalesChatOverlayRenderer.TEXT_OFFSET;
-        LostTalesChatVisualStyle.drawPlain(this.fontRendererObj,
-                "§o" + this.fontRendererObj.trimStringToWidth(text, room),
-                x, y, alpha);
+        // A bubble before the words, on the caps' own middle, and the
+        // line itself in the asides' tone rather than the message ivory.
+        ChatIconSheet bubble = ChatIconSheet.SPEECH_BUBBLE;
+        bubble.drawWithShadow(x, y + (7 - bubble.getHeight()) / 2, alpha);
+        int textX = x + bubble.getWidth() + TYPING_BUBBLE_GAP;
+        LostTalesChatVisualStyle.drawColored(this.fontRendererObj,
+                "§o" + this.fontRendererObj.trimStringToWidth(text,
+                        room - (textX - x)),
+                textX, y, REPLY_CHIP_RGB, alpha);
     }
 
     /**
@@ -5042,11 +5053,11 @@ public final class LostTalesChatGui extends GuiChat {
             }
         }
         if (ClientChatAppearances.isLocked()) {
-            ChatIconSheet.LOCKED.drawWithShadow(
+            ChatLockAnimation.drawShut(
                     left + ChatPickerPanel.BUTTON_SIZE
-                            - ChatIconSheet.LOCKED.getWidth(),
+                            - ChatLockAnimation.SHUT_WIDTH,
                     top + ChatPickerPanel.BUTTON_SIZE
-                            - ChatIconSheet.LOCKED.getHeight(), 255);
+                            - ChatLockAnimation.HEIGHT, 255);
         }
         if (hovered && !isDragging()) {
             this.hoverTip = StatCollector.translateToLocal(
@@ -5313,37 +5324,27 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
-     * A right-pointing arrow at the bar's right end, drawn from
-     * rectangles like the tab controls, lifted a pixel while hovered;
-     * dim while there is nothing to send.
+     * The sheet's send arrow, centred in the button square at the bar's
+     * right end and lifted a pixel while hovered; a flat mauve while
+     * there is nothing to send. The sheet holds one arrow, so hovering
+     * is told by the lift alone.
      */
     private void drawSendButton(int barRight, int mouseX, int mouseY) {
         int left = sendButtonLeft(barRight);
         int top = barControlTop();
         boolean hovered = isInsideSendButton(mouseX, mouseY, barRight);
         boolean ready = this.inputField.getText().trim().length() > 0;
+        int x = left + (ChatPickerPanel.BUTTON_SIZE
+                - ChatIconSheet.SEND.getWidth()) / 2;
+        int y = top + (ChatPickerPanel.BUTTON_SIZE
+                - ChatIconSheet.SEND.getHeight()) / 2 - (hovered ? 1 : 0);
         // Text and glyphs are always fully opaque; the arrow says
         // what it can do with its colour, not by fading out.
-        int alpha = 255;
-        int y = top + (hovered ? 0 : 1);
-        int x = left + 2;
-        int color = LostTalesChatVisualStyle.argb(
-                hovered || ready ? LostTalesChatVisualStyle.IVORY
-                        : LostTalesColors.rgb(LostTalesColors.MAUVE),
-                alpha);
-        int shadow = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.SHADOW,
-                LostTalesChatVisualStyle.shadowAlpha(alpha));
-        for (int pass = 0; pass < 2; pass++) {
-            int c = pass == 0 ? shadow : color;
-            int ox = x + (pass == 0 ? 1 : 0);
-            int oy = y + (pass == 0 ? 1 : 0);
-            // Shaft, then a head of three shrinking columns.
-            drawRect(ox, oy + 5, ox + 5, oy + 7, c);
-            drawRect(ox + 4, oy + 2, ox + 5, oy + 10, c);
-            drawRect(ox + 5, oy + 3, ox + 6, oy + 9, c);
-            drawRect(ox + 6, oy + 4, ox + 7, oy + 8, c);
-            drawRect(ox + 7, oy + 5, ox + 8, oy + 7, c);
+        if (hovered || ready) {
+            ChatIconSheet.SEND.drawWithShadow(x, y, 255);
+        } else {
+            ChatIconSheet.SEND.drawSilhouetteWithShadow(
+                    LostTalesColors.rgb(LostTalesColors.MAUVE), x, y, 255);
         }
         this.regions.add(left, top, left + ChatPickerPanel.BUTTON_SIZE,
                 top + ChatPickerPanel.BUTTON_SIZE);

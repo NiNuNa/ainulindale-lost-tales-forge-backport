@@ -99,18 +99,20 @@ public final class LostTalesGuiRegionBlur {
      */
     public void drawRegion(double left, double top, double right,
                            double bottom, float opacity) {
-        drawFadedRegion(left, top, right, bottom, Double.NaN, opacity);
+        drawFadedRegion(left, top, right, bottom, null, opacity);
     }
 
     /**
-     * As {@link #drawRegion}, but the blur thins out to the right the
-     * way the chat backdrop does: full left of {@code fadeStartX},
-     * nothing at the right edge. {@code NaN} fades nothing.
+     * As {@link #drawRegion}, but the blur thins out across the region
+     * the way the chat backdrop does. {@code fadeWeights} is that
+     * profile sampled evenly from the left edge to the right — one more
+     * entry than the steps it is drawn in — and {@code null} fades
+     * nothing.
      */
     public void drawFadedRegion(double left, double top, double right,
-                                double bottom, double fadeStartX,
+                                double bottom, float[] fadeWeights,
                                 float opacity) {
-        drawMapped(left, top, right, bottom, fadeStartX,
+        drawMapped(left, top, right, bottom, fadeWeights,
                 left, top, right, bottom, opacity);
     }
 
@@ -124,13 +126,13 @@ public final class LostTalesGuiRegionBlur {
      */
     public void drawFadedRegionInTransform(
             double localLeft, double localTop, double localRight,
-            double localBottom, double localFadeStartX, double screenLeft,
+            double localBottom, float[] fadeWeights, double screenLeft,
             double screenTop, double scale, float opacity) {
         if (scale <= 0.0D) {
             return;
         }
         drawMapped(localLeft, localTop, localRight, localBottom,
-                localFadeStartX,
+                fadeWeights,
                 screenLeft + (localLeft) * scale,
                 screenTop + (localTop) * scale,
                 screenLeft + (localRight) * scale,
@@ -140,7 +142,7 @@ public final class LostTalesGuiRegionBlur {
 
     private void drawMapped(double vertexLeft, double vertexTop,
                             double vertexRight, double vertexBottom,
-                            double fadeStartVertexX, double screenLeft,
+                            float[] fadeWeights, double screenLeft,
                             double screenTop, double screenRight,
                             double screenBottom, float opacity) {
         if (!isFresh() || this.blurredTexture < 0
@@ -157,12 +159,10 @@ public final class LostTalesGuiRegionBlur {
         double v1 = clamp01(1.0D - screenTop / this.guiHeight);
         int alpha = Math.max(0, Math.min(255,
                 (int)Math.round(255.0D * opacity)));
-        boolean faded = !Double.isNaN(fadeStartVertexX)
-                && fadeStartVertexX < vertexRight;
-        double solidRight = faded
-                ? Math.max(vertexLeft, fadeStartVertexX) : vertexRight;
-        double uSolid = u0 + (u1 - u0) * (solidRight - vertexLeft)
-                / (vertexRight - vertexLeft);
+        int steps = fadeWeights == null ? 1 : fadeWeights.length - 1;
+        if (steps < 1) {
+            return;
+        }
         GL11.glEnable(GL11.GL_TEXTURE_2D);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, this.blurredTexture);
         GL11.glEnable(GL11.GL_BLEND);
@@ -172,29 +172,27 @@ public final class LostTalesGuiRegionBlur {
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         Tessellator tessellator = Tessellator.instance;
         tessellator.startDrawingQuads();
-        if (solidRight > vertexLeft) {
-            tessellator.setColorRGBA(255, 255, 255, alpha);
-            tessellator.addVertexWithUV(vertexLeft, vertexBottom, 0.0D,
-                    u0, v0);
-            tessellator.addVertexWithUV(solidRight, vertexBottom, 0.0D,
-                    uSolid, v0);
-            tessellator.addVertexWithUV(solidRight, vertexTop, 0.0D,
-                    uSolid, v1);
-            tessellator.addVertexWithUV(vertexLeft, vertexTop, 0.0D,
-                    u0, v1);
-        }
-        if (faded) {
-            tessellator.setColorRGBA(255, 255, 255, alpha);
-            tessellator.addVertexWithUV(solidRight, vertexBottom, 0.0D,
-                    uSolid, v0);
-            tessellator.setColorRGBA(255, 255, 255, 0);
-            tessellator.addVertexWithUV(vertexRight, vertexBottom, 0.0D,
-                    u1, v0);
-            tessellator.addVertexWithUV(vertexRight, vertexTop, 0.0D,
-                    u1, v1);
-            tessellator.setColorRGBA(255, 255, 255, alpha);
-            tessellator.addVertexWithUV(solidRight, vertexTop, 0.0D,
-                    uSolid, v1);
+        // One straight piece per step, the profile read at each of its
+        // edges: a quad blends in a straight line between its own edges,
+        // so a curve is drawn as a run of them.
+        for (int step = 0; step < steps; step++) {
+            double from = step / (double)steps;
+            double to = (step + 1) / (double)steps;
+            double x0 = vertexLeft + (vertexRight - vertexLeft) * from;
+            double x1 = vertexLeft + (vertexRight - vertexLeft) * to;
+            double uFrom = u0 + (u1 - u0) * from;
+            double uTo = u0 + (u1 - u0) * to;
+            int a0 = fadeWeights == null ? alpha
+                    : Math.round(alpha * fadeWeights[step]);
+            int a1 = fadeWeights == null ? alpha
+                    : Math.round(alpha * fadeWeights[step + 1]);
+            tessellator.setColorRGBA(255, 255, 255, a0);
+            tessellator.addVertexWithUV(x0, vertexBottom, 0.0D, uFrom, v0);
+            tessellator.setColorRGBA(255, 255, 255, a1);
+            tessellator.addVertexWithUV(x1, vertexBottom, 0.0D, uTo, v0);
+            tessellator.addVertexWithUV(x1, vertexTop, 0.0D, uTo, v1);
+            tessellator.setColorRGBA(255, 255, 255, a0);
+            tessellator.addVertexWithUV(x0, vertexTop, 0.0D, uFrom, v1);
         }
         tessellator.draw();
         GL11.glShadeModel(GL11.GL_FLAT);

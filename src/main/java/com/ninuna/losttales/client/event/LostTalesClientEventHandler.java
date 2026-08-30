@@ -19,6 +19,8 @@ import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
+import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
+import com.ninuna.losttales.client.chat.LostTalesSpeechBubbleRenderer;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import com.ninuna.losttales.client.chat.ClientChatSession;
 import com.ninuna.losttales.client.chat.ClientChatChannelViews;
@@ -83,6 +85,7 @@ import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.client.event.EntityViewRenderEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
+import net.minecraftforge.client.event.RenderLivingEvent;
 import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.client.event.TextureStitchEvent;
@@ -133,6 +136,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientPartyStateCache.clear();
         ClientPartyMemberStatusCache.clear();
         ClientPartyTrackingCache.clear();
+        // Words over a head belong to the world they were spoken in.
+        ChatSpeechBubbles.clear();
         // Chat is the one client state that outlives a disconnect: the
         // game keeps its own message history for as long as it runs, and
         // everything Lost Tales knows about those messages — their tabs,
@@ -281,6 +286,22 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         }
     }
 
+
+    /**
+     * Speech over a player's head, drawn where vanilla hangs a
+     * nameplate: in the entity's own render pass, so the position
+     * arrives with the event instead of being worked out from a camera
+     * this mod can move.
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void renderSpeechBubbles(RenderLivingEvent.Specials.Post event) {
+        try {
+            LostTalesSpeechBubbleRenderer.render(event.entity, event.x,
+                    event.y, event.z);
+        } catch (Throwable ignored) {
+            // Speech over a head is decoration; it never costs a frame.
+        }
+    }
 
     @SubscribeEvent
     public void renderWorldMarkers(RenderWorldLastEvent event) {

@@ -15,6 +15,7 @@ import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.chat.ChatEmojiUsageStore;
+import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
 import com.ninuna.losttales.client.chat.ChatWindowLayoutStore;
 import com.ninuna.losttales.client.chat.LostTalesChatClientHandler;
 import com.ninuna.losttales.client.chat.LostTalesChatPresentation;
@@ -431,6 +432,9 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleChatMessage(LostTalesChatMessagePacket packet) {
         LostTalesChatPresentation.receive(packet);
+        // The same line again, kept for the speaker's own head; it files
+        // only what was said in character and ignores everything else.
+        ChatSpeechBubbles.receive(packet);
     }
 
     @Override

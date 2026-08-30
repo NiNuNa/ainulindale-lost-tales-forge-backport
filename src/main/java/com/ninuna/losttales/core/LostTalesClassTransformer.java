@@ -47,6 +47,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.lotrSpeechTransformer.active";
     public static final String NPC_CHAT_ACTIVE_PROPERTY =
             "losttales.npcChatTransformer.active";
+    public static final String NPC_SPEECH_RENDER_ACTIVE_PROPERTY =
+            "losttales.npcSpeechRenderTransformer.active";
+    public static final String NAMEPLATE_ACTIVE_PROPERTY =
+            "losttales.nameplateTransformer.active";
+    public static final String ALIGNMENT_LIFT_ACTIVE_PROPERTY =
+            "losttales.alignmentLiftTransformer.active";
     public static final String ACCESSORY_CONTAINER_ACTIVE_PROPERTY =
             "losttales.accessoryContainerTransformer.active";
     public static final String ACCESSORY_PICK_BLOCK_ACTIVE_PROPERTY =
@@ -128,6 +134,14 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "lotr.common.entity.npc.LOTRSpeech";
     private static final String LOTR_NPC_SPEECH_HANDLER =
             "lotr.common.network.LOTRPacketNPCSpeech$Handler";
+    private static final String LOTR_RENDER_ALIGNMENT_BONUS =
+            "lotr.client.render.entity.LOTRRenderAlignmentBonus";
+    private static final String RENDERER_LIVING_ENTITY =
+            "net.minecraft.client.renderer.entity.RendererLivingEntity";
+    private static final String LOTR_TICK_HANDLER_CLIENT =
+            "lotr.client.LOTRTickHandlerClient";
+    private static final String LOTR_NPC_RENDERING =
+            "lotr/client/render/entity/LOTRNPCRendering";
     private static final String LOTR_GUI_MAP =
             "lotr.client.gui.LOTRGuiMap";
     private static final String LOTR_LEVEL_DATA =
@@ -191,6 +205,15 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "(Lnet/minecraft/entity/player/EntityPlayer;"
                     + "Lnet/minecraft/util/IChatComponent;"
                     + "Llotr/common/entity/npc/LOTREntityNPC;)V";
+    private static final String NAMEPLATE_HOOK_OWNER =
+            "com/ninuna/losttales/client/chat/"
+                    + "LostTalesSpeechBubbleRenderer";
+    private static final String NAMEPLATE_HOOK_DESC =
+            "(Lnet/minecraft/entity/EntityLivingBase;)Z";
+    private static final String ALIGNMENT_LIFT_DESC = "(D)D";
+    private static final String NPC_SPEECH_RENDER_DESC =
+            "(Lnet/minecraft/client/Minecraft;"
+                    + "Lnet/minecraft/world/World;F)V";
     private static final String NPC_IMMERSIVE_HOOK_DESC =
             "(Lnet/minecraft/entity/player/EntityPlayer;"
                     + "Llotr/common/entity/npc/LOTREntityNPC;"
@@ -353,6 +376,15 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
         if (LOTR_NPC_SPEECH_HANDLER.equals(transformedName)) {
             return transformLotrNpcSpeechHandler(basicClass);
+        }
+        if (LOTR_TICK_HANDLER_CLIENT.equals(transformedName)) {
+            return transformLotrNpcSpeechRendering(basicClass);
+        }
+        if (RENDERER_LIVING_ENTITY.equals(transformedName)) {
+            return transformLivingLabel(basicClass);
+        }
+        if (LOTR_RENDER_ALIGNMENT_BONUS.equals(transformedName)) {
+            return transformLotrAlignmentLift(basicClass);
         }
         if (LOTR_GUI_MAP.equals(transformedName)) {
             return transformLotrGuiMap(basicClass);
@@ -1828,6 +1860,157 @@ public final class LostTalesClassTransformer implements IClassTransformer {
      * same synthetic accessor LOTR itself calls one instruction earlier;
      * a handler shaped differently simply keeps the chat patch alone.
      */
+    /**
+     * Sends LOTR's pass over every NPC's floating speech through
+     * {@code LostTalesNpcChatHook#renderNpcSpeeches} instead, so the
+     * words over an NPC's head are drawn in the chat's own style beside
+     * the players' — under a name in its faction's colour, the way the
+     * conversation shows it. The hook keeps LOTR's call and makes it
+     * when the styling is off, so turning the feature off restores
+     * LOTR's speech exactly; a failure to patch leaves LOTR's own
+     * drawing in place and costs only the restyling.
+     */
+    /**
+     * Lets Lost Tales hold back one entity's floating name. A speaking
+     * player wears the name the chat signs them with, in its own colour
+     * and over their words, and vanilla's plain account name in the same
+     * place would only double it — but the pass that draws it also
+     * carries the speech itself and LOTR's alignment, so cancelling the
+     * whole pass is not the way. The guard goes on the label draw alone:
+     * everything else in that pass, ours included, still runs.
+     */
+    /**
+     * Lifts LOTR's floating alignment clear of what a speaker wears.
+     * It is a spawned effect rather than part of any nameplate pass, so
+     * its own renderer is where its height is decided; the hook raises
+     * the y it is drawn at before anything is drawn there.
+     */
+    private static byte[] transformLotrAlignmentLift(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"doRender".equals(method.name)
+                        || !method.desc.startsWith(
+                                "(Lnet/minecraft/entity/Entity;DDD")) {
+                    continue;
+                }
+                if (containsHook(method, NAMEPLATE_HOOK_OWNER,
+                        "liftAlignment")) {
+                    System.setProperty(
+                            ALIGNMENT_LIFT_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                // doRender(this, entity, x, y, z, ...): y is the double
+                // at slot four, raised in place before its first use.
+                InsnList lift = new InsnList();
+                lift.add(new VarInsnNode(Opcodes.DLOAD, 4));
+                lift.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                        NAMEPLATE_HOOK_OWNER, "liftAlignment",
+                        ALIGNMENT_LIFT_DESC, false));
+                lift.add(new VarInsnNode(Opcodes.DSTORE, 4));
+                method.instructions.insert(lift);
+                System.setProperty(ALIGNMENT_LIFT_ACTIVE_PROPERTY, "true");
+                info("Patched LOTR floating alignment to stand above a "
+                        + "speaker's name");
+                return write(owner);
+            }
+            warn("Could not locate LOTRRenderAlignmentBonus#doRender; "
+                    + "floating alignment will keep LOTR's height");
+            return basicClass;
+        } catch (Throwable failure) {
+            warn("Failed to lift LOTR floating alignment: " + failure);
+            return basicClass;
+        }
+    }
+
+    private static byte[] transformLivingLabel(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"renderLivingLabel".equals(method.name)
+                        && !"func_96449_a".equals(method.name)) {
+                    continue;
+                }
+                if (!method.desc.startsWith(
+                        "(Lnet/minecraft/entity/EntityLivingBase;DDD"
+                                + "Ljava/lang/String;")) {
+                    continue;
+                }
+                if (containsHook(method, NAMEPLATE_HOOK_OWNER,
+                        "hidesNameplate")) {
+                    System.setProperty(NAMEPLATE_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                LabelNode carryOn = new LabelNode();
+                InsnList guard = new InsnList();
+                guard.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                guard.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                        NAMEPLATE_HOOK_OWNER, "hidesNameplate",
+                        NAMEPLATE_HOOK_DESC, false));
+                guard.add(new JumpInsnNode(Opcodes.IFEQ, carryOn));
+                guard.add(new InsnNode(Opcodes.RETURN));
+                guard.add(carryOn);
+                method.instructions.insert(guard);
+                System.setProperty(NAMEPLATE_ACTIVE_PROPERTY, "true");
+                info("Patched entity nameplates so a speaking player "
+                        + "wears the chat's own name");
+                return write(owner);
+            }
+            warn("Could not locate RendererLivingEntity#renderLivingLabel; "
+                    + "a speaking player will wear both names");
+            return basicClass;
+        } catch (Throwable failure) {
+            warn("Failed to patch entity nameplates: " + failure);
+            return basicClass;
+        }
+    }
+
+    private static byte[] transformLotrNpcSpeechRendering(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                for (AbstractInsnNode instruction =
+                        method.instructions.getFirst();
+                     instruction != null;
+                     instruction = instruction.getNext()) {
+                    if (!(instruction instanceof MethodInsnNode)) {
+                        continue;
+                    }
+                    MethodInsnNode call = (MethodInsnNode)instruction;
+                    if (call.getOpcode() != Opcodes.INVOKESTATIC
+                            || !NPC_SPEECH_RENDER_DESC.equals(call.desc)) {
+                        continue;
+                    }
+                    if (NPC_CHAT_HOOK_OWNER.equals(call.owner)
+                            && "renderNpcSpeeches".equals(call.name)) {
+                        System.setProperty(
+                                NPC_SPEECH_RENDER_ACTIVE_PROPERTY, "true");
+                        return basicClass;
+                    }
+                    if (LOTR_NPC_RENDERING.equals(call.owner)
+                            && "renderAllNPCSpeeches".equals(call.name)) {
+                        call.owner = NPC_CHAT_HOOK_OWNER;
+                        call.name = "renderNpcSpeeches";
+                        System.setProperty(
+                                NPC_SPEECH_RENDER_ACTIVE_PROPERTY, "true");
+                        info("Patched LOTR NPC floating speech into the "
+                                + "Lost Tales chat style");
+                        return write(owner);
+                    }
+                }
+            }
+            warn("Could not locate LOTRNPCRendering#renderAllNPCSpeeches; "
+                    + "NPC floating speech will keep LOTR's style");
+            return basicClass;
+        } catch (Throwable failure) {
+            warn("Failed to patch LOTR NPC floating speech: " + failure);
+            return basicClass;
+        }
+    }
+
     private static void insertImmersiveSpeechHook(MethodNode method,
                                                   int npcLocal) {
         int playerLocal = findNpcSpeechHandlerPlayerLocal(method);

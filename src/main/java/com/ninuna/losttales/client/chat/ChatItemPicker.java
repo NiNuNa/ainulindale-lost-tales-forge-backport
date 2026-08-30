@@ -5,8 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
-import net.minecraft.init.Items;
-import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
 
 /**
@@ -18,7 +16,6 @@ import net.minecraft.util.StatCollector;
 final class ChatItemPicker extends ChatPickerPanel {
     private static final int CELL_SIZE = 14;
     private static final int COLUMNS = 6;
-    private static final ItemStack BUTTON_ICON = new ItemStack(Items.iron_sword);
     /** Inventory snapshots are refreshed at most this often while open. */
     private static final long REFRESH_INTERVAL_NANOS = 250L * 1000000L;
 
@@ -123,7 +120,9 @@ final class ChatItemPicker extends ChatPickerPanel {
     @Override
     void drawButtonIcon(Minecraft minecraft, int left, int top,
                         boolean lifted) {
-        ChatInlineIcons.drawItemButton(minecraft, BUTTON_ICON, left, top,
-                BUTTON_SIZE);
+        ChatIconSheet icon = lifted
+                ? ChatIconSheet.ITEM_HOVER : ChatIconSheet.ITEM;
+        icon.drawWithShadow(left + (BUTTON_SIZE - icon.getWidth()) / 2,
+                top + (BUTTON_SIZE - icon.getHeight()) / 2, 255);
     }
 }

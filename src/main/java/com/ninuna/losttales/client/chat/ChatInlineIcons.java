@@ -194,16 +194,10 @@ final class ChatInlineIcons {
         drawMarker(minecraft, iconName, rgb, boxX, boxY, size, alpha, false);
     }
 
-    /* Toolbar buttons: one content box, centred in the button square. */
-
-    static void drawItemButton(Minecraft minecraft, ItemStack stack,
-                               int left, int top, int buttonSize) {
-        float inset = (buttonSize - CONTENT_SIZE) / 2.0F;
-        drawItem(minecraft, stack, left + inset, top + inset,
-                CONTENT_SIZE, 255);
-    }
-
-    /** Marker artwork fitted into the content box, uniformly scaled. */
+    /**
+     * The marker picker's button: its artwork fitted into the content
+     * box, centred in the button square and uniformly scaled.
+     */
     static void drawMarkerButton(Minecraft minecraft, String iconName,
                                  int rgb, int left, int top, int buttonSize) {
         float inset = (buttonSize - CONTENT_SIZE) / 2.0F;

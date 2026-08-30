@@ -128,6 +128,11 @@ final class ChatPopupMenu {
     private int labelX = PADDING_X;
     /** Room the lock column takes at the right, or 0 without one. */
     private int lockWidth;
+    /**
+     * The swing of the one lock a list may carry. Only the character
+     * selection has one, and only on its top row.
+     */
+    private final ChatLockAnimation lockAnimation = new ChatLockAnimation();
     /** First row asked for — the wheel's target; rows above it lie past
      *  the top edge. */
     private int scrollRows;
@@ -409,18 +414,12 @@ final class ChatPopupMenu {
                     entry.dim ? "§o" + entry.label : entry.label,
                     this.x + this.labelX, rowY + 2, 255);
             if (entry.lockControl != null) {
-                // The lock at the row's end, with the hover state the
-                // window's own lock uses.
-                boolean locked = entry.lockControl.booleanValue();
-                boolean lockHovered =
-                        lockControlAt(mouseX, mouseY) == entry;
-                ChatIconSheet lock = locked
-                        ? (lockHovered ? ChatIconSheet.LOCKED_HOVER
-                                : ChatIconSheet.LOCKED)
-                        : (lockHovered ? ChatIconSheet.UNLOCKED_HOVER
-                                : ChatIconSheet.UNLOCKED);
-                lock.drawWithShadow(lockLeft() + 1,
-                        rowY + (ROW_HEIGHT - lock.getHeight()) / 2, 255);
+                // The lock at the row's end, swinging the way the
+                // window's own lock does.
+                this.lockAnimation.draw(lockLeft() + 1,
+                        rowY + (ROW_HEIGHT - ChatLockAnimation.HEIGHT) / 2,
+                        entry.lockControl.booleanValue(),
+                        lockControlAt(mouseX, mouseY) == entry, 255);
             }
             rowY += ROW_HEIGHT;
         }

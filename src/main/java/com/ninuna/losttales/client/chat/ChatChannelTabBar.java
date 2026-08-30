@@ -19,14 +19,18 @@ import org.lwjgl.opengl.GL11;
  * The tabs of one chat window, laid out the way a browser lays out
  * its tabs. Tabs stand side by side with a one-pixel seam on the
  * window's top rule; the selected tab is drawn last, lifted, and
- * brighter. Switching is a hard cut: the picked tab is forward the
- * frame it is picked, however the pick happened — a click, the
- * keyboard, or a command bringing the console forward — so nothing
- * sweeps across the tabs between. A tab with unread messages
- * carries textual counters after its name: {@code [p]} pings in salmon,
- * then {@code [x]} other unread lines in honey; a muted tab is drawn
- * dim and italic. The channel's colour runs along each tab's top edge,
- * full at the centre and fading to nothing at both ends.
+ * brighter. A tab is built rather than stretched: the sheet's left and
+ * right border pieces at its ends, a line joining their tips, and the
+ * tab's interior tone filling the span between them, so a label of any
+ * length leaves the artwork undistorted. Switching is a hard cut: the
+ * picked tab is forward the frame it is picked, however the pick
+ * happened — a click, the keyboard, or a command bringing the console
+ * forward — so nothing sweeps across the tabs between. A tab with
+ * unread messages carries textual counters after its name:
+ * {@code [p]} pings in salmon, then {@code [x]} other unread lines in
+ * honey; a muted tab is drawn dim and italic. The channel's colour runs
+ * across each tab's face two rows under that line, full at the centre
+ * and fading to nothing at both ends.
  *
  * <p>Every tab carries a settings cog and, unless it is the last tab the
  * player could close, a close cross, while the row has room for them;
@@ -44,17 +48,36 @@ import org.lwjgl.opengl.GL11;
  * history it stands on.</p>
  */
 final class ChatChannelTabBar {
+    /** Height of a resting tab's border pieces; the selected pair adds
+     *  the lift. */
+    private static final int PIECE_HEIGHT =
+            ChatIconSheet.TAB_LEFT.getHeight();
     /**
-     * Body height of a resting tab, the top rule's row included: the
-     * colour rule and its chamfer (two rows), the icon with a clear row
-     * above and below it (twelve), and the top rule (one). The selected
-     * tab rises above it and its interior grows by the lift.
+     * Body height of a resting tab: the sheet's resting border pieces
+     * whole, and under them the window's top rule, which is the strip's
+     * last row and the one row a tab does not draw on. The selected tab
+     * rises out of the row — its border pieces are exactly the lift
+     * taller — and its interior rises with it rather than growing.
      */
-    static final int HEIGHT = 15;
+    static final int HEIGHT = PIECE_HEIGHT + 1;
     /** Pixels the selected tab rises out of the row. */
     static final int LIFT = 2;
     /** Full height of the row: a resting tab plus the lift. */
     static final int ROW_HEIGHT = HEIGHT + LIFT;
+    /** Width of a tab's border pieces; the same in every state. */
+    private static final int BORDER_WIDTH = ChatIconSheet.TAB_LEFT.getWidth();
+    /**
+     * The rows of a tab, measured from its top: a chamfered row, the
+     * line joining the border tips, a clear row, the channel accent,
+     * another clear row, and then the interior — as tall as the icon it
+     * holds, so the label sits level with it whatever either measures.
+     */
+    private static final int TIP_ROW = 1;
+    private static final int ACCENT_ROW = TIP_ROW + 2;
+    private static final int INTERIOR_TOP = ACCENT_ROW + 2;
+    private static final int INTERIOR_HEIGHT = ChatChannelIcons.SIZE;
+    /** Rows a capital letter takes; what text is centred by. */
+    private static final int CAP_HEIGHT = 7;
     /** Seam between neighbouring tabs. */
     private static final int TAB_GAP = 1;
     private static final int PADDING_X = 6;
@@ -76,6 +99,18 @@ final class ChatChannelTabBar {
      * against and no control crosses.
      */
     private static final int GRIP_INSET = 3;
+    /**
+     * Opacity of a tab's interior. The border sprites carry that same
+     * interior behind them at this alpha, so the span they enclose has
+     * to be filled with it exactly or a tab reads as two tones.
+     */
+    private static final int TAB_SURFACE_ALPHA = 0xAB;
+    /** The line joining a resting tab's border tips. */
+    private static final int TIP_RGB =
+            LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE);
+    /** The same line on a hovered or selected tab. */
+    private static final int TIP_LIT_RGB =
+            LostTalesColors.rgb(LostTalesColors.IVORY);
     private static final int PING_COUNTER_RGB =
             LostTalesColors.rgb(LostTalesColors.SALMON);
     private static final int UNREAD_COUNTER_RGB =
@@ -95,6 +130,8 @@ final class ChatChannelTabBar {
     private final Map<ChatTab, Boolean> cachedMuted =
             new HashMap<ChatTab, Boolean>();
     private FontRenderer cachedFont;
+    /** The end lock's swing; one row, one lock, one state. */
+    private final ChatLockAnimation lockAnimation = new ChatLockAnimation();
     private int cachedLeft = Integer.MIN_VALUE;
     private int cachedRight = Integer.MIN_VALUE;
     private boolean cachedShowClose;
@@ -319,10 +356,21 @@ final class ChatChannelTabBar {
                     LostTalesChatVisualStyle.drawColored(font, this.restoreBadge,
                             row.offsetX + this.restoreX + END_CONTROL_SIZE
                                     + COUNTER_GAP,
-                            centredInStrip(bottom, 7),
+                            centredInStrip(bottom, CAP_HEIGHT),
                             UNREAD_COUNTER_RGB, scaled(0xFF));
                 }
             }
+            // Last of everything the strip holds, so the tabs, the end
+            // controls and the bare stretch between them all sink into
+            // the rule together rather than each on its own. It is the
+            // very shade the window hangs from its own top edge, hung
+            // the other way up — same routine, so the two sides of the
+            // rule cannot drift apart.
+            LostTalesChatOverlayRenderer.drawEdgeFade(
+                    row.offsetX + row.left - 2, row.offsetX + row.right + 2,
+                    bottom - 1, rowTop(bottom),
+                    LostTalesChatOverlayRenderer.TOP_EDGE_FADE_HEIGHT,
+                    scaled(LostTalesChatOverlayRenderer.EDGE_FADE_ALPHA));
         } finally {
             LostTalesChatOverlayRenderer.endVerticalClip(clipped);
         }
@@ -354,20 +402,34 @@ final class ChatChannelTabBar {
                 + ChatChannelIcons.GAP;
         int width = font.getStringWidth(label) + PADDING_X * 2 + iconWidth;
         int top = y - HEIGHT / 2;
-        int surface = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
-                LostTalesChatVisualStyle.SURFACE_ALPHA);
-        Gui.drawRect(x + 1, top, x + width - 1, top + 1, surface);
-        Gui.drawRect(x, top + 1, x + width, top + HEIGHT, surface);
-        Gui.drawRect(x + 1, top + 1, x + width - 1, top + 2,
-                LostTalesChatVisualStyle.argb(
-                        ClientChatChannelState.displayColor(tab), 0xFF));
+        // The shape a hovered tab wears, so what follows the pointer is
+        // plainly the tab that left the row.
+        drawTabShape(x, x + width, top, false, true, 0xFF,
+                TAB_SURFACE_ALPHA);
+        drawAccent(x + BORDER_WIDTH, x + width - BORDER_WIDTH,
+                top + ACCENT_ROW,
+                ClientChatChannelState.displayColor(tab), 0xFF);
+        int interiorTop = top + INTERIOR_TOP;
         if (icon != null) {
             ChatChannelIcons.draw(Minecraft.getMinecraft(), tab,
-                    x + PADDING_X, top + 3.0F, 230);
+                    x + PADDING_X,
+                    centredInInterior(interiorTop, ChatChannelIcons.SIZE),
+                    230);
         }
         LostTalesChatVisualStyle.drawPlain(font, label,
-                x + PADDING_X + iconWidth, top + 4, 230);
+                x + PADDING_X + iconWidth,
+                centredInInterior(interiorTop, CAP_HEIGHT), 230);
+    }
+
+    /**
+     * Where a run of {@code height} rows sits in a tab's interior,
+     * centred on the icon that fills it. The icon is an even number of
+     * rows and the caps and the control glyphs are odd, so neither can
+     * land on its centre; the remainder is spent above the run, which
+     * is the half they read as level with the icon from.
+     */
+    private static int centredInInterior(int interiorTop, int height) {
+        return interiorTop + (INTERIOR_HEIGHT - height + 1) / 2;
     }
 
     private int scaled(int alpha) {
@@ -382,52 +444,39 @@ final class ChatChannelTabBar {
         boolean faint = tab.tab.equals(row.dragging);
         // Selection is a hard cut: the picked tab is forward at once,
         // nothing sweeps across the tabs between.
-        float rise = selected ? 1.0F : 0.0F;
-        int lift = Math.round(LIFT * rise);
+        int lift = selected ? LIFT : 0;
         int top = rowBottom - HEIGHT - lift;
-        // Every tab reaches the strip's bottom, under the top rule that
-        // takes the strip's last row; the selected one rises, it does
-        // not sink.
-        int bottom = rowBottom;
+        // A tab draws its border pieces whole and stops one row short
+        // of the strip's last row, which is the window's top rule; the
+        // selected one rises out of the row, it does not sink.
         int left = row.offsetX + tab.x;
         int right = left + tab.width;
         float dim = faint ? 0.4F : 1.0F;
-
-        // Surfaces at the chat's half opacity; the selected tab is told
-        // apart by its lift, its lighter tone and its accent, not by
-        // being more solid.
-        int surfaceAlpha = scaled(Math.round(
-                LostTalesChatVisualStyle.SURFACE_ALPHA * dim));
-        int surfaceRgb = blend(LostTalesChatVisualStyle.SURFACE_RGB,
-                LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
-                hoveredTab ? Math.max(0.35F, rise) : rise * 0.55F);
-        int surface = (surfaceAlpha << 24) | surfaceRgb;
-        // Chamfered top corners: the top row is inset one pixel per side.
-        Gui.drawRect(left + 1, top, right - 1, top + 1, surface);
-        Gui.drawRect(left, top + 1, right, bottom, surface);
-        // Channel accent along the top edge, brighter when forward,
-        // full at the centre and gone at the ends like the edge rules.
-        int accentAlpha = scaled(Math.round(
-                (0xA0 + (0xFF - 0xA0) * rise) * dim));
-        drawAccent(left + 1, right - 1, top + 1,
+        // The border artwork is opaque and carries the interior with it;
+        // the span between the pieces is filled to match.
+        drawTabShape(left, right, top, selected, hoveredTab,
+                scaled(Math.round(0xFF * dim)),
+                scaled(Math.round(TAB_SURFACE_ALPHA * dim)));
+        // Channel accent across the tab's face, clear of the border
+        // artwork on every side: brighter when forward, full at the
+        // centre and gone at the ends like the edge rules.
+        int accentAlpha = scaled(Math.round((selected ? 0xFF : 0xA0) * dim));
+        drawAccent(left + BORDER_WIDTH, right - BORDER_WIDTH,
+                top + ACCENT_ROW,
                 ClientChatChannelState.displayColor(tab.tab), accentAlpha);
         // Text is always at full opacity; a muted tab is told by its
         // italics alone.
         int textAlpha = scaled(Math.round(255 * dim));
-        // Everything inside the tab is centred between the colour rule
-        // (the two rows at the top) and the window's top rule (the
-        // strip's last row) of a resting tab: the icon at its own size,
-        // the label's caps and the controls. The selected tab's lift
-        // carries them up with it rather than re-centring them in the
-        // taller body.
-        int interiorTop = top + 2;
-        int interiorHeight = HEIGHT - 3;
+        // Everything inside the tab stands in the interior, one clear
+        // row under the accent: the icon at its own size, the label's
+        // caps and the controls level with it. The selected tab's lift
+        // carries them up with it rather than re-centring them.
+        int interiorTop = top + INTERIOR_TOP;
         int textX = left + PADDING_X;
-        int textY = interiorTop + (interiorHeight - 7) / 2;
+        int textY = centredInInterior(interiorTop, CAP_HEIGHT);
         if (tab.icon != null) {
             ChatChannelIcons.draw(Minecraft.getMinecraft(), tab.tab, textX,
-                    interiorTop
-                            + (interiorHeight - ChatChannelIcons.SIZE) / 2.0F,
+                    centredInInterior(interiorTop, ChatChannelIcons.SIZE),
                     textAlpha);
             textX += ChatChannelIcons.SIZE + ChatChannelIcons.GAP;
         }
@@ -448,9 +497,9 @@ final class ChatChannelTabBar {
         }
         // The controls are never dimmed with the label: only the
         // window's own fade and a dragged tab's faintness reach them.
-        // The control sprites centred in the interior like the caps.
-        int controlTop = interiorTop + (interiorHeight - 5) / 2
-                - (CONTROL_SIZE - 5) / 2;
+        // Their hit squares are centred in the interior like the caps,
+        // and each sprite is centred in its square in turn.
+        int controlTop = centredInInterior(interiorTop, CONTROL_SIZE);
         int controlAlpha = scaled(Math.round(0xFF * dim));
         if (tab.settingsX >= 0) {
             drawCog(row.offsetX + tab.settingsX, controlTop,
@@ -466,6 +515,56 @@ final class ChatChannelTabBar {
                             && hovered.tab.equals(tab.tab),
                     controlAlpha);
         }
+    }
+
+    /**
+     * A tab's shape: the interior filling the span its two border pieces
+     * enclose, the line joining their tips, and the pieces themselves.
+     * The pieces are drawn at their own size — a longer label widens the
+     * span, never the artwork — and the selected pair stands two rows
+     * taller than the resting ones, which is the lift its caller has
+     * already made room for. Everything that draws a tab comes through
+     * here, so the row and a dragged tab's ghost cannot drift apart.
+     */
+    private static void drawTabShape(int left, int right, int top,
+                                     boolean selected, boolean hovered,
+                                     int spriteAlpha, int interiorAlpha) {
+        ChatIconSheet leftPiece;
+        ChatIconSheet rightPiece;
+        int interiorRgb;
+        int tipRgb;
+        if (selected) {
+            leftPiece = ChatIconSheet.TAB_SELECTED_LEFT;
+            rightPiece = ChatIconSheet.TAB_SELECTED_RIGHT;
+            interiorRgb = LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB;
+            tipRgb = TIP_LIT_RGB;
+        } else if (hovered) {
+            leftPiece = ChatIconSheet.TAB_HOVER_LEFT;
+            rightPiece = ChatIconSheet.TAB_HOVER_RIGHT;
+            interiorRgb = LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB;
+            tipRgb = TIP_LIT_RGB;
+        } else {
+            leftPiece = ChatIconSheet.TAB_LEFT;
+            rightPiece = ChatIconSheet.TAB_RIGHT;
+            interiorRgb = LostTalesChatVisualStyle.SURFACE_RGB;
+            tipRgb = TIP_RGB;
+        }
+        int spanLeft = left + BORDER_WIDTH;
+        int spanRight = right - BORDER_WIDTH;
+        int height = leftPiece.getHeight();
+        if (spanRight > spanLeft) {
+            // As deep as the pieces themselves, so the span cannot end
+            // short of the artwork it stands between.
+            Gui.drawRect(spanLeft, top, spanRight, top + height,
+                    LostTalesChatVisualStyle.argb(interiorRgb, interiorAlpha));
+            // The tips are the pieces' innermost lit columns, one pixel
+            // outside the span, so the line meets both without a gap.
+            Gui.drawRect(spanLeft, top + TIP_ROW, spanRight,
+                    top + TIP_ROW + 1,
+                    LostTalesChatVisualStyle.argb(tipRgb, spriteAlpha));
+        }
+        leftPiece.draw(left, top, spriteAlpha);
+        rightPiece.draw(spanRight, top, spriteAlpha);
     }
 
     /**
@@ -561,17 +660,14 @@ final class ChatChannelTabBar {
 
     /**
      * The lock's body keeps its place whichever way the shackle goes:
-     * both sprites start at the same left edge, the open shackle
-     * reaching past the square into the gap.
+     * every frame starts at the same left edge and stands on the same
+     * row, the open shackle reaching past the square into the gap.
      */
     private void drawLock(int x, int rowBottom, boolean locked,
                           boolean hovered) {
-        ChatIconSheet icon = locked
-                ? (hovered ? ChatIconSheet.LOCKED_HOVER : ChatIconSheet.LOCKED)
-                : (hovered ? ChatIconSheet.UNLOCKED_HOVER
-                        : ChatIconSheet.UNLOCKED);
-        icon.drawWithShadow(x + 1, centredInStrip(rowBottom, icon.getHeight()),
-                scaled(0xFF));
+        this.lockAnimation.draw(x + 1,
+                centredInStrip(rowBottom, ChatLockAnimation.HEIGHT),
+                locked, hovered, scaled(0xFF));
     }
 
     private void drawRestore(int x, int rowBottom, boolean hovered) {
@@ -969,17 +1065,6 @@ final class ChatChannelTabBar {
         int fixed = fixedWithCounters > available
                 ? fixedWithout : fixedWithCounters;
         return labels > available - fixed;
-    }
-
-    private static int blend(int fromRgb, int toRgb, float amount) {
-        float t = Math.max(0.0F, Math.min(1.0F, amount));
-        int red = Math.round(((fromRgb >> 16) & 0xFF)
-                + (((toRgb >> 16) & 0xFF) - ((fromRgb >> 16) & 0xFF)) * t);
-        int green = Math.round(((fromRgb >> 8) & 0xFF)
-                + (((toRgb >> 8) & 0xFF) - ((fromRgb >> 8) & 0xFF)) * t);
-        int blue = Math.round((fromRgb & 0xFF)
-                + ((toRgb & 0xFF) - (fromRgb & 0xFF)) * t);
-        return (red << 16) | (green << 8) | blue;
     }
 
     static final class Tab {

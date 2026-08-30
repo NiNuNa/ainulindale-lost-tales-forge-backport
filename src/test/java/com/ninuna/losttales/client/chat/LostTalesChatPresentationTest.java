@@ -331,17 +331,45 @@ public final class LostTalesChatPresentationTest {
     }
 
     @Test
-    public void chatBackdropUsesPlumBlackAndFadesAfterTwoThirds() {
+    public void chatBackdropUsesPlumBlack() {
         assertEquals(LostTalesColors.rgb(LostTalesColors.PLUM_BLACK),
                 LostTalesChatOverlayRenderer.CHAT_BACKDROP_RGB);
         assertEquals(0x2D1E2F,
                 LostTalesChatOverlayRenderer.CHAT_BACKDROP_RGB);
-        assertEquals(67,
-                LostTalesChatOverlayRenderer.backdropFadeStart(100));
-        assertEquals(66,
-                LostTalesChatOverlayRenderer.backdropFadeStart(99));
-        assertEquals(200,
-                LostTalesChatOverlayRenderer.backdropFadeStart(300));
+    }
+
+    /**
+     * The backdrop leans away from the very first pixel and reaches
+     * nothing at the last, and it does so without a corner anywhere: it
+     * held full strength for two thirds and then fell away in a straight
+     * line, and the eye read the corner where the two met as an edge in
+     * the band. What that costs is checked too — the curve spends the
+     * same total opacity the old profile did, so a line's backdrop is no
+     * lighter overall than it was.
+     */
+    @Test
+    public void theBackdropFadeHasNoCornerToRead() {
+        float[] weights = LostTalesChatOverlayRenderer.BACKDROP_FADE_WEIGHTS;
+        assertTrue("The fade needs steps to be drawn in",
+                weights.length > 8);
+        assertEquals(1.0F, weights[0], 0.0F);
+        assertEquals(0.0F, weights[weights.length - 1], 0.0F);
+        float steepest = 0.0F;
+        float area = 0.0F;
+        for (int step = 0; step + 1 < weights.length; step++) {
+            float drop = weights[step] - weights[step + 1];
+            assertTrue("The fade never brightens again", drop >= 0.0F);
+            steepest = Math.max(steepest, drop);
+            area += (weights[step] + weights[step + 1]) / 2.0F;
+        }
+        area /= weights.length - 1;
+        // The old profile: full for two thirds, then straight to
+        // nothing. Same ink, spread instead of broken.
+        assertEquals(2.0F / 3.0F + (1.0F / 3.0F) / 2.0F, area, 0.01F);
+        // No step may drop more than a small share of the whole, which
+        // is what a corner in the profile would show up as.
+        assertTrue("The fade turns a corner somewhere: " + steepest,
+                steepest < 0.2F);
     }
 
     @Test

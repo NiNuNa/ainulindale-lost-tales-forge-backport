@@ -93,20 +93,54 @@ final class LostTalesChatOverlayRenderer {
      */
     private static final float HEAD_LEFT_OFFSET =
             ChatInlineIcons.HEAD_SLOT_INSET;
-    private static final float BACKDROP_FADE_START = 2.0F / 3.0F;
+    /**
+     * How a line's backdrop thins out across its width. It held full
+     * strength for two thirds and then fell away in a straight line,
+     * which left a visible edge where the two met: the eye reads the
+     * corner in the opacity, not the opacity itself. It now leans away
+     * from the very first pixel along a curve that is flat where it
+     * starts, so there is no corner anywhere to see, and it spends the
+     * same total opacity across the band as the old profile did.
+     */
+    private static final int BACKDROP_FADE_POWER = 5;
+    /**
+     * Steps the curve is drawn in. A quad blends in a straight line
+     * between its edges, so a curve is a run of short straight pieces,
+     * as the edge fades are.
+     */
+    private static final int BACKDROP_FADE_STEPS = 32;
+    /**
+     * The curve sampled once, evenly across the band: the opacity at
+     * each step's edge as a share of the backdrop's own. Shared with the
+     * blur behind the band so the two thin out together.
+     */
+    static final float[] BACKDROP_FADE_WEIGHTS = backdropFadeWeights();
+
+    private static float[] backdropFadeWeights() {
+        float[] weights = new float[BACKDROP_FADE_STEPS + 1];
+        for (int step = 0; step < weights.length; step++) {
+            float across = step / (float)BACKDROP_FADE_STEPS;
+            float falloff = across;
+            for (int power = 1; power < BACKDROP_FADE_POWER; power++) {
+                falloff *= across;
+            }
+            weights[step] = 1.0F - falloff;
+        }
+        return weights;
+    }
     /**
      * Depth of the shade hanging from the window's top edge: one line,
      * so the line passing under the top rule has faded most of the way
      * out before the clip cuts it.
      */
-    private static final float TOP_EDGE_FADE_HEIGHT = LINE_HEIGHT;
+    static final float TOP_EDGE_FADE_HEIGHT = LINE_HEIGHT;
     /**
      * Depth of the shade hanging from the bottom edge: two lines, so it
      * reaches through the trailing strip and over the newest message.
      */
     private static final float BOTTOM_EDGE_FADE_HEIGHT = LINE_HEIGHT * 2.0F;
     /** Opacity of an edge fade on the edge it hangs from: half. */
-    private static final int EDGE_FADE_ALPHA = 0x80;
+    static final int EDGE_FADE_ALPHA = 0x80;
     /**
      * How long a line stays on screen in the closed feed, in the update
      * counter's own ticks: vanilla's own ten seconds, held to full
@@ -298,8 +332,7 @@ final class LostTalesChatOverlayRenderer {
         blur.drawRegion(blurLeft, blurTop, blurRight, historyTop,
                 blurOpacity);
         blur.drawFadedRegion(blurLeft, historyTop, blurRight, historyBottom,
-                blurLeft + (blurRight - blurLeft) * BACKDROP_FADE_START,
-                blurOpacity);
+                BACKDROP_FADE_WEIGHTS, blurOpacity);
         blur.drawRegion(blurLeft, historyBottom, blurRight, blurBottom,
                 blurOpacity);
         // The newest line sits on the baseline; the whole window rides
@@ -941,9 +974,7 @@ final class LostTalesChatOverlayRenderer {
                                 .drawFadedRegionInTransform(
                                         panelLeft, y - LINE_HEIGHT,
                                         panelRight, y,
-                                        panelLeft
-                                                + (panelRight - panelLeft)
-                                                * BACKDROP_FADE_START,
+                                        BACKDROP_FADE_WEIGHTS,
                                         originX + entry * scale,
                                         originY + stackOffset, scale,
                                         alpha / 255.0F);
@@ -1165,8 +1196,8 @@ final class LostTalesChatOverlayRenderer {
      * mesh with the opacity worked out at every vertex: a single shaded
      * quad would put a visible seam along its diagonal.
      */
-    private static void drawEdgeFade(float left, float right, float edge,
-                                     float limit, float height, int alpha) {
+    static void drawEdgeFade(float left, float right, float edge,
+                             float limit, float height, int alpha) {
         int safeAlpha = Math.max(0, Math.min(255, alpha));
         if (safeAlpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
@@ -1916,15 +1947,6 @@ final class LostTalesChatOverlayRenderer {
                 Math.round(255.0F * opacity * opening.getOpacity())));
     }
 
-    static float backdropFadeStart(float width) {
-        return Math.max(0.0F, width * BACKDROP_FADE_START);
-    }
-
-    /** As above in whole units, which is how the layout measures it. */
-    static int backdropFadeStart(int width) {
-        return Math.max(0, Math.round(width * BACKDROP_FADE_START));
-    }
-
     /**
      * Palette backdrop band with a smooth transparent right edge. Edges
      * are fractional: a band has to meet its neighbour and the window's
@@ -1938,14 +1960,6 @@ final class LostTalesChatOverlayRenderer {
         if (right <= left || bottom <= top || safeAlpha <= 0) {
             return;
         }
-        float fadeStart = Math.min(right,
-                left + backdropFadeStart(right - left));
-        fillRect(left, top, fadeStart, bottom,
-                (safeAlpha << 24) | backdropRgb);
-        if (fadeStart >= right) {
-            return;
-        }
-
         GL11.glDisable(GL11.GL_TEXTURE_2D);
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glDisable(GL11.GL_ALPHA_TEST);
@@ -1953,13 +1967,21 @@ final class LostTalesChatOverlayRenderer {
         GL11.glShadeModel(GL11.GL_SMOOTH);
         Tessellator tessellator = Tessellator.instance;
         tessellator.startDrawingQuads();
-        tessellator.setColorRGBA_I(backdropRgb, 0);
-        tessellator.addVertex(right, bottom, 0.0D);
-        tessellator.addVertex(right, top, 0.0D);
-        tessellator.setColorRGBA_I(backdropRgb, safeAlpha);
-        tessellator.addVertex(fadeStart, top, 0.0D);
-        tessellator.addVertex(fadeStart, bottom, 0.0D);
-        // (kept together with the solid half below)
+        float width = right - left;
+        for (int step = 0; step < BACKDROP_FADE_STEPS; step++) {
+            float x0 = left + width * step / (float)BACKDROP_FADE_STEPS;
+            float x1 = left + width * (step + 1) / (float)BACKDROP_FADE_STEPS;
+            int a0 = Math.round(safeAlpha * BACKDROP_FADE_WEIGHTS[step]);
+            int a1 = Math.round(safeAlpha * BACKDROP_FADE_WEIGHTS[step + 1]);
+            // Same winding as the backdrop's other quads: the GUI pass
+            // culls back faces.
+            tessellator.setColorRGBA_I(backdropRgb, a1);
+            tessellator.addVertex(x1, bottom, 0.0D);
+            tessellator.addVertex(x1, top, 0.0D);
+            tessellator.setColorRGBA_I(backdropRgb, a0);
+            tessellator.addVertex(x0, top, 0.0D);
+            tessellator.addVertex(x0, bottom, 0.0D);
+        }
         tessellator.draw();
         GL11.glShadeModel(GL11.GL_FLAT);
         GL11.glDisable(GL11.GL_BLEND);

@@ -4,12 +4,15 @@ import com.ninuna.losttales.client.render.EntityRenderTextureAccess;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import cpw.mods.fml.common.FMLLog;
+import lotr.client.render.entity.LOTRNPCRendering;
 import lotr.common.entity.npc.LOTREntityNPC;
 import lotr.common.fac.LOTRFaction;
+import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.world.World;
 
 /**
  * Called by the coremod inside LOTR's client-side NPC speech packet
@@ -37,6 +40,27 @@ public final class LostTalesNpcChatHook {
     private static long lastFiledNanos;
 
     private LostTalesNpcChatHook() {}
+
+    /**
+     * Stands in for LOTR's own pass over every NPC's floating speech.
+     * Lost Tales draws that speech with each NPC instead — in the chat's
+     * ivory on the chat's black, under the NPC's name in its faction's
+     * colour, so an NPC reads the same over its head as in the
+     * conversation. With the styling turned off, LOTR's pass runs
+     * exactly as it did.
+     */
+    public static void renderNpcSpeeches(Minecraft minecraft, World world,
+                                         float partialTicks) {
+        try {
+            if (LostTalesConfig.enableNpcChatStyling
+                    && LostTalesConfig.showChatSpeechBubbles) {
+                return;
+            }
+        } catch (Throwable throwable) {
+            logFailureOnce(throwable);
+        }
+        LOTRNPCRendering.renderAllNPCSpeeches(minecraft, world, partialTicks);
+    }
 
     public static void addNpcChatMessage(EntityPlayer player,
                                          IChatComponent original,
@@ -88,6 +112,10 @@ public final class LostTalesNpcChatHook {
             if (name == null || name.length() == 0 || plain.length() == 0) {
                 return;
             }
+            // The world's copy, in the chat's own colours; LOTR's own
+            // drawing of it is redirected below.
+            ChatSpeechBubbles.receiveNpc(npc.getUniqueID(), name,
+                    nameColor(npc), plain);
             if (fileSpeech(npc, name, plain)) {
                 lastFiledEntityId = npc.getEntityId();
                 lastFiledSpeech = plain;

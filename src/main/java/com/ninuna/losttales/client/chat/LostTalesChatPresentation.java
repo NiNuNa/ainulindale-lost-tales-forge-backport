@@ -224,7 +224,9 @@ public final class LostTalesChatPresentation {
      * rather than something the sender wrote.
      */
     private static IChatComponent markEdited(IChatComponent line) {
-        int color = LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE);
+        // The quiet tone the reply chip and the typing line wear too:
+        // the three are the chat's asides, and they read as one set.
+        int color = LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
         ChatComponentText mark = text(
                 StatCollector.translateToLocal("gui.losttales.chat.edited"),
                 nearestFormatting(color), false);

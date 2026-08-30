@@ -417,6 +417,58 @@ public final class LostTalesClassTransformerTest {
                 "addImmersiveSpeech"));
     }
 
+    /**
+     * LOTR draws every NPC's floating speech in one static pass, called
+     * from its client tick handler. Lost Tales takes that call over so
+     * the words over an NPC's head are drawn in the chat's own style;
+     * a dependency bump that renames or moves the pass has to fail here
+     * rather than leaving two sets of speech drawn over each other.
+     */
+    @Test
+    public void npcFloatingSpeechIsDrawnInTheChatStyle() throws Exception {
+        ClassNode transformed = transform("lotr.client.LOTRTickHandlerClient");
+        assertTrue(containsStaticHookAnywhere(
+                transformed, NPC_CHAT_HOOK_OWNER, "renderNpcSpeeches"));
+        assertFalse(containsStaticHookAnywhere(
+                transformed, "lotr/client/render/entity/LOTRNPCRendering",
+                "renderAllNPCSpeeches"));
+    }
+
+    /**
+     * The guard goes on vanilla's label draw alone. Cancelling the whole
+     * specials pass would have been simpler and was wrong: that pass
+     * returns before it fires its own Post event, which is where the
+     * speech and LOTR's alignment are drawn, so one cancel took out all
+     * three. A Forge bump that renames or reshapes the label draw has to
+     * fail here rather than quietly leaving two names over one head.
+     */
+    @Test
+    public void aSpeakingPlayerWearsOneNameNotTwo() throws Exception {
+        ClassNode transformed = transform(
+                "net.minecraft.client.renderer.entity.RendererLivingEntity");
+        assertTrue(containsStaticHookAnywhere(transformed,
+                "com/ninuna/losttales/client/chat/"
+                        + "LostTalesSpeechBubbleRenderer",
+                "hidesNameplate"));
+    }
+
+    /**
+     * LOTR's floating alignment is a spawned effect with a position of
+     * its own, so its own renderer is the only place its height can be
+     * raised clear of a speaker's name. A dependency bump that reshapes
+     * that renderer has to fail here rather than quietly dropping the
+     * alignment back through the middle of the words.
+     */
+    @Test
+    public void floatingAlignmentStandsAboveASpeakersName() throws Exception {
+        ClassNode transformed = transform(
+                "lotr.client.render.entity.LOTRRenderAlignmentBonus");
+        assertTrue(containsStaticHookAnywhere(transformed,
+                "com/ninuna/losttales/client/chat/"
+                        + "LostTalesSpeechBubbleRenderer",
+                "liftAlignment"));
+    }
+
     @Test
     public void playerDeathMessagesUseRoleplayCharacterNames()
             throws Exception {
