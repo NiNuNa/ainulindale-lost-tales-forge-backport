@@ -328,11 +328,14 @@ public final class LostTalesChatService {
             // The bridge posts the line under the sender's name with their
             // head as the picture; emoji shortcodes go as the Unicode
             // emoji Discord renders, share tokens as the text they were
-            // typed as.
+            // typed as. The message's own id and the reply it resolved
+            // travel with it, so the post can be linked to its Discord
+            // copy and a reply can point at the Discord original.
             LostTalesDiscordBridge.getInstance().relay(identityName,
                     DiscordAvatarUrl.of(LostTalesConfig.discordAvatarUrlTemplate,
                             accountName, sender.getUniqueID()),
-                    DiscordMessageSanitizer.outbound(message));
+                    DiscordMessageSanitizer.outbound(message),
+                    packet.getMessageId(), reply);
         }
     }
 
@@ -341,34 +344,89 @@ public final class LostTalesChatService {
      * thread: it enters the Discord channel for everyone online under
      * the Discord display name, with a fixed sender id no account owns,
      * and is never posted back to Discord. The bridge has already
-     * sanitised and bounded the text.
+     * sanitised and bounded the text, and resolved the quote when the
+     * message answers one — a Discord reply is shown exactly as a
+     * player's reply is. The line is recorded like any other, so
+     * players can reply to it in turn; its author id is the bridge's
+     * own, which no account holds, so nobody can edit or take it back.
+     * Answers with the id the message was distributed under, or
+     * {@link ChatMessageIds#NONE} when nothing went out, so the bridge
+     * can link the line to the Discord message it came from.
      */
-    public static void sendFromDiscord(String displayName, String message) {
+    public static long sendFromDiscord(String displayName, String message,
+                                       ChatReplyReference reply) {
         MinecraftServer server = MinecraftServer.getServer();
         if (!LostTalesConfig.discordEnabled || displayName == null
                 || displayName.length() == 0
                 || !ChatMessageValidator.isValid(message) || server == null
                 || server.getConfigurationManager() == null
                 || server.getConfigurationManager().playerEntityList == null) {
-            return;
+            return ChatMessageIds.NONE;
         }
         int ivory = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
+        long messageId = ChatMessageIdAllocator.next();
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
                 ChatChannel.DISCORD,
                 LostTalesChatMessagePacket.DISCORD_SENDER_ID, displayName,
                 displayName, "", ivory, ivory, message,
                 System.currentTimeMillis(), "", null, "", "", 0, true,
-                ChatMessageIdAllocator.next());
+                messageId, reply);
         FMLLog.info("[losttales/chat/discord] <%s (discord)> %s", displayName,
                 message);
         @SuppressWarnings("unchecked")
         List<EntityPlayerMP> online =
                 server.getConfigurationManager().playerEntityList;
+        List<UUID> recipientIds = new ArrayList<UUID>(online.size());
         for (EntityPlayerMP recipient : online) {
             if (recipient != null) {
                 LostTalesNetworkHandler.CHANNEL.sendTo(packet, recipient);
+                recipientIds.add(recipient.getUniqueID());
             }
         }
+        ChatMessageLog.record(messageId,
+                LostTalesChatMessagePacket.DISCORD_SENDER_ID, displayName,
+                message, recipientIds);
+        return messageId;
+    }
+
+    /**
+     * A Discord member's own edit, found by the bridge's sweep and
+     * delivered on the server thread: the line is rewritten for
+     * everyone who was sent it, exactly as a player's edit is. The
+     * bridge signed the line with its own author id when it was
+     * recorded, which is what allows the rewrite here and what stops
+     * any player from making one. Nothing is posted back to Discord —
+     * the change came from there.
+     */
+    public static void editFromDiscord(long messageId, String message) {
+        if (!ChatMessageValidator.isValid(message)) {
+            return;
+        }
+        Set<UUID> recipients = ChatMessageLog.applyEdit(messageId,
+                LostTalesChatMessagePacket.DISCORD_SENDER_ID, message);
+        if (recipients == null) {
+            return;
+        }
+        FMLLog.info("[losttales/chat/discord] edited message %d: %s",
+                Long.valueOf(messageId), message);
+        tellRecipients(recipients,
+                LostTalesChatUpdatePacket.edited(messageId, message));
+    }
+
+    /**
+     * A Discord member's own deletion, on the same terms as an edit:
+     * the line is taken back from everyone who was sent it.
+     */
+    public static void deleteFromDiscord(long messageId) {
+        Set<UUID> recipients = ChatMessageLog.remove(messageId,
+                LostTalesChatMessagePacket.DISCORD_SENDER_ID);
+        if (recipients == null) {
+            return;
+        }
+        FMLLog.info("[losttales/chat/discord] deleted message %d",
+                Long.valueOf(messageId));
+        tellRecipients(recipients,
+                LostTalesChatUpdatePacket.removed(messageId));
     }
 
     /**
@@ -451,9 +509,8 @@ public final class LostTalesChatService {
      *
      * <p>The new text passes the same validator a fresh message does,
      * so an edit is not a way around what a send would have refused.
-     * A line already carried to Discord is not re-posted: the bridge
-     * writes through a webhook and does not keep what it would need to
-     * go back and change it.</p>
+     * A line already carried to Discord is corrected there as well,
+     * through the id the bridge kept from its own post.</p>
      */
     public static void edit(EntityPlayerMP editor, long messageId,
                             String message) {
@@ -471,6 +528,11 @@ public final class LostTalesChatService {
                 editor.getCommandSenderName(), message);
         tellRecipients(recipients,
                 LostTalesChatUpdatePacket.edited(messageId, message));
+        // A line carried to Discord is corrected there too: the bridge
+        // rewrites its own webhook post by the id it kept. A message of
+        // any other channel resolves to no post and nothing happens.
+        LostTalesDiscordBridge.getInstance().relayEdit(messageId,
+                DiscordMessageSanitizer.outbound(message));
     }
 
     /**
@@ -492,6 +554,8 @@ public final class LostTalesChatService {
                 remover.getCommandSenderName(), Long.valueOf(messageId));
         tellRecipients(recipients,
                 LostTalesChatUpdatePacket.removed(messageId));
+        // Taken back from Discord as well, on the same terms as an edit.
+        LostTalesDiscordBridge.getInstance().relayDelete(messageId);
     }
 
     /**

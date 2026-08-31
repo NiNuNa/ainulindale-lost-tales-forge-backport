@@ -82,7 +82,7 @@ final class ChatChannelTabBar {
      */
     static final int HEIGHT = PIECE_HEIGHT + 1;
     /** Pixels the selected tab rises out of the row. */
-    static final int LIFT = 2;
+    static final int LIFT = 3;
     /** Full height of the row: a resting tab plus the lift. */
     static final int ROW_HEIGHT = HEIGHT + LIFT;
     /** Width of a tab's border pieces; the same in every state. */
@@ -187,11 +187,22 @@ final class ChatChannelTabBar {
     /** Room the grip keeps at the row's right end: its glyph and inset. */
     static final int MIN_GRIP_WIDTH = GRIP_WIDTH + GRIP_INSET;
     /**
-     * Opacity of a tab's interior. The border sprites carry that same
-     * interior behind them at this alpha, so the span they enclose has
-     * to be filled with it exactly or a tab reads as two tones.
+     * Opacity of a tab's surface, which the bar paints itself in one
+     * layer under the border artwork's ink. The artwork carries a
+     * preview of the surface behind its ink at this same alpha; the
+     * preview is cut away at draw time on {@link #TAB_INK_THRESHOLD}.
      */
     private static final int TAB_SURFACE_ALPHA = 0xAB;
+    /**
+     * Fragment-alpha share separating a tab piece's ink from the
+     * surface preview behind it: ink is authored fully opaque, the
+     * preview at {@link #TAB_SURFACE_ALPHA}, and only what clears the
+     * threshold is drawn. The surface itself is painted by the bar in a
+     * single layer, so the states stay one colour instead of stacking;
+     * {@link ChatIconSheetTest} keeps the artwork on the right sides of
+     * the threshold.
+     */
+    static final float TAB_INK_THRESHOLD = 0.85F;
     /** The line joining a resting tab's border tips. */
     private static final int TIP_RGB =
             LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE);
@@ -720,8 +731,8 @@ final class ChatChannelTabBar {
         // edge, and the name is cut to what is actually left for it.
         float stretch = width - tab.width;
         float dim = 1.0F;
-        // The border artwork is opaque and carries the interior with it;
-        // the span between the pieces is filled to match.
+        // One surface painted under border ink and span alike; the
+        // artwork's own backdrop texels are cut away inside.
         drawTabShape(left, right, top, selected, lit,
                 scaled(Math.round(0xFF * dim)),
                 scaled(Math.round(TAB_SURFACE_ALPHA * dim)));
@@ -860,19 +871,19 @@ final class ChatChannelTabBar {
         // the whole tab lights together rather than in two steps.
         ChatIconSheet leftLit = null;
         ChatIconSheet rightLit = null;
-        int interiorRgb;
+        int surfaceRgb;
         int tipRgb;
         if (selected) {
             leftPiece = ChatIconSheet.TAB_SELECTED_LEFT;
             rightPiece = ChatIconSheet.TAB_SELECTED_RIGHT;
-            interiorRgb = LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB;
+            surfaceRgb = LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB;
             tipRgb = TIP_LIT_RGB;
         } else {
             leftPiece = ChatIconSheet.TAB_LEFT;
             rightPiece = ChatIconSheet.TAB_RIGHT;
             leftLit = ChatIconSheet.TAB_HOVER_LEFT;
             rightLit = ChatIconSheet.TAB_HOVER_RIGHT;
-            interiorRgb = LostTalesChatVisualStyle.blend(
+            surfaceRgb = LostTalesChatVisualStyle.blend(
                     LostTalesChatVisualStyle.SURFACE_RGB,
                     LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB, lit);
             tipRgb = LostTalesChatVisualStyle.blend(TIP_RGB, TIP_LIT_RGB,
@@ -881,27 +892,53 @@ final class ChatChannelTabBar {
         float spanLeft = left + BORDER_WIDTH;
         float spanRight = right - BORDER_WIDTH;
         int height = leftPiece.getHeight();
+        // The tab's one surface, painted in a single layer across its
+        // whole chamfered footprint — the top row inset a pixel each
+        // side, the body below it, border regions and span alike, at the
+        // tab's own fractional edges since a tab settles on a display
+        // pixel rather than a whole GUI one. One layer whose tone
+        // travels is what keeps the states one colour: a tab fully
+        // crossed to the lit artwork stands on exactly the surface the
+        // selected tab stands on, where a hover layer stacked over the
+        // resting one would darken past it — and the border pieces can
+        // never read as another tone than the span between them, since
+        // both are this same paint.
+        LostTalesChatOverlayRenderer.fillRect(left + 1, top, right - 1,
+                top + 1,
+                LostTalesChatVisualStyle.argb(surfaceRgb, interiorAlpha));
+        LostTalesChatOverlayRenderer.fillRect(left, top + 1, right,
+                top + height,
+                LostTalesChatVisualStyle.argb(surfaceRgb, interiorAlpha));
         if (spanRight > spanLeft) {
-            // As deep as the pieces themselves, so the span cannot end
-            // short of the artwork it stands between. Filled at the
-            // tab's own fractional edges, since a tab settles on a
-            // display pixel rather than on a whole GUI one.
-            LostTalesChatOverlayRenderer.fillRect(spanLeft, top, spanRight,
-                    top + height,
-                    LostTalesChatVisualStyle.argb(interiorRgb, interiorAlpha));
             // The tips are the pieces' innermost lit columns, one pixel
             // outside the span, so the line meets both without a gap.
             LostTalesChatOverlayRenderer.fillRect(spanLeft, top + TIP_ROW,
                     spanRight, top + TIP_ROW + 1,
                     LostTalesChatVisualStyle.argb(tipRgb, spriteAlpha));
         }
-        leftPiece.draw(left, top, spriteAlpha);
-        rightPiece.draw(spanRight, top, spriteAlpha);
-        int over = Math.round(spriteAlpha * lit);
-        if (leftLit != null
-                && over >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
-            leftLit.draw(left, top, over);
-            rightLit.draw(spanRight, top, over);
+        // The pieces bring ink alone to the frame: their backdrop texels
+        // only preview the surface painted above and are cut away on the
+        // ink threshold, or they would stack a second layer over it. The
+        // test sees texture and vertex alpha multiplied, so the
+        // threshold is scaled by the share each piece is drawn at.
+        GL11.glEnable(GL11.GL_ALPHA_TEST);
+        try {
+            GL11.glAlphaFunc(GL11.GL_GREATER,
+                    TAB_INK_THRESHOLD * spriteAlpha / 255.0F);
+            leftPiece.draw(left, top, spriteAlpha);
+            rightPiece.draw(spanRight, top, spriteAlpha);
+            int over = Math.round(spriteAlpha * lit);
+            if (leftLit != null
+                    && over >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+                GL11.glAlphaFunc(GL11.GL_GREATER,
+                        TAB_INK_THRESHOLD * over / 255.0F);
+                leftLit.draw(left, top, over);
+                rightLit.draw(spanRight, top, over);
+            }
+        } finally {
+            // The threshold vanilla's GUI runs under, as the item
+            // renderer also leaves it.
+            GL11.glAlphaFunc(GL11.GL_GREATER, 0.1F);
         }
     }
 

@@ -37,7 +37,7 @@ final class ClientChatMessages {
             return;
         }
         ENTRIES.put(Long.valueOf(packet.getMessageId()),
-                new Remembered(packet, tab, showcaseIds));
+                new Remembered(packet, tab, showcaseIds, false));
         while (ENTRIES.size() > ClientChatChannelViews.maxTrackedLines()) {
             Iterator<Long> oldest = ENTRIES.keySet().iterator();
             oldest.next();
@@ -58,9 +58,44 @@ final class ClientChatMessages {
             return;
         }
         // Keeps its place in the order, so an edit does not change what
-        // is forgotten next.
+        // is forgotten next; the message is edited from here on, and a
+        // later rebuild of the line keeps saying so.
         ENTRIES.put(Long.valueOf(messageId),
-                new Remembered(packet, entry.tab, entry.showcaseIds));
+                new Remembered(packet, entry.tab, entry.showcaseIds, true));
+    }
+
+    /**
+     * Swaps what a message is built from without making it an edited
+     * one: what a reply takes when the message it quotes changes under
+     * it — the reply itself still says exactly what it said.
+     */
+    static synchronized void refresh(long messageId,
+                                     LostTalesChatMessagePacket packet) {
+        Remembered entry = ENTRIES.get(Long.valueOf(messageId));
+        if (entry == null || packet == null) {
+            return;
+        }
+        ENTRIES.put(Long.valueOf(messageId), new Remembered(packet,
+                entry.tab, entry.showcaseIds, entry.edited));
+    }
+
+    /**
+     * The messages still held that reply to {@code messageId}, oldest
+     * first: whose quotes have to follow when it is edited.
+     */
+    static synchronized java.util.List<Long> replyingTo(long messageId) {
+        java.util.List<Long> result = new java.util.ArrayList<Long>();
+        if (!ChatMessageIds.isServerId(messageId)) {
+            return result;
+        }
+        for (java.util.Map.Entry<Long, Remembered> entry
+                : ENTRIES.entrySet()) {
+            if (entry.getValue().packet.getReply().getMessageId()
+                    == messageId) {
+                result.add(entry.getKey());
+            }
+        }
+        return result;
     }
 
     /** Forgets a message that is no longer shown. */
@@ -82,12 +117,15 @@ final class ClientChatMessages {
         final LostTalesChatMessagePacket packet;
         final ChatTab tab;
         final int[] showcaseIds;
+        /** Whether the message has been edited; its line says so. */
+        final boolean edited;
 
         private Remembered(LostTalesChatMessagePacket packet, ChatTab tab,
-                           int[] showcaseIds) {
+                           int[] showcaseIds, boolean edited) {
             this.packet = packet;
             this.tab = tab;
             this.showcaseIds = showcaseIds;
+            this.edited = edited;
         }
     }
 }

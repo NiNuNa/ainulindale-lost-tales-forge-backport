@@ -71,12 +71,12 @@ enum ChatIconSheet {
      * selected pair is two rows taller: the tab it draws stands that
      * much above the resting ones.
      */
-    TAB_LEFT(0, 59, 4, 17),
-    TAB_RIGHT(5, 59, 4, 17),
-    TAB_HOVER_LEFT(10, 59, 4, 17),
-    TAB_HOVER_RIGHT(15, 59, 4, 17),
-    TAB_SELECTED_LEFT(20, 57, 4, 19),
-    TAB_SELECTED_RIGHT(25, 57, 4, 19),
+    TAB_LEFT(0, 59, 4, 18),
+    TAB_RIGHT(5, 59, 4, 18),
+    TAB_HOVER_LEFT(10, 59, 4, 18),
+    TAB_HOVER_RIGHT(15, 59, 4, 18),
+    TAB_SELECTED_LEFT(20, 56, 4, 21),
+    TAB_SELECTED_RIGHT(25, 56, 4, 21),
     /**
      * The hatch laid over message rows the history does not reach: a
      * 45° line every eight texels. The pattern's period divides the

@@ -51,18 +51,7 @@ public final class DiscordServerNotices {
 
     /** Backslash-escapes every character Discord's markdown gives meaning to. */
     static String escape(String name) {
-        String value = name == null ? "" : name.trim();
-        StringBuilder escaped = new StringBuilder(value.length() + 4);
-        for (int index = 0; index < value.length(); index++) {
-            char character = value.charAt(index);
-            if (character == '\\' || character == '*' || character == '_'
-                    || character == '~' || character == '`' || character == '|'
-                    || character == '>' || character == '@' || character == '#') {
-                escaped.append('\\');
-            }
-            escaped.append(character);
-        }
-        return escaped.toString();
+        return DiscordMessageSanitizer.escapeMarkdown(name);
     }
 
     private static String bound(String topic) {

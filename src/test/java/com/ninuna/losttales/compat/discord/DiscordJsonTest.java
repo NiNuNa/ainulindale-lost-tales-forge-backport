@@ -66,6 +66,75 @@ public final class DiscordJsonTest {
     }
 
     @Test
+    public void repliesCarryTheReferencedIdAndForwardsDoNot() {
+        List<DiscordJson.Message> messages = DiscordJson.parseMessages("["
+                + "{\"id\":\"40\",\"content\":\"a reply\","
+                + "\"message_reference\":{\"message_id\":\"30\",\"type\":0}},"
+                + "{\"id\":\"41\",\"content\":\"typeless reply\","
+                + "\"message_reference\":{\"message_id\":\"30\"}},"
+                + "{\"id\":\"42\",\"content\":\"a forward\","
+                + "\"message_reference\":{\"message_id\":\"30\",\"type\":1}},"
+                + "{\"id\":\"43\",\"content\":\"plain\"}"
+                + "]");
+        assertEquals(4, messages.size());
+        // Oldest first: the listing above arrives reversed.
+        assertEquals("", messages.get(0).referencedMessageId);
+        assertEquals("", messages.get(1).referencedMessageId);
+        assertEquals("30", messages.get(2).referencedMessageId);
+        assertEquals("30", messages.get(3).referencedMessageId);
+    }
+
+    @Test
+    public void editStampsAreReadAndEmptyForUneditedMessages() {
+        List<DiscordJson.Message> messages = DiscordJson.parseMessages("["
+                + "{\"id\":\"50\",\"content\":\"edited\","
+                + "\"edited_timestamp\":\"2026-09-01T00:00:00Z\"},"
+                + "{\"id\":\"40\",\"content\":\"plain\","
+                + "\"edited_timestamp\":null},"
+                + "{\"id\":\"30\",\"content\":\"bare\"}"
+                + "]");
+        assertEquals(3, messages.size());
+        assertEquals("", messages.get(0).editedTimestamp);
+        assertEquals("", messages.get(1).editedTimestamp);
+        assertEquals("2026-09-01T00:00:00Z", messages.get(2).editedTimestamp);
+    }
+
+    @Test
+    public void createdMessageIdsAreReadFromWaitReplies() {
+        assertEquals("123456", DiscordJson.parseCreatedMessageId(
+                "{\"id\":\"123456\",\"content\":\"hi\"}"));
+        assertEquals("", DiscordJson.parseCreatedMessageId("{}"));
+        assertEquals("", DiscordJson.parseCreatedMessageId("[]"));
+        assertEquals("", DiscordJson.parseCreatedMessageId("garbage"));
+        assertEquals("", DiscordJson.parseCreatedMessageId(null));
+        assertEquals("", DiscordJson.parseCreatedMessageId(""));
+    }
+
+    @Test
+    public void webhookInfoNeedsBothIds() {
+        DiscordJson.WebhookInfo info = DiscordJson.parseWebhookInfo(
+                "{\"guild_id\":\"9\",\"channel_id\":\"8\",\"name\":\"hook\"}");
+        assertEquals("9", info.guildId);
+        assertEquals("8", info.channelId);
+        assertEquals(null, DiscordJson.parseWebhookInfo(
+                "{\"channel_id\":\"8\"}"));
+        assertEquals(null, DiscordJson.parseWebhookInfo("{}"));
+        assertEquals(null, DiscordJson.parseWebhookInfo("garbage"));
+        assertEquals(null, DiscordJson.parseWebhookInfo(null));
+    }
+
+    @Test
+    public void editBodiesCarryTheNewTextAndPingNobody() {
+        JsonObject body = new JsonParser().parse(
+                DiscordJson.webhookEditBody("@everyone corrected"))
+                .getAsJsonObject();
+        assertEquals("@everyone corrected", body.get("content").getAsString());
+        assertEquals(0, body.getAsJsonObject("allowed_mentions")
+                .getAsJsonArray("parse").size());
+        assertFalse(body.has("username"));
+    }
+
+    @Test
     public void rateLimitWaitsAreReadInMilliseconds() {
         assertEquals(1500L, DiscordJson.retryAfterMillis(
                 "{\"message\":\"slow down\",\"retry_after\":1.5}"));

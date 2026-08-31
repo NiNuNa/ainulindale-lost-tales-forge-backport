@@ -55,6 +55,60 @@ public final class ChatIconSheetTest {
         }
     }
 
+    /**
+     * The bar paints a tab's surface itself and keeps only the border
+     * pieces' <em>ink</em>, cutting everything under
+     * {@link ChatChannelTabBar#TAB_INK_THRESHOLD} away at draw time —
+     * the artwork's backdrop texels are a preview, not a layer. That
+     * only works while every texel is on the right side of the
+     * threshold: ink fully opaque, everything else safely below it. A
+     * re-export whose backdrop creeps toward opacity would stack a
+     * second surface over the painted one and is failed here instead.
+     */
+    @Test
+    public void tabPiecesSeparateInkFromSurfacePreview() throws Exception {
+        InputStream stream = ChatIconSheetTest.class.getResourceAsStream(
+                "/assets/losttales/" + ChatIconSheet.TEXTURE_PATH);
+        assertNotNull("Chat icon sheet is missing", stream);
+        try {
+            BufferedImage sheet = ImageIO.read(stream);
+            assertInkOrPreview(sheet, ChatIconSheet.TAB_LEFT);
+            assertInkOrPreview(sheet, ChatIconSheet.TAB_RIGHT);
+            assertInkOrPreview(sheet, ChatIconSheet.TAB_HOVER_LEFT);
+            assertInkOrPreview(sheet, ChatIconSheet.TAB_HOVER_RIGHT);
+            assertInkOrPreview(sheet, ChatIconSheet.TAB_SELECTED_LEFT);
+            assertInkOrPreview(sheet, ChatIconSheet.TAB_SELECTED_RIGHT);
+        } finally {
+            stream.close();
+        }
+    }
+
+    /**
+     * Every texel of the piece must be ink at full opacity or a preview
+     * below the ink threshold; anything between would neither be cut
+     * away nor drawn whole.
+     */
+    private static void assertInkOrPreview(BufferedImage sheet,
+                                           ChatIconSheet piece) {
+        int ceiling = (int)Math.floor(
+                ChatChannelTabBar.TAB_INK_THRESHOLD * 255.0F);
+        boolean sawInk = false;
+        for (int y = 0; y < piece.getHeight(); y++) {
+            for (int x = 0; x < piece.getWidth(); x++) {
+                int alpha = sheet.getRGB(piece.getTextureU() + x,
+                        piece.getTextureV() + y) >>> 24;
+                if (alpha == 0xFF) {
+                    sawInk = true;
+                    continue;
+                }
+                assertTrue(piece + " texel " + x + "," + y + " at alpha "
+                        + alpha + " sits between preview and ink",
+                        alpha < ceiling);
+            }
+        }
+        assertTrue(piece + " carries no ink at all", sawInk);
+    }
+
     @Test
     public void hoverStatesMatchTheirRestingSprite() {
         assertSameSize(ChatIconSheet.EMOJI, ChatIconSheet.EMOJI_HOVER);

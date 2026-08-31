@@ -121,6 +121,49 @@ public final class DiscordMessageSanitizer {
         return result == null ? text : result.toString();
     }
 
+    /**
+     * The line a webhook post opens with when the game message answers
+     * one Discord holds: Discord's small subtext, an arrow, the quoted
+     * author in bold and the quoted text — linked to the original when
+     * a jump URL is known, plain when it is not. The closest thing to a
+     * native reply a webhook can carry: Discord accepts no
+     * {@code message_reference} on a webhook execution, so the header
+     * says in markdown what the reply banner would have said.
+     */
+    public static String replyHeader(String author, String excerpt,
+                                     String jumpUrl) {
+        String name = escapeMarkdown(outbound(author));
+        String quoted = escapeMarkdown(outbound(excerpt));
+        String body = "**" + name + "**"
+                + (quoted.length() == 0 ? "" : " — " + quoted);
+        if (jumpUrl != null && jumpUrl.length() > 0) {
+            body = "[" + body + "](" + jumpUrl + ")";
+        }
+        return "-# ↩ " + body + "\n";
+    }
+
+    /**
+     * Backslash-escapes every character Discord's markdown gives meaning
+     * to, the link brackets included, so a name or a quote reads as the
+     * text it is wherever the bridge writes it.
+     */
+    public static String escapeMarkdown(String text) {
+        String value = text == null ? "" : text.trim();
+        StringBuilder escaped = new StringBuilder(value.length() + 4);
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (character == '\\' || character == '*' || character == '_'
+                    || character == '~' || character == '`' || character == '|'
+                    || character == '>' || character == '@' || character == '#'
+                    || character == '[' || character == ']'
+                    || character == '(' || character == ')') {
+                escaped.append('\\');
+            }
+            escaped.append(character);
+        }
+        return escaped.toString();
+    }
+
     /** A Discord author's name as the chat shows it; empty for nothing usable. */
     public static String inboundName(String name) {
         if (name == null) {

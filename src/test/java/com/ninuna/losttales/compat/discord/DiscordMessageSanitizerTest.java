@@ -81,6 +81,39 @@ public final class DiscordMessageSanitizerTest {
     }
 
     @Test
+    public void replyHeadersQuoteInSubtextAndLinkWhenTheyCan() {
+        assertEquals("-# ↩ [**Aldric** — meet me at the gate](https://discord"
+                + ".com/channels/9/8/30)\n",
+                DiscordMessageSanitizer.replyHeader("Aldric",
+                        "meet me at the gate",
+                        "https://discord.com/channels/9/8/30"));
+        assertEquals("-# ↩ **Aldric** — meet me at the gate\n",
+                DiscordMessageSanitizer.replyHeader("Aldric",
+                        "meet me at the gate", ""));
+        // A quote with markdown in it reads as the text it is, brackets
+        // included, so it cannot break out of the masked link.
+        assertEquals("-# ↩ [**x\\_y** — a \\[b\\]\\(c\\) \\*d\\*](url)\n",
+                DiscordMessageSanitizer.replyHeader("x_y",
+                        "a [b](c) *d*", "url"));
+        // An emoji in the quote goes as the emoji Discord renders.
+        assertEquals("-# ↩ **Aldric** — hi 😳\n",
+                DiscordMessageSanitizer.replyHeader("Aldric",
+                        "hi :flushed:", null));
+        assertEquals("-# ↩ **Aldric**\n",
+                DiscordMessageSanitizer.replyHeader("Aldric", "", ""));
+    }
+
+    @Test
+    public void markdownEscapingCoversTheLinkBrackets() {
+        assertEquals("\\[a\\]\\(b\\) \\*c\\* \\@d \\#e \\`f\\` \\|g\\| \\>h",
+                DiscordMessageSanitizer.escapeMarkdown(
+                        "[a](b) *c* @d #e `f` |g| >h"));
+        assertEquals("", DiscordMessageSanitizer.escapeMarkdown(null));
+        assertEquals("plain", DiscordMessageSanitizer.escapeMarkdown(
+                " plain "));
+    }
+
+    @Test
     public void namesAreBoundedAndCleaned() {
         assertEquals("Sam Gamgee",
                 DiscordMessageSanitizer.inboundName(" Sam\n§lGamgee "));

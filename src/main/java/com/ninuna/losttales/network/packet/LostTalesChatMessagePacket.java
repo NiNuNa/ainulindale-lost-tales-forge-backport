@@ -493,6 +493,20 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 this.partnerIdentity, this.echoNonce);
     }
 
+    /**
+     * The same line quoting differently: what a client rebuilds a reply
+     * with when the message it quotes has been edited under it.
+     */
+    public LostTalesChatMessagePacket withReply(ChatReplyReference reply) {
+        return new LostTalesChatMessagePacket(getChannel(), this.senderId,
+                this.identityName, this.accountName, this.title,
+                this.titleColor, this.nameColor, this.message,
+                this.timestampMillis, this.skinId, this.showcases,
+                this.factionName, this.partner, this.roles,
+                this.accountLine, this.messageId, reply,
+                this.partnerIdentity, this.echoNonce);
+    }
+
     public ChatChannel getChannel() {
         return ChatChannel.fromId(this.channelId);
     }

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.input;
 
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
 import org.lwjgl.input.Keyboard;
 
 /** Per-key, frame-rate-independent motion for keyboard hint artwork. */
@@ -234,14 +235,11 @@ final class LostTalesInputIconAnimation {
     }
 
     private static float easeOutCubic(float value) {
-        float bounded = clamp01(value);
-        float inverse = 1.0F - bounded;
-        return 1.0F - inverse * inverse * inverse;
+        return LostTalesGuiEasing.easeOutCubic(value);
     }
 
     private static float smoothStep(float value) {
-        float bounded = clamp01(value);
-        return bounded * bounded * (3.0F - 2.0F * bounded);
+        return LostTalesGuiEasing.smoothStep(value);
     }
 
     private static float lerp(float from, float to, float progress) {
@@ -249,7 +247,7 @@ final class LostTalesInputIconAnimation {
     }
 
     private static float clamp01(float value) {
-        return Math.max(0.0F, Math.min(1.0F, value));
+        return LostTalesGuiEasing.clamp(value);
     }
 
     private static long elapsed(long earlier, long later) {

@@ -16,9 +16,9 @@ public final class ChatWindowPlacementTest {
 
     /**
      * Without a Minecraft instance a window is 160 wide, a line 11 tall,
-     * the strips 20 each with the rules on their inner rows, 2px of
+     * the strips 22 each with the rules on their inner rows, 2px of
      * head-room under the top rule, and one trailing line below the
-     * baseline — so a one-line window is 64 tall with 31 of it below
+     * baseline — so a one-line window is 68 tall with 33 of it below
      * the baseline. The screen margin is zero: a window may be dragged
      * flush against the border; other windows never hold it.
      */
@@ -26,16 +26,16 @@ public final class ChatWindowPlacementTest {
     public void onlyTheScreenEdgesHoldAWindow() {
         ChatWindowLayout.reset();
         ChatWindow dragged = ChatWindowLayout.firstWindow();
-        // Past the top-left edge: the corner (baseline 64 - 31 = 33).
+        // Past the top-left edge: the corner (baseline 68 - 33 = 35).
         ChatWindowPlacement.Anchor anchor = ChatWindowPlacement.constrainWindow(
                 dragged, null, -50.0D, -50.0D, 1000, 600);
         assertEquals(0.0D, anchor.x, 0.0001D);
-        assertEquals(33.0D, anchor.baseline, 0.0001D);
+        assertEquals(35.0D, anchor.baseline, 0.0001D);
         // Past the bottom-right margins: the far corner.
         anchor = ChatWindowPlacement.constrainWindow(dragged, null, 2000.0D,
                 2000.0D, 1000, 600);
         assertEquals(840.0D, anchor.x, 0.0001D);
-        assertEquals(569.0D, anchor.baseline, 0.0001D);
+        assertEquals(567.0D, anchor.baseline, 0.0001D);
         // Anywhere inside is fine, another window there or not: the
         // console window may be dropped right onto the conversation one.
         ChatWindowPlacement.Box other = ChatWindowPlacement.windowBounds(
@@ -52,12 +52,12 @@ public final class ChatWindowPlacementTest {
     }
 
     /**
-     * Without a Minecraft instance lines are 11 tall, the row 20 with
-     * 2px of head-room under it, and 31 hang below the baseline (the
+     * Without a Minecraft instance lines are 11 tall, the row 22 with
+     * 2px of head-room under it, and 33 hang below the baseline (the
      * trailing line and the bar); a one-line window's travel on a 600px
-     * screen is 536. The console window sits at 10% (baseline 86.6,
-     * bottom 117.6), the conversation window at 22% (baseline 150.92)
-     * with eight lines, so its top (40.92) runs over the console
+     * screen is 532. The console window sits at 10% (baseline 88.2,
+     * bottom 121.2), the conversation window at 22% (baseline 152.04)
+     * with eight lines, so its top (40.04) runs over the console
      * window.
      */
     @Test
@@ -82,10 +82,10 @@ public final class ChatWindowPlacementTest {
                     ChatWindowPlacement.windowBounds(console, null, 1000, 600);
             ChatWindowPlacement.Box belowBox =
                     ChatWindowPlacement.windowBounds(below, null, 1000, 600);
-            assertEquals(86.6D, consoleBox.baseline(), 0.0001D);
+            assertEquals(88.2D, consoleBox.baseline(), 0.0001D);
             assertEquals(88.0D, belowBox.room, 0.0001D);
-            assertEquals(150.92D, belowBox.baseline(), 0.0001D);
-            assertEquals(40.92D, belowBox.y, 0.0001D);
+            assertEquals(152.04D, belowBox.baseline(), 0.0001D);
+            assertEquals(40.04D, belowBox.y, 0.0001D);
             assertTrue(belowBox.y < consoleBox.bottom());
             // Linked above the growing window, it moves up with it until
             // it meets the top margin; the growing window keeps growing.
@@ -94,10 +94,10 @@ public final class ChatWindowPlacementTest {
                     1000, 600);
             belowBox = ChatWindowPlacement.windowBounds(below, null, 1000,
                     600);
-            assertEquals(33.0D, consoleBox.baseline(), 0.0001D);
+            assertEquals(35.0D, consoleBox.baseline(), 0.0001D);
             assertEquals(0.0D, consoleBox.y, 0.0001D);
             assertEquals(88.0D, belowBox.room, 0.0001D);
-            assertEquals(150.92D, belowBox.baseline(), 0.0001D);
+            assertEquals(152.04D, belowBox.baseline(), 0.0001D);
             // Stored anchors are untouched.
             assertEquals(10.0D, console.getOffsetY(), 0.0D);
             assertEquals(22.0D, below.getOffsetY(), 0.0D);
@@ -167,16 +167,16 @@ public final class ChatWindowPlacementTest {
      * A window is exactly as tall as it was dragged: the message room is
      * a pixel count, not a whole number of lines: nothing rounds it, so
      * the box is exactly as tall as asked. Without a Minecraft instance
-     * a line is 11 tall, the row 20 with 2px of head-room under it and
-     * 31 hang below the baseline, so a box of n lines is 53 + 11n
+     * a line is 11 tall, the row 22 with 2px of head-room under it and
+     * 33 hang below the baseline, so a box of n lines is 57 + 11n
      * tall.
      */
     @Test
     public void heightIsContinuousBetweenWholeLines() {
         ChatWindowLayout.reset();
-        assertEquals(20 + 2 + 132 + 31,
+        assertEquals(22 + 2 + 132 + 33,
                 ChatWindowPlacement.heightForLines(12.0D, null), 0.0001D);
-        assertEquals(20 + 2 + 136.07D + 31,
+        assertEquals(22 + 2 + 136.07D + 33,
                 ChatWindowPlacement.heightForLines(12.37D, null), 0.0001D);
         // Every height between two whole lines is reachable, and asking
         // for one gives it back unchanged, exactly.
@@ -202,7 +202,7 @@ public final class ChatWindowPlacementTest {
             ChatWindowPlacement.Box box = ChatWindowPlacement.windowBounds(
                     window, null, 1000, 600);
             assertEquals(136.07D, box.room, 0.0001D);
-            assertEquals(20 + 2 + 136.07D + 31, box.height, 0.0001D);
+            assertEquals(22 + 2 + 136.07D + 33, box.height, 0.0001D);
             assertEquals(13, LostTalesChatOverlayRenderer.linesForRoom(
                     (float)box.room, 1.0F));
         } finally {

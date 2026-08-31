@@ -81,9 +81,56 @@ final class DiscordHttp {
     }
 
     static Reply postWebhook(String webhookUrl, String body) throws IOException {
-        HttpURLConnection connection = open(webhookUrl, "POST");
+        // wait=true has Discord answer with the created message instead
+        // of an empty 204: its id is what links the post to the game
+        // line it carries, so a later reply can point back at it.
+        HttpURLConnection connection = open(webhookUrl
+                + (webhookUrl.indexOf('?') < 0 ? "?" : "&") + "wait=true",
+                "POST");
         connection.setRequestProperty("Content-Type", "application/json");
         return exchange(connection, body);
+    }
+
+    /**
+     * Reads the webhook object its own URL answers with — no bot, the
+     * token in the URL is the authorisation — which is where the guild
+     * and channel ids a jump link needs come from.
+     */
+    static Reply getWebhookInfo(String webhookUrl) throws IOException {
+        return exchange(open(webhookUrl, "GET"), null);
+    }
+
+    /**
+     * Rewrites a message the webhook itself posted; Discord answers 200
+     * with the message. Only the webhook's own posts can be rewritten,
+     * which is exactly the set the bridge ever asks about.
+     */
+    static Reply editWebhookMessage(String webhookUrl, String messageId,
+                                    String body) throws IOException {
+        HttpURLConnection connection =
+                open(webhookMessageUrl(webhookUrl, messageId), "POST");
+        DiscordHttpPatch.apply(connection);
+        connection.setRequestProperty("Content-Type", "application/json");
+        return exchange(connection, body);
+    }
+
+    /**
+     * Takes back a message the webhook itself posted; Discord answers
+     * 204 with nothing.
+     */
+    static Reply deleteWebhookMessage(String webhookUrl, String messageId)
+            throws IOException {
+        return exchange(open(webhookMessageUrl(webhookUrl, messageId),
+                "DELETE"), null);
+    }
+
+    /** One message of the webhook, any query on the base URL set aside. */
+    private static String webhookMessageUrl(String webhookUrl,
+                                            String messageId) {
+        int query = webhookUrl.indexOf('?');
+        String base = query < 0 ? webhookUrl
+                : webhookUrl.substring(0, query);
+        return base + "/messages/" + messageId;
     }
 
     /**

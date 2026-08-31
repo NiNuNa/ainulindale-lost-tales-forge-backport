@@ -180,11 +180,19 @@ public final class LostTalesChatPresentation {
             }
             return;
         }
+        // The quotes first: every held reply to the edited message
+        // re-cuts its excerpt to what the message says now, whether or
+        // not the message's own line is still held.
+        boolean quotesChanged = refreshQuotesOf(chat, packet.getMessageId(),
+                packet.getMessage());
         ClientChatMessages.Remembered remembered =
                 ClientChatMessages.get(packet.getMessageId());
         if (remembered == null || chatLineId == null) {
-            // Nothing left to correct: the message has already fallen
-            // out of the history this client keeps.
+            // Nothing left of the message itself to correct: it has
+            // fallen out of the history this client keeps.
+            if (quotesChanged) {
+                chat.refreshChat();
+            }
             return;
         }
         LostTalesChatMessagePacket edited;
@@ -202,11 +210,62 @@ public final class LostTalesChatPresentation {
                 remembered.tab, remembered.showcaseIds, grouped));
         if (!ChatWindowLines.replaceMessage(chat, chatLineId.intValue(),
                 full)) {
+            if (quotesChanged) {
+                chat.refreshChat();
+            }
             return;
         }
         ChatGroupRuns.replaceGroupedLine(chatLineId.intValue(), groupedLine);
         ClientChatMessages.rewrite(packet.getMessageId(), edited);
         chat.refreshChat();
+    }
+
+    /**
+     * Re-cuts the quote of every held reply to {@code messageId} to the
+     * text it says now, rebuilding each reply's line where it stands.
+     * The reply itself is untouched — the same words, and no edited
+     * mark of its own unless it already wore one — only what it shows
+     * of the message it answers moves, the way the server would cut a
+     * fresh quote of it now. Answers whether any line changed.
+     */
+    private static boolean refreshQuotesOf(GuiNewChat chat, long messageId,
+                                           String newText) {
+        boolean changed = false;
+        List<Long> replies = ClientChatMessages.replyingTo(messageId);
+        for (int index = 0; index < replies.size(); index++) {
+            long replyId = replies.get(index).longValue();
+            ClientChatMessages.Remembered entry =
+                    ClientChatMessages.get(replyId);
+            Integer lineId = ClientChatMessageIds.chatLineIdOf(replyId);
+            if (entry == null || lineId == null) {
+                continue;
+            }
+            LostTalesChatMessagePacket updated;
+            try {
+                updated = entry.packet.withReply(ChatReplyReference.of(
+                        messageId, entry.packet.getReply().getAuthor(),
+                        newText));
+            } catch (RuntimeException refused) {
+                continue;
+            }
+            IChatComponent full = build(updated, entry.tab,
+                    entry.showcaseIds, false);
+            // A reply never groups, so its grouped form is the full one.
+            IChatComponent groupedLine = build(updated, entry.tab,
+                    entry.showcaseIds, false);
+            if (entry.edited) {
+                full = markEdited(full);
+                groupedLine = markEdited(groupedLine);
+            }
+            if (!ChatWindowLines.replaceMessage(chat, lineId.intValue(),
+                    full)) {
+                continue;
+            }
+            ChatGroupRuns.replaceGroupedLine(lineId.intValue(), groupedLine);
+            ClientChatMessages.refresh(replyId, updated);
+            changed = true;
+        }
+        return changed;
     }
 
     /**
@@ -670,6 +729,7 @@ public final class LostTalesChatPresentation {
         flashedChatLineId = 0;
         flashedNanos = 0L;
         hoveredChatLineId = 0;
+        ChatSpoilerMarker.clear();
     }
 
     private static int allocateChatLineId() {
@@ -723,8 +783,13 @@ public final class LostTalesChatPresentation {
             root.appendSibling(ChatLayoutMarker.anchor());
             root.appendSibling(ChatLayoutMarker.bodyBreak(
                     packet.getNameColor()));
+            int bodyStart = root.getSiblings().size();
             appendMessageBody(root, packet.getMessage(), showcaseIds,
                     channel);
+            // Numbered over the body alone, so the grouped and the full
+            // build of one message agree on which spoiler is which.
+            ChatSpoilerMarker.mark(root.getSiblings(), bodyStart,
+                    packet.getMessageId());
             return root;
         }
         // A reply opens with the message it answers, on a row of its
@@ -826,8 +891,13 @@ public final class LostTalesChatPresentation {
         // The header ends here; the body stands on the next row.
         root.appendSibling(ChatLayoutMarker.bodyBreak(
                 packet.getNameColor()));
+        int bodyStart = root.getSiblings().size();
         appendMessageBody(root, packet.getMessage(), showcaseIds,
                 channel);
+        // The body alone: a spoiler quoted by a reply above stays
+        // covered, since the quote is context and not the message.
+        ChatSpoilerMarker.mark(root.getSiblings(), bodyStart,
+                packet.getMessageId());
         return root;
     }
 

@@ -92,6 +92,23 @@ public final class ChatMessageLog {
     }
 
     /**
+     * The quote for a message the Discord bridge names, with no
+     * recipient to check it against: a Discord member is nobody's
+     * account, so the promise the recipient check keeps is kept by the
+     * caller instead — the bridge only ever asks about ids from its own
+     * link table, which holds nothing but the bridged channel's own
+     * messages, every one of them distributed to everyone online and to
+     * Discord itself. Nothing private can be named through it.
+     */
+    public static synchronized ChatReplyReference quoteForDiscordChannel(
+            long messageId) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        return entry == null ? ChatReplyReference.NONE
+                : ChatReplyReference.of(messageId, entry.author,
+                        entry.excerpt);
+    }
+
+    /**
      * Rewrites what a message says and answers with everyone who has to
      * be told, or null when {@code editor} may not change it: no such
      * message, or one they did not write. The excerpt is recut, so a

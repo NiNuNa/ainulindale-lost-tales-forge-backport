@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
+
 /** Project-owned motion curves used by the Lost Tales chat presentation. */
 final class LostTalesChatMotion {
     private LostTalesChatMotion() {}
@@ -57,12 +59,11 @@ final class LostTalesChatMotion {
     }
 
     static float smoothStep(float value) {
-        float p = clamp(value);
-        return p * p * (3.0F - 2.0F * p);
+        return LostTalesGuiEasing.smoothStep(value);
     }
 
     private static float clamp(float value) {
-        return Math.max(0.0F, Math.min(1.0F, value));
+        return LostTalesGuiEasing.clamp(value);
     }
 
     static final class MessageSample {

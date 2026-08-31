@@ -1,5 +1,7 @@
 package com.ninuna.losttales.gui.hud.compass;
 
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
+
 /**
  * Frame-rate-independent motion for the compass height chevrons.
  *
@@ -171,12 +173,11 @@ final class LostTalesCompassHeightIndicatorAnimation {
     }
 
     private static float smoothStep(float value) {
-        float bounded = clamp01(value);
-        return bounded * bounded * (3.0F - 2.0F * bounded);
+        return LostTalesGuiEasing.smoothStep(value);
     }
 
     private static float clamp01(float value) {
-        return Math.max(0.0F, Math.min(1.0F, value));
+        return LostTalesGuiEasing.clamp(value);
     }
 
     static final class Frame {

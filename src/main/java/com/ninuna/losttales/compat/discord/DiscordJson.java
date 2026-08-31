@@ -31,14 +31,30 @@ public final class DiscordJson {
         public final String content;
         /** User id to display name for every {@code <@id>} in the content. */
         public final Map<String, String> mentionNames;
+        /**
+         * The Discord id of the message this one replies to, empty for
+         * an ordinary message. Only a real reply carries it: a forward
+         * also has a message reference, but of its own kind, and is not
+         * an answer to anything.
+         */
+        public final String referencedMessageId;
+        /**
+         * When the message was last edited, empty for never. The value
+         * itself is opaque here — what matters is that it changes with
+         * every edit, which is how a re-read page betrays one.
+         */
+        public final String editedTimestamp;
 
         Message(String id, String authorName, boolean bot, String content,
-                Map<String, String> mentionNames) {
+                Map<String, String> mentionNames,
+                String referencedMessageId, String editedTimestamp) {
             this.id = id;
             this.authorName = authorName;
             this.bot = bot;
             this.content = content;
             this.mentionNames = mentionNames;
+            this.referencedMessageId = referencedMessageId;
+            this.editedTimestamp = editedTimestamp;
         }
     }
 
@@ -98,7 +114,80 @@ public final class DiscordJson {
         return new Message(id, author == null ? "" : displayName(author),
                 author != null && bool(author, "bot"),
                 string(object, "content"),
-                Collections.unmodifiableMap(mentions));
+                Collections.unmodifiableMap(mentions),
+                referencedMessageId(object),
+                string(object, "edited_timestamp"));
+    }
+
+    /**
+     * The Discord id a reply's {@code message_reference} names, or empty
+     * for anything else. A reference of any type but the default reply —
+     * a forward is type 1 — is not an answer and yields nothing.
+     */
+    private static String referencedMessageId(JsonObject object) {
+        if (!object.has("message_reference")
+                || !object.get("message_reference").isJsonObject()) {
+            return "";
+        }
+        JsonObject reference = object.getAsJsonObject("message_reference");
+        JsonElement type = reference.get("type");
+        try {
+            if (type != null && type.isJsonPrimitive()
+                    && type.getAsInt() != 0) {
+                return "";
+            }
+        } catch (RuntimeException exception) {
+            return "";
+        }
+        return string(reference, "message_id");
+    }
+
+    /**
+     * The id of the message a {@code wait=true} webhook post answers
+     * with, or empty for anything that does not parse as one.
+     */
+    public static String parseCreatedMessageId(String json) {
+        JsonObject object = parseObject(json);
+        return object == null ? "" : string(object, "id");
+    }
+
+    /** Where a webhook posts: the ids a jump link is built from. */
+    public static final class WebhookInfo {
+        public final String guildId;
+        public final String channelId;
+
+        WebhookInfo(String guildId, String channelId) {
+            this.guildId = guildId;
+            this.channelId = channelId;
+        }
+    }
+
+    /**
+     * The guild and channel a webhook belongs to, read from the webhook
+     * object its own URL answers with, or null for anything else.
+     */
+    public static WebhookInfo parseWebhookInfo(String json) {
+        JsonObject object = parseObject(json);
+        if (object == null) {
+            return null;
+        }
+        String guildId = string(object, "guild_id");
+        String channelId = string(object, "channel_id");
+        return guildId.length() == 0 || channelId.length() == 0 ? null
+                : new WebhookInfo(guildId, channelId);
+    }
+
+    private static JsonObject parseObject(String json) {
+        if (json == null || json.trim().length() == 0) {
+            return null;
+        }
+        try {
+            JsonElement root = new JsonParser().parse(json);
+            return root != null && root.isJsonObject()
+                    ? root.getAsJsonObject() : null;
+        } catch (RuntimeException exception) {
+            return null;
+        }
     }
 
     /** The name Discord shows: the global display name, else the username. */
@@ -121,6 +210,19 @@ public final class DiscordJson {
         if (avatarUrl != null && avatarUrl.length() > 0) {
             body.addProperty("avatar_url", avatarUrl);
         }
+        JsonObject allowedMentions = new JsonObject();
+        allowedMentions.add("parse", new JsonArray());
+        body.add("allowed_mentions", allowedMentions);
+        return body.toString();
+    }
+
+    /**
+     * The body of a webhook message edit: the new text, still pinging
+     * nobody. The name and picture belong to the post and cannot change.
+     */
+    public static String webhookEditBody(String content) {
+        JsonObject body = new JsonObject();
+        body.addProperty("content", content == null ? "" : content);
         JsonObject allowedMentions = new JsonObject();
         allowedMentions.add("parse", new JsonArray());
         body.add("allowed_mentions", allowedMentions);

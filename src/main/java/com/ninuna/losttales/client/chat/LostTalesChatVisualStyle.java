@@ -347,6 +347,12 @@ final class LostTalesChatVisualStyle {
             }
             String text = part.getUnformattedTextForChat();
             String formatting = part.getChatStyle().getFormattingCode();
+            if (ChatSpoilerMarker.isRevealed(part)) {
+                // A revealed spoiler is read in the clear: only the
+                // style's own obfuscation goes — a sender's typed &k
+                // lives in the text and stays whatever it was.
+                formatting = formatting.replace("§k", "");
+            }
             ChatHeadMarker.Data marker = ChatHeadMarker.decode(part);
             if (marker != null) {
                 afterHead = true;

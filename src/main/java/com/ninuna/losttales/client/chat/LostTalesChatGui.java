@@ -39,6 +39,7 @@ import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatDeletePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatEditPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingPacket;
 import java.net.URI;
@@ -1802,6 +1803,11 @@ public final class LostTalesChatGui extends GuiChat {
         if (text.length() > 0 && ChatMessageValidator.isValid(text)) {
             this.mc.ingameGUI.getChatGUI().addToSentMessages(command);
             String outgoing = outgoingMessage(text);
+            // Shown before it is sent, exactly as a message typed into
+            // the tab is: the command is only another way of saying it.
+            long echoNonce = LostTalesChatPresentation.echoPending(tab,
+                    outgoing, resolveLocalShowcases(outgoing),
+                    ChatReplyReference.NONE);
             LostTalesNetworkHandler.CHANNEL.sendToServer(
                     new LostTalesChatSendPacket(ChatChannel.WHISPER, outgoing,
                             resolveShareReferences(outgoing),
@@ -1809,7 +1815,7 @@ public final class LostTalesChatGui extends GuiChat {
                             ClientChatAppearances.wireKind(),
                             ClientChatAppearances.wireCharacterId(),
                             ChatMessageIds.NONE,
-                            tab.getPartnerIdentity()));
+                            tab.getPartnerIdentity(), echoNonce));
         }
         return true;
     }
@@ -3221,6 +3227,13 @@ public final class LostTalesChatGui extends GuiChat {
                 }
             }
         }
+        // The identity the line was signed with beats the drawn rows: a
+        // grouped continuation has no header to read a name off, and
+        // the server's quote will name the identity anyway.
+        ClientChatMessages.Remembered remembered = ClientChatMessages.get(id);
+        if (remembered != null) {
+            name = remembered.packet.getIdentityName();
+        }
         // Composing happens where the message lives, and selecting a tab
         // clears any reply, so the target is set after the move.
         selectChannel(tab);
@@ -3799,6 +3812,19 @@ public final class LostTalesChatGui extends GuiChat {
                 break;
             }
         }
+        // What the lines themselves act on: a reply's quote jumps to the
+        // message it names, a covered spoiler reveals, a shared marker
+        // flies the map, a link opens. The hit is the very one a click
+        // resolves, so the pointer promises exactly what a press would
+        // do — and nothing for spans that only consume the click, a
+        // name or a mention, whose answer is the hover card already
+        // showing.
+        LostTalesChatOverlayRenderer.Hit lineHit =
+                LostTalesChatOverlayRenderer.hitAt(this.mc, mouseX + 0.5F,
+                        mouseY + 0.5F);
+        if (lineHit != null && actsOnClick(lineHit.component)) {
+            return true;
+        }
         // A window that is not the one being typed in answers to a
         // click by becoming it, so the pointer says so over all of it.
         ChatWindowFrame frame = frameAt(mouseX, mouseY);
@@ -3818,6 +3844,34 @@ public final class LostTalesChatGui extends GuiChat {
         // grip and all, is inert, and the pointer says so.
         return window != null && !window.isLocked()
                 && isOnWindowStrip(frame, mouseY);
+    }
+
+    /**
+     * Whether a click on the run would actually do something, which is
+     * what earns the pointer's hand: the checks mirror
+     * {@link #handleComponentClick} and {@link #jumpToQuotedMessage},
+     * leaving out the spans that only consume the press.
+     */
+    private boolean actsOnClick(IChatComponent component) {
+        if (component == null) {
+            return false;
+        }
+        if (ChatReplyMarker.isMarker(component)) {
+            return true;
+        }
+        if (ChatSpoilerMarker.isMarker(component)
+                && !ChatSpoilerMarker.isRevealed(component)) {
+            return true;
+        }
+        ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(component);
+        if (share != null && share.kind == ChatShareKind.MARKER) {
+            return this.mc.gameSettings.chatLinks;
+        }
+        ClickEvent event = component.getChatStyle() == null ? null
+                : component.getChatStyle().getChatClickEvent();
+        return event != null
+                && event.getAction() == ClickEvent.Action.OPEN_URL
+                && this.mc.gameSettings.chatLinks;
     }
 
     /** Whether a screen y falls in the window's tab strip as drawn. */
@@ -4825,12 +4879,27 @@ public final class LostTalesChatGui extends GuiChat {
         this.menuMessageText = text;
         this.menuMessageId = band == null ? ChatMessageIds.NONE
                 : ClientChatMessageIds.messageIdOf(chatLineId);
-        this.menuMessageAccount = band == null ? ""
-                : messageAccount(band.lines, band.viewIndex, chatLineId);
-        this.menuMessageIdentity = band == null ? ""
-                : messageIdentity(band.lines, band.viewIndex, chatLineId);
-        this.menuMessageFromDiscord = band != null
-                && isFromDiscord(band.lines, band.viewIndex, chatLineId);
+        // Who the message is resolved from the packet it was built of,
+        // not from the drawn rows: a grouped continuation has no header
+        // row to read a name off, and its sender still owns it. Only a
+        // line with no packet behind it — an adopted stray, an NPC's
+        // speech — is read from what was drawn.
+        ClientChatMessages.Remembered remembered =
+                ClientChatMessages.get(this.menuMessageId);
+        if (remembered != null) {
+            this.menuMessageAccount = remembered.packet.getAccountName();
+            this.menuMessageIdentity = remembered.packet.getIdentityName();
+            this.menuMessageFromDiscord =
+                    LostTalesChatMessagePacket.DISCORD_SENDER_ID.equals(
+                            remembered.packet.getSenderId());
+        } else {
+            this.menuMessageAccount = band == null ? ""
+                    : messageAccount(band.lines, band.viewIndex, chatLineId);
+            this.menuMessageIdentity = band == null ? ""
+                    : messageIdentity(band.lines, band.viewIndex, chatLineId);
+            this.menuMessageFromDiscord = band != null
+                    && isFromDiscord(band.lines, band.viewIndex, chatLineId);
+        }
         this.menuChatLineId = chatLineId;
         this.menuX = mouseX;
         this.menuY = mouseY;
@@ -4920,7 +4989,10 @@ public final class LostTalesChatGui extends GuiChat {
             return;
         }
         long id = this.menuMessageId;
-        String name = this.menuMessageAccount;
+        // The chip and the local quote name the identity the line was
+        // signed with, exactly as the server's own quote will.
+        String name = this.menuMessageIdentity.length() > 0
+                ? this.menuMessageIdentity : this.menuMessageAccount;
         // The menu resolved the message when it opened, which is also
         // the quote an NPC's conversation has to build for itself.
         String excerpt = this.menuMessageText;
@@ -5752,7 +5824,18 @@ public final class LostTalesChatGui extends GuiChat {
      */
     private boolean handleComponentClick(
             LostTalesChatOverlayRenderer.Hit hit) {
-        if (hit == null || !this.mc.gameSettings.chatLinks) {
+        if (hit == null) {
+            return false;
+        }
+        // A spoiler answers before anything else, and whatever the
+        // chat-links option says: revealing covered text is the chat's
+        // own furniture, not a link. The click is spent either way, so
+        // the marker's carrier can never fall through to the input.
+        if (ChatSpoilerMarker.isMarker(hit.component)) {
+            ChatSpoilerMarker.reveal(hit.component);
+            return true;
+        }
+        if (!this.mc.gameSettings.chatLinks) {
             return false;
         }
         if (ChatHeadMarker.isMarker(hit.component)) {

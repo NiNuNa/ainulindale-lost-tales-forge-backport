@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import org.lwjgl.opengl.GL11;
 
@@ -370,8 +371,7 @@ final class ChatLockAnimation {
     }
 
     private static float smoothStep(float value) {
-        float bounded = clamp01(value);
-        return bounded * bounded * (3.0F - 2.0F * bounded);
+        return LostTalesGuiEasing.smoothStep(value);
     }
 
     /** A pose, with the shadow's own trailing offset worked out from it. */
@@ -386,9 +386,7 @@ final class ChatLockAnimation {
     }
 
     private static float easeOutCubic(float value) {
-        float bounded = clamp01(value);
-        float inverse = 1.0F - bounded;
-        return 1.0F - inverse * inverse * inverse;
+        return LostTalesGuiEasing.easeOutCubic(value);
     }
 
     private static float lerp(float from, float to, float progress) {
@@ -396,7 +394,7 @@ final class ChatLockAnimation {
     }
 
     private static float clamp01(float value) {
-        return Math.max(0.0F, Math.min(1.0F, value));
+        return LostTalesGuiEasing.clamp(value);
     }
 
     /** Where the padlock stands this instant, and where its shadow does. */

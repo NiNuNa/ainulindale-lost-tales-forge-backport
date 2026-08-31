@@ -52,6 +52,28 @@ public final class ChatMessageLogTest {
     }
 
     /**
+     * The bridge's own lookup skips the recipient check — a Discord
+     * member is nobody's account — and is safe because the bridge only
+     * asks about its own channel's messages; it still finds nothing for
+     * an id out of reach or taken back.
+     */
+    @Test
+    public void theDiscordChannelIsQuotedWithoutARecipient() {
+        long id = ChatMessageIdAllocator.next();
+        ChatMessageLog.record(id, ALICE, "Aldric", "meet me at the gate",
+                Arrays.asList(ALICE, BOB));
+        ChatReplyReference quote =
+                ChatMessageLog.quoteForDiscordChannel(id);
+        assertTrue(quote.exists());
+        assertEquals(id, quote.getMessageId());
+        assertEquals("Aldric", quote.getAuthor());
+        assertEquals("meet me at the gate", quote.getExcerpt());
+        assertFalse(ChatMessageLog.quoteForDiscordChannel(id + 1).exists());
+        ChatMessageLog.remove(id, ALICE);
+        assertFalse(ChatMessageLog.quoteForDiscordChannel(id).exists());
+    }
+
+    /**
      * The check that matters: naming the id of a whisper you were not in
      * quotes nothing, so a reply can never echo a private message into a
      * channel of the replier's choosing.
