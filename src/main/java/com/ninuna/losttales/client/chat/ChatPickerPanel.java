@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
+import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
 import com.ninuna.losttales.config.LostTalesConfig;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,7 +52,14 @@ abstract class ChatPickerPanel {
     private static final double SCROLL_SNAP_PIXELS = 0.5D;
 
     private boolean targetOpen;
-    private long transitionNanos;
+    /**
+     * How far the panel has opened. A panel reopened before it has
+     * finished closing sets out from the size it is showing rather than
+     * from nothing, so a button clicked twice quickly never makes the
+     * panel collapse and grow again.
+     */
+    private final LostTalesUiTransition openness =
+            new LostTalesUiTransition();
     private GuiTextField searchField;
     private int buttonIndex;
     private Entry hoveredEntry;
@@ -81,7 +90,6 @@ abstract class ChatPickerPanel {
     void setOpen(boolean open) {
         if (this.targetOpen != open) {
             this.targetOpen = open;
-            this.transitionNanos = System.nanoTime();
             this.scroll = 0;
             this.renderedScroll = 0.0D;
             if (this.searchField != null) {
@@ -536,17 +544,12 @@ abstract class ChatPickerPanel {
     }
 
     private float openProgress() {
-        if (!LostTalesConfig.enableChatAnimations) {
-            return this.targetOpen ? 1.0F : 0.0F;
-        }
-        long duration = Math.max(1,
-                LostTalesConfig.chatSelectorAnimationDurationMillis)
-                * 1000000L;
-        float elapsed = Math.min(1.0F,
-                (System.nanoTime() - this.transitionNanos)
-                        / (float)duration);
-        float eased = LostTalesChatMotion.menuProgress(elapsed);
-        return this.targetOpen ? eased : 1.0F - eased;
+        return this.openness.advance(System.nanoTime(), this.targetOpen,
+                LostTalesConfig.enableChatAnimations
+                        ? Math.max(1, LostTalesConfig
+                                .chatSelectorAnimationDurationMillis)
+                        : 0,
+                LostTalesUiEasing.SETTLE);
     }
 
     int panelWidth() {

@@ -512,6 +512,24 @@ public final class ChatWindowPlacement {
     }
 
     /**
+     * The baseline a window has when the top of its tab row lies at
+     * {@code rowTop}: the row is the box's first pixel row, so this is
+     * the box top plus everything that stands between it and the newest
+     * message's line. {@code window} null means a window about to be
+     * created, at its smallest. A tab carried out of a row is placed
+     * with this, so the row it is dropped into lands exactly where the
+     * row it came from was — a window three lines tall and a window
+     * thirty do not answer the same pointer differently.
+     */
+    public static double baselineForRowTop(ChatWindow window,
+                                           Minecraft minecraft,
+                                           double rowTop) {
+        double height = window == null ? minHeight(minecraft)
+                : currentHeight(window, minecraft);
+        return rowTop + height - barHeight(minecraft);
+    }
+
+    /**
      * Keeps a window's requested position on screen: the whole box as it
      * currently shows stays inside the margins. Other windows do not
      * hold it; windows may overlap. {@code window} null means a window
@@ -656,6 +674,22 @@ public final class ChatWindowPlacement {
     /** The narrowest box a window may be dragged to, in GUI pixels. */
     public static double minBoxWidth(Minecraft minecraft) {
         return boxWidthForChatWidth(minChatWidth(minecraft), minecraft);
+    }
+
+    /**
+     * The narrowest box <em>this</em> window may be dragged to: the
+     * readable minimum above, or the width its own tab row needs to keep
+     * every tab in the strip, whichever is greater. A window with more
+     * tabs therefore has a wider floor, so pulling an edge shortens the
+     * names down to a letter each and then stops rather than dropping a
+     * tab out of sight.
+     */
+    public static double minBoxWidth(Minecraft minecraft,
+                                     ChatWindow window) {
+        int row = ChatChannelTabBar.chatWidthForNarrowestRow(minecraft,
+                window);
+        return boxWidthForChatWidth(
+                Math.max(minChatWidth(minecraft), row), minecraft);
     }
 
     /**

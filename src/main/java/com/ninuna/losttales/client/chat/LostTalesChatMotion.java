@@ -33,19 +33,6 @@ final class LostTalesChatMotion {
         return 13.0F * (1.0F - settled) + 1.25F * followThrough;
     }
 
-    static float menuProgress(float progress) {
-        float p = clamp(progress);
-        float settled = smoothStep(p);
-        float followThrough = (float)Math.sin(p * Math.PI)
-                * (1.0F - p) * 0.08F;
-        return clamp(settled + followThrough);
-    }
-
-    static float stagger(float progress, int index) {
-        float delay = Math.min(0.30F, Math.max(0, index) * 0.045F);
-        return menuProgress((clamp(progress) - delay) / (1.0F - delay));
-    }
-
     /**
      * How long the shared scroll easing takes to cover most of the
      * distance to its target: short enough to feel immediate, long

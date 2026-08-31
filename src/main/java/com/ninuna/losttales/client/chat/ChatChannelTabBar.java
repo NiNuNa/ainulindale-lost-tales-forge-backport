@@ -2,13 +2,13 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -152,14 +152,38 @@ final class ChatChannelTabBar {
     private static final int COG_WIDTH = ChatIconSheet.COG.getWidth();
     private static final int CLOSE_WIDTH = ChatIconSheet.CLOSE.getWidth();
     private static final int GRIP_WIDTH = ChatIconSheet.GRIP.getWidth();
-    /** The tab search control at the row's left end. */
-    private static final ChatIconSheet SEARCH_ICON =
-            ChatIconSheet.CHEVRON_DOWN;
-    private static final ChatIconSheet SEARCH_ICON_HOVER =
-            ChatIconSheet.CHEVRON_DOWN_HOVER;
-    private static final int SEARCH_WIDTH = SEARCH_ICON.getWidth();
-    /** Where the row's tabs begin: past the search control and its gap. */
-    private static final int SEARCH_RUN = SEARCH_WIDTH + END_CONTROL_GAP;
+    /**
+     * The tab search control at the row's left end: the sheet's chevron
+     * run, pointing down while its panel is away and folding up to a
+     * rule and over as the panel opens. Every frame is the same width,
+     * so the row's geometry does not move as it plays.
+     */
+    private static final ChatIconSheet[] SEARCH_FRAMES = {
+            ChatIconSheet.CHEVRON_1, ChatIconSheet.CHEVRON_2,
+            ChatIconSheet.CHEVRON_3, ChatIconSheet.CHEVRON_4,
+            ChatIconSheet.CHEVRON_5};
+    private static final ChatIconSheet[] SEARCH_FRAMES_HOVER = {
+            ChatIconSheet.CHEVRON_1_HOVER, ChatIconSheet.CHEVRON_2_HOVER,
+            ChatIconSheet.CHEVRON_3_HOVER, ChatIconSheet.CHEVRON_4_HOVER,
+            ChatIconSheet.CHEVRON_5_HOVER};
+    private static final int SEARCH_WIDTH =
+            SEARCH_FRAMES[0].getWidth();
+    /**
+     * How far the strip reaches left of {@link Row#left}: the row is
+     * laid out from the first thing standing in it, and the surface it
+     * stands on begins here, which is the window's own left edge.
+     */
+    private static final int STRIP_INSET = 2;
+    /**
+     * Clear space either side of the search control: the window's edge,
+     * this, the control, this again, and then the first tab.
+     */
+    private static final int SEARCH_MARGIN = 3;
+    /** Where the search control's ink begins, measured from the row's left. */
+    private static final int SEARCH_INSET = SEARCH_MARGIN - STRIP_INSET;
+    /** Where the row's tabs begin: past the search control and its gaps. */
+    private static final int SEARCH_RUN =
+            SEARCH_INSET + SEARCH_WIDTH + SEARCH_MARGIN;
     /** Room the grip keeps at the row's right end: its glyph and inset. */
     static final int MIN_GRIP_WIDTH = GRIP_WIDTH + GRIP_INSET;
     /**
@@ -205,22 +229,21 @@ final class ChatChannelTabBar {
     private int restoreWidth;
     /** Right edge of the last tab, before the end controls. */
     private int tabsRight;
+    /** How wide the run the hand is carrying is, and where in it the
+     *  pressed tab stands; both zero while nothing is being carried. */
+    private int draggedRunWidth;
+    private int draggedPressedOffset;
     /** Limit the tabs may not cross; the end controls begin here. */
     private int tabsLimit = Integer.MAX_VALUE;
-    /**
-     * Whether the last layout changed which tabs the row holds. Only
-     * then is the row worth settling into its new shape: a window moved
-     * or resized carries its whole strip with it, and a row easing after
-     * one would swing along behind the window rather than belonging to
-     * it.
-     */
-    private boolean tabsChanged;
+
+    /** The search control's chevron: one run, one open/closed state. */
+    private final ChatIconFlipbook searchChevron =
+            new ChatIconFlipbook(SEARCH_FRAMES, SEARCH_FRAMES_HOVER);
     /**
      * How far each of the row's own controls has crossed to its hovered
      * artwork. A control the pointer leaves crosses back the same way,
      * so nothing in the strip ever swaps in one frame.
      */
-    private float searchFade;
     private float restoreFade;
     private float windowSettingsFade;
     private float windowCloseFade;
@@ -233,7 +256,26 @@ final class ChatChannelTabBar {
      * closing tab's neighbours and stands in its new place at once when
      * a tab opens.
      */
+    /** The row's own lower cut, handed down to each tab's contents. */
+    private double rowClipBottom = Double.NaN;
     private float drawnTabsRight;
+    /** That edge measured from the row's left. */
+    private float drawnTabsRightOffset;
+    /**
+     * Whether the places the last layout handed out were a tab joining
+     * or leaving rather than two changing over. Room a joining tab takes
+     * is given up at once — the tabs to its right are simply there, the
+     * way the hairline and the {@code +} after them are — and only room
+     * handed back is travelled. A reorder is not room changing hands at
+     * all, so there both directions travel.
+     */
+    private boolean seedGivesRoomAtOnce;
+    /** What the controls still owe to a tab joining or leaving the row. */
+    private float controlsOwed;
+    private boolean controlsNeedSeed;
+    private float controlsSeedOffset;
+    /** Whether the edge has been placed at all yet. */
+    private boolean tabsRightSeen;
     private long slideNanos;
     /** Whether the row is showing the restore control at all. */
     private boolean showRestore;
@@ -244,6 +286,8 @@ final class ChatChannelTabBar {
     private int windowCloseX = -1;
     /** Left edge of the hairline between the last tab and the +. */
     private int tabDividerX = -1;
+    /** The fraction of a pixel that run is really drawn at. */
+    private float restoreRunFraction;
     /** Left edges of the hairlines around the window's own controls. */
     private int firstDividerX = -1;
     private int secondDividerX = -1;
@@ -302,6 +346,10 @@ final class ChatChannelTabBar {
         boolean windowControls;
         /** Whether the restore control is offered after the row. */
         boolean showRestore;
+        /** Whether this row's tab search panel is open right now. */
+        boolean searchOpen;
+        /** Whether this row's restore list is open right now. */
+        boolean restoreOpen;
         /** Unread lines waiting in closed channels, shown after the +. */
         int closedUnread;
         /** Whether this window is the one being dragged right now. */
@@ -313,8 +361,34 @@ final class ChatChannelTabBar {
          * row's tabs until it is carried clear of it altogether.
          */
         ChatTab dragging;
+        /**
+         * Every tab travelling with it, in row order, {@link #dragging}
+         * among them. A marked group is carried as one long tab: the
+         * pressed one sits under the hand and the rest keep their places
+         * against it, so the run leans, swaps and stops as a single
+         * thing rather than as one tab with strays following it.
+         */
+        List<ChatTab> draggedGroup = Collections.emptyList();
         /** Where the dragged tab's left edge follows the pointer. */
         int draggedLeft = Integer.MIN_VALUE;
+        /**
+         * Whether this window is being resized right now. The row then
+         * keeps within a few pixels of the layout it is given instead of
+         * easing freely into it: a size eased over a tenth of a second
+         * smooths a single step, but across a fast drag it would trail
+         * the very edge being dragged.
+         */
+        boolean resizing;
+    }
+
+    /**
+     * How far inside a window's left edge its first tab begins: the
+     * strip's own inset and the search control's run. A tab carried out
+     * of one row and into a window of its own lands here, so a drag has
+     * to allow for it to keep the cursor on the pixel it grabbed.
+     */
+    static int tabRunLeftInset() {
+        return STRIP_INSET + SEARCH_RUN;
     }
 
     /** Highest pixel any tab can reach (the selected tab fully lifted). */
@@ -355,7 +429,7 @@ final class ChatChannelTabBar {
             }
             return new Hit(HitKind.TAB, tab.tab);
         }
-        if (hitsControl(localX, row.left, SEARCH_WIDTH)) {
+        if (hitsControl(localX, row.left + SEARCH_INSET, SEARCH_WIDTH)) {
             return new Hit(HitKind.SEARCH, null);
         }
         if (hitsControl(localX, this.lockX, LOCK_WIDTH)) {
@@ -441,14 +515,22 @@ final class ChatChannelTabBar {
         }
         advanceSlides(tabs, row);
         this.alphaScale = Math.max(0.0F, Math.min(1.0F, alphaScale));
-        Hit hovered = hitAt(font, row, mouseX, mouseY);
+        // Hit testing answers for the places the tabs will settle in,
+        // not the places they are drawn while one of them is under the
+        // hand. Asking it during a drag lights whichever tab's resting
+        // slot the pointer happens to be crossing — a cog or a cross on
+        // a tab the hand is only passing over — so the row simply
+        // answers nothing until the tab is put down.
+        Hit hovered = row.dragging != null ? null
+                : hitAt(font, row, mouseX, mouseY);
         int bottom = row.rowBottom;
         // The window's title strip, ending exactly on the rule row:
         // drawn outside the clip below, so the inward-rounded cut can
         // never open a bright seam — anything a tab gives up to the cut
         // shows this same surface.
-        Gui.drawRect(row.offsetX + row.left - 2, rowTop(bottom),
-                row.offsetX + row.right + 2, bottom - 1,
+        Gui.drawRect(row.offsetX + row.left - STRIP_INSET,
+                rowTop(bottom),
+                row.offsetX + row.right + STRIP_INSET, bottom - 1,
                 LostTalesChatVisualStyle.argb(
                         LostTalesChatVisualStyle.SURFACE_RGB,
                         scaled(LostTalesChatVisualStyle.SURFACE_ALPHA)));
@@ -458,9 +540,10 @@ final class ChatChannelTabBar {
         // to cast onto. Inward, so not one display pixel of a tab or a
         // shadow ever lands on the rule row; the rule itself is drawn
         // after the clip.
+        this.rowClipBottom = row.rowBottomExact - 1.0D;
         boolean clipped = LostTalesChatOverlayRenderer.beginVerticalClip(
                 Minecraft.getMinecraft(), Double.NaN,
-                row.rowBottomExact - 1.0D, true);
+                this.rowClipBottom, true);
         try {
             // A window being dragged holds the grip's highlight wherever the
             // pointer has gone, the way a control keeps its pressed look.
@@ -474,11 +557,9 @@ final class ChatChannelTabBar {
             // neighbours; a dragged one draws last of all, since it
             // slides across them.
             Tab selectedTab = null;
-            Tab draggedTab = null;
             for (int index = 0; index < tabs.size(); index++) {
                 Tab tab = tabs.get(index);
-                if (tab.tab.equals(row.dragging)) {
-                    draggedTab = tab;
+                if (isCarried(row, tab.tab)) {
                     continue;
                 }
                 if (tab.tab.equals(row.selected)) {
@@ -490,9 +571,14 @@ final class ChatChannelTabBar {
             if (selectedTab != null) {
                 drawTab(font, selectedTab, row, bottom, hovered, true);
             }
-            if (draggedTab != null) {
-                drawTab(font, draggedTab, row, bottom, hovered,
-                        draggedTab.tab.equals(row.selected));
+            // The carried run draws last of all and in row order, so it
+            // slides across its neighbours as one piece.
+            for (int index = 0; index < tabs.size(); index++) {
+                Tab tab = tabs.get(index);
+                if (isCarried(row, tab.tab)) {
+                    drawTab(font, tab, row, bottom, hovered,
+                            tab.tab.equals(row.selected));
+                }
             }
             // The end controls sit centred in the strip, like the selected
             // tab's label; the badge's caps share that centre.
@@ -500,6 +586,8 @@ final class ChatChannelTabBar {
                 drawLock(row.offsetX + this.lockX, bottom, row.locked,
                         hovered != null && hovered.kind == HitKind.LOCK);
             }
+            GL11.glPushMatrix();
+            GL11.glTranslatef(this.restoreRunFraction, 0.0F, 0.0F);
             if (this.tabDividerX >= 0) {
                 drawDivider(row.offsetX + this.tabDividerX, bottom);
             }
@@ -508,7 +596,14 @@ final class ChatChannelTabBar {
                         && hovered.kind == HitKind.RESTORE;
                 this.restoreFade = fade(this.restoreFade, hovered,
                         HitKind.RESTORE);
-                drawEndControl(ChatIconSheet.PLUS, ChatIconSheet.PLUS_HOVER,
+                // The control says which way it goes: a + while the
+                // list it opens is away, and the same crossbar without
+                // its upright — a minus — while the list is out.
+                drawEndControl(
+                        row.restoreOpen ? ChatIconSheet.MINUS
+                                : ChatIconSheet.PLUS,
+                        row.restoreOpen ? ChatIconSheet.MINUS_HOVER
+                                : ChatIconSheet.PLUS_HOVER,
                         this.restoreFade, row.offsetX + this.restoreX,
                         bottom);
                 if (this.restoreBadge.length() > 0) {
@@ -520,11 +615,12 @@ final class ChatChannelTabBar {
                             UNREAD_COUNTER_RGB, scaled(0xFF));
                 }
             }
+            GL11.glPopMatrix();
             // The tab search sits at the row's left end, before the
             // first tab, where a browser keeps it.
-            this.searchFade = fade(this.searchFade, hovered,
-                    HitKind.SEARCH);
-            drawSearch(row.offsetX + row.left, bottom, this.searchFade);
+            drawSearch(row.offsetX + row.left + SEARCH_INSET, bottom,
+                    row.searchOpen,
+                    hovered != null && hovered.kind == HitKind.SEARCH);
             // The window's own controls, in the order a title bar
             // reads: the lock (drawn above), a hairline, its settings
             // and close, another hairline, then the grip.
@@ -555,7 +651,8 @@ final class ChatChannelTabBar {
             // the other way up — same routine, so the two sides of the
             // rule cannot drift apart.
             LostTalesChatOverlayRenderer.drawEdgeFade(
-                    row.offsetX + row.left - 2, row.offsetX + row.right + 2,
+                    row.offsetX + row.left - STRIP_INSET,
+                    row.offsetX + row.right + STRIP_INSET,
                     bottom - 1, rowTop(bottom),
                     LostTalesChatOverlayRenderer.TOP_EDGE_FADE_HEIGHT,
                     scaled(LostTalesChatOverlayRenderer.EDGE_FADE_ALPHA));
@@ -567,15 +664,17 @@ final class ChatChannelTabBar {
         // row of the history's own backdrop, as the bottom rule does, so
         // both edges of a window read the same way.
         LostTalesChatOverlayRenderer.drawBackdropRow(
-                row.offsetX + row.left - 2, bottom - 1,
-                row.offsetX + row.right + 2, bottom,
+                row.offsetX + row.left - STRIP_INSET, bottom - 1,
+                row.offsetX + row.right + STRIP_INSET, bottom,
                 scaled(LostTalesChatOverlayRenderer.backdropRowAlpha(
                         Minecraft.getMinecraft())));
-        LostTalesChatOverlayRenderer.drawRule(row.offsetX + row.left - 2,
-                row.offsetX + row.right + 2, bottom - 1, bottom,
+        LostTalesChatOverlayRenderer.drawRule(
+                row.offsetX + row.left - STRIP_INSET,
+                row.offsetX + row.right + STRIP_INSET, bottom - 1, bottom,
                 scaled(0xFF));
-        regions.addWindow(row.offsetX + row.left - 2, rowTop(bottom),
-                row.offsetX + row.right + 2, bottom);
+        regions.addWindow(row.offsetX + row.left - STRIP_INSET,
+                rowTop(bottom), row.offsetX + row.right + STRIP_INSET,
+                bottom);
     }
 
     /**
@@ -611,9 +710,15 @@ final class ChatChannelTabBar {
         // A tab draws its border pieces whole and stops one row short
         // of the strip's last row, which is the window's top rule; the
         // selected one rises out of the row, it does not sink.
-        int left = row.offsetX + drawnX(row, tab);
-        int right = left + tab.width;
-        int shift = left - (row.offsetX + tab.x);
+        float left = row.offsetX + drawnX(row, tab);
+        float width = drawnWidth(row, tab);
+        float right = left + width;
+        float shift = left - (row.offsetX + tab.x);
+        // Everything but the label is a fixed size, so a tab drawn wider
+        // or narrower than the one it is easing toward owes that whole
+        // difference to its name: the controls keep hugging the right
+        // edge, and the name is cut to what is actually left for it.
+        float stretch = width - tab.width;
         float dim = 1.0F;
         // The border artwork is opaque and carries the interior with it;
         // the span between the pieces is filled to match.
@@ -632,11 +737,53 @@ final class ChatChannelTabBar {
         // Text is always at full opacity; a muted tab is told by its
         // italics alone.
         int textAlpha = scaled(Math.round(255 * dim));
-        // Everything inside the tab stands in the interior, one clear
-        // row under the accent: the icon at its own size, the label's
-        // caps and the controls level with it. The selected tab's lift
-        // carries them up with it rather than re-centring them.
-        int interiorTop = top + INTERIOR_TOP;
+        // Everything inside the tab is cut off at the tab's own edge as
+        // it narrows, the way a browser cuts a tab's label, rather than
+        // the name being shortened again by whole letters every few
+        // pixels. The row's own lower cut goes with it, since a scissor
+        // replaces the one before it rather than narrowing it.
+        boolean clipped = LostTalesChatOverlayRenderer.beginClip(
+                Minecraft.getMinecraft(), left, right - BORDER_WIDTH,
+                Double.NaN, this.rowClipBottom, true);
+        try {
+            drawTabContents(font, tab, row, hovered, left, top + INTERIOR_TOP,
+                    shift, stretch, textAlpha, scaled(Math.round(0xFF * dim)));
+        } finally {
+            LostTalesChatOverlayRenderer.endVerticalClip(clipped);
+        }
+    }
+
+    /**
+     * What stands inside a tab, one clear row under the accent: the icon
+     * at its own size, the label's caps and the counters level with it,
+     * and the tab's own controls against its right end. The selected
+     * tab's lift carries all of it up rather than re-centring it. Drawn
+     * inside the caller's clip, so a tab narrower than its contents
+     * shows as much of them as it has room for.
+     */
+    private void drawTabContents(FontRenderer font, Tab tab, Row row,
+                                 Hit hovered, float left, int interiorTop,
+                                 float shift, float stretch, int textAlpha,
+                                 int controlAlpha) {
+        // The words are drawn at whole coordinates inside a matrix moved
+        // by whatever fraction of a pixel the tab stands on, since the
+        // font draws at whole ones: the glyphs then land on the same
+        // display pixels the tab's own artwork does.
+        int wholeLeft = (int)Math.floor(left);
+        GL11.glPushMatrix();
+        GL11.glTranslatef(left - wholeLeft, 0.0F, 0.0F);
+        try {
+            drawTabText(font, tab, wholeLeft, interiorTop, textAlpha);
+        } finally {
+            GL11.glPopMatrix();
+        }
+        drawTabControls(tab, row, hovered, shift, stretch, interiorTop,
+                controlAlpha);
+    }
+
+    /** The icon, the name and the counters, left to right. */
+    private void drawTabText(FontRenderer font, Tab tab, int left,
+                             int interiorTop, int textAlpha) {
         int textX = left + PADDING_X;
         int textY = centredInInterior(interiorTop, CAP_HEIGHT);
         if (tab.icon != null) {
@@ -660,18 +807,27 @@ final class ChatChannelTabBar {
             LostTalesChatVisualStyle.drawColored(font, tab.otherText,
                     textX, textY, UNREAD_COUNTER_RGB, textAlpha);
         }
-        // The controls are never dimmed with the label: only the
-        // window's own fade and a dragged tab's faintness reach them.
-        // Their hit squares are centred in the interior like the caps,
-        // and each sprite is centred in its square in turn.
+    }
+
+    /**
+     * The tab's own cog and cross. Never dimmed with the label: only the
+     * window's own fade and a dragged tab's faintness reach them. Their
+     * hit squares are centred in the interior like the caps, and each
+     * sprite is centred in its square in turn. They keep hugging the
+     * tab's drawn right end, so a tab still easing to another width does
+     * not leave them stranded in the middle.
+     */
+    private void drawTabControls(Tab tab, Row row, Hit hovered, float shift,
+                                 float stretch, int interiorTop,
+                                 int controlAlpha) {
         int controlTop = centredInInterior(interiorTop, CONTROL_SIZE);
-        int controlAlpha = scaled(Math.round(0xFF * dim));
         if (tab.settingsX >= 0) {
             tab.cogFade = LostTalesChatVisualStyle.hoverFade(tab.cogFade,
                     onControl(hovered, tab, HitKind.SETTINGS),
                     this.frameElapsed);
             drawTabControl(ChatIconSheet.COG, ChatIconSheet.COG_HOVER,
-                    tab.cogFade, row.offsetX + tab.settingsX + shift,
+                    tab.cogFade,
+                    row.offsetX + tab.settingsX + shift + stretch,
                     controlTop, controlAlpha);
         }
         if (tab.closeX >= 0) {
@@ -679,7 +835,8 @@ final class ChatChannelTabBar {
                     onControl(hovered, tab, HitKind.CLOSE),
                     this.frameElapsed);
             drawTabControl(ChatIconSheet.CLOSE, ChatIconSheet.CLOSE_HOVER,
-                    tab.closeFade, row.offsetX + tab.closeX + shift,
+                    tab.closeFade,
+                    row.offsetX + tab.closeX + shift + stretch,
                     controlTop, controlAlpha);
         }
     }
@@ -693,7 +850,7 @@ final class ChatChannelTabBar {
      * already made room for. Everything that draws a tab comes through
      * here, so the row and a dragged tab's ghost cannot drift apart.
      */
-    private static void drawTabShape(int left, int right, int top,
+    private static void drawTabShape(float left, float right, int top,
                                      boolean selected, float lit,
                                      int spriteAlpha, int interiorAlpha) {
         ChatIconSheet leftPiece;
@@ -721,18 +878,21 @@ final class ChatChannelTabBar {
             tipRgb = LostTalesChatVisualStyle.blend(TIP_RGB, TIP_LIT_RGB,
                     lit);
         }
-        int spanLeft = left + BORDER_WIDTH;
-        int spanRight = right - BORDER_WIDTH;
+        float spanLeft = left + BORDER_WIDTH;
+        float spanRight = right - BORDER_WIDTH;
         int height = leftPiece.getHeight();
         if (spanRight > spanLeft) {
             // As deep as the pieces themselves, so the span cannot end
-            // short of the artwork it stands between.
-            Gui.drawRect(spanLeft, top, spanRight, top + height,
+            // short of the artwork it stands between. Filled at the
+            // tab's own fractional edges, since a tab settles on a
+            // display pixel rather than on a whole GUI one.
+            LostTalesChatOverlayRenderer.fillRect(spanLeft, top, spanRight,
+                    top + height,
                     LostTalesChatVisualStyle.argb(interiorRgb, interiorAlpha));
             // The tips are the pieces' innermost lit columns, one pixel
             // outside the span, so the line meets both without a gap.
-            Gui.drawRect(spanLeft, top + TIP_ROW, spanRight,
-                    top + TIP_ROW + 1,
+            LostTalesChatOverlayRenderer.fillRect(spanLeft, top + TIP_ROW,
+                    spanRight, top + TIP_ROW + 1,
                     LostTalesChatVisualStyle.argb(tipRgb, spriteAlpha));
         }
         leftPiece.draw(left, top, spriteAlpha);
@@ -750,7 +910,7 @@ final class ChatChannelTabBar {
      * {@code right}: the given alpha at the centre, nothing at either
      * end, the same profile as the window's edge rules.
      */
-    private static void drawAccent(int left, int right, int y, int rgb,
+    private static void drawAccent(float left, float right, int y, int rgb,
                                    int alpha) {
         if (right <= left || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
@@ -790,18 +950,46 @@ final class ChatChannelTabBar {
      * place the layout gave it, so the tabs a dragged one passes close
      * up behind it rather than jumping.
      */
-    private int drawnX(Row row, Tab tab) {
-        return tab.tab.equals(row.dragging) ? draggedLeft(row, tab)
-                : Math.round(tab.drawnX);
+    private float drawnX(Row row, Tab tab) {
+        return isCarried(row, tab.tab) ? draggedLeft(row, tab)
+                : (float)(row.left + tab.drawnLeftOffset
+                        + snapped(tab.slide, displayStep()));
+    }
+
+    /**
+     * How wide a tab is drawn: the width it is easing toward once the
+     * row has settled, and on the way there the width it is passing
+     * through. A tab under the hand keeps its exact size — it is not
+     * being resized, it is being carried.
+     */
+    private static float drawnWidth(Row row, Tab tab) {
+        return isCarried(row, tab.tab) ? tab.width : tab.drawnWidthSnapped;
+    }
+
+    /**
+     * How fine a step the row may move in: one display pixel, in the
+     * GUI's own units. The finest the screen has, and what everything
+     * else in the chat lays its pixel art on.
+     */
+    private static double displayStep() {
+        return 1.0D / ChatWindowFrame.displayScaleFactor();
+    }
+
+    /** {@code value} laid on the nearest whole display pixel. */
+    private static double snapped(double value, double step) {
+        return Math.round(value / step) * step;
     }
 
     /**
      * Advances the row toward its own layout. Every tab keeps the place
-     * it was drawn at and eases to the one it holds now, over
-     * {@link #SLIDE_SECONDS}, and the controls standing after the tabs
-     * travel with them, so a tab opening or closing carries the row
-     * along instead of snapping it. The tab under the hand is the one
-     * exception: it follows the pointer rigidly.
+     * and the size it was drawn at and eases to the ones it holds now,
+     * over {@link #SLIDE_SECONDS}, and the controls standing after the
+     * tabs travel with them — so a tab opening or closing, a drag
+     * settling, and a window being dragged narrower all carry the row
+     * along instead of snapping it. Places are measured from the row's
+     * own left edge, so a window <em>moved</em> takes its strip with it
+     * in one piece and nothing swings along behind it. The tab under the
+     * hand is the one exception: it follows the pointer rigidly.
      */
     private void advanceSlides(List<Tab> tabs, Row row) {
         long now = System.nanoTime();
@@ -809,24 +997,81 @@ final class ChatChannelTabBar {
                 : (now - this.slideNanos) / 1.0E9D;
         this.slideNanos = now;
         this.frameElapsed = elapsed;
-        boolean animate = LostTalesConfig.enableChatAnimations
-                && this.tabsChanged;
+        measureRun(tabs, row);
+        boolean animate = LostTalesConfig.enableChatAnimations;
+        // The row is laid down from one running cursor over the widths
+        // the tabs are actually drawn at, rather than each tab easing to
+        // a place of its own. Places of their own were the jitter: while
+        // a row reflows, a tab's own travel and its neighbour's are at
+        // different points of the same curve, so the gap between them
+        // genuinely opened and closed by fractions of a pixel — and
+        // rounding each of them apart turned those fractions into whole
+        // pixels that disagreed. With one cursor the seam is the seam,
+        // and a tab's left edge can only move the way its neighbours'
+        // widths do: one way, smoothly.
+        double step = displayStep();
+        double cursor = SEARCH_RUN;
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
-            float target = tab.tab.equals(row.dragging)
-                    ? draggedLeft(row, tab) : tab.x;
-            tab.drawnX = animate
-                    ? eased(tab.drawnX, target, elapsed) : target;
+            boolean carried = isCarried(row, tab.tab);
+            if (!animate) {
+                tab.drawnWidth = tab.width;
+            } else if (!carried) {
+                if (row.resizing) {
+                    // Only a size is changing, and a size never changes
+                    // by much at once: the row may trail its layout by a
+                    // few pixels to smooth the step and no further, so a
+                    // fast drag cannot pull the strip off the edge being
+                    // dragged.
+                    tab.drawnWidth = withinLag(tab.drawnWidth, tab.width);
+                }
+                tab.drawnWidth = eased(tab.drawnWidth, tab.width, elapsed);
+            } else {
+                // Under the hand: its own size, whatever the row is
+                // settling to around it.
+                tab.drawnWidth = tab.width;
+            }
+            // Each width laid on a display pixel and the places taken
+            // as the running total of them: two tabs of one size are
+            // then always drawn one size — rounding the running total
+            // instead let one tab absorb the odd pixel and the next take
+            // it back, which is the wobble — and every seam is exactly
+            // the seam, since each place is the one before it plus a
+            // width and a gap.
+            tab.drawnWidthSnapped = (float)Math.max(step,
+                    snapped(tab.drawnWidth, step));
+            tab.drawnLeftOffset = (float)cursor;
+            cursor += tab.drawnWidthSnapped + TAB_GAP;
+            if (tab.needsSeed) {
+                // First sight of the tab in this layout: it owes the
+                // distance from where it was drawn to the slot it has
+                // just been given, and pays it off below.
+                tab.needsSeed = false;
+                float owed = (float)(tab.seedLeftOffset
+                        - tab.drawnLeftOffset);
+                // Positive is a tab drawn right of where it now belongs,
+                // which is room handed back to it: that it travels. A
+                // negative one would be catching up to room taken from
+                // it, and it does not travel to give room up — it is
+                // simply out of the way.
+                tab.slide = this.seedGivesRoomAtOnce
+                        ? Math.max(0.0F, owed) : owed;
+            }
+            if (carried) {
+                // Held at the pointer, and its debt recorded from there,
+                // so letting go leaves it to travel the rest of the way
+                // instead of arriving the instant the button comes up.
+                tab.slide = (float)(draggedLeft(row, tab) - row.left
+                        - tab.drawnLeftOffset);
+            } else if (!animate) {
+                tab.slide = 0.0F;
+            } else {
+                tab.slide = eased(tab.slide, 0.0F, elapsed);
+            }
         }
-        // The controls after the tabs are attached to the last of them
-        // rather than easing to where the tabs will end up: they stand
-        // at the edge the tabs are drawn to this frame. A tab opening
-        // puts them in their new place at once instead of flying in
-        // from under the row, one closing carries them along as its
-        // neighbours travel, and a tab dragged into the row cannot be
-        // pushed out past a + still catching up. The dragged tab itself
-        // is left out — it follows the pointer, not the row.
-        this.drawnTabsRight = drawnTabsRight(tabs, row);
+        // Last, so the edge the controls stand at is worked out from
+        // the places the tabs have just eased to.
+        advanceTabsRight(tabs, row, elapsed);
         placeLeftRun();
     }
 
@@ -835,18 +1080,98 @@ final class ChatChannelTabBar {
      * An empty row ends where its tabs would have begun.
      */
     private float drawnTabsRight(List<Tab> tabs, Row row) {
-        if (row.dragging != null) {
-            // A tab under the hand is drawn at the pointer, so the row
-            // has no drawn edge to stand at; the controls hold the one
-            // the tabs will settle to, which a reorder never changes.
-            return this.tabsRight;
-        }
         float right = row.left + SEARCH_RUN;
+        boolean pushing = isPushingControls(tabs, row);
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
-            right = Math.max(right, tab.drawnX + tab.width);
+            if (isCarried(row, tab.tab)) {
+                right = Math.max(right, pushing ? draggedRunRight(row)
+                        : tab.x + tab.width);
+                continue;
+            }
+            right = Math.max(right,
+                    drawnX(row, tab) + drawnWidth(row, tab));
         }
         return right;
+    }
+
+    /**
+     * Whether the run under the hand is driving the controls after the
+     * tabs: it is, whenever it is the last of them. They give way in
+     * front of it the way a browser's add-tab control does, and come
+     * back behind it as it eases into its slot on release.
+     */
+    private boolean isPushingControls(List<Tab> tabs, Row row) {
+        return !tabs.isEmpty()
+                && isCarried(row, tabs.get(tabs.size() - 1).tab);
+    }
+
+    /**
+     * Advances the edge the controls after the tabs stand at. It follows
+     * the tabs, and the tabs ease — but not every change reaches it
+     * through one of them: a tab leaving the <em>end</em> of the row
+     * moves none of its neighbours, so the edge would fall a whole tab's
+     * width in one frame and the hairline and the {@code +} would jump
+     * to their new place instead of travelling to it. So the edge eases
+     * in its own right, on the same curve.
+     *
+     * <p>They are <em>attached</em> to it, not following it: a row
+     * reflowing to new widths moves them exactly as it moves its tabs,
+     * with nothing of their own to lag by. Only a tab joining or leaving
+     * the row can move this edge without moving a tab — a tab leaving
+     * the end of a row moves no neighbour at all — and that one jump is
+     * travelled, on the very curve a tab's own travel uses, so what
+     * moves is one thing. Room given up is taken at once: the controls
+     * are never found in front of the tabs. Kept relative to the row's
+     * left, like the tabs' own places, so a window being carried about
+     * takes its controls with it rigidly. The one thing they do not ease
+     * after is the hand: a run pushing them along drives them directly,
+     * or they would trail the very tab that is shoving them.</p>
+     */
+    private void advanceTabsRight(List<Tab> tabs, Row row, double elapsed) {
+        float exact = drawnTabsRight(tabs, row) - row.left;
+        if (!this.tabsRightSeen || !LostTalesConfig.enableChatAnimations
+                || isPushingControls(tabs, row)) {
+            this.tabsRightSeen = true;
+            this.controlsOwed = 0.0F;
+        } else {
+            if (this.controlsNeedSeed) {
+                // The row has just gained or lost a tab, which is the
+                // one thing that can move this edge without moving a
+                // tab: everything else reaches it through the widths,
+                // which are already travelling. Room given up is taken
+                // at once — the controls are never found in front of
+                // the tabs — and room handed back is owed and paid off
+                // on the very curve a tab's own travel uses, so the two
+                // move as one thing rather than one following another.
+                this.controlsNeedSeed = false;
+                this.controlsOwed = Math.max(0.0F,
+                        this.controlsSeedOffset - exact);
+            }
+            this.controlsOwed = eased(this.controlsOwed, 0.0F, elapsed);
+        }
+        this.drawnTabsRightOffset = exact + this.controlsOwed;
+        this.drawnTabsRight = row.left + this.drawnTabsRightOffset;
+    }
+
+    /** Whether a tab is one of those the hand is carrying. */
+    private static boolean isCarried(Row row, ChatTab tab) {
+        return tab != null && row.draggedLeft != Integer.MIN_VALUE
+                && (tab.equals(row.dragging)
+                        || row.draggedGroup.contains(tab));
+    }
+
+    /**
+     * How far behind its layout the row may be drawn while a resize
+     * runs: about one step of a shortened label, so a single step is
+     * still smoothed and a drag can never open a gap at the row's end.
+     */
+    private static final float RESIZE_MAX_LAG = 4.0F;
+
+    /** {@code current}, brought back to within the lag of {@code target}. */
+    private static float withinLag(float current, float target) {
+        return Math.max(target - RESIZE_MAX_LAG,
+                Math.min(target + RESIZE_MAX_LAG, current));
     }
 
     /** One step toward {@code target}, arriving rather than creeping. */
@@ -854,7 +1179,13 @@ final class ChatChannelTabBar {
                                double elapsed) {
         float value = (float)LostTalesChatMotion.approach(current, target,
                 elapsed, SLIDE_SECONDS);
-        return Math.abs(target - value) < 0.5F ? target : value;
+        // Inside one display pixel there is nothing left to draw, and
+        // an exponential tail spends longer and longer covering it — the
+        // last steps arriving further and further apart, which reads as
+        // stepping rather than as the end of a slide. So the last one is
+        // simply arrived at, and no sooner: snapping a whole GUI pixel
+        // would itself be a jump of three at GUI scale three.
+        return Math.abs(target - value) < displayStep() ? target : value;
     }
 
     /**
@@ -867,9 +1198,17 @@ final class ChatChannelTabBar {
         if (!this.showRestore) {
             this.tabDividerX = -1;
             this.restoreX = -1;
+            this.restoreRunFraction = 0.0F;
             return;
         }
-        this.tabDividerX = Math.round(this.drawnTabsRight) + END_CONTROL_GAP;
+        // Whole pixels for hit testing, and the fraction the tabs stand
+        // on kept beside them: the run is drawn inside a matrix moved by
+        // it, so it travels with the tabs a display pixel at a time
+        // rather than a whole GUI pixel behind them.
+        float edge = this.drawnTabsRight;
+        int whole = (int)Math.floor(edge);
+        this.restoreRunFraction = edge - whole;
+        this.tabDividerX = whole + END_CONTROL_GAP;
         this.restoreX = this.tabDividerX + DIVIDER_WIDTH + END_CONTROL_GAP;
     }
 
@@ -883,10 +1222,87 @@ final class ChatChannelTabBar {
         if (row.draggedLeft == Integer.MIN_VALUE) {
             return tab.x;
         }
-        // The end controls keep their room from a dragged tab as much as
-        // from a resting one: a tab stops where the row's tabs stop.
+        return draggedRunLeft(row) + tab.runOffset;
+    }
+
+    /**
+     * Where the carried run's own left edge is drawn: the pressed tab
+     * under the hand, the rest of the run held against it, and the whole
+     * of it kept inside the row.
+     *
+     * <p>A run being reordered stops where the row's tabs settle to, so
+     * the hairline and the {@code +} it would otherwise push are a firm
+     * border. One still arriving from another window may go on to the
+     * row's own limit, which is where the end controls begin.</p>
+     */
+    private int draggedRunLeft(Row row) {
+        int wanted = row.draggedLeft - this.draggedPressedOffset;
         return Math.max(row.left + SEARCH_RUN,
-                Math.min(this.tabsLimit - tab.width, row.draggedLeft));
+                Math.min(carryLimit(row) - this.draggedRunWidth, wanted));
+    }
+
+    /**
+     * The edge a carried run is stopped at: the row's own limit, where
+     * its end controls begin. The hairline and the {@code +} are not a
+     * border to a tab under the hand — a run carried to the end pushes
+     * them along in front of it, whether it has just arrived from
+     * another window or has lived in this row all along, and whether or
+     * not it has been put down since. They are where the row's tabs
+     * come to rest, not a wall the hand is stopped by.
+     *
+     * <p>Every question the drag asks of a row goes through this one
+     * answer — where the run may be drawn, and how far past the row it
+     * has been pulled — so the two can never read different edges.</p>
+     */
+    private int carryLimit(Row row) {
+        // The room the tabs move in runs from the search control to the
+        // window's padlock, and the hairline and the {@code +} live
+        // inside it, trailing the last tab. So a tab stops far enough
+        // short of the padlock for those to still fit before it: run the
+        // tab itself all the way up and it shoves them over the padlock.
+        //
+        // That is what {@code tabsLimit} already is — the row's own
+        // right-hand limit, the padlock less the room the restore run
+        // keeps. It is measured from the strip, never from the tabs, so
+        // it does not move as tabs come and go and the place a tab was
+        // taken from is still inside the room a moment later.
+        return this.tabsLimit;
+    }
+
+    /**
+     * Measures the run the hand is carrying: each of its tabs' place
+     * inside it, how wide the whole of it is, and how far into it the
+     * pressed tab stands. Everything that positions, leans or bounds the
+     * run reads these, so a group is one shape rather than a set of tabs
+     * that happen to travel together. Cheap and idempotent — every
+     * caller that has just laid the row out runs it.
+     */
+    private void measureRun(List<Tab> tabs, Row row) {
+        int offset = 0;
+        this.draggedPressedOffset = 0;
+        for (int index = 0; index < tabs.size(); index++) {
+            Tab tab = tabs.get(index);
+            if (!isCarried(row, tab.tab)) {
+                continue;
+            }
+            tab.runOffset = offset;
+            if (tab.tab.equals(row.dragging)) {
+                this.draggedPressedOffset = offset;
+            }
+            offset += tab.width + TAB_GAP;
+        }
+        this.draggedRunWidth = offset == 0 ? 0 : offset - TAB_GAP;
+    }
+
+    /** How wide the run this row is carrying is drawn, or zero. */
+    int carriedRunWidth(FontRenderer font, Row row) {
+        measureRun(layout(font, row), row);
+        return this.draggedRunWidth;
+    }
+
+    /** The run's right edge as drawn. */
+    private int draggedRunRight(Row row) {
+        return draggedRunLeft(row) + this.draggedRunWidth;
     }
 
     /**
@@ -902,6 +1318,7 @@ final class ChatChannelTabBar {
      */
     int slideIndexAt(FontRenderer font, Row row, List<ChatTab> group) {
         List<Tab> tabs = layout(font, row);
+        measureRun(tabs, row);
         Tab dragged = null;
         for (int index = 0; index < tabs.size(); index++) {
             if (tabs.get(index).tab.equals(row.dragging)) {
@@ -916,7 +1333,7 @@ final class ChatChannelTabBar {
         // The furthest place the tab has actually leaned into wins, so
         // both ends of the row are reachable whatever the tab measures,
         // which comparing centres alone does not manage.
-        int left = draggedLeft(row, dragged);
+        int left = draggedRunLeft(row);
         int current = heldBefore(tabs, group);
         int previous = row.left + SEARCH_RUN;
         int slot = 0;
@@ -951,25 +1368,55 @@ final class ChatChannelTabBar {
      * Zero while the tab is still somewhere the row can put it.
      */
     int draggedOverrun(FontRenderer font, Row row) {
-        List<Tab> tabs = layout(font, row);
-        if (row.draggedLeft == Integer.MIN_VALUE) {
+        measureRun(layout(font, row), row);
+        if (row.draggedLeft == Integer.MIN_VALUE
+                || this.draggedRunWidth <= 0) {
             return 0;
         }
-        Tab dragged = null;
-        for (int index = 0; index < tabs.size(); index++) {
-            if (tabs.get(index).tab.equals(row.dragging)) {
-                dragged = tabs.get(index);
-            }
+        // Measured against the very edge the run is stopped at, so
+        // pulling on past the row's right end asks for a window of its
+        // own after exactly the same travel as pulling past its left end
+        // or away from it altogether.
+        return overrunAt(font, row,
+                row.draggedLeft - row.offsetX - this.draggedPressedOffset,
+                this.draggedRunWidth);
+    }
+
+    /**
+     * How far outside this row's tab span a tab of {@code width} whose
+     * left edge lies at {@code left} would be carried; zero while the
+     * row could hold it there. Row-local coordinates. The drag asks this
+     * of every row it passes, so joining a row and being torn out of one
+     * are decided by a single measurement rather than by two that can
+     * read the same pointer differently.
+     */
+    /**
+     * How far outside the room a run at {@code left} has been carried:
+     * zero anywhere inside it, and otherwise the distance past whichever
+     * border it has passed. One measure answers everything the drag
+     * asks — where a run may be drawn, when it has been pulled far
+     * enough to leave, and whether a row will take it back — so no two
+     * answers can read different edges.
+     */
+    int overrunAt(FontRenderer font, Row row, int left, int width) {
+        measureRun(layout(font, row), row);
+        return overrunOf(left, width, row.left + SEARCH_RUN,
+                carryLimit(row));
+    }
+
+    /**
+     * How far outside {@code [lowest, limit]} a tab of {@code width}
+     * whose left edge lies at {@code left} would be carried. Zero
+     * anywhere the span could hold it, and never negative: a span too
+     * narrow for the tab reads as overrun from its right end, which is
+     * the end the tab is being pushed against.
+     */
+    static int overrunOf(int left, int width, int lowest, int limit) {
+        int highest = limit - width;
+        if (left > highest) {
+            return left - highest;
         }
-        if (dragged == null) {
-            return 0;
-        }
-        int lowest = row.left + SEARCH_RUN;
-        int highest = this.tabsLimit - dragged.width;
-        if (row.draggedLeft < lowest) {
-            return lowest - row.draggedLeft;
-        }
-        return row.draggedLeft > highest ? row.draggedLeft - highest : 0;
+        return left < lowest ? lowest - left : 0;
     }
 
     /** The place the dragged run holds now: the tabs left before it. */
@@ -988,7 +1435,7 @@ final class ChatChannelTabBar {
        their hit squares; hovering swaps in the sprite's hover state. */
 
     private void drawTabControl(ChatIconSheet resting,
-                                ChatIconSheet hovered, float fade, int x,
+                                ChatIconSheet hovered, float fade, float x,
                                 int y, int alpha) {
         ChatIconSheet.drawPairWithShadow(resting, hovered, fade,
                 x + (CONTROL_SIZE - resting.getWidth()) / 2,
@@ -1065,11 +1512,16 @@ final class ChatChannelTabBar {
     }
 
     /**
-     * The tab search control: the chevron a list opens below, centred in
-     * the strip like every other control the row carries.
+     * The tab search control: the chevron whose run says whether its
+     * panel is out, centred in the strip like every other control the
+     * row carries. The frames differ in height, so the run is centred in
+     * the strip's control band rather than pinned to one row of it.
      */
-    private void drawSearch(int x, int rowBottom, float fade) {
-        drawEndControl(SEARCH_ICON, SEARCH_ICON_HOVER, fade, x, rowBottom);
+    private void drawSearch(int x, int rowBottom, boolean open,
+                            boolean hovered) {
+        this.searchChevron.advance(open, hovered);
+        this.searchChevron.draw(x, rowTop(rowBottom), SEARCH_WIDTH,
+                ROW_HEIGHT - 1, scaled(0xFF));
     }
 
     /** The drag handle at the strip's right end, where a title bar keeps it. */
@@ -1114,7 +1566,30 @@ final class ChatChannelTabBar {
             return this.cachedTabs;
         }
         List<ChatTab> channels = row.tabs;
-        this.tabsChanged = !channels.equals(this.cachedChannels);
+        // Whether the row holds a different set of tabs, rather than the
+        // same ones in another order. A tab joining or leaving gives or
+        // hands back room; a reorder only swaps two of them over.
+        this.seedGivesRoomAtOnce =
+                channels.size() != this.cachedChannels.size()
+                        || !channels.containsAll(this.cachedChannels);
+        if (this.tabsRightSeen && this.seedGivesRoomAtOnce) {
+            // A tab joining or leaving is the only change that can move
+            // the controls without moving a tab, since one leaving the
+            // end of a row moves no neighbour at all. Remembered here,
+            // where the old row is still known, and paid off by the
+            // slide — which gives up room at once and travels the room
+            // handed back, however the tab left: closed by its cross,
+            // or carried off by the hand.
+            //
+            // Two tabs changing places is not that. The tab that ends up
+            // last is travelling to its new size and place already, and
+            // the controls are read off it, so they arrive with it. Give
+            // them a travel of their own here and they set off on a
+            // second motion of their own alongside the tab's, which
+            // reads as their coming unstuck from it.
+            this.controlsNeedSeed = true;
+            this.controlsSeedOffset = this.drawnTabsRightOffset;
+        }
         int count = channels.size();
         String badge = row.showRestore
                 ? ClientChatChannelViews.counterText(row.closedUnread) : "";
@@ -1220,14 +1695,29 @@ final class ChatChannelTabBar {
             Boolean muted = this.cachedMuted.get(channel);
             Tab built = new Tab(channel, index, icon, label, labelWidth,
                     pingText, pingWidth, otherText, otherWidth, x, width,
-                    settingsX, closeX, muted != null && muted.booleanValue());
+                    settingsX, closeX,
+                    muted != null && muted.booleanValue());
+            // A tab the row has not held before stands in its own place
+            // at its own size; one it has keeps what it was drawn at
+            // below, and travels from there.
+            built.drawnLeftOffset = x - row.left;
+            built.drawnWidthSnapped = width;
+            built.drawnWidth = width;
             // A tab the row already held keeps where it was drawn, so a
             // change of places is travelled rather than jumped; one that
             // has just opened starts in its own place.
             for (int at = 0; at < this.cachedTabs.size(); at++) {
                 if (this.cachedTabs.get(at).tab.equals(channel)) {
                     Tab was = this.cachedTabs.get(at);
-                    built.drawnX = was.drawnX;
+                    built.drawnWidth = was.drawnWidth;
+                    built.drawnWidthSnapped = was.drawnWidthSnapped;
+                    // Where it was on screen a moment ago. The cursor
+                    // that will place it is not known until the row is
+                    // advanced, so the travel it owes is worked out
+                    // there, against the slot it actually lands in.
+                    built.seedLeftOffset = was.drawnLeftOffset
+                            + was.slide;
+                    built.needsSeed = true;
                     built.hoverFade = was.hoverFade;
                     built.cogFade = was.cogFade;
                     built.closeFade = was.closeFade;
@@ -1239,7 +1729,15 @@ final class ChatChannelTabBar {
         }
         this.tabsRight = tabs.isEmpty()
                 ? row.left + SEARCH_RUN : x - TAB_GAP;
-        this.drawnTabsRight = drawnTabsRight(tabs, row);
+        if (!this.tabsRightSeen) {
+            // First sight: the controls stand where the row puts them
+            // rather than travelling in from nowhere. Every frame after
+            // this the slide advances the edge, and a layout worked out
+            // between two draws must not undo what it has reached.
+            this.tabsRightSeen = true;
+            this.drawnTabsRightOffset = drawnTabsRight(tabs, row) - row.left;
+            this.drawnTabsRight = row.left + this.drawnTabsRightOffset;
+        }
         // The + opens a channel into this row, so it stands with the
         // tabs; everything that acts on the window itself stands with
         // the grip, against the row's right edge.
@@ -1476,6 +1974,62 @@ final class ChatChannelTabBar {
                         minecraft));
     }
 
+    /**
+     * The chat width below which the row would have to leave one of its
+     * tabs out of the strip altogether: every tab with its padding, its
+     * icon and enough of its name to read as a name — its first letter
+     * and the ellipsis that says the rest was cut — the controls the tab
+     * in front keeps, the seams between them, and the room the end
+     * controls hold. Counters are left out: a crowded row gives those up
+     * before it shortens anything. Zero when the row cannot be measured.
+     *
+     * <p>This is what bounds a resize. A window may be dragged as narrow
+     * as its own tabs allow and no narrower, so a tab can never be made
+     * to vanish by pulling an edge — the row shortens names down to a
+     * letter and then stops giving way.</p>
+     */
+    static int chatWidthForNarrowestRow(Minecraft minecraft,
+                                        ChatWindow window) {
+        if (minecraft == null || minecraft.fontRenderer == null
+                || window == null) {
+            return 0;
+        }
+        FontRenderer font = minecraft.fontRenderer;
+        List<ChatTab> tabs = ChatWindowFrame.visibleTabs(window);
+        if (tabs.isEmpty()) {
+            return 0;
+        }
+        int rowWidth = SEARCH_RUN + endControlsWidth(window, font)
+                + TAB_GAP * (tabs.size() - 1)
+                // Only the tab in front keeps its controls once the row
+                // is crowded, and a crowded row is the case being bounded.
+                + controlsWidth(true);
+        for (int index = 0; index < tabs.size(); index++) {
+            ChatTab tab = tabs.get(index);
+            rowWidth += PADDING_X * 2 + iconWidth(tab)
+                    + narrowestLabelWidth(font, tab);
+        }
+        return Math.max(ChatWindowPlacement.minChatWidth(minecraft),
+                ChatWindowPlacement.chatWidthForBox(
+                        rowWidth + STRIP_INSET * 2, minecraft));
+    }
+
+    /**
+     * The least room a tab's name may be given and still say which tab
+     * it is: its first letter and the ellipsis, or the whole name when
+     * that is shorter than the two together.
+     */
+    private static int narrowestLabelWidth(FontRenderer font, ChatTab tab) {
+        String name = ClientChatChannelState.displayName(tab);
+        if (name == null || name.length() == 0) {
+            return 0;
+        }
+        int whole = font.getStringWidth(name);
+        int cut = font.getStringWidth(name.substring(0, 1))
+                + font.getStringWidth("...");
+        return Math.min(whole, cut);
+    }
+
     private static int count(Map<ChatTab, Integer> counters, ChatTab tab) {
         Integer value = counters.get(tab);
         return value == null ? 0 : value.intValue();
@@ -1588,6 +2142,8 @@ final class ChatChannelTabBar {
         final int rowIndex;
         /** The channel's emoji before the label, or null. */
         final ChatEmoji icon;
+        /** The name as the row's layout cut it to fit; a tab narrower
+         *  than that shows as much of it as the clip leaves. */
         final String label;
         final int labelWidth;
         /** {@code [p]} unread pings, or empty. */
@@ -1599,11 +2155,41 @@ final class ChatChannelTabBar {
         /** Resting left edge before the row's horizontal motion. */
         final int x;
         /**
-         * Where the tab is actually drawn while the row settles into
-         * that place. The one thing about a tab that changes without
-         * the row being laid out again.
+         * How wide the tab is drawn while it settles into the width the
+         * row has given it, and where the row's running cursor has put
+         * it — whole pixels, laid down one after another, so the seam
+         * between two tabs is exactly the seam and never a rounding of
+         * two numbers that were rounded apart.
          */
-        float drawnX;
+        float drawnWidth;
+        /**
+         * The width and place the tab is really drawn at, both laid on
+         * whole <em>display</em> pixels rather than whole GUI ones. A
+         * display pixel is the finest step the screen has — a third of a
+         * GUI pixel at GUI scale three — so a row reflowing moves in
+         * steps that small instead of jumping a whole GUI pixel at a
+         * time, and the border artwork still lands exactly on its own
+         * texels. Every width is snapped the same way and the places are
+         * the running total of them, so two tabs of one size are always
+         * drawn one size and the seam between any two is exact.
+         */
+        float drawnWidthSnapped;
+        float drawnLeftOffset;
+        /**
+         * What this tab still owes to a change of <em>place</em>: the
+         * distance from where it is drawn to the slot the row has given
+         * it, eased away to nothing. A tab whose place has not changed
+         * owes nothing and stands exactly on the cursor, which is what
+         * keeps a row reflowing to new widths from shuffling by a pixel
+         * — every tab has one position, not one of its own.
+         */
+        float slide;
+        /** Where it was drawn before the row was laid out again. */
+        private float seedLeftOffset;
+        private boolean needsSeed;
+        /** Where this tab stands inside the run being carried, if it is
+         *  one of them; measured each frame by {@code measureRun}. */
+        int runOffset;
         /** How far the tab and its controls have crossed to their lit
          *  artwork; carried on when the row is laid out again. */
         float hoverFade;
@@ -1617,9 +2203,9 @@ final class ChatChannelTabBar {
         final boolean muted;
 
         Tab(ChatTab tab, int rowIndex, ChatEmoji icon, String label,
-            int labelWidth, String pingText, int pingWidth, String otherText,
-            int otherWidth, int x, int width, int settingsX, int closeX,
-            boolean muted) {
+            int labelWidth, String pingText, int pingWidth,
+            String otherText, int otherWidth, int x, int width,
+            int settingsX, int closeX, boolean muted) {
             this.tab = tab;
             this.rowIndex = rowIndex;
             this.icon = icon;
@@ -1630,8 +2216,9 @@ final class ChatChannelTabBar {
             this.otherText = otherText;
             this.otherWidth = otherWidth;
             this.x = x;
-            this.drawnX = x;
             this.width = width;
+            this.drawnWidth = width;
+            this.drawnWidthSnapped = width;
             this.settingsX = settingsX;
             this.closeX = closeX;
             this.muted = muted;

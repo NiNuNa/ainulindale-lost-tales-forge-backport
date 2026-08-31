@@ -233,7 +233,7 @@ public final class ClientChatChannelViewsTest {
     }
 
     @Test
-    public void scrollIsPerChannelClampedAndStableUnderInsertions() {
+    public void scrollIsPerChannelAndClamped() {
         ClientChatChannelViews.scroll(ChatChannel.ALL, 7, 30, 10.0D);
         assertEquals(7.0D, ClientChatChannelViews.getScroll(
                 ChatChannel.ALL, 30, 10.0D), 0.0D);
@@ -242,13 +242,6 @@ public final class ClientChatChannelViewsTest {
         ClientChatChannelViews.scroll(ChatChannel.ALL, 100, 30, 10.0D);
         assertEquals(20.0D, ClientChatChannelViews.getScroll(
                 ChatChannel.ALL, 30, 10.0D), 0.0D);
-        ClientChatChannelViews.onLinesAdded(ChatChannel.ALL, 2);
-        assertEquals(22.0D, ClientChatChannelViews.getScroll(
-                ChatChannel.ALL, 32, 10.0D), 0.0D);
-        // A view that is not scrolled stays pinned to the newest line.
-        ClientChatChannelViews.onLinesAdded(ChatChannel.OOC, 2);
-        assertEquals(0.0D, ClientChatChannelViews.getScroll(
-                ChatChannel.OOC, 32, 10.0D), 0.0D);
         ClientChatChannelViews.scroll(ChatChannel.ALL, -100, 32, 10.0D);
         assertEquals(0.0D, ClientChatChannelViews.getScroll(
                 ChatChannel.ALL, 32, 10.0D), 0.0D);

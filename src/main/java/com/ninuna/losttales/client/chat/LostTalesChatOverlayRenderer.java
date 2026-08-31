@@ -205,7 +205,11 @@ final class LostTalesChatOverlayRenderer {
             int screenWidth = resolution.getScaledWidth();
             int screenHeight = resolution.getScaledHeight();
             List<ChatWindow> windows = ChatWindowLayout.windows();
+            // Both per-window caches are let go together: the frame that
+            // records where a window drew, and the lines it laid out for
+            // itself.
             ChatWindowFrame.prune(windows);
+            ChatWindowLines.prune(windows);
             if (!open) {
                 drawFeed(minecraft, chat, drawn, screenWidth, screenHeight,
                         partialTicks);
@@ -308,11 +312,22 @@ final class LostTalesChatOverlayRenderer {
         // ends.
         float room = (float)frame.room;
         int lineLimit = linesForRoom(room, scale);
-        double roomLines = room / (double)(LINE_HEIGHT * scale);
+        // The scroll range is taken from the rows the window will draw,
+        // the unread divider's own row included: a synthetic row that
+        // counted toward the drawn height but not toward the reachable
+        // one left the oldest message stranded above the ceiling.
+        frame.resolveDividerRow(lines, view == null ? null
+                : ClientChatChannelViews.unreadDividerLine(view));
+        // A view scrolled back is put back on the message it is reading
+        // before its offset is clamped, so a message arriving, a divider
+        // opening or the window re-wrapping never moves the page under
+        // the eye.
+        ClientChatChannelViews.holdPosition(view, frame);
+        double roomLines = frame.roomLines();
         double scroll = view == null ? 0.0D
                 : ClientChatChannelViews.renderedScroll(view,
-                        ClientChatChannelViews.getScroll(view, lines.size(),
-                                roomLines));
+                        ClientChatChannelViews.getScroll(view,
+                                frame.contentRows(), roomLines));
         frame.renderedScrollLines = scroll;
         frame.drawn = true;
         // The window's own rectangle of the blurred frame, under the
@@ -407,6 +422,7 @@ final class LostTalesChatOverlayRenderer {
                 : ClientChatChannelViews.visibleLines(drawn, filter);
         frame.lines = lines;
         frame.view = null;
+        frame.resolveDividerRow(lines, null);
         // The frame is captured and blurred only while the feed has a
         // line still on screen; the rest of the time gameplay pays
         // nothing for the feed's blur.
@@ -448,24 +464,6 @@ final class LostTalesChatOverlayRenderer {
         return lines;
     }
 
-    /** Number of wrapped lines at the head of history with this id. */
-    static int countLeadingLines(GuiNewChat chat, int chatLineId) {
-        try {
-            List<ChatLine> drawn = getDrawnLines(chat);
-            int count = 0;
-            while (drawn != null && count < drawn.size()
-                    && drawn.get(count) != null
-                    && drawn.get(count).getChatLineID() == chatLineId) {
-                count++;
-            }
-            return count;
-        } catch (IllegalAccessException ignored) {
-            return 0;
-        } catch (RuntimeException ignored) {
-            return 0;
-        }
-    }
-
     /**
      * The drawn band under a GUI-space point in any window, or null.
      * Resolved against the bands recorded by the last draw; the band
@@ -480,21 +478,27 @@ final class LostTalesChatOverlayRenderer {
             return null;
         }
         try {
+            // Front to back, and no further than the window the point is
+            // in: a window covered by another owns nothing under it, so
+            // a line of it that happens to lie behind the front window
+            // answers neither a hover nor a click. Windows that do not
+            // overlap are unaffected — each still owns its own lines.
             List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
-            for (int index = 0; index < frames.size(); index++) {
+            for (int index = frames.size() - 1; index >= 0; index--) {
                 ChatWindowFrame frame = frames.get(index);
                 ChatLineBands bands = frame.bands;
                 List<ChatLine> lines = frame.lines;
-                if (lines == null || !bands.describes(lines, lines.size())) {
-                    continue;
+                if (lines != null && bands.describes(lines, lines.size())) {
+                    int band = bands.find(mouseX, mouseY);
+                    if (band >= 0) {
+                        return new Band(frame, lines, bands.viewIndexOf(band),
+                                bands.localX(band, mouseX), bands.topOf(band),
+                                bands.bottomOf(band), bands.scale());
+                    }
                 }
-                int band = bands.find(mouseX, mouseY);
-                if (band < 0) {
-                    continue;
+                if (frame.contains(mouseX, mouseY)) {
+                    return null;
                 }
-                return new Band(frame, lines, bands.viewIndexOf(band),
-                        bands.localX(band, mouseX), bands.topOf(band),
-                        bands.bottomOf(band), bands.scale());
             }
             return null;
         } catch (RuntimeException ignored) {
@@ -638,6 +642,22 @@ final class LostTalesChatOverlayRenderer {
      */
     static boolean beginVerticalClip(Minecraft minecraft, double topY,
                                      double bottomY, boolean inward) {
+        return beginClip(minecraft, Double.NaN, Double.NaN, topY, bottomY,
+                inward);
+    }
+
+    /**
+     * As {@link #beginVerticalClip}, cutting on any of the four sides.
+     * Any edge may be {@code NaN}, meaning nothing is cut there.
+     *
+     * <p>The rectangle replaces whatever scissor is in force rather than
+     * narrowing it, so a caller clipping inside another clip passes both
+     * — the tab row hands its own bottom edge down to each tab, which
+     * then adds its own two sides.</p>
+     */
+    static boolean beginClip(Minecraft minecraft, double leftX,
+                             double rightX, double topY, double bottomY,
+                             boolean inward) {
         try {
             ScaledResolution resolution = new ScaledResolution(minecraft,
                     minecraft.displayWidth, minecraft.displayHeight);
@@ -664,13 +684,28 @@ final class LostTalesChatOverlayRenderer {
                             : Math.ceil(highEdge - CLIP_EDGE_EPSILON));
             top = Math.max(0, top);
             bottom = Math.min(minecraft.displayHeight, bottom);
-            if (bottom <= top) {
+            // Scissor space counts rightward from the display's left, so
+            // the horizontal edges need no flip; the rounding is the
+            // same rule, inward giving up the pixel a fraction falls in.
+            int left = Double.isNaN(leftX) ? 0 : (int)(inward
+                    ? Math.ceil(leftX * pixelsPerGuiPixel
+                            - CLIP_EDGE_EPSILON)
+                    : Math.floor(leftX * pixelsPerGuiPixel
+                            + CLIP_EDGE_EPSILON));
+            int right = Double.isNaN(rightX) ? minecraft.displayWidth
+                    : (int)(inward
+                            ? Math.floor(rightX * pixelsPerGuiPixel
+                                    + CLIP_EDGE_EPSILON)
+                            : Math.ceil(rightX * pixelsPerGuiPixel
+                                    - CLIP_EDGE_EPSILON));
+            left = Math.max(0, left);
+            right = Math.min(minecraft.displayWidth, right);
+            if (bottom <= top || right <= left) {
                 return false;
             }
             GL11.glPushAttrib(GL11.GL_SCISSOR_BIT | GL11.GL_ENABLE_BIT);
             GL11.glEnable(GL11.GL_SCISSOR_TEST);
-            GL11.glScissor(0, top, Math.max(0, minecraft.displayWidth),
-                    bottom - top);
+            GL11.glScissor(left, top, right - left, bottom - top);
             return true;
         } catch (RuntimeException unavailable) {
             return false;
@@ -700,6 +735,17 @@ final class LostTalesChatOverlayRenderer {
                 + (scrollSlide > 0.0F ? 1 : 0);
         int eligibleLineCount = 0;
         int totalLineCount = lines.size();
+        // The stack is measured in rows, not in lines: the unread
+        // divider takes a row of its own between the last read message
+        // and the first unread one, and everything older stands a row
+        // higher for it. A line's row is worked out from where the
+        // divider is rather than accumulated as the loop passes it, so
+        // the stack lands in the same place whichever end of the
+        // history the draw starts from — and so the scroll ceiling, the
+        // scrollbar and the draw are all reading one geometry.
+        int dividerIndex = open ? frame.dividerLineIndex : -1;
+        int dividerRows = dividerIndex >= 0 ? 1 : 0;
+        int totalRowCount = totalLineCount + dividerRows;
         float opacity = minecraft.gameSettings.chatOpacity * 0.9F + 0.1F;
         float scale = chat.func_146244_h();
         ChatLineBands bands = frame.bands;
@@ -728,7 +774,7 @@ final class LostTalesChatOverlayRenderer {
         // themselves ease. The stack rises with a new message only while
         // the window is still growing; full, it would only look like it
         // is trying to.
-        boolean growing = totalLineCount <= visibleLineCount;
+        boolean growing = totalRowCount <= visibleLineCount;
         float originX = restingX;
         float originY = restingY;
         // Everything the message stack is moved by, and nothing else is:
@@ -746,7 +792,7 @@ final class LostTalesChatOverlayRenderer {
         // The stack the loop is about to draw, so the cut is known
         // before it runs.
         int plannedLineCount = Math.max(0, Math.min(visibleLineCount,
-                totalLineCount - scrollPosition));
+                totalRowCount - scrollPosition));
         float roomUnscaled = room / scale;
         // The window's rules are where content ends: everything the
         // stack draws is cut on the top rule and on the bottom rule, and
@@ -781,8 +827,8 @@ final class LostTalesChatOverlayRenderer {
         // one with a height of its own, whose empty rows are part of the
         // window. Only a window following the game setting and still
         // filling up carries its row down onto its last line.
-        boolean full = fixedHeight || totalLineCount <= 0
-                || totalLineCount * (float)LINE_HEIGHT
+        boolean full = fixedHeight || totalRowCount <= 0
+                || totalRowCount * (float)LINE_HEIGHT
                         >= roomUnscaled - 0.01F;
         frame.setStackTop(full ? restingY - room
                 : restingY + stackOffset
@@ -827,7 +873,7 @@ final class LostTalesChatOverlayRenderer {
                 // running under the words.
                 int hatchedRows = plannedLineCount
                         + (totalLineCount <= 0 ? 1 : 0);
-                if (totalLineCount * (float)LINE_HEIGHT
+                if (totalRowCount * (float)LINE_HEIGHT
                         < roomUnscaled - 0.01F) {
                     ChatIconSheet.EMPTY_HATCH.drawTiledFadingFromMiddle(
                             columns.enabled
@@ -844,10 +890,6 @@ final class LostTalesChatOverlayRenderer {
             }
             // Only the message stack is offset; the panel and the shades
             // belong to the window's own edges and stay on them.
-            // The unread divider takes a whole row of its own between
-            // the last read message and the first unread one; everything
-            // older shifts up by it, and the stack top follows.
-            int dividerRows = 0;
             // Where the hovered message's toolbar goes, filled in by the
             // stack as it draws it.
             float hoveredTop = 0.0F;
@@ -860,28 +902,30 @@ final class LostTalesChatOverlayRenderer {
                 clipped = open && beginVerticalClip(minecraft, clipTop,
                         clipBottom, true);
 
-                // A scrolled view starts one line earlier: the line the
+                // A scrolled view starts one row earlier: the row the
                 // first turn of scroll slid into the trailing strip,
                 // clipped where the strip's reveal ends.
-                int firstLine = Math.max(0, scrollPosition - 1);
-                Integer dividerLine = open && frame.view != null
-                        ? ClientChatChannelViews.unreadDividerLine(
-                                frame.view)
-                        : null;
-                String dividerLabel = dividerLine == null ? ""
+                int firstRow = Math.max(0, scrollPosition - 1);
+                int firstLine = Math.max(0,
+                        lineOfRow(firstRow, dividerIndex));
+                String dividerLabel = dividerIndex < 0 ? ""
                         : ClientChatChannelViews.unreadDividerLabel(
                                 frame.view);
                 // The line in the topmost slot owns the head-room above
                 // it: its band reaches up to the rule instead of being
                 // cut flush on its glyphs. A window with a fixed height
-                // and empty rows has no line at its top, so nothing
+                // and empty rows has no line at its top, and neither has
+                // one whose topmost row is the divider's, so nothing
                 // there is extended.
-                int topmostIndex = Math.min(lines.size(),
-                        scrollPosition + visibleLineCount) - 1;
+                int topmostIndex = lineOfRow(Math.min(totalRowCount,
+                        scrollPosition + visibleLineCount) - 1,
+                        dividerIndex);
                 for (int lineIndex = firstLine;
-                     lineIndex < lines.size()
-                             && lineIndex - scrollPosition < visibleLineCount;
-                     lineIndex++) {
+                     lineIndex < lines.size(); lineIndex++) {
+                    int rowIndex = rowOfLine(lineIndex, dividerIndex);
+                    if (rowIndex - scrollPosition >= visibleLineCount) {
+                        break;
+                    }
                     ChatLine line = lines.get(lineIndex);
                     if (line == null) {
                         continue;
@@ -911,8 +955,7 @@ final class LostTalesChatOverlayRenderer {
                     alpha = (int)(alpha * entryOpacity(line));
                     alpha = (int)(alpha * opening.getOpacity());
                     eligibleLineCount++;
-                    int y = -(lineIndex - scrollPosition + dividerRows)
-                            * LINE_HEIGHT;
+                    int y = -(rowIndex - scrollPosition) * LINE_HEIGHT;
                     float entry = entrySlide(line);
                     if (open) {
                         // Recorded exactly as drawn: the same translate, slide
@@ -938,13 +981,7 @@ final class LostTalesChatOverlayRenderer {
                     if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
                         continue;
                     }
-                    boolean dividerHere = dividerLine != null
-                            && line.getChatLineID() == dividerLine.intValue()
-                            && (lineIndex + 1 >= lines.size()
-                                    || lines.get(lineIndex + 1) == null
-                                    || lines.get(lineIndex + 1)
-                                            .getChatLineID()
-                                            != dividerLine.intValue());
+                    boolean dividerHere = lineIndex == dividerIndex;
                     int color = LostTalesChatPresentation.isPingedLine(
                             line.getChatLineID())
                             ? PING_BACKDROP_RGB : CHAT_BACKDROP_RGB;
@@ -1035,9 +1072,6 @@ final class LostTalesChatOverlayRenderer {
                     GL11.glPopMatrix();
                     GL11.glPopMatrix();
                     GL11.glDisable(GL11.GL_ALPHA_TEST);
-                    if (dividerHere) {
-                        dividerRows++;
-                    }
                 }
 
             } finally {
@@ -1046,9 +1080,10 @@ final class LostTalesChatOverlayRenderer {
                 GL11.glPopMatrix();
             }
             if (!full) {
-                // Lines the draw passed over: the stack ends lower than
-                // the room allows, so the row follows it down. The
-                // unread divider's row is part of the stack.
+                // Rows the draw passed over: the stack ends lower than
+                // the room allows, so the tab row follows it down. A
+                // history short enough to leave room is drawn whole, so
+                // the divider's row is among them.
                 frame.setStackTop(restingY + stackOffset
                         - (eligibleLineCount + dividerRows)
                                 * LINE_HEIGHT * scale);
@@ -1112,8 +1147,12 @@ final class LostTalesChatOverlayRenderer {
             }
             frame.scrollbarRight = 0.0F;
             if (open) {
+                // The thumb is sized in the same units the scroll range
+                // is clamped in — rows of the window's own room — not in
+                // the pixels the track happens to be drawn with, which
+                // differ by the chat scale.
                 drawScrollbar(frame, panelRight, topEdge, bottomEdge,
-                        lines.size(), room / Math.max(1.0F, LINE_HEIGHT),
+                        totalRowCount, (float)frame.roomLines(),
                         scrollLines, opacity * opening.getOpacity(),
                         originX, originY, scale);
             }
@@ -1148,8 +1187,8 @@ final class LostTalesChatOverlayRenderer {
                     boolean buttonClipped = beginVerticalClip(minecraft,
                             clipTop, clipBottom, true);
                     try {
-                        drawJumpButton(frame, panelLeft, panelRight,
-                                bottomEdge,
+                        drawJumpButton(minecraft, frame, panelLeft,
+                                panelRight, bottomEdge,
                                 Math.round(255.0F * opacity
                                         * opening.getOpacity()),
                                 originX, originY, scale);
@@ -1163,6 +1202,27 @@ final class LostTalesChatOverlayRenderer {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glEnable(GL11.GL_ALPHA_TEST);
         }
+    }
+
+    /**
+     * Which row of the stack a line stands on. The unread divider owns
+     * the row directly above the message it divides at, so every line
+     * older than that message — one further along vanilla's newest-first
+     * list — stands one row higher than its index.
+     */
+    static int rowOfLine(int lineIndex, int dividerIndex) {
+        return dividerIndex >= 0 && lineIndex > dividerIndex
+                ? lineIndex + 1 : lineIndex;
+    }
+
+    /**
+     * The line standing on a row, as the inverse of {@link #rowOfLine}.
+     * The divider's own row carries no line; it answers with the line
+     * below it, so a draw starting there begins one row early rather
+     * than skipping the divider.
+     */
+    static int lineOfRow(int row, int dividerIndex) {
+        return dividerIndex >= 0 && row > dividerIndex ? row - 1 : row;
     }
 
     /**
@@ -1448,7 +1508,8 @@ final class LostTalesChatOverlayRenderer {
      * on the frame, so the click resolves against exactly what is on
      * screen.
      */
-    private static void drawJumpButton(ChatWindowFrame frame,
+    private static void drawJumpButton(Minecraft minecraft,
+                                       ChatWindowFrame frame,
                                        float panelLeft, float panelRight,
                                        float bottomEdge,
                                        int alpha, float originX,
@@ -1487,6 +1548,11 @@ final class LostTalesChatOverlayRenderer {
                 arrowTop + 2.0F, ivory);
         fillRect(centre - 1.0F, arrowTop + 2.0F, centre + 1.0F,
                 arrowTop + 3.0F, ivory);
+        // What is waiting below, so a view scrolled back says how much
+        // it has not seen rather than only that there is more. In the
+        // divider's own crimson, which is the colour this chat says
+        // "unread" in, on the button's right shoulder.
+        drawWaitingCount(minecraft, frame, right, top, alpha);
         frame.jumpPillLeft = originX + left * scale;
         frame.jumpPillTop = originY + top * scale;
         frame.jumpPillRight = originX + right * scale;
@@ -1494,6 +1560,37 @@ final class LostTalesChatOverlayRenderer {
         // hitbox ends where the pixels do.
         frame.jumpPillBottom = Math.min(originY + bottom * scale,
                 originY + bottomEdge * scale);
+    }
+
+    /**
+     * The count of messages that arrived while the view was scrolled
+     * back, as a small badge on the jump-to-present button. Anchored on
+     * the button's top-right corner and drawn over its outline, so a
+     * long count grows leftward across the button rather than off the
+     * panel; nothing is drawn while nothing is waiting.
+     */
+    private static void drawWaitingCount(Minecraft minecraft,
+                                         ChatWindowFrame frame,
+                                         float buttonRight, float buttonTop,
+                                         int alpha) {
+        int waiting = ClientChatChannelViews.waitingBelow(frame.view);
+        if (waiting <= 0 || minecraft.fontRenderer == null
+                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        String text = waiting > ClientChatChannelViews.MAX_UNREAD
+                ? ClientChatChannelViews.MAX_UNREAD + "+"
+                : String.valueOf(waiting);
+        int textWidth = minecraft.fontRenderer.getStringWidth(text);
+        float badgeRight = buttonRight + 2.0F;
+        float badgeLeft = badgeRight - textWidth - 3.0F;
+        float badgeTop = buttonTop - 2.0F;
+        float badgeBottom = badgeTop + 9.0F;
+        fillRect(badgeLeft, badgeTop, badgeRight, badgeBottom,
+                (alpha << 24) | UNREAD_DIVIDER_RGB);
+        LostTalesChatVisualStyle.drawColored(minecraft.fontRenderer, text,
+                Math.round(badgeLeft) + 2, Math.round(badgeTop) + 1,
+                LostTalesChatVisualStyle.IVORY, alpha);
     }
 
     /** Edge of one toolbar button's square. */
@@ -1913,7 +2010,7 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /** A flat quad at fractional edges; {@code Gui.drawRect} is whole. */
-    private static void fillRect(float left, float top, float right,
+    static void fillRect(float left, float top, float right,
                                  float bottom, int argb) {
         int alpha = argb >>> 24;
         if (alpha <= 0 || right <= left || bottom <= top) {

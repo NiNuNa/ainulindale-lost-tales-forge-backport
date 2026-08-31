@@ -65,6 +65,21 @@ final class DiscordHttp {
     }
 
     /** Posts a webhook body; Discord answers 204 with nothing on success. */
+    /**
+     * Tells Discord the bot is typing in the channel, which shows its
+     * own indicator there for about ten seconds. Presence only: no text
+     * crosses with it, and the call carries no body at all.
+     */
+    static Reply postTyping(String botToken, String channelId)
+            throws IOException {
+        HttpURLConnection connection = open(
+                API_BASE + "/channels/" + channelId + "/typing", "POST");
+        connection.setRequestProperty("Authorization", "Bot " + botToken);
+        // An empty body rather than none: the exchange sets the length
+        // from it, which is what a POST with nothing to say needs.
+        return exchange(connection, "");
+    }
+
     static Reply postWebhook(String webhookUrl, String body) throws IOException {
         HttpURLConnection connection = open(webhookUrl, "POST");
         connection.setRequestProperty("Content-Type", "application/json");

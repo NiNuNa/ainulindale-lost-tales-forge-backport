@@ -7,6 +7,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -153,6 +154,64 @@ final class ChatWindowLines {
     /** Forgotten with the rest of the client's chat state. */
     static synchronized void clear() {
         CACHE.clear();
+    }
+
+    /**
+     * Drops the layout of every window that has gone. A view's lines are
+     * held against its window's id, and once that window is closed
+     * nothing asks for them again — so the entry is never refreshed and
+     * never replaced either, since ids are handed out and never reused.
+     * What it leaves behind is not small: a whole re-wrapped copy of the
+     * history as it stood when the window closed, and, through the keys
+     * of that copy, vanilla's own message objects held alive after
+     * vanilla has trimmed them from its history. Every detached window
+     * closed in a session left one until the world was left.
+     *
+     * <p>Called from the draw beside {@link ChatWindowFrame#prune}: the
+     * two per-window caches answer to one question — which windows are
+     * still real — and are let go together. The feed is not a window and
+     * is never pruned.</p>
+     */
+    static synchronized void prune(List<ChatWindow> windows) {
+        // Nothing to sweep while the cache holds no more than the feed
+        // and one entry per window. A window drawn before its first
+        // layout makes this miss by one, which only puts the sweep off
+        // to the next frame; it can never drop a view still in use.
+        if (windows != null && CACHE.size() > windows.size() + 1) {
+            pruneViews(CACHE, windows);
+        }
+    }
+
+    /**
+     * The sweep itself, over any map of views by id: everything whose id
+     * is neither the feed's nor a live window's goes. Separate from the
+     * cache it is run over so it can be exercised without a screen.
+     */
+    static void pruneViews(Map<String, ?> views, List<ChatWindow> windows) {
+        String feedId = ChatWindowFrame.feed().windowId;
+        Iterator<String> iterator = views.keySet().iterator();
+        while (iterator.hasNext()) {
+            String viewId = iterator.next();
+            if (viewId == null || viewId.equals(feedId)) {
+                continue;
+            }
+            boolean alive = false;
+            for (int index = 0; windows != null && index < windows.size();
+                 index++) {
+                if (windows.get(index).getId().equals(viewId)) {
+                    alive = true;
+                    break;
+                }
+            }
+            if (!alive) {
+                iterator.remove();
+            }
+        }
+    }
+
+    /** How many views the cache is holding; for tests and diagnostics. */
+    static synchronized int cachedViewCount() {
+        return CACHE.size();
     }
 
     /**

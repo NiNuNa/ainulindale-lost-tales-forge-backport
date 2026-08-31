@@ -253,7 +253,7 @@ public final class LostTalesChatPresentation {
         ClientChatMessageIds.remember(chatLineId, packet.getMessageId());
         // Kept so the same line can be built again if it is edited.
         ClientChatMessages.remember(packet, tab, showcaseIds);
-        noteLinePrinted(minecraft, chat, chatLineId, tab, mentioned);
+        noteLinePrinted(chatLineId, tab, mentioned);
         return chatLineId;
     }
 
@@ -508,8 +508,7 @@ public final class LostTalesChatPresentation {
     }
 
     /** Records animation timing and the line's tab for the tab views. */
-    private static void noteLinePrinted(Minecraft minecraft, GuiNewChat chat,
-                                        int chatLineId, ChatTab tab,
+    private static void noteLinePrinted(int chatLineId, ChatTab tab,
                                         boolean mentioned) {
         lastMessageChatLineId = chatLineId;
         hasLastMessage = true;
@@ -517,9 +516,6 @@ public final class LostTalesChatPresentation {
         lastMessageTab = tab;
         ClientChatChannelViews.record(chatLineId, tab,
                 ClientChatChannelState.getSelected(), mentioned);
-        ClientChatChannelViews.onLinesAdded(tab,
-                LostTalesChatOverlayRenderer.countLeadingLines(
-                        chat, chatLineId));
     }
 
     /**
@@ -955,9 +951,6 @@ public final class LostTalesChatPresentation {
                         System.currentTimeMillis()), chatLineId);
         ClientChatChannelViews.record(chatLineId, tab,
                 ClientChatChannelState.getSelected(), mentioned);
-        ClientChatChannelViews.onLinesAdded(tab,
-                LostTalesChatOverlayRenderer.countLeadingLines(
-                        chat, chatLineId));
         if (mentioned) {
             markPinged(chatLineId);
             if (audibleMentionCue && ChatWindowLayout.isPingAudible(tab)) {
@@ -1292,7 +1285,7 @@ public final class LostTalesChatPresentation {
         // sees it, so it is named locally like the player's replies.
         ClientChatMessageIds.remember(chatLineId,
                 ClientChatMessageIds.nextLocal());
-        noteLinePrinted(minecraft, chat, chatLineId, tab, mentioned);
+        noteLinePrinted(chatLineId, tab, mentioned);
         if (mentioned) {
             markPinged(chatLineId);
             if (ChatWindowLayout.isPingAudible(tab)) {

@@ -57,6 +57,25 @@ public final class ClientChatChannelViews {
     /** Where each view is drawn right now, easing toward its target. */
     private static final Map<ChatTab, Ease> RENDERED =
             new HashMap<ChatTab, Ease>();
+    /**
+     * Messages that have arrived in a tab while its own view was
+     * scrolled back, capped like the unread counters. Cleared the moment
+     * the view returns to the newest message, which is what the
+     * jump-to-present button does.
+     */
+    private static final Map<ChatTab, Integer> WAITING_BELOW =
+            new HashMap<ChatTab, Integer>();
+    /** The message each scrolled-back view is holding on to. */
+    private static final Map<ChatTab, Anchor> ANCHORS =
+            new HashMap<ChatTab, Anchor>();
+    /**
+     * How many times the player has moved each view themselves. A hold
+     * is taken against the reading it was made from, so a wheel turn,
+     * a scrollbar drag or a jump replaces it rather than being undone
+     * by it.
+     */
+    private static final Map<ChatTab, Integer> SCROLL_REVISION =
+            new HashMap<ChatTab, Integer>();
     /** Closer than this to the target and the offset simply arrives. */
     private static final double SCROLL_SNAP_LINES = 0.01D;
     /**
@@ -103,7 +122,24 @@ public final class ClientChatChannelViews {
             iterator.remove();
         }
         invalidateCache();
-        if (!tab.equals(selected)) {
+        if (tab.equals(selected)) {
+            // The tab is open in front of the player — but if they have
+            // scrolled back to read, a message arriving is one they have
+            // not seen. It is counted on the jump-to-present button, and
+            // the first of a run opens the same crimson divider an unread
+            // run in another tab opens, so where they were reading is
+            // marked as plainly there as anywhere else.
+            if (target(tab) > 0.0D) {
+                int waiting = count(WAITING_BELOW, tab);
+                WAITING_BELOW.put(tab, Integer.valueOf(
+                        Math.min(MAX_UNREAD + 1, waiting + 1)));
+                if (waiting == 0) {
+                    UNREAD_DIVIDERS.put(tab, new UnreadDivider(chatLineId));
+                }
+            }
+            return;
+        }
+        {
             Map<ChatTab, Integer> counter = mentionsLocalPlayer
                     ? UNREAD_PINGS : UNREAD_OTHER;
             counter.put(tab, Integer.valueOf(
@@ -122,30 +158,120 @@ public final class ClientChatChannelViews {
                 mentionsLocalPlayer);
     }
 
-    /** Keeps a scrolled-up view stable when lines are inserted above it. */
-    public static synchronized void onLinesAdded(ChatTab tab,
-                                                 int addedLineCount) {
-        if (addedLineCount <= 0) {
+    /**
+     * Holds a scrolled-back view on the message it is reading. Called
+     * once for every open window before its scroll is clamped, so the
+     * correction is made in the same frame the stack grows in and never
+     * shows as a jump.
+     *
+     * <p>A view scrolled away from the newest message is a view of a
+     * <em>message</em>, not of a row number: what should stay still
+     * under the eye is the conversation, whatever happens beneath it.
+     * So the view remembers the line at its bottom edge and how far
+     * above that line it sits, and every frame it is put back on that
+     * line. New messages arriving underneath, an unread divider opening
+     * a row of its own, the window being made narrower and the whole
+     * history re-wrapping — none of them move the page being read. A
+     * view resting on the newest message holds nothing: it belongs to
+     * the foot of the stack, and there the arriving messages should push
+     * it, which is what jumping to the present goes back to.</p>
+     */
+    static synchronized void holdPosition(ChatTab view,
+                                          ChatWindowFrame frame) {
+        if (view == null || frame == null) {
             return;
         }
-        for (Map.Entry<ChatTab, Double> entry : SCROLL.entrySet()) {
-            if ((tab == null || entry.getKey().equals(tab))
-                    && entry.getValue().doubleValue() > 0.0D) {
-                entry.setValue(Double.valueOf(
-                        entry.getValue().doubleValue() + addedLineCount));
-                // The view stays on the same message, so what is drawn
-                // must move with it rather than easing across the gap.
-                Ease ease = RENDERED.get(entry.getKey());
-                if (ease != null) {
-                    ease.value += addedLineCount;
-                }
+        double current = target(view);
+        List<ChatLine> lines = frame.lines;
+        if (current <= 0.0D || lines == null || lines.isEmpty()) {
+            ANCHORS.remove(view);
+            // Back at the newest message: nothing is waiting below any
+            // more, whether the player scrolled down or jumped.
+            WAITING_BELOW.remove(view);
+            return;
+        }
+        int divider = frame.dividerLineIndex;
+        Anchor anchor = ANCHORS.get(view);
+        if (anchor != null && anchor.revision == revision(view)) {
+            int index = anchor.locate(lines);
+            if (index >= 0) {
+                place(view, LostTalesChatOverlayRenderer.rowOfLine(
+                        index, divider) + anchor.delta, current);
+                return;
             }
+        }
+        // Nothing held yet, or the message that was held has been
+        // trimmed away: take hold of whatever is at the view's edge now.
+        int index = Math.max(0, Math.min(lines.size() - 1,
+                LostTalesChatOverlayRenderer.lineOfRow(
+                        (int)Math.floor(current), divider)));
+        ChatLine line = lines.get(index);
+        if (line == null) {
+            ANCHORS.remove(view);
+            return;
+        }
+        ANCHORS.put(view, new Anchor(line.getChatLineID(), index,
+                current - LostTalesChatOverlayRenderer.rowOfLine(
+                        index, divider), revision(view)));
+    }
+
+    /**
+     * Moves a view's offset to where its held message now stands. The
+     * drawn offset moves with it rather than easing after it: nothing
+     * has happened that the eye should see travel — the page is exactly
+     * where it was, and only the rows beneath it have changed.
+     */
+    private static void place(ChatTab view, double offset, double current) {
+        double bounded = Math.max(0.0D, offset);
+        if (bounded == current) {
+            return;
+        }
+        SCROLL.put(view, Double.valueOf(bounded));
+        Ease ease = RENDERED.get(view);
+        if (ease != null) {
+            ease.value = Math.max(0.0D, ease.value + bounded - current);
         }
     }
 
-    public static synchronized void onLinesAdded(ChatChannel channel,
-                                                 int addedLineCount) {
-        onLinesAdded(ChatTab.of(channel), addedLineCount);
+    /** What a view is holding on to while it is scrolled back. */
+    private static final class Anchor {
+        final int chatLineId;
+        /** Rows between that line's own row and the view's offset. */
+        final double delta;
+        /** The scroll this hold was taken against; a later one drops it. */
+        final int revision;
+        /** Where the line was last found, tried first next time. */
+        private int lastIndex;
+
+        Anchor(int chatLineId, int index, double delta, int revision) {
+            this.chatLineId = chatLineId;
+            this.lastIndex = index;
+            this.delta = delta;
+            this.revision = revision;
+        }
+
+        /**
+         * Where the held line is in the list now, or -1 once the history
+         * has trimmed past it. The place it was last found is tried
+         * first, which is the answer on every frame nothing arrived.
+         */
+        int locate(List<ChatLine> lines) {
+            if (this.lastIndex >= 0 && this.lastIndex < lines.size()
+                    && lines.get(this.lastIndex) != null
+                    && lines.get(this.lastIndex).getChatLineID()
+                            == this.chatLineId) {
+                return this.lastIndex;
+            }
+            for (int index = 0; index < lines.size(); index++) {
+                if (lines.get(index) != null
+                        && lines.get(index).getChatLineID()
+                                == this.chatLineId) {
+                    this.lastIndex = index;
+                    return index;
+                }
+            }
+            return -1;
+        }
     }
 
     /** Called while a view is on screen; clears its unread counters. */
@@ -219,7 +345,18 @@ public final class ClientChatChannelViews {
     public static synchronized void scrollHome(ChatTab view) {
         if (view != null) {
             SCROLL.remove(view);
+            ANCHORS.remove(view);
+            WAITING_BELOW.remove(view);
+            noteScrolled(view);
         }
+    }
+
+    /**
+     * Messages that arrived in this view while it was scrolled back:
+     * what the jump-to-present button counts. Zero once the view is home.
+     */
+    public static synchronized int waitingBelow(ChatTab view) {
+        return count(WAITING_BELOW, view);
     }
 
     /** One tab's divider: where the latest unread run starts. */
@@ -455,6 +592,7 @@ public final class ClientChatChannelViews {
                                              double roomLines) {
         if (view != null) {
             SCROLL.put(view, Double.valueOf(Math.max(0.0D, lines)));
+            noteScrolled(view);
             getScroll(view, totalLines, roomLines);
         }
     }
@@ -466,6 +604,7 @@ public final class ClientChatChannelViews {
             return;
         }
         SCROLL.put(view, Double.valueOf(target(view) + delta));
+        noteScrolled(view);
         getScroll(view, totalLines, roomLines);
     }
 
@@ -479,11 +618,27 @@ public final class ClientChatChannelViews {
     public static synchronized void resetScroll() {
         SCROLL.clear();
         RENDERED.clear();
+        ANCHORS.clear();
+        SCROLL_REVISION.clear();
+        WAITING_BELOW.clear();
     }
 
     private static double target(ChatTab view) {
         Double value = view == null ? null : SCROLL.get(view);
         return value == null ? 0.0D : value.doubleValue();
+    }
+
+    private static int revision(ChatTab view) {
+        Integer value = view == null ? null : SCROLL_REVISION.get(view);
+        return value == null ? 0 : value.intValue();
+    }
+
+    /** Records that the player has moved this view themselves. */
+    private static void noteScrolled(ChatTab view) {
+        if (view != null) {
+            SCROLL_REVISION.put(view,
+                    Integer.valueOf(revision(view) + 1));
+        }
     }
 
     /** Views whose easing is remembered; one per window is plenty. */
@@ -533,6 +688,9 @@ public final class ClientChatChannelViews {
         TAB_BY_LINE_ID.clear();
         SCROLL.clear();
         RENDERED.clear();
+        ANCHORS.clear();
+        SCROLL_REVISION.clear();
+        WAITING_BELOW.clear();
         UNREAD_PINGS.clear();
         UNREAD_OTHER.clear();
         UNREAD_DIVIDERS.clear();

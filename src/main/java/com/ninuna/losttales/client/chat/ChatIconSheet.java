@@ -2,7 +2,6 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.ResourceLocation;
@@ -29,6 +28,14 @@ enum ChatIconSheet {
     SEND(88, 1, 8, 8),
     PLUS(0, 11, 5, 5),
     PLUS_HOVER(6, 11, 5, 5),
+    /**
+     * The {@code +} with its upright stroke taken away: what the restore
+     * control wears while the list it opens is out. One row of artwork
+     * rather than a five-row cell, so it centres on the same row of the
+     * strip the {@code +}'s own crossbar stands on.
+     */
+    MINUS(80, 13, 5, 1),
+    MINUS_HOVER(86, 13, 5, 1),
     CLOSE(12, 11, 5, 5),
     CLOSE_HOVER(18, 11, 5, 5),
     COG(24, 11, 5, 5),
@@ -77,9 +84,25 @@ enum ChatIconSheet {
      * the region is tiled with them.
      */
     EMPTY_HATCH(0, 26, 16, 16),
-    /** The chevron a control opens a list below itself with. */
-    CHEVRON_DOWN(0, 43, 5, 3),
-    CHEVRON_DOWN_HOVER(6, 43, 5, 3);
+    /**
+     * The chevron a control opens a list below itself with, animated:
+     * five frames from pointing down (the list is away and opens
+     * downward) through a flat rule to pointing up (the list is out and
+     * folds back up toward it). The vertical counterpart of the
+     * insert-toolbar chevron above, laid out the same way — each cell
+     * exactly its own artwork, so a frame centres on the control
+     * however tall it is.
+     */
+    CHEVRON_1(0, 43, 5, 3),
+    CHEVRON_2(0, 47, 5, 2),
+    CHEVRON_3(0, 50, 5, 1),
+    CHEVRON_4(0, 52, 5, 2),
+    CHEVRON_5(0, 55, 5, 3),
+    CHEVRON_1_HOVER(6, 43, 5, 3),
+    CHEVRON_2_HOVER(6, 47, 5, 2),
+    CHEVRON_3_HOVER(6, 50, 5, 1),
+    CHEVRON_4_HOVER(6, 52, 5, 2),
+    CHEVRON_5_HOVER(6, 55, 5, 3);
 
     static final String TEXTURE_PATH = "textures/gui/chat.png";
     static final int SHEET_WIDTH = 97;
@@ -105,7 +128,7 @@ enum ChatIconSheet {
     int getHeight() { return this.height; }
 
     /** The sprite at its own size, with the chat's shadow under it. */
-    void drawWithShadow(int x, int y, int alpha) {
+    void drawWithShadow(float x, float y, int alpha) {
         drawWithShadow(this.u, this.v, this.width, this.height, x, y, alpha);
     }
 
@@ -114,7 +137,7 @@ enum ChatIconSheet {
      * how a control whose sheet holds a single colourway of its glyph
      * says it is inert.
      */
-    void drawSilhouetteWithShadow(int rgb, int x, int y, int alpha) {
+    void drawSilhouetteWithShadow(int rgb, float x, float y, int alpha) {
         drawShadow(this.u, this.v, this.width, this.height, x, y, alpha);
         LostTalesSilhouetteRenderState.begin(rgb);
         try {
@@ -133,7 +156,7 @@ enum ChatIconSheet {
      */
     static void drawPairWithShadow(ChatIconSheet resting,
                                    ChatIconSheet hovered, float progress,
-                                   int x, int y, int alpha) {
+                                   float x, float y, int alpha) {
         resting.drawWithShadow(x, y, alpha);
         int over = Math.round(alpha * Math.max(0.0F, Math.min(1.0F,
                 progress)));
@@ -148,14 +171,14 @@ enum ChatIconSheet {
      * than named cells, so they carry their own coordinates.
      */
     static void drawWithShadow(int u, int v, int width, int height,
-                               int x, int y, int alpha) {
+                               float x, float y, int alpha) {
         drawShadow(u, v, width, height, x, y, alpha);
         draw(u, v, width, height, x, y, alpha);
     }
 
     /** The shared drop shadow: the same cell, offset, in the shadow tone. */
     private static void drawShadow(int u, int v, int width, int height,
-                                   int x, int y, int alpha) {
+                                   float x, float y, int alpha) {
         int shadowAlpha = LostTalesChatVisualStyle.shadowAlpha(alpha);
         if (shadowAlpha <= 0) {
             return;

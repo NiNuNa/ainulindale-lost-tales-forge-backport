@@ -425,6 +425,12 @@ public final class LostTalesChatService {
                 && !LostTalesWaystonePermissionPolicy.isOperator(sender)) {
             return;
         }
+        if (channel == ChatChannel.DISCORD && typing) {
+            // The bridged channel has readers on the other side too, and
+            // Discord shows its own indicator when the bot says it is
+            // typing. Nothing but presence crosses.
+            LostTalesDiscordBridge.getInstance().relayTyping();
+        }
         LostTalesChatTypingSyncPacket packet = new LostTalesChatTypingSyncPacket(
                 channel, "", identityName, typing);
         for (EntityPlayerMP recipient : resolveRecipients(

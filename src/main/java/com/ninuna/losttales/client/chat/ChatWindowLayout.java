@@ -247,6 +247,28 @@ public final class ChatWindowLayout {
     }
 
     /** Brings a window to the front of the stack; not a layout change. */
+    /**
+     * Sends a window behind every other one, the reverse of
+     * {@link #raise}. The whole order is written down first: windows
+     * that were never raised sit at the back in layout order, so a
+     * window pushed under them has to be listed with them to really be
+     * behind them.
+     */
+    public static synchronized void lower(String windowId) {
+        if (window(windowId) == null) {
+            return;
+        }
+        List<ChatWindow> order = stacked();
+        STACK.clear();
+        for (int index = 0; index < order.size(); index++) {
+            String id = order.get(index).getId();
+            if (!id.equals(windowId)) {
+                STACK.add(id);
+            }
+        }
+        STACK.add(0, windowId);
+    }
+
     public static synchronized void raise(String windowId) {
         if (window(windowId) == null) {
             return;

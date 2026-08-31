@@ -53,7 +53,5 @@ public final class LostTalesChatMotionTest {
                 LostTalesChatMotion.inputOffset(-2.0F), EPSILON);
         assertEquals(0.0F,
                 LostTalesChatMotion.inputOffset(2.0F), EPSILON);
-        assertEquals(1.0F,
-                LostTalesChatMotion.menuProgress(2.0F), EPSILON);
     }
 }

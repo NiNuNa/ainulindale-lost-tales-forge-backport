@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.server.MinecraftServer;
 
 /**
@@ -46,6 +47,9 @@ public final class LostTalesDiscordBridge {
             new LostTalesDiscordBridge();
     private static final int MAX_QUEUED_INBOUND = 256;
     private static final int MAX_QUEUED_OUTBOUND = 256;
+    /** Shortest gap between two typing pings; Discord's own lasts ten
+     *  seconds, so anything more often is spent for nothing. */
+    private static final long TYPING_INTERVAL_MILLIS = 8000L;
     private static final int MAX_INBOUND_PER_TICK = 8;
     private static final long MIN_BACKOFF_MILLIS = 5000L;
     private static final long MAX_BACKOFF_MILLIS = 60000L;
@@ -62,6 +66,13 @@ public final class LostTalesDiscordBridge {
     private final AtomicInteger outboundCount = new AtomicInteger();
     private final DiscordChannelStatus status = new DiscordChannelStatus();
     private volatile boolean statusRefreshRequested;
+    /**
+     * When a typing ping was last sent to Discord. Discord shows its own
+     * indicator for about ten seconds from one, so repeating it faster
+     * than that buys nothing and only spends the bridge's rate limit.
+     */
+    private final AtomicLong typingSentMillis = new AtomicLong();
+    private volatile boolean typingRequested;
     private volatile Worker worker;
     private boolean registered;
 
@@ -130,6 +141,10 @@ public final class LostTalesDiscordBridge {
         this.outboundCount.set(0);
         this.status.reset();
         this.statusRefreshRequested = false;
+        // Presence is about a moment that has passed: a request left
+        // standing must not reach the next server this bridge serves.
+        this.typingRequested = false;
+        this.typingSentMillis.set(0L);
     }
 
     public boolean isRunning() {
@@ -168,6 +183,26 @@ public final class LostTalesDiscordBridge {
         }
         this.outboundCount.incrementAndGet();
         this.outbound.add(new Outbound(username, avatarUrl, message));
+    }
+
+    /**
+     * Says that somebody in the game is typing into the bridged channel,
+     * so Discord shows its indicator there. Presence only, and only
+     * while game chat is being relayed at all: no text crosses with it,
+     * and what Discord sees is the bot typing rather than a name it has
+     * no account for. Cheap and idempotent — the worker sends at most
+     * one ping per {@link #TYPING_INTERVAL_MILLIS}, and drops the rest.
+     *
+     * <p>Only this direction is possible over the bridge as it is built.
+     * Discord publishes a user's own typing on its gateway alone, which
+     * is a WebSocket the bridge deliberately does not open — it is
+     * plain HTTP and the polling API carries no typing at all — so a
+     * Discord member typing cannot be shown in game.</p>
+     */
+    public void relayTyping() {
+        if (LostTalesConfig.discordRelayGameChat) {
+            this.typingRequested = true;
+        }
     }
 
     /**
@@ -324,6 +359,7 @@ public final class LostTalesDiscordBridge {
                     }
                     if (this.posts) {
                         flushOutbound();
+                        flushTyping();
                     }
                     recovered();
                 } catch (RateLimited limited) {
@@ -348,6 +384,37 @@ public final class LostTalesDiscordBridge {
                 }
             }
             sendLast();
+        }
+
+        /**
+         * Sends the typing ping if one has been asked for and the last
+         * is old enough. A refusal is dropped rather than retried:
+         * presence is only worth saying while it is still true.
+         */
+        private void flushTyping() {
+            if (!typingRequested) {
+                return;
+            }
+            typingRequested = false;
+            long now = System.currentTimeMillis();
+            long last = typingSentMillis.get();
+            if (last != 0L && now - last < TYPING_INTERVAL_MILLIS) {
+                return;
+            }
+            String token = LostTalesConfig.discordBotToken.trim();
+            String channel = LostTalesConfig.discordChannelId.trim();
+            if (token.length() == 0 || channel.length() == 0) {
+                return;
+            }
+            typingSentMillis.set(now);
+            try {
+                DiscordHttp.postTyping(token, channel);
+            } catch (IOException ignored) {
+                // Presence that did not arrive is presence not worth
+                // chasing; the next keystroke asks again.
+            } catch (RuntimeException ignored) {
+                // As above.
+            }
         }
 
         /**

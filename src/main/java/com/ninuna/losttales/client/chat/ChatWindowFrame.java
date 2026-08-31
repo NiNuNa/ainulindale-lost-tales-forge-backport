@@ -42,6 +42,20 @@ final class ChatWindowFrame {
     final ChatChannelTabBar tabBar = new ChatChannelTabBar();
     /** The view's line list drawn last; the bands index into it. */
     List<ChatLine> lines = Collections.emptyList();
+    /**
+     * Index in {@link #lines} of the oldest wrapped row of the message
+     * the unread divider stands above, or -1 while this view shows no
+     * divider. The divider takes a whole row of the stack, so it is part
+     * of the window's content height and not only of its drawing: the
+     * scroll range, the scrollbar and the draw all read it here, which
+     * is what keeps the room a view can reach and the rows it actually
+     * renders the same measurement.
+     */
+    int dividerLineIndex = -1;
+    /** What {@link #dividerLineIndex} was worked out from. */
+    private List<ChatLine> dividerSource;
+    private int dividerSourceSize;
+    private int dividerSourceLineId;
     /** The tab shown while open, null for the closed-chat feed. */
     ChatTab view;
     boolean drawn;
@@ -224,6 +238,12 @@ final class ChatWindowFrame {
         FEED.lines = Collections.emptyList();
         FEED.drawn = false;
         FEED.bands.reset(null, 0, 1.0F);
+        // The feed's frame is never pruned, so what it remembers about
+        // the history it was reading has to be let go with the history.
+        FEED.dividerLineIndex = -1;
+        FEED.dividerSource = null;
+        FEED.dividerSourceSize = 0;
+        FEED.dividerSourceLineId = 0;
     }
 
     /**
@@ -351,6 +371,90 @@ final class ChatWindowFrame {
     /** Records where the drawn message stack ended up this frame. */
     void setStackTop(double screenY) {
         this.stackTop = screenY;
+    }
+
+    /**
+     * Works out where this view's unread divider falls in the line list
+     * and records it. The answer is kept until the list, its length or
+     * the divider's message changes: it is asked for every window of
+     * every frame, and the scan is only worth paying for when one of
+     * those has moved.
+     */
+    void resolveDividerRow(List<ChatLine> drawnLines, Integer dividerLine) {
+        int lineId = dividerLine == null ? 0 : dividerLine.intValue();
+        int size = drawnLines == null ? 0 : drawnLines.size();
+        if (drawnLines == this.dividerSource && size == this.dividerSourceSize
+                && lineId == this.dividerSourceLineId
+                && stillDivides(drawnLines, lineId)) {
+            return;
+        }
+        this.dividerSource = drawnLines;
+        this.dividerSourceSize = size;
+        this.dividerSourceLineId = lineId;
+        this.dividerLineIndex = lineId == 0 ? -1
+                : lastRowOf(drawnLines, lineId);
+    }
+
+    /**
+     * Whether the remembered row still holds the divider's message. The
+     * list is rebuilt rather than edited whenever the history changes,
+     * so its identity is the usual signal; this reads the row itself as
+     * well, so a list that changed under the same identity cannot leave
+     * the stack drawing a divider where there is none.
+     */
+    private boolean stillDivides(List<ChatLine> drawnLines, int lineId) {
+        if (lineId == 0) {
+            return this.dividerLineIndex < 0;
+        }
+        if (this.dividerLineIndex < 0) {
+            return true;
+        }
+        return drawnLines != null && this.dividerLineIndex < drawnLines.size()
+                && drawnLines.get(this.dividerLineIndex) != null
+                && drawnLines.get(this.dividerLineIndex).getChatLineID()
+                        == lineId;
+    }
+
+    /**
+     * The oldest wrapped row of a message, which is the row the divider
+     * stands above: vanilla's list runs newest first, so a message's
+     * rows are a run and its last index is the one to divide at.
+     */
+    private static int lastRowOf(List<ChatLine> drawnLines, int chatLineId) {
+        if (drawnLines == null) {
+            return -1;
+        }
+        for (int index = 0; index < drawnLines.size(); index++) {
+            ChatLine line = drawnLines.get(index);
+            if (line == null || line.getChatLineID() != chatLineId) {
+                continue;
+            }
+            while (index + 1 < drawnLines.size()
+                    && drawnLines.get(index + 1) != null
+                    && drawnLines.get(index + 1).getChatLineID()
+                            == chatLineId) {
+                index++;
+            }
+            return index;
+        }
+        return -1;
+    }
+
+    /**
+     * Rows of content this view holds: its wrapped message lines plus
+     * the unread divider's own row when it has one. Every measurement
+     * of how far the view can scroll is taken from this, so the range
+     * the player can reach is exactly the stack that is drawn.
+     */
+    int contentRows() {
+        return (this.lines == null ? 0 : this.lines.size())
+                + (this.dividerLineIndex >= 0 ? 1 : 0);
+    }
+
+    /** Rows of content the window has room for, fractions included. */
+    double roomLines() {
+        return this.room / (double)Math.max(1.0F,
+                LostTalesChatOverlayRenderer.LINE_HEIGHT * this.scale);
     }
 
     /**
