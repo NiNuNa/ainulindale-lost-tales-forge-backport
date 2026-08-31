@@ -33,10 +33,12 @@ import org.lwjgl.opengl.GL11;
  * across each tab's face two rows under that line, full at the centre
  * and fading to nothing at both ends.
  *
- * <p>Every tab carries a settings cog and a close cross while the row
- * has room for them; when it has not, only the selected tab keeps its
- * controls and the labels are shortened with an ellipsis, widest first,
- * until the row fits. The row's other controls stand at its two ends:
+ * <p>Every tab carries a settings cog and a close cross, and its name
+ * gives way before they do: a crowded row shortens the labels with an
+ * ellipsis, widest first, down to a first letter, and only when even
+ * that is not enough does it give anything else up — the counters,
+ * then the other tabs' cogs, then their crosses, the selected tab
+ * keeping its own controls throughout. The row's other controls stand at its two ends:
  * the restore {@code +} follows the last tab, since what it opens joins
  * that row, and the window's own controls are gathered against the
  * right edge beside the grip that moves it, in the order a title bar
@@ -120,16 +122,31 @@ final class ChatChannelTabBar {
     /** Slack a press on an end control is allowed either side of its ink. */
     private static final int END_CONTROL_SLACK = 2;
     /**
-     * How far onto a neighbour a dragged tab leans before it takes that
-     * neighbour's place: half way over it, which is where a browser's
-     * tabs change places and the only share that reads the same in both
-     * directions. Half is the balance point — the two tabs have swapped
-     * exactly as much as they have not — so it is also the one share
-     * that cannot argue with itself: any smaller share would be reached
-     * going right and reached again coming back from the place it just
-     * won, and the tab would shake between the two.
+     * Share of a neighbour a dragged tab crosses before it takes that
+     * neighbour's place: a third of it, the reach at which the move
+     * already reads as meant without asking for half the tab. A third
+     * cannot be one line in the row — the only line that reads as the
+     * same travel from both sides is the halfway point — so every
+     * boundary keeps two, a third in from either side, and the band
+     * between them holds whatever place the run already has; see
+     * {@link #reorderSlot}.
      */
+    private static final int SWAP_SHARE = 3;
+    /** Slack leaning against a swap, so a run resting exactly on one of
+     *  its lines does not shake across it as the hand does. */
     private static final int SWAP_GUARD = 2;
+    /**
+     * The retreat that takes a just-made swap back. The two lines of a
+     * boundary lie a third in from either side of the tab between the
+     * places, so the moment a run crosses one it already stands past
+     * the other; read cold, every swap would swap straight back. The
+     * boundary just crossed therefore answers to the crossing instead:
+     * the swap stands until the run is carried this far past the far
+     * line — from where that line reads as any other, with this same
+     * step in hand to tremble in — or retreats this far behind the
+     * point it swapped at, which undoes it about where it was made.
+     */
+    private static final int SWAP_UNDO = 4;
     /** How long the tabs a dragged one passed take to close up behind it. */
     private static final double SLIDE_SECONDS = 0.10D;
     /** The hairline dividing the row's controls. */
@@ -244,6 +261,10 @@ final class ChatChannelTabBar {
      *  pressed tab stands; both zero while nothing is being carried. */
     private int draggedRunWidth;
     private int draggedPressedOffset;
+    /** The reorder memory of the drag this row is carrying, and the tab
+     *  it belongs to; a new drag starts it afresh. */
+    private final ReorderLatch reorderLatch = new ReorderLatch();
+    private ChatTab reorderOwner;
     /** Limit the tabs may not cross; the end controls begin here. */
     private int tabsLimit = Integer.MAX_VALUE;
 
@@ -384,10 +405,11 @@ final class ChatChannelTabBar {
         int draggedLeft = Integer.MIN_VALUE;
         /**
          * Whether this window is being resized right now. The row then
-         * keeps within a few pixels of the layout it is given instead of
-         * easing freely into it: a size eased over a tenth of a second
-         * smooths a single step, but across a fast drag it would trail
-         * the very edge being dragged.
+         * takes the layout it is given at once instead of easing into
+         * it: the tabs are part of the very geometry the hand is
+         * dragging, so every one of them follows the edge in the same
+         * frame — nothing trails it, and nothing goes on correcting
+         * itself after the drag stops.
          */
         boolean resizing;
     }
@@ -495,18 +517,24 @@ final class ChatChannelTabBar {
     }
 
     /**
-     * Insertion index for a tab dropped at {@code mouseX}, into the
-     * row's <em>full</em> tab list: before the first drawn tab whose
-     * centre lies right of the pointer, and past everything — trimmed
-     * trailing tabs included — right of the drawn run, so a crowded row
-     * can still take a tab to its very end.
+     * Insertion index for a run of tabs carried over this row, into the
+     * row's <em>full</em> tab list. The row's tabs make one more place
+     * than there are tabs, and the run takes the one its own centre has
+     * reached: before the first drawn tab whose centre lies right of
+     * the run's, and past everything — trimmed trailing tabs included —
+     * once it has passed them all, so a crowded row can still take a
+     * tab to its very end. Measured from the carried run itself,
+     * row-local, rather than from the pointer: where the run lands then
+     * does not depend on where along it the hand happens to hold it,
+     * and the two end places ask only that the run stand mostly past
+     * the end tab, never that it cover it.
      */
-    int dropIndexAt(FontRenderer font, Row row, int mouseX) {
+    int dropIndexAt(FontRenderer font, Row row, int runLeft, int runWidth) {
         List<Tab> tabs = layout(font, row);
-        int localX = mouseX - row.offsetX;
+        int centre = runLeft + runWidth / 2;
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
-            if (localX < tab.x + tab.width / 2) {
+            if (centre < tab.x + tab.width / 2) {
                 return tab.rowIndex;
             }
         }
@@ -521,6 +549,12 @@ final class ChatChannelTabBar {
     void draw(FontRenderer font, ChatPointerRegions regions, Row row,
               int mouseX, int mouseY, float alphaScale) {
         List<Tab> tabs = layout(font, row);
+        if (row.dragging == null) {
+            // No hand on this row: whatever the last drag remembered
+            // about its crossings is over, and the next starts clean.
+            this.reorderOwner = null;
+            this.reorderLatch.clear();
+        }
         if (tabs.isEmpty()) {
             return;
         }
@@ -1051,22 +1085,17 @@ final class ChatChannelTabBar {
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
             boolean carried = isCarried(row, tab.tab);
-            if (!animate) {
+            if (!animate || carried || row.resizing) {
+                // Its own size at once: a carried tab is not being
+                // resized but carried, and a tab in a window whose edge
+                // is under the hand is part of the very geometry being
+                // dragged — a width still easing there is a width
+                // trailing the input, and the whole row must follow the
+                // edge as one layout rather than as tabs chasing
+                // targets of their own.
                 tab.drawnWidth = tab.width;
-            } else if (!carried) {
-                if (row.resizing) {
-                    // Only a size is changing, and a size never changes
-                    // by much at once: the row may trail its layout by a
-                    // few pixels to smooth the step and no further, so a
-                    // fast drag cannot pull the strip off the edge being
-                    // dragged.
-                    tab.drawnWidth = withinLag(tab.drawnWidth, tab.width);
-                }
-                tab.drawnWidth = eased(tab.drawnWidth, tab.width, elapsed);
             } else {
-                // Under the hand: its own size, whatever the row is
-                // settling to around it.
-                tab.drawnWidth = tab.width;
+                tab.drawnWidth = eased(tab.drawnWidth, tab.width, elapsed);
             }
             // Each width laid on a display pixel and the places taken
             // as the running total of them: two tabs of one size are
@@ -1100,7 +1129,10 @@ final class ChatChannelTabBar {
                 // instead of arriving the instant the button comes up.
                 tab.slide = (float)(draggedLeft(row, tab) - row.left
                         - tab.drawnLeftOffset);
-            } else if (!animate) {
+            } else if (!animate || row.resizing) {
+                // A resize snaps travel too: a slide still paying off
+                // mid-drag would hold part of the row off the layout
+                // the edge is being dragged to.
                 tab.slide = 0.0F;
             } else {
                 tab.slide = eased(tab.slide, 0.0F, elapsed);
@@ -1198,19 +1230,6 @@ final class ChatChannelTabBar {
                         || row.draggedGroup.contains(tab));
     }
 
-    /**
-     * How far behind its layout the row may be drawn while a resize
-     * runs: about one step of a shortened label, so a single step is
-     * still smoothed and a drag can never open a gap at the row's end.
-     */
-    private static final float RESIZE_MAX_LAG = 4.0F;
-
-    /** {@code current}, brought back to within the lag of {@code target}. */
-    private static float withinLag(float current, float target) {
-        return Math.max(target - RESIZE_MAX_LAG,
-                Math.min(target + RESIZE_MAX_LAG, current));
-    }
-
     /** One step toward {@code target}, arriving rather than creeping. */
     private static float eased(float current, float target,
                                double elapsed) {
@@ -1285,11 +1304,10 @@ final class ChatChannelTabBar {
      * them along in front of it, whether it has just arrived from
      * another window or has lived in this row all along, and whether or
      * not it has been put down since. They are where the row's tabs
-     * come to rest, not a wall the hand is stopped by.
-     *
-     * <p>Every question the drag asks of a row goes through this one
-     * answer — where the run may be drawn, and how far past the row it
-     * has been pulled — so the two can never read different edges.</p>
+     * come to rest, not a wall the hand is stopped by. Only the drawing
+     * is stopped here: whether the pull has left the row is measured
+     * from the pointer against the strip itself, so the clamp cannot
+     * make one direction of pull cheaper than another.
      */
     private int carryLimit(Row row) {
         // The room the tabs move in runs from the search control to the
@@ -1344,116 +1362,156 @@ final class ChatChannelTabBar {
 
     /**
      * Which place in the row a tab being dragged along it has reached:
-     * past every tab whose centre its own drawn centre has passed, the
-     * ones travelling with it left out. An insert-before index into the
+     * past every tab it has crossed a third of the way onto, the ones
+     * travelling with it left out. An insert-before index into the
      * row's tab list, or -1 while the tab is not in this row.
      *
      * <p>Measured against the row with the tabs being dragged taken out
      * of it, so the places do not move as the run passes between them:
      * a threshold that moved with the run would be crossed again the
-     * moment it was crossed, and the row would shake.</p>
+     * moment it was crossed, and the row would shake. The thresholds
+     * themselves, and the memory that keeps a fresh swap from swapping
+     * straight back, live in {@link #reorderSlot}; here the row is only
+     * turned into the rest positions that rule reads.</p>
      */
     int slideIndexAt(FontRenderer font, Row row, List<ChatTab> group) {
         List<Tab> tabs = layout(font, row);
         measureRun(tabs, row);
-        Tab dragged = null;
+        boolean holdsDragged = false;
+        int others = 0;
         for (int index = 0; index < tabs.size(); index++) {
             if (tabs.get(index).tab.equals(row.dragging)) {
-                dragged = tabs.get(index);
+                holdsDragged = true;
+            }
+            if (!group.contains(tabs.get(index).tab)) {
+                others++;
             }
         }
-        if (dragged == null) {
+        if (!holdsDragged) {
             return -1;
         }
-        // Every place the run could take, as the left edge the row would
-        // give it once the tabs travelling with it are out of the way.
-        // The furthest place the tab has actually leaned into wins, so
-        // both ends of the row are reachable whatever the tab measures,
-        // which comparing centres alone does not manage.
-        int left = draggedRunLeft(row);
-        int current = heldBefore(tabs, group);
-        int previous = row.left + SEARCH_RUN;
-        int slot = 0;
-        int best = 0;
+        if (row.dragging == null || !row.dragging.equals(this.reorderOwner)) {
+            // A drag this row has not seen yet — newly pressed, or just
+            // docked in from another window: its memory starts clean.
+            this.reorderOwner = row.dragging;
+            this.reorderLatch.clear();
+        }
+        // The row with the carried run lifted out: where each remaining
+        // tab would rest, which is also where the run itself would rest
+        // at each place it could take.
+        int[] restLeft = new int[others];
+        int[] widths = new int[others];
+        int cursor = row.left + SEARCH_RUN;
+        int at = 0;
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
             if (group.contains(tab.tab)) {
                 continue;
             }
-            int next = previous + tab.width + TAB_GAP;
-            slot++;
-            // Half way onto the neighbour either way, with a couple of
-            // pixels of slack around that so a tab left resting on the
-            // balance point does not shake across it as the hand does.
-            // The slack leans against the move, whichever way it goes.
-            int middle = (previous + next) / 2;
-            int threshold = slot > current ? middle + SWAP_GUARD
-                    : middle - SWAP_GUARD;
+            restLeft[at] = cursor;
+            widths[at] = tab.width;
+            cursor += tab.width + TAB_GAP;
+            at++;
+        }
+        return reorderSlot(draggedRunLeft(row), heldBefore(tabs, group),
+                restLeft, widths, TAB_GAP, this.reorderLatch);
+    }
+
+    /**
+     * What one drag remembers about the last place it changed: the
+     * boundary it crossed, the way it went, and where the run's left
+     * edge stood when it did. {@link #reorderSlot} says why a boundary
+     * just crossed needs remembering at all.
+     */
+    static final class ReorderLatch {
+        /** Index in the rest arrays of the tab last swapped with; -1
+         *  while no swap stands in need of holding. */
+        int boundary = -1;
+        /** Whether that swap carried the run rightward. */
+        boolean rightward;
+        /** The run's left edge at the moment of the swap. */
+        int crossedAt;
+
+        void clear() {
+            this.boundary = -1;
+        }
+    }
+
+    /**
+     * The place a dragged run has reached among the row's other tabs.
+     * {@code restLeft} and {@code width} describe those tabs with the
+     * run lifted out — each one's resting left edge, which is also the
+     * run's own rest at each place it could take — {@code left} is
+     * where the run's left edge is now, and {@code current} the place
+     * it holds.
+     *
+     * <p>Every boundary between two places is two lines, a third of the
+     * tab in from either side: coming from the left the run takes the
+     * far place at the first line, coming from the right it takes it
+     * back at the second, so the reach is a third of the neighbour
+     * whichever way the hand goes. Between the lines the run keeps
+     * whatever place it has — except at the boundary just crossed. Its
+     * nearer line already lies behind a run that has only just crossed
+     * the farther one, so read cold it would hand the swap straight
+     * back; the {@code latch} instead holds that one boundary to the
+     * crossing itself, until the run is carried a clear step past the
+     * far line or retreats {@link #SWAP_UNDO} behind the point it
+     * swapped at. A fast drag crosses as many boundaries in one step as
+     * the pointer did.</p>
+     */
+    static int reorderSlot(int left, int current, int[] restLeft,
+                           int[] width, int gap, ReorderLatch latch) {
+        int best = 0;
+        for (int index = 0; index < width.length; index++) {
+            int slot = index + 1;
+            int third = width[index] / SWAP_SHARE;
+            // The line a run coming from the left takes this place at,
+            // and the one a run coming back over the tab gives it up
+            // at; the guard leans against the move either way.
+            int enter = restLeft[index] + third + SWAP_GUARD;
+            int keep = restLeft[index] + width[index] + gap - third
+                    - SWAP_GUARD;
+            int threshold;
+            if (latch.boundary == index) {
+                if (latch.rightward) {
+                    if (left >= keep + SWAP_UNDO) {
+                        // Carried a clear step past the far line: the
+                        // swap no longer needs holding, and the line
+                        // takes over from here. The step is what keeps
+                        // the line real — released exactly on it, the
+                        // run would sit with no room to tremble, and a
+                        // slow slide across it rocked the pair back and
+                        // forth as the hand breathed.
+                        latch.clear();
+                        threshold = keep;
+                    } else {
+                        threshold = Math.min(keep,
+                                latch.crossedAt - SWAP_UNDO);
+                    }
+                } else {
+                    if (left <= enter - SWAP_UNDO) {
+                        latch.clear();
+                        threshold = enter;
+                    } else {
+                        threshold = Math.max(enter,
+                                latch.crossedAt + SWAP_UNDO);
+                    }
+                }
+            } else {
+                threshold = slot > current ? enter : keep;
+            }
             if (left >= threshold) {
                 best = slot;
             }
-            previous = next;
+        }
+        if (best != current) {
+            // Remember the boundary between the old place and the new
+            // one nearest the new: the one a tremor would recross first.
+            latch.boundary = best > current ? best - 1 : best;
+            latch.rightward = best > current;
+            latch.crossedAt = left;
         }
         return best;
-    }
-
-    /**
-     * How far past either end of the row a dragged tab has been carried:
-     * the tab itself stops where the row's tabs stop, so this is the
-     * pointer pulling on beyond that, and it is what asks for a window
-     * of its own as plainly as carrying the tab above or below the row.
-     * Zero while the tab is still somewhere the row can put it.
-     */
-    int draggedOverrun(FontRenderer font, Row row) {
-        measureRun(layout(font, row), row);
-        if (row.draggedLeft == Integer.MIN_VALUE
-                || this.draggedRunWidth <= 0) {
-            return 0;
-        }
-        // Measured against the very edge the run is stopped at, so
-        // pulling on past the row's right end asks for a window of its
-        // own after exactly the same travel as pulling past its left end
-        // or away from it altogether.
-        return overrunAt(font, row,
-                row.draggedLeft - row.offsetX - this.draggedPressedOffset,
-                this.draggedRunWidth);
-    }
-
-    /**
-     * How far outside this row's tab span a tab of {@code width} whose
-     * left edge lies at {@code left} would be carried; zero while the
-     * row could hold it there. Row-local coordinates. The drag asks this
-     * of every row it passes, so joining a row and being torn out of one
-     * are decided by a single measurement rather than by two that can
-     * read the same pointer differently.
-     */
-    /**
-     * How far outside the room a run at {@code left} has been carried:
-     * zero anywhere inside it, and otherwise the distance past whichever
-     * border it has passed. One measure answers everything the drag
-     * asks — where a run may be drawn, when it has been pulled far
-     * enough to leave, and whether a row will take it back — so no two
-     * answers can read different edges.
-     */
-    int overrunAt(FontRenderer font, Row row, int left, int width) {
-        measureRun(layout(font, row), row);
-        return overrunOf(left, width, row.left + SEARCH_RUN,
-                carryLimit(row));
-    }
-
-    /**
-     * How far outside {@code [lowest, limit]} a tab of {@code width}
-     * whose left edge lies at {@code left} would be carried. Zero
-     * anywhere the span could hold it, and never negative: a span too
-     * narrow for the tab reads as overrun from its right end, which is
-     * the end the tab is being pushed against.
-     */
-    static int overrunOf(int left, int width, int lowest, int limit) {
-        int highest = limit - width;
-        if (left > highest) {
-            return left - highest;
-        }
-        return left < lowest ? lowest - left : 0;
     }
 
     /** The place the dragged run holds now: the tabs left before it. */
@@ -1577,11 +1635,11 @@ final class ChatChannelTabBar {
      * Resting geometry for the row, cached until the font, limits, tab
      * list, selection, a label, a counter, a mute or the control set
      * changes. The end controls keep their room at the right; the tabs
-     * share what is left: whole, with controls on every tab, while that
-     * fits, else with controls on the selected tab only and labels
-     * shortened, widest first, to one common width. A tab that still
-     * finds no room is left out of the row rather than crossing the
-     * limit; it stays open and reachable by cycling.
+     * share what is left: whole while that fits, else shortened and
+     * stripped a stage at a time — labels first, then counters, then
+     * the background tabs' cogs and crosses. A tab that still finds no
+     * room is left out of the row rather than crossing the limit; it
+     * stays open and reachable by cycling.
      */
     List<Tab> layout(FontRenderer font, Row row) {
         if (font == null || row == null || row.tabs == null
@@ -1664,18 +1722,43 @@ final class ChatChannelTabBar {
             }
         }
         int[] labelRoom = labelWidths.clone();
-        // Counters are the first thing a crowded row gives up, and only
-        // if shortening every label was not enough.
         boolean showCounters = true;
+        boolean cogEverywhere = true;
+        boolean closeEverywhere = true;
         int first = 0;
         int last = count - 1;
         if (!controlsEverywhere) {
-            int[] fixed = fixedWidths(channels, counters, controls,
-                    selectedIndex, true);
-            if (total(fixed, 0, count - 1) > available) {
+            // The names give way first: a crowded row shortens them —
+            // down to a first letter and its ellipsis — while every tab
+            // keeps its cog and its cross. Only when even those short
+            // names cannot pay for the room does anything else go, and
+            // then one thing at a time: the counters, then the other
+            // tabs' cogs, then their crosses. The selected tab keeps
+            // its own controls throughout — it is the one being worked
+            // with — and whole tabs leave the row only after all of
+            // that has been given up.
+            int[] minLabels = new int[count];
+            for (int index = 0; index < count; index++) {
+                minLabels[index] = Math.min(labelWidths[index],
+                        narrowestLabelWidth(font,
+                                this.cachedLabels.get(channels.get(index))));
+            }
+            int[] fixed = fixedWidths(channels, counters, selectedIndex,
+                    showClose, true, true, true);
+            if (!roomFor(fixed, minLabels, available)) {
                 showCounters = false;
-                fixed = fixedWidths(channels, counters, controls,
-                        selectedIndex, false);
+                fixed = fixedWidths(channels, counters, selectedIndex,
+                        showClose, false, true, true);
+            }
+            if (!roomFor(fixed, minLabels, available)) {
+                cogEverywhere = false;
+                fixed = fixedWidths(channels, counters, selectedIndex,
+                        showClose, false, false, true);
+            }
+            if (!roomFor(fixed, minLabels, available)) {
+                closeEverywhere = false;
+                fixed = fixedWidths(channels, counters, selectedIndex,
+                        showClose, false, false, false);
             }
             // Only when even bare tabs do not fit does the row show
             // fewer of them, and then it keeps a run around the tab in
@@ -1721,13 +1804,13 @@ final class ChatChannelTabBar {
                     + countersWidth(pingWidth, otherWidth);
             int settingsX = -1;
             int closeX = -1;
-            if (controlsEverywhere || selected) {
+            if (selected || cogEverywhere) {
                 settingsX = x + width - PADDING_X + CONTROL_GAP;
                 width += CONTROL_GAP + CONTROL_SIZE;
-                if (showClose) {
-                    closeX = x + width - PADDING_X + CONTROL_GAP;
-                    width += CONTROL_GAP + CONTROL_SIZE;
-                }
+            }
+            if (showClose && (selected || closeEverywhere)) {
+                closeX = x + width - PADDING_X + CONTROL_GAP;
+                width += CONTROL_GAP + CONTROL_SIZE;
             }
             Boolean muted = this.cachedMuted.get(channel);
             Tab built = new Tab(channel, index, icon, label, labelWidth,
@@ -1823,19 +1906,43 @@ final class ChatChannelTabBar {
 
     /**
      * What a tab takes before its label: its padding, its icon, its
-     * counters while the row still shows them, and the controls of the
-     * tab in front.
+     * counters while the row still shows them, and whichever controls
+     * the row's crowding still grants it. The selected tab's own are
+     * granted whatever the stage.
      */
     private static int[] fixedWidths(List<ChatTab> channels, int[] counters,
-                                     int controls, int selectedIndex,
-                                     boolean withCounters) {
+                                     int selectedIndex, boolean showClose,
+                                     boolean withCounters,
+                                     boolean cogEverywhere,
+                                     boolean closeEverywhere) {
         int[] fixed = new int[channels.size()];
         for (int index = 0; index < fixed.length; index++) {
+            boolean selected = index == selectedIndex;
+            int tabControls = 0;
+            if (selected || cogEverywhere) {
+                tabControls += CONTROL_GAP + CONTROL_SIZE;
+            }
+            if (showClose && (selected || closeEverywhere)) {
+                tabControls += CONTROL_GAP + CONTROL_SIZE;
+            }
             fixed[index] = PADDING_X * 2 + iconWidth(channels.get(index))
-                    + (withCounters ? counters[index] : 0)
-                    + (index == selectedIndex ? controls : 0);
+                    + (withCounters ? counters[index] : 0) + tabControls;
         }
         return fixed;
+    }
+
+    /**
+     * Whether every tab's fixed parts and at least a readable scrap of
+     * every name fit the room together: what the crowded row asks of
+     * each stage before giving the next thing up.
+     */
+    private static boolean roomFor(int[] fixed, int[] minLabels,
+                                   int available) {
+        int sum = 0;
+        for (int index = 0; index < fixed.length; index++) {
+            sum += fixed[index] + minLabels[index];
+        }
+        return sum <= available;
     }
 
     private static int total(int[] widths, int first, int last) {
@@ -2017,8 +2124,9 @@ final class ChatChannelTabBar {
      * icon and enough of its name to read as a name — its first letter
      * and the ellipsis that says the rest was cut — the controls the tab
      * in front keeps, the seams between them, and the room the end
-     * controls hold. Counters are left out: a crowded row gives those up
-     * before it shortens anything. Zero when the row cannot be measured.
+     * controls hold. Counters and the other tabs' controls are left
+     * out: a row this narrow has already given them up, stage by stage.
+     * Zero when the row cannot be measured.
      *
      * <p>This is what bounds a resize. A window may be dragged as narrow
      * as its own tabs allow and no narrower, so a tab can never be made
@@ -2057,7 +2165,12 @@ final class ChatChannelTabBar {
      * that is shorter than the two together.
      */
     private static int narrowestLabelWidth(FontRenderer font, ChatTab tab) {
-        String name = ClientChatChannelState.displayName(tab);
+        return narrowestLabelWidth(font,
+                ClientChatChannelState.displayName(tab));
+    }
+
+    /** The same floor, over a name already resolved. */
+    private static int narrowestLabelWidth(FontRenderer font, String name) {
         if (name == null || name.length() == 0) {
             return 0;
         }
@@ -2115,16 +2228,15 @@ final class ChatChannelTabBar {
     /**
      * Whether the window's row is already shortening its tab names: the
      * same width model {@link #layout} draws with — the end controls'
-     * reserved room, each tab's padding, icon and counters (given up
-     * first, exactly as the layout gives them up), the controls the
-     * crowded row keeps on the selected tab alone — measured against
-     * the window's own width. This is what the auto-open policy asks
-     * before filing a new tab into a window: a row whose names are
-     * whole takes the tab, one already ellipsizing is full and the
-     * channel opens elsewhere. The restore control's room is always
-     * counted, so the answer does not flap as the {@code +} comes and
-     * goes. Without a renderer to measure with the answer is "not
-     * crowded", which keeps the layout usable headlessly.
+     * reserved room, and each tab's padding, icon, counters, controls
+     * and whole label, since names are the first thing a crowded row
+     * gives up. This is what the auto-open policy asks before filing a
+     * new tab into a window: a row whose names are whole takes the tab,
+     * one already ellipsizing is full and the channel opens elsewhere.
+     * The restore control's room is always counted, so the answer does
+     * not flap as the {@code +} comes and goes. Without a renderer to
+     * measure with the answer is "not crowded", which keeps the layout
+     * usable headlessly.
      */
     static boolean rowIsCrowded(Minecraft minecraft, ChatWindow window) {
         if (minecraft == null || minecraft.fontRenderer == null
@@ -2147,30 +2259,23 @@ final class ChatChannelTabBar {
         int rowWidth = box.width - 4 - SEARCH_RUN;
         int available = rowWidth - endControlsWidth(window, font)
                 - TAB_GAP * (tabs.size() - 1);
-        int fixedWithCounters = controlsWidth(true);
-        int fixedWithout = controlsWidth(true);
-        int labels = 0;
+        int natural = 0;
         for (int index = 0; index < tabs.size(); index++) {
             ChatTab tab = tabs.get(index);
-            int base = PADDING_X * 2 + iconWidth(tab);
-            fixedWithCounters += base + countersWidth(
-                    font.getStringWidth(
-                            ClientChatChannelViews.counterText(
-                                    ClientChatChannelViews
-                                            .unreadPingCount(tab))),
-                    font.getStringWidth(
-                            ClientChatChannelViews.counterText(
-                                    ClientChatChannelViews
-                                            .unreadOtherCount(tab))));
-            fixedWithout += base;
-            labels += font.getStringWidth(
-                    ClientChatChannelState.displayName(tab));
+            natural += PADDING_X * 2 + iconWidth(tab) + controlsWidth(true)
+                    + font.getStringWidth(
+                            ClientChatChannelState.displayName(tab))
+                    + countersWidth(
+                            font.getStringWidth(
+                                    ClientChatChannelViews.counterText(
+                                            ClientChatChannelViews
+                                                    .unreadPingCount(tab))),
+                            font.getStringWidth(
+                                    ClientChatChannelViews.counterText(
+                                            ClientChatChannelViews
+                                                    .unreadOtherCount(tab))));
         }
-        // Counters go before labels shorten, so a row that only had to
-        // give them up still counts as whole-named.
-        int fixed = fixedWithCounters > available
-                ? fixedWithout : fixedWithCounters;
-        return labels > available - fixed;
+        return natural > available;
     }
 
     static final class Tab {

@@ -113,31 +113,29 @@ public final class LostTalesChatGui extends GuiChat {
     private static final int WHEEL_LINES = 2;
     /*
      * Leaving a row and coming back to it are two questions about one
-     * pointer, so each direction gets a pull that takes a tab out and a
-     * shorter reach that puts it back. Between the two lies a band where
-     * neither happens; that band is the whole point. A single threshold
-     * left one pixel between out and in, and a hand that never holds
-     * quite still crossed it every other frame.
+     * pointer, so each gets its own reach: the pull that tears a run
+     * out is longer than the one that puts it back, and between the two
+     * lies a band where neither happens. That band is the whole point —
+     * a single threshold left one pixel between out and in, and a hand
+     * that never holds quite still crossed it every other frame.
      *
-     * The two directions are not the same size, because what they are
-     * measured from is not the same thing. Above and below there is only
-     * the strip, a thin thing to steer a carried window onto, and a
-     * pointer a little off it is plainly aiming at it. To the sides the
-     * measure is the row's room — the stretch tabs actually sit in — and
-     * a tab held a little outside it is still being offered to the row.
-     * Sideways therefore needs the longer reach of the two, or a tab
-     * could only be brought back by laying it almost exactly on the tab
-     * already sitting there.
+     * Both are the pointer's distance to the strip itself — the bar the
+     * player sees, band and ends alike. One object measured against one
+     * rectangle: past a corner the two overhangs count as one
+     * straight-line pull, so a run carried out diagonally travels the
+     * same distance as one carried straight off the strip or straight
+     * past its end, and no direction is a cheaper way out than another.
      */
 
-    /** How far above or below a row a dragged tab leaves it. */
-    static final int DETACH_DISTANCE = 14;
-    /** How far above or below a row a tab may still be put back into it. */
-    static final int RETURN_DISTANCE = 7;
-    /** How far past either end of a row's room a dragged tab leaves it. */
-    static final int SIDE_DETACH_DISTANCE = 26;
-    /** How far outside that room a tab may still be put back into it. */
-    static final int SIDE_RETURN_DISTANCE = 16;
+    /** The pull, measured from the strip, that tears a dragged run out
+     *  of its row — the same in every direction. */
+    static final int DETACH_DISTANCE = 20;
+    /** The reach, measured the same way, within which the row a run was
+     *  torn out of takes it back. */
+    static final int RETURN_DISTANCE = 12;
+    /** How far above or below a row's band a carried run may still be
+     *  offered to it. */
+    static final int DOCK_BAND_SLACK = 7;
     /** Horizontal slack around a row that still counts as dropping on it. */
     private static final int DOCK_SLACK = 24;
     /** Distance from another window's edge at which a drag snaps and links. */
@@ -5536,9 +5534,11 @@ public final class LostTalesChatGui extends GuiChat {
             }
             ChatWindowFrame frame = frameFor(window);
             ChatChannelTabBar.Row row = rowFor(window, frame, opening);
-            if (row == null || mouseY < ChatChannelTabBar.rowTop(
-                    row.rowBottom) - RETURN_DISTANCE
-                    || mouseY >= row.rowBottom + RETURN_DISTANCE) {
+            if (row == null) {
+                continue;
+            }
+            int bandOff = bandOverhang(row, mouseY);
+            if (bandOff > DOCK_BAND_SLACK) {
                 continue;
             }
             // The whole strip docks, end controls and grip included: a
@@ -5550,31 +5550,76 @@ public final class LostTalesChatGui extends GuiChat {
                 continue;
             }
             // The row a tab was last thrown out of — whichever row that
-            // is — asks one thing more of it before taking it back: that
-            // it has really come back inside the room. The reach back in is shorter than the pull that
-            // tore it out, so the two cannot argue about one pointer and
-            // a tab torn off at that row's edge is not handed straight
-            // back on the next frame, flashing a window up and taking it
-            // away again.
-            //
-            // Only that row asks. A row a tab has never left has
-            // nothing to guard against — and asking anyway made a row
-            // hard to drop a tab into from the left, since a tab held by
-            // its right-hand end had to be carried most of its own width
-            // into the row before the row would admit it was being
-            // offered one.
+            // is — asks one thing more of it before taking it back:
+            // that the pointer has really come back within reach of the
+            // strip it was pulled off. The reach back in is shorter than
+            // the pull that tore it out, so the two cannot argue about
+            // one pointer and a tab torn off at that row's edge is not
+            // handed straight back on the next frame, flashing a window
+            // up and taking it away again. Only that row asks: a row a
+            // tab has never left has nothing to guard against.
             if (window.getId().equals(drag.leftRowId)
-                    && frame.tabBar.overrunAt(this.fontRendererObj, row,
-                            mouseX - drag.grabOffsetX - row.offsetX,
-                            carriedTabWidth(drag, opening))
-                                    >= SIDE_RETURN_DISTANCE) {
+                    && pulledBeyond(stripOverhang(row, mouseX), bandOff,
+                            RETURN_DISTANCE)) {
                 continue;
             }
+            // Where the carried run itself stands over this row: its
+            // tabs ride at a fixed offset from the pointer — the grab
+            // point, kept from the row they were pressed in — so the
+            // row is offered the run where the hand is showing it, not
+            // wherever along it the hand happens to hold it.
+            int runWidth = carriedTabWidth(drag, opening);
+            int runLeft = mouseX - runGrabOffsetX(drag) - row.offsetX;
             drag.targetWindowId = window.getId();
             drag.targetIndex = frame.tabBar.dropIndexAt(
-                    this.fontRendererObj, row, mouseX);
+                    this.fontRendererObj, row, runLeft, runWidth);
             return;
         }
+    }
+
+    /**
+     * How far above or below the row's band the pointer stands; zero
+     * anywhere inside it. One of the two overhangs every attach and
+     * detach question is measured by — and both are the pointer's,
+     * measured against the bar the player sees, so no direction of pull
+     * is measured against a different thing than another.
+     */
+    private static int bandOverhang(ChatChannelTabBar.Row row, int mouseY) {
+        int rowTop = ChatChannelTabBar.rowTop(row.rowBottom);
+        return overhangOf(mouseY, rowTop, row.rowBottom);
+    }
+
+    /** The sideways twin: how far past either end of the strip the
+     *  pointer stands, zero anywhere along it. */
+    private static int stripOverhang(ChatChannelTabBar.Row row, int mouseX) {
+        return overhangOf(mouseX, row.offsetX + row.left,
+                row.offsetX + row.right);
+    }
+
+    /** How far outside {@code [lower, upper)} a position lies. */
+    private static int overhangOf(int at, int lower, int upper) {
+        return at < lower ? lower - at : at >= upper ? at - upper : 0;
+    }
+
+    /**
+     * Where the carried run's left edge rides, measured back from the
+     * pointer: the grab offset within the pressed tab plus that tab's
+     * place within the run — the very measure a torn-off window is held
+     * by, so a run is offered to a row exactly where it is seen.
+     */
+    private static int runGrabOffsetX(TabDrag drag) {
+        return drag.grabOffsetInWindowX - ChatChannelTabBar.tabRunLeftInset();
+    }
+
+    /**
+     * Whether a pull of {@code dx} past the strip's ends and {@code dy}
+     * off its band has reached {@code distance}: the two overhangs
+     * taken as one straight-line pull — the pointer's distance to the
+     * nearest point of the strip being left — so a diagonal pull
+     * measures like any other.
+     */
+    static boolean pulledBeyond(int dx, int dy, int distance) {
+        return dx * dx + dy * dy >= distance * distance;
     }
 
     /**
@@ -5623,7 +5668,7 @@ public final class LostTalesChatGui extends GuiChat {
             carryWindow(drag, detached, mouseX, mouseY);
             return;
         }
-        if (hasLeftItsRow(drag, mouseY)) {
+        if (hasLeftItsRow(drag, mouseX, mouseY)) {
             tearOff(drag, mouseX, mouseY);
             return;
         }
@@ -5714,8 +5759,19 @@ public final class LostTalesChatGui extends GuiChat {
     /**
      * Whether the pointer has carried the tabs clear of the row they are
      * still in. A row that is not on screen counts as left behind.
+     * Carried past either end of the strip the pointer is just as
+     * plainly on its way out as carried above or below it, and the two
+     * overhangs are one pull, so a diagonal carry needs the same travel
+     * as a straight one. It is the pointer that is measured on every
+     * side — not the run, whose end tabs rest touching the room's very
+     * edges, so measuring it made a sideways pull start counting from
+     * the first pixel of the drag while an upward one still had the
+     * band to cross. Leaving costs the full pull, coming back a shorter
+     * reach, and between the two lies a band where nothing happens at
+     * all — which is what keeps the two answers from arguing about one
+     * pointer.
      */
-    private boolean hasLeftItsRow(TabDrag drag, int mouseY) {
+    private boolean hasLeftItsRow(TabDrag drag, int mouseX, int mouseY) {
         ChatWindow window = ChatWindowLayout.windowOf(drag.tab);
         ChatWindowFrame frame = window == null ? null : frameFor(window);
         ChatChannelTabBar.Row row = window == null ? null
@@ -5723,21 +5779,8 @@ public final class LostTalesChatGui extends GuiChat {
         if (row == null) {
             return true;
         }
-        int rowTop = ChatChannelTabBar.rowTop(row.rowBottom);
-        int distance = mouseY < rowTop ? rowTop - mouseY
-                : mouseY >= row.rowBottom ? mouseY - row.rowBottom : 0;
-        if (distance >= DETACH_DISTANCE) {
-            return true;
-        }
-        // Carried past either end of the row a tab is just as plainly on
-        // its way out as carried above or below it, and as often as the
-        // hand asks: leaving costs the full pull, coming back a much
-        // shorter reach, and between the two lies a band where nothing
-        // happens at all. That band is what keeps the two answers from
-        // arguing about one pointer — not a rule that a tab may only
-        // leave once, which merely stopped it leaving again.
-        return frame.tabBar.draggedOverrun(this.fontRendererObj, row)
-                >= SIDE_DETACH_DISTANCE;
+        return pulledBeyond(stripOverhang(row, mouseX),
+                bandOverhang(row, mouseY), DETACH_DISTANCE);
     }
 
     /**
