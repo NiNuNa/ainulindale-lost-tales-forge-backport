@@ -166,6 +166,7 @@ public final class LostTalesChatGui extends GuiChat {
     private static final int REPLY_CHIP_RGB =
             LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
     private static final String POPUP_MESSAGE = "message";
+    private static final String POPUP_PLAYER = "player";
     private static final String POPUP_SETTINGS = "settings";
     private static final String POPUP_CHARACTERS = "characters";
     private static final String POPUP_RESTORE = "restore";
@@ -183,6 +184,7 @@ public final class LostTalesChatGui extends GuiChat {
     private static final String ENTRY_DELETE = "delete";
     /** The second half of deleting: the row that is the confirmation. */
     private static final String ENTRY_DELETE_CONFIRM = "delete_confirm";
+    private static final String ENTRY_IGNORE = "ignore_account";
     private static final String ENTRY_MUTE = "mute";
     private static final String ENTRY_PINGS = "pings";
     private static final String ENTRY_HIDE = "hide";
@@ -231,6 +233,8 @@ public final class LostTalesChatGui extends GuiChat {
     private String menuMessageIdentity = "";
     /** Whether it came over the Discord bridge, where nobody can be reached. */
     private boolean menuMessageFromDiscord;
+    /** The sender's account, when the line still has its packet; else null. */
+    private UUID menuMessageSenderId;
     private String menuMessageText = "";
     /** Where the menu was opened, so the delete confirmation lands there too. */
     private int menuX;
@@ -2960,15 +2964,19 @@ public final class LostTalesChatGui extends GuiChat {
                 return;
             }
         }
-        // A right-click opens the message's own menu — reply, copy —
-        // not the people in it: over the sender's identity or a mention
-        // — wherever the card shows — the click belongs to the person
-        // and the menu does not open.
-        if (button == 1
-                && !LostTalesChatHoverCard.isPointerOnPerson(this.mc,
-                        mouseX, mouseY)
-                && openMessagePopup(mouseX, mouseY)) {
-            return;
+        // A right-click on a person — the sender's identity span or a
+        // mention, wherever the card shows — opens that person's own
+        // menu: message them, ignore them. Anywhere else on a line it
+        // opens the message's menu: reply, copy, edit, delete.
+        if (button == 1) {
+            if (LostTalesChatHoverCard.isPointerOnPerson(this.mc,
+                    mouseX, mouseY)) {
+                if (openPlayerPopup(mouseX, mouseY)) {
+                    return;
+                }
+            } else if (openMessagePopup(mouseX, mouseY)) {
+                return;
+            }
         }
         if (button == 0) {
             ChatWindowFrame frame = frameAt(mouseX, mouseY);
@@ -4890,6 +4898,7 @@ public final class LostTalesChatGui extends GuiChat {
             this.menuMessageFromDiscord =
                     LostTalesChatMessagePacket.DISCORD_SENDER_ID.equals(
                             remembered.packet.getSenderId());
+            this.menuMessageSenderId = remembered.packet.getSenderId();
         } else {
             this.menuMessageAccount = band == null ? ""
                     : messageAccount(band.lines, band.viewIndex, chatLineId);
@@ -4897,6 +4906,7 @@ public final class LostTalesChatGui extends GuiChat {
                     : messageIdentity(band.lines, band.viewIndex, chatLineId);
             this.menuMessageFromDiscord = band != null
                     && isFromDiscord(band.lines, band.viewIndex, chatLineId);
+            this.menuMessageSenderId = null;
         }
         this.menuChatLineId = chatLineId;
         this.menuX = mouseX;
@@ -4929,27 +4939,59 @@ public final class LostTalesChatGui extends GuiChat {
                     StatCollector.translateToLocal(
                             "gui.losttales.chat.message.delete")));
         }
-        // Opening a conversation with the sender lives here now: a name
-        // in the chat is a person to read, not a link to press.
-        // Not for yourself, and not for Discord: a name on the bridge
-        // belongs to somebody this server cannot reach, so offering to
-        // message them would offer something that cannot work.
-        if (this.menuMessageAccount.length() > 0
-                && !this.menuMessageFromDiscord
-                && (this.mc.thePlayer == null
-                        || !this.menuMessageAccount.equalsIgnoreCase(
-                                this.mc.thePlayer.getCommandSenderName()))) {
-            entries.add(new ChatPopupMenu.Entry(ENTRY_MESSAGE,
-                    StatCollector.translateToLocalFormatted(
-                            "gui.losttales.chat.message.whisper",
-                            this.menuMessageIdentity.length() > 0
-                                    ? this.menuMessageIdentity
-                                    : this.menuMessageAccount)));
-        }
         this.popup.open(POPUP_MESSAGE,
                 ClientChatChannelViews.tabOf(chatLineId), entries,
                 this.fontRendererObj, mouseX, mouseY, this.width,
                 this.height);
+        return true;
+    }
+
+    /**
+     * The menu over a person — the sender's identity span or a mention:
+     * message them, ignore them. The message's own menu stays with the
+     * message body; this one is account and character business, so it
+     * opens only over somebody an account stands behind — not an NPC,
+     * not a role mention, not the Discord bridge, and not yourself.
+     */
+    private boolean openPlayerPopup(int mouseX, int mouseY) {
+        LostTalesChatHoverCard.Target person = LostTalesChatHoverCard
+                .personAt(this.mc, mouseX + 0.5F, mouseY + 0.5F);
+        if (person == null || person.role != null || person.npcIdentity
+                || person.playerId == null
+                || person.accountName.length() == 0
+                || LostTalesChatMessagePacket.DISCORD_SENDER_ID.equals(
+                        person.playerId)
+                || (this.mc.thePlayer != null && person.playerId.equals(
+                        this.mc.thePlayer.getUniqueID()))) {
+            return false;
+        }
+        this.menuMessageAccount = person.accountName;
+        this.menuMessageIdentity = person.identityName;
+        this.menuMessageSenderId = person.playerId;
+        this.menuMessageFromDiscord = false;
+        List<ChatPopupMenu.Entry> entries =
+                new ArrayList<ChatPopupMenu.Entry>();
+        // The header names who the menu is about, the way the card does:
+        // the identity, with the account behind it when they differ.
+        String name = LostTalesChatVisualStyle.removeColorCodes(
+                person.identityName).trim();
+        entries.add(ChatPopupMenu.Entry.header(
+                name.length() > 0 && !name.equalsIgnoreCase(
+                        person.accountName)
+                        ? name + " (" + person.accountName + ")"
+                        : person.accountName));
+        entries.add(new ChatPopupMenu.Entry(ENTRY_MESSAGE,
+                StatCollector.translateToLocalFormatted(
+                        "gui.losttales.chat.message.whisper",
+                        name.length() > 0 ? name : person.accountName)));
+        entries.add(new ChatPopupMenu.Entry(ENTRY_IGNORE,
+                StatCollector.translateToLocalFormatted(
+                        ClientChatIgnores.isIgnored(person.playerId)
+                                ? "gui.losttales.chat.message.unignore"
+                                : "gui.losttales.chat.message.ignore",
+                        person.accountName)));
+        this.popup.open(POPUP_PLAYER, null, entries, this.fontRendererObj,
+                mouseX, mouseY, this.width, this.height);
         return true;
     }
 
@@ -5080,6 +5122,31 @@ public final class LostTalesChatGui extends GuiChat {
                 new LostTalesChatDeletePacket(this.menuMessageId));
     }
 
+    /**
+     * Starts or stops ignoring the account behind the menu's message.
+     * Existing lines stay — ignoring quiets what has not been said yet —
+     * and the notice says which way it went.
+     */
+    private void toggleIgnore() {
+        if (this.menuMessageSenderId == null) {
+            return;
+        }
+        if (ClientChatIgnores.isIgnored(this.menuMessageSenderId)) {
+            ClientChatIgnores.unignore(this.menuMessageSenderId);
+            showNotice(StatCollector.translateToLocalFormatted(
+                    "gui.losttales.chat.unignored", this.menuMessageAccount));
+        } else if (ClientChatIgnores.ignore(this.menuMessageSenderId,
+                this.menuMessageAccount)) {
+            ClientChatIgnores.rememberName(this.menuMessageSenderId,
+                    this.menuMessageIdentity);
+            showNotice(StatCollector.translateToLocalFormatted(
+                    "gui.losttales.chat.ignored", this.menuMessageAccount));
+        } else {
+            showNotice(StatCollector.translateToLocal(
+                    "gui.losttales.chat.ignore_full"));
+        }
+    }
+
     /** Whether a message is being rewritten in the tab now selected. */
     private boolean isEditing() {
         return ChatMessageIds.isServerId(this.editingMessageId)
@@ -5129,12 +5196,16 @@ public final class LostTalesChatGui extends GuiChat {
      * came from.
      */
     private boolean handlePopupEntry(ChatPopupMenu.Entry entry) {
-        if (POPUP_MESSAGE.equals(this.popup.kind())) {
-            if (ENTRY_REPLY.equals(entry.id)) {
-                startReply();
-            } else if (ENTRY_MESSAGE.equals(entry.id)) {
+        if (POPUP_PLAYER.equals(this.popup.kind())) {
+            if (ENTRY_MESSAGE.equals(entry.id)) {
                 openWhisperTab(this.menuMessageAccount,
                         this.menuMessageIdentity);
+            } else if (ENTRY_IGNORE.equals(entry.id)) {
+                toggleIgnore();
+            }
+        } else if (POPUP_MESSAGE.equals(this.popup.kind())) {
+            if (ENTRY_REPLY.equals(entry.id)) {
+                startReply();
             } else if (ENTRY_EDIT.equals(entry.id)) {
                 startEdit();
             } else if (ENTRY_DELETE.equals(entry.id)) {

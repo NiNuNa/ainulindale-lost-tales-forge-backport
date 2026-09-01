@@ -97,6 +97,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
+import com.ninuna.losttales.chat.moderation.ChatAuditLog;
 import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
 import com.ninuna.losttales.chat.server.ChatMessageLog;
 import com.ninuna.losttales.chat.server.LostTalesChatRoleRosterWatcher;
@@ -311,6 +312,7 @@ public class LostTalesCommonProxy {
         LostTalesChatRoleRosterWatcher.clear();
         ChatMessageIdAllocator.reset();
         ChatMessageLog.clear();
+        ChatAuditLog.onServerStarting();
         ELostTalesCommand.initAndRegisterCommands(event);
         LostTalesDiscordBridge.getInstance().start();
     }
@@ -377,6 +379,7 @@ public class LostTalesCommonProxy {
         LostTalesChatRoleRosterWatcher.clear();
         ChatMessageIdAllocator.reset();
         ChatMessageLog.clear();
+        ChatAuditLog.onServerStopping();
         LostTalesMobAggroEventHandler.clearAll();
     }
 }

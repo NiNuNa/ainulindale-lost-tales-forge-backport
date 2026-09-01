@@ -2,11 +2,16 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatRecipientRule;
+import com.ninuna.losttales.chat.moderation.ChatAuditLog;
+import com.ninuna.losttales.chat.moderation.ChatMuteDurations;
+import com.ninuna.losttales.chat.moderation.ChatMuteEntry;
+import com.ninuna.losttales.chat.moderation.ChatMuteStorage;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareReference;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
@@ -159,6 +164,15 @@ public final class LostTalesChatService {
                 || !ChatMessageValidator.isValid(message)) {
             return;
         }
+        // A muted account sends nothing anywhere but its own console; the
+        // Discord relay sits behind this gate, so nothing leaks out either.
+        if (channel.getRecipientRule() != ChatRecipientRule.SELF) {
+            ChatMuteEntry mute = activeMute(sender);
+            if (mute != null) {
+                tellMuted(sender, mute);
+                return;
+            }
+        }
         EntityPlayerMP whisperTarget = null;
         String whisperIdentity = "";
         if (channel.getRecipientRule() == ChatRecipientRule.WHISPER) {
@@ -205,7 +219,7 @@ public final class LostTalesChatService {
         String factionId = character == null ? ""
                 : LotrCharacterAdapter.normalizeFactionId(
                         character.getStartingFactionId());
-        if (channel.getRecipientRule() == ChatRecipientRule.PARTY) {
+        if (channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP) {
             party = PartyService.getInstance()
                     .getPartyForActiveCharacter(sender);
             if (party == null || character == null
@@ -214,13 +228,12 @@ public final class LostTalesChatService {
                         "chat.losttales.channel.party_unavailable"));
                 return;
             }
-        } else if (channel.getRecipientRule()
-                == ChatRecipientRule.FACTION && factionId.length() == 0) {
+        } else if (channel.getAccess() == ChatChannelAccess.CHARACTER_FACTION
+                && factionId.length() == 0) {
             sender.addChatMessage(new ChatComponentTranslation(
                     "chat.losttales.channel.faction_unavailable"));
             return;
-        } else if (channel.getRecipientRule()
-                == ChatRecipientRule.OPERATORS
+        } else if (channel.getAccess() == ChatChannelAccess.OPERATOR
                 && !LostTalesWaystonePermissionPolicy.isOperator(sender)) {
             // The client only offers the tab while it believes the player
             // is an operator; tell it again so a revoked op loses the tab.
@@ -228,7 +241,7 @@ public final class LostTalesChatService {
             sender.addChatMessage(new ChatComponentTranslation(
                     "chat.losttales.channel.admin_unavailable"));
             return;
-        } else if (channel == ChatChannel.DISCORD
+        } else if (channel.getAccess() == ChatChannelAccess.DISCORD_BRIDGE
                 && !LostTalesConfig.discordEnabled) {
             sendAccess(sender);
             sender.addChatMessage(new ChatComponentTranslation(
@@ -324,6 +337,13 @@ public final class LostTalesChatService {
         // than against who would be sent one now.
         ChatMessageLog.record(packet.getMessageId(), sender.getUniqueID(),
                 identityName, message, recipientIds);
+        ChatAuditLog.logMessage(packet.getMessageId(), channel.getId(),
+                sender.getUniqueID(), accountName,
+                appearance == null ? null : appearance.getCharacterId(),
+                identityName,
+                whisperTarget == null ? ""
+                        : whisperTarget.getCommandSenderName(),
+                message);
         if (channel == ChatChannel.DISCORD) {
             // The bridge posts the line under the sender's name with their
             // head as the picture; emoji shortcodes go as the Unicode
@@ -444,6 +464,11 @@ public final class LostTalesChatService {
                 || channel.getRecipientRule() == ChatRecipientRule.SELF) {
             return;
         }
+        // Presence from a muted account is dropped without a notice: a
+        // typing indicator promises a message the send would refuse.
+        if (activeMute(sender) != null) {
+            return;
+        }
         RoleplayCharacter character = CharacterActiveResolver.get(sender);
         String accountName = sender.getGameProfile() == null
                 ? sender.getCommandSenderName()
@@ -469,17 +494,17 @@ public final class LostTalesChatService {
         String factionId = character == null ? ""
                 : LotrCharacterAdapter.normalizeFactionId(
                         character.getStartingFactionId());
-        if (channel.getRecipientRule() == ChatRecipientRule.PARTY) {
+        if (channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP) {
             party = PartyService.getInstance()
                     .getPartyForActiveCharacter(sender);
             if (party == null || character == null
                     || !party.containsMember(character.getCharacterId())) {
                 return;
             }
-        } else if (channel.getRecipientRule() == ChatRecipientRule.FACTION
+        } else if (channel.getAccess() == ChatChannelAccess.CHARACTER_FACTION
                 && factionId.length() == 0) {
             return;
-        } else if (channel.getRecipientRule() == ChatRecipientRule.OPERATORS
+        } else if (channel.getAccess() == ChatChannelAccess.OPERATOR
                 && !LostTalesWaystonePermissionPolicy.isOperator(sender)) {
             return;
         }
@@ -519,12 +544,22 @@ public final class LostTalesChatService {
                 || !ChatMessageValidator.isValid(message)) {
             return;
         }
+        // An edit puts new words in front of the same readers a send
+        // would reach, so a mute refuses it the same way. Deleting is
+        // still allowed: taking a message back harms nobody.
+        ChatMuteEntry mute = activeMute(editor);
+        if (mute != null) {
+            tellMuted(editor, mute);
+            return;
+        }
         Set<UUID> recipients = ChatMessageLog.applyEdit(messageId,
                 editor.getUniqueID(), message);
         if (recipients == null) {
             return;
         }
         FMLLog.info("[losttales/chat/edit] <%s> %s",
+                editor.getCommandSenderName(), message);
+        ChatAuditLog.logEdit(messageId, editor.getUniqueID(),
                 editor.getCommandSenderName(), message);
         tellRecipients(recipients,
                 LostTalesChatUpdatePacket.edited(messageId, message));
@@ -552,6 +587,8 @@ public final class LostTalesChatService {
         }
         FMLLog.info("[losttales/chat/delete] <%s> message %d",
                 remover.getCommandSenderName(), Long.valueOf(messageId));
+        ChatAuditLog.logDelete(messageId, remover.getUniqueID(),
+                remover.getCommandSenderName());
         tellRecipients(recipients,
                 LostTalesChatUpdatePacket.removed(messageId));
         // Taken back from Discord as well, on the same terms as an edit.
@@ -646,6 +683,32 @@ public final class LostTalesChatService {
     }
 
     /** The online player with that account name, case-insensitively. */
+    /** The mute currently silencing the player's account, or null. */
+    private static ChatMuteEntry activeMute(EntityPlayerMP player) {
+        return ChatMuteStorage.get(player.worldObj).getActiveMute(
+                player.getUniqueID(), System.currentTimeMillis());
+    }
+
+    /** Tells a refused sender they are muted, for how long, and why. */
+    private static void tellMuted(EntityPlayerMP player, ChatMuteEntry mute) {
+        boolean hasReason = mute.getReason().length() > 0;
+        if (mute.isPermanent()) {
+            player.addChatMessage(hasReason
+                    ? new ChatComponentTranslation(
+                            "chat.losttales.muted.because", mute.getReason())
+                    : new ChatComponentTranslation("chat.losttales.muted"));
+            return;
+        }
+        String remaining = ChatMuteDurations.formatRemaining(
+                mute.getExpiresAtMillis() - System.currentTimeMillis());
+        player.addChatMessage(hasReason
+                ? new ChatComponentTranslation(
+                        "chat.losttales.muted.timed.because", remaining,
+                        mute.getReason())
+                : new ChatComponentTranslation(
+                        "chat.losttales.muted.timed", remaining));
+    }
+
     private static EntityPlayerMP findOnlinePlayer(String name) {
         MinecraftServer server = MinecraftServer.getServer();
         String wanted = name == null ? "" : name.trim();

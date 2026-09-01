@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
@@ -256,17 +257,16 @@ public final class ClientChatChannelState {
         return false;
     }
 
-    /** Whether the channel's tab is shown and its history readable. */
+    /**
+     * Whether the channel's tab is shown and its history readable: every
+     * open channel always, a gated one while its access is held.
+     */
     public static synchronized boolean isAvailable(ChatChannel channel) {
         if (channel == null) {
             return false;
         }
-        if (channel == ChatChannel.ALL || channel == ChatChannel.OOC
-                || channel == ChatChannel.CONSOLE
-                || channel == ChatChannel.WHISPER) {
-            return true;
-        }
-        return canSend(channel);
+        return channel.getAccess() == ChatChannelAccess.NONE
+                || canSend(channel);
     }
 
     public static synchronized boolean canSend(ChatTab tab) {
@@ -276,26 +276,27 @@ public final class ClientChatChannelState {
     /**
      * Whether the local player may currently send into the channel.
      * Identity no longer gates a channel — any channel is spoken with
-     * any appearance, the account included — so only membership does:
-     * Faction and Party need the active character to belong somewhere,
-     * and the staff and Discord channels need the server's word.
+     * any appearance, the account included — so only the channel's own
+     * access does: membership for Faction and Party, the server's word
+     * for the staff and Discord channels.
      */
     public static synchronized boolean canSend(ChatChannel channel) {
         if (channel == null) {
             return false;
         }
-        if (channel == ChatChannel.ADMIN) {
+        ChatChannelAccess access = channel.getAccess();
+        if (access == ChatChannelAccess.OPERATOR) {
             return adminAccess;
         }
-        if (channel == ChatChannel.DISCORD) {
+        if (access == ChatChannelAccess.DISCORD_BRIDGE) {
             return discordAccess;
         }
-        if (channel == ChatChannel.FACTION) {
+        if (access == ChatChannelAccess.CHARACTER_FACTION) {
             CharacterSummary active = activeCharacter();
             return active != null && LotrCharacterAdapter.normalizeFactionId(
                     active.getStartingFactionId()).length() > 0;
         }
-        if (channel != ChatChannel.PARTY) {
+        if (access != ChatChannelAccess.PARTY_MEMBERSHIP) {
             return true;
         }
         PartyStateSnapshot snapshot = ClientPartyStateCache.getSnapshot();

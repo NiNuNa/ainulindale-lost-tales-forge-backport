@@ -69,6 +69,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.client.chat.ClientChatAccountRoles;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
+import com.ninuna.losttales.client.chat.ClientChatIgnores;
 import com.ninuna.losttales.client.chat.ClientChatTypingState;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
@@ -113,6 +114,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         CameraPresetFileStore.initialize(
                 event.getModConfigurationDirectory());
         ChatEmojiUsageStore.initialize(
+                event.getModConfigurationDirectory());
+        ClientChatIgnores.initialize(
                 event.getModConfigurationDirectory());
         ChatWindowLayoutStore.initialize(
                 event.getModConfigurationDirectory());
@@ -431,10 +434,35 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
     @Override
     public void handleChatMessage(LostTalesChatMessagePacket packet) {
+        // A line from an ignored account is dropped before it exists
+        // anywhere on this client: no history entry, no tab, no unread,
+        // no ping, no whisper opening. The name it was signed with is
+        // learned first, so the account's typing presence can be dropped
+        // by name too. A player's own line is never dropped.
+        if (isIgnoredLine(packet)) {
+            return;
+        }
         LostTalesChatPresentation.receive(packet);
         // The same line again, kept for the speaker's own head; it files
         // only what was said in character and ignores everything else.
         ChatSpeechBubbles.receive(packet);
+    }
+
+    private static boolean isIgnoredLine(LostTalesChatMessagePacket packet) {
+        if (packet == null || packet.getSenderId() == null
+                || !ClientChatIgnores.isIgnored(packet.getSenderId())) {
+            return false;
+        }
+        if (Minecraft.getMinecraft().thePlayer != null
+                && packet.getSenderId().equals(
+                        Minecraft.getMinecraft().thePlayer.getUniqueID())) {
+            return false;
+        }
+        ClientChatIgnores.rememberName(packet.getSenderId(),
+                packet.getIdentityName());
+        ClientChatIgnores.rememberName(packet.getSenderId(),
+                packet.getAccountName());
+        return true;
     }
 
     @Override
@@ -464,6 +492,16 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
     @Override
     public void handleChatTyping(LostTalesChatTypingSyncPacket packet) {
+        // Presence names a sender without an account, so it is dropped
+        // by the names known to belong to ignored accounts: the stored
+        // account names, plus every identity a dropped line has taught
+        // this session.
+        if (packet != null
+                && (ClientChatIgnores.isIgnoredName(packet.getPartner())
+                        || ClientChatIgnores.isIgnoredName(
+                                packet.getIdentityName()))) {
+            return;
+        }
         ClientChatTypingState.accept(packet);
     }
 

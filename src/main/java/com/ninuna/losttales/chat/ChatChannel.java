@@ -8,32 +8,37 @@ import java.util.Locale;
 
 /**
  * Small stable channel catalogue shared by packet validation and client UI.
- * Declaration order is storage surface (ordinals index client view state);
- * the order channels are presented in is {@link #presentationOrder()}.
+ * Each constant is one built-in {@link ChatChannelDescriptor}: the id, the
+ * identity its lines wear, the routing rule, the access a player needs,
+ * and the presentation. The string ids are the wire and storage surface —
+ * packets and the layout file carry them, and client view state is keyed
+ * by tab identity — so an id is permanent while declaration order carries
+ * no meaning of its own; the order channels are presented in is
+ * {@link #presentationOrder()}.
  */
 public enum ChatChannel {
     ALL("all", "Global", ChatIdentityType.CHARACTER,
-            ChatRecipientRule.GLOBAL,
+            ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.FERN_GREEN)),
     PROXIMITY("proximity", "Proximity", ChatIdentityType.CHARACTER,
-            ChatRecipientRule.PROXIMITY,
+            ChatRecipientRule.PROXIMITY, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN)),
     // Presentation shows the member's own party colour; this seafoam is
     // only the fallback outside a party.
     PARTY("party", "Party", ChatIdentityType.CHARACTER,
-            ChatRecipientRule.PARTY,
+            ChatRecipientRule.PARTY, ChatChannelAccess.PARTY_MEMBERSHIP,
             LostTalesColors.rgb(LostTalesColors.SEAFOAM)),
     // Presentation shows the sender's LOTR faction colour; this palette
     // honey is only the indicator/selector fallback.
     FACTION("faction", "Faction", ChatIdentityType.CHARACTER,
-            ChatRecipientRule.FACTION,
+            ChatRecipientRule.FACTION, ChatChannelAccess.CHARACTER_FACTION,
             LostTalesColors.rgb(LostTalesColors.HONEY)),
     OOC("ooc", "OOC", ChatIdentityType.ACCOUNT,
-            ChatRecipientRule.GLOBAL,
+            ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE)),
     /** Staff channel: operators only, account identity; the wire id stays. */
     ADMIN("admin", "Operator", ChatIdentityType.ACCOUNT,
-            ChatRecipientRule.OPERATORS,
+            ChatRecipientRule.OPERATORS, ChatChannelAccess.OPERATOR,
             LostTalesColors.rgb(LostTalesColors.CRIMSON)),
     /**
      * The player's private console: what only they see anyway — command
@@ -41,7 +46,7 @@ public enum ChatChannel {
      * they type there, which is echoed back to them alone.
      */
     CONSOLE("console", "Console", ChatIdentityType.ACCOUNT,
-            ChatRecipientRule.SELF,
+            ChatRecipientRule.SELF, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.MAUVE)),
     /**
      * A private conversation between two accounts. Not a tab of its own:
@@ -49,7 +54,7 @@ public enum ChatChannel {
      * keeps them apart by the partner's name.
      */
     WHISPER("whisper", "Whisper", ChatIdentityType.ACCOUNT,
-            ChatRecipientRule.WHISPER,
+            ChatRecipientRule.WHISPER, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.APRICOT)),
     /**
      * The server's Discord channel, bridged both ways by the server's
@@ -57,7 +62,7 @@ public enum ChatChannel {
      * the tab exists only while the server says the bridge is on.
      */
     DISCORD("discord", "Discord", ChatIdentityType.ACCOUNT,
-            ChatRecipientRule.GLOBAL,
+            ChatRecipientRule.GLOBAL, ChatChannelAccess.DISCORD_BRIDGE,
             LostTalesColors.rgb(LostTalesColors.STEEL_BLUE));
 
     /** Tab, indicator, and cycle order: the two global channels bracket
@@ -69,27 +74,30 @@ public enum ChatChannel {
                     ALL, PROXIMITY, FACTION, OOC, DISCORD, PARTY, ADMIN,
                     CONSOLE));
 
-    private final String id;
-    private final String displayName;
-    private final ChatIdentityType identityType;
-    private final ChatRecipientRule recipientRule;
-    private final int displayColor;
+    private final ChatChannelDescriptor descriptor;
 
     ChatChannel(String id, String displayName,
                 ChatIdentityType identityType,
-                ChatRecipientRule recipientRule, int displayColor) {
-        this.id = id;
-        this.displayName = displayName;
-        this.identityType = identityType;
-        this.recipientRule = recipientRule;
-        this.displayColor = displayColor;
+                ChatRecipientRule recipientRule,
+                ChatChannelAccess access, int displayColor) {
+        this.descriptor = new ChatChannelDescriptor(id, displayName,
+                identityType, recipientRule, access, displayColor);
     }
 
-    public String getId() { return this.id; }
-    public String getDisplayName() { return this.displayName; }
-    public ChatIdentityType getIdentityType() { return this.identityType; }
-    public ChatRecipientRule getRecipientRule() { return this.recipientRule; }
-    public int getDisplayColor() { return this.displayColor; }
+    public String getId() { return this.descriptor.getId(); }
+    public String getDisplayName() { return this.descriptor.getDisplayName(); }
+    public ChatIdentityType getIdentityType() {
+        return this.descriptor.getIdentityType();
+    }
+    public ChatRecipientRule getRecipientRule() {
+        return this.descriptor.getRecipientRule();
+    }
+    public ChatChannelAccess getAccess() {
+        return this.descriptor.getAccess();
+    }
+    public int getDisplayColor() { return this.descriptor.getDisplayColor(); }
+    /** The channel as the facts that describe it. */
+    public ChatChannelDescriptor getDescriptor() { return this.descriptor; }
 
     /** Every channel in the order the client presents them. */
     public static List<ChatChannel> presentationOrder() {
@@ -100,7 +108,7 @@ public enum ChatChannel {
         String normalized = id == null ? ""
                 : id.trim().toLowerCase(Locale.ROOT);
         for (ChatChannel channel : values()) {
-            if (channel.id.equals(normalized)) {
+            if (channel.getId().equals(normalized)) {
                 return channel;
             }
         }

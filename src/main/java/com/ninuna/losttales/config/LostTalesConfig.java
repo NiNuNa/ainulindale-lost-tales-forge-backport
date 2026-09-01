@@ -136,6 +136,9 @@ public final class LostTalesConfig {
      */
     public static int chatHistoryLines = 1000;
     /** Tell others when this player is typing; show others' typing. */
+    /** Server only: the opt-in moderation record of what was said. */
+    public static boolean chatAuditLogEnabled = false;
+    public static int chatAuditRetentionDays = 30;
     public static boolean sendChatTypingStatus = true;
     public static boolean showChatTypingIndicators = true;
     /** Server switch for relaying typing presence at all. */
@@ -829,6 +832,20 @@ public final class LostTalesConfig {
                     CATEGORY_CHAT,
                     chatTypingIndicators,
                     "Relay who is typing into a channel to the players who would read the message; off drops every typing notice on the server."
+            );
+            chatAuditLogEnabled = config.getBoolean(
+                    "auditLog",
+                    CATEGORY_CHAT,
+                    chatAuditLogEnabled,
+                    "Server only: append every accepted chat message, edit, and deletion - private whispers included - as JSON lines under logs/losttales-chat/, one file per UTC day, for moderation. Off by default; tell your players before turning it on."
+            );
+            chatAuditRetentionDays = config.getInt(
+                    "auditRetentionDays",
+                    CATEGORY_CHAT,
+                    chatAuditRetentionDays,
+                    1,
+                    365,
+                    "Days of chat audit files kept; files older than this are deleted when the server starts and as the day rolls over."
             );
             discordEnabled = config.getBoolean(
                     "enabled",

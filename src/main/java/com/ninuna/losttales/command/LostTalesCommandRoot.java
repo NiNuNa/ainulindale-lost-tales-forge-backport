@@ -19,6 +19,8 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
     private final LostTalesCommandPartyAdmin partyCommand = new LostTalesCommandPartyAdmin();
     private final LostTalesCommandCharacterAdmin characterCommand =
             new LostTalesCommandCharacterAdmin();
+    private final LostTalesCommandChatModeration chatCommand =
+            new LostTalesCommandChatModeration();
 
     public LostTalesCommandRoot() {
         super(LostTalesMetaData.MOD_ID);
@@ -26,7 +28,7 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/" + getCommandName() + " <quest|mapmarker|hud|summon|party|character> ...";
+        return "/" + getCommandName() + " <quest|mapmarker|hud|summon|party|character|chat> ...";
     }
 
     @Override
@@ -74,6 +76,9 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
                 || "char".equalsIgnoreCase(name)) {
             return characterCommand;
         }
+        if ("chat".equalsIgnoreCase(name)) {
+            return chatCommand;
+        }
         return null;
     }
 
@@ -92,6 +97,7 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " summon <entity> [x] [y] [z] [dataTag]");
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " party <status|validate|repair|clearcombat>");
         send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " character <status|recover|cooldown|freeze|unfreeze|deleted|restore|rollback|purge> ...");
+        send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " chat <mute|unmute|mutes>");
         send(sender, EnumChatFormatting.DARK_GRAY + "Use /losttales <subcommand>; legacy underscore commands are no longer registered.");
     }
 
@@ -102,7 +108,7 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
     @Override
     public List addTabCompletionOptions(ICommandSender sender, String[] args) {
         if (args.length == 1) {
-            return getListOfStringsMatchingLastWord(args, "quest", "mapmarker", "hud", "summon", "party", "character");
+            return getListOfStringsMatchingLastWord(args, "quest", "mapmarker", "hud", "summon", "party", "character", "chat");
         }
 
         CommandBase command = getSubCommand(args[0]);

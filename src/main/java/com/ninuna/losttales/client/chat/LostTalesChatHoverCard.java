@@ -68,6 +68,15 @@ final class LostTalesChatHoverCard {
     }
 
     /**
+     * The person under the pointer, exactly where a card shows; null
+     * anywhere else. What the player menu opens over.
+     */
+    static Target personAt(Minecraft minecraft, float mouseX,
+                           float mouseY) {
+        return find(minecraft, mouseX, mouseY);
+    }
+
+    /**
      * Card for a mention candidate. The candidate's key is the player's
      * UUID when the appearance sync knows them; without it only the
      * account identity can be shown.
@@ -719,7 +728,7 @@ final class LostTalesChatHoverCard {
         return result;
     }
 
-    private static final class Target {
+    static final class Target {
         final UUID playerId;
         final boolean accountIdentity;
         /** An NPC's card: the portrait for a head, no account, and the
