@@ -81,7 +81,7 @@ public final class LostTalesClientUtil {
         if (Keyboard.isKeyDown(Keyboard.KEY_LCONTROL)) {
             list.add("");
             list.add("Faction: §f§o" + I18n.format("lotr.faction."
-                    + material.getFaction().getFaction().codeName() + ".name"));
+                    + material.getFaction().codeName() + ".name"));
             if (material.getMaterial() != null) {
                 list.add("Repair Item: §f§o"
                         + material.getMaterial().getRepairItem().getDisplayName());

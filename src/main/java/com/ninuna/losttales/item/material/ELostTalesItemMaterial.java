@@ -2,6 +2,7 @@ package com.ninuna.losttales.item.material;
 
 import com.ninuna.losttales.faction.ELostTalesFaction;
 import lotr.common.LOTRMod;
+import lotr.common.fac.LOTRFaction;
 import net.minecraft.block.material.Material;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
@@ -19,18 +20,37 @@ public enum ELostTalesItemMaterial {
     BLUE_GOBLINS(new LostTalesItemMaterialBase("BLUE_GOBLINS", 350, 2, 5.5F, 2.5F, 6, new int[]{2, 4, 2, 2}, new ItemStack(LOTRMod.orcSteel)));
 
     private final LostTalesItemMaterialBase material;
-    private final ELostTalesFaction faction;
+    private final LOTRFaction faction;
 
     ELostTalesItemMaterial(LostTalesItemMaterialBase material) {
         this.material = material;
-        this.faction = ELostTalesFaction.valueOf(this.name());
+        this.faction = resolveFaction(this.name());
+    }
+
+    /**
+     * A material named after a Lost Tales faction uses that faction; any other
+     * name must be one of LOTR's own factions (LOTHLORIEN is one — the mod
+     * deliberately has no faction of its own for it). NEUTRAL is LOTR's
+     * UNALIGNED pseudo-faction; its display name comes from the
+     * lotr.faction.UNALIGNED.name entry in this mod's lang file.
+     */
+    private static LOTRFaction resolveFaction(String name) {
+        if ("NEUTRAL".equals(name)) {
+            return LOTRFaction.UNALIGNED;
+        }
+        for (ELostTalesFaction f : ELostTalesFaction.values()) {
+            if (f.name().equals(name)) {
+                return f.getFaction();
+            }
+        }
+        return LOTRFaction.valueOf(name);
     }
 
     public LostTalesItemMaterialBase getMaterial() {
         return material;
     }
 
-    public ELostTalesFaction getFaction() {
+    public LOTRFaction getFaction() {
         return faction;
     }
 

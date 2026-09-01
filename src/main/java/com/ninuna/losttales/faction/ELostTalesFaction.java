@@ -1,6 +1,7 @@
 package com.ninuna.losttales.faction;
 
 import com.ninuna.losttales.achievement.ELostTalesAchievement;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.util.LostTalesPair;
 import com.ninuna.losttales.util.LostTalesUtil;
 import com.ninuna.losttales.world.map.waypoint.ELostTalesWaypoint;
@@ -16,7 +17,7 @@ import lotr.common.world.map.LOTRWaypoint;
 public enum ELostTalesFaction {
     ARNOR(
             //  Faction:
-            LostTalesUtil.addFaction("ARNOR", 0xC6E5FF, LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_MAN)),
+            LostTalesUtil.addFaction("ARNOR", LostTalesColors.rgb(LostTalesColors.SEAFOAM), LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_MAN)),
             //  Active?, Approves of War Crimes?, Isolationist?:
             false, false, false,
             //  Faction Map Region:
@@ -25,7 +26,7 @@ public enum ELostTalesFaction {
 
     LOSSOTH(
             //  Faction:
-            LostTalesUtil.addFaction("LOSSOTH", 0xe8e8e8, DimensionRegion.NORTH.getRegion(), EnumSet.of(LOTRFaction.FactionType.TYPE_MAN)),
+            LostTalesUtil.addFaction("LOSSOTH", LostTalesColors.rgb(LostTalesColors.IVORY), DimensionRegion.NORTH.getRegion(), EnumSet.of(LOTRFaction.FactionType.TYPE_MAN)),
             //  Active?, Approves of War Crimes?, Isolationist?:
             true, false, false,
             //  Faction Map Region:
@@ -34,7 +35,7 @@ public enum ELostTalesFaction {
 
     MORIA_GOBLINS(
             //  Faction:
-            LostTalesUtil.addFaction("MORIA_GOBLINS", 0x201d1d, LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_ORC)),
+            LostTalesUtil.addFaction("MORIA_GOBLINS", LostTalesColors.rgb(LostTalesColors.PLUM_BLACK), LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_ORC)),
             //  Active?, Approves of War Crimes?, Isolationist?:
             true, true, false,
             //  Faction Map Region:
@@ -43,34 +44,16 @@ public enum ELostTalesFaction {
 
     OROCARNI(
             //  Faction:
-            LostTalesUtil.addFaction("OROCARNI", 0xb03838, LOTRDimension.DimensionRegion.EAST, EnumSet.of(LOTRFaction.FactionType.TYPE_DWARF)),
+            LostTalesUtil.addFaction("OROCARNI", LostTalesColors.rgb(LostTalesColors.CRIMSON), LOTRDimension.DimensionRegion.EAST, EnumSet.of(LOTRFaction.FactionType.TYPE_DWARF)),
             //  Active?, Approves of War Crimes?, Isolationist?:
             true, true, false,
             //  Faction Map Region:
             new LOTRMapRegion(2415, 915, 350)
     ),
 
-    LOTHLORIEN(
-            //  Faction:
-            LostTalesUtil.addFaction("LOTHLORIEN", 0x8c2727, LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_ELF)),
-            //  Active?, Approves of War Crimes?, Isolationist?:
-            false, false, false,
-            //  Faction Map Region:
-            new LOTRMapRegion(2415, 915, 350)
-    ),
-
-    NEUTRAL(
-            //  Faction:
-            LostTalesUtil.addFaction("NEUTRAL", 0x8c2727, LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_FREE)),
-            //  Active?, Approves of War Crimes?, Isolationist?:
-            false, false, false,
-            //  Faction Map Region:
-            new LOTRMapRegion(2415, 915, 350)
-    ),
-
     THARBAD(
             //  Faction:
-            LostTalesUtil.addFaction("THARBAD", 0x8c2727, LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_MAN)),
+            LostTalesUtil.addFaction("THARBAD", LostTalesColors.rgb(LostTalesColors.RUST), LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_MAN)),
             //  Active?, Approves of War Crimes?, Isolationist?:
             true, false, false,
             //  Faction Map Region:
@@ -79,7 +62,7 @@ public enum ELostTalesFaction {
 
     MOON_ELVES(
             //  Faction:
-            LostTalesUtil.addFaction("MOON_ELVES", 0x1f305c, DimensionRegion.NORTH.getRegion(), EnumSet.of(LOTRFaction.FactionType.TYPE_ELF, LOTRFaction.FactionType.TYPE_FREE)),
+            LostTalesUtil.addFaction("MOON_ELVES", LostTalesColors.rgb(LostTalesColors.INDIGO), DimensionRegion.NORTH.getRegion(), EnumSet.of(LOTRFaction.FactionType.TYPE_ELF, LOTRFaction.FactionType.TYPE_FREE)),
             //  Active?, Approves of War Crimes?, Isolationist?:
             true, false, false,
             //  Faction Map Region:
@@ -88,7 +71,7 @@ public enum ELostTalesFaction {
 
     SUN_ELVES(
             //  Faction:
-            LostTalesUtil.addFaction("SUN_ELVES", 0x731440, LOTRDimension.DimensionRegion.EAST, EnumSet.of(LOTRFaction.FactionType.TYPE_ELF, LOTRFaction.FactionType.TYPE_FREE)),
+            LostTalesUtil.addFaction("SUN_ELVES", LostTalesColors.rgb(LostTalesColors.WINE), LOTRDimension.DimensionRegion.EAST, EnumSet.of(LOTRFaction.FactionType.TYPE_ELF, LOTRFaction.FactionType.TYPE_FREE)),
             //  Active?, Approves of War Crimes?, Isolationist?:
             true, false, false,
             //  Faction Map Region:
@@ -97,7 +80,7 @@ public enum ELostTalesFaction {
 
     ODANE(
             //  Faction:
-            LostTalesUtil.addFaction("ODANE", 0xB45A32, LOTRDimension.DimensionRegion.EAST, EnumSet.of(LOTRFaction.FactionType.TYPE_MAN)),
+            LostTalesUtil.addFaction("ODANE", LostTalesColors.rgb(LostTalesColors.CORAL), LOTRDimension.DimensionRegion.EAST, EnumSet.of(LOTRFaction.FactionType.TYPE_MAN)),
             //  Active?, Approves of War Crimes?, Isolationist?:
             true, false, false,
             //  Faction Map Region:
@@ -106,7 +89,7 @@ public enum ELostTalesFaction {
 
     BLUE_GOBLINS(
             //  Faction:
-            LostTalesUtil.addFaction("BLUE_GOBLINS", 0x0d2436, LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_ORC)),
+            LostTalesUtil.addFaction("BLUE_GOBLINS", LostTalesColors.rgb(LostTalesColors.HARBOR_BLUE), LOTRDimension.DimensionRegion.WEST, EnumSet.of(LOTRFaction.FactionType.TYPE_ORC)),
             //  Active?, Approves of War Crimes?, Isolationist?:
             true, true, false,
             //  Faction Map Region:
@@ -160,19 +143,92 @@ public enum ELostTalesFaction {
                 new LostTalesPair(LOTRFaction.FANGORN, LOTRFactionRelations.Relation.ENEMY),
                 new LostTalesPair(LOTRFaction.ROHAN, LOTRFactionRelations.Relation.ENEMY),
                 new LostTalesPair(LOTRFaction.DORWINION, LOTRFactionRelations.Relation.ENEMY),
+                new LostTalesPair(LOTRFaction.GUNDABAD, LOTRFactionRelations.Relation.FRIEND),
                 new LostTalesPair(ELostTalesFaction.MORIA_GOBLINS.getFaction(), LOTRFactionRelations.Relation.FRIEND),
                 new LostTalesPair(ELostTalesFaction.MOON_ELVES.getFaction(), LOTRFactionRelations.Relation.ENEMY)
+        });
+
+        // The mortal enemies are the same list Mordor carries in
+        // LOTRFaction.initAllProperties(): every good-aligned faction.
+        MORIA_GOBLINS.setFactionRelations( new LostTalesPair[]{
+                new LostTalesPair(LOTRFaction.GUNDABAD, LOTRFactionRelations.Relation.FRIEND),
+                new LostTalesPair(LOTRFaction.HOBBIT, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.BREE, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.RANGER_NORTH, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.BLUE_MOUNTAINS, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.HIGH_ELF, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.WOOD_ELF, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.DALE, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.DURINS_FOLK, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.LOTHLORIEN, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.FANGORN, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.ROHAN, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.GONDOR, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.DORWINION, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.TAURETHRIM, LOTRFactionRelations.Relation.MORTAL_ENEMY)
+        });
+
+        LOSSOTH.setFactionRelations( new LostTalesPair[]{
+                new LostTalesPair(LOTRFaction.RANGER_NORTH, LOTRFactionRelations.Relation.ALLY),
+                new LostTalesPair(LOTRFaction.BREE, LOTRFactionRelations.Relation.FRIEND),
+                new LostTalesPair(ELostTalesFaction.THARBAD.getFaction(), LOTRFactionRelations.Relation.FRIEND),
+                new LostTalesPair(ELostTalesFaction.BLUE_GOBLINS.getFaction(), LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.ANGMAR, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.GUNDABAD, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.MORDOR, LOTRFactionRelations.Relation.ENEMY)
+        });
+
+        THARBAD.setFactionRelations( new LostTalesPair[]{
+                new LostTalesPair(LOTRFaction.HOBBIT, LOTRFactionRelations.Relation.ALLY),
+                new LostTalesPair(LOTRFaction.BREE, LOTRFactionRelations.Relation.ALLY),
+                new LostTalesPair(LOTRFaction.RANGER_NORTH, LOTRFactionRelations.Relation.ALLY),
+                new LostTalesPair(LOTRFaction.BLUE_MOUNTAINS, LOTRFactionRelations.Relation.FRIEND),
+                new LostTalesPair(LOTRFaction.HIGH_ELF, LOTRFactionRelations.Relation.FRIEND),
+                new LostTalesPair(ELostTalesFaction.MORIA_GOBLINS.getFaction(), LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(ELostTalesFaction.BLUE_GOBLINS.getFaction(), LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.GUNDABAD, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.ANGMAR, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.DUNLAND, LOTRFactionRelations.Relation.ENEMY)
         });
 
         MOON_ELVES.setFactionRelations( new LostTalesPair[]{
                 new LostTalesPair(ELostTalesFaction.SUN_ELVES.getFaction(), LOTRFactionRelations.Relation.MORTAL_ENEMY)
         });
 
+        // Mordor's mortal-enemy list again, except Durin's Folk, who are only an enemy.
+        OROCARNI.setFactionRelations( new LostTalesPair[]{
+                new LostTalesPair(LOTRFaction.MORDOR, LOTRFactionRelations.Relation.ALLY),
+                new LostTalesPair(LOTRFaction.RHUDEL, LOTRFactionRelations.Relation.ALLY),
+                new LostTalesPair(LOTRFaction.DURINS_FOLK, LOTRFactionRelations.Relation.ENEMY),
+                new LostTalesPair(LOTRFaction.HOBBIT, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.BREE, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.RANGER_NORTH, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.BLUE_MOUNTAINS, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.HIGH_ELF, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.WOOD_ELF, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.DALE, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.LOTHLORIEN, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.FANGORN, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.ROHAN, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.GONDOR, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.DORWINION, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.TAURETHRIM, LOTRFactionRelations.Relation.MORTAL_ENEMY)
+        });
+
         ODANE.setFactionRelations( new LostTalesPair[]{
-                new LostTalesPair(LOTRFaction.DALE, LOTRFactionRelations.Relation.FRIEND),
-                new LostTalesPair(LOTRFaction.DORWINION, LOTRFactionRelations.Relation.FRIEND),
-                new LostTalesPair(LOTRFaction.RHUDEL, LOTRFactionRelations.Relation.ENEMY),
-                new LostTalesPair(LOTRFaction.MORDOR, LOTRFactionRelations.Relation.ENEMY)
+                new LostTalesPair(ELostTalesFaction.OROCARNI.getFaction(), LOTRFactionRelations.Relation.FRIEND),
+                new LostTalesPair(LOTRFaction.MORDOR, LOTRFactionRelations.Relation.ENEMY),
+                new LostTalesPair(LOTRFaction.GUNDABAD, LOTRFactionRelations.Relation.ENEMY),
+                new LostTalesPair(LOTRFaction.ANGMAR, LOTRFactionRelations.Relation.ENEMY),
+                new LostTalesPair(LOTRFaction.DOL_GULDUR, LOTRFactionRelations.Relation.ENEMY),
+                new LostTalesPair(LOTRFaction.ISENGARD, LOTRFactionRelations.Relation.ENEMY),
+                new LostTalesPair(ELostTalesFaction.MORIA_GOBLINS.getFaction(), LOTRFactionRelations.Relation.ENEMY),
+                new LostTalesPair(ELostTalesFaction.BLUE_GOBLINS.getFaction(), LOTRFactionRelations.Relation.ENEMY),
+                new LostTalesPair(LOTRFaction.HIGH_ELF, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.WOOD_ELF, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(LOTRFaction.LOTHLORIEN, LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(ELostTalesFaction.MOON_ELVES.getFaction(), LOTRFactionRelations.Relation.MORTAL_ENEMY),
+                new LostTalesPair(ELostTalesFaction.SUN_ELVES.getFaction(), LOTRFactionRelations.Relation.MORTAL_ENEMY)
         });
 
         for (ELostTalesFaction f : ELostTalesFaction.values()) {
@@ -244,14 +300,14 @@ public enum ELostTalesFaction {
                 } else {
                     LostTalesUtil.setFactionAchievementCategory(f.getFaction(), ELostTalesAchievement.Category.valueOf(f.getFaction().codeName()).getCategory());
                 }
-                LostTalesUtil.addFactionRank(f.getFaction(), 10.0f, "a", false).makeAchievement().makeTitle();
-                LostTalesUtil.addFactionRank(f.getFaction(), 50.0f, "b", false).makeAchievement().makeTitle();
-                LostTalesUtil.addFactionRank(f.getFaction(), 100.0f, "c", false).makeAchievement().makeTitle().setPledgeRank();
-                LostTalesUtil.addFactionRank(f.getFaction(), 200.0f, "d", false).makeAchievement().makeTitle();
-                LostTalesUtil.addFactionRank(f.getFaction(), 500.0f, "e", false).makeAchievement().makeTitle();
-                LostTalesUtil.addFactionRank(f.getFaction(), 1000.0f, "f", false).makeAchievement().makeTitle();
-                LostTalesUtil.addFactionRank(f.getFaction(), 1500.0f, "g", false).makeAchievement().makeTitle();
-                LostTalesUtil.addFactionRank(f.getFaction(), 3000.0f, "h", false).makeAchievement().makeTitle();
+                LostTalesUtil.addFactionRank(f.getFaction(), 10.0f, "a", f.hasFeminineRank("a")).makeAchievement().makeTitle();
+                LostTalesUtil.addFactionRank(f.getFaction(), 50.0f, "b", f.hasFeminineRank("b")).makeAchievement().makeTitle();
+                LostTalesUtil.addFactionRank(f.getFaction(), 100.0f, "c", f.hasFeminineRank("c")).makeAchievement().makeTitle().setPledgeRank();
+                LostTalesUtil.addFactionRank(f.getFaction(), 200.0f, "d", f.hasFeminineRank("d")).makeAchievement().makeTitle();
+                LostTalesUtil.addFactionRank(f.getFaction(), 500.0f, "e", f.hasFeminineRank("e")).makeAchievement().makeTitle();
+                LostTalesUtil.addFactionRank(f.getFaction(), 1000.0f, "f", f.hasFeminineRank("f")).makeAchievement().makeTitle();
+                LostTalesUtil.addFactionRank(f.getFaction(), 1500.0f, "g", f.hasFeminineRank("g")).makeAchievement().makeTitle();
+                LostTalesUtil.addFactionRank(f.getFaction(), 3000.0f, "h", f.hasFeminineRank("h")).makeAchievement().makeTitle();
             }
         }
     }
@@ -271,6 +327,26 @@ public enum ELostTalesFaction {
 
                 LostTalesUtil.clearControlZones(f.getFaction());
             }
+        }
+    }
+
+    /**
+     * A rank may only be registered gendered when en_US.lang carries the
+     * matching rank.<name>_fm and rank.<name>_fm.f entries — without them the
+     * feminine title displays as a raw lang key.
+     */
+    private boolean hasFeminineRank(String rankName) {
+        switch (this) {
+            case LOSSOTH:
+                return "b".equals(rankName) || "f".equals(rankName) || "h".equals(rankName);
+            case OROCARNI:
+                return "g".equals(rankName) || "h".equals(rankName);
+            case MOON_ELVES:
+                return "f".equals(rankName);
+            case BLUE_GOBLINS:
+                return "h".equals(rankName);
+            default:
+                return false;
         }
     }
 
