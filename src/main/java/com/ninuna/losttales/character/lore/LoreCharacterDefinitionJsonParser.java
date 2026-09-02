@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
+import com.ninuna.losttales.character.registry.CharacterBodyModelRegistry;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
@@ -198,14 +199,7 @@ public final class LoreCharacterDefinitionJsonParser {
         if (LoreCharacterDefinition.Appearance.RACE_DEFAULT_MODEL.equals(modelId)) {
             return true;
         }
-        if (CharacterRaceRegistry.HUMAN.equals(raceId)) return "lotr:human".equals(modelId);
-        if (CharacterRaceRegistry.ELF.equals(raceId)) return "lotr:elf".equals(modelId);
-        if (CharacterRaceRegistry.DWARF.equals(raceId)) return "lotr:dwarf".equals(modelId);
-        if (CharacterRaceRegistry.HOBBIT.equals(raceId)) return "lotr:hobbit".equals(modelId);
-        if (CharacterRaceRegistry.ORC.equals(raceId)) return "lotr:orc".equals(modelId);
-        if (CharacterRaceRegistry.URUK.equals(raceId)) return "lotr:uruk".equals(modelId);
-        return CharacterRaceRegistry.HALF_TROLL.equals(raceId)
-                && "lotr:half_troll".equals(modelId);
+        return CharacterBodyModelRegistry.isCompatible(raceId, modelId);
     }
 
     private static int requiredInteger(JsonElement element, String path) {

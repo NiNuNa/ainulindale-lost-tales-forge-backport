@@ -1,13 +1,15 @@
 package com.ninuna.losttales.character.model;
 
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 
 import java.util.UUID;
 
 /** Persistent server-authoritative record for one roleplaying character. */
 public class RoleplayCharacter {
 
-    public static final int CURRENT_DATA_VERSION = 6;
+    public static final int CURRENT_DATA_VERSION = 8;
     public static final int INITIAL_ROLEPLAY_LEVEL = 1;
     public static final boolean DEFAULT_SHOW_MINECRAFT_CAPE = true;
     public static final int DEFAULT_COSMETIC_CAPE_ID = CharacterCapeCatalog.NONE_ID;
@@ -19,6 +21,8 @@ public class RoleplayCharacter {
     private final String raceId;
     private final String genderId;
     private final String skinId;
+    private final String bodyTypeId;
+    private final String chestTypeId;
     private final String description;
     private final int age;
     private final String startingFactionId;
@@ -84,6 +88,7 @@ public class RoleplayCharacter {
                 "");
     }
 
+    /** Body and chest types default from the sex; records written before them use this. */
     public RoleplayCharacter(UUID characterId, UUID ownerId, int slotIndex, String name,
                              String raceId, String genderId, String skinId, int age,
                              String startingFactionId, int roleplayLevel,
@@ -92,6 +97,37 @@ public class RoleplayCharacter {
                              int cosmeticCapeId, String startingWaypointId,
                              boolean unconventionalSettings,
                              String description) {
+        this(characterId, ownerId, slotIndex, name, raceId, genderId, skinId,
+                age, startingFactionId, roleplayLevel, progression,
+                creationTimestamp, dataVersion, showMinecraftCape,
+                cosmeticCapeId, startingWaypointId, unconventionalSettings,
+                description, CharacterBodyTypeRegistry.defaultFor(genderId));
+    }
+
+    /** Chest type defaults from the sex; records written before it use this. */
+    public RoleplayCharacter(UUID characterId, UUID ownerId, int slotIndex, String name,
+                             String raceId, String genderId, String skinId, int age,
+                             String startingFactionId, int roleplayLevel,
+                             CharacterProgression progression, long creationTimestamp,
+                             int dataVersion, boolean showMinecraftCape,
+                             int cosmeticCapeId, String startingWaypointId,
+                             boolean unconventionalSettings,
+                             String description, String bodyTypeId) {
+        this(characterId, ownerId, slotIndex, name, raceId, genderId, skinId,
+                age, startingFactionId, roleplayLevel, progression,
+                creationTimestamp, dataVersion, showMinecraftCape,
+                cosmeticCapeId, startingWaypointId, unconventionalSettings,
+                description, bodyTypeId, CharacterChestTypeRegistry.defaultFor(genderId));
+    }
+
+    public RoleplayCharacter(UUID characterId, UUID ownerId, int slotIndex, String name,
+                             String raceId, String genderId, String skinId, int age,
+                             String startingFactionId, int roleplayLevel,
+                             CharacterProgression progression, long creationTimestamp,
+                             int dataVersion, boolean showMinecraftCape,
+                             int cosmeticCapeId, String startingWaypointId,
+                             boolean unconventionalSettings,
+                             String description, String bodyTypeId, String chestTypeId) {
         if (characterId == null) {
             throw new IllegalArgumentException("characterId must not be null");
         }
@@ -106,6 +142,12 @@ public class RoleplayCharacter {
         this.raceId = raceId == null ? "" : raceId;
         this.genderId = genderId == null ? "" : genderId;
         this.skinId = skinId == null ? "" : skinId;
+        this.bodyTypeId = CharacterBodyTypeRegistry.contains(bodyTypeId)
+                ? CharacterBodyTypeRegistry.normalizeIdentifier(bodyTypeId)
+                : CharacterBodyTypeRegistry.defaultFor(genderId);
+        this.chestTypeId = CharacterChestTypeRegistry.contains(chestTypeId)
+                ? CharacterChestTypeRegistry.normalizeIdentifier(chestTypeId)
+                : CharacterChestTypeRegistry.defaultFor(genderId);
         this.description = description == null ? "" : description;
         this.age = age;
         this.startingFactionId = startingFactionId == null ? "" : startingFactionId;
@@ -145,6 +187,16 @@ public class RoleplayCharacter {
 
     public String getSkinId() {
         return this.skinId;
+    }
+
+    /** Arm width of the body, one of {@link CharacterBodyTypeRegistry}; stored apart from sex. */
+    public String getBodyTypeId() {
+        return this.bodyTypeId;
+    }
+
+    /** Chest shape and size, one of {@link CharacterChestTypeRegistry}; stored apart from sex. */
+    public String getChestTypeId() {
+        return this.chestTypeId;
     }
 
     public String getDescription() {

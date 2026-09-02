@@ -26,6 +26,8 @@ public final class CharacterCreateRequestPacket implements IMessage {
     private String startingFactionId = "";
     private String startingWaypointId = "";
     private boolean unconventionalSettings;
+    private String bodyTypeId = "";
+    private String chestTypeId = "";
     private boolean malformed;
 
     public CharacterCreateRequestPacket() {}
@@ -46,6 +48,8 @@ public final class CharacterCreateRequestPacket implements IMessage {
         this.startingFactionId = request.getStartingFactionId();
         this.startingWaypointId = request.getStartingWaypointId();
         this.unconventionalSettings = request.hasUnconventionalSettings();
+        this.bodyTypeId = request.getBodyTypeId();
+        this.chestTypeId = request.getChestTypeId();
     }
 
     @Override
@@ -67,6 +71,10 @@ public final class CharacterCreateRequestPacket implements IMessage {
             this.startingWaypointId = CharacterPacketCodec.readString(
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             this.unconventionalSettings = buffer.readBoolean();
+            this.bodyTypeId = CharacterPacketCodec.readString(
+                    buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            this.chestTypeId = CharacterPacketCodec.readString(
+                    buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             CharacterPacketCodec.requireFinished(buffer);
             if (this.expectedRosterRevision < 0L) {
                 throw new CharacterPacketCodec.DecodeException("missing roster revision");
@@ -94,6 +102,12 @@ public final class CharacterCreateRequestPacket implements IMessage {
         CharacterPacketCodec.writeString(buffer, this.startingWaypointId,
                 CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         buffer.writeBoolean(this.unconventionalSettings);
+        // Appended after the original layout: the requested arm width.
+        CharacterPacketCodec.writeString(
+                buffer, this.bodyTypeId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+        // Appended again: the requested chest type.
+        CharacterPacketCodec.writeString(
+                buffer, this.chestTypeId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
     }
 
     private CharacterCreationRequest toRequest() {
@@ -108,7 +122,9 @@ public final class CharacterCreateRequestPacket implements IMessage {
                 this.startingFactionId,
                 this.startingWaypointId,
                 this.unconventionalSettings,
-                this.description
+                this.description,
+                this.bodyTypeId,
+                this.chestTypeId
         );
     }
 

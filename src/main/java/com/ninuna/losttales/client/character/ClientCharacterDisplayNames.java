@@ -2,6 +2,11 @@ package com.ninuna.losttales.client.character;
 
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.cape.CharacterCapeDefinition;
+import com.ninuna.losttales.character.registry.CharacterBodyModelDefinition;
+import com.ninuna.losttales.character.registry.CharacterBodyModelRegistry;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterChestTypeDefinition;
+import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
@@ -137,8 +142,49 @@ public final class ClientCharacterDisplayNames {
         if (groupKey.equals(group)) {
             group = prettifyIdentifier(definition.getDisplayGroupId());
         }
+        if (definition.isAccountSkin()) {
+            // One entry, not a numbered variant.
+            return group;
+        }
         return I18n.format("gui.losttales.character.skin_value",
                 group, Integer.valueOf(definition.getVariantIndex() + 1));
+    }
+
+    public static List<String> getBodyTypeIds() {
+        return Collections.unmodifiableList(
+                new ArrayList<String>(CharacterBodyTypeRegistry.getAll()));
+    }
+
+    /** True when the skin's body offers an arm width choice. */
+    public static boolean hasBodyTypeChoice(String skinId) {
+        CharacterSkinDefinition definition = CharacterSkinRegistry.get(skinId);
+        CharacterBodyModelDefinition model = definition == null
+                ? null : CharacterBodyModelRegistry.get(definition.getModelId());
+        return model != null && model.supportsBodyTypes();
+    }
+
+    public static String bodyType(String id) {
+        return translatedIdentifier("gui.losttales.character.body.", id, "losttales:");
+    }
+
+    public static List<String> getChestTypeIds() {
+        ArrayList<String> ids = new ArrayList<String>();
+        for (CharacterChestTypeDefinition definition : CharacterChestTypeRegistry.getAll()) {
+            ids.add(definition.getId());
+        }
+        return Collections.unmodifiableList(ids);
+    }
+
+    /** True when the skin's body can carry a chest. */
+    public static boolean hasChestChoice(String skinId) {
+        CharacterSkinDefinition definition = CharacterSkinRegistry.get(skinId);
+        CharacterBodyModelDefinition model = definition == null
+                ? null : CharacterBodyModelRegistry.get(definition.getModelId());
+        return model != null && model.hasChestVariant();
+    }
+
+    public static String chestType(String id) {
+        return translatedIdentifier("gui.losttales.character.chest.", id, "losttales:");
     }
 
     public static String faction(String id) {

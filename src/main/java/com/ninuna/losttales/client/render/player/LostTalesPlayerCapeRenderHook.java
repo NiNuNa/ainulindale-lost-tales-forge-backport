@@ -20,9 +20,14 @@ public final class LostTalesPlayerCapeRenderHook {
             return;
         }
 
+        ResolvedPlayerAppearance appearance =
+                PlayerAppearanceResolver.resolve(event.entityPlayer);
+        if (appearance == null) {
+            return;
+        }
         LostTalesConfiguredPlayerRenderer renderer =
                 (LostTalesConfiguredPlayerRenderer)event.renderer;
-        String raceId = renderer.getRaceId();
+        String raceId = appearance.getRaceId();
         if (DISABLED_RACES.contains(raceId)) {
             return;
         }
@@ -30,6 +35,7 @@ public final class LostTalesPlayerCapeRenderHook {
         try {
             LostTalesPlayerCapeRenderer.render(
                     renderer,
+                    raceId,
                     (AbstractClientPlayer)event.entityPlayer,
                     event.partialRenderTick);
             // The normal cape has now either been rendered or intentionally

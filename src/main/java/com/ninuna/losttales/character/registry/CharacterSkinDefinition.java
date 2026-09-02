@@ -5,7 +5,10 @@ package com.ninuna.losttales.character.registry;
  *
  * The texture is either provided by LOTR Legacy, in which case only a stable
  * identifier and a resource location are stored and no LOTR asset is copied,
- * or bundled with Lost Tales under {@code assets/losttales/textures/skins/}.
+ * bundled with Lost Tales under {@code assets/losttales/textures/skins/}, or
+ * the player's own account skin, which every client fetches for itself.
+ * Every skin names the body model that draws it and the layout its texels
+ * follow, so the client never has to guess either from the race.
  */
 public final class CharacterSkinDefinition {
 
@@ -15,12 +18,25 @@ public final class CharacterSkinDefinition {
     private final String displayGroupId;
     private final int variantIndex;
     private final String textureLocation;
+    private final String modelId;
+    private final CharacterSkinLayout layout;
+    private final boolean accountSkin;
 
     CharacterSkinDefinition(String id, String raceId, String genderId,
                             String displayGroupId, int variantIndex,
-                            String textureLocation) {
+                            String textureLocation, String modelId,
+                            CharacterSkinLayout layout) {
+        this(id, raceId, genderId, displayGroupId, variantIndex,
+                textureLocation, modelId, layout, false);
+    }
+
+    CharacterSkinDefinition(String id, String raceId, String genderId,
+                            String displayGroupId, int variantIndex,
+                            String textureLocation, String modelId,
+                            CharacterSkinLayout layout, boolean accountSkin) {
         if (isBlank(id) || isBlank(raceId) || isBlank(displayGroupId)
-                || isBlank(textureLocation) || variantIndex < 0) {
+                || isBlank(textureLocation) || isBlank(modelId)
+                || layout == null || variantIndex < 0) {
             throw new IllegalArgumentException("character skin fields must be valid");
         }
         this.id = id;
@@ -29,6 +45,9 @@ public final class CharacterSkinDefinition {
         this.displayGroupId = displayGroupId;
         this.variantIndex = variantIndex;
         this.textureLocation = textureLocation;
+        this.modelId = modelId;
+        this.layout = layout;
+        this.accountSkin = accountSkin;
     }
 
     public String getId() {
@@ -52,13 +71,28 @@ public final class CharacterSkinDefinition {
         return this.variantIndex;
     }
 
+    /** Resource location of the texture; a placeholder for an account skin. */
     public String getTextureLocation() {
         return this.textureLocation;
+    }
+
+    /** Identifier of the {@link CharacterBodyModelRegistry} model that draws this skin. */
+    public String getModelId() {
+        return this.modelId;
+    }
+
+    public CharacterSkinLayout getLayout() {
+        return this.layout;
     }
 
     /** True when the texture ships inside the Lost Tales jar. */
     public boolean isBundled() {
         return this.textureLocation.startsWith(CharacterSkinRegistry.BUNDLED_TEXTURE_ROOT);
+    }
+
+    /** True when the texture is the player's own Minecraft account skin. */
+    public boolean isAccountSkin() {
+        return this.accountSkin;
     }
 
     public boolean isCompatibleWith(String raceId, String genderId) {

@@ -328,7 +328,9 @@ public final class CharacterService {
                     RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
                     creation.getStartingWaypointId(),
                     creation.hasUnconventionalSettings(),
-                    creation.getDescription()
+                    creation.getDescription(),
+                    creation.getBodyTypeId(),
+                    creation.getChestTypeId()
             );
         }
         return null;

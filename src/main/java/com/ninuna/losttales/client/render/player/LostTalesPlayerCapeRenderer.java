@@ -52,6 +52,7 @@ final class LostTalesPlayerCapeRenderer {
     private LostTalesPlayerCapeRenderer() {}
 
     static void render(LostTalesConfiguredPlayerRenderer renderer,
+                       String raceId,
                        AbstractClientPlayer player,
                        float partialTicks) {
         if (renderer == null || player == null || player.isInvisible()) {
@@ -81,7 +82,7 @@ final class LostTalesPlayerCapeRenderer {
             return;
         }
 
-        CapeTransform transform = CapeTransform.forRace(renderer.getRaceId());
+        CapeTransform transform = CapeTransform.forRace(raceId);
         ModelRenderer body = model.bipedBody;
         ModelRenderer cloak = CAPE_MODEL.bipedCloak;
 

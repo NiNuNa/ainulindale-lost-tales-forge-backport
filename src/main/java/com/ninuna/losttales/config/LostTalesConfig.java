@@ -130,6 +130,17 @@ public final class LostTalesConfig {
     public static String chatPingSound = DEFAULT_CHAT_PING_SOUND;
     public static boolean enableChatAnimations = true;
     /**
+     * Developer aid: a local PNG drawn on the local player instead of the
+     * account skin, with a chosen arm width. Empty path disables it.
+     */
+    public static String devSkinOverridePath = "";
+    public static String devSkinOverrideBodyType = "";
+    /** Draw the jacket, sleeve, and trouser overlays of 64x64 skins. */
+    public static boolean showSkinOverlays = true;
+    /** Feminine chest physics on/off and bounce strength (0 to 1). */
+    public static boolean chestPhysics = true;
+    public static float chestBounce = 0.35F;
+    /**
      * Messages (and wrapped lines) the chat history keeps, shared by
      * every channel; vanilla keeps a hundred. A safety bound as much as
      * a preference: the coremod feeds it to vanilla's own trimming.
@@ -997,6 +1008,36 @@ public final class LostTalesConfig {
                     CATEGORY_CLIENT,
                     chatPingSound,
                     "Sound event played when a chat message @-mentions you; empty disables the sound."
+            );
+            devSkinOverridePath = config.getString(
+                    "devSkinOverridePath",
+                    CATEGORY_CLIENT,
+                    devSkinOverridePath,
+                    "Developer aid: path of a 64x32 or 64x64 PNG drawn on your own player instead of your account skin. Empty disables it."
+            );
+            devSkinOverrideBodyType = config.getString(
+                    "devSkinOverrideBodyType",
+                    CATEGORY_CLIENT,
+                    devSkinOverrideBodyType,
+                    "Arm width for the override skin: wide or slim. Anything else means wide."
+            );
+            showSkinOverlays = config.getBoolean(
+                    "showSkinOverlays",
+                    CATEGORY_CLIENT,
+                    showSkinOverlays,
+                    "Draw the jacket, sleeve, and trouser overlay layers of 64x64 skins on players."
+            );
+            chestPhysics = config.getBoolean(
+                    "chestPhysics",
+                    CATEGORY_CLIENT,
+                    chestPhysics,
+                    "Let the chest sway and bounce with movement."
+            );
+            chestBounce = config.getFloat(
+                    "chestBounce",
+                    CATEGORY_CLIENT,
+                    chestBounce, 0.0F, 1.0F,
+                    "Strength of the chest physics; 0 is still, 1 is the most movement."
             );
             chatHistoryLines = config.getInt(
                     "chatHistoryLines",

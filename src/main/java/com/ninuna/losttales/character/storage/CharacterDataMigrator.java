@@ -111,6 +111,17 @@ public final class CharacterDataMigrator {
                     // description.
                     return 6;
                 }
+                if (version == 6) {
+                    // Character v7 adds BodyTypeId, the arm width stored
+                    // apart from the sex. The codec derives it from the sex
+                    // when it is missing.
+                    return 7;
+                }
+                if (version == 7) {
+                    // Character v8 adds ChestTypeId, the chest shape and size
+                    // stored apart from the sex, derived from it when missing.
+                    return 8;
+                }
                 break;
             case PROGRESSION:
                 if (version == 0) {

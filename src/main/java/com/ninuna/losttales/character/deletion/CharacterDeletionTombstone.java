@@ -125,6 +125,8 @@ public final class CharacterDeletionTombstone {
                 source.getCosmeticCapeId(),
                 source.getStartingWaypointId(),
                 source.hasUnconventionalSettings(),
-                source.getDescription());
+                source.getDescription(),
+                source.getBodyTypeId(),
+                source.getChestTypeId());
     }
 }

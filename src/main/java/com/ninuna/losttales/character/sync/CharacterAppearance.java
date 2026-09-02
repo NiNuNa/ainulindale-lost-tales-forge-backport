@@ -3,6 +3,8 @@ package com.ninuna.losttales.character.sync;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
@@ -12,9 +14,10 @@ import java.util.UUID;
 /**
  * Public projection of an online player's active character: what other
  * clients need to render it and to describe it in the chat player card
- * (name, race, gender, starting faction, level, age, biography). Nothing
- * here is private roster state — slots, experience, waypoints, and the
- * switch state stay in {@link CharacterSummary} for the owner only.
+ * (name, race, gender, body and chest type, starting faction, level, age,
+ * biography). Nothing here is private roster state — slots, experience,
+ * waypoints, and the switch state stay in {@link CharacterSummary} for the
+ * owner only.
  */
 public final class CharacterAppearance {
     /** Biography length bound, the same one character creation enforces. */
@@ -26,6 +29,8 @@ public final class CharacterAppearance {
     private final String raceId;
     private final String genderId;
     private final String skinId;
+    private final String bodyTypeId;
+    private final String chestTypeId;
     private final boolean showMinecraftCape;
     private final int cosmeticCapeId;
     private final String startingFactionId;
@@ -41,11 +46,38 @@ public final class CharacterAppearance {
                 RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID);
     }
 
+    /** Preview constructor carrying a chosen body type. */
+    public CharacterAppearance(UUID playerId, String raceId,
+                               String genderId, String skinId, String bodyTypeId) {
+        this(playerId, raceId, genderId, skinId, bodyTypeId,
+                CharacterChestTypeRegistry.defaultFor(genderId));
+    }
+
+    /** Preview constructor carrying chosen body and chest types. */
+    public CharacterAppearance(UUID playerId, String raceId,
+                               String genderId, String skinId, String bodyTypeId,
+                               String chestTypeId) {
+        this(playerId, "", "", raceId, genderId, skinId,
+                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
+                "", 0, 0, "", bodyTypeId, chestTypeId);
+    }
+
     public CharacterAppearance(UUID playerId, String raceId,
                                String genderId, String skinId,
                                boolean showMinecraftCape, int cosmeticCapeId) {
         this(playerId, "", raceId, genderId, skinId,
                 showMinecraftCape, cosmeticCapeId);
+    }
+
+    /** Preview projection carrying capes and chosen body and chest types. */
+    public static CharacterAppearance preview(UUID playerId, String raceId,
+                                              String genderId, String skinId,
+                                              String bodyTypeId, String chestTypeId,
+                                              boolean showMinecraftCape,
+                                              int cosmeticCapeId) {
+        return new CharacterAppearance(playerId, "", "", raceId, genderId, skinId,
+                showMinecraftCape, cosmeticCapeId, "", 0, 0, "", bodyTypeId, chestTypeId);
     }
 
     public CharacterAppearance(UUID playerId, String characterName,
@@ -71,7 +103,8 @@ public final class CharacterAppearance {
     /**
      * Full projection including the card details. A level or age of zero
      * and an empty faction or description mean "not known", which is what
-     * previews and removals carry; the card omits those lines.
+     * previews and removals carry; the card omits those lines. Body and
+     * chest types default from the sex.
      */
     public CharacterAppearance(UUID playerId, String accountName,
                                String characterName,
@@ -79,6 +112,32 @@ public final class CharacterAppearance {
                                boolean showMinecraftCape, int cosmeticCapeId,
                                String startingFactionId, int roleplayLevel,
                                int age, String description) {
+        this(playerId, accountName, characterName, raceId, genderId, skinId,
+                showMinecraftCape, cosmeticCapeId, startingFactionId,
+                roleplayLevel, age, description,
+                CharacterBodyTypeRegistry.defaultFor(genderId));
+    }
+
+    /** Chest type defaults from the sex. */
+    public CharacterAppearance(UUID playerId, String accountName,
+                               String characterName,
+                               String raceId, String genderId, String skinId,
+                               boolean showMinecraftCape, int cosmeticCapeId,
+                               String startingFactionId, int roleplayLevel,
+                               int age, String description, String bodyTypeId) {
+        this(playerId, accountName, characterName, raceId, genderId, skinId,
+                showMinecraftCape, cosmeticCapeId, startingFactionId,
+                roleplayLevel, age, description, bodyTypeId,
+                CharacterChestTypeRegistry.defaultFor(genderId));
+    }
+
+    public CharacterAppearance(UUID playerId, String accountName,
+                               String characterName,
+                               String raceId, String genderId, String skinId,
+                               boolean showMinecraftCape, int cosmeticCapeId,
+                               String startingFactionId, int roleplayLevel,
+                               int age, String description, String bodyTypeId,
+                               String chestTypeId) {
         if (playerId == null) {
             throw new IllegalArgumentException("playerId must not be null");
         }
@@ -88,6 +147,12 @@ public final class CharacterAppearance {
         this.raceId = CharacterRaceRegistry.canonicalizeIdentifier(raceId);
         this.genderId = CharacterGenderRegistry.normalizeIdentifier(genderId);
         this.skinId = CharacterSkinRegistry.normalizeIdentifier(skinId);
+        this.bodyTypeId = CharacterBodyTypeRegistry.contains(bodyTypeId)
+                ? CharacterBodyTypeRegistry.normalizeIdentifier(bodyTypeId)
+                : CharacterBodyTypeRegistry.defaultFor(this.genderId);
+        this.chestTypeId = CharacterChestTypeRegistry.contains(chestTypeId)
+                ? CharacterChestTypeRegistry.normalizeIdentifier(chestTypeId)
+                : CharacterChestTypeRegistry.defaultFor(this.genderId);
         this.showMinecraftCape = showMinecraftCape;
         this.cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(cosmeticCapeId);
         this.startingFactionId = startingFactionId == null
@@ -118,7 +183,9 @@ public final class CharacterAppearance {
                         active.getStartingFactionId(),
                         active.getRoleplayLevel(),
                         active.getAge(),
-                        active.getDescription());
+                        active.getDescription(),
+                        active.getBodyTypeId(),
+                        active.getChestTypeId());
     }
 
     public static CharacterAppearance removed(UUID playerId) {
@@ -154,6 +221,16 @@ public final class CharacterAppearance {
 
     public String getSkinId() {
         return this.skinId;
+    }
+
+    /** Arm width of the body; only bodies that offer a choice read it. */
+    public String getBodyTypeId() {
+        return this.bodyTypeId;
+    }
+
+    /** Chest shape and size; only bodies with a chest variant read it. */
+    public String getChestTypeId() {
+        return this.chestTypeId;
     }
 
     public boolean isMinecraftCapeVisible() {

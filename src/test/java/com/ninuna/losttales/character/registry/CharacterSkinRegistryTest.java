@@ -52,7 +52,7 @@ public final class CharacterSkinRegistryTest {
     @Test
     public void lotrSkinsStayInsideTheLotrNamespace() {
         for (CharacterSkinDefinition definition : CharacterSkinRegistry.getAll()) {
-            if (definition.isBundled()) {
+            if (definition.isBundled() || definition.isAccountSkin()) {
                 continue;
             }
             assertTrue(definition.getId() + " must point into LOTR Legacy",
@@ -83,6 +83,74 @@ public final class CharacterSkinRegistryTest {
                 CharacterRaceRegistry.DWARF, CharacterGenderRegistry.FEMALE));
         assertFalse(CharacterSkinRegistry.isCompatible(EXILED_DWARF,
                 CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE));
+    }
+
+    @Test
+    public void everySkinNamesItsRaceModelAndTheLotrLayout() {
+        for (CharacterSkinDefinition definition : CharacterSkinRegistry.getAll()) {
+            assertNotNull(definition.getId() + " model must be registered",
+                    CharacterBodyModelRegistry.get(definition.getModelId()));
+            assertTrue(definition.getId() + " model must suit its race",
+                    CharacterBodyModelRegistry.isCompatible(
+                            definition.getRaceId(), definition.getModelId()));
+            if (definition.isAccountSkin()) {
+                assertEquals(CharacterSkinLayout.MINECRAFT_64X64, definition.getLayout());
+                continue;
+            }
+            String expectedModel = CharacterBodyModelRegistry.getDefaultModelId(
+                    definition.getRaceId());
+            assertEquals(definition.getId() + " model", expectedModel,
+                    definition.getModelId());
+            assertEquals(definition.getId() + " layout",
+                    CharacterBodyModelRegistry.get(expectedModel).getLayout(),
+                    definition.getLayout());
+        }
+    }
+
+    @Test
+    public void everyRaceButTheHalfTrollOffersTheAccountSkinFirst() {
+        for (CharacterRaceDefinition race : CharacterRaceRegistry.getAll()) {
+            CharacterSkinDefinition first = CharacterSkinRegistry.getCompatibleSkins(
+                    race.getId(), race.getDefaultGenderId()).get(0);
+            boolean halfTroll = CharacterRaceRegistry.HALF_TROLL.equals(race.getId());
+            assertEquals(race.getId(), !halfTroll, first.isAccountSkin());
+            if (!halfTroll) {
+                assertEquals(race.getId(), CharacterSkinLayout.MINECRAFT_64X64,
+                        first.getLayout());
+                assertTrue(race.getId(), CharacterBodyModelRegistry.isCompatible(
+                        race.getId(), first.getModelId()));
+            }
+        }
+        assertEquals("losttales:account_skin_elf",
+                CharacterSkinRegistry.getCompatibleSkins(
+                        CharacterRaceRegistry.ELF, CharacterGenderRegistry.FEMALE)
+                        .get(0).getId());
+    }
+
+    @Test
+    public void accountSkinIsAHumanOptionButNeverTheFallback() {
+        CharacterSkinDefinition account = CharacterSkinRegistry.get(
+                CharacterSkinRegistry.ACCOUNT_SKIN_ID);
+        assertNotNull(account);
+        assertTrue(account.isAccountSkin());
+        assertFalse(account.isBundled());
+        assertEquals(CharacterRaceRegistry.HUMAN, account.getRaceId());
+        assertTrue(CharacterSkinRegistry.isCompatible(CharacterSkinRegistry.ACCOUNT_SKIN_ID,
+                CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.FEMALE));
+        assertTrue(CharacterSkinRegistry.isCompatible(CharacterSkinRegistry.ACCOUNT_SKIN_ID,
+                CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE));
+        assertFalse(CharacterSkinRegistry.isCompatible(CharacterSkinRegistry.ACCOUNT_SKIN_ID,
+                CharacterRaceRegistry.ELF, CharacterGenderRegistry.MALE));
+        assertEquals(CharacterSkinRegistry.ACCOUNT_SKIN_ID,
+                CharacterSkinRegistry.getCompatibleSkins(
+                        CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE)
+                        .get(0).getId());
+        for (int seed = 0; seed < 64; seed++) {
+            String fallback = CharacterSkinRegistry.getDefaultSkinId(
+                    CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE,
+                    new java.util.UUID(seed, seed * 31L));
+            assertFalse(fallback, CharacterSkinRegistry.isAccountSkin(fallback));
+        }
     }
 
     @Test

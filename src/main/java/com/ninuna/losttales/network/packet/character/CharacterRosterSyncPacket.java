@@ -73,6 +73,10 @@ public final class CharacterRosterSyncPacket implements IMessage {
                 long experiencePoints = buffer.readLong();
                 long creationTimestamp = buffer.readLong();
                 int characterDataVersion = buffer.readInt();
+                String bodyTypeId = CharacterPacketCodec.readString(
+                        buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                String chestTypeId = CharacterPacketCodec.readString(
+                        buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
 
                 if (!CharacterRoster.isValidSlotIndex(slotIndex)
                         || !ids.add(characterId)
@@ -99,7 +103,9 @@ public final class CharacterRosterSyncPacket implements IMessage {
                         experiencePoints,
                         creationTimestamp,
                         characterDataVersion,
-                        description
+                        description,
+                        bodyTypeId,
+                        chestTypeId
                 ));
             }
             CharacterPacketCodec.requireFinished(buffer);
@@ -152,6 +158,14 @@ public final class CharacterRosterSyncPacket implements IMessage {
             buffer.writeLong(character.getExperiencePoints());
             buffer.writeLong(character.getCreationTimestamp());
             buffer.writeInt(character.getDataVersion());
+            // Appended after the original layout: the arm width chosen for
+            // the character.
+            CharacterPacketCodec.writeString(
+                    buffer, character.getBodyTypeId(),
+                    CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            CharacterPacketCodec.writeString(
+                    buffer, character.getChestTypeId(),
+                    CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         }
     }
 

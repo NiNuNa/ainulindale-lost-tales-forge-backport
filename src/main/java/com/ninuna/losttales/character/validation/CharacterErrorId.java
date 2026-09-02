@@ -22,6 +22,8 @@ public enum CharacterErrorId {
     INVALID_RACE("invalid_race"),
     INVALID_GENDER("invalid_gender"),
     INVALID_SKIN("invalid_skin"),
+    INVALID_BODY_TYPE("invalid_body_type"),
+    INVALID_CHEST_TYPE("invalid_chest_type"),
     INVALID_DESCRIPTION("invalid_description"),
     INVALID_CAPE("invalid_cape"),
     CAPE_NOT_ELIGIBLE("cape_not_eligible"),

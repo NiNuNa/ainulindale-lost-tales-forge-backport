@@ -187,6 +187,16 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
                 ClientCharacterDisplayNames.gender(character.getGenderId()), x, lineY, width);
         lineY = drawLabelValue(I18n.format("gui.losttales.character.skin"),
                 ClientCharacterDisplayNames.skin(character.getSkinId()), x, lineY, width);
+        if (ClientCharacterDisplayNames.hasBodyTypeChoice(character.getSkinId())) {
+            lineY = drawLabelValue(I18n.format("gui.losttales.character.body"),
+                    ClientCharacterDisplayNames.bodyType(character.getBodyTypeId()),
+                    x, lineY, width);
+        }
+        if (ClientCharacterDisplayNames.hasChestChoice(character.getSkinId())) {
+            lineY = drawLabelValue(I18n.format("gui.losttales.character.chest"),
+                    ClientCharacterDisplayNames.chestType(character.getChestTypeId()),
+                    x, lineY, width);
+        }
         if (character.getDescription().length() > 0) {
             this.fontRendererObj.drawStringWithShadow(
                     I18n.format("gui.losttales.character.description") + ":",

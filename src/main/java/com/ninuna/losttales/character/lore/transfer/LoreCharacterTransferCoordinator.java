@@ -575,7 +575,8 @@ public final class LoreCharacterTransferCoordinator {
                 RoleplayCharacter.CURRENT_DATA_VERSION,
                 source.isMinecraftCapeVisible(), source.getCosmeticCapeId(),
                 source.getStartingWaypointId(),
-                source.hasUnconventionalSettings(), source.getDescription());
+                source.hasUnconventionalSettings(), source.getDescription(),
+                source.getBodyTypeId(), source.getChestTypeId());
     }
 
     private static UUID uniqueId(Stores stores) {

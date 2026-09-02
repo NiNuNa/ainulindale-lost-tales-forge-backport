@@ -2,6 +2,8 @@ package com.ninuna.losttales.character.sync;
 
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 
 import java.util.UUID;
 
@@ -14,6 +16,8 @@ public final class CharacterSummary {
     private final String raceId;
     private final String genderId;
     private final String skinId;
+    private final String bodyTypeId;
+    private final String chestTypeId;
     private final String description;
     private final boolean showMinecraftCape;
     private final int cosmeticCapeId;
@@ -49,12 +53,41 @@ public final class CharacterSummary {
                 dataVersion, "");
     }
 
+    /** Body and chest types default from the sex. */
     public CharacterSummary(UUID characterId, int slotIndex, String name,
                             String raceId, String genderId, String skinId,
                             boolean showMinecraftCape, int cosmeticCapeId,
                             int age, String startingFactionId, int roleplayLevel,
                             long experiencePoints, long creationTimestamp,
                             int dataVersion, String description) {
+        this(characterId, slotIndex, name, raceId, genderId, skinId,
+                showMinecraftCape, cosmeticCapeId, age, startingFactionId,
+                roleplayLevel, experiencePoints, creationTimestamp,
+                dataVersion, description,
+                CharacterBodyTypeRegistry.defaultFor(genderId));
+    }
+
+    /** Chest type defaults from the sex. */
+    public CharacterSummary(UUID characterId, int slotIndex, String name,
+                            String raceId, String genderId, String skinId,
+                            boolean showMinecraftCape, int cosmeticCapeId,
+                            int age, String startingFactionId, int roleplayLevel,
+                            long experiencePoints, long creationTimestamp,
+                            int dataVersion, String description, String bodyTypeId) {
+        this(characterId, slotIndex, name, raceId, genderId, skinId,
+                showMinecraftCape, cosmeticCapeId, age, startingFactionId,
+                roleplayLevel, experiencePoints, creationTimestamp,
+                dataVersion, description, bodyTypeId,
+                CharacterChestTypeRegistry.defaultFor(genderId));
+    }
+
+    public CharacterSummary(UUID characterId, int slotIndex, String name,
+                            String raceId, String genderId, String skinId,
+                            boolean showMinecraftCape, int cosmeticCapeId,
+                            int age, String startingFactionId, int roleplayLevel,
+                            long experiencePoints, long creationTimestamp,
+                            int dataVersion, String description, String bodyTypeId,
+                            String chestTypeId) {
         if (characterId == null) {
             throw new IllegalArgumentException("characterId must not be null");
         }
@@ -64,6 +97,12 @@ public final class CharacterSummary {
         this.raceId = raceId == null ? "" : raceId;
         this.genderId = genderId == null ? "" : genderId;
         this.skinId = skinId == null ? "" : skinId;
+        this.bodyTypeId = CharacterBodyTypeRegistry.contains(bodyTypeId)
+                ? CharacterBodyTypeRegistry.normalizeIdentifier(bodyTypeId)
+                : CharacterBodyTypeRegistry.defaultFor(genderId);
+        this.chestTypeId = CharacterChestTypeRegistry.contains(chestTypeId)
+                ? CharacterChestTypeRegistry.normalizeIdentifier(chestTypeId)
+                : CharacterChestTypeRegistry.defaultFor(genderId);
         this.description = description == null ? "" : description;
         this.showMinecraftCape = showMinecraftCape;
         this.cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(cosmeticCapeId);
@@ -94,7 +133,9 @@ public final class CharacterSummary {
                 character.getProgression().getExperiencePoints(),
                 character.getCreationTimestamp(),
                 character.getDataVersion(),
-                character.getDescription()
+                character.getDescription(),
+                character.getBodyTypeId(),
+                character.getChestTypeId()
         );
     }
 
@@ -120,6 +161,14 @@ public final class CharacterSummary {
 
     public String getSkinId() {
         return this.skinId;
+    }
+
+    public String getBodyTypeId() {
+        return this.bodyTypeId;
+    }
+
+    public String getChestTypeId() {
+        return this.chestTypeId;
     }
 
     public String getDescription() {

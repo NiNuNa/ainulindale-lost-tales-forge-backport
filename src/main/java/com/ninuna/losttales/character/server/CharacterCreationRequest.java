@@ -14,6 +14,8 @@ public final class CharacterCreationRequest {
     private final String raceId;
     private final String genderId;
     private final String skinId;
+    private final String bodyTypeId;
+    private final String chestTypeId;
     private final String description;
     private final int age;
     private final String startingFactionId;
@@ -40,6 +42,7 @@ public final class CharacterCreationRequest {
                 unconventionalSettings, "");
     }
 
+    /** Empty body and chest types let validation pick the defaults for the sex. */
     public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
                                     String name, String raceId, String genderId,
                                     String skinId, int age,
@@ -47,12 +50,40 @@ public final class CharacterCreationRequest {
                                     String startingWaypointId,
                                     boolean unconventionalSettings,
                                     String description) {
+        this(expectedRosterRevision, slotIndex, name, raceId, genderId,
+                skinId, age, startingFactionId, startingWaypointId,
+                unconventionalSettings, description, "");
+    }
+
+    /** An empty chest type lets validation pick the default for the sex. */
+    public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
+                                    String name, String raceId, String genderId,
+                                    String skinId, int age,
+                                    String startingFactionId,
+                                    String startingWaypointId,
+                                    boolean unconventionalSettings,
+                                    String description, String bodyTypeId) {
+        this(expectedRosterRevision, slotIndex, name, raceId, genderId,
+                skinId, age, startingFactionId, startingWaypointId,
+                unconventionalSettings, description, bodyTypeId, "");
+    }
+
+    public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
+                                    String name, String raceId, String genderId,
+                                    String skinId, int age,
+                                    String startingFactionId,
+                                    String startingWaypointId,
+                                    boolean unconventionalSettings,
+                                    String description, String bodyTypeId,
+                                    String chestTypeId) {
         this.expectedRosterRevision = expectedRosterRevision;
         this.slotIndex = slotIndex;
         this.name = name;
         this.raceId = raceId;
         this.genderId = genderId;
         this.skinId = skinId;
+        this.bodyTypeId = bodyTypeId == null ? "" : bodyTypeId;
+        this.chestTypeId = chestTypeId == null ? "" : chestTypeId;
         this.description = description;
         this.age = age;
         this.startingFactionId = startingFactionId;
@@ -82,6 +113,16 @@ public final class CharacterCreationRequest {
 
     public String getSkinId() {
         return this.skinId;
+    }
+
+    /** Requested arm width; empty means the default for the sex. */
+    public String getBodyTypeId() {
+        return this.bodyTypeId;
+    }
+
+    /** Requested chest type; empty means the default for the sex. */
+    public String getChestTypeId() {
+        return this.chestTypeId;
     }
 
     public String getDescription() {

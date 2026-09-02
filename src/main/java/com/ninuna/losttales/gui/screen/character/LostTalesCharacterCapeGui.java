@@ -330,11 +330,13 @@ public final class LostTalesCharacterCapeGui extends GuiScreen {
         if (player == null || player.getUniqueID() == null || active == null) {
             return;
         }
-        CharacterAppearance preview = new CharacterAppearance(
+        CharacterAppearance preview = CharacterAppearance.preview(
                 player.getUniqueID(),
                 active.getRaceId(),
                 active.getGenderId(),
                 active.getSkinId(),
+                active.getBodyTypeId(),
+                active.getChestTypeId(),
                 this.showMinecraftCape,
                 selectedCapeId());
         ClientCharacterAppearanceCache.setPreview(preview);

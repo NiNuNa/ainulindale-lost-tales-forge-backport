@@ -11,6 +11,8 @@ import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterRaceAttributes;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
 import com.ninuna.losttales.gui.screen.LostTalesCharacterInfoGui;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
@@ -44,6 +46,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
     private static final int BUTTON_CREATE = 13;
     private static final int BUTTON_BACK = 14;
     private static final int BUTTON_CANCEL = 15;
+    private static final int BUTTON_BODY_PREVIOUS = 16;
+    private static final int BUTTON_BODY_NEXT = 17;
+    private static final int BUTTON_CHEST_PREVIOUS = 18;
+    private static final int BUTTON_CHEST_NEXT = 19;
 
     private static final int STEP_APPEARANCE = 0;
     private static final int STEP_IDENTITY = 1;
@@ -58,11 +64,15 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
     private List<String> raceIds = Collections.emptyList();
     private List<String> genderIds = Collections.emptyList();
     private List<String> skinIds = Collections.emptyList();
+    private List<String> bodyTypeIds = Collections.emptyList();
+    private List<String> chestTypeIds = Collections.emptyList();
     private List<String> factionIds = Collections.emptyList();
     private List<String> waypointIds = Collections.emptyList();
     private int raceIndex;
     private int genderIndex;
     private int skinIndex;
+    private int bodyTypeIndex = -1;
+    private int chestTypeIndex = -1;
     private int factionIndex;
     private int waypointIndex;
     private int step = STEP_APPEARANCE;
@@ -119,6 +129,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
                     fieldX, top + 30, fieldWidth);
             addCyclerButtons(BUTTON_SKIN_PREVIOUS, BUTTON_SKIN_NEXT,
                     fieldX, top + 60, fieldWidth);
+            addCyclerButtons(BUTTON_BODY_PREVIOUS, BUTTON_BODY_NEXT,
+                    fieldX, top + 90, fieldWidth);
+            addCyclerButtons(BUTTON_CHEST_PREVIOUS, BUTTON_CHEST_NEXT,
+                    fieldX, top + 120, fieldWidth);
             this.continueButton = new GuiButton(
                     BUTTON_CONTINUE, this.width / 2 - 104, bottom, 100, 20,
                     I18n.format("gui.losttales.character.continue"));
@@ -227,6 +241,16 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
                     && this.genderIds.size() < 2) {
                 button.enabled = false;
             }
+            if ((button.id == BUTTON_BODY_PREVIOUS
+                    || button.id == BUTTON_BODY_NEXT)
+                    && (this.bodyTypeIds.size() < 2 || !hasBodyTypeChoice())) {
+                button.enabled = false;
+            }
+            if ((button.id == BUTTON_CHEST_PREVIOUS
+                    || button.id == BUTTON_CHEST_NEXT)
+                    && (this.chestTypeIds.size() < 2 || !hasChestChoice())) {
+                button.enabled = false;
+            }
             if ((button.id == BUTTON_FACTION_PREVIOUS
                     || button.id == BUTTON_FACTION_NEXT)
                     && this.factionIds.size() < 2) {
@@ -278,6 +302,22 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
                 return;
             case BUTTON_SKIN_NEXT:
                 this.skinIndex = cycleIndex(this.skinIndex, 1, this.skinIds.size());
+                return;
+            case BUTTON_BODY_PREVIOUS:
+                this.bodyTypeIndex = cycleIndex(
+                        this.bodyTypeIndex, -1, this.bodyTypeIds.size());
+                return;
+            case BUTTON_BODY_NEXT:
+                this.bodyTypeIndex = cycleIndex(
+                        this.bodyTypeIndex, 1, this.bodyTypeIds.size());
+                return;
+            case BUTTON_CHEST_PREVIOUS:
+                this.chestTypeIndex = cycleIndex(
+                        this.chestTypeIndex, -1, this.chestTypeIds.size());
+                return;
+            case BUTTON_CHEST_NEXT:
+                this.chestTypeIndex = cycleIndex(
+                        this.chestTypeIndex, 1, this.chestTypeIds.size());
                 return;
             case BUTTON_FACTION_PREVIOUS:
                 this.factionIndex = cycleIndex(this.factionIndex, -1, this.factionIds.size());
@@ -337,11 +377,48 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
     private void cycleGender(int direction) {
         this.genderIndex = cycleIndex(this.genderIndex, direction, this.genderIds.size());
         rebuildSkins();
+        // Sex only picks the defaults; the player can still cycle away from them.
+        rebuildBodyTypes(true);
+        rebuildChestTypes(true);
     }
 
     private void rebuildAppearanceOptions() {
         rebuildSkins();
+        rebuildBodyTypes(false);
+        rebuildChestTypes(false);
         rebuildFactions();
+    }
+
+    private void rebuildChestTypes(boolean resetToDefault) {
+        this.chestTypeIds = ClientCharacterDisplayNames.getChestTypeIds();
+        if (resetToDefault || this.chestTypeIndex < 0) {
+            String genderId = selected(this.genderIds, this.genderIndex);
+            int defaultIndex = this.chestTypeIds.indexOf(
+                    CharacterChestTypeRegistry.defaultFor(genderId));
+            this.chestTypeIndex = Math.max(0, defaultIndex);
+        }
+        this.chestTypeIndex = clampIndex(this.chestTypeIndex, this.chestTypeIds.size());
+    }
+
+    private boolean hasChestChoice() {
+        return ClientCharacterDisplayNames.hasChestChoice(
+                selected(this.skinIds, this.skinIndex));
+    }
+
+    private void rebuildBodyTypes(boolean resetToDefault) {
+        this.bodyTypeIds = ClientCharacterDisplayNames.getBodyTypeIds();
+        if (resetToDefault || this.bodyTypeIndex < 0) {
+            String genderId = selected(this.genderIds, this.genderIndex);
+            int defaultIndex = this.bodyTypeIds.indexOf(
+                    CharacterBodyTypeRegistry.defaultFor(genderId));
+            this.bodyTypeIndex = Math.max(0, defaultIndex);
+        }
+        this.bodyTypeIndex = clampIndex(this.bodyTypeIndex, this.bodyTypeIds.size());
+    }
+
+    private boolean hasBodyTypeChoice() {
+        return ClientCharacterDisplayNames.hasBodyTypeChoice(
+                selected(this.skinIds, this.skinIndex));
     }
 
     private void rebuildSkins() {
@@ -427,7 +504,9 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
                 raceId, genderId, skinId, age, factionId,
                 waypointId, this.unconventionalSettings,
                 CharacterValidator.normalizeDescription(
-                        this.descriptionField.getText()));
+                        this.descriptionField.getText()),
+                selected(this.bodyTypeIds, this.bodyTypeIndex),
+                selected(this.chestTypeIds, this.chestTypeIndex));
         this.statusMessage = I18n.format("gui.losttales.character.creating");
         this.statusError = false;
         this.pendingRequestId = ClientCharacterNetwork.createCharacter(request);
@@ -465,6 +544,20 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
                     labelX, rowY + 36);
             drawLabel(I18n.format("gui.losttales.character.skin"),
                     labelX, rowY + 66);
+            drawLabel(I18n.format("gui.losttales.character.body"),
+                    labelX, rowY + 96);
+            drawCenteredValue(hasBodyTypeChoice()
+                            ? ClientCharacterDisplayNames.bodyType(
+                                    selected(this.bodyTypeIds, this.bodyTypeIndex))
+                            : I18n.format("gui.losttales.character.body.fixed"),
+                    valueX + 22, rowY + 90, valueWidth - 44);
+            drawLabel(I18n.format("gui.losttales.character.chest"),
+                    labelX, rowY + 126);
+            drawCenteredValue(hasChestChoice()
+                            ? ClientCharacterDisplayNames.chestType(
+                                    selected(this.chestTypeIds, this.chestTypeIndex))
+                            : I18n.format("gui.losttales.character.chest.fixed"),
+                    valueX + 22, rowY + 120, valueWidth - 44);
             drawCenteredValue(ClientCharacterDisplayNames.race(
                             selected(this.raceIds, this.raceIndex)),
                     valueX + 22, rowY, valueWidth - 44);
@@ -478,7 +571,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
                     valueX + 22, rowY + 60, valueWidth - 44);
 
             if (panelHeight >= 314) {
-                drawRaceAttributes(left + 18, rowY + 112,
+                drawRaceAttributes(left + 18, rowY + 142,
                         panelWidth - previewWidth - 36);
             }
             if (previewWidth > 0) {
@@ -628,7 +721,9 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
         }
 
         CharacterAppearance preview = new CharacterAppearance(
-                player.getUniqueID(), raceId, genderId, skinId);
+                player.getUniqueID(), raceId, genderId, skinId,
+                selected(this.bodyTypeIds, this.bodyTypeIndex),
+                selected(this.chestTypeIds, this.chestTypeIndex));
         ClientCharacterAppearanceCache.setPreview(preview);
         boolean previousDebugBoundingBox = RenderManager.debugBoundingBox;
         try {

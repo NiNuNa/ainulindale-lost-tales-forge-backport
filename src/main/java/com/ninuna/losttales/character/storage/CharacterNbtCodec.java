@@ -5,6 +5,8 @@ import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterProgression;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
@@ -56,6 +58,8 @@ public final class CharacterNbtCodec {
     private static final String TAG_RACE_ID = "RaceId";
     private static final String TAG_GENDER_ID = "GenderId";
     private static final String TAG_SKIN_ID = "SkinId";
+    private static final String TAG_BODY_TYPE_ID = "BodyTypeId";
+    private static final String TAG_CHEST_TYPE_ID = "ChestTypeId";
     private static final String TAG_DESCRIPTION = "Description";
     private static final String TAG_SHOW_MINECRAFT_CAPE = "ShowMinecraftCape";
     private static final String TAG_COSMETIC_CAPE_ID = "CosmeticCapeId";
@@ -290,6 +294,8 @@ public final class CharacterNbtCodec {
         tag.setString(TAG_RACE_ID, character.getRaceId());
         tag.setString(TAG_GENDER_ID, character.getGenderId());
         tag.setString(TAG_SKIN_ID, character.getSkinId());
+        tag.setString(TAG_BODY_TYPE_ID, character.getBodyTypeId());
+        tag.setString(TAG_CHEST_TYPE_ID, character.getChestTypeId());
         tag.setString(TAG_DESCRIPTION, character.getDescription());
         tag.setBoolean(TAG_SHOW_MINECRAFT_CAPE, character.isMinecraftCapeVisible());
         tag.setInteger(TAG_COSMETIC_CAPE_ID, character.getCosmeticCapeId());
@@ -536,6 +542,40 @@ public final class CharacterNbtCodec {
                     characterId, rosterOwnerId);
         }
 
+        // Records written before version 7 carry no body type; the sex picks
+        // it, which is what the creator would have pre-selected.
+        boolean hasBodyType = tag.hasKey(TAG_BODY_TYPE_ID, Constants.NBT.TAG_STRING);
+        String storedBodyTypeId = hasBodyType
+                ? CharacterBodyTypeRegistry.normalizeIdentifier(tag.getString(TAG_BODY_TYPE_ID))
+                : "";
+        String bodyTypeId = CharacterBodyTypeRegistry.contains(storedBodyTypeId)
+                ? storedBodyTypeId
+                : CharacterBodyTypeRegistry.defaultFor(genderId);
+        if (!bodyTypeId.equals(storedBodyTypeId)) {
+            repaired = true;
+            if (hasBodyType) {
+                warn("Repairing unknown body type %s to %s for character %s owned by %s",
+                        storedBodyTypeId, bodyTypeId, characterId, rosterOwnerId);
+            }
+        }
+
+        // Records written before version 8 carry no chest type; the sex
+        // picks it, as the creator would have.
+        boolean hasChestType = tag.hasKey(TAG_CHEST_TYPE_ID, Constants.NBT.TAG_STRING);
+        String storedChestTypeId = hasChestType
+                ? CharacterChestTypeRegistry.normalizeIdentifier(tag.getString(TAG_CHEST_TYPE_ID))
+                : "";
+        String chestTypeId = CharacterChestTypeRegistry.contains(storedChestTypeId)
+                ? storedChestTypeId
+                : CharacterChestTypeRegistry.defaultFor(genderId);
+        if (!chestTypeId.equals(storedChestTypeId)) {
+            repaired = true;
+            if (hasChestType) {
+                warn("Repairing unknown chest type %s to %s for character %s owned by %s",
+                        storedChestTypeId, chestTypeId, characterId, rosterOwnerId);
+            }
+        }
+
         boolean hasDescription = tag.hasKey(
                 TAG_DESCRIPTION, Constants.NBT.TAG_STRING);
         String storedDescription = hasDescription
@@ -659,7 +699,9 @@ public final class CharacterNbtCodec {
                 cosmeticCapeId,
                 startingWaypointId,
                 unconventionalSettings,
-                description
+                description,
+                bodyTypeId,
+                chestTypeId
         );
         return CharacterReadResult.success(character, repaired, quarantinedEntries);
     }

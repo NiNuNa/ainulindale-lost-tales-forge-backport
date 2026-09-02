@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.render.player;
 
 import com.ninuna.losttales.character.registry.CharacterSkinDefinition;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
+import com.ninuna.losttales.client.skin.LostTalesAccountSkins;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.mojang.authlib.GameProfile;
@@ -319,7 +320,8 @@ public final class LostTalesCharacterHeadIconRenderer {
     private static ResolvedHead resolveConfiguredHead(String skinId) {
         CharacterSkinDefinition configured =
                 CharacterSkinRegistry.get(skinId);
-        if (configured == null) {
+        if (configured == null || configured.isAccountSkin()) {
+            // An account skin is the player's own head.
             return null;
         }
         return new ResolvedHead(
@@ -344,13 +346,17 @@ public final class LostTalesCharacterHeadIconRenderer {
                 if (value instanceof AbstractClientPlayer) {
                     AbstractClientPlayer player = (AbstractClientPlayer) value;
                     if (ownerId.equals(player.getUniqueID())) {
-                        ResourceLocation skin = player.getLocationSkin();
+                        // The 64x64 copy the body renderer draws with, so
+                        // the portrait and the player never disagree.
+                        ResourceLocation skin =
+                                LostTalesAccountSkins.resolve(player).getTexture();
                         if (skin != null) {
                             ACCOUNT_SKINS.put(ownerId, skin);
                         }
                         return new ResolvedHead(
                                 skin == null ? DEFAULT_PLAYER_SKIN : skin,
-                                CharacterHeadIconLayout.minecraftSkin());
+                                CharacterHeadIconLayout.forAccountTexture(
+                                        skin == null ? null : skin.getResourceDomain()));
                     }
                 } else if (value instanceof EntityPlayer
                         && ownerId.equals(
@@ -363,7 +369,8 @@ public final class LostTalesCharacterHeadIconRenderer {
                 ? null : ACCOUNT_SKINS.get(ownerId);
         return new ResolvedHead(
                 cached == null ? DEFAULT_PLAYER_SKIN : cached,
-                CharacterHeadIconLayout.minecraftSkin());
+                CharacterHeadIconLayout.forAccountTexture(
+                        cached == null ? null : cached.getResourceDomain()));
     }
 
     /**

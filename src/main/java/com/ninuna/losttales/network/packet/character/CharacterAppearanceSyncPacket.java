@@ -77,6 +77,10 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                 int age = buffer.readInt();
                 String description = CharacterPacketCodec.readString(
                         buffer, CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
+                String bodyTypeId = CharacterPacketCodec.readString(
+                        buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                String chestTypeId = CharacterPacketCodec.readString(
+                        buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 if (!playerIds.add(playerId)) {
                     throw new CharacterPacketCodec.DecodeException(
                             "duplicate appearance player UUID");
@@ -93,7 +97,8 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                 decoded.add(new CharacterAppearance(
                         playerId, accountName, characterName, raceId,
                         genderId, skinId, showMinecraftCape, cosmeticCapeId,
-                        startingFactionId, roleplayLevel, age, description));
+                        startingFactionId, roleplayLevel, age, description,
+                        bodyTypeId, chestTypeId));
             }
             CharacterPacketCodec.requireFinished(buffer);
             this.appearances = Collections.unmodifiableList(decoded);
@@ -141,6 +146,15 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
             CharacterPacketCodec.writeString(
                     buffer, appearance.getDescription(),
                     CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
+            // Appended again: the arm width, which other clients need to
+            // pick the body the character is drawn with.
+            CharacterPacketCodec.writeString(
+                    buffer, appearance.getBodyTypeId(),
+                    CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            // Appended again: the chest type.
+            CharacterPacketCodec.writeString(
+                    buffer, appearance.getChestTypeId(),
+                    CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         }
     }
 

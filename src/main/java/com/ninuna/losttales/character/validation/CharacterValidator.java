@@ -2,6 +2,8 @@ package com.ninuna.losttales.character.validation;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
 import com.ninuna.losttales.character.registry.CharacterFactionResolver;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
@@ -122,6 +124,27 @@ public final class CharacterValidator {
             return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_SKIN);
         }
 
+        // Body type is a choice of its own; an empty request takes the
+        // default for the sex, anything unknown is refused.
+        String bodyTypeId = CharacterBodyTypeRegistry.normalizeIdentifier(
+                request.getBodyTypeId());
+        if (bodyTypeId.length() == 0) {
+            bodyTypeId = CharacterBodyTypeRegistry.defaultFor(genderId);
+        } else if (!isValidIdentifierLength(bodyTypeId)
+                || !CharacterBodyTypeRegistry.contains(bodyTypeId)) {
+            return CharacterCreationValidationResult.failure(
+                    CharacterErrorId.INVALID_BODY_TYPE);
+        }
+        String chestTypeId = CharacterChestTypeRegistry.normalizeIdentifier(
+                request.getChestTypeId());
+        if (chestTypeId.length() == 0) {
+            chestTypeId = CharacterChestTypeRegistry.defaultFor(genderId);
+        } else if (!isValidIdentifierLength(chestTypeId)
+                || !CharacterChestTypeRegistry.contains(chestTypeId)) {
+            return CharacterCreationValidationResult.failure(
+                    CharacterErrorId.INVALID_CHEST_TYPE);
+        }
+
         String description = normalizeDescription(request.getDescription());
         if (!isValidDescription(description)) {
             return CharacterCreationValidationResult.failure(
@@ -177,7 +200,9 @@ public final class CharacterValidator {
                 faction.getId(),
                 waypointId,
                 unconventional,
-                description
+                description,
+                bodyTypeId,
+                chestTypeId
         ));
     }
 

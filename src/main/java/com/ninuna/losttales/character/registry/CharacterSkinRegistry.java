@@ -25,6 +25,14 @@ public final class CharacterSkinRegistry {
     public static final String LOTR_TEXTURE_ROOT = "lotr:";
     /** Prefix of every texture location bundled with Lost Tales. */
     public static final String BUNDLED_TEXTURE_ROOT = "losttales:textures/skins/";
+    /**
+     * The player's own Minecraft account skin, drawn on the Lost Tales player
+     * body. Every client fetches the texture for itself; the placeholder
+     * location below is never loaded.
+     */
+    public static final String ACCOUNT_SKIN_ID = "losttales:account_skin";
+    public static final String ACCOUNT_SKIN_GROUP = "account";
+    private static final String ACCOUNT_TEXTURE_PLACEHOLDER = "losttales:account_skin";
 
     private static final Map<String, CharacterSkinDefinition> DEFINITIONS;
     private static final Map<String, List<CharacterSkinDefinition>> BY_RACE;
@@ -33,7 +41,17 @@ public final class CharacterSkinRegistry {
         LinkedHashMap<String, CharacterSkinDefinition> definitions =
                 new LinkedHashMap<String, CharacterSkinDefinition>();
 
-        // Adult human body skins. These all use LOTRModelHuman.
+        // The account skin comes first in every race's list so a new
+        // character lands on it. The half-troll has none: its body has no
+        // sensible mapping onto a Minecraft skin.
+        registerAccountSkin(definitions, CharacterRaceRegistry.HUMAN);
+        registerAccountSkin(definitions, CharacterRaceRegistry.ELF);
+        registerAccountSkin(definitions, CharacterRaceRegistry.DWARF);
+        registerAccountSkin(definitions, CharacterRaceRegistry.HOBBIT);
+        registerAccountSkin(definitions, CharacterRaceRegistry.ORC);
+        registerAccountSkin(definitions, CharacterRaceRegistry.URUK);
+
+        // Adult human body skins, painted for LOTR's human body.
         registerGenderedGroup(definitions, CharacterRaceRegistry.HUMAN,
                 "human_bree", "mob/bree/bree", 30, 9);
         registerGenderedGroup(definitions, CharacterRaceRegistry.HUMAN,
@@ -150,16 +168,28 @@ public final class CharacterSkinRegistry {
 
     /**
      * Returns a deterministic fallback so an old character does not receive a
-     * different appearance each time its record is loaded.
+     * different appearance each time its record is loaded. The account skin
+     * is never chosen for a record that did not ask for it.
      */
     public static String getDefaultSkinId(String raceId, String genderId, UUID seed) {
-        List<CharacterSkinDefinition> skins = getCompatibleSkins(raceId, genderId);
+        ArrayList<CharacterSkinDefinition> skins = new ArrayList<CharacterSkinDefinition>();
+        for (CharacterSkinDefinition definition : getCompatibleSkins(raceId, genderId)) {
+            if (!definition.isAccountSkin()) {
+                skins.add(definition);
+            }
+        }
         if (skins.isEmpty()) {
             return "";
         }
         int hash = seed == null ? 0 : seed.hashCode();
         int index = (hash & Integer.MAX_VALUE) % skins.size();
         return skins.get(index).getId();
+    }
+
+    /** True when the identifier names the player's own account skin. */
+    public static boolean isAccountSkin(String skinId) {
+        CharacterSkinDefinition definition = get(skinId);
+        return definition != null && definition.isAccountSkin();
     }
 
     public static String normalizeIdentifier(String id) {
@@ -197,12 +227,41 @@ public final class CharacterSkinRegistry {
                 BUNDLED_TEXTURE_ROOT + resourceBase, count);
     }
 
+    /**
+     * Registers the account skin for a race: unisex, in Minecraft's layout,
+     * drawn by the race's own body (the plain player body for humans) with
+     * its race geometry sampled from the skin.
+     */
+    private static void registerAccountSkin(
+            Map<String, CharacterSkinDefinition> definitions, String raceId) {
+        boolean human = raceId.equals(CharacterRaceRegistry.HUMAN);
+        String id = human
+                ? ACCOUNT_SKIN_ID
+                : ACCOUNT_SKIN_ID + "_" + stripNamespace(raceId);
+        CharacterSkinDefinition definition = new CharacterSkinDefinition(
+                id, raceId, "", ACCOUNT_SKIN_GROUP, 0,
+                ACCOUNT_TEXTURE_PLACEHOLDER,
+                human ? CharacterBodyModelRegistry.LOSTTALES_PLAYER
+                        : CharacterBodyModelRegistry.getDefaultModelId(raceId),
+                CharacterSkinLayout.MINECRAFT_64X64, true);
+        if (definitions.put(definition.getId(), definition) != null) {
+            throw new IllegalStateException("duplicate character skin id " + id);
+        }
+    }
+
     private static void registerGroup(
             Map<String, CharacterSkinDefinition> definitions,
             String raceId, String genderId, String displayGroupId,
             String textureBase, int count) {
         String genderSuffix = genderId.length() == 0
                 ? "" : "_" + stripNamespace(genderId);
+        // Catalogue skins are painted for the race's default body, in the
+        // layout that body reads.
+        String modelId = CharacterBodyModelRegistry.getDefaultModelId(raceId);
+        CharacterBodyModelDefinition model = CharacterBodyModelRegistry.get(modelId);
+        if (model == null) {
+            throw new IllegalStateException("no body model for race " + raceId);
+        }
         for (int index = 0; index < count; index++) {
             String id = "losttales:" + displayGroupId + genderSuffix + "_" + index;
             CharacterSkinDefinition definition = new CharacterSkinDefinition(
@@ -211,7 +270,9 @@ public final class CharacterSkinRegistry {
                     genderId,
                     displayGroupId,
                     index,
-                    textureBase + "/" + index + ".png"
+                    textureBase + "/" + index + ".png",
+                    modelId,
+                    model.getLayout()
             );
             CharacterSkinDefinition previous = definitions.put(definition.getId(), definition);
             if (previous != null) {
