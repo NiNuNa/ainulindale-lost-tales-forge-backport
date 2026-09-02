@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.chat.ChatMarkdown;
@@ -944,13 +945,7 @@ public final class LostTalesChatPresentation {
      * bare title when the sender's faction is unknown.
      */
     static String epithet(String factionName, String title) {
-        String faction = factionName == null ? "" : factionName.trim();
-        String bare = title == null ? "" : title.trim();
-        if (faction.length() == 0) {
-            return bare;
-        }
-        return translate("chat.losttales.title.epithet", "%s %s",
-                faction, bare);
+        return ChatEpithet.epithet(factionName, title);
     }
 
     /**
@@ -959,15 +954,7 @@ public final class LostTalesChatPresentation {
      */
     private static String translate(String key, String fallback,
                                     Object... arguments) {
-        String format = StatCollector.translateToLocal(key);
-        if (format == null || format.length() == 0 || format.equals(key)) {
-            format = fallback;
-        }
-        try {
-            return String.format(format, arguments);
-        } catch (IllegalArgumentException ignored) {
-            return String.format(fallback, arguments);
-        }
+        return ChatEpithet.translate(key, fallback, arguments);
     }
 
     /**

@@ -88,6 +88,17 @@ public final class ChatAuditLog {
                 "");
     }
 
+    /**
+     * An operator taking another's message back: the operator is the
+     * account, the message's author stands where the identity does.
+     */
+    public static void logModerationDelete(long messageId, UUID operator,
+                                           String operatorName,
+                                           String authorName) {
+        append("delete_by_operator", messageId, operator, operatorName,
+                null, authorName, "", "", "");
+    }
+
     private static synchronized void append(String event, long messageId,
                                             UUID account, String accountName,
                                             UUID characterId,

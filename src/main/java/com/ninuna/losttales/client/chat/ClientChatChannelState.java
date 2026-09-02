@@ -18,6 +18,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import net.minecraft.util.EnumChatFormatting;
 
 /**
@@ -59,6 +60,9 @@ public final class ClientChatChannelState {
     private static boolean discordAccess;
     /** Server-stated roles of this player; what {@code @Operator} reaches. */
     private static int roleMask;
+    /** Server-stated muted senders; filled for operators only. */
+    private static final java.util.Set<UUID> MUTED_SENDERS =
+            new java.util.HashSet<UUID>();
     /**
      * Server-stated online role holders, account name to mask, in the
      * order the server listed them: what the role hover card names its
@@ -489,6 +493,28 @@ public final class ClientChatChannelState {
         return ChatAccountRole.fromMask(roleMask);
     }
 
+    /**
+     * Replaces the server's statement of who is muted; empty for anyone
+     * but an operator, whose menus offer to lift a mute in force and to
+     * lay one where there is none.
+     */
+    public static synchronized void setMutedSenders(
+            java.util.Collection<UUID> senders) {
+        MUTED_SENDERS.clear();
+        if (senders != null) {
+            for (UUID sender : senders) {
+                if (sender != null) {
+                    MUTED_SENDERS.add(sender);
+                }
+            }
+        }
+    }
+
+    /** Whether the server said this sender is under a mute. */
+    public static synchronized boolean isMutedSender(UUID sender) {
+        return sender != null && MUTED_SENDERS.contains(sender);
+    }
+
     /** Replaces the online role roster with the server's statement. */
     public static synchronized void setRoleHolders(
             Map<String, Integer> holders) {
@@ -605,6 +631,7 @@ public final class ClientChatChannelState {
         discordAccess = false;
         roleMask = 0;
         ROLE_HOLDERS.clear();
+        MUTED_SENDERS.clear();
         DRAFTS.clear();
     }
 

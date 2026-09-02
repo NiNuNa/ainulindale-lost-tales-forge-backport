@@ -667,7 +667,7 @@ final class LostTalesChatHoverCard {
     private static void drawHead(Minecraft minecraft, Target target,
                                  float x, float y) {
         if (target.accountIdentity
-                && LostTalesChatMessagePacket.DISCORD_SENDER_ID.equals(
+                && LostTalesChatMessagePacket.isDiscordSender(
                         target.playerId)) {
             // A Discord sender has no account head; the Discord mark
             // stands in, 1:1 — never scaled — centred in the head's box.

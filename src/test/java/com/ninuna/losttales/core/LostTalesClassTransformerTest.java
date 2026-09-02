@@ -48,6 +48,8 @@ public final class LostTalesClassTransformerTest {
                     + "LostTalesMenuFramerateHook";
     private static final String FAST_TRAVEL_ARRIVAL_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/LostTalesLotrFastTravelArrivalHook";
+    private static final String SERVER_BROADCAST_HOOK_OWNER =
+            "com/ninuna/losttales/chat/server/LostTalesServerBroadcastHook";
     private static final String DEBUG_HOOK_OWNER =
             "com/ninuna/losttales/character/physics/CharacterDebugHitboxHook";
     private static final String FAST_TRAVEL_HOOK_OWNER =
@@ -281,6 +283,39 @@ public final class LostTalesClassTransformerTest {
                             .operand == 100);
         }
         assertEquals(2, hooks);
+    }
+
+    @Test
+    public void serverBroadcastsReportEveryServerWideLine() throws Exception {
+        ClassNode manager = transform(
+                "net.minecraft.server.management.ServerConfigurationManager");
+        MethodNode method = findMethod(manager, "sendChatMsg");
+        assertEquals("(Lnet/minecraft/util/IChatComponent;)V", method.desc);
+        assertTrue(containsStaticHook(manager, "sendChatMsg",
+                SERVER_BROADCAST_HOOK_OWNER, "onBroadcast"));
+        // The hook is the very first thing the method does, fed the
+        // component argument, so it sees every line before it is sent.
+        AbstractInsnNode first = method.instructions.getFirst();
+        while (first != null && first.getOpcode() < 0) {
+            first = first.getNext();
+        }
+        assertTrue(first instanceof org.objectweb.asm.tree.VarInsnNode);
+        assertEquals(Opcodes.ALOAD, first.getOpcode());
+        assertEquals(1, ((org.objectweb.asm.tree.VarInsnNode)first).var);
+        AbstractInsnNode second = nextCode(first);
+        assertTrue(second instanceof MethodInsnNode);
+        assertEquals("onBroadcast", ((MethodInsnNode)second).name);
+        // Applying the transformer again changes nothing.
+        byte[] once = new LostTalesClassTransformer().transform(
+                "net.minecraft.server.management.ServerConfigurationManager",
+                "net.minecraft.server.management.ServerConfigurationManager",
+                readResource("net/minecraft/server/management/"
+                        + "ServerConfigurationManager.class"));
+        byte[] twice = new LostTalesClassTransformer().transform(
+                "net.minecraft.server.management.ServerConfigurationManager",
+                "net.minecraft.server.management.ServerConfigurationManager",
+                once);
+        assertTrue(java.util.Arrays.equals(once, twice));
     }
 
     @Test

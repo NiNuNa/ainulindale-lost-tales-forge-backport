@@ -26,14 +26,55 @@ import java.util.UUID;
  */
 public final class LostTalesChatMessagePacket implements IMessage {
     /**
-     * The sender id every line arriving from Discord carries: a fixed
-     * id derived from a name no account owns. The server signs inbound
-     * bridge lines with it, and clients recognise it to draw the
-     * Discord mark where a player line would draw the sender's head.
+     * The bridge's own sender id: derived from a name no account owns.
+     * It is the author every line from Discord is recorded under, which
+     * is what lets the bridge — and nobody else — edit or take such a
+     * line back, and its upper half is the namespace every Discord
+     * member's own sender id lives in ({@link #discordSenderId}).
      */
     public static final UUID DISCORD_SENDER_ID = UUID.nameUUIDFromBytes(
             "losttales:discord".getBytes(
                     java.nio.charset.Charset.forName("UTF-8")));
+
+    /**
+     * The sender id a line from one Discord member carries: the bridge's
+     * namespace over the member's own Discord id, which is a 64-bit
+     * snowflake and fits the lower half exactly. Two members never share
+     * one, and the same member always has the same, so a client can
+     * ignore them and the server can mute them the way it does an
+     * account — while {@link #isDiscordSender} still tells every one of
+     * them from a player. A member whose id cannot be read gets the
+     * bridge's own id, the one every Discord line carried before ids
+     * were kept.
+     */
+    public static UUID discordSenderId(String discordUserId) {
+        if (discordUserId == null) {
+            return DISCORD_SENDER_ID;
+        }
+        try {
+            return new UUID(DISCORD_SENDER_ID.getMostSignificantBits(),
+                    Long.parseUnsignedLong(discordUserId.trim()));
+        } catch (NumberFormatException malformed) {
+            return DISCORD_SENDER_ID;
+        }
+    }
+
+    /** Whether a sender id names the Discord bridge or one of its members. */
+    public static boolean isDiscordSender(UUID senderId) {
+        return senderId != null && senderId.getMostSignificantBits()
+                == DISCORD_SENDER_ID.getMostSignificantBits();
+    }
+
+    /**
+     * The Discord id of the member a sender id stands for; empty for a
+     * player, and for the bridge's own id.
+     */
+    public static String discordUserIdOf(UUID senderId) {
+        if (!isDiscordSender(senderId) || DISCORD_SENDER_ID.equals(senderId)) {
+            return "";
+        }
+        return Long.toUnsignedString(senderId.getLeastSignificantBits());
+    }
 
     private static final int MAX_PACKET_BYTES = 2048
             + ChatMessageValidator.MAX_UTF8_BYTES

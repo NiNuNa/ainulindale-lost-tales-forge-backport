@@ -74,9 +74,22 @@ final class ChatPopupMenu {
         ChatIconSheet sprite;
         /** The lock control at the row's end: its state, or null for none. */
         Boolean lockControl;
+        /**
+         * The colour the label is drawn in; -1 for the menu's ivory. An
+         * operator's action wears the Operator channel's crimson, so a
+         * row that reaches beyond this player's own words is told apart
+         * at a glance.
+         */
+        int labelColor = -1;
 
         Entry(String id, String label) {
             this(id, label, false, false, false, -1, null);
+        }
+
+        /** The same entry with its label in the given colour. */
+        Entry withLabelColor(int color) {
+            this.labelColor = color;
+            return this;
         }
 
         Entry(String id, String label, boolean dim, int color, ChatTab icon) {
@@ -610,9 +623,16 @@ final class ChatPopupMenu {
             }
             // Text at full opacity always; a muted channel is italic, the
             // hovered row is told by its highlight.
-            LostTalesChatVisualStyle.drawPlain(font,
-                    entry.dim ? "§o" + entry.label : entry.label,
-                    this.x + this.labelX, rowY + 2, 255);
+            if (entry.labelColor >= 0) {
+                LostTalesChatVisualStyle.drawColored(font,
+                        entry.dim ? "§o" + entry.label : entry.label,
+                        this.x + this.labelX, rowY + 2, entry.labelColor,
+                        255);
+            } else {
+                LostTalesChatVisualStyle.drawPlain(font,
+                        entry.dim ? "§o" + entry.label : entry.label,
+                        this.x + this.labelX, rowY + 2, 255);
+            }
             if (entry.lockControl != null) {
                 // The lock at the row's end, swinging the way the
                 // window's own lock does.

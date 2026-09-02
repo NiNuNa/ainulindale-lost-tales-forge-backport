@@ -12,7 +12,8 @@ import java.util.Map;
 
 /**
  * The shapes the bridge exchanges with Discord, with the bundled Gson:
- * the message list a channel returns, the body a webhook is given, and
+ * the message list a channel returns, the bodies a webhook is given — a
+ * chat line as text under a name, a server notice as one embed — and
  * the body that sets a channel's topic. Nothing else of the API is
  * modelled. Parsing never throws: anything that is not the expected
  * shape yields an empty list.
@@ -26,6 +27,8 @@ public final class DiscordJson {
     /** One Discord message, reduced to what the chat needs. */
     public static final class Message {
         public final String id;
+        /** The author's own Discord id; empty when the message had no author. */
+        public final String authorId;
         public final String authorName;
         public final boolean bot;
         public final String content;
@@ -45,10 +48,11 @@ public final class DiscordJson {
          */
         public final String editedTimestamp;
 
-        Message(String id, String authorName, boolean bot, String content,
-                Map<String, String> mentionNames,
+        Message(String id, String authorId, String authorName, boolean bot,
+                String content, Map<String, String> mentionNames,
                 String referencedMessageId, String editedTimestamp) {
             this.id = id;
+            this.authorId = authorId;
             this.authorName = authorName;
             this.bot = bot;
             this.content = content;
@@ -111,7 +115,8 @@ public final class DiscordJson {
                 }
             }
         }
-        return new Message(id, author == null ? "" : displayName(author),
+        return new Message(id, author == null ? "" : string(author, "id"),
+                author == null ? "" : displayName(author),
                 author != null && bool(author, "bot"),
                 string(object, "content"),
                 Collections.unmodifiableMap(mentions),
@@ -210,6 +215,35 @@ public final class DiscordJson {
         if (avatarUrl != null && avatarUrl.length() > 0) {
             body.addProperty("avatar_url", avatarUrl);
         }
+        JsonObject allowedMentions = new JsonObject();
+        allowedMentions.add("parse", new JsonArray());
+        body.add("allowed_mentions", allowedMentions);
+        return body.toString();
+    }
+
+    /**
+     * The body of one of the server's own notices: no text, one embed
+     * with the notice's colour down its edge and the notice's line on
+     * the author row, the player's head beside it when there is one.
+     * Posted under the webhook's own name and picture. The author row
+     * renders no markdown and reaches nobody's mentions; the mention
+     * block is sent all the same, so the post can ping nobody whatever
+     * Discord makes of it.
+     */
+    public static String webhookEmbedBody(DiscordNotice notice) {
+        JsonObject author = new JsonObject();
+        author.addProperty("name", notice == null ? "" : notice.getText());
+        if (notice != null && notice.getIconUrl().length() > 0) {
+            author.addProperty("icon_url", notice.getIconUrl());
+        }
+        JsonObject embed = new JsonObject();
+        embed.addProperty("color", Integer.valueOf(
+                notice == null ? 0 : notice.getColor()));
+        embed.add("author", author);
+        JsonArray embeds = new JsonArray();
+        embeds.add(embed);
+        JsonObject body = new JsonObject();
+        body.add("embeds", embeds);
         JsonObject allowedMentions = new JsonObject();
         allowedMentions.add("parse", new JsonArray());
         body.add("allowed_mentions", allowedMentions);

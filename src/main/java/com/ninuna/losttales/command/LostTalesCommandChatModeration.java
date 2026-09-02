@@ -4,8 +4,12 @@ import com.ninuna.losttales.chat.moderation.ChatMuteDurations;
 import com.ninuna.losttales.chat.moderation.ChatMuteEntry;
 import com.ninuna.losttales.chat.moderation.ChatMuteStorage;
 import com.ninuna.losttales.chat.moderation.ChatMuteWorldData;
+import com.ninuna.losttales.chat.server.LostTalesChatService;
+import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
+import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
@@ -86,9 +90,13 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
             return;
         }
         EntityPlayerMP target = findOnlinePlayer(args[1]);
-        if (target == null) {
+        DiscordMember member = target == null
+                ? DiscordMember.parse(args[1]) : null;
+        if (target == null && member == null) {
             send(sender, EnumChatFormatting.RED + "No online player named "
-                    + args[1] + ". Muting needs the player online.");
+                    + args[1] + ". Muting needs the player online; a "
+                    + "Discord member is named discord:<name> after they "
+                    + "have written, or discord:<their Discord id>.");
             return;
         }
         long now = System.currentTimeMillis();
@@ -102,8 +110,9 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
             }
         }
         String reason = joinFrom(args, reasonFrom);
-        ChatMuteEntry entry = new ChatMuteEntry(target.getUniqueID(),
-                target.getCommandSenderName(),
+        ChatMuteEntry entry = new ChatMuteEntry(
+                target != null ? target.getUniqueID() : member.senderId,
+                target != null ? target.getCommandSenderName() : member.label,
                 sender == null ? "" : sender.getCommandSenderName(),
                 reason, now, expiresAt);
         if (!mutes.mute(entry)) {
@@ -111,7 +120,10 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
                     + "The mute list is full; lift one before adding another.");
             return;
         }
-        tellMuted(target, entry, now);
+        if (target != null) {
+            tellMuted(target, entry, now);
+        }
+        LostTalesChatService.sendAccessToOperators();
         send(sender, EnumChatFormatting.GREEN + "Muted "
                 + entry.getAccountName()
                 + (entry.isPermanent() ? " permanently"
@@ -128,13 +140,22 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
             return;
         }
         EntityPlayerMP online = findOnlinePlayer(args[1]);
+        DiscordMember member = online == null
+                ? DiscordMember.parse(args[1]) : null;
         ChatMuteEntry lifted = online != null
                 ? mutes.unmute(online.getUniqueID())
-                : mutes.unmuteByName(args[1]);
+                : member != null ? mutes.unmute(member.senderId)
+                        : mutes.unmuteByName(args[1]);
+        if (lifted == null && member != null) {
+            // Muted under a name the member has since changed, or by id
+            // and now named: the stored label still finds it.
+            lifted = mutes.unmuteByName(args[1]);
+        }
         if (lifted == null) {
             send(sender, EnumChatFormatting.RED + args[1] + " is not muted.");
             return;
         }
+        LostTalesChatService.sendAccessToOperators();
         send(sender, EnumChatFormatting.GREEN + "Unmuted "
                 + lifted.getAccountName() + ".");
         if (online != null) {
@@ -192,6 +213,58 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
                         "chat.losttales.muted.timed", remaining));
     }
 
+    /**
+     * A Discord member named on the command line, {@code discord:Name}
+     * for a member whose line the bridge relayed this session or
+     * {@code discord:123456789012345678} for one named by Discord id;
+     * null for anything else. The sender id is the one the member's
+     * lines carry, so the mute stored against it is the one the chat
+     * service checks.
+     */
+    static final class DiscordMember {
+        static final String PREFIX = "discord:";
+        final UUID senderId;
+        /** {@code discord:Name}, as the mute list shows it. */
+        final String label;
+
+        private DiscordMember(UUID senderId, String label) {
+            this.senderId = senderId;
+            this.label = label;
+        }
+
+        static DiscordMember parse(String argument) {
+            String value = argument == null ? "" : argument.trim();
+            if (value.length() <= PREFIX.length() || !value.substring(0,
+                    PREFIX.length()).equalsIgnoreCase(PREFIX)) {
+                return null;
+            }
+            String who = value.substring(PREFIX.length()).trim();
+            String userId = who;
+            if (!isDiscordId(who)) {
+                userId = LostTalesDiscordBridge.getInstance()
+                        .findDiscordUserId(who);
+                if (userId.length() == 0) {
+                    return null;
+                }
+            }
+            return new DiscordMember(
+                    LostTalesChatMessagePacket.discordSenderId(userId),
+                    PREFIX + who);
+        }
+
+        private static boolean isDiscordId(String value) {
+            if (value.length() < 15 || value.length() > 20) {
+                return false;
+            }
+            for (int index = 0; index < value.length(); index++) {
+                if (!Character.isDigit(value.charAt(index))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
     private static String joinFrom(String[] args, int from) {
         if (args.length <= from) {
             return "";
@@ -236,8 +309,10 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
     private void sendUsage(ICommandSender sender) {
         send(sender, EnumChatFormatting.GRAY + getCommandUsage(sender));
         send(sender, EnumChatFormatting.GRAY
-                + "/losttales chat mute <player> [30s|15m|2h|7d] [reason]");
-        send(sender, EnumChatFormatting.GRAY + "/losttales chat unmute <player>");
+                + "/losttales chat mute <player|discord:name|discord:id> "
+                + "[30s|15m|2h|7d] [reason]");
+        send(sender, EnumChatFormatting.GRAY
+                + "/losttales chat unmute <player|discord:name|discord:id>");
         send(sender, EnumChatFormatting.GRAY + "/losttales chat mutes");
     }
 

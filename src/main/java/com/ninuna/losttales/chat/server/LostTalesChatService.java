@@ -3,6 +3,7 @@ package com.ninuna.losttales.chat.server;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelAccess;
+import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
@@ -350,8 +351,26 @@ public final class LostTalesChatService {
             // emoji Discord renders, share tokens as the text they were
             // typed as. The message's own id and the reply it resolved
             // travel with it, so the post can be linked to its Discord
-            // copy and a reply can point at the Discord original.
-            LostTalesDiscordBridge.getInstance().relay(identityName,
+            // copy and a reply can point at the Discord original. A line
+            // spoken as a character carries the title the game shows.
+            LostTalesDiscordBridge.getInstance().relay(
+                    accountLine ? identityName : ChatEpithet.titledName(
+                            identityName, presentation.factionName,
+                            presentation.title),
+                    DiscordAvatarUrl.of(LostTalesConfig.discordAvatarUrlTemplate,
+                            accountName, sender.getUniqueID()),
+                    DiscordMessageSanitizer.outbound(message),
+                    packet.getMessageId(), reply);
+        } else if (LostTalesDiscordBridge.relaysReadOnly(channel)) {
+            // Global and OOC can be shown on Discord read-only: the same
+            // line, signed with the same identity and title the game
+            // shows, under a channel tag, with the account's head — a
+            // character's skin is a resource of the game, not a picture
+            // Discord can fetch.
+            LostTalesDiscordBridge.getInstance().relayReadOnly(channel,
+                    accountLine ? identityName : ChatEpithet.titledName(
+                            identityName, presentation.factionName,
+                            presentation.title),
                     DiscordAvatarUrl.of(LostTalesConfig.discordAvatarUrlTemplate,
                             accountName, sender.getUniqueID()),
                     DiscordMessageSanitizer.outbound(message),
@@ -362,7 +381,10 @@ public final class LostTalesChatService {
     /**
      * A message from Discord, delivered by the bridge on the server
      * thread: it enters the Discord channel for everyone online under
-     * the Discord display name, with a fixed sender id no account owns,
+     * the Discord display name, with the sender id that stands for that
+     * member ({@link LostTalesChatMessagePacket#discordSenderId}) — so a
+     * client can ignore them, and a mute stored against that id
+     * silences them here, silently, exactly as an account's mute does —
      * and is never posted back to Discord. The bridge has already
      * sanitised and bounded the text, and resolved the quote when the
      * message answers one — a Discord reply is shown exactly as a
@@ -373,7 +395,8 @@ public final class LostTalesChatService {
      * {@link ChatMessageIds#NONE} when nothing went out, so the bridge
      * can link the line to the Discord message it came from.
      */
-    public static long sendFromDiscord(String displayName, String message,
+    public static long sendFromDiscord(String displayName, String discordUserId,
+                                       String message,
                                        ChatReplyReference reply) {
         MinecraftServer server = MinecraftServer.getServer();
         if (!LostTalesConfig.discordEnabled || displayName == null
@@ -383,11 +406,20 @@ public final class LostTalesChatService {
                 || server.getConfigurationManager().playerEntityList == null) {
             return ChatMessageIds.NONE;
         }
+        UUID senderId = LostTalesChatMessagePacket.discordSenderId(
+                discordUserId);
+        if (isDiscordSenderMuted(server, senderId)) {
+            // Dropped without a word: the member is on Discord, where no
+            // notice of ours reaches, and nothing is recorded, so the
+            // line cannot be replied to or corrected either.
+            FMLLog.info("[losttales/chat/discord] dropped a line from muted "
+                    + "member %s", displayName);
+            return ChatMessageIds.NONE;
+        }
         int ivory = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
         long messageId = ChatMessageIdAllocator.next();
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
-                ChatChannel.DISCORD,
-                LostTalesChatMessagePacket.DISCORD_SENDER_ID, displayName,
+                ChatChannel.DISCORD, senderId, displayName,
                 displayName, "", ivory, ivory, message,
                 System.currentTimeMillis(), "", null, "", "", 0, true,
                 messageId, reply);
@@ -407,6 +439,23 @@ public final class LostTalesChatService {
                 LostTalesChatMessagePacket.DISCORD_SENDER_ID, displayName,
                 message, recipientIds);
         return messageId;
+    }
+
+    /**
+     * Whether a mute is stored against a Discord member's sender id.
+     * Mutes live in the overworld's storage like every other; a world
+     * that cannot be read silences nobody.
+     */
+    private static boolean isDiscordSenderMuted(MinecraftServer server,
+                                                UUID senderId) {
+        try {
+            return server.worldServerForDimension(0) != null
+                    && ChatMuteStorage.get(server.worldServerForDimension(0))
+                            .getActiveMute(senderId,
+                                    System.currentTimeMillis()) != null;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     /**
@@ -572,8 +621,12 @@ public final class LostTalesChatService {
 
     /**
      * Takes one of {@code remover}'s own messages back, on the same
-     * terms as {@link #edit}. Everyone who was sent it is told to drop
-     * it; nobody else hears that it ever existed.
+     * terms as {@link #edit}, or — when the remover is an operator —
+     * anyone's message that is still within reach. Everyone who was
+     * sent it is told to drop it; nobody else hears that it ever
+     * existed. Operators may remove but never edit another's words: a
+     * removal is visibly a removal. Operator status is read here, from
+     * the server's own list, never from the request.
      */
     public static void delete(EntityPlayerMP remover, long messageId) {
         if (remover == null || remover.worldObj == null
@@ -582,17 +635,40 @@ public final class LostTalesChatService {
         }
         Set<UUID> recipients = ChatMessageLog.remove(messageId,
                 remover.getUniqueID());
+        boolean fromDiscord = false;
         if (recipients == null) {
-            return;
+            if (!LostTalesWaystonePermissionPolicy.isOperator(remover)) {
+                return;
+            }
+            ChatMessageLog.Removal removal =
+                    ChatMessageLog.removeByOperator(messageId);
+            if (removal == null) {
+                return;
+            }
+            recipients = removal.recipients;
+            fromDiscord = LostTalesChatMessagePacket.DISCORD_SENDER_ID
+                    .equals(removal.authorId);
+            FMLLog.info("[losttales/chat/delete] operator <%s> removed "
+                    + "message %d of <%s>", remover.getCommandSenderName(),
+                    Long.valueOf(messageId), removal.author);
+            ChatAuditLog.logModerationDelete(messageId,
+                    remover.getUniqueID(), remover.getCommandSenderName(),
+                    removal.author);
+        } else {
+            FMLLog.info("[losttales/chat/delete] <%s> message %d",
+                    remover.getCommandSenderName(), Long.valueOf(messageId));
+            ChatAuditLog.logDelete(messageId, remover.getUniqueID(),
+                    remover.getCommandSenderName());
         }
-        FMLLog.info("[losttales/chat/delete] <%s> message %d",
-                remover.getCommandSenderName(), Long.valueOf(messageId));
-        ChatAuditLog.logDelete(messageId, remover.getUniqueID(),
-                remover.getCommandSenderName());
         tellRecipients(recipients,
                 LostTalesChatUpdatePacket.removed(messageId));
         // Taken back from Discord as well, on the same terms as an edit.
-        LostTalesDiscordBridge.getInstance().relayDelete(messageId);
+        // A line that came from Discord is a member's own message there,
+        // which the webhook could not delete anyway: the removal is
+        // in-game moderation only, and Discord's moderators keep theirs.
+        if (!fromDiscord) {
+            LostTalesDiscordBridge.getInstance().relayDelete(messageId);
+        }
     }
 
     /**
@@ -749,13 +825,57 @@ public final class LostTalesChatService {
                 || player.worldObj.isRemote) {
             return;
         }
+        boolean operator = LostTalesWaystonePermissionPolicy.isOperator(player);
         LostTalesNetworkHandler.CHANNEL.sendTo(
-                new LostTalesChatAccessPacket(
-                        LostTalesWaystonePermissionPolicy.isOperator(player),
+                new LostTalesChatAccessPacket(operator,
                         LostTalesConfig.discordEnabled,
                         ChatAccountRoleResolver.resolve(player),
-                        roleHolders),
+                        roleHolders,
+                        operator ? mutedSenders(player)
+                                : Collections.<UUID>emptyList()),
                 player);
+    }
+
+    /**
+     * Every sender id under a mute right now, for an operator's menus.
+     * A store that cannot be read names nobody, which only costs the
+     * menu its foreknowledge — the server still answers the command.
+     */
+    private static List<UUID> mutedSenders(EntityPlayerMP operator) {
+        try {
+            List<ChatMuteEntry> active = ChatMuteStorage.get(operator.worldObj)
+                    .getActiveMutes(System.currentTimeMillis());
+            List<UUID> ids = new ArrayList<UUID>(active.size());
+            for (ChatMuteEntry mute : active) {
+                ids.add(mute.getAccountId());
+            }
+            return ids;
+        } catch (RuntimeException ignored) {
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Sends every online operator their access again: what a mute or an
+     * unmute calls, so their menus follow the store the moment it
+     * changes. Nobody else is sent anything.
+     */
+    public static void sendAccessToOperators() {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null
+                || server.getConfigurationManager().playerEntityList == null) {
+            return;
+        }
+        List<LostTalesChatAccessPacket.RoleHolder> holders = roleHolders(null);
+        @SuppressWarnings("unchecked")
+        List<EntityPlayerMP> online =
+                server.getConfigurationManager().playerEntityList;
+        for (EntityPlayerMP player : online) {
+            if (player != null
+                    && LostTalesWaystonePermissionPolicy.isOperator(player)) {
+                sendAccess(player, holders);
+            }
+        }
     }
 
     /**

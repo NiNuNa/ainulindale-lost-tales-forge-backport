@@ -185,11 +185,20 @@ public final class LostTalesChatGui extends GuiChat {
     /** The second half of deleting: the row that is the confirmation. */
     private static final String ENTRY_DELETE_CONFIRM = "delete_confirm";
     private static final String ENTRY_IGNORE = "ignore_account";
+    /**
+     * What an operator's rows are drawn in: the Operator channel's own
+     * crimson, so an action that reaches beyond this player's words is
+     * told apart from the rest of the menu at a glance.
+     */
+    private static final int OPERATOR_ACTION_COLOR =
+            ChatChannel.ADMIN.getDisplayColor();
+    /** Operators only: the server mute, put in the bar to be completed. */
+    private static final String ENTRY_MUTE_ACCOUNT = "mute_account";
+    private static final String ENTRY_UNMUTE_ACCOUNT = "unmute_account";
     private static final String ENTRY_MUTE = "mute";
     private static final String ENTRY_PINGS = "pings";
     private static final String ENTRY_HIDE = "hide";
     private static final String ENTRY_DETACH = "detach";
-    private static final String ENTRY_CLOSE = "close";
     private static final String ENTRY_WINDOW_UNSTICK = "window_unstick";
     private static final String ENTRY_WINDOW_RESET = "window_reset";
     /** Where a detached window's row lands: a little below its old one. */
@@ -2885,6 +2894,14 @@ public final class LostTalesChatGui extends GuiChat {
             // The marks are the row's; a press anywhere else lets them go.
             ChatTabSelection.clear();
         }
+        // A right-click on a tab opens the tab's own menu, the one the
+        // cog opens. Asked here, beside the left press on the rows and
+        // before the overlay guard below: the strip registers the
+        // rectangle it painted, so a press on it never reaches the
+        // message menus further down.
+        if (button == 1 && handleRowRightClick(mouseX, mouseY)) {
+            return;
+        }
         if (button == 2 && closeTabAt(mouseX, mouseY)) {
             return;
         }
@@ -4177,6 +4194,45 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
+     * A right press on one of the rows: on a tab — its name, its cog or
+     * its cross — it opens the tab's menu where the cog would; anywhere
+     * else on the strip — the bare stretch, the grip, the end controls —
+     * it opens the window's own menu where the window's cog would, on
+     * the same terms as that cog: a locked window offers neither. The
+     * press belongs to that window like any other, and is spent on the
+     * strip either way — a strip is not a line and opens no message menu.
+     */
+    private boolean handleRowRightClick(int mouseX, int mouseY) {
+        LostTalesGuiAnimationSample opening =
+                ClientChatChannelViews.openSample();
+        List<ChatWindow> windows = ChatWindowLayout.stacked();
+        for (int index = windows.size() - 1; index >= 0; index--) {
+            ChatWindow window = windows.get(index);
+            ChatWindowFrame frame = frameFor(window);
+            ChatChannelTabBar.Row row = rowFor(window, frame, opening);
+            if (row == null) {
+                continue;
+            }
+            ChatChannelTabBar.Hit hit = frame.tabBar.hitAt(
+                    this.fontRendererObj, row, mouseX, mouseY);
+            if (hit == null && !(ChatChannelTabBar.inRowBand(row, mouseY)
+                    && mouseX >= frame.boxLeft
+                    && mouseX < frame.boxRight)) {
+                continue;
+            }
+            int anchorBottom = ChatChannelTabBar.rowTop(row.rowBottom) - 2;
+            selectWindow(window);
+            if (hit != null && hit.tab != null) {
+                openSettingsPopup(hit.tab, mouseX, anchorBottom);
+            } else if (!window.isLocked()) {
+                openWindowPopup(window, mouseX, anchorBottom);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * A left press on one of the rows. Picking a tab also arms a drag;
      * the controls act at once. Shift marks the tab instead of picking
      * it, so several tabs of one row can be moved or closed together.
@@ -4482,15 +4538,18 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
-     * The cog menu's five entries, each its own independent preference
-     * or action: Mute Channel (out of the feed), Mute Mentions (cue
-     * silent), Hide Channel (stays closed when messaged), Move to its
-     * own Window, and Close Channel.
+     * The tab's menu — behind the cog, and under a right-click on the
+     * tab — four entries, each its own independent preference or
+     * action: Mute Channel (out of the feed), Mute Mentions (cue
+     * silent), Hide Channel (stays closed when messaged), and Move to
+     * its own Window. Closing is the cross on the tab and nothing else:
+     * a row that only repeats the button beside it is a second way to
+     * lose a tab by accident.
      */
     private void openSettingsPopup(ChatTab channel, int anchorX,
                                    int anchorBottom) {
         List<ChatPopupMenu.Entry> entries =
-                new ArrayList<ChatPopupMenu.Entry>(5);
+                new ArrayList<ChatPopupMenu.Entry>(4);
         entries.add(new ChatPopupMenu.Entry(ENTRY_MUTE,
                 StatCollector.translateToLocal(
                         ChatWindowLayout.isMuted(channel)
@@ -4506,8 +4565,8 @@ public final class LostTalesChatGui extends GuiChat {
                         ChatWindowLayout.isHidden(channel)
                                 ? "gui.losttales.chat.tab.unhide"
                                 : "gui.losttales.chat.tab.hide")));
-        // Layout actions the row may have no room for: a window of its
-        // own, and closing, offered whenever the layout would allow it.
+        // A layout action the row may have no room for: a window of its
+        // own, offered whenever the layout would allow it.
         ChatWindow window = ChatWindowLayout.windowOf(channel);
         if (window != null && !window.isLocked()
                 && window.getTabs().size() > 1
@@ -4516,11 +4575,6 @@ public final class LostTalesChatGui extends GuiChat {
             entries.add(new ChatPopupMenu.Entry(ENTRY_DETACH,
                     StatCollector.translateToLocal(
                             "gui.losttales.chat.tab.detach")));
-        }
-        if (ClientChatChannelState.isClosable(channel)) {
-            entries.add(new ChatPopupMenu.Entry(ENTRY_CLOSE,
-                    StatCollector.translateToLocal(
-                            "gui.losttales.chat.tab.close")));
         }
         this.popup.open(POPUP_SETTINGS, channel, entries,
                 this.fontRendererObj, anchorX - 4, anchorBottom,
@@ -4896,7 +4950,7 @@ public final class LostTalesChatGui extends GuiChat {
             this.menuMessageAccount = remembered.packet.getAccountName();
             this.menuMessageIdentity = remembered.packet.getIdentityName();
             this.menuMessageFromDiscord =
-                    LostTalesChatMessagePacket.DISCORD_SENDER_ID.equals(
+                    LostTalesChatMessagePacket.isDiscordSender(
                             remembered.packet.getSenderId());
             this.menuMessageSenderId = remembered.packet.getSenderId();
         } else {
@@ -4925,7 +4979,10 @@ public final class LostTalesChatGui extends GuiChat {
                 StatCollector.translateToLocal(
                         "gui.losttales.chat.message.copy")));
         // Your own words are yours to correct or take back. The server
-        // decides that too — this only offers what it would allow.
+        // decides that too — this only offers what it would allow. An
+        // operator may take anyone's words back, but never rewrite them:
+        // a removal is visibly a removal, an edit would put words in
+        // another's mouth. Their row wears the Operator crimson.
         if (isOwnMessage()) {
             if (ClientChatMessages.get(this.menuMessageId) != null) {
                 // Editable only while this client still remembers what
@@ -4938,6 +4995,11 @@ public final class LostTalesChatGui extends GuiChat {
             entries.add(new ChatPopupMenu.Entry(ENTRY_DELETE,
                     StatCollector.translateToLocal(
                             "gui.losttales.chat.message.delete")));
+        } else if (canModerateMessage()) {
+            entries.add(new ChatPopupMenu.Entry(ENTRY_DELETE,
+                    StatCollector.translateToLocal(
+                            "gui.losttales.chat.message.delete"))
+                    .withLabelColor(OPERATOR_ACTION_COLOR));
         }
         this.popup.open(POPUP_MESSAGE,
                 ClientChatChannelViews.tabOf(chatLineId), entries,
@@ -4950,8 +5012,10 @@ public final class LostTalesChatGui extends GuiChat {
      * The menu over a person — the sender's identity span or a mention:
      * message them, ignore them. The message's own menu stays with the
      * message body; this one is account and character business, so it
-     * opens only over somebody an account stands behind — not an NPC,
-     * not a role mention, not the Discord bridge, and not yourself.
+     * opens only over somebody who can be addressed — not an NPC, not a
+     * role mention, and not yourself. A Discord member can be ignored
+     * but not whispered to, so their menu offers the one entry; the
+     * bridge's own nameless id is nobody and opens nothing.
      */
     private boolean openPlayerPopup(int mouseX, int mouseY) {
         LostTalesChatHoverCard.Target person = LostTalesChatHoverCard
@@ -4965,10 +5029,12 @@ public final class LostTalesChatGui extends GuiChat {
                         this.mc.thePlayer.getUniqueID()))) {
             return false;
         }
+        boolean fromDiscord = LostTalesChatMessagePacket.isDiscordSender(
+                person.playerId);
         this.menuMessageAccount = person.accountName;
         this.menuMessageIdentity = person.identityName;
         this.menuMessageSenderId = person.playerId;
-        this.menuMessageFromDiscord = false;
+        this.menuMessageFromDiscord = fromDiscord;
         List<ChatPopupMenu.Entry> entries =
                 new ArrayList<ChatPopupMenu.Entry>();
         // The header names who the menu is about, the way the card does:
@@ -4980,16 +5046,33 @@ public final class LostTalesChatGui extends GuiChat {
                         person.accountName)
                         ? name + " (" + person.accountName + ")"
                         : person.accountName));
-        entries.add(new ChatPopupMenu.Entry(ENTRY_MESSAGE,
-                StatCollector.translateToLocalFormatted(
-                        "gui.losttales.chat.message.whisper",
-                        name.length() > 0 ? name : person.accountName)));
+        if (!fromDiscord) {
+            entries.add(new ChatPopupMenu.Entry(ENTRY_MESSAGE,
+                    StatCollector.translateToLocalFormatted(
+                            "gui.losttales.chat.message.whisper",
+                            name.length() > 0 ? name : person.accountName)));
+        }
         entries.add(new ChatPopupMenu.Entry(ENTRY_IGNORE,
                 StatCollector.translateToLocalFormatted(
                         ClientChatIgnores.isIgnored(person.playerId)
                                 ? "gui.losttales.chat.message.unignore"
                                 : "gui.losttales.chat.message.ignore",
                         person.accountName)));
+        if (ClientChatChannelState.hasAdminAccess()) {
+            // The server's mute, for operators: the row offers to lift
+            // the mute the server says is in force, else to lay one. The
+            // server tells operators the muted set with their access and
+            // again whenever it changes, and decides for itself anyway.
+            boolean muted = ClientChatChannelState.isMutedSender(
+                    person.playerId);
+            entries.add(new ChatPopupMenu.Entry(
+                    muted ? ENTRY_UNMUTE_ACCOUNT : ENTRY_MUTE_ACCOUNT,
+                    StatCollector.translateToLocalFormatted(muted
+                            ? "gui.losttales.chat.message.unmute"
+                            : "gui.losttales.chat.message.mute",
+                            person.accountName))
+                    .withLabelColor(OPERATOR_ACTION_COLOR));
+        }
         this.popup.open(POPUP_PLAYER, null, entries, this.fontRendererObj,
                 mouseX, mouseY, this.width, this.height);
         return true;
@@ -5059,6 +5142,17 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
+     * Whether this player, as an operator, may take the message the menu
+     * was opened over back from everyone: any line the server can still
+     * be asked about, another player's or a Discord member's alike. The
+     * server checks operator status again on the request.
+     */
+    private boolean canModerateMessage() {
+        return ChatMessageIds.isServerId(this.menuMessageId)
+                && ClientChatChannelState.hasAdminAccess();
+    }
+
+    /**
      * Puts the message back in the bar to be rewritten. What goes into
      * the field is the text that was <em>sent</em> — the markup as it
      * was typed, not the line as it reads — so editing a formatted
@@ -5092,14 +5186,17 @@ public final class LostTalesChatGui extends GuiChat {
      * whether the menu is now showing that question.
      */
     private boolean askToDelete() {
-        if (!isOwnMessage()) {
+        boolean own = isOwnMessage();
+        if (!own && !canModerateMessage()) {
             return false;
         }
         List<ChatPopupMenu.Entry> entries =
                 new ArrayList<ChatPopupMenu.Entry>();
-        entries.add(new ChatPopupMenu.Entry(ENTRY_DELETE_CONFIRM,
-                StatCollector.translateToLocal(
-                        "gui.losttales.chat.message.delete.confirm")));
+        ChatPopupMenu.Entry confirm = new ChatPopupMenu.Entry(
+                ENTRY_DELETE_CONFIRM, StatCollector.translateToLocal(
+                        "gui.losttales.chat.message.delete.confirm"));
+        entries.add(own ? confirm
+                : confirm.withLabelColor(OPERATOR_ACTION_COLOR));
         this.popup.replaceEntries(entries, this.fontRendererObj,
                 this.width, this.height);
         return true;
@@ -5127,6 +5224,31 @@ public final class LostTalesChatGui extends GuiChat {
      * Existing lines stay — ignoring quiets what has not been said yet —
      * and the notice says which way it went.
      */
+    /**
+     * Puts the mute command in the bar with the target filled in and
+     * the caret after it, so the operator adds a duration and a reason
+     * — or none — and sends it with Enter; the server does the muting
+     * and answers in the console.
+     */
+    private void startMute() {
+        cancelReply();
+        String command = "/losttales chat mute " + muteTarget() + " ";
+        this.inputField.setText(command);
+        this.inputField.setCursorPositionEnd();
+        ClientChatChannelState.setDraft(command);
+    }
+
+    /**
+     * How the mute command names whoever the menu is about: a player by
+     * account, a Discord member as {@code discord:<name>}, which the
+     * server resolves through the bridge's memory of who bore the name.
+     */
+    private String muteTarget() {
+        return this.menuMessageFromDiscord
+                ? "discord:" + this.menuMessageAccount
+                : this.menuMessageAccount;
+    }
+
     private void toggleIgnore() {
         if (this.menuMessageSenderId == null) {
             return;
@@ -5202,6 +5324,10 @@ public final class LostTalesChatGui extends GuiChat {
                         this.menuMessageIdentity);
             } else if (ENTRY_IGNORE.equals(entry.id)) {
                 toggleIgnore();
+            } else if (ENTRY_MUTE_ACCOUNT.equals(entry.id)) {
+                startMute();
+            } else if (ENTRY_UNMUTE_ACCOUNT.equals(entry.id)) {
+                func_146403_a("/losttales chat unmute " + muteTarget());
             }
         } else if (POPUP_MESSAGE.equals(this.popup.kind())) {
             if (ENTRY_REPLY.equals(entry.id)) {
@@ -5239,8 +5365,6 @@ public final class LostTalesChatGui extends GuiChat {
                         !ChatWindowLayout.isHidden(channel));
             } else if (ENTRY_DETACH.equals(entry.id)) {
                 detachChannel(channel);
-            } else if (ENTRY_CLOSE.equals(entry.id)) {
-                closeChannel(channel);
             }
         } else if (POPUP_SEARCH.equals(this.popup.kind())) {
             if (entry.id.startsWith(ENTRY_OPEN_PREFIX)) {

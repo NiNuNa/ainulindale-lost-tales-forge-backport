@@ -142,6 +142,32 @@ public final class ChatMessageLog {
         return Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy));
     }
 
+    /**
+     * Forgets a message whoever wrote it and answers with who wrote it
+     * and who has to be told, or null for a message out of reach. What
+     * an operator's removal calls: the author check is the caller's,
+     * made against the operator's own standing rather than the entry.
+     */
+    public static synchronized Removal removeByOperator(long messageId) {
+        Entry entry = ENTRIES.remove(Long.valueOf(messageId));
+        return entry == null ? null : new Removal(entry.authorId,
+                entry.author, Collections.unmodifiableSet(
+                        new HashSet<UUID>(entry.seenBy)));
+    }
+
+    /** A message an operator took back: whose it was and who saw it. */
+    public static final class Removal {
+        public final UUID authorId;
+        public final String author;
+        public final Set<UUID> recipients;
+
+        Removal(UUID authorId, String author, Set<UUID> recipients) {
+            this.authorId = authorId;
+            this.author = author;
+            this.recipients = recipients;
+        }
+    }
+
     /** The message, but only for the account that wrote it. */
     private static Entry authored(long messageId, UUID account) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));

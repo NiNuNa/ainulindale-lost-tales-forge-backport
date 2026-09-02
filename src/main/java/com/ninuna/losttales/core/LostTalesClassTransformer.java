@@ -97,6 +97,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.chatWrapTransformer.active";
     public static final String LOTR_FAST_TRAVEL_ARRIVAL_ACTIVE_PROPERTY =
             "losttales.lotrFastTravelArrivalTransformer.active";
+    public static final String SERVER_BROADCAST_ACTIVE_PROPERTY =
+            "losttales.serverBroadcastTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
@@ -309,11 +311,18 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     private static final String FAST_TRAVEL_ARRIVAL_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/"
                     + "LostTalesLotrFastTravelArrivalHook";
+    private static final String SERVER_CONFIGURATION_MANAGER =
+            "net.minecraft.server.management.ServerConfigurationManager";
+    private static final String SERVER_BROADCAST_HOOK_OWNER =
+            "com/ninuna/losttales/chat/server/LostTalesServerBroadcastHook";
 
     @Override
     public byte[] transform(String name, String transformedName, byte[] basicClass) {
         if (basicClass == null) {
             return null;
+        }
+        if (SERVER_CONFIGURATION_MANAGER.equals(transformedName)) {
+            return transformServerBroadcast(basicClass);
         }
         if (ENTITY_RENDERER.equals(transformedName)) {
             return transformGuiScreenDraw(transformCamera(basicClass));
@@ -2876,6 +2885,56 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return basicClass;
         } catch (Throwable throwable) {
             warn("Failed to patch LOTR fast travel completion: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Opens the server's broadcast seam.
+     *
+     * <p>Every line the whole server sees — death messages, vanilla and
+     * LOTR achievement announcements, joins and leaves, {@code /say} —
+     * goes out through {@code ServerConfigurationManager.sendChatMsg}.
+     * The component is handed to
+     * {@code LostTalesServerBroadcastHook.onBroadcast} at the head of
+     * the method, before it is sent, exactly as every player is about
+     * to receive it; the hook observes and never alters it. Without the
+     * patch the Discord bridge cannot hear of deaths or achievements
+     * and says so when it starts.</p>
+     */
+    private static byte[] transformServerBroadcast(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("sendChatMsg".equals(method.name)
+                        || "func_148539_a".equals(method.name))
+                        || !"(Lnet/minecraft/util/IChatComponent;)V"
+                        .equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, SERVER_BROADCAST_HOOK_OWNER,
+                        "onBroadcast")) {
+                    System.setProperty(SERVER_BROADCAST_ACTIVE_PROPERTY,
+                            "true");
+                    return basicClass;
+                }
+                InsnList hook = new InsnList();
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                        SERVER_BROADCAST_HOOK_OWNER, "onBroadcast",
+                        "(Lnet/minecraft/util/IChatComponent;)V"));
+                method.instructions.insert(hook);
+                System.setProperty(SERVER_BROADCAST_ACTIVE_PROPERTY, "true");
+                info("Patched server chat broadcasts to report every "
+                        + "server-wide line");
+                return write(owner);
+            }
+            warn("Could not locate ServerConfigurationManager#sendChatMsg; "
+                    + "deaths and achievements will not reach Discord");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch server chat broadcasts: " + throwable);
             return basicClass;
         }
     }

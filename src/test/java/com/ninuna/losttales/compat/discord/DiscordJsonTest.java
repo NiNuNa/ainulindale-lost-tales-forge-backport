@@ -34,6 +34,8 @@ public final class DiscordJsonTest {
         DiscordJson.Message latest = messages.get(2);
         assertEquals("30", latest.id);
         assertEquals("Sam", latest.authorName);
+        assertEquals("1", latest.authorId);
+        assertEquals("", messages.get(0).authorId);
         assertFalse(latest.bot);
         assertEquals("later <@7>", latest.content);
         // A null global name falls back to the username.
@@ -63,6 +65,34 @@ public final class DiscordJsonTest {
                 DiscordJson.webhookBody("", "", "hi")).getAsJsonObject();
         assertFalse(nameless.has("username"));
         assertFalse(nameless.has("avatar_url"));
+    }
+
+    @Test
+    public void noticesAreOneEmbedWithTheLineOnTheAuthorRow() {
+        JsonObject body = new JsonParser().parse(DiscordJson.webhookEmbedBody(
+                DiscordServerNotices.playerDied("Steve fell from a high place",
+                        "https://heads/Steve"))).getAsJsonObject();
+        assertFalse(body.has("content"));
+        assertFalse(body.has("username"));
+        assertEquals(1, body.getAsJsonArray("embeds").size());
+        JsonObject embed = body.getAsJsonArray("embeds").get(0)
+                .getAsJsonObject();
+        assertEquals(0x5D4550, embed.get("color").getAsInt());
+        JsonObject author = embed.getAsJsonObject("author");
+        assertEquals("💀 Steve fell from a high place",
+                author.get("name").getAsString());
+        assertEquals("https://heads/Steve", author.get("icon_url").getAsString());
+        assertEquals(0, body.getAsJsonObject("allowed_mentions")
+                .getAsJsonArray("parse").size());
+
+        // No picture, no icon field; the colour is never negative.
+        JsonObject plain = new JsonParser().parse(DiscordJson.webhookEmbedBody(
+                DiscordServerNotices.serverStarted())).getAsJsonObject();
+        JsonObject plainEmbed = plain.getAsJsonArray("embeds").get(0)
+                .getAsJsonObject();
+        assertFalse(plainEmbed.getAsJsonObject("author").has("icon_url"));
+        assertTrue(plainEmbed.get("color").getAsInt() >= 0);
+        assertTrue(plainEmbed.get("color").getAsInt() <= 0xFFFFFF);
     }
 
     @Test

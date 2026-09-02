@@ -1,6 +1,5 @@
-package com.ninuna.losttales.client.chat;
+package com.ninuna.losttales.chat;
 
-import com.ninuna.losttales.chat.ChatChannel;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
 import org.junit.Test;
@@ -67,6 +66,45 @@ public final class ChatSystemLineClassifierTest {
         // The key decides, never the rendered text.
         assertEquals(CONSOLE, ChatSystemLineClassifier.classify(
                 new ChatComponentText("death.attack.mob")));
+    }
+
+    @Test
+    public void sharedLinesAreToldApartByKind() {
+        assertEquals(ChatSystemLineClassifier.Kind.ACHIEVEMENT,
+                ChatSystemLineClassifier.kindOf(new ChatComponentTranslation(
+                        "chat.type.achievement", "Steve",
+                        new ChatComponentText("Taking Inventory"))));
+        assertEquals(ChatSystemLineClassifier.Kind.ACHIEVEMENT,
+                ChatSystemLineClassifier.kindOf(new ChatComponentTranslation(
+                        "chat.lotr.achievement", "Steve", "Middle-earth",
+                        new ChatComponentText("[First Steps]"))));
+        assertEquals(ChatSystemLineClassifier.Kind.DEATH,
+                ChatSystemLineClassifier.kindOf(new ChatComponentTranslation(
+                        "death.attack.mob", "Steve", "Zombie")));
+        assertEquals(ChatSystemLineClassifier.Kind.DEATH,
+                ChatSystemLineClassifier.kindOf(new ChatComponentTranslation(
+                        "death.fell.accident.generic", "Steve")));
+        assertEquals(ChatSystemLineClassifier.Kind.JOIN,
+                ChatSystemLineClassifier.kindOf(new ChatComponentTranslation(
+                        "multiplayer.player.joined", "Steve")));
+        assertEquals(ChatSystemLineClassifier.Kind.JOIN,
+                ChatSystemLineClassifier.kindOf(new ChatComponentTranslation(
+                        "multiplayer.player.joined.renamed", "Steve", "Bob")));
+        assertEquals(ChatSystemLineClassifier.Kind.LEAVE,
+                ChatSystemLineClassifier.kindOf(new ChatComponentTranslation(
+                        "multiplayer.player.left", "Steve")));
+        // Shared but of no named kind, private, plain, or nothing.
+        assertEquals(ChatSystemLineClassifier.Kind.OTHER,
+                ChatSystemLineClassifier.kindOf(new ChatComponentTranslation(
+                        "chat.type.announcement", "Server", "hello")));
+        assertEquals(ChatSystemLineClassifier.Kind.OTHER,
+                ChatSystemLineClassifier.kindOf(new ChatComponentTranslation(
+                        "commands.gamemode.success.self", "Creative")));
+        assertEquals(ChatSystemLineClassifier.Kind.OTHER,
+                ChatSystemLineClassifier.kindOf(
+                        new ChatComponentText("death.attack.mob")));
+        assertEquals(ChatSystemLineClassifier.Kind.OTHER,
+                ChatSystemLineClassifier.kindOf(null));
     }
 
     @Test

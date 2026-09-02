@@ -34,6 +34,21 @@ public final class DiscordMessageLinksTest {
     }
 
     @Test
+    public void readOnlyPostsRememberTheirWebhook() {
+        DiscordMessageLinks links = new DiscordMessageLinks();
+        links.link(1000L, "111", "", true);
+        links.link(2000L, "222", "-# header\n", false);
+        links.link(3000L, "333");
+        assertEquals(true, links.isReadOnly(1000L));
+        assertEquals(false, links.isReadOnly(2000L));
+        assertEquals(false, links.isReadOnly(3000L));
+        assertEquals(false, links.isReadOnly(4000L));
+        // Both directions still answer for a read-only post.
+        assertEquals("111", links.discordIdOf(1000L));
+        assertEquals(1000L, links.messageIdOf("111"));
+    }
+
+    @Test
     public void halfALinkIsNoLink() {
         DiscordMessageLinks links = new DiscordMessageLinks();
         links.link(ChatMessageIds.NONE, "111");

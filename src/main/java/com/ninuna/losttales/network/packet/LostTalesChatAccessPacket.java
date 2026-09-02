@@ -9,6 +9,7 @@ import io.netty.buffer.ByteBuf;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Server-to-client: which restricted chat channels the player may use,
@@ -30,13 +31,23 @@ import java.util.List;
 public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_HOLDERS = 256;
     private static final int MAX_HOLDER_NAME_BYTES = 64;
+    /** As many as the mute store holds; an operator is told them all. */
+    public static final int MAX_MUTED_SENDERS = 1024;
     private static final int MAX_PACKET_BYTES = 16
-            + MAX_HOLDERS * (MAX_HOLDER_NAME_BYTES + 8);
+            + MAX_HOLDERS * (MAX_HOLDER_NAME_BYTES + 8)
+            + 2 + MAX_MUTED_SENDERS * 16;
 
     private boolean adminAccess;
     private boolean discordAccess;
     private int roleMask;
     private List<RoleHolder> roleHolders = Collections.emptyList();
+    /**
+     * The sender ids under a server mute — accounts and Discord members
+     * alike — sent to operators only, so their menus can offer to lift a
+     * mute where one is in force and to lay one where none is. Empty
+     * for everyone else: who is muted is the operators' business.
+     */
+    private List<UUID> mutedSenders = Collections.emptyList();
     private boolean malformed;
 
     public LostTalesChatAccessPacket() {}
@@ -55,6 +66,14 @@ public final class LostTalesChatAccessPacket implements IMessage {
     public LostTalesChatAccessPacket(boolean adminAccess,
                                      boolean discordAccess, int roleMask,
                                      List<RoleHolder> roleHolders) {
+        this(adminAccess, discordAccess, roleMask, roleHolders,
+                Collections.<UUID>emptyList());
+    }
+
+    public LostTalesChatAccessPacket(boolean adminAccess,
+                                     boolean discordAccess, int roleMask,
+                                     List<RoleHolder> roleHolders,
+                                     List<UUID> mutedSenders) {
         this.adminAccess = adminAccess;
         this.discordAccess = discordAccess;
         this.roleMask = roleMask;
@@ -65,6 +84,17 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                 > MAX_HOLDERS
                                 ? roleHolders.subList(0, MAX_HOLDERS)
                                 : roleHolders));
+        List<UUID> muted = new ArrayList<UUID>();
+        if (mutedSenders != null) {
+            for (UUID sender : mutedSenders) {
+                if (sender != null && muted.size() < MAX_MUTED_SENDERS) {
+                    muted.add(sender);
+                }
+            }
+        }
+        this.mutedSenders = muted.isEmpty()
+                ? Collections.<UUID>emptyList()
+                : Collections.unmodifiableList(muted);
     }
 
     @Override
@@ -109,6 +139,22 @@ public final class LostTalesChatAccessPacket implements IMessage {
             } else {
                 this.roleHolders = Collections.emptyList();
             }
+            // Appended once more: the muted senders. A packet written
+            // before they travelled ends here and names none.
+            if (buffer.readableBytes() >= 2) {
+                int count = buffer.readUnsignedShort();
+                if (count > MAX_MUTED_SENDERS) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "too many muted senders");
+                }
+                List<UUID> muted = new ArrayList<UUID>(count);
+                for (int index = 0; index < count; index++) {
+                    muted.add(new UUID(buffer.readLong(), buffer.readLong()));
+                }
+                this.mutedSenders = Collections.unmodifiableList(muted);
+            } else {
+                this.mutedSenders = Collections.emptyList();
+            }
             LostTalesPacketCodec.requireFinished(buffer);
         } catch (RuntimeException exception) {
             this.malformed = true;
@@ -116,6 +162,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.discordAccess = false;
             this.roleMask = 0;
             this.roleHolders = Collections.emptyList();
+            this.mutedSenders = Collections.emptyList();
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -131,6 +178,11 @@ public final class LostTalesChatAccessPacket implements IMessage {
                     MAX_HOLDER_NAME_BYTES);
             buffer.writeInt(holder.getMask());
         }
+        buffer.writeShort(this.mutedSenders.size());
+        for (UUID sender : this.mutedSenders) {
+            buffer.writeLong(sender.getMostSignificantBits());
+            buffer.writeLong(sender.getLeastSignificantBits());
+        }
     }
 
     public boolean hasAdminAccess() { return this.adminAccess; }
@@ -140,6 +192,9 @@ public final class LostTalesChatAccessPacket implements IMessage {
     public boolean hasDiscordAccess() { return this.discordAccess; }
     /** Every online account holding a role, as the server states it. */
     public List<RoleHolder> getRoleHolders() { return this.roleHolders; }
+
+    /** The muted sender ids; empty for anyone but an operator. */
+    public List<UUID> getMutedSenders() { return this.mutedSenders; }
     public boolean isMalformed() { return this.malformed; }
 
     /** One online account and the roles it holds; masks are never zero. */

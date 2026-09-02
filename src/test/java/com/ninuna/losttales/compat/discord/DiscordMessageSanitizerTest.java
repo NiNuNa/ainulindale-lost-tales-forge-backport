@@ -69,6 +69,25 @@ public final class DiscordMessageSanitizerTest {
     }
 
     @Test
+    public void readOnlyLinesArePostedUnderTheChannelTag() {
+        assertEquals("[Global] Aragorn",
+                DiscordMessageSanitizer.channelTaggedName("Global", "Aragorn"));
+        assertEquals("[OOC] Steve",
+                DiscordMessageSanitizer.channelTaggedName(" OOC ", " Steve "));
+        assertEquals("[Global] ",
+                DiscordMessageSanitizer.channelTaggedName("Global", null));
+        StringBuilder name = new StringBuilder();
+        for (int index = 0; index < 100; index++) {
+            name.append('a');
+        }
+        String tagged = DiscordMessageSanitizer.channelTaggedName("Global",
+                name.toString());
+        assertEquals(DiscordMessageSanitizer.MAX_WEBHOOK_NAME_LENGTH,
+                tagged.length());
+        assertTrue(tagged.startsWith("[Global] aaaa"));
+    }
+
+    @Test
     public void outboundTurnsCanonicalShortcodesIntoUnicode() {
         assertEquals("hi 😳 there 😂",
                 DiscordMessageSanitizer.outbound("hi :flushed: there :joy:"));

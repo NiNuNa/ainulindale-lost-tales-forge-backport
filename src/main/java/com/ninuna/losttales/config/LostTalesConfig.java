@@ -155,11 +155,20 @@ public final class LostTalesConfig {
     public static int discordPollIntervalSeconds = 3;
     public static boolean discordRelayGameChat = true;
     public static boolean discordRelayDiscordChat = true;
+    /** Post Global and OOC lines to Discord, one way; nothing comes back. */
+    public static boolean discordRelayGlobalChat = true;
+    public static boolean discordRelayOocChat = true;
+    /** Where the read-only lines go; empty means the main webhook. */
+    public static String discordReadOnlyWebhookUrl = "";
     /** The picture a post carries: {name}/{uuid} of the sender's account. */
     public static String discordAvatarUrlTemplate =
             "https://mc-heads.net/head/{name}/64";
     /** Post server start/stop and player join/leave notices to the webhook. */
     public static boolean discordServerEvents = true;
+    /** Post every player death message to the webhook. */
+    public static boolean discordDeathMessages = true;
+    /** Post vanilla and LOTR achievement announcements to the webhook. */
+    public static boolean discordAchievements = true;
     /** Keep the channel topic saying whether the server is up and who is on. */
     public static boolean discordChannelStatus = true;
     /** Least seconds between two topic writes; Discord allows two per ten minutes. */
@@ -891,6 +900,24 @@ public final class LostTalesConfig {
                     discordRelayDiscordChat,
                     "Server only: show messages written in the Discord channel in the game's Discord channel."
             );
+            discordRelayGlobalChat = config.getBoolean(
+                    "relayGlobalChat",
+                    CATEGORY_DISCORD,
+                    discordRelayGlobalChat,
+                    "Server only: also post the game's Global channel to Discord, read-only - each line under [Global] and the character's name and title, and nothing written on Discord ever enters Global. Goes to readOnlyWebhookUrl when set, else to webhookUrl."
+            );
+            discordRelayOocChat = config.getBoolean(
+                    "relayOocChat",
+                    CATEGORY_DISCORD,
+                    discordRelayOocChat,
+                    "Server only: also post the game's OOC channel to Discord, read-only - each line under [OOC] and the account name, and nothing written on Discord ever enters OOC. Goes to readOnlyWebhookUrl when set, else to webhookUrl."
+            );
+            discordReadOnlyWebhookUrl = config.getString(
+                    "readOnlyWebhookUrl",
+                    CATEGORY_DISCORD,
+                    discordReadOnlyWebhookUrl,
+                    "Server only, secret, optional: a webhook of a second Discord channel for the read-only Global and OOC lines, so they need not share the bridged channel. Empty posts them to webhookUrl."
+            );
             discordAvatarUrlTemplate = config.getString(
                     "avatarUrlTemplate",
                     CATEGORY_DISCORD,
@@ -901,7 +928,19 @@ public final class LostTalesConfig {
                     "serverEvents",
                     CATEGORY_DISCORD,
                     discordServerEvents,
-                    "Server only: post a short notice to the webhook when the server starts or shuts down and when a player joins or leaves."
+                    "Server only: post a notice to the webhook when the server starts or shuts down and when a player joins or leaves. Needs webhookUrl."
+            );
+            discordDeathMessages = config.getBoolean(
+                    "deathMessages",
+                    CATEGORY_DISCORD,
+                    discordDeathMessages,
+                    "Server only: post every player's death message to the webhook, worded exactly as the game announces it. Needs webhookUrl."
+            );
+            discordAchievements = config.getBoolean(
+                    "achievements",
+                    CATEGORY_DISCORD,
+                    discordAchievements,
+                    "Server only: post vanilla and Middle-earth achievement announcements to the webhook, worded exactly as the game announces them. Needs webhookUrl."
             );
             discordChannelStatus = config.getBoolean(
                     "channelStatus",

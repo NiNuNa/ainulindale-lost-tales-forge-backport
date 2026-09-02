@@ -140,7 +140,7 @@ final class ChatHeadMarker {
          */
         boolean isDiscordSender() {
             return this.accountIdentity
-                    && LostTalesChatMessagePacket.DISCORD_SENDER_ID.equals(
+                    && LostTalesChatMessagePacket.isDiscordSender(
                             this.senderId);
         }
 

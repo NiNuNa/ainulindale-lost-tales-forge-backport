@@ -16,16 +16,21 @@ import java.util.Map;
  * an edit or a removal follow its message across: the webhook can
  * rewrite or take back its own posts by exactly these ids. A posted
  * line's reply header is kept beside its id, since an edit rewrites the
- * whole content and the header has to be said again.
+ * whole content and the header has to be said again, and so is which
+ * webhook posted it: a read-only Global or OOC line may live in another
+ * Discord channel than the bridged one, and a correction has to go
+ * where the post went.
  *
- * <p>Only messages of the bridged Discord channel are ever linked, so a
- * Discord id can never lead to a line from a private channel. Bounded
- * to the newest {@link #MAX_LINKS} pairs — the same order of reach the
- * chat's own {@link com.ninuna.losttales.chat.server.ChatMessageLog}
- * has — and cleared when the bridge stops: a link is about one session
- * of one channel, exactly like the history it indexes into. Written
- * from the server thread (inbound) and the bridge's worker (outbound),
- * so every touch is synchronized.</p>
+ * <p>Only public lines are ever linked — the bridged Discord channel's
+ * and the read-only channels', every one of them sent to everyone
+ * online — so a Discord id can never lead to a line from a private
+ * channel. Bounded to the newest {@link #MAX_LINKS} pairs — the same
+ * order of reach the chat's own
+ * {@link com.ninuna.losttales.chat.server.ChatMessageLog} has — and
+ * cleared when the bridge stops: a link is about one session, exactly
+ * like the history it indexes into. Written from the server thread
+ * (inbound) and the bridge's worker (outbound), so every touch is
+ * synchronized.</p>
  */
 final class DiscordMessageLinks {
     /** Pairs remembered; past it the oldest link goes first. */
@@ -38,20 +43,30 @@ final class DiscordMessageLinks {
 
     /** Remembers one pair; ignores anything without both halves. */
     void link(long messageId, String discordId) {
-        link(messageId, discordId, "");
+        link(messageId, discordId, "", false);
     }
 
     /**
      * As above, with the reply header the message was posted under, for
      * an edit to open with again; empty for a headerless line.
      */
-    synchronized void link(long messageId, String discordId, String header) {
+    void link(long messageId, String discordId, String header) {
+        link(messageId, discordId, header, false);
+    }
+
+    /**
+     * As above, saying as well whether the post went through the
+     * read-only webhook rather than the bridged channel's, so an edit
+     * or a removal follows it to the right place.
+     */
+    synchronized void link(long messageId, String discordId, String header,
+                           boolean readOnly) {
         if (!ChatMessageIds.isServerId(messageId) || discordId == null
                 || discordId.length() == 0) {
             return;
         }
         Entry previous = this.entryByMessage.put(Long.valueOf(messageId),
-                new Entry(discordId, header == null ? "" : header));
+                new Entry(discordId, header == null ? "" : header, readOnly));
         if (previous != null && !previous.discordId.equals(discordId)) {
             // A message relinked drops its old pair, so the reverse map
             // stays exactly as bounded as the forward one.
@@ -79,6 +94,12 @@ final class DiscordMessageLinks {
         return entry == null ? "" : entry.header;
     }
 
+    /** Whether a game message's post went through the read-only webhook. */
+    synchronized boolean isReadOnly(long messageId) {
+        Entry entry = this.entryByMessage.get(Long.valueOf(messageId));
+        return entry != null && entry.readOnly;
+    }
+
     /**
      * The game message a Discord id names, or
      * {@link ChatMessageIds#NONE} for none known.
@@ -101,14 +122,16 @@ final class DiscordMessageLinks {
         return this.entryByMessage.size();
     }
 
-    /** One posted or delivered message: its Discord id and its header. */
+    /** One posted or delivered message: its Discord id, header and webhook. */
     private static final class Entry {
         final String discordId;
         final String header;
+        final boolean readOnly;
 
-        Entry(String discordId, String header) {
+        Entry(String discordId, String header, boolean readOnly) {
             this.discordId = discordId;
             this.header = header;
+            this.readOnly = readOnly;
         }
     }
 }
