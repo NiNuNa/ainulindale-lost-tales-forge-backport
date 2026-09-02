@@ -27,9 +27,11 @@ import java.util.UUID;
  *
  * The answer is cached per player and recomputed only when the appearance
  * cache hands out a different {@link CharacterAppearance} instance, which is
- * what every sync packet, preview push, and preview pop does. Render code
- * therefore pays one map lookup per frame and never rebuilds keys or
- * resource locations. Client render thread only.
+ * what every sync packet, preview push, and preview pop does, or when the
+ * account skin behind an entry is replaced, which happens once the local
+ * player's profile textures arrive. Render code therefore pays a map lookup
+ * or two per frame and never rebuilds keys or resource locations. Client
+ * render thread only.
  */
 public final class PlayerAppearanceResolver {
 
@@ -50,23 +52,38 @@ public final class PlayerAppearanceResolver {
         }
         CharacterAppearance appearance = ClientCharacterAppearanceCache.get(playerId);
         Entry entry = RESOLVED.get(playerId);
-        if (entry == null || entry.source != appearance) {
+        boolean rebuild = entry == null || entry.source != appearance;
+        LostTalesAccountSkins.AccountSkin skin = null;
+        if (rebuild || entry.skin != null) {
+            // A rebuild may need the account skin; an entry drawn with one
+            // asks again so a swapped-in skin replaces the entry that used
+            // the old one. Entries drawn with a catalogue skin pay nothing.
+            skin = accountSkin(player);
+            rebuild = rebuild || entry.skin != skin;
+        }
+        if (rebuild) {
             ResolvedPlayerAppearance resolved = appearance == null
-                    ? resolveDefault(player)
+                    ? resolveDefault(skin)
                     : resolve(playerId, appearance);
             if (resolved == null && appearance != null) {
                 // A character the client cannot draw falls back to the same
                 // look a player without a character has.
-                resolved = resolveDefault(player);
+                resolved = resolveDefault(skin);
             } else if (resolved != null && resolved.usesAccountSkin()
-                    && player instanceof AbstractClientPlayer) {
-                resolved = resolved.withTexture(LostTalesAccountSkins.resolve(
-                        (AbstractClientPlayer)player).getTexture());
+                    && skin != null) {
+                resolved = resolved.withTexture(skin.getTexture());
             }
-            entry = new Entry(appearance, resolved);
+            entry = new Entry(appearance, resolved,
+                    resolved != null && resolved.usesAccountSkin() ? skin : null);
             RESOLVED.put(playerId, entry);
         }
         return entry.resolved;
+    }
+
+    private static LostTalesAccountSkins.AccountSkin accountSkin(EntityPlayer player) {
+        return player instanceof AbstractClientPlayer
+                ? LostTalesAccountSkins.resolve((AbstractClientPlayer)player)
+                : null;
     }
 
     /**
@@ -108,12 +125,11 @@ public final class PlayerAppearanceResolver {
     }
 
     /** A plain human on the Lost Tales body with the account's skin and arm width. */
-    private static ResolvedPlayerAppearance resolveDefault(EntityPlayer player) {
-        if (!(player instanceof AbstractClientPlayer)) {
+    private static ResolvedPlayerAppearance resolveDefault(
+            LostTalesAccountSkins.AccountSkin skin) {
+        if (skin == null) {
             return null;
         }
-        LostTalesAccountSkins.AccountSkin skin =
-                LostTalesAccountSkins.resolve((AbstractClientPlayer)player);
         return new ResolvedPlayerAppearance(
                 CharacterRaceRegistry.HUMAN,
                 CharacterBodyModelRegistry.LOSTTALES_PLAYER,
@@ -157,10 +173,14 @@ public final class PlayerAppearanceResolver {
     private static final class Entry {
         private final CharacterAppearance source;
         private final ResolvedPlayerAppearance resolved;
+        /** The account skin the entry was drawn with; null when it used none. */
+        private final LostTalesAccountSkins.AccountSkin skin;
 
-        private Entry(CharacterAppearance source, ResolvedPlayerAppearance resolved) {
+        private Entry(CharacterAppearance source, ResolvedPlayerAppearance resolved,
+                      LostTalesAccountSkins.AccountSkin skin) {
             this.source = source;
             this.resolved = resolved;
+            this.skin = skin;
         }
     }
 }

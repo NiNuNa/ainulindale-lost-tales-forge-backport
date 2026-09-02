@@ -1011,7 +1011,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                 injectLotrMapMiniQuestFilter(method);
                         changed |= miniQuestFilterHookPresent;
                     }
-                } else if ("drawScreen".equals(method.name)
+                } else if (isNamed(owner, method, "drawScreen", "func_73863_a")
                         && "(IIF)V".equals(method.desc)) {
                     compassHookPresent = containsHook(
                             method, LOTR_MAP_COMPASS_HOOK_OWNER,
@@ -1269,7 +1269,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             if (call.getOpcode() != Opcodes.INVOKEVIRTUAL
                     || !"net/minecraft/client/gui/FontRenderer"
                     .equals(call.owner)
-                    || !"drawString".equals(call.name)
+                    || !("drawString".equals(call.name)
+                    || "func_78276_b".equals(call.name))
                     || !"(Ljava/lang/String;III)I".equals(call.desc)) {
                 continue;
             }
@@ -1899,7 +1900,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             ClassNode owner = read(basicClass);
             for (Object value : owner.methods) {
                 MethodNode method = (MethodNode)value;
-                if (!"doRender".equals(method.name)
+                if (!isNamed(owner, method, "doRender", "func_76986_a")
                         || !method.desc.startsWith(
                                 "(Lnet/minecraft/entity/Entity;DDD")) {
                     continue;

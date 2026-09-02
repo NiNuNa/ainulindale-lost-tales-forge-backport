@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.skin;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.mojang.authlib.GameProfile;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.AbstractClientPlayer;
@@ -27,7 +28,12 @@ import java.util.UUID;
  * keep working. Every texture here lives under {@code losttales:skins/} and
  * stays registered for the rest of the client run, since the same hash names
  * the same image. The per-player answers are dropped on disconnect.
- * Client render thread only.
+ *
+ * The local player's profile carries no {@code textures} property when the
+ * entity is built; vanilla's skin manager fetches it on a worker thread and
+ * writes it onto the same profile object a moment later. An answer given
+ * before that property exists is therefore provisional and is replaced as
+ * soon as the property appears. Client render thread only.
  */
 public final class LostTalesAccountSkins {
 
@@ -36,11 +42,14 @@ public final class LostTalesAccountSkins {
         private final ResourceLocation texture;
         private final String bodyTypeId;
         private final boolean fromAccount;
+        private final boolean awaitingProfile;
 
-        AccountSkin(ResourceLocation texture, String bodyTypeId, boolean fromAccount) {
+        AccountSkin(ResourceLocation texture, String bodyTypeId, boolean fromAccount,
+                    boolean awaitingProfile) {
             this.texture = texture;
             this.bodyTypeId = bodyTypeId;
             this.fromAccount = fromAccount;
+            this.awaitingProfile = awaitingProfile;
         }
 
         public ResourceLocation getTexture() {
@@ -55,6 +64,11 @@ public final class LostTalesAccountSkins {
         public boolean isFromAccount() {
             return this.fromAccount;
         }
+
+        /** True while the default stands in for a profile not yet fetched. */
+        public boolean isAwaitingProfile() {
+            return this.awaitingProfile;
+        }
     }
 
     private static final ResourceLocation VANILLA_DEFAULT_SKIN =
@@ -64,7 +78,6 @@ public final class LostTalesAccountSkins {
     private static final ResourceLocation OVERRIDE_TEXTURE =
             new ResourceLocation(LostTalesMetaData.MOD_ID, "skins/dev_override");
     private static final String TEXTURE_PREFIX = "skins/";
-    private static final String VANILLA_CACHE_DIRECTORY = "assets/skins";
 
     private static final Map<UUID, AccountSkin> RESOLVED = new HashMap<UUID, AccountSkin>();
     private static BufferedImage defaultImage;
@@ -76,14 +89,21 @@ public final class LostTalesAccountSkins {
     public static AccountSkin resolve(AbstractClientPlayer player) {
         UUID playerId = player == null ? null : player.getUniqueID();
         if (playerId == null) {
-            return defaultSkin();
+            return defaultSkin(false);
         }
         AccountSkin skin = RESOLVED.get(playerId);
-        if (skin == null) {
+        if (skin == null
+                || (skin.awaitingProfile && hasTextures(player.getGameProfile()))) {
             skin = create(player);
             RESOLVED.put(playerId, skin);
         }
         return skin;
+    }
+
+    private static boolean hasTextures(GameProfile profile) {
+        return profile != null && profile.getProperties() != null
+                && profile.getProperties().containsKey(
+                        ProfileTexturesDecoder.TEXTURES_PROPERTY);
     }
 
     /** Forgets every per-player answer; the developer override reloads on next use. */
@@ -103,10 +123,11 @@ public final class LostTalesAccountSkins {
             return override;
         }
 
-        AccountSkinProfile profile = ProfileTexturesDecoder.decode(player.getGameProfile());
+        GameProfile gameProfile = player.getGameProfile();
+        AccountSkinProfile profile = ProfileTexturesDecoder.decode(gameProfile);
         BufferedImage placeholder = defaultImage(minecraft);
         if (profile == null || placeholder == null) {
-            return defaultSkin();
+            return defaultSkin(!hasTextures(gameProfile));
         }
 
         ResourceLocation location = new ResourceLocation(
@@ -122,7 +143,7 @@ public final class LostTalesAccountSkins {
         return new AccountSkin(location,
                 profile.isSlim() ? CharacterBodyTypeRegistry.SLIM
                         : CharacterBodyTypeRegistry.WIDE,
-                true);
+                true, false);
     }
 
     /**
@@ -157,7 +178,7 @@ public final class LostTalesAccountSkins {
                         + "override %s (%s)", LostTalesMetaData.MOD_ID, path, bodyTypeId);
             }
         }
-        return new AccountSkin(OVERRIDE_TEXTURE, bodyTypeId, true);
+        return new AccountSkin(OVERRIDE_TEXTURE, bodyTypeId, true, false);
     }
 
     private static BufferedImage readOverride(File file) {
@@ -176,21 +197,23 @@ public final class LostTalesAccountSkins {
         }
     }
 
-    private static AccountSkin defaultSkin() {
+    /** The default skin; provisional while the profile is still being fetched. */
+    private static AccountSkin defaultSkin(boolean awaitingProfile) {
         Minecraft minecraft = Minecraft.getMinecraft();
         BufferedImage image = defaultImage(minecraft);
         if (image == null) {
             // The vanilla default is 64x32; the model samples it wrongly but
             // the player is still drawn rather than missing.
             return new AccountSkin(VANILLA_DEFAULT_SKIN,
-                    CharacterBodyTypeRegistry.WIDE, false);
+                    CharacterBodyTypeRegistry.WIDE, false, awaitingProfile);
         }
         if (!defaultRegistered) {
             defaultRegistered = true;
             minecraft.getTextureManager().loadTexture(DEFAULT_TEXTURE,
                     new AccountSkinTexture(image, null, "default skin"));
         }
-        return new AccountSkin(DEFAULT_TEXTURE, CharacterBodyTypeRegistry.WIDE, false);
+        return new AccountSkin(DEFAULT_TEXTURE, CharacterBodyTypeRegistry.WIDE, false,
+                awaitingProfile);
     }
 
     /** Vanilla's Steve brought into the 64x64 layout, read once. */
@@ -223,10 +246,6 @@ public final class LostTalesAccountSkins {
 
     /** Where vanilla's own downloader stores this hash; read only, never written. */
     private static File vanillaCachedCopy(Minecraft minecraft, String hash) {
-        if (minecraft == null || minecraft.mcDataDir == null || hash.length() < 2) {
-            return null;
-        }
-        File directory = new File(minecraft.mcDataDir, VANILLA_CACHE_DIRECTORY);
-        return new File(new File(directory, hash.substring(0, 2)), hash);
+        return VanillaSkinCacheAccess.cachedCopy(minecraft, hash);
     }
 }

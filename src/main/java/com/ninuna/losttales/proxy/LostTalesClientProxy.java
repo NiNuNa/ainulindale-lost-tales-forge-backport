@@ -187,6 +187,20 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                 ThirdPersonTargetingHooks.ACTIVE_PROPERTY)) {
             FMLLog.warning("[losttales] Third-person targeting transformer is not active; vanilla targeting will remain active safely");
         }
+    }
+
+    private static boolean thirdPersonActionsVerified;
+
+    /**
+     * Checks the PlayerControllerMP patches once the class exists. It is
+     * loaded when the first world is joined, so the check runs from the
+     * local player's first tick rather than from mod init.
+     */
+    public static void verifyThirdPersonActionTransformers() {
+        if (thirdPersonActionsVerified) {
+            return;
+        }
+        thirdPersonActionsVerified = true;
         if (LostTalesThirdPersonConfig.enabled
                 && LostTalesThirdPersonConfig.enableCameraIntentTargeting
                 && !Boolean.getBoolean(

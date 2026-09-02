@@ -67,6 +67,7 @@ import com.ninuna.losttales.item.weapon.LostTalesItemBattleaxe;
 import com.ninuna.losttales.item.weapon.LostTalesItemDagger;
 import com.ninuna.losttales.item.weapon.LostTalesItemSpear;
 import com.ninuna.losttales.item.weapon.LostTalesItemSword;
+import com.ninuna.losttales.proxy.LostTalesClientProxy;
 import com.ninuna.losttales.world.map.LostTalesMapOverlay;
 import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
 import cpw.mods.fml.common.eventhandler.EventPriority;
@@ -270,6 +271,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
             return;
         }
         if (event.player == Minecraft.getMinecraft().thePlayer) {
+            LostTalesClientProxy.verifyThirdPersonActionTransformers();
             LostTalesClientMobAggroCache.validateContext(event.player);
             ThirdPersonCameraRuntime.onClientTick(
                     Minecraft.getMinecraft());
