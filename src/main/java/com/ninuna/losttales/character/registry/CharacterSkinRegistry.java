@@ -10,13 +10,21 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Server-valid catalogue of player-compatible skins supplied by LOTR Legacy.
+ * Server-valid catalogue of player-compatible skins.
  *
- * Lost Tales stores only stable identifiers and LOTR resource locations. The
- * actual textures remain inside the required LOTR Legacy installation and are
- * never copied into this add-on.
+ * Most skins are supplied by LOTR Legacy: Lost Tales stores only stable
+ * identifiers and LOTR resource locations, and the textures stay inside the
+ * required LOTR installation. Skins drawn for Lost Tales itself ship under
+ * {@code assets/losttales/textures/skins/} and register through the same
+ * catalogue, so the creation screen cycles both kinds in one list and the
+ * server validates both the same way.
  */
 public final class CharacterSkinRegistry {
+
+    /** Prefix of every texture location that points into LOTR Legacy. */
+    public static final String LOTR_TEXTURE_ROOT = "lotr:";
+    /** Prefix of every texture location bundled with Lost Tales. */
+    public static final String BUNDLED_TEXTURE_ROOT = "losttales:textures/skins/";
 
     private static final Map<String, CharacterSkinDefinition> DEFINITIONS;
     private static final Map<String, List<CharacterSkinDefinition>> BY_RACE;
@@ -70,6 +78,10 @@ public final class CharacterSkinRegistry {
                 "dwarf_erebor", "mob/dwarf/dwarf", 3, 3);
         registerGenderedGroup(definitions, CharacterRaceRegistry.DWARF,
                 "dwarf_blue_mountains", "mob/dwarf/blueMountains", 3, 3);
+        // Drawn for Lost Tales: a 64x64 skin in the LOTR layout, rendered
+        // through the same dwarf model as the LOTR skins above.
+        registerBundledGroup(definitions, CharacterRaceRegistry.DWARF,
+                CharacterGenderRegistry.MALE, "dwarf_exiled", "dwarf/exiled_male", 1);
 
         registerGenderedGroup(definitions, CharacterRaceRegistry.HOBBIT,
                 "hobbit_shire", "mob/hobbit/hobbit", 13, 13);
@@ -159,22 +171,36 @@ public final class CharacterSkinRegistry {
             String raceId, String displayGroupId, String resourceBase,
             int maleCount, int femaleCount) {
         registerGroup(definitions, raceId, CharacterGenderRegistry.MALE,
-                displayGroupId, resourceBase + "_male", maleCount);
+                displayGroupId, LOTR_TEXTURE_ROOT + resourceBase + "_male", maleCount);
         registerGroup(definitions, raceId, CharacterGenderRegistry.FEMALE,
-                displayGroupId, resourceBase + "_female", femaleCount);
+                displayGroupId, LOTR_TEXTURE_ROOT + resourceBase + "_female", femaleCount);
     }
 
     private static void registerUnisexGroup(
             Map<String, CharacterSkinDefinition> definitions,
             String raceId, String displayGroupId, String resourceBase,
             int count) {
-        registerGroup(definitions, raceId, "", displayGroupId, resourceBase, count);
+        registerGroup(definitions, raceId, "", displayGroupId,
+                LOTR_TEXTURE_ROOT + resourceBase, count);
+    }
+
+    /**
+     * Registers skins bundled with Lost Tales. {@code resourceBase} is the
+     * folder under {@code assets/losttales/textures/skins/} that holds
+     * {@code 0.png}, {@code 1.png}, ... for the group.
+     */
+    private static void registerBundledGroup(
+            Map<String, CharacterSkinDefinition> definitions,
+            String raceId, String genderId, String displayGroupId,
+            String resourceBase, int count) {
+        registerGroup(definitions, raceId, genderId, displayGroupId,
+                BUNDLED_TEXTURE_ROOT + resourceBase, count);
     }
 
     private static void registerGroup(
             Map<String, CharacterSkinDefinition> definitions,
             String raceId, String genderId, String displayGroupId,
-            String resourceBase, int count) {
+            String textureBase, int count) {
         String genderSuffix = genderId.length() == 0
                 ? "" : "_" + stripNamespace(genderId);
         for (int index = 0; index < count; index++) {
@@ -185,7 +211,7 @@ public final class CharacterSkinRegistry {
                     genderId,
                     displayGroupId,
                     index,
-                    "lotr:" + resourceBase + "/" + index + ".png"
+                    textureBase + "/" + index + ".png"
             );
             CharacterSkinDefinition previous = definitions.put(definition.getId(), definition);
             if (previous != null) {

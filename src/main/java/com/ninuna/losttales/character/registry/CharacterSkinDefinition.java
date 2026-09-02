@@ -1,10 +1,11 @@
 package com.ninuna.losttales.character.registry;
 
 /**
- * One server-valid character skin backed by a texture provided by LOTR Legacy.
+ * One server-valid character skin.
  *
- * The add-on stores only a stable identifier and a resource location. It does
- * not copy or redistribute any LOTR texture assets.
+ * The texture is either provided by LOTR Legacy, in which case only a stable
+ * identifier and a resource location are stored and no LOTR asset is copied,
+ * or bundled with Lost Tales under {@code assets/losttales/textures/skins/}.
  */
 public final class CharacterSkinDefinition {
 
@@ -53,6 +54,11 @@ public final class CharacterSkinDefinition {
 
     public String getTextureLocation() {
         return this.textureLocation;
+    }
+
+    /** True when the texture ships inside the Lost Tales jar. */
+    public boolean isBundled() {
+        return this.textureLocation.startsWith(CharacterSkinRegistry.BUNDLED_TEXTURE_ROOT);
     }
 
     public boolean isCompatibleWith(String raceId, String genderId) {
