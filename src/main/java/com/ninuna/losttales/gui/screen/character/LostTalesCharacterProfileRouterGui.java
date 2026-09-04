@@ -12,7 +12,10 @@ import org.lwjgl.input.Keyboard;
 
 /**
  * Client-only profile entry controller. It never treats a missing client cache
- * as an empty authoritative roster and routes only after a server snapshot.
+ * as an empty authoritative roster and routes only after a server snapshot:
+ * a player with no characters yet lands on the roster, where the account is
+ * the identity they are playing and a character can be made; everyone else
+ * lands on the profile of whatever they are playing as.
  */
 public final class LostTalesCharacterProfileRouterGui extends GuiScreen {
 
@@ -65,11 +68,7 @@ public final class LostTalesCharacterProfileRouterGui extends GuiScreen {
         }
         this.routed = true;
         if (snapshot.getCharacterCount() == 0) {
-            this.mc.displayGuiScreen(new LostTalesCharacterCreationGui(
-                    this.parent, 0, true));
-        } else if (snapshot.getActiveCharacter() == null) {
-            this.mc.displayGuiScreen(new LostTalesCharacterRosterGui(
-                    this.parent, true));
+            this.mc.displayGuiScreen(new LostTalesCharacterRosterGui(this.parent));
         } else {
             this.mc.displayGuiScreen(new LostTalesCharacterInfoGui(this.parent));
         }

@@ -51,23 +51,6 @@ public final class DiscordJsonTest {
     }
 
     @Test
-    public void webhookBodiesCarryTheNameAndPingNobody() {
-        JsonObject body = new JsonParser().parse(
-                DiscordJson.webhookBody("Aragorn", "https://heads/Aragorn",
-                        "@everyone hello")).getAsJsonObject();
-        assertEquals("@everyone hello", body.get("content").getAsString());
-        assertEquals("Aragorn", body.get("username").getAsString());
-        assertEquals("https://heads/Aragorn",
-                body.get("avatar_url").getAsString());
-        assertEquals(0, body.getAsJsonObject("allowed_mentions")
-                .getAsJsonArray("parse").size());
-        JsonObject nameless = new JsonParser().parse(
-                DiscordJson.webhookBody("", "", "hi")).getAsJsonObject();
-        assertFalse(nameless.has("username"));
-        assertFalse(nameless.has("avatar_url"));
-    }
-
-    @Test
     public void noticesAreOneEmbedWithTheLineOnTheAuthorRow() {
         JsonObject body = new JsonParser().parse(DiscordJson.webhookEmbedBody(
                 DiscordServerNotices.playerDied("Steve fell from a high place",
@@ -154,14 +137,68 @@ public final class DiscordJsonTest {
     }
 
     @Test
-    public void editBodiesCarryTheNewTextAndPingNobody() {
+    public void lineBodiesAreCardsInTheChannelsColour() {
+        DiscordJson.LineCard card = new DiscordJson.LineCard("\uD83D\uDEE1\uFE0F Gondor",
+                0x1234AB, "Player890", 1700000000000L, "> header\n");
         JsonObject body = new JsonParser().parse(
-                DiscordJson.webhookEditBody("@everyone corrected"))
+                DiscordJson.webhookLineBody("Aragorn, the Gondor Farmer",
+                        "https://heads/Aragorn", card, "@everyone hi"))
                 .getAsJsonObject();
-        assertEquals("@everyone corrected", body.get("content").getAsString());
+        assertEquals("Aragorn, the Gondor Farmer", body.get("username").getAsString());
+        assertEquals("https://heads/Aragorn", body.get("avatar_url").getAsString());
+        assertFalse("everything is on the card", body.has("content"));
+        JsonObject embed = body.getAsJsonArray("embeds").get(0).getAsJsonObject();
+        assertEquals(0x1234AB, embed.get("color").getAsInt());
+        assertEquals("\uD83D\uDEE1\uFE0F Gondor",
+                embed.getAsJsonObject("author").get("name").getAsString());
+        assertEquals("the reply opens the text",
+                "> header\n@everyone hi", embed.get("description").getAsString());
+        assertEquals("Player890",
+                embed.getAsJsonObject("footer").get("text").getAsString());
+        assertEquals("2023-11-14T22:13:20Z", embed.get("timestamp").getAsString());
         assertEquals(0, body.getAsJsonObject("allowed_mentions")
                 .getAsJsonArray("parse").size());
+    }
+
+    @Test
+    public void aBareCardIsJustTheLine() {
+        JsonObject body = new JsonParser().parse(
+                DiscordJson.webhookLineBody("", "", DiscordJson.LineCard.NONE, "hi"))
+                .getAsJsonObject();
         assertFalse(body.has("username"));
+        assertFalse(body.has("avatar_url"));
+        assertFalse(body.has("content"));
+        JsonObject embed = body.getAsJsonArray("embeds").get(0).getAsJsonObject();
+        assertEquals("hi", embed.get("description").getAsString());
+        assertFalse(embed.has("author"));
+        assertFalse(embed.has("footer"));
+        assertFalse(embed.has("timestamp"));
+        assertEquals(0, embed.get("color").getAsInt());
+        // A missing card draws the same.
+        assertEquals(body, new JsonParser().parse(
+                DiscordJson.webhookLineBody("", "", null, "hi")));
+    }
+
+    @Test
+    public void lineEditBodiesDrawTheCardAgainAndPingNobody() {
+        DiscordJson.LineCard card = new DiscordJson.LineCard("\uD83C\uDF0D Global",
+                0x00FF00, "", 1700000000000L, "");
+        JsonObject body = new JsonParser().parse(
+                DiscordJson.webhookLineEditBody(card, "@everyone corrected"))
+                .getAsJsonObject();
+        assertFalse(body.has("username"));
+        assertFalse(body.has("content"));
+        JsonObject embed = body.getAsJsonArray("embeds").get(0).getAsJsonObject();
+        assertEquals("@everyone corrected", embed.get("description").getAsString());
+        assertEquals("\uD83C\uDF0D Global",
+                embed.getAsJsonObject("author").get("name").getAsString());
+        assertFalse("an account line names no account twice", embed.has("footer"));
+        assertEquals("the original time stays", "2023-11-14T22:13:20Z",
+                embed.get("timestamp").getAsString());
+        assertEquals(0, body.getAsJsonObject("allowed_mentions")
+                .getAsJsonArray("parse").size());
+        assertEquals("> q\n", card.withHeader("> q\n").header);
+        assertEquals("", DiscordJson.LineCard.NONE.withHeader(null).header);
     }
 
     @Test

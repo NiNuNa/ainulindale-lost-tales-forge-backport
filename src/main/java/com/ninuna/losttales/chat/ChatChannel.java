@@ -10,7 +10,9 @@ import java.util.Locale;
  * Small stable channel catalogue shared by packet validation and client UI.
  * Each constant is one built-in {@link ChatChannelDescriptor}: the id, the
  * identity its lines wear, the routing rule, the access a player needs,
- * and the presentation. The string ids are the wire and storage surface —
+ * the presentation, and whether the Discord bridge may carry it — the
+ * Party channel, the console and whispers are private and never leave
+ * the game. The string ids are the wire and storage surface —
  * packets and the layout file carry them, and client view state is keyed
  * by tab identity — so an id is permanent while declaration order carries
  * no meaning of its own; the order channels are presented in is
@@ -19,27 +21,27 @@ import java.util.Locale;
 public enum ChatChannel {
     ALL("all", "Global", ChatIdentityType.CHARACTER,
             ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.FERN_GREEN)),
+            LostTalesColors.rgb(LostTalesColors.FERN_GREEN), true),
     PROXIMITY("proximity", "Proximity", ChatIdentityType.CHARACTER,
             ChatRecipientRule.PROXIMITY, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN)),
+            LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN), true),
     // Presentation shows the member's own party colour; this seafoam is
     // only the fallback outside a party.
     PARTY("party", "Party", ChatIdentityType.CHARACTER,
             ChatRecipientRule.PARTY, ChatChannelAccess.PARTY_MEMBERSHIP,
-            LostTalesColors.rgb(LostTalesColors.SEAFOAM)),
+            LostTalesColors.rgb(LostTalesColors.SEAFOAM), false),
     // Presentation shows the sender's LOTR faction colour; this palette
     // honey is only the indicator/selector fallback.
     FACTION("faction", "Faction", ChatIdentityType.CHARACTER,
             ChatRecipientRule.FACTION, ChatChannelAccess.CHARACTER_FACTION,
-            LostTalesColors.rgb(LostTalesColors.HONEY)),
+            LostTalesColors.rgb(LostTalesColors.HONEY), true),
     OOC("ooc", "OOC", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE)),
+            LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE), true),
     /** Staff channel: operators only, account identity; the wire id stays. */
     ADMIN("admin", "Operator", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.OPERATORS, ChatChannelAccess.OPERATOR,
-            LostTalesColors.rgb(LostTalesColors.CRIMSON)),
+            LostTalesColors.rgb(LostTalesColors.CRIMSON), true),
     /**
      * The player's private console: what only they see anyway — command
      * output, fast-travel countdowns, other mods' notices — plus anything
@@ -47,7 +49,7 @@ public enum ChatChannel {
      */
     CONSOLE("console", "Console", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.SELF, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.MAUVE)),
+            LostTalesColors.rgb(LostTalesColors.MAUVE), false),
     /**
      * A private conversation between two accounts. Not a tab of its own:
      * every whisper partner is one tab on this channel, and the client
@@ -55,7 +57,7 @@ public enum ChatChannel {
      */
     WHISPER("whisper", "Whisper", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.WHISPER, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.APRICOT)),
+            LostTalesColors.rgb(LostTalesColors.APRICOT), false),
     /**
      * The server's Discord channel, bridged both ways by the server's
      * own bridge: account identity, everyone in the game reads it, and
@@ -63,7 +65,7 @@ public enum ChatChannel {
      */
     DISCORD("discord", "Discord", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.GLOBAL, ChatChannelAccess.DISCORD_BRIDGE,
-            LostTalesColors.rgb(LostTalesColors.STEEL_BLUE));
+            LostTalesColors.rgb(LostTalesColors.STEEL_BLUE), true);
 
     /** Tab, indicator, and cycle order: the two global channels bracket
      *  the scoped role-play ones, Discord beside OOC as the other account
@@ -79,9 +81,11 @@ public enum ChatChannel {
     ChatChannel(String id, String displayName,
                 ChatIdentityType identityType,
                 ChatRecipientRule recipientRule,
-                ChatChannelAccess access, int displayColor) {
+                ChatChannelAccess access, int displayColor,
+                boolean bridgeable) {
         this.descriptor = new ChatChannelDescriptor(id, displayName,
-                identityType, recipientRule, access, displayColor);
+                identityType, recipientRule, access, displayColor,
+                bridgeable);
     }
 
     public String getId() { return this.descriptor.getId(); }
@@ -96,6 +100,8 @@ public enum ChatChannel {
         return this.descriptor.getAccess();
     }
     public int getDisplayColor() { return this.descriptor.getDisplayColor(); }
+    /** Whether the Discord bridge may carry this channel at all; see {@link ChatChannelDescriptor#isBridgeable}. */
+    public boolean isBridgeable() { return this.descriptor.isBridgeable(); }
     /** The channel as the facts that describe it. */
     public ChatChannelDescriptor getDescriptor() { return this.descriptor; }
 

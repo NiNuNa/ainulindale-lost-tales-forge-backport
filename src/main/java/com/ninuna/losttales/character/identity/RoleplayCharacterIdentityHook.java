@@ -30,11 +30,12 @@ public final class RoleplayCharacterIdentityHook {
 
     private RoleplayCharacterIdentityHook() {}
 
-    /** Returns the active character UUID, or the account UUID as a safe fallback. */
+    /** The gameplay id: the active character's UUID, or the account's own when on the account. */
     public static UUID resolveGameplayId(EntityPlayer player) {
         UUID accountId = player == null ? null : player.getUniqueID();
         RoleplayCharacter character = resolveActive(player);
-        return character == null ? accountId : character.getCharacterId();
+        return PlayableIdentity.gameplayId(
+                character == null ? null : character.getCharacterId(), accountId);
     }
 
     /** Returns the active character name for roleplay dialogue only. */
@@ -102,6 +103,26 @@ public final class RoleplayCharacterIdentityHook {
         }
         addRoleplayReplacement(replacements, victim);
         return replaceAccountNames(vanillaMessage, replacements);
+    }
+
+    /**
+     * A copy of a broadcast line naming {@code subject} by the character
+     * they are playing rather than by their account, where the two
+     * differ; the line itself when they do not or when there is no
+     * subject. What the achievement announcements are passed through
+     * before they leave the game, since the client renames the line's
+     * subject the same way when it shows it.
+     */
+    public static IChatComponent resolveSubjectName(
+            IChatComponent message, EntityPlayerMP subject) {
+        if (message == null) {
+            return null;
+        }
+        Map<String, String> replacements =
+                new LinkedHashMap<String, String>();
+        addRoleplayReplacement(replacements, subject);
+        return replacements.isEmpty() ? message
+                : replaceAccountNames(message, replacements);
     }
 
     static IChatComponent replaceAccountNames(

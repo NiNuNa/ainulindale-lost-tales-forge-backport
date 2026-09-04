@@ -13,31 +13,38 @@ import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.server.MinecraftServer;
 
 /**
  * The server's own Discord bridge, no library behind it: a worker
- * thread polls one Discord channel for new messages through the REST
- * API, posts the game's lines and the server's notices to a webhook,
- * and keeps the channel's topic saying whether the server is up, while
- * the server thread only ever touches two bounded queues and a wanted
- * topic. Discord messages are handed to
+ * thread polls the Discord channels the bindings read for new messages
+ * through the REST API, posts the game's lines and the server's notices
+ * to the webhooks they name, and keeps the Discord channel's topic
+ * saying whether the server is up, while the server thread only ever
+ * touches two bounded queues and a wanted topic. Which game channel is
+ * tied to which Discord channel, and which way, is
+ * {@link DiscordChannelBindings}: the game's own Discord channel both
+ * ways, and any other channel the channel itself allows — each line
+ * posted as a card in its channel's colour, headed by the channel's
+ * name — while the Party channel, the console and whispers never leave
+ * the game. Discord messages are handed to
  * {@link LostTalesChatService#sendFromDiscord} on the server tick, so
  * they reach players through the same packet as every other line; game
- * lines are queued here by the chat service and posted off-thread. The
- * Global and OOC channels can be posted as well, read-only — under
- * {@code [Global] Name}, through a second webhook when one is
- * configured — and nothing on Discord ever answers into them.
+ * lines are queued here by the chat service and posted off-thread.
  *
  * <p>The server's own notices — started, shutting down, a player joined,
  * left, died or earned an achievement — are {@link DiscordNotice}s,
@@ -99,14 +106,24 @@ public final class LostTalesDiscordBridge {
             new LinkedHashMap<String, String>();
     /** Turns joins, leaves and the server's broadcasts into notices. */
     private final DiscordGameEventRelay relay = new DiscordGameEventRelay();
+    /** The bindings read at the last start; empty while the bridge is stopped. */
+    private volatile DiscordChannelBindings bindings = DiscordChannelBindings.EMPTY;
+    /** Where the bindings' warnings go: the log, once each at start. */
+    private static final DiscordChannelBindings.Warnings LOG_WARNINGS =
+            new DiscordChannelBindings.Warnings() {
+                @Override
+                public void warn(String message) {
+                    FMLLog.warning("[%s] %s", LostTalesMetaData.MOD_ID, message);
+                }
+            };
     private volatile boolean statusRefreshRequested;
     /**
-     * When a typing ping was last sent to Discord. Discord shows its own
-     * indicator for about ten seconds from one, so repeating it faster
-     * than that buys nothing and only spends the bridge's rate limit.
+     * The bindings somebody is typing into, by key, waiting for the
+     * worker to say so on Discord. Written on the server thread, drained
+     * by the worker.
      */
-    private final AtomicLong typingSentMillis = new AtomicLong();
-    private volatile boolean typingRequested;
+    private final Set<String> typingRequests =
+            Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
     private volatile Worker worker;
     private boolean registered;
 
@@ -122,23 +139,23 @@ public final class LostTalesDiscordBridge {
         if (!LostTalesConfig.discordEnabled) {
             return;
         }
-        boolean bot = LostTalesConfig.discordBotToken.trim().length() > 0
-                && LostTalesConfig.discordChannelId.trim().length() > 0;
-        boolean reads = LostTalesConfig.discordRelayDiscordChat && bot;
-        boolean readOnly = LostTalesConfig.discordRelayGlobalChat
-                || LostTalesConfig.discordRelayOocChat;
-        boolean posts = LostTalesConfig.discordWebhookUrl.trim().length() > 0
-                && (LostTalesConfig.discordRelayGameChat
-                        || LostTalesConfig.discordServerEvents
-                        || LostTalesConfig.discordDeathMessages
-                        || LostTalesConfig.discordAchievements)
-                || readOnly && readOnlyWebhookUrl().length() > 0;
-        boolean manages = LostTalesConfig.discordChannelStatus && bot;
+        boolean botPresent = LostTalesConfig.discordBotToken.trim().length() > 0;
+        DiscordChannelBindings configured = DiscordChannelBindings.parse(
+                LostTalesConfig.discordChannelBindings, botPresent, LOG_WARNINGS);
+        this.bindings = configured;
+        boolean reads = configured.readsAnything();
+        boolean notices = LostTalesConfig.discordServerEvents
+                || LostTalesConfig.discordDeathMessages
+                || LostTalesConfig.discordAchievements;
+        boolean posts = configured.sendsAnything()
+                || notices && configured.noticeWebhookUrl().length() > 0;
+        DiscordChannelBinding discord = configured.discordChannel();
+        boolean manages = LostTalesConfig.discordChannelStatus && botPresent
+                && discord != null && discord.getDiscordChannelId().length() > 0;
         if (!reads && !posts && !manages) {
-            FMLLog.warning("[%s] Discord bridge is enabled but has neither a "
-                    + "bot token and channel id to read or manage with nor a "
-                    + "webhook URL to post to; nothing will be relayed",
-                    LostTalesMetaData.MOD_ID);
+            FMLLog.warning("[%s] Discord bridge is enabled but no binding "
+                    + "reads a Discord channel, posts to a webhook, or keeps "
+                    + "a topic; nothing will be relayed", LostTalesMetaData.MOD_ID);
             return;
         }
         if (!this.registered) {
@@ -157,45 +174,14 @@ public final class LostTalesDiscordBridge {
                     + "active; deaths and achievements will not reach "
                     + "Discord", LostTalesMetaData.MOD_ID);
         }
-        Worker started = new Worker(reads, posts, manages);
+        Worker started = new Worker(configured, reads, posts, manages);
         this.worker = started;
         started.start();
-        FMLLog.info("[%s] Discord bridge started (%s%s%s)", LostTalesMetaData.MOD_ID,
+        FMLLog.info("[%s] Discord bridge started (%s%s): %s", LostTalesMetaData.MOD_ID,
                 reads && posts ? "both ways" : reads ? "Discord to game"
                         : posts ? "game to Discord" : "topic only",
                 manages && (reads || posts) ? ", channel topic" : "",
-                posts && readOnly ? ", read-only "
-                        + (LostTalesConfig.discordRelayGlobalChat
-                                && LostTalesConfig.discordRelayOocChat
-                                ? "Global and OOC"
-                                : LostTalesConfig.discordRelayGlobalChat
-                                        ? "Global" : "OOC") : "");
-    }
-
-    /**
-     * The webhook the read-only lines go to: the one configured for
-     * them, else the main one. Empty when there is neither.
-     */
-    private static String readOnlyWebhookUrl() {
-        String own = LostTalesConfig.discordReadOnlyWebhookUrl.trim();
-        return own.length() > 0 ? own
-                : LostTalesConfig.discordWebhookUrl.trim();
-    }
-
-    /**
-     * Whether lines of the channel are posted to Discord read-only: the
-     * two public conversation channels, each behind its own switch, and
-     * never a scoped or private one. What the chat service asks before
-     * it prepares a line for the bridge.
-     */
-    public static boolean relaysReadOnly(ChatChannel channel) {
-        if (channel == ChatChannel.ALL) {
-            return LostTalesConfig.discordRelayGlobalChat;
-        }
-        if (channel == ChatChannel.OOC) {
-            return LostTalesConfig.discordRelayOocChat;
-        }
-        return false;
+                configured.describeForLog());
     }
 
     /**
@@ -218,6 +204,7 @@ public final class LostTalesDiscordBridge {
                         Long.valueOf(STOP_JOIN_MILLIS));
             }
         }
+        this.bindings = DiscordChannelBindings.EMPTY;
         this.inbound.clear();
         this.inboundCount.set(0);
         this.outbound.clear();
@@ -230,8 +217,7 @@ public final class LostTalesDiscordBridge {
         this.statusRefreshRequested = false;
         // Presence is about a moment that has passed: a request left
         // standing must not reach the next server this bridge serves.
-        this.typingRequested = false;
-        this.typingSentMillis.set(0L);
+        this.typingRequests.clear();
     }
 
     public boolean isRunning() {
@@ -246,39 +232,55 @@ public final class LostTalesDiscordBridge {
     }
 
     /**
-     * Queues a game line for Discord; the worker posts it. Dropped when
-     * the bridge is off, posting is off, or the queue is full.
-     * {@code messageId} is the line's own name, kept so the post's
-     * Discord copy can be linked back to it; {@code reply} is the quote
-     * the line was distributed with, rendered onto the post as a header
-     * — pointing at the Discord original when the bridge knows it.
+     * Whether the game's own Discord channel exists for players: the
+     * bridge is on and a binding ties that channel to Discord in at
+     * least one direction. What the access packet and the send gate ask.
      */
-    public void relay(String username, String avatarUrl, String message,
-                      long messageId, ChatReplyReference reply) {
-        if (LostTalesConfig.discordRelayGameChat) {
-            post(username, avatarUrl, message, messageId, reply, false);
-        }
+    public boolean offersDiscordChannel() {
+        DiscordChannelBinding discord = this.bindings.discordChannel();
+        return LostTalesConfig.discordEnabled && this.worker != null
+                && discord != null
+                && discord.getDirection() != DiscordBridgeDirection.DISABLED;
+    }
+
+    /** The bindings in force, for the chat service's routing questions. */
+    public DiscordChannelBindings bindings() {
+        return this.bindings;
     }
 
     /**
-     * Queues a line of a read-only channel — Global or OOC — for
-     * Discord, under {@code [Channel] Name} so the channel shows beside
-     * the sender ({@code username} is the header the game shows, title
-     * included: {@code Aragorn, the Gondor Farmer}), through the
-     * read-only webhook when one is configured.
-     * One way only: nothing on Discord ever answers into the channel.
-     * The post is linked like any other, so an edit or a removal in the
-     * game still follows it. Dropped when the channel is not relayed.
+     * Queues a game line for Discord through the binding of its channel
+     * — for the Faction channel, of the sender's faction — when that
+     * binding posts; dropped otherwise, and when the queue is full. The
+     * post wears the sender's name and picture, and the line itself is
+     * a card: an embed in {@code color} headed by {@code channelLabel}
+     * — the channel's mark and name, a faction's own name for Faction
+     * chat — so a Discord channel that several game channels share
+     * still says where each line was spoken, footed by
+     * {@code accountName} where the line was spoken as a character
+     * (empty on an account line) and stamped with the time it was said.
+     * The name is never tagged: Discord refuses a webhook name that says
+     * "discord". {@code messageId} is the line's own name, kept so the
+     * post's Discord copy can be linked back to it; {@code reply} is the
+     * quote the line was distributed with, opening the card's text as a
+     * block quote — pointing at the Discord original when the bridge
+     * knows it.
      */
-    public void relayReadOnly(ChatChannel channel, String username,
-                              String avatarUrl, String message,
-                              long messageId, ChatReplyReference reply) {
-        if (channel == null || !relaysReadOnly(channel)) {
+    public void relayToDiscord(ChatChannel channel, String factionId,
+                               String channelLabel, int color, String username,
+                               String avatarUrl, String accountName,
+                               String message, long messageId,
+                               ChatReplyReference reply) {
+        DiscordChannelBinding binding = this.bindings.forGame(channel, factionId);
+        if (binding == null || !binding.sendsToDiscord()
+                || message == null || message.length() == 0) {
             return;
         }
-        post(DiscordMessageSanitizer.channelTaggedName(
-                channel.getDisplayName(), username), avatarUrl, message,
-                messageId, reply, true);
+        enqueueOutbound(new Outbound(Outbound.Kind.POST, username, avatarUrl,
+                message, messageId,
+                reply == null ? ChatReplyReference.NONE : reply, null,
+                binding.key(), new DiscordJson.LineCard(channelLabel, color,
+                        accountName, System.currentTimeMillis(), "")));
     }
 
     /**
@@ -293,7 +295,7 @@ public final class LostTalesDiscordBridge {
         }
         enqueueOutbound(new Outbound(Outbound.Kind.POST, "", "",
                 notice.getText(), ChatMessageIds.NONE,
-                ChatReplyReference.NONE, notice, false));
+                ChatReplyReference.NONE, notice, "", null));
     }
 
     /** The config switch a kind of notice answers to. */
@@ -323,7 +325,7 @@ public final class LostTalesDiscordBridge {
             // resolved there, and dropped when there is no copy.
             enqueueOutbound(new Outbound(Outbound.Kind.EDIT, "", "",
                     message, messageId, ChatReplyReference.NONE, null,
-                    false));
+                    "", null));
         }
     }
 
@@ -333,19 +335,7 @@ public final class LostTalesDiscordBridge {
      */
     public void relayDelete(long messageId) {
         enqueueOutbound(new Outbound(Outbound.Kind.DELETE, "", "", "",
-                messageId, ChatReplyReference.NONE, null, false));
-    }
-
-    private void post(String username, String avatarUrl, String message,
-                      long messageId, ChatReplyReference reply,
-                      boolean readOnly) {
-        if (message == null || message.length() == 0) {
-            return;
-        }
-        enqueueOutbound(new Outbound(Outbound.Kind.POST, username, avatarUrl,
-                message, messageId,
-                reply == null ? ChatReplyReference.NONE : reply, null,
-                readOnly));
+                messageId, ChatReplyReference.NONE, null, "", null));
     }
 
     private void enqueueOutbound(Outbound entry) {
@@ -359,12 +349,14 @@ public final class LostTalesDiscordBridge {
     }
 
     /**
-     * Says that somebody in the game is typing into the bridged channel,
-     * so Discord shows its indicator there. Presence only, and only
-     * while game chat is being relayed at all: no text crosses with it,
-     * and what Discord sees is the bot typing rather than a name it has
-     * no account for. Cheap and idempotent — the worker sends at most
-     * one ping per {@link #TYPING_INTERVAL_MILLIS}, and drops the rest.
+     * Says that somebody in the game is typing into a bound channel, so
+     * Discord shows its indicator in that channel. Presence only, and
+     * only for a binding that posts: no text crosses with it, and what
+     * Discord sees is the bot typing rather than a name it has no
+     * account for. Cheap and idempotent — the worker sends at most one
+     * ping per binding per {@link #TYPING_INTERVAL_MILLIS}, and drops
+     * the rest. A binding that names no Discord channel is asked its
+     * webhook's channel once, since the bot must know where to type.
      *
      * <p>Only this direction is possible over the bridge as it is built.
      * Discord publishes a user's own typing on its gateway alone, which
@@ -372,9 +364,10 @@ public final class LostTalesDiscordBridge {
      * plain HTTP and the polling API carries no typing at all — so a
      * Discord member typing cannot be shown in game.</p>
      */
-    public void relayTyping() {
-        if (LostTalesConfig.discordRelayGameChat) {
-            this.typingRequested = true;
+    public void relayTyping(ChatChannel channel, String factionId) {
+        DiscordChannelBinding binding = this.bindings.forGame(channel, factionId);
+        if (binding != null && binding.sendsToDiscord()) {
+            this.typingRequests.add(binding.key());
         }
     }
 
@@ -494,20 +487,31 @@ public final class LostTalesDiscordBridge {
             }
             return;
         }
+        // Delivered into the channel its binding names, and only while
+        // that binding still reads: the bindings are read once at start,
+        // so this is a guard on the queue, not a policy of its own.
+        DiscordChannelBinding binding = this.bindings.byKey(message.bindingKey);
+        if (binding == null || !binding.readsFromDiscord()) {
+            return;
+        }
         // A Discord reply names a Discord id; when that id is a
-        // message the bridge has seen cross — either way — the
-        // line is delivered quoting it, exactly as a player's
-        // reply is. One referencing anything older than the
-        // session, or deleted since, goes out plain.
+        // message the bridge has seen cross — either way — through
+        // this same binding, the line is delivered quoting it, exactly
+        // as a player's reply is. One referencing anything older than
+        // the session, deleted since, or belonging to another bound
+        // channel goes out plain: a quote never carries words from one
+        // bound channel into another.
         ChatReplyReference reply = ChatReplyReference.NONE;
         long referenced = this.links.messageIdOf(
                 message.referencedDiscordId);
-        if (referenced != ChatMessageIds.NONE) {
+        if (referenced != ChatMessageIds.NONE
+                && binding.key().equals(this.links.bindingKeyOf(referenced))) {
             reply = ChatMessageLog.quoteForDiscordChannel(referenced);
         }
         long messageId = LostTalesChatService.sendFromDiscord(
+                binding.getChannel(), binding.getFactionScope(),
                 message.name, message.authorId, message.text, reply);
-        this.links.link(messageId, message.discordId);
+        this.links.link(messageId, message.discordId, "", binding.key());
     }
 
     private void enqueueInbound(Inbound entry) {
@@ -532,15 +536,19 @@ public final class LostTalesDiscordBridge {
         final String discordId;
         /** The Discord id this message replies to; empty for none. */
         final String referencedDiscordId;
+        /** The binding it was read through; empty for word about an old message. */
+        final String bindingKey;
 
         Inbound(Kind kind, String name, String authorId, String text,
-                String discordId, String referencedDiscordId) {
+                String discordId, String referencedDiscordId,
+                String bindingKey) {
             this.kind = kind;
             this.name = name;
             this.authorId = authorId;
             this.text = text;
             this.discordId = discordId;
             this.referencedDiscordId = referencedDiscordId;
+            this.bindingKey = bindingKey;
         }
     }
 
@@ -559,12 +567,15 @@ public final class LostTalesDiscordBridge {
         final ChatReplyReference reply;
         /** The server's own notice a post is, posted as an embed; null for a line. */
         final DiscordNotice notice;
-        /** Whether a post goes through the read-only webhook. */
-        final boolean readOnly;
+        /** The binding a post goes through; empty for a notice, an edit or a removal. */
+        final String bindingKey;
+        /** The card a line is posted as, its reply header still empty; null otherwise. */
+        final DiscordJson.LineCard card;
 
         Outbound(Kind kind, String username, String avatarUrl,
                  String message, long messageId, ChatReplyReference reply,
-                 DiscordNotice notice, boolean readOnly) {
+                 DiscordNotice notice, String bindingKey,
+                 DiscordJson.LineCard card) {
             this.kind = kind;
             this.username = username;
             this.avatarUrl = avatarUrl;
@@ -572,8 +583,20 @@ public final class LostTalesDiscordBridge {
             this.messageId = messageId;
             this.reply = reply;
             this.notice = notice;
-            this.readOnly = readOnly;
+            this.bindingKey = bindingKey == null ? "" : bindingKey;
+            this.card = card;
         }
+    }
+
+    /** What the worker knows of one Discord channel it reads. */
+    private static final class ChannelCursor {
+        /** The newest message id seen; empty until the channel is primed. */
+        String after = "";
+        /** The watch over relayed messages for edits and deletions. */
+        final DiscordMessageSweep sweep = new DiscordMessageSweep();
+        boolean primed;
+        /** Reading refused for the session: the bot cannot see the channel. */
+        boolean disabled;
     }
 
     /** The polling, posting and topic-writing thread; one per started bridge. */
@@ -581,12 +604,21 @@ public final class LostTalesDiscordBridge {
         final boolean reads;
         final boolean posts;
         final boolean manages;
+        /** The bindings this worker serves, fixed for its life. */
+        private final DiscordChannelBindings bindings;
         private volatile boolean running = true;
-        /** The newest message id seen; empty until the channel is primed. */
-        private String after = "";
-        /** The watch over relayed messages for edits and deletions. */
-        private final DiscordMessageSweep sweep = new DiscordMessageSweep();
-        private boolean primed;
+        /** One cursor per Discord channel read, by its channel id. */
+        private final Map<String, ChannelCursor> cursors =
+                new HashMap<String, ChannelCursor>();
+        /** Bindings whose webhook Discord refused for the session. */
+        private final Set<String> postingDisabled = new HashSet<String>();
+        /**
+         * When a typing ping was last sent per binding. Discord shows its
+         * own indicator for about ten seconds from one, so repeating it
+         * faster than that buys nothing and only spends the rate limit.
+         */
+        private final Map<String, Long> typingSentMillis = new HashMap<String, Long>();
+        /** The bot itself was refused: nothing is read for the session. */
         private boolean readingDisabled;
         private boolean healthy = true;
         private long backoffMillis = MIN_BACKOFF_MILLIS;
@@ -600,9 +632,11 @@ public final class LostTalesDiscordBridge {
         /** Whether the no-PATCH warning has been said this session. */
         private boolean patchWarned;
 
-        Worker(boolean reads, boolean posts, boolean manages) {
+        Worker(DiscordChannelBindings bindings, boolean reads, boolean posts,
+               boolean manages) {
             super("LostTales-Discord");
             setDaemon(true);
+            this.bindings = bindings;
             this.reads = reads;
             this.posts = posts;
             this.manages = manages;
@@ -621,7 +655,7 @@ public final class LostTalesDiscordBridge {
                 try {
                     if (this.reads && !this.readingDisabled) {
                         poll();
-                        sweepChannel();
+                        sweepChannels();
                     }
                     if (this.posts) {
                         flushOutbound();
@@ -653,34 +687,53 @@ public final class LostTalesDiscordBridge {
         }
 
         /**
-         * Sends the typing ping if one has been asked for and the last
-         * is old enough. A refusal is dropped rather than retried:
-         * presence is only worth saying while it is still true.
+         * Sends a typing ping into every bound channel asked for since
+         * the last pass whose last ping is old enough. A refusal is
+         * dropped rather than retried: presence is only worth saying
+         * while it is still true.
          */
         private void flushTyping() {
-            if (!typingRequested) {
-                return;
-            }
-            typingRequested = false;
-            long now = System.currentTimeMillis();
-            long last = typingSentMillis.get();
-            if (last != 0L && now - last < TYPING_INTERVAL_MILLIS) {
+            if (typingRequests.isEmpty()) {
                 return;
             }
             String token = LostTalesConfig.discordBotToken.trim();
-            String channel = LostTalesConfig.discordChannelId.trim();
-            if (token.length() == 0 || channel.length() == 0) {
-                return;
+            for (String key : new ArrayList<String>(typingRequests)) {
+                typingRequests.remove(key);
+                DiscordChannelBinding binding = this.bindings.byKey(key);
+                if (binding == null || token.length() == 0) {
+                    continue;
+                }
+                long now = System.currentTimeMillis();
+                Long last = this.typingSentMillis.get(key);
+                if (last != null && now - last.longValue() < TYPING_INTERVAL_MILLIS) {
+                    continue;
+                }
+                String channel = typingChannelOf(binding);
+                if (channel.length() == 0) {
+                    continue;
+                }
+                this.typingSentMillis.put(key, Long.valueOf(now));
+                try {
+                    DiscordHttp.postTyping(token, channel);
+                } catch (IOException ignored) {
+                    // Presence that did not arrive is presence not worth
+                    // chasing; the next keystroke asks again.
+                } catch (RuntimeException ignored) {
+                    // As above.
+                }
             }
-            typingSentMillis.set(now);
-            try {
-                DiscordHttp.postTyping(token, channel);
-            } catch (IOException ignored) {
-                // Presence that did not arrive is presence not worth
-                // chasing; the next keystroke asks again.
-            } catch (RuntimeException ignored) {
-                // As above.
+        }
+
+        /**
+         * Where the bot types for a binding: the Discord channel it
+         * reads, or the channel its webhook posts to, asked once.
+         */
+        private String typingChannelOf(DiscordChannelBinding binding) {
+            if (binding.getDiscordChannelId().length() > 0) {
+                return binding.getDiscordChannelId();
             }
+            DiscordJson.WebhookInfo info = webhookInfo(binding.getWebhookUrl());
+            return info == null || info.channelId == null ? "" : info.channelId;
         }
 
         /**
@@ -711,8 +764,12 @@ public final class LostTalesDiscordBridge {
         }
 
         private void flushStatus(boolean finalAttempt) {
+            DiscordChannelBinding discord = this.bindings.discordChannel();
+            if (discord == null) {
+                return;
+            }
             status.flush(LostTalesConfig.discordBotToken.trim(),
-                    LostTalesConfig.discordChannelId.trim(),
+                    discord.getDiscordChannelId(),
                     Math.max(60L, Math.min(3600L,
                             LostTalesConfig.discordChannelStatusIntervalSeconds))
                             * 1000L,
@@ -720,135 +777,167 @@ public final class LostTalesDiscordBridge {
         }
 
         /**
-         * Reads what arrived since the last look. The first successful
-         * read only learns the newest id, so history before the server
-         * started is never replayed into the game.
+         * Reads what arrived in every bound Discord channel since the
+         * last look. The first successful read of a channel only learns
+         * its newest id, so history before the server started is never
+         * replayed into the game. A channel the bot cannot see is given
+         * up for the session on its own; the others go on.
          */
         private void poll() throws IOException {
             String token = LostTalesConfig.discordBotToken.trim();
-            String channel = LostTalesConfig.discordChannelId.trim();
-            DiscordHttp.Reply reply = DiscordHttp.getMessages(token, channel,
-                    this.primed ? this.after : "",
-                    this.primed ? DiscordJson.PAGE_SIZE : 1);
-            if (readRefused(reply.status)) {
-                return;
-            }
-            if (reply.status == 429) {
-                throw new RateLimited(DiscordJson.retryAfterMillis(reply.body));
-            }
-            if (!reply.isSuccess()) {
-                throw new IOException("Discord replied HTTP " + reply.status
-                        + " to a channel read");
-            }
-            List<DiscordJson.Message> messages =
-                    DiscordJson.parseMessages(reply.body);
-            if (!messages.isEmpty()) {
-                this.after = messages.get(messages.size() - 1).id;
-            }
-            if (!this.primed) {
-                this.primed = true;
-                return;
-            }
-            for (DiscordJson.Message message : messages) {
-                if (message.bot) {
+            for (DiscordChannelBinding binding : this.bindings.reading()) {
+                ChannelCursor cursor = cursorFor(binding);
+                if (cursor.disabled) {
                     continue;
                 }
-                String name = DiscordMessageSanitizer.inboundName(
-                        message.authorName);
-                String text = DiscordMessageSanitizer.inbound(
-                        message.content, message.mentionNames);
-                if (name.length() > 0 && text.length() > 0) {
-                    rememberAuthor(name, message.authorId);
-                    enqueueInbound(new Inbound(Inbound.Kind.MESSAGE, name,
-                            message.authorId, text, message.id,
-                            message.referencedMessageId));
-                    // Watched from now on, so a later edit or deletion
-                    // of it follows the message into the game.
-                    this.sweep.track(message);
+                DiscordHttp.Reply reply = DiscordHttp.getMessages(token,
+                        binding.getDiscordChannelId(),
+                        cursor.primed ? cursor.after : "",
+                        cursor.primed ? DiscordJson.PAGE_SIZE : 1);
+                if (readRefused(reply.status, binding, cursor)) {
+                    continue;
+                }
+                if (reply.status == 429) {
+                    throw new RateLimited(DiscordJson.retryAfterMillis(reply.body));
+                }
+                if (!reply.isSuccess()) {
+                    throw new IOException("Discord replied HTTP " + reply.status
+                            + " to a read of " + binding.key());
+                }
+                List<DiscordJson.Message> messages =
+                        DiscordJson.parseMessages(reply.body);
+                if (!messages.isEmpty()) {
+                    cursor.after = messages.get(messages.size() - 1).id;
+                }
+                if (!cursor.primed) {
+                    cursor.primed = true;
+                    continue;
+                }
+                for (DiscordJson.Message message : messages) {
+                    // The webhooks' own posts come back as bot messages:
+                    // the second guard against a line going round, after
+                    // the chat service's own rule that a line from
+                    // Discord is never posted back.
+                    if (message.bot) {
+                        continue;
+                    }
+                    String name = DiscordMessageSanitizer.inboundName(
+                            message.authorName);
+                    String text = DiscordMessageSanitizer.inbound(
+                            message.content, message.mentionNames);
+                    if (name.length() > 0 && text.length() > 0) {
+                        rememberAuthor(name, message.authorId);
+                        enqueueInbound(new Inbound(Inbound.Kind.MESSAGE, name,
+                                message.authorId, text, message.id,
+                                message.referencedMessageId, binding.key()));
+                        // Watched from now on, so a later edit or deletion
+                        // of it follows the message into the game.
+                        cursor.sweep.track(message);
+                    }
+                }
+            }
+        }
+
+        private ChannelCursor cursorFor(DiscordChannelBinding binding) {
+            ChannelCursor cursor = this.cursors.get(binding.getDiscordChannelId());
+            if (cursor == null) {
+                cursor = new ChannelCursor();
+                this.cursors.put(binding.getDiscordChannelId(), cursor);
+            }
+            return cursor;
+        }
+
+        /**
+         * Re-reads each read channel's newest page and compares it with
+         * the messages relayed from it, so a Discord member's own edits
+         * and deletions follow their messages into the game — the
+         * polling API says nothing about either, which makes looking
+         * again the only way to hear of them. Only the page's reach is
+         * watched: a message older than the newest
+         * {@link DiscordJson#PAGE_SIZE} is out of sight and stays as it
+         * was delivered. A channel with nothing watched costs no second
+         * request.
+         */
+        private void sweepChannels() throws IOException {
+            String token = LostTalesConfig.discordBotToken.trim();
+            for (DiscordChannelBinding binding : this.bindings.reading()) {
+                ChannelCursor cursor = cursorFor(binding);
+                if (cursor.disabled || cursor.sweep.isEmpty()) {
+                    continue;
+                }
+                DiscordHttp.Reply reply = DiscordHttp.getMessages(token,
+                        binding.getDiscordChannelId(), "", DiscordJson.PAGE_SIZE);
+                if (readRefused(reply.status, binding, cursor)) {
+                    continue;
+                }
+                if (reply.status == 429) {
+                    throw new RateLimited(DiscordJson.retryAfterMillis(reply.body));
+                }
+                if (!reply.isSuccess()) {
+                    throw new IOException("Discord replied HTTP " + reply.status
+                            + " to a sweep of " + binding.key());
+                }
+                DiscordMessageSweep.Changes changes = cursor.sweep.apply(
+                        DiscordJson.parseMessages(reply.body));
+                for (DiscordJson.Message message : changes.edited) {
+                    String text = DiscordMessageSanitizer.inbound(
+                            message.content, message.mentionNames);
+                    // Edited down to nothing sayable — an attachment left
+                    // alone — keeps the words it was delivered with.
+                    if (text.length() > 0) {
+                        enqueueInbound(new Inbound(Inbound.Kind.EDIT, "", "",
+                                text, message.id, "", binding.key()));
+                    }
+                }
+                for (int index = 0; index < changes.deletedIds.size(); index++) {
+                    enqueueInbound(new Inbound(Inbound.Kind.DELETE, "", "", "",
+                            changes.deletedIds.get(index), "", binding.key()));
                 }
             }
         }
 
         /**
-         * Re-reads the channel's newest page and compares it with the
-         * messages relayed, so a Discord member's own edits and
-         * deletions follow their messages into the game — the polling
-         * API says nothing about either, which makes looking again the
-         * only way to hear of them. Only the page's reach is watched:
-         * a message older than the newest {@link DiscordJson#PAGE_SIZE}
-         * is out of sight and stays as it was delivered. Skipped
-         * entirely while nothing is watched, so a quiet channel costs
-         * no second request.
+         * Whether Discord refused a read. A refused token stops reading
+         * everywhere for the session; a channel the bot cannot see, or
+         * one that is gone, stops reading that binding alone. Each is
+         * said once.
          */
-        private void sweepChannel() throws IOException {
-            if (this.sweep.isEmpty()) {
-                return;
+        private boolean readRefused(int status, DiscordChannelBinding binding,
+                                    ChannelCursor cursor) {
+            if (status == 401) {
+                this.readingDisabled = true;
+                FMLLog.severe("[%s] Discord refused the bot (HTTP 401): check "
+                        + "the token; Discord-to-game relay is off until the "
+                        + "server restarts", LostTalesMetaData.MOD_ID);
+                return true;
             }
-            DiscordHttp.Reply reply = DiscordHttp.getMessages(
-                    LostTalesConfig.discordBotToken.trim(),
-                    LostTalesConfig.discordChannelId.trim(), "",
-                    DiscordJson.PAGE_SIZE);
-            if (readRefused(reply.status)) {
-                return;
+            if (status == 403 || status == 404) {
+                cursor.disabled = true;
+                FMLLog.severe("[%s] Discord refused a read of channel %s for "
+                        + "binding %s (HTTP %d): check that the bot is in the "
+                        + "server with access to that channel and the Message "
+                        + "Content intent, and that the channel still exists; "
+                        + "reading it is off until the server restarts",
+                        LostTalesMetaData.MOD_ID, binding.getDiscordChannelId(),
+                        binding.key(), Integer.valueOf(status));
+                return true;
             }
-            if (reply.status == 429) {
-                throw new RateLimited(DiscordJson.retryAfterMillis(reply.body));
-            }
-            if (!reply.isSuccess()) {
-                throw new IOException("Discord replied HTTP " + reply.status
-                        + " to a channel sweep");
-            }
-            DiscordMessageSweep.Changes changes = this.sweep.apply(
-                    DiscordJson.parseMessages(reply.body));
-            for (DiscordJson.Message message : changes.edited) {
-                String text = DiscordMessageSanitizer.inbound(
-                        message.content, message.mentionNames);
-                // Edited down to nothing sayable — an attachment left
-                // alone — keeps the words it was delivered with.
-                if (text.length() > 0) {
-                    enqueueInbound(new Inbound(Inbound.Kind.EDIT, "", "",
-                            text, message.id, ""));
-                }
-            }
-            for (int index = 0; index < changes.deletedIds.size(); index++) {
-                enqueueInbound(new Inbound(Inbound.Kind.DELETE, "", "", "",
-                        changes.deletedIds.get(index), ""));
-            }
-        }
-
-        /**
-         * Whether Discord refused the bot outright; said once, and
-         * reading stays off for the session.
-         */
-        private boolean readRefused(int status) {
-            if (status != 401 && status != 403) {
-                return false;
-            }
-            this.readingDisabled = true;
-            FMLLog.severe("[%s] Discord refused the bot (HTTP %d): check "
-                    + "the token, that the bot is in the server with "
-                    + "access to the channel, and that the Message "
-                    + "Content intent is enabled; Discord-to-game relay "
-                    + "is off until the server restarts",
-                    LostTalesMetaData.MOD_ID, Integer.valueOf(status));
-            return true;
+            return false;
         }
 
         private void flushOutbound() throws IOException {
-            String mainWebhook = LostTalesConfig.discordWebhookUrl.trim();
-            String readOnlyWebhook = readOnlyWebhookUrl();
             Outbound next;
             while ((next = outbound.peek()) != null) {
-                String header = "";
+                DiscordJson.LineCard card = null;
                 DiscordHttp.Reply reply;
-                // A post goes where its kind says; a correction goes
+                // A post goes where its binding says; a correction goes
                 // where its post went, which only the link remembers.
-                boolean readOnly = next.kind == Outbound.Kind.POST
-                        ? next.readOnly : links.isReadOnly(next.messageId);
-                String webhook = readOnly ? readOnlyWebhook : mainWebhook;
-                if (webhook.length() == 0) {
-                    // Nowhere to send it: a line of a kind whose webhook
-                    // is not configured. Nothing to retry.
+                String key = next.kind == Outbound.Kind.POST
+                        ? next.bindingKey : links.bindingKeyOf(next.messageId);
+                String webhook = webhookFor(next, key);
+                if (webhook.length() == 0 || this.postingDisabled.contains(key)) {
+                    // Nowhere to send it: a binding without a webhook, or
+                    // one Discord has refused. Nothing to retry.
                     outbound.poll();
                     outboundCount.decrementAndGet();
                     continue;
@@ -859,10 +948,11 @@ public final class LostTalesDiscordBridge {
                     reply = DiscordHttp.postWebhook(webhook,
                             DiscordJson.webhookEmbedBody(next.notice));
                 } else if (next.kind == Outbound.Kind.POST) {
-                    header = replyHeader(next, webhook);
+                    card = (next.card == null ? DiscordJson.LineCard.NONE
+                            : next.card).withHeader(replyHeader(next, webhook));
                     reply = DiscordHttp.postWebhook(webhook,
-                            DiscordJson.webhookBody(next.username,
-                                    next.avatarUrl, header + next.message));
+                            DiscordJson.webhookLineBody(next.username,
+                                    next.avatarUrl, card, next.message));
                 } else {
                     // An edit or a removal follows the message it names:
                     // the queue is worked in order, so the post that
@@ -880,9 +970,9 @@ public final class LostTalesDiscordBridge {
                     }
                     reply = next.kind == Outbound.Kind.EDIT
                             ? DiscordHttp.editWebhookMessage(webhook,
-                                    discordId, DiscordJson.webhookEditBody(
-                                            links.headerOf(next.messageId)
-                                                    + next.message))
+                                    discordId, DiscordJson.webhookLineEditBody(
+                                            links.cardOf(next.messageId),
+                                            next.message))
                             : DiscordHttp.deleteWebhookMessage(webhook,
                                     discordId);
                 }
@@ -898,6 +988,20 @@ public final class LostTalesDiscordBridge {
                     // There is nothing left to correct there.
                     continue;
                 }
+                if (next.kind == Outbound.Kind.POST
+                        && (reply.status == 401 || reply.status == 404)) {
+                    // The webhook itself is gone or refused: no post of
+                    // this binding can succeed until it is fixed and the
+                    // server restarts. The other bindings go on.
+                    this.postingDisabled.add(key);
+                    FMLLog.severe("[%s] Discord refused the webhook of binding "
+                            + "%s (HTTP %d): the webhook was deleted or its URL "
+                            + "is wrong; posting there is off until the server "
+                            + "restarts", LostTalesMetaData.MOD_ID,
+                            key.length() == 0 ? "the notices" : key,
+                            Integer.valueOf(reply.status));
+                    continue;
+                }
                 if (!reply.isSuccess()) {
                     throw new IOException("Discord replied HTTP " + reply.status
                             + " to a webhook "
@@ -909,13 +1013,26 @@ public final class LostTalesDiscordBridge {
                     // The post's Discord id, from the wait=true body:
                     // what a reply from either side finds the message
                     // by, and what an edit or a removal follows it by,
-                    // with the header an edit has to open with again. A
-                    // body that does not parse leaves the line unlinked.
+                    // with the card an edit has to draw again. A body
+                    // that does not parse leaves the line unlinked.
                     links.link(next.messageId,
                             DiscordJson.parseCreatedMessageId(reply.body),
-                            header, next.readOnly);
+                            next.bindingKey, card);
                 }
             }
+        }
+
+        /**
+         * The webhook an entry goes through: the notices' own for a
+         * notice, else the webhook of the binding the entry names.
+         * Empty for a binding that has none or is not known.
+         */
+        private String webhookFor(Outbound next, String key) {
+            if (next.notice != null) {
+                return this.bindings.noticeWebhookUrl();
+            }
+            DiscordChannelBinding binding = this.bindings.byKey(key);
+            return binding == null ? "" : binding.getWebhookUrl();
         }
 
         /**

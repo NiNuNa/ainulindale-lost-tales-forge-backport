@@ -25,6 +25,22 @@ public final class ChatTabDragGeometryTest {
                 < LostTalesChatGui.RETURN_DISTANCE);
     }
 
+    @Test
+    public void theBandBetweenLeavingAndReturningOutlastsAHandTremor() {
+        // A tremor too small to start a drag cannot cross the band.
+        assertTrue(LostTalesChatGui.DETACH_DISTANCE
+                - LostTalesChatGui.RETURN_DISTANCE
+                > LostTalesChatGui.DRAG_THRESHOLD);
+    }
+
+    @Test
+    public void leavingTakesLessThanARow() {
+        // A run comes free before the pointer has crossed a whole tab
+        // row of the window it is leaving.
+        assertTrue(LostTalesChatGui.DETACH_DISTANCE
+                < ChatChannelTabBar.ROW_HEIGHT);
+    }
+
     /**
      * The pull that tears a run out is one straight-line distance to
      * the strip it is leaving, so a diagonal carry needs the same

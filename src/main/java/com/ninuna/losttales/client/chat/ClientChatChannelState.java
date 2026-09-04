@@ -75,6 +75,8 @@ public final class ClientChatChannelState {
     private static final Map<ChatTab, String> DRAFTS =
             new LinkedHashMap<ChatTab, String>();
     private static final int MAX_DRAFTS = 64;
+    /** What was sent from each tab, for the arrows to recall there. */
+    private static final ChatSentHistory SENT_HISTORY = new ChatSentHistory();
 
     private ClientChatChannelState() {}
 
@@ -211,15 +213,50 @@ public final class ClientChatChannelState {
 
     /**
      * Closes the tab under {@link #isClosable} and moves the selection
-     * off it if it was selected. Closing never mutes: the channel keeps
-     * receiving and keeps its own mute setting.
+     * off it if it was selected: onto its neighbour in the same window,
+     * so the input stays where the player was working and no other
+     * window comes forward for it; only a window emptied by the close
+     * hands the selection elsewhere. Closing never mutes: the channel
+     * keeps receiving and keeps its own mute setting.
      */
     public static synchronized boolean close(ChatTab tab) {
+        ChatWindow window = ChatWindowLayout.windowOf(tab);
+        int index = window == null ? -1 : window.getTabs().indexOf(tab);
+        boolean wasSelected = tab != null && tab.equals(selected);
         if (!isClosable(tab) || !ChatWindowLayout.close(tab)) {
             return false;
         }
+        if (wasSelected) {
+            ChatTab neighbour = neighbourIn(window, index);
+            selected = neighbour != null ? neighbour : fallbackTab();
+        }
         ensureAvailable();
         return true;
+    }
+
+    /**
+     * The tab that takes a closed tab's place in its window: the one now
+     * standing where it stood, else the last, else any selectable one;
+     * null when the window is gone or holds nothing selectable.
+     */
+    private static ChatTab neighbourIn(ChatWindow window, int index) {
+        if (window == null || index < 0) {
+            return null;
+        }
+        List<ChatTab> tabs = window.getTabs();
+        if (tabs.isEmpty()) {
+            return null;
+        }
+        ChatTab nearest = tabs.get(Math.min(index, tabs.size() - 1));
+        if (isSelectable(nearest)) {
+            return nearest;
+        }
+        for (ChatTab candidate : tabs) {
+            if (isSelectable(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     /** Whether the tab's history is readable and its tab shown. */
@@ -614,6 +651,30 @@ public final class ClientChatChannelState {
         return getDraft(selected);
     }
 
+    /** Remembers a line sent from a tab, for the arrows to recall there and nowhere else. */
+    public static synchronized void recordSent(ChatTab tab, String text) {
+        SENT_HISTORY.record(tab, text);
+    }
+
+    /**
+     * Walks a tab's sent lines: Up is {@code -1}, Down {@code +1}. The
+     * text the field should now hold, or null when nothing changes.
+     */
+    public static synchronized String recallSent(ChatTab tab, int direction,
+                                                 String fieldText) {
+        return SENT_HISTORY.step(tab, direction, fieldText);
+    }
+
+    /** Ends a walk through sent lines: sending, or leaving the tab, does this. */
+    public static synchronized void endSentBrowse() {
+        SENT_HISTORY.endBrowse();
+    }
+
+    /** Drops every conversation tab's sent lines along with the conversations. */
+    public static synchronized void forgetConversationHistory() {
+        SENT_HISTORY.forgetConversations();
+    }
+
     /** A tab's unsent input; empty when it has none. */
     public static synchronized String getDraft(ChatTab tab) {
         String value = tab == null ? null : DRAFTS.get(tab);
@@ -633,6 +694,7 @@ public final class ClientChatChannelState {
         ROLE_HOLDERS.clear();
         MUTED_SENDERS.clear();
         DRAFTS.clear();
+        SENT_HISTORY.clear();
     }
 
     private static CharacterSummary activeCharacter() {

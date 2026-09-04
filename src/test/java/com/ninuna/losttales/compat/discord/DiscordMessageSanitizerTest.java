@@ -69,25 +69,6 @@ public final class DiscordMessageSanitizerTest {
     }
 
     @Test
-    public void readOnlyLinesArePostedUnderTheChannelTag() {
-        assertEquals("[Global] Aragorn",
-                DiscordMessageSanitizer.channelTaggedName("Global", "Aragorn"));
-        assertEquals("[OOC] Steve",
-                DiscordMessageSanitizer.channelTaggedName(" OOC ", " Steve "));
-        assertEquals("[Global] ",
-                DiscordMessageSanitizer.channelTaggedName("Global", null));
-        StringBuilder name = new StringBuilder();
-        for (int index = 0; index < 100; index++) {
-            name.append('a');
-        }
-        String tagged = DiscordMessageSanitizer.channelTaggedName("Global",
-                name.toString());
-        assertEquals(DiscordMessageSanitizer.MAX_WEBHOOK_NAME_LENGTH,
-                tagged.length());
-        assertTrue(tagged.startsWith("[Global] aaaa"));
-    }
-
-    @Test
     public void outboundTurnsCanonicalShortcodesIntoUnicode() {
         assertEquals("hi 😳 there 😂",
                 DiscordMessageSanitizer.outbound("hi :flushed: there :joy:"));
@@ -100,25 +81,25 @@ public final class DiscordMessageSanitizerTest {
     }
 
     @Test
-    public void replyHeadersQuoteInSubtextAndLinkWhenTheyCan() {
-        assertEquals("-# ↩ [**Aldric** — meet me at the gate](https://discord"
+    public void replyHeadersQuoteAsABlockQuoteAndLinkWhenTheyCan() {
+        assertEquals("> ↩ [**Aldric** — meet me at the gate](https://discord"
                 + ".com/channels/9/8/30)\n",
                 DiscordMessageSanitizer.replyHeader("Aldric",
                         "meet me at the gate",
                         "https://discord.com/channels/9/8/30"));
-        assertEquals("-# ↩ **Aldric** — meet me at the gate\n",
+        assertEquals("> ↩ **Aldric** — meet me at the gate\n",
                 DiscordMessageSanitizer.replyHeader("Aldric",
                         "meet me at the gate", ""));
         // A quote with markdown in it reads as the text it is, brackets
         // included, so it cannot break out of the masked link.
-        assertEquals("-# ↩ [**x\\_y** — a \\[b\\]\\(c\\) \\*d\\*](url)\n",
+        assertEquals("> ↩ [**x\\_y** — a \\[b\\]\\(c\\) \\*d\\*](url)\n",
                 DiscordMessageSanitizer.replyHeader("x_y",
                         "a [b](c) *d*", "url"));
         // An emoji in the quote goes as the emoji Discord renders.
-        assertEquals("-# ↩ **Aldric** — hi 😳\n",
+        assertEquals("> ↩ **Aldric** — hi 😳\n",
                 DiscordMessageSanitizer.replyHeader("Aldric",
                         "hi :flushed:", null));
-        assertEquals("-# ↩ **Aldric**\n",
+        assertEquals("> ↩ **Aldric**\n",
                 DiscordMessageSanitizer.replyHeader("Aldric", "", ""));
     }
 

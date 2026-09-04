@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -77,18 +78,12 @@ public final class ChatWindowLayout {
     /** Widest a window may be dragged; no screen is anywhere near this. */
     public static final int MAX_CHAT_WIDTH = 4096;
     /**
-     * How far below the first window a window made for an arriving
-     * conversation lands, as a percent of the screen travel: far enough
-     * to read as a window of its own, near enough to be found.
+     * The screen a window is cascaded on when there is no client to
+     * measure one: 854 by 480 at GUI scale two, the smallest window the
+     * game opens at. Only ever used off the client.
      */
-    private static final double NEW_WINDOW_DROP = 12.0D;
-    /**
-     * How far a new window's anchor must be from every other one before
-     * it counts as clear of them, and how finely the screen is searched
-     * for such a spot.
-     */
-    private static final double NEW_WINDOW_CLEARANCE = 20.0D;
-    private static final int NEW_WINDOW_STEPS = 8;
+    private static final int HEADLESS_SCREEN_WIDTH = 427;
+    private static final int HEADLESS_SCREEN_HEIGHT = 240;
     /** Window id of layouts written before every window was equal. */
     static final String LEGACY_MAIN_ID = "main";
     private static final String ID_PREFIX = "w";
@@ -552,10 +547,14 @@ public final class ChatWindowLayout {
 
     /**
      * The window a tab that opens by itself — a conversation, the
-     * console answering a command — belongs in: the first unlocked one,
-     * or a new one when every window is locked and the layout has room
-     * for another. With no room left the first window takes it anyway,
-     * since losing the message would be worse than crossing a lock.
+     * console answering a command — belongs in. The window it is asked
+     * for takes it when that window is unlocked and has room; otherwise
+     * the most recently used window that does, front of the stack
+     * first; then, while the layout has room for another, a new window
+     * cascaded from the one asked for, or from the front window. With
+     * no room for another, the front-most unlocked window takes it
+     * anyway, since losing the message would be worse than crowding a
+     * row, and a layout of locked windows alone hands it to the first.
      *
      * <p>Null once every window has been closed: a message never opens
      * the chat back up by itself. Its channel still receives it, counts
@@ -563,39 +562,70 @@ public final class ChatWindowLayout {
      * when a window comes back.</p>
      */
     static synchronized ChatWindow receivingWindow() {
+        return receivingWindow(null);
+    }
+
+    /** As above, with the window the tab was asked to open in, or null. */
+    static synchronized ChatWindow receivingWindow(ChatWindow preferred) {
         if (isEmpty()) {
             return null;
         }
-        // A window already ellipsizing its tab names is full: the first
-        // unlocked one with whole names takes the tab, and when every
-        // unlocked window is crowded a new window opens instead of
-        // shortening anyone's names further. Only at the window cap
-        // does a crowded row take the tab anyway — crowded beats lost.
-        for (int index = 0; index < WINDOWS.size(); index++) {
-            ChatWindow window = WINDOWS.get(index);
+        if (preferred != null && WINDOWS.contains(preferred)
+                && !preferred.isLocked() && !isCrowded(preferred)) {
+            return preferred;
+        }
+        // A window whose row is already cutting its tab names is full:
+        // the window last brought to the front with room takes the tab,
+        // and when every unlocked window is full a new window opens
+        // instead of cutting anyone's names further.
+        List<ChatWindow> byRecency = byRecency();
+        for (int index = 0; index < byRecency.size(); index++) {
+            ChatWindow window = byRecency.get(index);
             if (!window.isLocked() && !isCrowded(window)) {
                 return window;
             }
         }
         if (WINDOWS.size() < MAX_WINDOWS) {
             ChatWindow created = newWindow();
-            placeClearOfOthers(created);
+            cascadeFrom(created, preferred != null ? preferred : frontWindow());
             WINDOWS.add(created);
+            // A window that has just opened stands in front of the rest.
+            raise(created.getId());
             return created;
         }
-        for (int index = 0; index < WINDOWS.size(); index++) {
-            if (!WINDOWS.get(index).isLocked()) {
-                return WINDOWS.get(index);
+        for (int index = 0; index < byRecency.size(); index++) {
+            if (!byRecency.get(index).isLocked()) {
+                return byRecency.get(index);
             }
         }
         return firstWindow();
     }
 
     /**
-     * Whether the window's row is already shortening its names. The
-     * width model is the tab bar's; without a renderer to measure with
-     * — headless tests, a broken frame — the answer is no, which is the
-     * behaviour the layout always had.
+     * Windows most recently brought to the front first, then the ones
+     * never raised in layout order: the order a tab that opens by
+     * itself asks them in.
+     */
+    private static List<ChatWindow> byRecency() {
+        List<ChatWindow> result = new ArrayList<ChatWindow>(WINDOWS.size());
+        for (int index = STACK.size() - 1; index >= 0; index--) {
+            ChatWindow window = window(STACK.get(index));
+            if (window != null) {
+                result.add(window);
+            }
+        }
+        for (int index = 0; index < WINDOWS.size(); index++) {
+            if (!STACK.contains(WINDOWS.get(index).getId())) {
+                result.add(WINDOWS.get(index));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Whether the window's row is already cutting its tab names short.
+     * The width model is the tab bar's; without a renderer to measure
+     * with — headless tests, a broken frame — the answer is no.
      */
     private static boolean isCrowded(ChatWindow window) {
         try {
@@ -651,14 +681,10 @@ public final class ChatWindowLayout {
             // The tab as first opened, with the name's original casing.
             return existing.getTabs().get(existing.getTabs().indexOf(tab));
         }
-        ChatWindow window = window(preferredWindowId);
-        if (window == null || window.isLocked() || isCrowded(window)) {
-            // The active window takes the tab first. A locked window is
-            // finished, and one already ellipsizing its tab names is
-            // full: the conversation opens in another window with
-            // room, or in a new one of its own.
-            window = receivingWindow();
-        }
+        // The window asked for takes the tab first; a locked or a full
+        // one hands it to another with room, or to a new one cascaded
+        // from it.
+        ChatWindow window = receivingWindow(window(preferredWindowId));
         if (window == null) {
             // No window left to open it in; the tab stays closed and its
             // channel keeps receiving.
@@ -673,20 +699,21 @@ public final class ChatWindowLayout {
     }
 
     /**
-     * Opens a tab in a window of its own, placed clear of the others:
-     * how a channel comes back when no window is left to put it in, and
-     * what the screen's empty state offers. Refused for a tab that is
-     * already open and once {@link #MAX_WINDOWS} exist.
+     * Opens a tab in a window of its own, cascaded from the front
+     * window: how a channel comes back when no window is left to put it
+     * in, and what the screen's empty state offers. Refused for a tab
+     * that is already open and once {@link #MAX_WINDOWS} exist.
      */
     public static synchronized ChatTab openInNewWindow(ChatTab tab) {
         if (tab == null || isOpen(tab) || WINDOWS.size() >= MAX_WINDOWS) {
             return null;
         }
         ChatWindow created = newWindow();
-        placeClearOfOthers(created);
+        cascadeFrom(created, frontWindow());
         created.tabs().add(tab);
         created.setActiveTab(tab);
         WINDOWS.add(created);
+        raise(created.getId());
         changed();
         return tab;
     }
@@ -1253,141 +1280,76 @@ public final class ChatWindowLayout {
         return result;
     }
 
+    /** The window last brought to the front, else the first; null with none. */
+    private static ChatWindow frontWindow() {
+        List<ChatWindow> order = byRecency();
+        return order.isEmpty() ? null : order.get(0);
+    }
+
     /**
-     * Puts a window the chat opened by itself where it covers no other
-     * one: candidate spots on a grid are measured as the actual boxes
-     * the windows are drawn in, and the spot whose box overlaps nothing
-     * — the one nearest where the window would have gone anyway — wins.
-     * When no spot on the screen is clear, the one overlapping least
-     * takes it, which is better than refusing to show the conversation.
-     * Without a renderer to measure boxes with, clearance falls back to
-     * distance between the stored anchors, which is all the layout
-     * itself knows.
+     * Puts a window the chat opened by itself one cascade step right and
+     * down from {@code reference}, at that window's size, so windows the
+     * chat opens stack the way desktop windows do and the same layout
+     * always gives the same place. With no window to cascade from, the
+     * first one lands where the default layout puts its conversation
+     * window. Measured in the boxes the windows are drawn in when there
+     * is a client to measure with, and otherwise on a screen of a fixed
+     * size: the rule is the same either way, only the pixels differ.
      */
-    private static void placeClearOfOthers(ChatWindow created) {
-        ChatWindow first = firstWindow();
-        // With no window to keep clear of, the first one lands where the
-        // default layout puts its conversation window.
-        double wantedX = first == null ? 0.0D : first.getOffsetX();
-        double wantedY = first == null ? 100.0D
-                : clampPercent(first.getOffsetY() + NEW_WINDOW_DROP);
-        if (placeByBoxes(created, wantedX, wantedY)) {
+    private static void cascadeFrom(ChatWindow created, ChatWindow reference) {
+        if (reference == null) {
+            created.setOffsets(0.0D, 100.0D);
             return;
         }
-        double bestX = wantedX;
-        double bestY = wantedY;
-        double bestClearance = -1.0D;
-        double bestDistance = Double.MAX_VALUE;
-        for (int row = 0; row <= NEW_WINDOW_STEPS; row++) {
-            for (int column = 0; column <= NEW_WINDOW_STEPS; column++) {
-                double x = column * 100.0D / NEW_WINDOW_STEPS;
-                double y = row * 100.0D / NEW_WINDOW_STEPS;
-                double clearance = nearestAnchor(x, y);
-                double distance = distance(x, y, wantedX, wantedY);
-                boolean clear = clearance >= NEW_WINDOW_CLEARANCE;
-                boolean bestClear = bestClearance >= NEW_WINDOW_CLEARANCE;
-                if (clear && bestClear ? distance < bestDistance
-                        : clear || clearance > bestClearance) {
-                    bestClearance = clearance;
-                    bestDistance = distance;
-                    bestX = x;
-                    bestY = y;
-                }
+        // The size the player gave the window it comes from, as a
+        // detached tab's window takes it.
+        created.setMaxLines(reference.getMaxLines());
+        created.setWidth(reference.getWidth());
+        net.minecraft.client.Minecraft minecraft = clientMinecraft();
+        int screenWidth = HEADLESS_SCREEN_WIDTH;
+        int screenHeight = HEADLESS_SCREEN_HEIGHT;
+        if (minecraft != null) {
+            try {
+                net.minecraft.client.gui.ScaledResolution resolution =
+                        new net.minecraft.client.gui.ScaledResolution(minecraft,
+                                minecraft.displayWidth, minecraft.displayHeight);
+                screenWidth = resolution.getScaledWidth();
+                screenHeight = resolution.getScaledHeight();
+            } catch (RuntimeException unavailable) {
+                minecraft = null;
             }
         }
-        created.setOffsets(clampPercent(bestX), clampPercent(bestY));
+        // The new window is placed by its tab row: the corner is where
+        // the row lands at the size the window opens at, the way a tab
+        // torn off a row is placed, so a window that opens with one line
+        // stands a step below the reference's row rather than a whole
+        // full-height window below it.
+        ChatWindowPlacement.Box from = ChatWindowPlacement.windowBounds(
+                reference, minecraft, screenWidth, screenHeight);
+        int width = ChatWindowPlacement.windowWidth(created, minecraft);
+        double height = ChatWindowPlacement.currentHeight(created, minecraft);
+        ChatWindowCascade.Corner corner = ChatWindowCascade.place(
+                from.x, from.y, width, height, screenWidth,
+                screenHeight, HudPlacementLayout.SCREEN_MARGIN,
+                ChatWindowCascade.STEP);
+        double baseline = ChatWindowPlacement.baselineForRowTop(
+                created, minecraft, corner.y);
+        created.setOffsets(
+                clampPercent(ChatWindowPlacement.windowPercentX(
+                        created, corner.x, minecraft, screenWidth)),
+                clampPercent(ChatWindowPlacement.windowPercentY(
+                        baseline, minecraft, screenHeight)));
     }
 
-    /**
-     * Box-measured placement: every grid spot is scored by how much the
-     * created window's prospective box would overlap the boxes the
-     * existing windows are actually drawn in. Zero-overlap spots win by
-     * their distance to the wanted position; otherwise the least
-     * overlapped area wins. False when the boxes cannot be measured —
-     * headless, or mid-startup — and the anchor heuristic stands in.
-     */
-    private static boolean placeByBoxes(ChatWindow created,
-                                        double wantedX, double wantedY) {
+    /** The running client, or null headlessly or before it exists. */
+    private static net.minecraft.client.Minecraft clientMinecraft() {
         try {
-            net.minecraft.client.Minecraft minecraft =
-                    net.minecraft.client.Minecraft.getMinecraft();
-            if (minecraft == null) {
-                return false;
-            }
-            net.minecraft.client.gui.ScaledResolution resolution =
-                    new net.minecraft.client.gui.ScaledResolution(minecraft,
-                            minecraft.displayWidth, minecraft.displayHeight);
-            int screenWidth = resolution.getScaledWidth();
-            int screenHeight = resolution.getScaledHeight();
-            ChatWindowPlacement.Box[] taken =
-                    new ChatWindowPlacement.Box[WINDOWS.size()];
-            for (int index = 0; index < WINDOWS.size(); index++) {
-                taken[index] = ChatWindowPlacement.windowBounds(
-                        WINDOWS.get(index), minecraft, screenWidth,
-                        screenHeight);
-            }
-            double bestX = wantedX;
-            double bestY = wantedY;
-            double bestOverlap = Double.MAX_VALUE;
-            double bestDistance = Double.MAX_VALUE;
-            for (int row = 0; row <= NEW_WINDOW_STEPS; row++) {
-                for (int column = 0; column <= NEW_WINDOW_STEPS; column++) {
-                    double x = column * 100.0D / NEW_WINDOW_STEPS;
-                    double y = row * 100.0D / NEW_WINDOW_STEPS;
-                    ChatWindowPlacement.Box candidate =
-                            ChatWindowPlacement.prospectiveBounds(created,
-                                    x, y, minecraft, screenWidth,
-                                    screenHeight);
-                    double overlap = 0.0D;
-                    for (int index = 0; index < taken.length; index++) {
-                        overlap += overlapArea(candidate, taken[index]);
-                    }
-                    double distance = distance(x, y, wantedX, wantedY);
-                    if (overlap < bestOverlap - 0.5D
-                            || (Math.abs(overlap - bestOverlap) <= 0.5D
-                                    && distance < bestDistance)) {
-                        bestOverlap = overlap;
-                        bestDistance = distance;
-                        bestX = x;
-                        bestY = y;
-                    }
-                }
-            }
-            created.setOffsets(clampPercent(bestX), clampPercent(bestY));
-            return true;
+            return net.minecraft.client.Minecraft.getMinecraft();
         } catch (RuntimeException unavailable) {
-            return false;
+            return null;
         } catch (LinkageError unavailable) {
-            return false;
+            return null;
         }
-    }
-
-    /** Overlapped area of two boxes, in square GUI pixels. */
-    private static double overlapArea(ChatWindowPlacement.Box first,
-                                      ChatWindowPlacement.Box second) {
-        double width = Math.min(first.right(), second.right())
-                - Math.max(first.x, second.x);
-        double height = Math.min(first.bottom(), second.bottom())
-                - Math.max(first.y, second.y);
-        return width > 0.0D && height > 0.0D ? width * height : 0.0D;
-    }
-
-    /** How far the nearest existing window's anchor is, in percent. */
-    private static double nearestAnchor(double x, double y) {
-        double nearest = Double.MAX_VALUE;
-        for (int index = 0; index < WINDOWS.size(); index++) {
-            ChatWindow window = WINDOWS.get(index);
-            nearest = Math.min(nearest, distance(x, y,
-                    window.getOffsetX(), window.getOffsetY()));
-        }
-        return nearest;
-    }
-
-    private static double distance(double x, double y,
-                                   double otherX, double otherY) {
-        double dx = x - otherX;
-        double dy = y - otherY;
-        return Math.sqrt(dx * dx + dy * dy);
     }
 
     private static ChatWindow newWindow() {

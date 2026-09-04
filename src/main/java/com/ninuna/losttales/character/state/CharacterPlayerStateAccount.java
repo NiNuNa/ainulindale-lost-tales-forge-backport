@@ -6,10 +6,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/** Persistent snapshot manifest for all characters owned by one account. */
+/** Persistent snapshot manifest for every playable identity of one account, the account itself included. */
 public final class CharacterPlayerStateAccount {
 
-    public static final int CURRENT_DATA_VERSION = 12;
+    public static final int CURRENT_DATA_VERSION = 13;
     public static final int CURRENT_BOOTSTRAP_VERSION = 12;
 
     private final UUID ownerId;

@@ -23,7 +23,7 @@ import java.util.UUID;
 public final class CharacterSwitchWorldData extends WorldSavedData {
 
     public static final String DATA_NAME = "losttales_character_switches";
-    public static final int CURRENT_DATA_VERSION = 2;
+    public static final int CURRENT_DATA_VERSION = 3;
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_ACCOUNTS = "Accounts";
@@ -313,7 +313,9 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
         if (transaction.getSourceCharacterId() != null) {
             writeUuid(tag, TAG_SOURCE_CHARACTER_UUID, transaction.getSourceCharacterId());
         }
-        writeUuid(tag, TAG_TARGET_CHARACTER_UUID, transaction.getTargetCharacterId());
+        if (transaction.getTargetCharacterId() != null) {
+            writeUuid(tag, TAG_TARGET_CHARACTER_UUID, transaction.getTargetCharacterId());
+        }
         tag.setLong(TAG_SOURCE_REVISION, transaction.getSourceRosterRevision());
         tag.setLong(TAG_TARGET_REVISION, transaction.getTargetRosterRevision());
         tag.setLong(TAG_PREPARED_AT, transaction.getPreparedAt());
@@ -349,7 +351,9 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
         UUID transactionId = readUuid(tag, TAG_TRANSACTION_UUID);
         UUID sourceId = readUuid(tag, TAG_SOURCE_CHARACTER_UUID);
         UUID targetId = readUuid(tag, TAG_TARGET_CHARACTER_UUID);
-        if (transactionId == null || targetId == null) {
+        // A version-3 journal leaves the target out when the target is the
+        // account; older journals always named a character.
+        if (transactionId == null || version < 3 && targetId == null) {
             throw new IllegalArgumentException("transaction identifiers are missing");
         }
         NBTTagCompound previous = tag.hasKey(TAG_PREVIOUS, Constants.NBT.TAG_COMPOUND)

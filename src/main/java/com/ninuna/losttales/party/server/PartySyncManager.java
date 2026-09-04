@@ -1,7 +1,6 @@
 package com.ninuna.losttales.party.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
-import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.party.PartyOperationResultPacket;
 import com.ninuna.losttales.network.packet.party.PartyStateSyncPacket;
@@ -358,18 +357,17 @@ public final class PartySyncManager {
             if (!target.isValid()) {
                 continue;
             }
-            RoleplayCharacter character = target.character;
-            if (character == null
-                    || state.getActiveCharacterId().equals(character.getCharacterId())
-                    || partyData.getPartyForCharacter(character.getCharacterId()) != null
-                    || alreadyInvitedCharacters.contains(character.getCharacterId())) {
+            UUID targetId = target.gameplayId();
+            if (state.getActiveCharacterId().equals(targetId)
+                    || partyData.getPartyForCharacter(targetId) != null
+                    || alreadyInvitedCharacters.contains(targetId)) {
                 continue;
             }
             candidates.add(new PartyInviteTargetSnapshot(
                     targetOwnerId,
-                    character.getCharacterId(),
+                    targetId,
                     targetPlayer.getCommandSenderName(),
-                    character.getName()));
+                    target.displayName));
         }
 
         Collections.sort(candidates, new Comparator<PartyInviteTargetSnapshot>() {

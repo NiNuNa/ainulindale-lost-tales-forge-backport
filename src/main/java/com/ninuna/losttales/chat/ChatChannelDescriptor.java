@@ -16,12 +16,14 @@ public final class ChatChannelDescriptor {
     private final ChatRecipientRule recipientRule;
     private final ChatChannelAccess access;
     private final int displayColor;
+    private final boolean bridgeable;
 
     public ChatChannelDescriptor(String id, String displayName,
                                  ChatIdentityType identityType,
                                  ChatRecipientRule recipientRule,
                                  ChatChannelAccess access,
-                                 int displayColor) {
+                                 int displayColor,
+                                 boolean bridgeable) {
         if (id == null || id.trim().length() == 0) {
             throw new IllegalArgumentException("id must not be empty");
         }
@@ -36,6 +38,7 @@ public final class ChatChannelDescriptor {
         this.recipientRule = recipientRule;
         this.access = access;
         this.displayColor = displayColor;
+        this.bridgeable = bridgeable;
     }
 
     public String getId() { return this.id; }
@@ -44,6 +47,13 @@ public final class ChatChannelDescriptor {
     public ChatRecipientRule getRecipientRule() { return this.recipientRule; }
     public ChatChannelAccess getAccess() { return this.access; }
     public int getDisplayColor() { return this.displayColor; }
+    /**
+     * Whether the server's Discord bridge may carry the channel's lines
+     * out of the game or into it. A policy fact, separate from routing
+     * and access: what is private stays private however the bridge is
+     * configured.
+     */
+    public boolean isBridgeable() { return this.bridgeable; }
 
     @Override
     public String toString() {

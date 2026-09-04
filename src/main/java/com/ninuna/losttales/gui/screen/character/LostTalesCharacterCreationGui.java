@@ -14,7 +14,6 @@ import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
-import com.ninuna.losttales.gui.screen.LostTalesCharacterInfoGui;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
@@ -56,7 +55,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
 
     private final GuiScreen parent;
     private final int slotIndex;
-    private final boolean firstCharacterFlow;
 
     private GuiTextField nameField;
     private GuiTextField ageField;
@@ -87,11 +85,9 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
     private GuiButton continueButton;
     private GuiButton unconventionalButton;
 
-    public LostTalesCharacterCreationGui(GuiScreen parent, int slotIndex,
-                                         boolean firstCharacterFlow) {
+    public LostTalesCharacterCreationGui(GuiScreen parent, int slotIndex) {
         this.parent = parent;
         this.slotIndex = slotIndex;
-        this.firstCharacterFlow = firstCharacterFlow;
     }
 
     @Override
@@ -220,13 +216,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
         }
         this.statusMessage = ClientCharacterDisplayNames.operationSuccess("create");
         this.statusError = false;
-        CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
-        if (snapshot != null) {
-            if (this.firstCharacterFlow && snapshot.getActiveCharacter() != null) {
-                this.mc.displayGuiScreen(new LostTalesCharacterInfoGui(this.parent));
-            } else {
-                this.mc.displayGuiScreen(this.parent);
-            }
+        // The new character is on the roster; the player is still whoever
+        // they were playing, and picks it from the roster when they want to.
+        if (ClientCharacterRosterCache.getSnapshot() != null) {
+            this.mc.displayGuiScreen(this.parent);
         }
     }
 

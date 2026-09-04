@@ -2,7 +2,6 @@ package com.ninuna.losttales.party.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
-import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.party.PartyTrackingSyncPacket;
@@ -96,25 +95,14 @@ public final class PartyTrackingSyncManager {
         if (receiver == null) {
             return false;
         }
-        PartyTrackingSnapshot content;
-        if (receiver.activeCharacter == null) {
-            // No character to own a marker, so the player owns it. They are
-            // in no party by definition, and see nothing but their own.
-            content = buildSoloContent(recipient.getUniqueID(),
-                    recipient.getUniqueID(),
-                    recipient.getCommandSenderName(), view);
-        } else {
-            UUID activeCharacterId =
-                    receiver.activeCharacter.getCharacterId();
-            Party party = view.partyData.getPartyForCharacter(
-                    activeCharacterId);
-            content = party == null
-                    ? buildSoloContent(recipient.getUniqueID(),
-                            activeCharacterId,
-                            receiver.activeCharacter.getName(), view)
-                    : buildPartyContent(recipient.getUniqueID(),
-                            activeCharacterId, party, view);
-        }
+        // The identity being played owns the marker and holds the party
+        // membership, whether it is a character or the account itself.
+        Party party = view.partyData.getPartyForCharacter(receiver.gameplayId);
+        PartyTrackingSnapshot content = party == null
+                ? buildSoloContent(recipient.getUniqueID(),
+                        receiver.gameplayId, receiver.displayName, view)
+                : buildPartyContent(recipient.getUniqueID(),
+                        receiver.gameplayId, party, view);
 
         SentState sent = SENT_STATES.get(recipient.getUniqueID());
         if (sent == null) {
@@ -141,9 +129,8 @@ public final class PartyTrackingSyncManager {
     /**
      * One player, no party: their own marker and nothing else.
      *
-     * <p>{@code markerOwnerId} is the active character when there is one and
-     * the player themselves when there is not, so a player who has yet to
-     * make a character can still place and see their own marker.</p>
+     * <p>{@code markerOwnerId} is the identity being played: the active
+     * character, or the account itself.</p>
      */
     private static PartyTrackingSnapshot buildSoloContent(
             UUID recipientOwnerId, UUID markerOwnerId,
@@ -223,9 +210,7 @@ public final class PartyTrackingSyncManager {
             PartyMember member,
             OnlinePlayerContext online) {
         if (online == null || online.player == null
-                || online.activeCharacter == null
-                || !member.getCharacterId().equals(
-                online.activeCharacter.getCharacterId())) {
+                || !member.getCharacterId().equals(online.gameplayId)) {
             return null;
         }
         EntityPlayerMP player = online.player;
@@ -299,10 +284,12 @@ public final class PartyTrackingSyncManager {
                 }
                 PartyService.ActiveCharacterContext active =
                         PartyService.getInstance().resolveActiveCharacter(player);
+                if (!active.isValid()) {
+                    continue;
+                }
                 onlineByOwner.put(player.getUniqueID(),
-                        new OnlinePlayerContext(
-                                player,
-                                active.isValid() ? active.character : null));
+                        new OnlinePlayerContext(player, active.gameplayId(),
+                                active.displayName));
             }
         }
         return new ServerView(partyData, markerData, onlineByOwner);
@@ -329,12 +316,15 @@ public final class PartyTrackingSyncManager {
 
     private static final class OnlinePlayerContext {
         private final EntityPlayerMP player;
-        private final RoleplayCharacter activeCharacter;
+        /** The id the player is playing as; never null. */
+        private final UUID gameplayId;
+        private final String displayName;
 
-        private OnlinePlayerContext(EntityPlayerMP player,
-                                    RoleplayCharacter activeCharacter) {
+        private OnlinePlayerContext(EntityPlayerMP player, UUID gameplayId,
+                                    String displayName) {
             this.player = player;
-            this.activeCharacter = activeCharacter;
+            this.gameplayId = gameplayId;
+            this.displayName = displayName;
         }
     }
 

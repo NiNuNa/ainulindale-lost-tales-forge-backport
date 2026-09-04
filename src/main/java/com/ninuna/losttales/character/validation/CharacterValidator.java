@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.validation;
 
+import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
@@ -204,6 +205,25 @@ public final class CharacterValidator {
                 bodyTypeId,
                 chestTypeId
         ));
+    }
+
+    /**
+     * A switch target: the roster's own account is always selectable, a
+     * character must belong to the roster. Both check the roster revision.
+     */
+    public static CharacterValidationResult validateSelectionTarget(
+            CharacterRoster roster, PlayableIdentity target, long expectedRevision) {
+        CharacterValidationResult revision = validateExpectedRevision(roster, expectedRevision);
+        if (!revision.isValid()) {
+            return revision;
+        }
+        if (target == null || !roster.getOwnerId().equals(target.getOwnerId())) {
+            return CharacterValidationResult.failure(CharacterErrorId.INVALID_CHARACTER_ID);
+        }
+        if (target.isAccount()) {
+            return CharacterValidationResult.success();
+        }
+        return validateCharacterReference(roster, target.getCharacterId(), expectedRevision);
     }
 
     public static CharacterValidationResult validateCharacterReference(

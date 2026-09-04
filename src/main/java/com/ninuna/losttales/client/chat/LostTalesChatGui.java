@@ -103,7 +103,7 @@ public final class LostTalesChatGui extends GuiChat {
     /** The pickers and lists take the bar's top plus this as their floor. */
     private static final int INPUT_ANCHOR_BELOW_BAR = 14;
     /** Pointer travel before a press on a tab becomes a drag. */
-    private static final int DRAG_THRESHOLD = 4;
+    static final int DRAG_THRESHOLD = 4;
     /**
      * Message lines one notch of the wheel moves. Short, because the
      * view glides to the new offset rather than jumping to it: a long
@@ -115,9 +115,9 @@ public final class LostTalesChatGui extends GuiChat {
      * Leaving a row and coming back to it are two questions about one
      * pointer, so each gets its own reach: the pull that tears a run
      * out is longer than the one that puts it back, and between the two
-     * lies a band where neither happens. That band is the whole point —
-     * a single threshold left one pixel between out and in, and a hand
-     * that never holds quite still crossed it every other frame.
+     * lies a band where neither happens. The band is wider than the
+     * travel that starts a drag at all, so a hand that never holds quite
+     * still cannot cross from out to in and back every other frame.
      *
      * Both are the pointer's distance to the strip itself — the bar the
      * player sees, band and ends alike. One object measured against one
@@ -128,11 +128,13 @@ public final class LostTalesChatGui extends GuiChat {
      */
 
     /** The pull, measured from the strip, that tears a dragged run out
-     *  of its row — the same in every direction. */
-    static final int DETACH_DISTANCE = 20;
+     *  of its row — the same in every direction. Less than a tab row,
+     *  so a run comes free before the pointer has crossed a whole row
+     *  of the window it is leaving. */
+    static final int DETACH_DISTANCE = 14;
     /** The reach, measured the same way, within which the row a run was
      *  torn out of takes it back. */
-    static final int RETURN_DISTANCE = 12;
+    static final int RETURN_DISTANCE = 9;
     /** How far above or below a row's band a carried run may still be
      *  offered to it. */
     static final int DOCK_BAND_SLACK = 7;
@@ -215,8 +217,6 @@ public final class LostTalesChatGui extends GuiChat {
     /** Gap between the + and the line beside it. */
     private static final int EMPTY_STATE_GAP = 5;
 
-    private static final java.lang.reflect.Field SENT_HISTORY_CURSOR =
-            findSentHistoryCursor();
     /**
      * When the input bar's entrance began: the screen opening, and again
      * whenever the bar arrives in another window.
@@ -839,12 +839,14 @@ public final class LostTalesChatGui extends GuiChat {
     /**
      * Text belongs to the tab it was typed in: what the field holds goes
      * back to the tab just left, and the tab coming to the front brings
-     * its own unsent text, if any.
+     * its own unsent text, if any. A walk through the tab's sent lines
+     * ends here, so the line it left in the field is what goes back.
      */
     private void swapDraft(ChatTab previous, ChatTab selected) {
         if (this.inputField == null) {
             return;
         }
+        ClientChatChannelState.endSentBrowse();
         if (previous != null) {
             ClientChatChannelState.setDraft(previous,
                     this.inputField.getText());
@@ -1025,6 +1027,21 @@ public final class LostTalesChatGui extends GuiChat {
         if (shareSuggestions.isActive() && handleShareSuggestionKey(keyCode)) {
             return;
         }
+        // Up and Down walk what was sent from the selected tab, and from
+        // it alone: each tab keeps its own history. Handled here, never
+        // by super, whose single history mixes every tab's lines.
+        if (keyCode == Keyboard.KEY_UP || keyCode == Keyboard.KEY_DOWN) {
+            String recalled = ClientChatChannelState.recallSent(
+                    ClientChatChannelState.getSelected(),
+                    keyCode == Keyboard.KEY_UP ? -1 : 1,
+                    this.inputField.getText());
+            if (recalled != null) {
+                this.inputField.setText(recalled);
+                this.inputField.setCursorPositionEnd();
+                enforceLimit();
+            }
+            return;
+        }
         // Tab and the arrows walk the tabs of the window being typed
         // in. All three need an empty field: with text in it the arrows
         // belong to the caret, as they do in any text field.
@@ -1082,6 +1099,15 @@ public final class LostTalesChatGui extends GuiChat {
         }
         String text = this.inputField.getText().trim();
         boolean command = text.length() > 0 && isServerCommand(text);
+        ChatTab typedIn = ClientChatChannelState.getSelected();
+        if (command) {
+            // The command and what it answers are shown in the tab it
+            // was typed in, and the console keeps a copy of both as the
+            // log of everything that was asked. Typed in the console,
+            // it is shown there once. The tab in front stays in front.
+            LostTalesChatPresentation.expectCommandOutput(typedIn);
+            LostTalesChatPresentation.echoCommand(typedIn, text);
+        }
         if (text.length() > 0) {
             func_146403_a(text);
             // Speaking moves the conversation on: the unread divider
@@ -1092,16 +1118,8 @@ public final class LostTalesChatGui extends GuiChat {
         this.inputField.setText("");
         this.sent = false;
         ClientChatChannelState.setDraft("");
-        resetSentHistoryCursor();
+        ClientChatChannelState.endSentBrowse();
         stopTyping();
-        if (command) {
-            // Whatever the command answers is console output, so the
-            // console comes forward and takes the input before the
-            // answer arrives. Only once the field has been emptied:
-            // moving the selection swaps drafts between tabs, and the
-            // command that has just gone out is not one.
-            showConsole();
-        }
     }
 
     /**
@@ -1342,13 +1360,6 @@ public final class LostTalesChatGui extends GuiChat {
         String message = this.inputField.getText().trim();
         if (message.length() == 0 || message.startsWith("/")) {
             return false;
-        }
-        if (ClientChatChannelState.getSelectedChannel()
-                == ChatChannel.CONSOLE) {
-            // The console is for commands; plain text has nowhere to go.
-            showNotice(StatCollector.translateToLocal(
-                    "gui.losttales.chat.console_commands_only"));
-            return true;
         }
         if (!ClientChatChannelState.canSend(
                 ClientChatChannelState.getSelected())) {
@@ -1676,26 +1687,30 @@ public final class LostTalesChatGui extends GuiChat {
         String message = text == null ? "" : text.trim();
         this.sent = true;
         ClientChatChannelState.setDraft("");
+        // The tab the line was typed in, taken before a whisper command
+        // moves the selection to the conversation it opens.
+        ChatTab tab = ClientChatChannelState.getSelected();
         if (message.startsWith("/")) {
+            // A command is recalled from the tab it was typed in, like
+            // anything else typed there, and goes to the server as the
+            // command it is. The console is brought forward by whatever
+            // asked for the send, once it has emptied the field.
+            ClientChatChannelState.recordSent(tab, message);
             if (sendWhisperCommand(message)) {
                 return;
             }
-            // The console is brought forward by whatever asked for the
-            // send, once it has emptied the field.
-            super.func_146403_a(message);
+            this.mc.thePlayer.sendChatMessage(message);
             return;
         }
-        ChatTab tab = ClientChatChannelState.getSelected();
         if (message.length() == 0
                 || !ChatMessageValidator.isValid(message)
-                || tab.getChannel() == ChatChannel.CONSOLE
                 || !ClientChatChannelState.canSend(tab)) {
             return;
         }
-        this.mc.ingameGUI.getChatGUI().addToSentMessages(message);
-        // The sent history above keeps the raw text, so recalling it
-        // gives back exactly what was typed; what goes out may have its
-        // emoticons converted.
+        // The history keeps the raw text, so recalling it gives back
+        // exactly what was typed; what goes out may have its emoticons
+        // converted.
+        ClientChatChannelState.recordSent(tab, message);
         String outgoing = outgoingMessage(message);
         // A message being rewritten is not a new one: it goes back to
         // the server as a correction to the line it came from, and the
@@ -1767,31 +1782,6 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
-     * Brings the console forward and puts the input in it: its window
-     * comes to the front, the console becomes that window's front tab,
-     * and the selection follows. A console the player has closed is
-     * reopened first. Purely local presentation — the command itself has
-     * already gone to the server, and nothing here depends on the
-     * answer, so it behaves the same in single player and on a server.
-     */
-    private void showConsole() {
-        ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
-        if (!ClientChatChannelState.isAvailable(console)) {
-            return;
-        }
-        if (!ChatWindowLayout.isOpen(console)
-                && !ChatWindowLayout.restore(ChatChannel.CONSOLE)) {
-            return;
-        }
-        ChatWindow window = ChatWindowLayout.windowOf(console);
-        if (window != null) {
-            ChatWindowLayout.raise(window.getId());
-        }
-        ChatWindowLayout.setActiveTab(console);
-        selectChannel(console);
-    }
-
-    /**
      * {@code /msg}, {@code /tell} and {@code /w} are the chat's own: the
      * name opens (and selects) that whisper tab, and any text after it is
      * sent there as a whisper rather than as a vanilla command.
@@ -1812,7 +1802,6 @@ public final class LostTalesChatGui extends GuiChat {
         }
         String text = parts.length > 2 ? parts[2].trim() : "";
         if (text.length() > 0 && ChatMessageValidator.isValid(text)) {
-            this.mc.ingameGUI.getChatGUI().addToSentMessages(command);
             String outgoing = outgoingMessage(text);
             // Shown before it is sent, exactly as a message typed into
             // the tab is: the command is only another way of saying it.
@@ -2038,6 +2027,26 @@ public final class LostTalesChatGui extends GuiChat {
      */
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        // The screen is flat overlay content and takes no part in depth
+        // testing, exactly as the HUD's chat pass does not: an item
+        // icon (a faction tab's banner, a shared item) is drawn at a
+        // raised z and leaves its depth behind, and with the test on
+        // whatever is drawn over it afterwards, the next tab included,
+        // is rejected where they overlap.
+        boolean depthTest = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
+        if (depthTest) {
+            GL11.glDisable(GL11.GL_DEPTH_TEST);
+        }
+        try {
+            drawChat(mouseX, mouseY, partialTicks);
+        } finally {
+            if (depthTest) {
+                GL11.glEnable(GL11.GL_DEPTH_TEST);
+            }
+        }
+    }
+
+    private void drawChat(int mouseX, int mouseY, float partialTicks) {
         ClientChatChannelState.ensureAvailable();
         syncSelection();
         noteInputWindow();
@@ -2529,15 +2538,17 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
-     * The label a hovered row control offers. A tab names itself in
-     * full, whatever the row had room to draw; the grip speaks only for
-     * its own glyph, so the empty strip that also drags stays silent.
+     * The label a hovered row control offers. A tab whose name the row
+     * cut short shows it whole by the marquee in the tab itself, and
+     * only names itself here when animation is off; the grip speaks only
+     * for its own glyph, so the empty strip that also drags stays silent.
      */
     private static String tipFor(ChatChannelTabBar.Hit hit,
                                  ChatWindow window, boolean overGrip) {
         switch (hit.kind) {
             case TAB:
-                return ClientChatChannelState.displayName(hit.tab);
+                return hit.labelClipped && !LostTalesConfig.enableChatAnimations
+                        ? ClientChatChannelState.displayName(hit.tab) : "";
             case CLOSE:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.tab.close");
@@ -6486,40 +6497,6 @@ public final class LostTalesChatGui extends GuiChat {
                 (System.nanoTime() - this.barEntranceNanos)
                         / (float)duration));
         return LostTalesChatMotion.inputOffset(progress);
-    }
-
-    /**
-     * Puts vanilla's up/down history cursor back after the newest sent
-     * message, as its {@code initGui} does, since the screen is not
-     * rebuilt between messages any more. The field is private; a Forge
-     * layout without it only costs the cursor position.
-     */
-    private void resetSentHistoryCursor() {
-        if (SENT_HISTORY_CURSOR == null) {
-            return;
-        }
-        try {
-            SENT_HISTORY_CURSOR.setInt(this,
-                    this.mc.ingameGUI.getChatGUI().getSentMessages().size());
-        } catch (IllegalAccessException ignored) {
-        } catch (RuntimeException ignored) {
-        }
-    }
-
-    private static java.lang.reflect.Field findSentHistoryCursor() {
-        try {
-            java.lang.reflect.Field field =
-                    GuiChat.class.getDeclaredField("sentHistoryCursor");
-            if (field.getType() != int.class) {
-                return null;
-            }
-            field.setAccessible(true);
-            return field;
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        } catch (RuntimeException ignored) {
-            return null;
-        }
     }
 
     private void showNotice(String text) {

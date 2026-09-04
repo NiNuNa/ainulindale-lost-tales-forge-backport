@@ -2,6 +2,8 @@ package com.ninuna.losttales.character.identity;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -57,5 +59,15 @@ public final class RoleplayCharacterIdentityHookTest {
         assertEquals("Player2840",
                 ((ChatComponentText)result)
                         .getChatComponentText_TextValue());
+    }
+
+    @Test
+    public void aLineWithoutASubjectIsHandedBackUntouched() {
+        ChatComponentTranslation source = new ChatComponentTranslation(
+                "chat.type.achievement", new ChatComponentText("Player15"),
+                new ChatComponentText("[First Steps]"));
+        assertSame(source,
+                RoleplayCharacterIdentityHook.resolveSubjectName(source, null));
+        assertNull(RoleplayCharacterIdentityHook.resolveSubjectName(null, null));
     }
 }

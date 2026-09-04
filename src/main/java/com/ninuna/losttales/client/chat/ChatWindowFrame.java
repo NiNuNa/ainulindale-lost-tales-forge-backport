@@ -43,6 +43,14 @@ final class ChatWindowFrame {
     /** The view's line list drawn last; the bands index into it. */
     List<ChatLine> lines = Collections.emptyList();
     /**
+     * The most wrapped rows any tab of this window has been drawn with
+     * this session. A window that follows the game's chat height is as
+     * tall as this rather than as tall as the tab in front, so every
+     * tab of the window shares one height and switching tabs never
+     * resizes it; a tab with fewer lines shows empty rows above them.
+     */
+    int peakLines;
+    /**
      * Index in {@link #lines} of the oldest wrapped row of the message
      * the unread divider stands above, or -1 while this view shows no
      * divider. The divider takes a whole row of the stack, so it is part

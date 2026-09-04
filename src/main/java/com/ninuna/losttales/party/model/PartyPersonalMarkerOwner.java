@@ -1,5 +1,7 @@
 package com.ninuna.losttales.party.model;
 
+import com.ninuna.losttales.character.identity.PlayableIdentity;
+
 import java.util.UUID;
 
 /**
@@ -26,6 +28,6 @@ public final class PartyPersonalMarkerOwner {
      * @return the owner id, or null when neither is known
      */
     public static UUID resolve(UUID activeCharacterId, UUID playerId) {
-        return activeCharacterId != null ? activeCharacterId : playerId;
+        return PlayableIdentity.gameplayId(activeCharacterId, playerId);
     }
 }

@@ -24,6 +24,32 @@ public final class ClientChatChannelStateTest {
     }
 
     @Test
+    public void closingTheSelectedTabStaysInItsWindow() {
+        // Proximity and OOC in a window of their own, Global elsewhere.
+        ChatWindow own = ChatWindowLayout.detach(ChatChannel.PROXIMITY, 0.0D, 0.0D);
+        assertTrue(ChatWindowLayout.moveTab(ChatChannel.OOC, own.getId(), 1));
+        ClientChatChannelState.select(ChatChannel.OOC);
+        assertTrue(ClientChatChannelState.close(ChatTab.of(ChatChannel.OOC)));
+        assertEquals("the neighbour in the same window, not Global elsewhere",
+                ChatChannel.PROXIMITY, ClientChatChannelState.getSelectedChannel());
+        // Closing the window's last tab is the one case that leaves it.
+        assertTrue(ClientChatChannelState.close(ChatTab.of(ChatChannel.PROXIMITY)));
+        assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
+    }
+
+    @Test
+    public void sentHistoryIsKeptPerTabAndClearedWithTheState() {
+        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
+        ClientChatChannelState.recordSent(global, "Hi");
+        assertEquals("Hi", ClientChatChannelState.recallSent(global, -1, ""));
+        assertEquals(null, ClientChatChannelState.recallSent(ooc, -1, ""));
+        ClientChatChannelState.endSentBrowse();
+        ClientChatChannelState.clear();
+        assertEquals(null, ClientChatChannelState.recallSent(global, -1, ""));
+    }
+
+    @Test
     public void closedChannelsAreNeverSelectedAndCycleFollowsTheLayout() {
         acceptRoster("lotr:gondor");
         ChatWindowLayout.detach(ChatChannel.PROXIMITY, 0.0D, 0.0D);

@@ -1,7 +1,6 @@
 package com.ninuna.losttales.party.quest;
 
-import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.server.CharacterActiveResolver;
+import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyMember;
@@ -64,12 +63,12 @@ public final class PartyQuestProgressCoordinator {
             return;
         }
 
-        RoleplayCharacter creditedCharacter =
-                CharacterActiveResolver.get(creditedPlayer);
+        UUID creditedId = RoleplayCharacterIdentityHook.resolveGameplayId(
+                creditedPlayer);
         Party party = PartyService.getInstance()
                 .getPartyForActiveCharacter(creditedPlayer);
-        if (creditedCharacter == null || party == null
-                || !party.containsMember(creditedCharacter.getCharacterId())) {
+        if (creditedId == null || party == null
+                || !party.containsMember(creditedId)) {
             return;
         }
 
@@ -85,8 +84,7 @@ public final class PartyQuestProgressCoordinator {
 
         for (PartyMember member : party.getMembers()) {
             if (member == null
-                    || creditedCharacter.getCharacterId().equals(
-                            member.getCharacterId())) {
+                    || creditedId.equals(member.getCharacterId())) {
                 continue;
             }
             EntityPlayerMP participant = findOnlinePlayer(
@@ -119,9 +117,8 @@ public final class PartyQuestProgressCoordinator {
                 || participant.getHealth() <= 0.0F) {
             return false;
         }
-        RoleplayCharacter active = CharacterActiveResolver.get(participant);
-        if (active == null
-                || !member.getCharacterId().equals(active.getCharacterId())
+        if (!member.getCharacterId().equals(
+                RoleplayCharacterIdentityHook.resolveGameplayId(participant))
                 || !member.getOwnerId().equals(participant.getUniqueID())) {
             return false;
         }

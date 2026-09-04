@@ -124,12 +124,12 @@ public final class DiscordMessageSanitizer {
     }
 
     /**
-     * The line a webhook post opens with when the game message answers
-     * one Discord holds: Discord's small subtext, an arrow, the quoted
-     * author in bold and the quoted text — linked to the original when
-     * a jump URL is known, plain when it is not. The closest thing to a
-     * native reply a webhook can carry: Discord accepts no
-     * {@code message_reference} on a webhook execution, so the header
+     * The line a game line's card opens with when the message answers
+     * one Discord holds: a block quote of an arrow, the quoted author in
+     * bold and the quoted text — linked to the original when a jump URL
+     * is known, plain when it is not. The closest thing to a native
+     * reply a webhook can carry: Discord accepts no
+     * {@code message_reference} on a webhook execution, so the quote
      * says in markdown what the reply banner would have said.
      */
     public static String replyHeader(String author, String excerpt,
@@ -141,26 +141,7 @@ public final class DiscordMessageSanitizer {
         if (jumpUrl != null && jumpUrl.length() > 0) {
             body = "[" + body + "](" + jumpUrl + ")";
         }
-        return "-# ↩ " + body + "\n";
-    }
-
-    /**
-     * The name a read-only line is posted under: the channel in brackets
-     * before the sender, {@code [Global] Aragorn}, so a Discord reader
-     * sees at a glance which channel a line was said in when several
-     * share one Discord channel. A webhook name renders no markdown and
-     * is bounded by Discord at {@link #MAX_WEBHOOK_NAME_LENGTH}; the
-     * sender's name gives way before the tag does.
-     */
-    public static String channelTaggedName(String channelName, String name) {
-        String tag = "[" + (channelName == null ? "" : channelName.trim())
-                + "] ";
-        String sender = name == null ? "" : name.trim();
-        int room = MAX_WEBHOOK_NAME_LENGTH - tag.length();
-        if (sender.length() > room) {
-            sender = sender.substring(0, Math.max(0, room)).trim();
-        }
-        return tag + sender;
+        return "> ↩ " + body + "\n";
     }
 
     /**

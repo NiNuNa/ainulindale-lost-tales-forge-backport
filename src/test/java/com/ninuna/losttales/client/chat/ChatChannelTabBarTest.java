@@ -13,6 +13,56 @@ import static org.junit.Assert.assertTrue;
  */
 public final class ChatChannelTabBarTest {
 
+    private static final double EPSILON = 1.0E-6D;
+
+    /** The marquee: still, out, rest, back, rest — on the clock alone. */
+    @Test
+    public void marqueeWaitsThenSlidesOutRestsAndSlidesBack() {
+        int overflow = 40;
+        double delay = ChatChannelTabBar.MARQUEE_START_DELAY_SECONDS;
+        double speed = ChatChannelTabBar.MARQUEE_SPEED_PX_PER_SECOND;
+        double pause = ChatChannelTabBar.MARQUEE_END_PAUSE_SECONDS;
+        double slide = overflow / speed;
+        assertEquals(0.0D, ChatChannelTabBar.marqueeOffset(0.0D, overflow), EPSILON);
+        assertEquals(0.0D, ChatChannelTabBar.marqueeOffset(delay * 0.8D, overflow), EPSILON);
+        // Half a second in: half a second's worth of sliding.
+        assertEquals(0.5D * speed,
+                ChatChannelTabBar.marqueeOffset(delay + 0.5D, overflow), EPSILON);
+        // At the end of the slide and through the rest: the whole overflow.
+        assertEquals(overflow,
+                ChatChannelTabBar.marqueeOffset(delay + slide, overflow), EPSILON);
+        assertEquals(overflow,
+                ChatChannelTabBar.marqueeOffset(delay + slide + pause * 0.5D, overflow),
+                EPSILON);
+        // Halfway back.
+        assertEquals(overflow / 2.0D,
+                ChatChannelTabBar.marqueeOffset(delay + slide + pause + slide / 2.0D,
+                        overflow), EPSILON);
+        // Home, resting, and round again.
+        double cycle = 2.0D * (slide + pause);
+        assertEquals(0.0D,
+                ChatChannelTabBar.marqueeOffset(delay + cycle - pause * 0.5D, overflow),
+                EPSILON);
+        assertEquals(0.5D * speed,
+                ChatChannelTabBar.marqueeOffset(delay + cycle + 0.5D, overflow), EPSILON);
+    }
+
+    @Test
+    public void marqueeIsStillWhenNothingOverflows() {
+        assertEquals(0.0D, ChatChannelTabBar.marqueeOffset(5.0D, 0), EPSILON);
+        assertEquals(0.0D, ChatChannelTabBar.marqueeOffset(5.0D, -3), EPSILON);
+    }
+
+    @Test
+    public void marqueeNeverLeavesTheOverflow() {
+        int overflow = 17;
+        for (double time = 0.0D; time < 20.0D; time += 0.037D) {
+            double offset = ChatChannelTabBar.marqueeOffset(time, overflow);
+            assertTrue(offset >= -EPSILON);
+            assertTrue(offset <= overflow + EPSILON);
+        }
+    }
+
     @Test
     public void widestLabelsAreCappedToOneWidthThatFits() {
         int[] widths = {40, 10, 60, 25};

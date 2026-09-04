@@ -33,13 +33,6 @@ public final class CharacterLocationTransitionService {
         this.component = component;
     }
 
-    public boolean isPendingInitialLocation(NBTTagCompound state)
-            throws CharacterStateValidationException {
-        String kind = this.component.getKind(state);
-        return VanillaLocationStateComponent.KIND_STARTING_WAYPOINT.equals(kind)
-                || VanillaLocationStateComponent.KIND_WORLD_SPAWN.equals(kind);
-    }
-
     public void transition(EntityPlayerMP player, NBTTagCompound state)
             throws CharacterStateValidationException {
         if (player == null || player.mcServer == null || player.worldObj == null

@@ -475,14 +475,17 @@ public final class ChatWindowLayoutTest {
 
     /**
      * A conversation that opens by itself when every window is locked
-     * gets a window of its own, and that window is put where it covers
-     * none of them.
+     * gets a window of its own, cascaded from the front window: one step
+     * right and down from it, at the size the player gave that window.
      */
     @Test
-    public void aWindowOpenedForAConversationKeepsClearOfTheOthers() {
+    public void aWindowOpenedForAConversationCascadesFromTheFrontWindow() {
         for (ChatWindow window : ChatWindowLayout.windows()) {
             ChatWindowLayout.setLocked(window.getId(), true);
         }
+        ChatWindowLayout.setWindowLines("w1", 12.0D, true);
+        ChatWindowLayout.setWindowWidth("w1", 320, true);
+        ChatWindowLayout.raise("w1");
         int before = ChatWindowLayout.windows().size();
         ChatTab whisper = ChatWindowLayout.openWhisper("Bilbo", null);
         assertNotNull(whisper);
@@ -490,15 +493,80 @@ public final class ChatWindowLayoutTest {
         assertNotNull(opened);
         // A locked window keeps the tabs it has; this one is new.
         assertEquals(before + 1, ChatWindowLayout.windows().size());
-        for (ChatWindow other : ChatWindowLayout.windows()) {
-            if (other == opened) {
-                continue;
-            }
-            double dx = opened.getOffsetX() - other.getOffsetX();
-            double dy = opened.getOffsetY() - other.getOffsetY();
-            assertTrue("the new window sits on top of " + other.getId(),
-                    Math.sqrt(dx * dx + dy * dy) >= 20.0D);
+        ChatWindow front = ChatWindowLayout.window("w1");
+        assertEquals(12.0D, opened.getMaxLines(), 0.0D);
+        assertEquals(320, opened.getWidth());
+        assertTrue("right of the front window",
+                opened.getOffsetX() > front.getOffsetX());
+        assertTrue("below the front window",
+                opened.getOffsetY() > front.getOffsetY());
+    }
+
+    @Test
+    public void theSameArrangementCascadesToTheSamePlace() {
+        double[] first = cascadeFromLockedLayout();
+        ChatWindowLayout.reset();
+        double[] second = cascadeFromLockedLayout();
+        assertEquals(first[0], second[0], 0.0D);
+        assertEquals(first[1], second[1], 0.0D);
+    }
+
+    private static double[] cascadeFromLockedLayout() {
+        for (ChatWindow window : ChatWindowLayout.windows()) {
+            ChatWindowLayout.setLocked(window.getId(), true);
         }
+        ChatWindowLayout.raise("w2");
+        ChatWindow opened = ChatWindowLayout.windowOf(
+                ChatWindowLayout.openWhisper("Bilbo", null));
+        return new double[] {opened.getOffsetX(), opened.getOffsetY()};
+    }
+
+    /**
+     * A conversation opens in the window it was asked for, else in the
+     * window last brought to the front that has room.
+     */
+    @Test
+    public void anArrivingConversationPrefersTheWindowLastBroughtToTheFront() {
+        ChatWindowLayout.raise("w1");
+        assertEquals("w1", ChatWindowLayout.windowOf(
+                ChatWindowLayout.openWhisper("Bilbo", null)).getId());
+        ChatWindowLayout.raise("w2");
+        assertEquals("w2", ChatWindowLayout.windowOf(
+                ChatWindowLayout.openWhisper("Frodo", null)).getId());
+        // The window asked for wins over the front one.
+        assertEquals("w1", ChatWindowLayout.windowOf(
+                ChatWindowLayout.openWhisper("Sam", "w1")).getId());
+        // A locked window asked for hands the tab to the front unlocked one.
+        ChatWindowLayout.setLocked("w1", true);
+        assertEquals("w2", ChatWindowLayout.windowOf(
+                ChatWindowLayout.openWhisper("Merry", "w1")).getId());
+    }
+
+    @Test
+    public void aWindowThatOpensByItselfStandsInFront() {
+        for (ChatWindow window : ChatWindowLayout.windows()) {
+            ChatWindowLayout.setLocked(window.getId(), true);
+        }
+        ChatWindowLayout.raise("w2");
+        ChatWindow opened = ChatWindowLayout.windowOf(
+                ChatWindowLayout.openWhisper("Bilbo", null));
+        java.util.List<ChatWindow> order = ChatWindowLayout.stacked();
+        assertSame(opened, order.get(order.size() - 1));
+        ChatTab plus = ChatTab.whisper("Frodo");
+        ChatWindowLayout.openInNewWindow(plus);
+        order = ChatWindowLayout.stacked();
+        assertSame(ChatWindowLayout.windowOf(plus), order.get(order.size() - 1));
+    }
+
+    @Test
+    public void theEmptyStateOpensAWindowCascadedFromTheFrontOne() {
+        ChatWindowLayout.setWindowLines("w2", 9.0D, true);
+        ChatWindowLayout.raise("w2");
+        ChatTab whisper = ChatTab.whisper("Pippin");
+        assertNotNull(ChatWindowLayout.openInNewWindow(whisper));
+        ChatWindow opened = ChatWindowLayout.windowOf(whisper);
+        assertEquals(9.0D, opened.getMaxLines(), 0.0D);
+        assertTrue(opened.getOffsetX() > ChatWindowLayout.window("w2").getOffsetX());
     }
 
     @Test

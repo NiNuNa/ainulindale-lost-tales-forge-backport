@@ -12,12 +12,20 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 import java.util.UUID;
 
-/** Client request to atomically select one owned character as active. */
+/**
+ * Client request to atomically play as one owned character, or as the
+ * account itself. The account form carries the owner's UUID in the
+ * character slot as a placeholder and says so with the trailing flag; the
+ * server builds the target from the live player and never from that slot.
+ * The flag is the last field, so a request without it still decodes as a
+ * character selection.
+ */
 public final class CharacterSelectRequestPacket implements IMessage {
 
     private int requestId;
     private long expectedRosterRevision;
     private UUID characterId;
+    private boolean selectAccount;
     private boolean malformed;
 
     public CharacterSelectRequestPacket() {}
@@ -32,12 +40,23 @@ public final class CharacterSelectRequestPacket implements IMessage {
         this.characterId = characterId;
     }
 
+    /** A request to play as the account; {@code ownerId} only fills the character slot. */
+    public static CharacterSelectRequestPacket forAccount(int requestId,
+                                                          long expectedRosterRevision,
+                                                          UUID ownerId) {
+        CharacterSelectRequestPacket packet = new CharacterSelectRequestPacket(
+                requestId, expectedRosterRevision, ownerId);
+        packet.selectAccount = true;
+        return packet;
+    }
+
     @Override
     public void fromBytes(ByteBuf buffer) {
         try {
             this.requestId = buffer.readInt();
             this.expectedRosterRevision = buffer.readLong();
             this.characterId = CharacterPacketCodec.readUuid(buffer);
+            this.selectAccount = buffer.isReadable() && buffer.readBoolean();
             CharacterPacketCodec.requireFinished(buffer);
             if (this.expectedRosterRevision < 0L) {
                 throw new CharacterPacketCodec.DecodeException("missing roster revision");
@@ -52,6 +71,19 @@ public final class CharacterSelectRequestPacket implements IMessage {
         buffer.writeInt(this.requestId);
         buffer.writeLong(this.expectedRosterRevision);
         CharacterPacketCodec.writeUuid(buffer, this.characterId);
+        buffer.writeBoolean(this.selectAccount);
+    }
+
+    public boolean isSelectAccount() {
+        return this.selectAccount;
+    }
+
+    public UUID getCharacterId() {
+        return this.characterId;
+    }
+
+    public boolean isMalformed() {
+        return this.malformed;
     }
 
     public static final class Handler implements IMessageHandler<CharacterSelectRequestPacket, IMessage> {
@@ -64,6 +96,7 @@ public final class CharacterSelectRequestPacket implements IMessage {
             final int requestId = message.requestId;
             final long expectedRosterRevision = message.expectedRosterRevision;
             final UUID characterId = message.characterId;
+            final boolean selectAccount = message.selectAccount;
             CharacterServerPacketDispatcher.submit(
                     player,
                     requestId,
@@ -75,7 +108,8 @@ public final class CharacterSelectRequestPacket implements IMessage {
                         public void run(EntityPlayerMP livePlayer) {
                             CharacterNetworkRequestHandler.handleSelectRequest(
                                     livePlayer, requestId,
-                                    expectedRosterRevision, characterId);
+                                    expectedRosterRevision, characterId,
+                                    selectAccount);
                         }
                     }
             );

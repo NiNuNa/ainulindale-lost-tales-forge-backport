@@ -1,7 +1,6 @@
 package com.ninuna.losttales.event;
 
-import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.character.server.CharacterActiveResolver;
+import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.entity.LostTalesHostilityHelper;
 import com.ninuna.losttales.entity.combat.LostTalesCombatEngagement;
@@ -244,15 +243,11 @@ public class LostTalesMobAggroEventHandler {
             return;
         }
 
-        RoleplayCharacter activeCharacter = CharacterActiveResolver.get(recipient);
-        if (activeCharacter == null) {
-            return;
-        }
-
         Party party;
         try {
             PartyWorldData data = PartyStorage.get(recipient.worldObj);
-            party = data.getPartyForCharacter(activeCharacter.getCharacterId());
+            party = data.getPartyForCharacter(
+                    RoleplayCharacterIdentityHook.resolveGameplayId(recipient));
         } catch (RuntimeException ignored) {
             return;
         }
@@ -274,9 +269,8 @@ public class LostTalesMobAggroEventHandler {
                     || sourcePlayer.isDead || !sourcePlayer.isEntityAlive()) {
                 continue;
             }
-            RoleplayCharacter sourceCharacter = CharacterActiveResolver.get(sourcePlayer);
-            if (sourceCharacter == null
-                    || !member.getCharacterId().equals(sourceCharacter.getCharacterId())) {
+            if (!member.getCharacterId().equals(
+                    RoleplayCharacterIdentityHook.resolveGameplayId(sourcePlayer))) {
                 continue;
             }
             PlayerCombatState sourceState = PLAYER_STATES.get(sourcePlayer.getUniqueID());

@@ -705,8 +705,10 @@ public final class ClientChatChannelViews {
         ClientChatAccountRoles.clear();
         ClientChatAppearances.clear();
         ChatTabSelection.clear();
-        // The history is gone with the world, and so are its conversations.
+        // The history is gone with the world, and so are its conversations
+        // and what was said in them.
         ChatWindowLayout.closeConversations();
+        ClientChatChannelState.forgetConversationHistory();
         ChatChannelIcons.forgetPortraits();
     }
 

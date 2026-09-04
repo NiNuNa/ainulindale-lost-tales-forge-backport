@@ -62,6 +62,23 @@ public final class ClientCharacterNetwork {
         });
     }
 
+    /** Asks to play as the account itself; {@code ownerId} is the roster's owner. */
+    public static int selectAccount(final long expectedRosterRevision,
+                                    final UUID ownerId) {
+        if (expectedRosterRevision < 0L || ownerId == null) {
+            throw new IllegalArgumentException("revision and ownerId must be valid");
+        }
+        final int requestId = nextRequestId();
+        return send(requestId, CharacterOperationType.SELECT, new Runnable() {
+            @Override
+            public void run() {
+                LostTalesNetworkHandler.CHANNEL.sendToServer(
+                        CharacterSelectRequestPacket.forAccount(
+                                requestId, expectedRosterRevision, ownerId));
+            }
+        });
+    }
+
     public static int deleteCharacter(final long expectedRosterRevision,
                                       final UUID characterId) {
         if (expectedRosterRevision < 0L || characterId == null) {

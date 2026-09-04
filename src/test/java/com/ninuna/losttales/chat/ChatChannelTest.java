@@ -73,10 +73,25 @@ public final class ChatChannelTest {
                 ChatChannel.DISCORD.getRecipientRule());
     }
 
+    /** Private conversations never leave the game, whatever the bridge is told. */
+    @Test
+    public void bridgeableMarksTheChannelsThatMayLeaveTheGame() {
+        assertEquals(true, ChatChannel.ALL.isBridgeable());
+        assertEquals(true, ChatChannel.PROXIMITY.isBridgeable());
+        assertEquals(true, ChatChannel.FACTION.isBridgeable());
+        assertEquals(true, ChatChannel.OOC.isBridgeable());
+        assertEquals(true, ChatChannel.ADMIN.isBridgeable());
+        assertEquals(true, ChatChannel.DISCORD.isBridgeable());
+        assertEquals(false, ChatChannel.PARTY.isBridgeable());
+        assertEquals(false, ChatChannel.CONSOLE.isBridgeable());
+        assertEquals(false, ChatChannel.WHISPER.isBridgeable());
+    }
+
     @Test
     public void descriptorCarriesExactlyWhatTheChannelStates() {
         for (ChatChannel channel : ChatChannel.values()) {
             ChatChannelDescriptor descriptor = channel.getDescriptor();
+            assertEquals(channel.isBridgeable(), descriptor.isBridgeable());
             assertEquals(channel.getId(), descriptor.getId());
             assertEquals(channel.getDisplayName(),
                     descriptor.getDisplayName());

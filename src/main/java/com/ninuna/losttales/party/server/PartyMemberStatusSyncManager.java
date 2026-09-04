@@ -89,10 +89,7 @@ public final class PartyMemberStatusSyncManager {
                                          boolean force) {
         OnlinePlayerContext receiver = view.onlineByOwner.get(
                 recipient.getUniqueID());
-        if (receiver == null || receiver.activeCharacterId == null) {
-            // Keep the per-connection sequence while the player temporarily has
-            // no valid active character. Structural state hides the old status,
-            // and a later character selection must still advance the sequence.
+        if (receiver == null) {
             return false;
         }
 
@@ -158,9 +155,8 @@ public final class PartyMemberStatusSyncManager {
         if (online == null || online.player == null) {
             return PartyMemberStatusSnapshot.offline(characterId);
         }
-        if (online.activeCharacterId == null) {
-            return PartyMemberStatusSnapshot.unavailable(characterId);
-        }
+        // The owner is online as another identity: a different character,
+        // or the account itself.
         if (!characterId.equals(online.activeCharacterId)) {
             return PartyMemberStatusSnapshot.inactive(characterId);
         }
@@ -248,30 +244,29 @@ public final class PartyMemberStatusSyncManager {
                     continue;
                 }
                 UUID ownerId = player.getUniqueID();
-                RoleplayCharacter character = resolveActiveCharacter(
-                        characterData, ownerId);
                 onlineByOwner.put(
                         ownerId,
                         new OnlinePlayerContext(
                                 player,
-                                character == null ? null
-                                        : character.getCharacterId()));
+                                resolveGameplayId(characterData, ownerId)));
             }
         }
         return new ServerView(partyData, onlineByOwner);
     }
 
 
-    private static RoleplayCharacter resolveActiveCharacter(
+    /**
+     * The id the player is playing as: the active character's when it is
+     * the owner's own, else the account's.
+     */
+    private static UUID resolveGameplayId(
             CharacterWorldData characterData, UUID ownerId) {
-        if (characterData == null || ownerId == null) {
-            return null;
-        }
-        CharacterRoster roster = characterData.getRoster(ownerId);
+        CharacterRoster roster = characterData == null || ownerId == null
+                ? null : characterData.getRoster(ownerId);
         RoleplayCharacter active = roster == null
                 ? null : roster.getActiveCharacter();
         return active != null && ownerId.equals(active.getOwnerId())
-                ? active : null;
+                ? active.getCharacterId() : ownerId;
     }
 
     private static boolean isServerPlayer(EntityPlayerMP player) {
@@ -296,6 +291,7 @@ public final class PartyMemberStatusSyncManager {
 
     private static final class OnlinePlayerContext {
         private final EntityPlayerMP player;
+        /** The id the player is playing as; never null. */
         private final UUID activeCharacterId;
 
         private OnlinePlayerContext(EntityPlayerMP player,

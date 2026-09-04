@@ -40,6 +40,7 @@ public enum CharacterErrorId {
     SWITCH_STORAGE_READ_ONLY("switch_storage_read_only"),
     SWITCH_PLAYER_STATE_STORAGE_READ_ONLY("switch_player_state_storage_read_only"),
     SWITCH_PLAYER_STATE_INVALID("switch_player_state_invalid"),
+    /** No longer produced: the account is a playable identity and needs no import target. Kept so the id and its text still resolve. */
     SWITCH_STATE_IMPORT_REQUIRED("switch_state_import_required"),
     SWITCH_PLAYER_NOT_READY("switch_player_not_ready"),
     SWITCH_SESSION_CHANGED("switch_session_changed"),

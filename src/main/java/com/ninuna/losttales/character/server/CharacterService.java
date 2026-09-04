@@ -3,6 +3,7 @@ package com.ninuna.losttales.character.server;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.deletion.CharacterDeletionService;
+import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorldData;
 import com.ninuna.losttales.character.model.CharacterProgression;
@@ -136,26 +137,11 @@ public final class CharacterService {
         if (createdInHighestUnlockedSlot) {
             roster.unlockNextSlot();
         }
-        boolean becameFirstActive = roster.getActiveCharacterId() == null
-                && roster.getCharacterCount() == 1;
-        if (becameFirstActive) {
-            roster.setActiveCharacterId(character.getCharacterId());
-        }
+        // A new character only joins the roster. The player stays on the
+        // identity they are playing and selects the character when they
+        // choose to, through the ordinary switch and its safeguards.
         roster.incrementRevision();
         data.saveRoster(roster);
-        if (becameFirstActive) {
-            CharacterErrorId initialization = CharacterSwitchCoordinator.getInstance()
-                    .initializeNewActiveCharacter(
-                            player, character.getCharacterId());
-            if (initialization != CharacterErrorId.NONE) {
-                // The roster mutation is already authoritative. The coordinator
-                // leaves a pending waypoint generation and disconnects fail-closed;
-                // login recovery completes it idempotently.
-                FMLLog.warning("[%s] First character %s for owner %s remains pending initialization: %s",
-                        LostTalesMetaData.MOD_ID, character.getCharacterId(),
-                        player.getUniqueID(), initialization.getId());
-            }
-        }
         return CharacterOperationResult.success(true, roster, character);
     }
 
@@ -164,6 +150,14 @@ public final class CharacterService {
             long expectedRosterRevision, UUID characterId) {
         return CharacterSwitchCoordinator.getInstance().selectCharacter(
                 player, requestId, expectedRosterRevision, characterId);
+    }
+
+    /** Plays as the given identity: one of the roster's characters, or the account itself. */
+    public CharacterOperationResult selectIdentity(
+            EntityPlayerMP player, int requestId,
+            long expectedRosterRevision, PlayableIdentity target) {
+        return CharacterSwitchCoordinator.getInstance().selectIdentity(
+                player, requestId, expectedRosterRevision, target);
     }
 
     public synchronized CharacterOperationResult updateCapeSettings(

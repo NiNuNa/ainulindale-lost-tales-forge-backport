@@ -304,7 +304,8 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             send(sender, EnumChatFormatting.GOLD + "Character switch status for "
                     + target.getCommandSenderName() + ":");
             send(sender, EnumChatFormatting.GRAY + "owner=" + ownerId
-                    + ", active=" + (roster == null ? "none" : roster.getActiveCharacterId())
+                    + ", active=" + (roster == null || roster.getActiveCharacterId() == null
+                            ? "account" : roster.getActiveCharacterId())
                     + ", rosterRevision=" + (roster == null ? -1L : roster.getRevision()));
             send(sender, EnumChatFormatting.GRAY + "stores: rosterReadOnly="
                     + characterData.isReadOnlyForNewerVersion()
@@ -327,8 +328,8 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
                 send(sender, EnumChatFormatting.GRAY
                         + "playerState=not bootstrapped");
             } else {
-                CharacterPlayerStateRecord activeRecord = roster == null
-                        ? null : playerState.getRecord(roster.getActiveCharacterId());
+                CharacterPlayerStateRecord activeRecord = playerState.getRecord(
+                        roster == null ? ownerId : roster.getActiveGameplayId());
                 send(sender, EnumChatFormatting.GRAY + "playerStateBootstrap="
                         + playerState.getBootstrapVersion()
                         + ", records=" + playerState.getRecords().size()

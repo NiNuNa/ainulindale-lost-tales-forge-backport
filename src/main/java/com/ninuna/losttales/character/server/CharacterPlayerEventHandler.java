@@ -125,8 +125,7 @@ public final class CharacterPlayerEventHandler {
                     .recover(serverPlayer);
         }
         if (lifecycleResult != CharacterErrorId.NONE
-                && lifecycleResult != CharacterErrorId.SWITCH_DEATH_PENDING
-                && lifecycleResult != CharacterErrorId.SWITCH_STATE_IMPORT_REQUIRED) {
+                && lifecycleResult != CharacterErrorId.SWITCH_DEATH_PENDING) {
             FMLLog.warning("[%s] Character lifecycle recovery for player %s returned %s",
                     LostTalesMetaData.MOD_ID,
                     player.getUniqueID(),
@@ -134,8 +133,7 @@ public final class CharacterPlayerEventHandler {
         }
 
         boolean switchingReady = lifecycleResult == CharacterErrorId.NONE
-                || lifecycleResult == CharacterErrorId.SWITCH_DEATH_PENDING
-                || lifecycleResult == CharacterErrorId.SWITCH_STATE_IMPORT_REQUIRED;
+                || lifecycleResult == CharacterErrorId.SWITCH_DEATH_PENDING;
         if (switchingReady) {
             CharacterLifecycleStateTracker.markReady(serverPlayer);
         }

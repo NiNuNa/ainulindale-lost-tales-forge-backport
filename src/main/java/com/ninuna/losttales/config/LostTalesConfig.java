@@ -1,6 +1,8 @@
 package com.ninuna.losttales.config;
 
 import java.io.File;
+import com.ninuna.losttales.compat.discord.DiscordChannelBindings;
+import net.minecraftforge.common.config.ConfigCategory;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
 /**
@@ -51,7 +53,6 @@ public final class LostTalesConfig {
     public static boolean showLotrWaypointCompassMarkers = true;
     public static boolean onlyShowUnlockedLotrWaypoints = true;
     public static boolean showHostileCompassMarkers = true;
-    public static boolean onlyShowAggroHostileCompassMarkers = true;
     public static int hostileCompassMarkerScanRadius = 48;
     public static boolean showHostileMapMarkers = true;
     public static int hostileMapMarkerDisplayRadius = 64;
@@ -161,16 +162,23 @@ public final class LostTalesConfig {
      */
     public static boolean discordEnabled;
     public static String discordBotToken = "";
-    public static String discordChannelId = "";
-    public static String discordWebhookUrl = "";
     public static int discordPollIntervalSeconds = 3;
-    public static boolean discordRelayGameChat = true;
-    public static boolean discordRelayDiscordChat = true;
-    /** Post Global and OOC lines to Discord, one way; nothing comes back. */
-    public static boolean discordRelayGlobalChat = true;
-    public static boolean discordRelayOocChat = true;
-    /** Where the read-only lines go; empty means the main webhook. */
-    public static String discordReadOnlyWebhookUrl = "";
+    /**
+     * The bindings a fresh file offers: the Discord channel, Global and
+     * OOC, each switched off until its channel and webhook are filled in.
+     */
+    private static final String[] DEFAULT_DISCORD_BINDINGS = {
+            "discord=DISABLED;channel=;webhook=",
+            "all=DISABLED;webhook=",
+            "ooc=DISABLED;webhook=",
+    };
+    /** The single-channel keys of older files, migrated into the bindings once and dropped. */
+    private static final String[] LEGACY_DISCORD_KEYS = {
+            "channelId", "webhookUrl", "relayGameChat", "relayDiscordChat",
+            "relayGlobalChat", "relayOocChat", "readOnlyWebhookUrl",
+    };
+    /** One entry per bound game channel. See {@code DiscordChannelBindings}. */
+    public static String[] discordChannelBindings = DEFAULT_DISCORD_BINDINGS.clone();
     /** The picture a post carries: {name}/{uuid} of the sender's account. */
     public static String discordAvatarUrlTemplate =
             "https://mc-heads.net/head/{name}/64";
@@ -272,9 +280,38 @@ public final class LostTalesConfig {
 
     private LostTalesConfig() {}
 
+    /**
+     * Keys older builds wrote that nothing reads any more, by category:
+     * dropped from a file as it is loaded, so a long-lived file describes
+     * only what the mod does today.
+     */
+    private static final String[][] RETIRED_KEYS = {
+            {CATEGORY_CHARACTERS, "characterAuditMaxEntries", "characterDeletedRetentionDays",
+                    "characterSwitchBlockInPortal", "characterSwitchBlockWhileRiding",
+                    "characterSwitchBlockWithContainerOpen", "characterSwitchCombatLockSeconds",
+                    "characterSwitchCooldownSeconds", "characterSwitchDimensionGuardSeconds",
+                    "characterSwitchOperatorBypass"},
+            {CATEGORY_CLIENT, "chestSize", "guiAnimationSpeed", "questNotificationsRightAligned",
+                    "useSkyrimCompassStyle", "useSkyrimQuestUiStyle",
+                    "onlyShowAggroHostileCompassMarkers"},
+    };
+
+    /** Drops every retired key the file still holds; true when it held any. */
+    private static boolean dropRetiredKeys(Configuration config) {
+        boolean dropped = false;
+        for (int group = 0; group < RETIRED_KEYS.length; group++) {
+            ConfigCategory category = config.getCategory(RETIRED_KEYS[group][0]);
+            for (int index = 1; index < RETIRED_KEYS[group].length; index++) {
+                dropped |= category.remove(RETIRED_KEYS[group][index]) != null;
+            }
+        }
+        return dropped;
+    }
+
     public static void load(File configFile) {
         loadedConfigFile = configFile;
         Configuration config = new Configuration(configFile);
+        boolean retiredDropped = dropRetiredKeys(config);
         try {
             config.load();
             applyGuiMetadata(config);
@@ -507,14 +544,6 @@ public final class LostTalesConfig {
                     showHostileCompassMarkers,
                     "Render server-approved enemies actively engaged with the local player on the Lost Tales compass."
             );
-            Property strictHostileMarkers = config.get(
-                    CATEGORY_CLIENT,
-                    "onlyShowAggroHostileCompassMarkers",
-                    true,
-                    "Compatibility key retained from older builds. Active-combat filtering is now always required and this value is forced to true."
-            );
-            strictHostileMarkers.set(true);
-            onlyShowAggroHostileCompassMarkers = true;
             hostileCompassMarkerScanRadius = config.getInt(
                     "hostileCompassMarkerScanRadius",
                     CATEGORY_CLIENT,
@@ -871,25 +900,13 @@ public final class LostTalesConfig {
                     "enabled",
                     CATEGORY_DISCORD,
                     discordEnabled,
-                    "Server only: bridge the Discord chat channel to one Discord text channel, game to Discord through a webhook and Discord to game by polling with a bot. Players get the Discord tab only while this is on."
+                    "Server only: bridge game channels to Discord text channels as channelBindings says, game to Discord through webhooks and Discord to game by polling with a bot. Players get the Discord tab only while this is on and the discord binding is not DISABLED."
             );
             discordBotToken = config.getString(
                     "botToken",
                     CATEGORY_DISCORD,
                     discordBotToken,
-                    "Server only, secret: the bot's token, used to read the Discord channel. The bot must be in the server with access to the channel and have the Message Content intent enabled."
-            );
-            discordChannelId = config.getString(
-                    "channelId",
-                    CATEGORY_DISCORD,
-                    discordChannelId,
-                    "Server only: the id of the Discord text channel to read."
-            );
-            discordWebhookUrl = config.getString(
-                    "webhookUrl",
-                    CATEGORY_DISCORD,
-                    discordWebhookUrl,
-                    "Server only, secret: a webhook URL of that channel, used to post the game's Discord-channel lines under each sender's name."
+                    "Server only, secret: the bot's token, used to read every bound Discord channel. The bot must be in the server with access to those channels and have the Message Content intent enabled."
             );
             discordPollIntervalSeconds = config.getInt(
                     "pollIntervalSeconds",
@@ -897,38 +914,43 @@ public final class LostTalesConfig {
                     discordPollIntervalSeconds,
                     2,
                     60,
-                    "Server only: how often the Discord channel is read for new messages, in seconds."
+                    "Server only: how often each bound Discord channel is read for new messages, in seconds."
             );
-            discordRelayGameChat = config.getBoolean(
-                    "relayGameChat",
+            // An older file bound one Discord channel through single keys.
+            // They become entries of the list below once, and are dropped,
+            // so the file describes the bridge in one place.
+            ConfigCategory discordCategory = config.getCategory(CATEGORY_DISCORD);
+            String[] migratedBindings = DiscordChannelBindings.legacyEntries(
+                    legacyString(discordCategory, "channelId"),
+                    legacyString(discordCategory, "webhookUrl"),
+                    legacyBoolean(discordCategory, "relayGameChat", true),
+                    legacyBoolean(discordCategory, "relayDiscordChat", true),
+                    legacyBoolean(discordCategory, "relayGlobalChat", true),
+                    legacyBoolean(discordCategory, "relayOocChat", true),
+                    legacyString(discordCategory, "readOnlyWebhookUrl"));
+            boolean legacyDropped = false;
+            for (int index = 0; index < LEGACY_DISCORD_KEYS.length; index++) {
+                legacyDropped |= discordCategory.remove(LEGACY_DISCORD_KEYS[index]) != null;
+            }
+            Property bindingsProperty = config.get(
                     CATEGORY_DISCORD,
-                    discordRelayGameChat,
-                    "Server only: post lines written in the game's Discord channel to Discord."
+                    "channelBindings",
+                    DEFAULT_DISCORD_BINDINGS,
+                    "Server only, secrets: one entry per game channel bound to a Discord channel, as <channel>=<direction>;channel=<Discord channel id>;webhook=<webhook URL>. The channel is a wire id (all, proximity, faction, ooc, admin, discord) or faction:<faction id> for one faction's Faction chat, with the id as LOTR names it (faction:lotr:gondor); the direction is DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL. channel= is needed to read, webhook= to post. Party, Console and whispers are private and refused."
             );
-            discordRelayDiscordChat = config.getBoolean(
-                    "relayDiscordChat",
-                    CATEGORY_DISCORD,
-                    discordRelayDiscordChat,
-                    "Server only: show messages written in the Discord channel in the game's Discord channel."
-            );
-            discordRelayGlobalChat = config.getBoolean(
-                    "relayGlobalChat",
-                    CATEGORY_DISCORD,
-                    discordRelayGlobalChat,
-                    "Server only: also post the game's Global channel to Discord, read-only - each line under [Global] and the character's name and title, and nothing written on Discord ever enters Global. Goes to readOnlyWebhookUrl when set, else to webhookUrl."
-            );
-            discordRelayOocChat = config.getBoolean(
-                    "relayOocChat",
-                    CATEGORY_DISCORD,
-                    discordRelayOocChat,
-                    "Server only: also post the game's OOC channel to Discord, read-only - each line under [OOC] and the account name, and nothing written on Discord ever enters OOC. Goes to readOnlyWebhookUrl when set, else to webhookUrl."
-            );
-            discordReadOnlyWebhookUrl = config.getString(
-                    "readOnlyWebhookUrl",
-                    CATEGORY_DISCORD,
-                    discordReadOnlyWebhookUrl,
-                    "Server only, secret, optional: a webhook of a second Discord channel for the read-only Global and OOC lines, so they need not share the bridged channel. Empty posts them to webhookUrl."
-            );
+            if (migratedBindings.length > 0) {
+                // An untouched list is replaced by what the old keys meant;
+                // a list already edited by hand keeps its entries and only
+                // gains the old channels it does not name yet.
+                String[] current = bindingsProperty.getStringList();
+                bindingsProperty.set(isUntouched(current, DEFAULT_DISCORD_BINDINGS)
+                        ? migratedBindings : mergeBindings(current, migratedBindings));
+                legacyDropped = true;
+            }
+            if (legacyDropped || retiredDropped) {
+                config.save();
+            }
+            discordChannelBindings = bindingsProperty.getStringList();
             discordAvatarUrlTemplate = config.getString(
                     "avatarUrlTemplate",
                     CATEGORY_DISCORD,
@@ -939,25 +961,25 @@ public final class LostTalesConfig {
                     "serverEvents",
                     CATEGORY_DISCORD,
                     discordServerEvents,
-                    "Server only: post a notice to the webhook when the server starts or shuts down and when a player joins or leaves. Needs webhookUrl."
+                    "Server only: post a notice when the server starts or shuts down and when a player joins or leaves, to the discord binding's webhook or else the first webhook that posts."
             );
             discordDeathMessages = config.getBoolean(
                     "deathMessages",
                     CATEGORY_DISCORD,
                     discordDeathMessages,
-                    "Server only: post every player's death message to the webhook, worded exactly as the game announces it. Needs webhookUrl."
+                    "Server only: post every player's death message, worded exactly as the game announces it, to the discord binding's webhook or else the first webhook that posts."
             );
             discordAchievements = config.getBoolean(
                     "achievements",
                     CATEGORY_DISCORD,
                     discordAchievements,
-                    "Server only: post vanilla and Middle-earth achievement announcements to the webhook, worded exactly as the game announces them. Needs webhookUrl."
+                    "Server only: post vanilla and Middle-earth achievement announcements, worded exactly as the game announces them, to the discord binding's webhook or else the first webhook that posts."
             );
             discordChannelStatus = config.getBoolean(
                     "channelStatus",
                     CATEGORY_DISCORD,
                     discordChannelStatus,
-                    "Server only: keep the Discord channel's topic saying whether the server is online and how many players are on (online, 3/20 players). Needs the bot token and channel id, and the bot needs the Manage Channels permission in that channel."
+                    "Server only: keep the discord binding's channel topic saying whether the server is online and how many players are on (online, 3/20 players). Needs the bot token and that binding's channel id, and the bot needs the Manage Channels permission there."
             );
             discordChannelStatusIntervalSeconds = config.getInt(
                     "channelStatusIntervalSeconds",
@@ -1739,6 +1761,48 @@ public final class LostTalesConfig {
                 "losttales.config.category.discord");
     }
 
+    /** A legacy key's string, or empty when the file no longer has it. */
+    private static String legacyString(ConfigCategory category, String key) {
+        return category != null && category.containsKey(key)
+                ? category.get(key).getString().trim() : "";
+    }
+
+    /** A legacy key's boolean, or the fallback when the file no longer has it. */
+    private static boolean legacyBoolean(ConfigCategory category, String key,
+                                         boolean fallback) {
+        return category != null && category.containsKey(key)
+                ? category.get(key).getBoolean(fallback) : fallback;
+    }
+
+    /** Whether a list is empty or exactly its default, never edited by hand. */
+    private static boolean isUntouched(String[] current, String[] defaults) {
+        return current == null || current.length == 0
+                || java.util.Arrays.equals(current, defaults);
+    }
+
+    /** The current entries, followed by the migrated ones for channels they do not name. */
+    private static String[] mergeBindings(String[] current, String[] migrated) {
+        java.util.ArrayList<String> merged = new java.util.ArrayList<String>();
+        java.util.HashSet<String> named = new java.util.HashSet<String>();
+        for (int index = 0; index < current.length; index++) {
+            merged.add(current[index]);
+            named.add(bindingKeyOf(current[index]));
+        }
+        for (int index = 0; index < migrated.length; index++) {
+            if (named.add(bindingKeyOf(migrated[index]))) {
+                merged.add(migrated[index]);
+            }
+        }
+        return merged.toArray(new String[merged.size()]);
+    }
+
+    /** The channel an entry names: everything before its first '='. */
+    private static String bindingKeyOf(String entry) {
+        int equals = entry == null ? -1 : entry.indexOf('=');
+        return equals < 0 ? "" : entry.substring(0, equals).trim()
+                .toLowerCase(java.util.Locale.ROOT);
+    }
+
     private static void writeCurrentValues(Configuration config) {
         if (config == null) {
             return;
@@ -1889,7 +1953,6 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "showLotrWaypointCompassMarkers", showLotrWaypointCompassMarkers).set(showLotrWaypointCompassMarkers);
         config.get(CATEGORY_CLIENT, "onlyShowUnlockedLotrWaypoints", onlyShowUnlockedLotrWaypoints).set(onlyShowUnlockedLotrWaypoints);
         config.get(CATEGORY_CLIENT, "showHostileCompassMarkers", showHostileCompassMarkers).set(showHostileCompassMarkers);
-        config.get(CATEGORY_CLIENT, "onlyShowAggroHostileCompassMarkers", true).set(true);
         config.get(CATEGORY_CLIENT, "hostileCompassMarkerScanRadius", hostileCompassMarkerScanRadius).set(hostileCompassMarkerScanRadius);
         config.get(CATEGORY_CLIENT, "showHostileMapMarkers", showHostileMapMarkers).set(showHostileMapMarkers);
         config.get(CATEGORY_CLIENT, "hostileMapMarkerDisplayRadius", hostileMapMarkerDisplayRadius).set(hostileMapMarkerDisplayRadius);

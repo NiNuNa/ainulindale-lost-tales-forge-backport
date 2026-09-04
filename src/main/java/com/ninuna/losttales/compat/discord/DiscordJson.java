@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -202,26 +203,6 @@ public final class DiscordJson {
     }
 
     /**
-     * The body of a webhook post: the text under a name and, when given,
-     * a picture, pinging nobody.
-     */
-    public static String webhookBody(String username, String avatarUrl,
-                                     String content) {
-        JsonObject body = new JsonObject();
-        body.addProperty("content", content == null ? "" : content);
-        if (username != null && username.length() > 0) {
-            body.addProperty("username", username);
-        }
-        if (avatarUrl != null && avatarUrl.length() > 0) {
-            body.addProperty("avatar_url", avatarUrl);
-        }
-        JsonObject allowedMentions = new JsonObject();
-        allowedMentions.add("parse", new JsonArray());
-        body.add("allowed_mentions", allowedMentions);
-        return body.toString();
-    }
-
-    /**
      * The body of one of the server's own notices: no text, one embed
      * with the notice's colour down its edge and the notice's line on
      * the author row, the player's head beside it when there is one.
@@ -251,16 +232,103 @@ public final class DiscordJson {
     }
 
     /**
-     * The body of a webhook message edit: the new text, still pinging
-     * nobody. The name and picture belong to the post and cannot change.
+     * What a game line's card says besides the line: the channel it was
+     * spoken in (its mark and name, a faction's own name for Faction
+     * chat) as the embed's heading, the colour down its edge, the account
+     * behind a character's name as its footer (empty on an account line,
+     * which is posted under the account's name already), the moment it
+     * was said as its timestamp, and the reply it answers as the block
+     * quote its text opens with (empty for none). Kept beside a posted
+     * line's id so an edit draws the same card again around the new text.
      */
-    public static String webhookEditBody(String content) {
+    public static final class LineCard {
+        /** A card that says nothing but the line. */
+        public static final LineCard NONE = new LineCard("", 0, "", 0L, "");
+
+        public final String channelLabel;
+        public final int color;
+        public final String accountName;
+        public final long postedMillis;
+        public final String header;
+
+        public LineCard(String channelLabel, int color, String accountName,
+                        long postedMillis, String header) {
+            this.channelLabel = channelLabel == null ? "" : channelLabel;
+            this.color = color;
+            this.accountName = accountName == null ? "" : accountName;
+            this.postedMillis = postedMillis;
+            this.header = header == null ? "" : header;
+        }
+
+        /** The same card opening with {@code header}. */
+        public LineCard withHeader(String header) {
+            return new LineCard(this.channelLabel, this.color,
+                    this.accountName, this.postedMillis, header);
+        }
+    }
+
+    /**
+     * The body of a game line: the sender's name and picture on the
+     * post, and the line itself as one embed drawn as {@code card}
+     * — the channel's colour, the channel's name at its head, the reply
+     * it answers quoted above the text, the account and the time at its
+     * foot — so a Discord channel that several game channels share
+     * still says where, by whom and when each line was spoken. Pings
+     * nobody.
+     */
+    public static String webhookLineBody(String username, String avatarUrl,
+                                         LineCard card, String message) {
         JsonObject body = new JsonObject();
-        body.addProperty("content", content == null ? "" : content);
+        if (username != null && username.length() > 0) {
+            body.addProperty("username", username);
+        }
+        if (avatarUrl != null && avatarUrl.length() > 0) {
+            body.addProperty("avatar_url", avatarUrl);
+        }
+        body.add("embeds", lineEmbeds(card, message));
         JsonObject allowedMentions = new JsonObject();
         allowedMentions.add("parse", new JsonArray());
         body.add("allowed_mentions", allowedMentions);
         return body.toString();
+    }
+
+    /**
+     * The body of a game line's edit: the same card drawn again around
+     * the new text. The name and picture belong to the post and cannot
+     * change.
+     */
+    public static String webhookLineEditBody(LineCard card, String message) {
+        JsonObject body = new JsonObject();
+        body.add("embeds", lineEmbeds(card, message));
+        JsonObject allowedMentions = new JsonObject();
+        allowedMentions.add("parse", new JsonArray());
+        body.add("allowed_mentions", allowedMentions);
+        return body.toString();
+    }
+
+    private static JsonArray lineEmbeds(LineCard card, String message) {
+        LineCard drawn = card == null ? LineCard.NONE : card;
+        JsonObject embed = new JsonObject();
+        embed.addProperty("color", Integer.valueOf(drawn.color & 0xFFFFFF));
+        if (drawn.channelLabel.length() > 0) {
+            JsonObject author = new JsonObject();
+            author.addProperty("name", drawn.channelLabel);
+            embed.add("author", author);
+        }
+        embed.addProperty("description",
+                drawn.header + (message == null ? "" : message));
+        if (drawn.accountName.length() > 0) {
+            JsonObject footer = new JsonObject();
+            footer.addProperty("text", drawn.accountName);
+            embed.add("footer", footer);
+        }
+        if (drawn.postedMillis > 0L) {
+            embed.addProperty("timestamp",
+                    Instant.ofEpochMilli(drawn.postedMillis).toString());
+        }
+        JsonArray embeds = new JsonArray();
+        embeds.add(embed);
+        return embeds;
     }
 
     /** The body of a channel modification that sets only the topic. */

@@ -51,11 +51,11 @@ final class PartyInvitationCoordinator {
 
     PartyInvitationOperationResult invitePlayer(
             EntityPlayerMP player,
-            RoleplayCharacter invitingCharacter,
-            CharacterWorldData characterData,
+            PartyService.ActiveCharacterContext inviting,
             PartyWorldData partyData,
             Party party,
             UUID targetOwnerId) {
+        CharacterWorldData characterData = inviting.characterData;
         if (targetOwnerId == null) {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.INVALID_TARGET, party, null);
@@ -84,13 +84,11 @@ final class PartyInvitationCoordinator {
         PartyService.ActiveCharacterContext target =
                 this.partyService.resolveActiveCharacter(targetPlayer);
         if (!target.isValid()) {
-            PartyErrorId error = target.errorId == PartyErrorId.NO_ACTIVE_CHARACTER
-                    ? PartyErrorId.TARGET_NO_ACTIVE_CHARACTER
-                    : PartyErrorId.INVALID_TARGET;
-            return PartyInvitationOperationResult.failure(error, party, null);
+            return PartyInvitationOperationResult.failure(
+                    PartyErrorId.INVALID_TARGET, party, null);
         }
-        UUID targetCharacterId = target.character.getCharacterId();
-        if (invitingCharacter.getCharacterId().equals(targetCharacterId)) {
+        UUID targetCharacterId = target.gameplayId();
+        if (inviting.gameplayId().equals(targetCharacterId)) {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.CANNOT_INVITE_SELF, party, null);
         }
@@ -114,12 +112,12 @@ final class PartyInvitationCoordinator {
         PartyInvitation invitation = new PartyInvitation(
                 invitationId,
                 party.getPartyId(),
-                invitingCharacter.getCharacterId(),
-                invitingCharacter.getOwnerId(),
-                invitingCharacter.getName(),
-                target.character.getCharacterId(),
-                target.character.getOwnerId(),
-                target.character.getName(),
+                inviting.gameplayId(),
+                inviting.ownerId(),
+                inviting.displayName,
+                target.gameplayId(),
+                target.ownerId(),
+                target.displayName,
                 now,
                 safeExpiration(now));
         try {
@@ -162,7 +160,7 @@ final class PartyInvitationCoordinator {
                     partyData.getParty(invitation.getPartyId()),
                     invitation);
         }
-        if (!active.character.getCharacterId().equals(
+        if (!active.gameplayId().equals(
                 invitation.getTargetCharacterId())
                 || !player.getUniqueID().equals(invitation.getTargetOwnerId())) {
             return PartyInvitationOperationResult.failure(
@@ -186,10 +184,10 @@ final class PartyInvitationCoordinator {
         }
 
         Party existingParty = partyData.getPartyForCharacter(
-                active.character.getCharacterId());
+                active.gameplayId());
         if (existingParty != null) {
             invitationData.removeInvitationsForTargetCharacter(
-                    active.character.getCharacterId());
+                    active.gameplayId());
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.TARGET_ALREADY_IN_PARTY,
                     true,
@@ -216,9 +214,9 @@ final class PartyInvitationCoordinator {
                     PartyErrorId.PARTY_FULL, true, party, invitation);
         }
         PartyMember joined = new PartyMember(
-                active.character.getCharacterId(),
-                active.character.getOwnerId(),
-                active.character.getName(),
+                active.gameplayId(),
+                active.ownerId(),
+                active.displayName,
                 now,
                 color);
         Party updatedParty = copyPartyWithAdditionalMember(party, joined);
@@ -229,7 +227,7 @@ final class PartyInvitationCoordinator {
         try {
             partyData.saveParty(updatedParty);
             invitationData.removeInvitationsForTargetCharacter(
-                    active.character.getCharacterId());
+                    active.gameplayId());
             if (updatedParty.isFull()) {
                 invitationData.removeInvitationsForParty(updatedParty.getPartyId());
             }
@@ -257,7 +255,7 @@ final class PartyInvitationCoordinator {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.INVITATION_NOT_FOUND, null, null);
         }
-        if (!active.character.getCharacterId().equals(
+        if (!active.gameplayId().equals(
                 invitation.getTargetCharacterId())
                 || !player.getUniqueID().equals(invitation.getTargetOwnerId())) {
             return PartyInvitationOperationResult.failure(
@@ -321,18 +319,18 @@ final class PartyInvitationCoordinator {
                 System.currentTimeMillis());
 
         Party party = partyData.getPartyForCharacter(
-                active.character.getCharacterId());
+                active.gameplayId());
         List<PartyInvitation> outgoing = new ArrayList<PartyInvitation>();
-        if (party != null && active.character.getCharacterId().equals(
+        if (party != null && active.gameplayId().equals(
                 party.getLeaderCharacterId())) {
             outgoing.addAll(invitationData.getInvitationsForParty(
                     party.getPartyId()));
         }
         return PartyInvitationState.success(
-                active.character.getCharacterId(),
+                active.gameplayId(),
                 party,
                 invitationData.getInvitationsForTargetCharacter(
-                        active.character.getCharacterId()),
+                        active.gameplayId()),
                 outgoing);
     }
 
@@ -412,18 +410,28 @@ final class PartyInvitationCoordinator {
         if (index.ambiguousCharacterIds.contains(targetId)) {
             return "ambiguous_target_character_uuid";
         }
+        // Either side may be an account playing as itself: its id is then
+        // its own owner's and stands as long as that account has a roster.
         RoleplayCharacter inviting = index.characters.get(invitingId);
         RoleplayCharacter target = index.characters.get(targetId);
-        if (inviting == null) {
+        boolean invitingAccount = inviting == null
+                && invitingId.equals(invitation.getInvitingOwnerId())
+                && index.isAccountOwner(invitingId);
+        boolean targetAccount = target == null
+                && targetId.equals(invitation.getTargetOwnerId())
+                && index.isAccountOwner(targetId);
+        if (inviting == null && !invitingAccount) {
             return "missing_inviting_character";
         }
-        if (target == null) {
+        if (target == null && !targetAccount) {
             return "missing_target_character";
         }
-        if (!inviting.getOwnerId().equals(invitation.getInvitingOwnerId())) {
+        if (inviting != null
+                && !inviting.getOwnerId().equals(invitation.getInvitingOwnerId())) {
             return "inviting_owner_mismatch";
         }
-        if (!target.getOwnerId().equals(invitation.getTargetOwnerId())) {
+        if (target != null
+                && !target.getOwnerId().equals(invitation.getTargetOwnerId())) {
             return "target_owner_mismatch";
         }
         return null;

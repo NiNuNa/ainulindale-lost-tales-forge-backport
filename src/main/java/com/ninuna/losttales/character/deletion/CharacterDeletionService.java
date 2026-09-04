@@ -94,7 +94,7 @@ public final class CharacterDeletionService {
         try {
             CharacterPlayerStateAccount account =
                     CharacterPlayerStateService.getInstance().ensureBootstrapped(
-                            player, roster, playerStateData, null);
+                            player, roster, playerStateData);
             current = CharacterPlayerStateService.getInstance().getCurrent(
                     account, character.getCharacterId());
             // The state generation must be durable before the deletion journal

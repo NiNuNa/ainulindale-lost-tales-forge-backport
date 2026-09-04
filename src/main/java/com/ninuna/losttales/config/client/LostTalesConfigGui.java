@@ -183,10 +183,7 @@ public class LostTalesConfigGui extends GuiConfig {
             return result;
         }
         Set<String> used = new HashSet<String>();
-        used.add("onlyShowAggroHostileCompassMarkers");
         used.add("hudPlacementVersion");
-        // Retired in favour of the directly editable duration control.
-        used.add("guiAnimationSpeed");
         if (groups != null) {
             for (IConfigElement group : groups) {
                 if (group == null || group.getChildElements() == null) {

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.party.server.PartySyncManager;
@@ -35,14 +36,28 @@ public final class CharacterNetworkRequestHandler {
         });
     }
 
+    /**
+     * Plays as the named character, or as the account when {@code selectAccount}
+     * is set. The target is built from the live player, never from the wire.
+     */
     public static void handleSelectRequest(final EntityPlayerMP player, final int requestId,
                                            final long expectedRosterRevision,
-                                           final UUID characterId) {
+                                           final UUID characterId,
+                                           final boolean selectAccount) {
         execute(player, requestId, CharacterOperationType.SELECT, new Operation() {
             @Override
             public CharacterOperationResult run() {
-                return CharacterService.getInstance().selectCharacter(
-                        player, requestId, expectedRosterRevision, characterId);
+                PlayableIdentity target;
+                if (selectAccount) {
+                    target = PlayableIdentity.account(player.getUniqueID());
+                } else if (characterId == null) {
+                    return CharacterOperationResult.failure(
+                            CharacterErrorId.INVALID_CHARACTER_ID, null);
+                } else {
+                    target = PlayableIdentity.character(player.getUniqueID(), characterId);
+                }
+                return CharacterService.getInstance().selectIdentity(
+                        player, requestId, expectedRosterRevision, target);
             }
         });
     }

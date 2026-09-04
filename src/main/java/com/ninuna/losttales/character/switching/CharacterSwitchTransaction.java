@@ -2,10 +2,13 @@ package com.ninuna.losttales.character.switching;
 
 import java.util.UUID;
 
-/** Persistent intent/commit record used to reconcile an interrupted switch. */
+/**
+ * Persistent intent/commit record used to reconcile an interrupted switch.
+ * A null source or target character id is the Minecraft account itself.
+ */
 public final class CharacterSwitchTransaction {
 
-    public static final int CURRENT_DATA_VERSION = 2;
+    public static final int CURRENT_DATA_VERSION = 3;
 
     private final UUID transactionId;
     private final UUID sourceCharacterId;
@@ -91,9 +94,8 @@ public final class CharacterSwitchTransaction {
                                       long targetStateGeneration,
                                       CharacterSwitchTransactionStatus status,
                                       long completedAt) {
-        if (transactionId == null || targetCharacterId == null) {
-            throw new IllegalArgumentException(
-                    "transaction and target character IDs are required");
+        if (transactionId == null) {
+            throw new IllegalArgumentException("transaction ID is required");
         }
         this.transactionId = transactionId;
         this.sourceCharacterId = sourceCharacterId;

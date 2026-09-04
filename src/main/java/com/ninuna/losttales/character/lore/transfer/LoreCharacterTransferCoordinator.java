@@ -26,7 +26,6 @@ import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.character.validation.CharacterValidationResult;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
-import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
 import com.ninuna.losttales.party.server.PartyOperationResult;
 import com.ninuna.losttales.party.server.PartyService;
 import cpw.mods.fml.common.FMLLog;
@@ -118,7 +117,7 @@ public final class LoreCharacterTransferCoordinator {
 
             CharacterPlayerStateAccount account =
                     CharacterPlayerStateService.getInstance().ensureBootstrapped(
-                            player, roster, stores.playerState, null);
+                            player, roster, stores.playerState);
             LoreCharacterVaultEntry vault = stores.transfers.getVaultEntry(
                     definition.getId());
             UUID characterId = ownership != null
@@ -173,18 +172,6 @@ public final class LoreCharacterTransferCoordinator {
             }
             CharacterRoster committed = stores.characters.getRoster(
                     player.getUniqueID());
-            if (committed != null && characterId.equals(
-                    committed.getActiveCharacterId())) {
-                CharacterErrorId initialization =
-                        CharacterSwitchCoordinator.getInstance()
-                                .initializeNewActiveCharacter(player, characterId);
-                if (initialization != CharacterErrorId.NONE) {
-                    FMLLog.warning("[%s] Newly claimed first lore character "
-                                    + "%s remains pending initialization: %s",
-                            LostTalesMetaData.MOD_ID, characterId,
-                            initialization.getId());
-                }
-            }
             return CharacterOperationResult.success(true, committed,
                     committed == null ? null
                             : committed.getCharacter(characterId));
@@ -245,7 +232,7 @@ public final class LoreCharacterTransferCoordinator {
             }
             CharacterPlayerStateAccount account =
                     CharacterPlayerStateService.getInstance().ensureBootstrapped(
-                            player, roster, stores.playerState, null);
+                            player, roster, stores.playerState);
             CharacterPlayerStateRecord state = account.getRecord(
                     character.getCharacterId());
             if (state == null) {
@@ -409,10 +396,8 @@ public final class LoreCharacterTransferCoordinator {
                 if (!roster.addCharacter(character)) {
                     return CharacterErrorId.SLOT_OCCUPIED;
                 }
-                if (roster.getActiveCharacterId() == null
-                        && roster.getCharacterCount() == 1) {
-                    roster.setActiveCharacterId(character.getCharacterId());
-                }
+                // A claim only adds the character; the player selects it
+                // when they choose to, like any other character.
                 roster.incrementRevision();
                 stores.characters.saveRoster(roster);
             }

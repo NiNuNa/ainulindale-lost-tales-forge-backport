@@ -1,5 +1,6 @@
 package com.ninuna.losttales.compat.discord;
 
+import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
 import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -95,11 +96,16 @@ public final class DiscordGameEventRelay {
                 && kind != ChatSystemLineClassifier.Kind.ACHIEVEMENT) {
             return null;
         }
-        String text = message.getUnformattedText();
+        // The line names its subject by account; the client shows it
+        // naming the character the subject is playing, and so does the
+        // notice. A death line was already renamed where it was made.
+        EntityPlayerMP subject = findOnlinePlayer(subjectAccountName(message));
+        String text = RoleplayCharacterIdentityHook.resolveSubjectName(
+                message, subject).getUnformattedText();
         if (text == null || text.trim().length() == 0) {
             return null;
         }
-        String icon = avatarOf(findOnlinePlayer(subjectAccountName(message)));
+        String icon = avatarOf(subject);
         return kind == ChatSystemLineClassifier.Kind.DEATH
                 ? DiscordServerNotices.playerDied(text, icon)
                 : DiscordServerNotices.achievement(text, icon);

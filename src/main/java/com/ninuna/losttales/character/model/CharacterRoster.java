@@ -1,5 +1,7 @@
 package com.ninuna.losttales.character.model;
 
+import com.ninuna.losttales.character.identity.PlayableIdentity;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -76,6 +78,11 @@ public class CharacterRoster {
 
     public RoleplayCharacter getActiveCharacter() {
         return this.activeCharacterId == null ? null : this.charactersById.get(this.activeCharacterId);
+    }
+
+    /** The id gameplay keys on: the active character's, or the owner's own when on the account. */
+    public UUID getActiveGameplayId() {
+        return PlayableIdentity.gameplayId(this.activeCharacterId, this.ownerId);
     }
 
     public void setActiveCharacterId(UUID activeCharacterId) {

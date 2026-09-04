@@ -144,6 +144,41 @@ public final class CharacterSwitchRecoveryReconcilerTest {
         assertNull(account.getTransaction());
     }
 
+    @Test
+    public void aSwitchToTheAccountCommitsAndClearsLikeAnyTarget() {
+        CharacterSwitchTransaction transaction = transaction(
+                SOURCE, null, 20L, CharacterSwitchTransactionStatus.PREPARED);
+        CharacterSwitchAccountState account = account(transaction);
+
+        CharacterSwitchRecoveryReconciler.Result result =
+                CharacterSwitchRecoveryReconciler
+                        .finalizeAfterDurablePlayerSave(
+                                null, account, 5000L);
+
+        assertEquals(CharacterSwitchRecoveryReconciler.Action.CLEAR_JOURNAL,
+                result.getAction());
+        assertNull(account.getTransaction());
+        assertEquals(4, account.getCooldownStage());
+    }
+
+    @Test
+    public void aSwitchAwayFromTheAccountAbortsBackToTheAccount() {
+        CharacterSwitchTransaction transaction = transaction(
+                null, TARGET, 20L, CharacterSwitchTransactionStatus.PREPARED);
+        CharacterSwitchAccountState account = account(transaction);
+
+        CharacterSwitchRecoveryReconciler.Result result =
+                CharacterSwitchRecoveryReconciler
+                        .finalizeAfterDurablePlayerSave(
+                                null, account, 5000L);
+
+        assertEquals(CharacterSwitchRecoveryReconciler.Action.CLEAR_JOURNAL,
+                result.getAction());
+        assertNull(account.getTransaction());
+        assertEquals(2, account.getCooldownStage());
+        assertFalse(account.isFrozen());
+    }
+
     private static CharacterSwitchAccountState account(
             CharacterSwitchTransaction transaction) {
         return new CharacterSwitchAccountState(
@@ -162,10 +197,19 @@ public final class CharacterSwitchRecoveryReconcilerTest {
     private static CharacterSwitchTransaction transaction(
             UUID source,
             CharacterSwitchTransactionStatus status) {
+        return transaction(source, TARGET, source == null ? -1L : 20L, status);
+    }
+
+    /** A journal between any two identities; a null id on either side is the account. */
+    static CharacterSwitchTransaction transaction(
+            UUID source,
+            UUID target,
+            long sourceStateGeneration,
+            CharacterSwitchTransactionStatus status) {
         return new CharacterSwitchTransaction(
                 UUID.fromString("50000000-0000-0000-0000-000000000005"),
                 source,
-                TARGET,
+                target,
                 10L,
                 11L,
                 3000L,
@@ -181,7 +225,7 @@ public final class CharacterSwitchRecoveryReconcilerTest {
                 4000L,
                 4000L,
                 4000L,
-                source == null ? -1L : 20L,
+                sourceStateGeneration,
                 21L,
                 status,
                 status == CharacterSwitchTransactionStatus.PREPARED

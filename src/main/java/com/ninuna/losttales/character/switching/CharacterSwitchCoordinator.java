@@ -1,6 +1,7 @@
 package com.ninuna.losttales.character.switching;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterOperationResult;
@@ -63,7 +64,28 @@ public final class CharacterSwitchCoordinator {
         if (!isServerPlayer(player)) {
             return CharacterOperationResult.failure(CharacterErrorId.INVALID_PLAYER, null);
         }
+        if (targetCharacterId == null) {
+            return CharacterOperationResult.failure(CharacterErrorId.INVALID_CHARACTER_ID, null);
+        }
+        return selectIdentity(player, requestId, expectedRosterRevision,
+                PlayableIdentity.character(player.getUniqueID(), targetCharacterId));
+    }
+
+    /**
+     * Switches the player to the given identity — one of their characters,
+     * or the account itself. A target owned by another account is refused.
+     */
+    public CharacterOperationResult selectIdentity(EntityPlayerMP player,
+                                                   int requestId,
+                                                   long expectedRosterRevision,
+                                                   PlayableIdentity target) {
+        if (!isServerPlayer(player)) {
+            return CharacterOperationResult.failure(CharacterErrorId.INVALID_PLAYER, null);
+        }
         UUID ownerId = player.getUniqueID();
+        if (target == null || !ownerId.equals(target.getOwnerId())) {
+            return CharacterOperationResult.failure(CharacterErrorId.INVALID_CHARACTER_ID, null);
+        }
         synchronized (getAccountLock(ownerId)) {
             long requestEpoch = CharacterLifecycleStateTracker.captureRequestEpoch(player);
             CharacterOperationResult cached = getCached(ownerId, requestEpoch, requestId);
@@ -72,7 +94,7 @@ public final class CharacterSwitchCoordinator {
             }
             CharacterOperationResult result = selectLocked(
                     player, requestId, requestEpoch,
-                    expectedRosterRevision, targetCharacterId);
+                    expectedRosterRevision, target);
             cache(ownerId, requestEpoch, requestId, result);
             return result;
         }
@@ -111,19 +133,8 @@ public final class CharacterSwitchCoordinator {
                     CharacterSwitchStorage.flush(player.worldObj);
                     return CharacterErrorId.SWITCH_DEATH_PENDING;
                 }
-                if (roster.getCharacterCount() > 0
-                        && roster.getActiveCharacterId() == null) {
-                    CharacterSwitchStorage.flush(player.worldObj);
-                    return CharacterErrorId.SWITCH_STATE_IMPORT_REQUIRED;
-                }
                 this.playerStateService.ensureBootstrapped(
-                        player, roster, stores.playerStates, null);
-                CharacterErrorId initialLocationResult =
-                        finalizePendingInitialCharacterLocked(
-                                player, roster, stores.playerStates);
-                if (initialLocationResult != CharacterErrorId.NONE) {
-                    return initialLocationResult;
-                }
+                        player, roster, stores.playerStates);
                 CharacterSwitchStorage.flush(player.worldObj);
                 return CharacterErrorId.NONE;
             } catch (CharacterStateValidationException exception) {
@@ -152,14 +163,10 @@ public final class CharacterSwitchCoordinator {
                         player.getUniqueID());
                 CharacterSwitchAccountState account =
                         stores.switches.getOrCreateAccount(player.getUniqueID());
-                if (roster.getCharacterCount() > 0
-                        && roster.getActiveCharacterId() == null) {
-                    return CharacterErrorId.SWITCH_STATE_IMPORT_REQUIRED;
-                }
                 this.playerStateService.ensureBootstrapped(
-                        player, roster, stores.playerStates, null);
+                        player, roster, stores.playerStates);
                 CharacterPlayerStateSnapshot snapshot =
-                        this.playerStateService.saveActiveLiveState(
+                        this.playerStateService.saveLiveState(
                         player, roster, stores.playerStates, false);
                 if (snapshot != null) {
                     CharacterErrorId prepareResult =
@@ -209,14 +216,11 @@ public final class CharacterSwitchCoordinator {
                         player.getUniqueID());
                 CharacterSwitchAccountState account =
                         stores.switches.getOrCreateAccount(player.getUniqueID());
-                if (!account.isDeathPending()
-                        && (roster.getCharacterCount() == 0
-                        || roster.getActiveCharacterId() != null)) {
+                if (!account.isDeathPending()) {
                     this.playerStateService.ensureBootstrapped(
-                            player, roster, stores.playerStates, null);
-                    if (roster.getActiveCharacterId() != null
-                            && !checkpointActiveStateLocked(
-                                    player, roster, account, stores)) {
+                            player, roster, stores.playerStates);
+                    if (!checkpointActiveStateLocked(
+                            player, roster, account, stores)) {
                         return CharacterErrorId.SWITCH_RECOVERY_REQUIRED;
                     }
                 }
@@ -255,7 +259,7 @@ public final class CharacterSwitchCoordinator {
         }
     }
 
-    /** Captures the active character on clean logout, except during unresolved death. */
+    /** Captures the identity being played on clean logout, except during unresolved death. */
     public void saveActiveStateOnLogout(EntityPlayerMP player) {
         if (!isServerPlayer(player)) {
             return;
@@ -271,8 +275,7 @@ public final class CharacterSwitchCoordinator {
                 CharacterSwitchAccountState account =
                         stores.switches.getOrCreateAccount(player.getUniqueID());
                 if (account.isDeathPending() || !player.isEntityAlive()
-                        || player.isDead || player.getHealth() <= 0.0F
-                        || roster.getActiveCharacterId() == null) {
+                        || player.isDead || player.getHealth() <= 0.0F) {
                     CharacterSwitchStorage.flush(player.worldObj);
                     return;
                 }
@@ -418,49 +421,6 @@ public final class CharacterSwitchCoordinator {
         }
     }
 
-    /** Applies and durably resolves a newly created first character. */
-    public CharacterErrorId initializeNewActiveCharacter(
-            EntityPlayerMP player, UUID characterId) {
-        if (!isServerPlayer(player) || characterId == null) {
-            return CharacterErrorId.INVALID_PLAYER;
-        }
-        synchronized (getAccountLock(player.getUniqueID())) {
-            boolean switching = CharacterLifecycleStateTracker.beginSwitch(player);
-            if (!switching) {
-                disconnectForRecovery(player);
-                return CharacterErrorId.SWITCH_ALREADY_IN_PROGRESS;
-            }
-            try {
-                Stores stores = loadStores(player.worldObj, player.getUniqueID());
-                CharacterErrorId availability = stores.check(player.getUniqueID());
-                if (availability != CharacterErrorId.NONE) {
-                    return availability;
-                }
-                CharacterRoster roster = stores.rosters.getOrCreateRoster(
-                        player.getUniqueID());
-                if (!characterId.equals(roster.getActiveCharacterId())) {
-                    disconnectForRecovery(player);
-                    return CharacterErrorId.INVALID_CHARACTER_ID;
-                }
-                this.playerStateService.ensureBootstrapped(
-                        player, roster, stores.playerStates, null);
-                CharacterPlayerStateStorage.flush(player.worldObj);
-                return finalizePendingInitialCharacterLocked(
-                        player, roster, stores.playerStates);
-            } catch (CharacterStateValidationException exception) {
-                logFailure(player, "initial_character_state", exception);
-                disconnectForRecovery(player);
-                return CharacterErrorId.SWITCH_PLAYER_STATE_INVALID;
-            } catch (RuntimeException exception) {
-                logFailure(player, "initial_character", exception);
-                disconnectForRecovery(player);
-                return CharacterErrorId.INTERNAL_ERROR;
-            } finally {
-                CharacterLifecycleStateTracker.endSwitch(player);
-            }
-        }
-    }
-
     public void clearAllRuntimeState() {
         this.requestCaches.clear();
         this.accountLocks.clear();
@@ -471,7 +431,7 @@ public final class CharacterSwitchCoordinator {
                                                     int requestId,
                                                     long requestEpoch,
                                                     long expectedRosterRevision,
-                                                    UUID targetCharacterId) {
+                                                    PlayableIdentity target) {
         Stores stores;
         try {
             stores = loadStores(player.worldObj, player.getUniqueID());
@@ -485,12 +445,13 @@ public final class CharacterSwitchCoordinator {
         }
 
         CharacterRoster roster = stores.rosters.getOrCreateRoster(player.getUniqueID());
-        CharacterValidationResult reference = CharacterValidator.validateCharacterReference(
-                roster, targetCharacterId, expectedRosterRevision);
+        CharacterValidationResult reference = CharacterValidator.validateSelectionTarget(
+                roster, target, expectedRosterRevision);
         if (!reference.isValid()) {
             return CharacterOperationResult.failure(reference.getErrorId(), roster);
         }
-        RoleplayCharacter target = roster.getCharacter(targetCharacterId);
+        RoleplayCharacter targetCharacter = target.isAccount()
+                ? null : roster.getCharacter(target.getCharacterId());
         CharacterSwitchAccountState account =
                 stores.switches.getOrCreateAccount(player.getUniqueID());
         CharacterErrorId recovery;
@@ -509,8 +470,8 @@ public final class CharacterSwitchCoordinator {
         if (recovery != CharacterErrorId.NONE) {
             return CharacterOperationResult.failure(recovery, roster);
         }
-        if (targetCharacterId.equals(roster.getActiveCharacterId())) {
-            return CharacterOperationResult.success(false, roster, target);
+        if (target.equals(PlayableIdentity.fromRoster(roster))) {
+            return CharacterOperationResult.success(false, roster, targetCharacter);
         }
 
         long safeNow = account.observeClock(System.currentTimeMillis());
@@ -533,12 +494,11 @@ public final class CharacterSwitchCoordinator {
                     CharacterErrorId.SWITCH_ALREADY_IN_PROGRESS, roster);
         }
 
-        UUID sourceCharacterId = roster.getActiveCharacterId();
+        PlayableIdentity source = PlayableIdentity.fromRoster(roster);
         RoleplayCharacter sourceCharacter = roster.getActiveCharacter();
         CharacterSwitchTransaction transaction = null;
         CharacterPlayerStateSnapshot sourceSnapshot = null;
-        CharacterPlayerStateSnapshot targetSnapshot = null;
-        CharacterPlayerStateSnapshot preApplyTargetSnapshot = null;
+        CharacterPlayerStateSnapshot targetSnapshot;
         boolean playerStateApplied = false;
         boolean rosterChanged = false;
         boolean commitFlushed = false;
@@ -546,7 +506,7 @@ public final class CharacterSwitchCoordinator {
         try {
             CharacterPlayerStateAccount playerStateAccount =
                     this.playerStateService.ensureBootstrapped(
-                            player, roster, stores.playerStates, targetCharacterId);
+                            player, roster, stores.playerStates);
 
             if (sourceCharacter != null) {
                 if (!CharacterRaceGameplayHandler.prepareEquipmentForCharacterSwitch(
@@ -558,13 +518,15 @@ public final class CharacterSwitchCoordinator {
                 // and main inventories. Synchronize before any later validation
                 // can fail so the client never retains a stale pre-switch view.
                 this.playerStateService.synchronize(player);
-                sourceSnapshot = this.playerStateService.captureAndAppend(
-                        player, playerStateAccount, stores.playerStates,
-                        sourceCharacterId);
             }
-            targetSnapshot = this.playerStateService.getCurrent(
-                    playerStateAccount, targetCharacterId);
-            preApplyTargetSnapshot = targetSnapshot;
+            // The live state is the source's, whichever identity that is; an
+            // account that has never been left gets its record from this.
+            sourceSnapshot = this.playerStateService.captureOrCreate(
+                    player, playerStateAccount, stores.playerStates, source);
+            // An account never played before starts from fresh defaults; a
+            // character always has a record once the account is bootstrapped.
+            targetSnapshot = this.playerStateService.getOrCreateCurrent(
+                    playerStateAccount, stores.playerStates, target);
 
             // A journal must never reference a generation that has not reached
             // disk. Persist bootstrap/source state first; an interruption here
@@ -581,8 +543,8 @@ public final class CharacterSwitchCoordinator {
                     ? Long.MAX_VALUE : roster.getRevision() + 1L;
             transaction = new CharacterSwitchTransaction(
                     UUID.randomUUID(),
-                    sourceCharacterId,
-                    targetCharacterId,
+                    source.getCharacterId(),
+                    target.getCharacterId(),
                     roster.getRevision(),
                     targetRevision,
                     safeNow,
@@ -598,7 +560,7 @@ public final class CharacterSwitchCoordinator {
                     cooldown.getLastSuccessfulSwitchAt(),
                     cooldown.getDecayAnchorAt(),
                     cooldown.getLastObservedWallClock(),
-                    sourceSnapshot == null ? -1L : sourceSnapshot.getGeneration(),
+                    sourceSnapshot.getGeneration(),
                     targetSnapshot.getGeneration(),
                     CharacterSwitchTransactionStatus.PREPARED,
                     0L);
@@ -618,8 +580,8 @@ public final class CharacterSwitchCoordinator {
                         commitPolicy.getRetryAtEpochMillis());
             }
             CharacterValidationResult finalReference =
-                    CharacterValidator.validateCharacterReference(
-                            roster, targetCharacterId, expectedRosterRevision);
+                    CharacterValidator.validateSelectionTarget(
+                            roster, target, expectedRosterRevision);
             if (!finalReference.isValid()) {
                 transaction.markAborted(System.currentTimeMillis());
                 stores.switches.saveAccount(account);
@@ -639,17 +601,16 @@ public final class CharacterSwitchCoordinator {
             // code validates first, but any unexpected mod callback failure
             // after the first mutation must still restore the source snapshot.
             playerStateApplied = true;
-            this.playerStateService.apply(player, target, targetSnapshot);
+            this.playerStateService.apply(player, target, targetCharacter, targetSnapshot);
             this.playerStateService.transitionLocation(player, targetSnapshot);
             if (!CharacterRaceGameplayHandler.prepareEquipmentForCharacterSwitch(
-                    player, target)) {
+                    player, targetCharacter)) {
                 throw new CharacterStateValidationException(
                         "Target armor cannot be normalized without dropping items");
             }
             // Persist any deterministic equipment normalization before identity commit.
-            targetSnapshot = this.playerStateService.captureAndAppend(
-                    player, playerStateAccount, stores.playerStates,
-                    targetCharacterId);
+            targetSnapshot = this.playerStateService.captureOrCreate(
+                    player, playerStateAccount, stores.playerStates, target);
             // Commit the normalized target generation before publishing its
             // reference in the transaction journal.
             CharacterPlayerStateStorage.flush(player.worldObj);
@@ -657,7 +618,7 @@ public final class CharacterSwitchCoordinator {
             stores.switches.saveAccount(account);
             CharacterSwitchStorage.flush(player.worldObj);
 
-            roster.setActiveCharacterId(targetCharacterId);
+            roster.setActiveCharacterId(target.getCharacterId());
             roster.incrementRevision();
             stores.rosters.saveRoster(roster);
             rosterChanged = true;
@@ -668,7 +629,7 @@ public final class CharacterSwitchCoordinator {
             CharacterSwitchStorage.flush(player.worldObj);
             commitFlushed = true;
 
-            CharacterRaceGameplayHandler.apply(player, target);
+            CharacterRaceGameplayHandler.apply(player, targetCharacter);
             this.playerStateService.synchronize(player);
             if (!checkpointActiveStateLocked(
                     player, roster, account, stores)) {
@@ -682,14 +643,14 @@ public final class CharacterSwitchCoordinator {
                     LostTalesMetaData.MOD_ID,
                     transaction.getTransactionId(),
                     player.getUniqueID(),
-                    String.valueOf(sourceCharacterId),
-                    targetCharacterId,
+                    source,
+                    target,
                     Long.valueOf(roster.getRevision()),
                     Long.valueOf(transaction.getSourceStateGeneration()),
                     Long.valueOf(transaction.getTargetStateGeneration()),
                     Integer.valueOf(account.getCooldownStage()),
                     Long.valueOf(account.getNextAllowedAt()));
-            return CharacterOperationResult.success(true, roster, target);
+            return CharacterOperationResult.success(true, roster, targetCharacter);
         } catch (Throwable throwable) {
             logFailure(player, transaction == null ? "prepare" :
                     "transaction_" + transaction.getTransactionId(), throwable);
@@ -704,18 +665,20 @@ public final class CharacterSwitchCoordinator {
                             CharacterErrorId.SWITCH_RECOVERY_REQUIRED, roster);
                 }
                 try {
-                    CharacterRaceGameplayHandler.apply(player, target);
+                    CharacterRaceGameplayHandler.apply(player, targetCharacter);
                     this.playerStateService.synchronize(player);
                 } catch (Throwable ignored) {
                     // The committed stores remain authoritative for login recovery.
                 }
-                return CharacterOperationResult.success(true, roster, target);
+                return CharacterOperationResult.success(true, roster, targetCharacter);
             }
             try {
-                if (playerStateApplied && sourceSnapshot != null
-                        && sourceCharacter != null) {
+                if (playerStateApplied && sourceSnapshot != null) {
+                    // The source generation captured above is exactly the
+                    // pre-switch live state, for the account as for a
+                    // character, so it goes back on before the roster does.
                     this.playerStateService.apply(
-                            player, sourceCharacter, sourceSnapshot);
+                            player, source, sourceCharacter, sourceSnapshot);
                     this.playerStateService.transitionLocation(
                             player, sourceSnapshot);
                     if (!CharacterRaceGameplayHandler.prepareEquipmentForCharacterSwitch(
@@ -725,26 +688,10 @@ public final class CharacterSwitchCoordinator {
                     }
                     CharacterRaceGameplayHandler.apply(player, sourceCharacter);
                     this.playerStateService.synchronize(player);
-                } else if (playerStateApplied && sourceCharacter == null) {
-                    // First legacy import has no prior character identity. Its
-                    // original target generation is also the exact pre-switch
-                    // live state, so reapply it before removing provisional race
-                    // modifiers and any equipment normalization.
-                    if (preApplyTargetSnapshot == null) {
-                        throw new CharacterStateValidationException(
-                                "Legacy import rollback snapshot is unavailable");
-                    }
-                    this.playerStateService.apply(
-                            player, target, preApplyTargetSnapshot);
-                    this.playerStateService.transitionLocation(
-                            player, preApplyTargetSnapshot);
-                    CharacterRaceGameplayHandler.apply(
-                            player, (RoleplayCharacter) null);
-                    this.playerStateService.synchronize(player);
                 }
                 if (rosterChanged
-                        && targetCharacterId.equals(roster.getActiveCharacterId())) {
-                    roster.setActiveCharacterId(sourceCharacterId);
+                        && target.equals(PlayableIdentity.fromRoster(roster))) {
+                    roster.setActiveCharacterId(source.getCharacterId());
                     roster.incrementRevision();
                     stores.rosters.saveRoster(roster);
                 }
@@ -781,48 +728,6 @@ public final class CharacterSwitchCoordinator {
         }
     }
 
-    /**
-     * Captures one live character and coordinates any surviving journal with
-     * the new generation before the vanilla account files are overwritten.
-     */
-    private CharacterErrorId finalizePendingInitialCharacterLocked(
-            EntityPlayerMP player,
-            CharacterRoster roster,
-            CharacterPlayerStateWorldData playerStateData)
-            throws CharacterStateValidationException {
-        UUID activeId = roster.getActiveCharacterId();
-        RoleplayCharacter character = roster.getActiveCharacter();
-        if (activeId == null || character == null) {
-            return CharacterErrorId.NONE;
-        }
-        CharacterPlayerStateAccount account =
-                playerStateData.getOrCreateAccount(player.getUniqueID());
-        CharacterPlayerStateSnapshot snapshot =
-                this.playerStateService.getCurrent(account, activeId);
-        if (!this.playerStateService.hasPendingInitialLocation(snapshot)) {
-            return CharacterErrorId.NONE;
-        }
-
-        // The pending waypoint snapshot is itself the recovery marker. Keep it
-        // durable until the live account file has the target state; only then
-        // replace it with a captured concrete position generation.
-        CharacterPlayerStateStorage.flush(player.worldObj);
-        this.playerStateService.apply(player, character, snapshot);
-        this.playerStateService.transitionLocation(player, snapshot);
-        if (!CharacterRaceGameplayHandler.prepareEquipmentForCharacterSwitch(
-                player, character)) {
-            throw new CharacterStateValidationException(
-                    "Initial character equipment could not be normalized safely");
-        }
-        CharacterRaceGameplayHandler.apply(player, character);
-        this.playerStateService.synchronize(player);
-        CharacterLiveStatePersistence.save(player);
-        this.playerStateService.captureAndAppend(
-                player, account, playerStateData, activeId);
-        CharacterPlayerStateStorage.flush(player.worldObj);
-        return CharacterErrorId.NONE;
-    }
-
     private boolean checkpointActiveStateLocked(
             EntityPlayerMP player,
             CharacterRoster roster,
@@ -836,13 +741,12 @@ public final class CharacterSwitchCoordinator {
             return false;
         }
         if (account.isDeathPending() || !player.isEntityAlive()
-                || player.isDead || player.getHealth() <= 0.0F
-                || roster.getActiveCharacterId() == null) {
+                || player.isDead || player.getHealth() <= 0.0F) {
             return true;
         }
 
         CharacterPlayerStateSnapshot snapshot =
-                this.playerStateService.saveActiveLiveState(
+                this.playerStateService.saveLiveState(
                         player, roster, stores.playerStates, false);
         if (snapshot == null) {
             return true;
@@ -879,11 +783,12 @@ public final class CharacterSwitchCoordinator {
             return CharacterErrorId.SWITCH_RECOVERY_REQUIRED;
         }
 
+        // A null id on either side is the account, so a null active id
+        // matches a journal whose source or target is the account.
         UUID activeId = roster.getActiveCharacterId();
         if (equalsUuid(activeId, transaction.getTargetCharacterId())) {
             transaction.setTargetStateGeneration(snapshot.getGeneration());
-        } else if (transaction.getSourceCharacterId() != null
-                && equalsUuid(activeId, transaction.getSourceCharacterId())) {
+        } else if (equalsUuid(activeId, transaction.getSourceCharacterId())) {
             transaction.setSourceStateGeneration(snapshot.getGeneration());
         } else {
             return requireManualRecoveryLocked(
@@ -911,8 +816,7 @@ public final class CharacterSwitchCoordinator {
             // may be referenced by an interrupted player-state journal. Generation
             // identifiers are preserved by the migration.
             playerStateAccount = this.playerStateService.ensureBootstrapped(
-                    player, roster, stores.playerStates,
-                    transaction.getTargetCharacterId());
+                    player, roster, stores.playerStates);
         }
 
         if (transaction.hasPlayerStateGenerations()
@@ -920,17 +824,21 @@ public final class CharacterSwitchCoordinator {
                 && player.getHealth() > 0.0F) {
             UUID activeId = roster.getActiveCharacterId();
             try {
-                // A first-character import has no source character. If its
-                // PREPARED record survived but the roster still has no active
-                // ID, Minecraft's account file is the authoritative source.
-                if (!(activeId == null
-                        && transaction.getSourceCharacterId() == null)) {
+                // A version-2 journal of a first-character import carries no
+                // source generation: the live account file is the source.
+                // If its PREPARED record survived and the roster is still on
+                // the account, that file is authoritative as it stands. A
+                // newer journal whose source is the account names the
+                // account's own generation and restores it like any source.
+                boolean legacyFirstImport =
+                        transaction.getSourceCharacterId() == null
+                        && transaction.getSourceStateGeneration() <= 0L;
+                if (!(activeId == null && legacyFirstImport)) {
                     long generation;
                     if (equalsUuid(activeId,
                             transaction.getTargetCharacterId())) {
                         generation = transaction.getTargetStateGeneration();
-                    } else if (transaction.getSourceCharacterId() != null
-                            && equalsUuid(activeId,
+                    } else if (equalsUuid(activeId,
                             transaction.getSourceCharacterId())) {
                         generation = transaction.getSourceStateGeneration();
                     } else {
@@ -938,13 +846,16 @@ public final class CharacterSwitchCoordinator {
                                 player.worldObj, account, stores.switches,
                                 transaction);
                     }
+                    PlayableIdentity identity = PlayableIdentity.of(
+                            player.getUniqueID(), activeId);
                     RoleplayCharacter activeCharacter =
                             roster.getCharacter(activeId);
                     CharacterPlayerStateSnapshot snapshot =
                             this.playerStateService.findGeneration(
-                                    playerStateAccount, activeId, generation);
+                                    playerStateAccount, identity.getGameplayId(),
+                                    generation);
                     this.playerStateService.apply(
-                            player, activeCharacter, snapshot);
+                            player, identity, activeCharacter, snapshot);
                     this.playerStateService.transitionLocation(
                             player, snapshot);
                     if (!CharacterRaceGameplayHandler

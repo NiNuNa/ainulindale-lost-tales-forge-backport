@@ -182,9 +182,10 @@ public final class PartyNetworkRequestHandler {
         if (!active.isValid()) {
             return active.errorId;
         }
+        // The request names the identity it was made for; a switch to
+        // another character, or to or from the account, has changed it.
         if (expectedActiveCharacterId == null
-                || !expectedActiveCharacterId.equals(
-                active.character.getCharacterId())) {
+                || !expectedActiveCharacterId.equals(active.gameplayId())) {
             return PartyErrorId.ACTIVE_CHARACTER_CHANGED;
         }
         if (!operationType.requiresPartyRevision()) {
@@ -197,8 +198,7 @@ public final class PartyNetworkRequestHandler {
         if (partyData.isReadOnlyForNewerVersion()) {
             return PartyErrorId.PARTY_STORAGE_READ_ONLY;
         }
-        Party party = partyData.getPartyForCharacter(
-                active.character.getCharacterId());
+        Party party = partyData.getPartyForCharacter(active.gameplayId());
         if (party == null) {
             return PartyErrorId.NOT_IN_PARTY;
         }

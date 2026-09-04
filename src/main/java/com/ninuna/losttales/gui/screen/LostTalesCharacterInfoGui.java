@@ -9,6 +9,7 @@ import com.ninuna.losttales.client.character.ClientCharacterRaceAttributes;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
+import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterCapeGui;
@@ -101,9 +102,10 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
         ClientCharacterRosterCache.SyncState state = ClientCharacterRosterCache.getState();
         if (state == ClientCharacterRosterCache.SyncState.READY) {
             CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
-            if (snapshot == null || snapshot.getActiveCharacter() == null) {
+            if (snapshot == null) {
                 this.mc.displayGuiScreen(new LostTalesCharacterProfileRouterGui(this.parent));
             }
+            updateCapeButton(snapshot);
         } else if (state == ClientCharacterRosterCache.SyncState.ERROR
                 && (this.rosterRequestId == 0
                 || !ClientCharacterRosterCache.isRequestPending(this.rosterRequestId))) {
@@ -167,14 +169,39 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
                 LostTalesSkyrimUiStyle.HUD_LABEL);
     }
 
+    /** Cape settings belong to a character; the account wears its own Minecraft cape. */
+    private void updateCapeButton(CharacterRosterSnapshot snapshot) {
+        for (Object object : this.buttonList) {
+            GuiButton button = (GuiButton) object;
+            if (button.id == BUTTON_CAPE) {
+                button.enabled = snapshot != null && snapshot.getActiveCharacter() != null;
+            }
+        }
+    }
+
     private void drawCharacterPanel(int x, int y, int width, int height) {
-        CharacterSummary character = getActiveCharacter();
+        CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
+        CharacterSummary character = snapshot == null ? null : snapshot.getActiveCharacter();
         LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj,
                 I18n.format("gui.losttales.character.profile"), x, y, width);
         int lineY = y + 16;
-        if (character == null) {
+        if (snapshot == null) {
             drawWrapped(I18n.format("gui.losttales.character.loading_detail"),
                     x, lineY, width, LostTalesSkyrimUiStyle.TEXT_MUTED, height);
+            return;
+        }
+        if (character == null) {
+            // Playing as the account: a human with no faction, described by
+            // the account alone.
+            lineY = drawLabelValue(I18n.format("gui.losttales.character.name"),
+                    getAccountName(), x, lineY, width);
+            lineY = drawLabelValue(I18n.format("gui.losttales.character.race"),
+                    ClientCharacterDisplayNames.race(CharacterRaceRegistry.HUMAN), x, lineY, width);
+            lineY = drawLabelValue(I18n.format("gui.losttales.character.starting_faction"),
+                    I18n.format("gui.losttales.character.account_faction_none"), x, lineY, width);
+            lineY = drawWrapped(I18n.format("gui.losttales.character.account_detail"),
+                    x, lineY + 2, width, LostTalesSkyrimUiStyle.TEXT_MUTED, 30);
+            drawRaceAndAccountSections(x, y, width, height, lineY + 8, "");
             return;
         }
         lineY = drawLabelValue(I18n.format("gui.losttales.character.name"),
@@ -209,10 +236,14 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
                 String.valueOf(character.getAge()), x, lineY, width);
         lineY = drawLabelValue(I18n.format("gui.losttales.character.starting_faction"),
                 ClientCharacterDisplayNames.faction(character.getStartingFactionId()), x, lineY, width);
-        lineY += 8;
+        drawRaceAndAccountSections(x, y, width, height, lineY + 8, character.getRaceId());
+    }
 
+    /** The race attributes, the shared account facts and the state note, under the identity rows. */
+    private void drawRaceAndAccountSections(int x, int y, int width, int height,
+                                            int lineY, String raceId) {
         CharacterRaceGameplayProfile raceProfile = ClientCharacterRaceAttributes.resolve(
-                this.mc == null ? null : this.mc.theWorld, character.getRaceId());
+                this.mc == null ? null : this.mc.theWorld, raceId);
         LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj,
                 I18n.format("gui.losttales.character.race_attributes"), x, lineY, width);
         lineY += 16;
@@ -433,9 +464,12 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
     }
 
     private String getCharacterName() {
-        CharacterSummary character = getActiveCharacter();
-        return character == null ? I18n.format("gui.losttales.character.loading")
-                : character.getName();
+        CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
+        if (snapshot == null) {
+            return I18n.format("gui.losttales.character.loading");
+        }
+        CharacterSummary character = snapshot.getActiveCharacter();
+        return character == null ? getAccountName() : character.getName();
     }
 
     private String getAccountName() {
@@ -480,7 +514,7 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
             return;
         }
         if (button.id == BUTTON_MANAGE) {
-            this.mc.displayGuiScreen(new LostTalesCharacterRosterGui(this, false));
+            this.mc.displayGuiScreen(new LostTalesCharacterRosterGui(this));
             return;
         }
         if (button.id == BUTTON_BACK) {

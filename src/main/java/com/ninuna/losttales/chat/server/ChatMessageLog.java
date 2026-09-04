@@ -96,9 +96,11 @@ public final class ChatMessageLog {
      * recipient to check it against: a Discord member is nobody's
      * account, so the promise the recipient check keeps is kept by the
      * caller instead — the bridge only ever asks about ids from its own
-     * link table, which holds nothing but the bridged channel's own
-     * messages, every one of them distributed to everyone online and to
-     * Discord itself. Nothing private can be named through it.
+     * link table, which holds nothing but lines of bridgeable channels
+     * that crossed to or from Discord, and it asks only for a line that
+     * crossed through the same binding the reply arrived by, so a quote
+     * never carries one bound channel's words into another. Nothing
+     * private can be named through it.
      */
     public static synchronized ChatReplyReference quoteForDiscordChannel(
             long messageId) {

@@ -6,6 +6,7 @@ import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatMessageOrigin;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatRecipientRule;
@@ -19,10 +20,13 @@ import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.compat.discord.DiscordAvatarUrl;
+import com.ninuna.losttales.compat.discord.DiscordBridgePolicy;
 import com.ninuna.losttales.compat.discord.DiscordMessageSanitizer;
+import com.ninuna.losttales.compat.discord.DiscordChannelLabel;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.compat.lotr.LostTalesWaystonePermissionPolicy;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
@@ -221,10 +225,12 @@ public final class LostTalesChatService {
                 : LotrCharacterAdapter.normalizeFactionId(
                         character.getStartingFactionId());
         if (channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP) {
+            // Membership follows the identity being played, the account
+            // included; the party service resolves it the same way.
             party = PartyService.getInstance()
                     .getPartyForActiveCharacter(sender);
-            if (party == null || character == null
-                    || !party.containsMember(character.getCharacterId())) {
+            if (party == null || !party.containsMember(
+                    RoleplayCharacterIdentityHook.resolveGameplayId(sender))) {
                 sender.addChatMessage(new ChatComponentTranslation(
                         "chat.losttales.channel.party_unavailable"));
                 return;
@@ -243,7 +249,7 @@ public final class LostTalesChatService {
                     "chat.losttales.channel.admin_unavailable"));
             return;
         } else if (channel.getAccess() == ChatChannelAccess.DISCORD_BRIDGE
-                && !LostTalesConfig.discordEnabled) {
+                && !LostTalesDiscordBridge.getInstance().offersDiscordChannel()) {
             sendAccess(sender);
             sender.addChatMessage(new ChatComponentTranslation(
                     "chat.losttales.channel.discord_unavailable"));
@@ -345,34 +351,37 @@ public final class LostTalesChatService {
                 whisperTarget == null ? ""
                         : whisperTarget.getCommandSenderName(),
                 message);
-        if (channel == ChatChannel.DISCORD) {
-            // The bridge posts the line under the sender's name with their
-            // head as the picture; emoji shortcodes go as the Unicode
-            // emoji Discord renders, share tokens as the text they were
-            // typed as. The message's own id and the reply it resolved
-            // travel with it, so the post can be linked to its Discord
-            // copy and a reply can point at the Discord original. A line
-            // spoken as a character carries the title the game shows.
-            LostTalesDiscordBridge.getInstance().relay(
+        // Out to Discord through the channel's binding, when it has one
+        // that posts. Only a player's own line in a channel that may be
+        // bridged ever leaves: the policy is asked here, before the
+        // bridge is, so no binding can carry a private channel or send
+        // a Discord line back. The bridge posts the line under the
+        // sender's name — a line spoken as a character carries the title
+        // the game shows — with the account's head as the picture, since
+        // a character's skin is a resource of the game and not a picture
+        // Discord can fetch; emoji shortcodes go as the Unicode emoji
+        // Discord renders, share tokens as the text they were typed as.
+        // The message's own id and the reply it resolved travel with it,
+        // so the post can be linked to its Discord copy and a reply can
+        // point at the Discord original.
+        if (DiscordBridgePolicy.relaysOutbound(ChatMessageOrigin.PLAYER, channel)) {
+            // The card wears the channel's colour and name — for Faction
+            // chat the sender's faction's, as the chat itself shows it —
+            // and names the account behind a character's name, the way
+            // the chat's own hover card does.
+            LostTalesDiscordBridge.getInstance().relayToDiscord(channel,
+                    factionId,
+                    DiscordChannelLabel.of(channel,
+                            channel == ChatChannel.FACTION
+                                    ? presentation.factionName : ""),
+                    channel == ChatChannel.FACTION
+                            ? presentation.nameColor : channel.getDisplayColor(),
                     accountLine ? identityName : ChatEpithet.titledName(
                             identityName, presentation.factionName,
                             presentation.title),
                     DiscordAvatarUrl.of(LostTalesConfig.discordAvatarUrlTemplate,
                             accountName, sender.getUniqueID()),
-                    DiscordMessageSanitizer.outbound(message),
-                    packet.getMessageId(), reply);
-        } else if (LostTalesDiscordBridge.relaysReadOnly(channel)) {
-            // Global and OOC can be shown on Discord read-only: the same
-            // line, signed with the same identity and title the game
-            // shows, under a channel tag, with the account's head — a
-            // character's skin is a resource of the game, not a picture
-            // Discord can fetch.
-            LostTalesDiscordBridge.getInstance().relayReadOnly(channel,
-                    accountLine ? identityName : ChatEpithet.titledName(
-                            identityName, presentation.factionName,
-                            presentation.title),
-                    DiscordAvatarUrl.of(LostTalesConfig.discordAvatarUrlTemplate,
-                            accountName, sender.getUniqueID()),
+                    accountLine ? "" : accountName,
                     DiscordMessageSanitizer.outbound(message),
                     packet.getMessageId(), reply);
         }
@@ -380,12 +389,17 @@ public final class LostTalesChatService {
 
     /**
      * A message from Discord, delivered by the bridge on the server
-     * thread: it enters the Discord channel for everyone online under
-     * the Discord display name, with the sender id that stands for that
-     * member ({@link LostTalesChatMessagePacket#discordSenderId}) — so a
-     * client can ignore them, and a mute stored against that id
-     * silences them here, silently, exactly as an account's mute does —
-     * and is never posted back to Discord. The bridge has already
+     * thread into the channel its binding names — the game's own Discord
+     * channel, or any other channel that may be bridged; for Faction
+     * chat, the faction the binding is for. It reaches everyone the
+     * channel's own rule reaches, under the Discord display name, with
+     * the sender id that stands for that member
+     * ({@link LostTalesChatMessagePacket#discordSenderId}) — so a client
+     * can ignore them, and a mute stored against that id silences them
+     * here, silently, exactly as an account's mute does — and is never
+     * posted back to Discord: a line of Discord origin never enters the
+     * relay, whatever channel it lands in. A Discord member is an
+     * external identity and wears no character. The bridge has already
      * sanitised and bounded the text, and resolved the quote when the
      * message answers one — a Discord reply is shown exactly as a
      * player's reply is. The line is recorded like any other, so
@@ -395,11 +409,14 @@ public final class LostTalesChatService {
      * {@link ChatMessageIds#NONE} when nothing went out, so the bridge
      * can link the line to the Discord message it came from.
      */
-    public static long sendFromDiscord(String displayName, String discordUserId,
+    public static long sendFromDiscord(ChatChannel channel, String factionScope,
+                                       String displayName, String discordUserId,
                                        String message,
                                        ChatReplyReference reply) {
         MinecraftServer server = MinecraftServer.getServer();
-        if (!LostTalesConfig.discordEnabled || displayName == null
+        if (!LostTalesConfig.discordEnabled
+                || !DiscordBridgePolicy.acceptsInbound(channel)
+                || displayName == null
                 || displayName.length() == 0
                 || !ChatMessageValidator.isValid(message) || server == null
                 || server.getConfigurationManager() == null
@@ -419,21 +436,21 @@ public final class LostTalesChatService {
         int ivory = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
         long messageId = ChatMessageIdAllocator.next();
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
-                ChatChannel.DISCORD, senderId, displayName,
+                channel, senderId, displayName,
                 displayName, "", ivory, ivory, message,
                 System.currentTimeMillis(), "", null, "", "", 0, true,
                 messageId, reply);
-        FMLLog.info("[losttales/chat/discord] <%s (discord)> %s", displayName,
-                message);
-        @SuppressWarnings("unchecked")
-        List<EntityPlayerMP> online =
-                server.getConfigurationManager().playerEntityList;
-        List<UUID> recipientIds = new ArrayList<UUID>(online.size());
-        for (EntityPlayerMP recipient : online) {
-            if (recipient != null) {
-                LostTalesNetworkHandler.CHANNEL.sendTo(packet, recipient);
-                recipientIds.add(recipient.getUniqueID());
-            }
+        FMLLog.info("[losttales/chat/%s] <%s (discord)> %s", channel.getId(),
+                displayName, message);
+        // Routed by the channel's own rule with no sender behind the
+        // line: everyone for a global channel, the operators for the
+        // staff channel, the faction's members for a faction binding.
+        List<EntityPlayerMP> recipients = resolveRecipients(
+                null, channel, null, factionScope == null ? "" : factionScope);
+        List<UUID> recipientIds = new ArrayList<UUID>(recipients.size());
+        for (EntityPlayerMP recipient : recipients) {
+            LostTalesNetworkHandler.CHANNEL.sendTo(packet, recipient);
+            recipientIds.add(recipient.getUniqueID());
         }
         ChatMessageLog.record(messageId,
                 LostTalesChatMessagePacket.DISCORD_SENDER_ID, displayName,
@@ -546,8 +563,8 @@ public final class LostTalesChatService {
         if (channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP) {
             party = PartyService.getInstance()
                     .getPartyForActiveCharacter(sender);
-            if (party == null || character == null
-                    || !party.containsMember(character.getCharacterId())) {
+            if (party == null || !party.containsMember(
+                    RoleplayCharacterIdentityHook.resolveGameplayId(sender))) {
                 return;
             }
         } else if (channel.getAccess() == ChatChannelAccess.CHARACTER_FACTION
@@ -557,11 +574,13 @@ public final class LostTalesChatService {
                 && !LostTalesWaystonePermissionPolicy.isOperator(sender)) {
             return;
         }
-        if (channel == ChatChannel.DISCORD && typing) {
-            // The bridged channel has readers on the other side too, and
+        if (typing && DiscordBridgePolicy.relaysOutbound(
+                ChatMessageOrigin.PLAYER, channel)) {
+            // A bound channel has readers on the other side too, and
             // Discord shows its own indicator when the bot says it is
-            // typing. Nothing but presence crosses.
-            LostTalesDiscordBridge.getInstance().relayTyping();
+            // typing. Nothing but presence crosses, and only through a
+            // binding that posts.
+            LostTalesDiscordBridge.getInstance().relayTyping(channel, factionId);
         }
         LostTalesChatTypingSyncPacket packet = new LostTalesChatTypingSyncPacket(
                 channel, "", identityName, typing);
@@ -828,7 +847,7 @@ public final class LostTalesChatService {
         boolean operator = LostTalesWaystonePermissionPolicy.isOperator(player);
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new LostTalesChatAccessPacket(operator,
-                        LostTalesConfig.discordEnabled,
+                        LostTalesDiscordBridge.getInstance().offersDiscordChannel(),
                         ChatAccountRoleResolver.resolve(player),
                         roleHolders,
                         operator ? mutedSenders(player)
@@ -1129,7 +1148,9 @@ public final class LostTalesChatService {
                 }
             } else if (channel.getRecipientRule()
                     == ChatRecipientRule.PROXIMITY) {
-                if (candidate.dimension == sender.dimension
+                // A line with no sender — one from Discord — has no
+                // place to be near; it reaches nobody here.
+                if (sender != null && candidate.dimension == sender.dimension
                         && candidate.getDistanceSqToEntity(sender)
                         <= proximityDistanceSquared()) {
                     result.add(candidate);
@@ -1152,11 +1173,8 @@ public final class LostTalesChatService {
         if (party == null || player == null) {
             return false;
         }
-        RoleplayCharacter active = CharacterActiveResolver.get(player);
-        if (active == null) {
-            return false;
-        }
-        PartyMember member = party.getMember(active.getCharacterId());
+        PartyMember member = party.getMember(
+                RoleplayCharacterIdentityHook.resolveGameplayId(player));
         return member != null && player.getUniqueID().equals(member.getOwnerId());
     }
 

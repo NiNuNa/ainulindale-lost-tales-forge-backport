@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.state;
 
+import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterRaceGameplayHandler;
@@ -104,16 +105,19 @@ public final class CharacterPlayerStateService {
     }
 
     /**
-     * One-time import and schema migration. The live account state is assigned
-     * only to the active character (or the explicitly selected import target
-     * when no active ID exists). Every other character receives clean defaults
-     * for newly introduced character-owned components.
+     * Bootstrap and schema migration for one account's saved identities. A
+     * roster seen for the first time gets a record for every character: the
+     * active character's is the live state the account file holds, every
+     * other character's is clean defaults. With no active character the live
+     * state is the account's own and stays where it is. Characters created
+     * later start from defaults too. The account itself has no record until
+     * the first capture that needs one: while the account is being played
+     * the vanilla player file already is its state.
      */
     public CharacterPlayerStateAccount ensureBootstrapped(
             EntityPlayerMP player,
             CharacterRoster roster,
-            CharacterPlayerStateWorldData data,
-            UUID selectedImportTarget)
+            CharacterPlayerStateWorldData data)
             throws CharacterStateValidationException {
         requirePlayerRoster(player, roster);
         if (data == null || data.isReadOnlyForNewerVersion()
@@ -131,10 +135,13 @@ public final class CharacterPlayerStateService {
 
         boolean changed = false;
         long now = System.currentTimeMillis();
+        // The live state is imported into the active character's record; on
+        // the account it is imported nowhere, since it is already the
+        // account's and is captured when the account is first left.
         UUID importTarget = null;
         if (account.getBootstrapVersion()
                 < CharacterPlayerStateAccount.CURRENT_BOOTSTRAP_VERSION) {
-            importTarget = resolveImportTarget(roster, selectedImportTarget);
+            importTarget = roster.getActiveCharacterId();
         }
 
         if (account.getBootstrapVersion() == 0) {
@@ -166,24 +173,16 @@ public final class CharacterPlayerStateService {
             changed = true;
         }
 
-        // Characters created after bootstrap normally start with a clean
-        // independent save. The one exception is a newly created first/active
-        // character: the live account state must become that character's save
-        // rather than being silently replaced with defaults on its first switch.
-        UUID activeId = roster.getActiveCharacterId();
+        // A character created after bootstrap starts from a clean save of
+        // its own: defaults, its starting faction's progression and its
+        // starting waypoint as the place its first switch lands it.
         for (RoleplayCharacter character : roster.getCharacters()) {
             if (account.getRecord(character.getCharacterId()) != null) {
                 continue;
             }
-            boolean active = character.getCharacterId().equals(activeId);
-            Map<String, NBTTagCompound> initialState = active
-                    ? captureComponents(player)
-                    : createDefaultComponents(character);
-            if (active && character.getStartingWaypointId().length() > 0) {
-                seedInitialCharacterState(initialState, character);
-            }
             CharacterPlayerStateSnapshot snapshot = createSnapshot(
-                    character.getCharacterId(), 1L, now, initialState);
+                    character.getCharacterId(), 1L, now,
+                    createDefaultComponents(character));
             account.putRecord(new CharacterPlayerStateRecord(
                     character.getCharacterId(), snapshot, null));
             changed = true;
@@ -195,22 +194,33 @@ public final class CharacterPlayerStateService {
         return account;
     }
 
-    public CharacterPlayerStateSnapshot captureAndAppend(
+    /**
+     * Captures the live player as the identity's next generation. An account
+     * captured for the first time gets its record from this capture; a
+     * character always has one once the account is bootstrapped.
+     */
+    public CharacterPlayerStateSnapshot captureOrCreate(
             EntityPlayerMP player,
             CharacterPlayerStateAccount account,
             CharacterPlayerStateWorldData data,
-            UUID characterId)
+            PlayableIdentity identity)
             throws CharacterStateValidationException {
-        if (characterId == null) {
-            return null;
-        }
         requireAccount(player, account, data);
-        CharacterPlayerStateRecord record = account.getRecord(characterId);
-        if (record == null) {
-            throw new CharacterStateValidationException(
-                    "No player-state record exists for source character " + characterId);
-        }
+        requireIdentityOwner(player, identity);
+        UUID gameplayId = identity.getGameplayId();
+        CharacterPlayerStateRecord record = account.getRecord(gameplayId);
         Map<String, NBTTagCompound> components = captureComponents(player);
+        if (record == null) {
+            if (!identity.isAccount()) {
+                throw new CharacterStateValidationException(
+                        "No player-state record exists for source character " + gameplayId);
+            }
+            CharacterPlayerStateSnapshot first = createSnapshot(
+                    gameplayId, 1L, System.currentTimeMillis(), components);
+            account.putRecord(new CharacterPlayerStateRecord(gameplayId, first, null));
+            data.saveAccount(account);
+            return first;
+        }
         CharacterPlayerStateSnapshot snapshot = record.createNext(
                 System.currentTimeMillis(), components);
         // Validate the candidate before mutating the generation pointers. An
@@ -259,6 +269,35 @@ public final class CharacterPlayerStateService {
         return record.getCurrent();
     }
 
+    /**
+     * The identity's current snapshot. An account with no record yet — one
+     * that has never been played since its characters were made, or whose
+     * state its first character took over before the account had a save of
+     * its own — starts from fresh defaults at the world spawn, saved here so
+     * a journal can reference the generation.
+     */
+    public CharacterPlayerStateSnapshot getOrCreateCurrent(
+            CharacterPlayerStateAccount account,
+            CharacterPlayerStateWorldData data,
+            PlayableIdentity identity)
+            throws CharacterStateValidationException {
+        if (account == null || data == null || identity == null
+                || !account.getOwnerId().equals(identity.getOwnerId())) {
+            throw new CharacterStateValidationException(
+                    "Character state account or identity is missing");
+        }
+        UUID gameplayId = identity.getGameplayId();
+        if (identity.isAccount() && account.getRecord(gameplayId) == null) {
+            CharacterPlayerStateSnapshot defaults = createSnapshot(
+                    gameplayId, 1L, Math.max(1L, System.currentTimeMillis()),
+                    createDefaultComponents(null));
+            account.putRecord(new CharacterPlayerStateRecord(gameplayId, defaults, null));
+            data.saveAccount(account);
+            return defaults;
+        }
+        return getCurrent(account, gameplayId);
+    }
+
     public CharacterPlayerStateSnapshot findGeneration(
             CharacterPlayerStateAccount account,
             UUID characterId,
@@ -284,11 +323,33 @@ public final class CharacterPlayerStateService {
                       RoleplayCharacter character,
                       CharacterPlayerStateSnapshot snapshot)
             throws CharacterStateValidationException {
-        if (player == null || character == null || snapshot == null
-                || !character.getCharacterId().equals(snapshot.getCharacterId())) {
+        if (player == null || character == null) {
             throw new CharacterStateValidationException(
                     "Target character and snapshot do not match");
         }
+        apply(player, PlayableIdentity.character(player.getUniqueID(),
+                character.getCharacterId()), character, snapshot);
+    }
+
+    /**
+     * Puts the snapshot on the live player as the given identity. The
+     * character is the identity's own, or null for the account, whose race
+     * attributes are vanilla's.
+     */
+    public void apply(EntityPlayerMP player,
+                      PlayableIdentity identity,
+                      RoleplayCharacter character,
+                      CharacterPlayerStateSnapshot snapshot)
+            throws CharacterStateValidationException {
+        if (player == null || identity == null || snapshot == null
+                || !identity.getGameplayId().equals(snapshot.getCharacterId())
+                || (character == null) != identity.isAccount()
+                || character != null
+                && !character.getCharacterId().equals(identity.getCharacterId())) {
+            throw new CharacterStateValidationException(
+                    "Target identity and snapshot do not match");
+        }
+        requireIdentityOwner(player, identity);
         validateSnapshot(snapshot);
         applyPhase(player, snapshot, CharacterStateApplyPhase.BEFORE_ATTRIBUTES);
         CharacterRaceGameplayHandler.applyProvisional(player, character);
@@ -314,22 +375,22 @@ public final class CharacterPlayerStateService {
         this.lotrCustomWaypointComponent.clearAllRuntimeState();
     }
 
-    public CharacterPlayerStateSnapshot saveActiveLiveState(
+    /** Captures the live player for whichever identity the roster says is being played. */
+    public CharacterPlayerStateSnapshot saveLiveState(
             EntityPlayerMP player,
             CharacterRoster roster,
             CharacterPlayerStateWorldData data,
             boolean flush)
             throws CharacterStateValidationException {
         requirePlayerRoster(player, roster);
-        UUID activeId = roster.getActiveCharacterId();
-        if (activeId == null || !player.isEntityAlive() || player.isDead
+        if (!player.isEntityAlive() || player.isDead
                 || player.getHealth() <= 0.0F) {
             return null;
         }
         CharacterPlayerStateAccount account = ensureBootstrapped(
-                player, roster, data, null);
-        CharacterPlayerStateSnapshot snapshot = captureAndAppend(
-                player, account, data, activeId);
+                player, roster, data);
+        CharacterPlayerStateSnapshot snapshot = captureOrCreate(
+                player, account, data, PlayableIdentity.fromRoster(roster));
         if (flush) {
             CharacterPlayerStateStorage.flush(player.worldObj);
         }
@@ -371,22 +432,6 @@ public final class CharacterPlayerStateService {
                     "Character snapshot exceeds the configured size limit: "
                             + size + " > " + maximum);
         }
-    }
-
-    private UUID resolveImportTarget(CharacterRoster roster,
-                                     UUID selectedImportTarget)
-            throws CharacterStateValidationException {
-        UUID importTarget = roster.getActiveCharacterId();
-        if (importTarget == null) {
-            importTarget = selectedImportTarget;
-        }
-        if (roster.getCharacterCount() > 0
-                && (importTarget == null
-                || roster.getCharacter(importTarget) == null)) {
-            throw new CharacterStateValidationException(
-                    "An existing character must be selected as the legacy import target");
-        }
-        return importTarget;
     }
 
     /** Upgrades retained generations without changing transaction references. */
@@ -815,33 +860,6 @@ public final class CharacterPlayerStateService {
                 player, snapshot.getComponent(VanillaLocationStateComponent.ID));
     }
 
-    public boolean hasPendingInitialLocation(
-            CharacterPlayerStateSnapshot snapshot)
-            throws CharacterStateValidationException {
-        validateSnapshot(snapshot);
-        return this.locationTransitionService.isPendingInitialLocation(
-                snapshot.getComponent(VanillaLocationStateComponent.ID));
-    }
-
-    private void seedInitialCharacterState(
-            Map<String, NBTTagCompound> components,
-            RoleplayCharacter character)
-            throws CharacterStateValidationException {
-        if (components == null || character == null) {
-            throw new CharacterStateValidationException(
-                    "Initial character state is incomplete");
-        }
-        NBTTagCompound progression = this.lotrProgressionComponent.createDefault(
-                character.getStartingFactionId());
-        NBTTagCompound location = createInitialLocation(character);
-        this.lotrProgressionComponent.validate(progression);
-        this.locationComponent.validate(location);
-        components.put(LotrProgressionStateComponent.ID,
-                (NBTTagCompound) progression.copy());
-        components.put(VanillaLocationStateComponent.ID,
-                (NBTTagCompound) location.copy());
-    }
-
     private NBTTagCompound createInitialLocation(RoleplayCharacter character) {
         if (character == null) {
             return this.locationComponent.createDefault();
@@ -899,6 +917,16 @@ public final class CharacterPlayerStateService {
                 || !player.getUniqueID().equals(roster.getOwnerId())) {
             throw new CharacterStateValidationException(
                     "Player and character roster are unavailable or do not match");
+        }
+    }
+
+    private static void requireIdentityOwner(EntityPlayerMP player,
+                                             PlayableIdentity identity)
+            throws CharacterStateValidationException {
+        if (player == null || identity == null
+                || !identity.getOwnerId().equals(player.getUniqueID())) {
+            throw new CharacterStateValidationException(
+                    "Identity does not belong to the player");
         }
     }
 

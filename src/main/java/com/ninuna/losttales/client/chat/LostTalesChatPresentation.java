@@ -1003,9 +1003,9 @@ public final class LostTalesChatPresentation {
         }
         int chatLineId = allocateChatLineId();
         GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
+        long now = System.currentTimeMillis();
         chat.printChatMessageWithOptionalDeletion(
-                buildSystemLine(shown, channel,
-                        System.currentTimeMillis()), chatLineId);
+                buildSystemLine(shown, channel, now), chatLineId);
         ClientChatChannelViews.record(chatLineId, tab,
                 ClientChatChannelState.getSelected(), mentioned);
         if (mentioned) {
@@ -1014,10 +1014,81 @@ public final class LostTalesChatPresentation {
                 playPingSound(minecraft);
             }
         }
-        if (channel == ChatChannel.CONSOLE && chat.getChatOpen()) {
-            frontConsole();
+        // A command's answer is shown where the command was typed as
+        // well; the console keeps the line above as the log's copy.
+        ChatTab asked = channel == ChatChannel.CONSOLE ? commandOutputTab() : null;
+        if (asked != null && !asked.equals(tab)) {
+            printLocalLine(chat, shown, asked, now);
         }
         return true;
+    }
+
+    /**
+     * How long after a command was sent the console lines that arrive
+     * are taken as its answer. Commands answer at once; the margin is
+     * for a server under load, and is short enough that an unrelated
+     * notice is rarely mistaken for an answer.
+     */
+    private static final long COMMAND_OUTPUT_WINDOW_MILLIS = 3000L;
+    private static ChatTab commandTab;
+    private static long commandUntilMillis;
+
+    /**
+     * Says a server command has just gone out from {@code tab}: console
+     * lines arriving within the window are shown there too, and the
+     * console keeps the copy that makes it the log.
+     */
+    public static void expectCommandOutput(ChatTab tab) {
+        commandTab = tab;
+        commandUntilMillis = System.currentTimeMillis() + COMMAND_OUTPUT_WINDOW_MILLIS;
+    }
+
+    private static ChatTab commandOutputTab() {
+        if (commandTab == null || System.currentTimeMillis() > commandUntilMillis) {
+            commandTab = null;
+            return null;
+        }
+        return commandTab;
+    }
+
+    /**
+     * Shows the command itself where it was typed, as {@code > /command},
+     * and in the console as the log's copy; typed in the console it is
+     * shown there once. Local only: the server never echoes a command.
+     */
+    public static void echoCommand(ChatTab tab, String command) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (tab == null || command == null || command.length() == 0
+                || minecraft == null || minecraft.ingameGUI == null) {
+            return;
+        }
+        GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
+        long now = System.currentTimeMillis();
+        IChatComponent echo = new ChatComponentText("> " + command);
+        echo.getChatStyle().setColor(EnumChatFormatting.GRAY);
+        ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
+        printLocalLine(chat, echo, tab, now);
+        if (!console.equals(tab)) {
+            printLocalLine(chat, echo, console, now);
+        }
+    }
+
+    /**
+     * Prints a line the client made itself into one tab, with that
+     * tab's channel prefix and a tracked id; never a mention, never a
+     * cue. The tab reopens for it unless it is hidden.
+     */
+    private static void printLocalLine(GuiNewChat chat, IChatComponent message,
+                                       ChatTab tab, long timestampMillis) {
+        if (!ChatWindowLayout.isOpen(tab) && !ChatWindowLayout.isHidden(tab)) {
+            ChatWindowLayout.openTab(tab, windowIdOfSelection());
+        }
+        int chatLineId = allocateChatLineId();
+        chat.printChatMessageWithOptionalDeletion(
+                buildSystemLine(message, tab.getChannel(), timestampMillis),
+                chatLineId);
+        ClientChatChannelViews.record(chatLineId, tab,
+                ClientChatChannelState.getSelected(), false);
     }
 
     /**
@@ -1243,27 +1314,6 @@ public final class LostTalesChatPresentation {
             }
         }
         return false;
-    }
-
-    /**
-     * Console output while the screen is open brings the console tab to
-     * the front of its window, so the player sees it. In the window the
-     * player is typing in that means selecting it; in another window the
-     * input stays where it is and only the tab comes forward.
-     */
-    private static void frontConsole() {
-        ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
-        ChatWindow window = ChatWindowLayout.windowOf(console);
-        if (window == null) {
-            return;
-        }
-        ChatWindow current = ChatWindowLayout.windowOf(
-                ClientChatChannelState.getSelected());
-        if (window == current) {
-            ClientChatChannelState.select(console);
-        } else {
-            ChatWindowLayout.setActiveTab(console);
-        }
     }
 
     /**

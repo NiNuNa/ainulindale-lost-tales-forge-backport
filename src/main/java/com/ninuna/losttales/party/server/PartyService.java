@@ -1,6 +1,8 @@
 package com.ninuna.losttales.party.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.character.identity.PlayableIdentity;
+import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.storage.CharacterStorage;
@@ -75,8 +77,7 @@ public final class PartyService {
             return PartyOperationResult.failure(
                     PartyErrorId.CHARACTER_STORAGE_READ_ONLY, null);
         }
-        Party existing = partyData.getPartyForCharacter(
-                context.character.getCharacterId());
+        Party existing = partyData.getPartyForCharacter(context.gameplayId());
         if (existing != null) {
             return PartyOperationResult.failure(
                     PartyErrorId.ALREADY_IN_PARTY, existing);
@@ -89,16 +90,16 @@ public final class PartyService {
         }
         long now = System.currentTimeMillis();
         PartyMember leader = new PartyMember(
-                context.character.getCharacterId(),
-                context.character.getOwnerId(),
-                context.character.getName(),
+                context.gameplayId(),
+                context.ownerId(),
+                context.displayName,
                 now,
                 PartyColor.GREEN);
         Party party = Party.createNew(partyId, leader, now);
         try {
             partyData.saveParty(party);
             invitationData.removeInvitationsForTargetCharacter(
-                    context.character.getCharacterId());
+                    context.gameplayId());
             return PartyOperationResult.success(true, party, leader);
         } catch (RuntimeException exception) {
             logFailure("create", player, exception);
@@ -134,7 +135,7 @@ public final class PartyService {
             return PartyOperationResult.failure(
                     PartyErrorId.INVITATION_STORAGE_READ_ONLY, context.party);
         }
-        UUID leavingCharacterId = context.character.getCharacterId();
+        UUID leavingCharacterId = context.gameplayId();
         PartyMember leaving = context.party.getMember(leavingCharacterId);
         boolean leaderLeaving = leavingCharacterId.equals(
                 context.party.getLeaderCharacterId());
@@ -330,7 +331,7 @@ public final class PartyService {
             return PartyOperationResult.failure(
                     PartyErrorId.INVALID_COLOR, context.party);
         }
-        UUID characterId = context.character.getCharacterId();
+        UUID characterId = context.gameplayId();
         PartyMember member = context.party.getMember(characterId);
         if (member.getColor() == color) {
             return PartyOperationResult.success(false, context.party, member);
@@ -356,9 +357,8 @@ public final class PartyService {
             return PartyOperationResult.failure(owner.errorId, null);
         }
         PartyWorldData partyData = getPartyData(player.worldObj);
-        Party party = owner.characterId == null || partyData == null
-                ? null
-                : partyData.getPartyForCharacter(owner.characterId);
+        Party party = partyData == null
+                ? null : partyData.getPartyForCharacter(owner.ownerId);
         if (player.isDead || !player.isEntityAlive()
                 || !hasMarkerPosition
                 || markerDimensionId != player.dimension
@@ -411,9 +411,8 @@ public final class PartyService {
             return PartyOperationResult.failure(owner.errorId, null);
         }
         PartyWorldData partyData = getPartyData(player.worldObj);
-        Party party = owner.characterId == null || partyData == null
-                ? null
-                : partyData.getPartyForCharacter(owner.characterId);
+        Party party = partyData == null
+                ? null : partyData.getPartyForCharacter(owner.ownerId);
         PartyGoHereMarkerWorldData markerData =
                 getWritableGoHereMarkerData(player.worldObj);
         if (markerData == null) {
@@ -454,8 +453,7 @@ public final class PartyService {
         }
         return this.invitationCoordinator.invitePlayer(
                 player,
-                context.character,
-                context.characterData,
+                context.active,
                 context.partyData,
                 context.party,
                 targetOwnerId);
@@ -658,7 +656,7 @@ public final class PartyService {
         return removedInvitations + removedMarkers;
     }
 
-    private boolean ensurePartyIntegrity(World world,
+    boolean ensurePartyIntegrity(World world,
                                          PartyWorldData partyData,
                                          CharacterWorldData characterData) {
         if (partyData.areCharacterReferencesValidated()) {
@@ -678,12 +676,19 @@ public final class PartyService {
             for (PartyMember member : members) {
                 UUID characterId = member.getCharacterId();
                 RoleplayCharacter character = index.characters.get(characterId);
+                // A member whose id is its own owner's is that account
+                // playing as itself; it stands as long as the account has
+                // a roster, exactly as a character stands while it exists.
+                boolean accountMember = character == null
+                        && characterId.equals(member.getOwnerId())
+                        && index.isAccountOwner(characterId);
                 String removalReason = null;
                 if (index.ambiguousCharacterIds.contains(characterId)) {
                     removalReason = "ambiguous_character_uuid";
-                } else if (character == null) {
+                } else if (character == null && !accountMember) {
                     removalReason = "missing_character";
-                } else if (!character.getOwnerId().equals(member.getOwnerId())) {
+                } else if (character != null
+                        && !character.getOwnerId().equals(member.getOwnerId())) {
                     removalReason = "character_owner_mismatch";
                 }
 
@@ -696,10 +701,11 @@ public final class PartyService {
                     changed = true;
                     continue;
                 }
-                if (party.refreshMemberIdentity(
-                        characterId,
-                        character.getOwnerId(),
-                        character.getName())) {
+                String name = character != null ? character.getName()
+                        : RoleplayCharacterIdentityHook.resolveGameplayName(characterId);
+                if (name != null && name.length() > 0
+                        && party.refreshMemberIdentity(
+                                characterId, member.getOwnerId(), name)) {
                     changed = true;
                 }
             }
@@ -737,16 +743,11 @@ public final class PartyService {
             return PartyContext.failure(
                     PartyErrorId.CHARACTER_STORAGE_READ_ONLY);
         }
-        Party party = partyData.getPartyForCharacter(
-                active.character.getCharacterId());
+        Party party = partyData.getPartyForCharacter(active.gameplayId());
         if (party == null) {
             return PartyContext.failure(PartyErrorId.NOT_IN_PARTY);
         }
-        return PartyContext.success(
-                active.character,
-                active.characterData,
-                partyData,
-                party);
+        return PartyContext.success(active, partyData, party);
     }
 
     ActiveCharacterContext resolveActiveCharacter(
@@ -768,12 +769,15 @@ public final class PartyService {
             return ActiveCharacterContext.failure(
                     PartyErrorId.CHARACTER_STORAGE_READ_ONLY);
         }
+        // No roster yet, or no active character, is the account playing as
+        // itself: a full identity, filed under the account's own id.
         CharacterRoster roster = data.getRoster(player.getUniqueID());
-        if (roster == null || roster.getActiveCharacter() == null) {
-            return ActiveCharacterContext.failure(
-                    PartyErrorId.NO_ACTIVE_CHARACTER);
+        RoleplayCharacter character = roster == null ? null : roster.getActiveCharacter();
+        if (character == null) {
+            return ActiveCharacterContext.success(data,
+                    PlayableIdentity.account(player.getUniqueID()), null,
+                    player.getCommandSenderName());
         }
-        RoleplayCharacter character = roster.getActiveCharacter();
         int matches = countCharacters(data, character.getCharacterId());
         if (matches == 0) {
             return ActiveCharacterContext.failure(
@@ -787,7 +791,12 @@ public final class PartyService {
             return ActiveCharacterContext.failure(
                     PartyErrorId.CHARACTER_NOT_FOUND);
         }
-        return ActiveCharacterContext.success(data, character);
+        String name = character.getName() == null
+                || character.getName().trim().length() == 0
+                ? player.getCommandSenderName() : character.getName();
+        return ActiveCharacterContext.success(data,
+                PlayableIdentity.character(player.getUniqueID(), character.getCharacterId()),
+                character, name);
     }
 
     CharacterIndex buildCharacterIndex(CharacterWorldData data) {
@@ -841,9 +850,8 @@ public final class PartyService {
 
     private boolean isLeader(PartyContext context) {
         return context != null
-                && context.character != null
-                && context.party != null
-                && context.character.getCharacterId().equals(
+                && context.isValid()
+                && context.gameplayId().equals(
                 context.party.getLeaderCharacterId());
     }
 
@@ -941,34 +949,21 @@ public final class PartyService {
     }
 
     /**
-     * Resolves who a personal marker belongs to, allowing a player with no
-     * character to own one themselves.
-     *
-     * <p>Only a missing character is forgiven. Every other reason the active
-     * character could not be resolved — unreadable storage, an ambiguous or
-     * stolen character id — is still a refusal, because those say the
-     * request cannot be trusted rather than that there is nobody to own
-     * it.</p>
+     * Resolves who a personal marker belongs to: the identity being played,
+     * which is the account itself when no character is. Unreadable storage,
+     * an ambiguous or stolen character id are still refusals, because those
+     * say the request cannot be trusted rather than who owns the marker.
      */
     PersonalMarkerContext resolvePersonalMarkerOwner(
             EntityPlayerMP player) {
         ActiveCharacterContext active = resolveActiveCharacter(player);
-        if (active.isValid()) {
-            UUID characterId = active.character.getCharacterId();
-            return PersonalMarkerContext.owned(
-                    PartyPersonalMarkerOwner.resolve(
-                            characterId, player.getUniqueID()),
-                    characterId);
+        if (!active.isValid()) {
+            return PersonalMarkerContext.failure(active.errorId);
         }
-        if (active.errorId == PartyErrorId.NO_ACTIVE_CHARACTER
-                && player != null) {
-            UUID ownerId = PartyPersonalMarkerOwner.resolve(
-                    null, player.getUniqueID());
-            if (ownerId != null) {
-                return PersonalMarkerContext.owned(ownerId, null);
-            }
-        }
-        return PersonalMarkerContext.failure(active.errorId);
+        return PersonalMarkerContext.owned(
+                PartyPersonalMarkerOwner.resolve(
+                        active.identity.getCharacterId(), player.getUniqueID()),
+                active.identity.getCharacterId());
     }
 
     /** Who a personal marker is filed under, and which character if any. */
@@ -1002,78 +997,95 @@ public final class PartyService {
         }
     }
 
+    /**
+     * The identity a player is acting as in the party system: one of their
+     * characters, or the account itself. Parties key members by the
+     * identity's gameplay id, so the account is a member like any other.
+     */
     static final class ActiveCharacterContext {
         final CharacterWorldData characterData;
+        final PlayableIdentity identity;
+        /** The active character; null when the identity is the account. */
         final RoleplayCharacter character;
+        /** The name the identity goes by: the character's, else the account's. */
+        final String displayName;
         final PartyErrorId errorId;
 
         private ActiveCharacterContext(CharacterWorldData characterData,
+                                       PlayableIdentity identity,
                                        RoleplayCharacter character,
+                                       String displayName,
                                        PartyErrorId errorId) {
             this.characterData = characterData;
+            this.identity = identity;
             this.character = character;
+            this.displayName = displayName;
             this.errorId = errorId;
         }
 
         private static ActiveCharacterContext success(
-                CharacterWorldData data, RoleplayCharacter character) {
+                CharacterWorldData data, PlayableIdentity identity,
+                RoleplayCharacter character, String displayName) {
             return new ActiveCharacterContext(
-                    data, character, PartyErrorId.NONE);
+                    data, identity, character, displayName, PartyErrorId.NONE);
         }
 
         private static ActiveCharacterContext failure(PartyErrorId errorId) {
-            return new ActiveCharacterContext(null, null, errorId);
+            return new ActiveCharacterContext(null, null, null, "", errorId);
         }
 
         boolean isValid() {
             return this.errorId == PartyErrorId.NONE
                     && this.characterData != null
-                    && this.character != null;
+                    && this.identity != null;
+        }
+
+        /** The id the party system files this identity under. */
+        UUID gameplayId() {
+            return this.identity.getGameplayId();
+        }
+
+        UUID ownerId() {
+            return this.identity.getOwnerId();
         }
     }
 
     private static final class PartyContext {
-        private final RoleplayCharacter character;
-        private final CharacterWorldData characterData;
+        private final ActiveCharacterContext active;
         private final PartyWorldData partyData;
         private final Party party;
         private final PartyErrorId errorId;
 
-        private PartyContext(RoleplayCharacter character,
-                             CharacterWorldData characterData,
+        private PartyContext(ActiveCharacterContext active,
                              PartyWorldData partyData,
                              Party party,
                              PartyErrorId errorId) {
-            this.character = character;
-            this.characterData = characterData;
+            this.active = active;
             this.partyData = partyData;
             this.party = party;
             this.errorId = errorId;
         }
 
         private static PartyContext success(
-                RoleplayCharacter character,
-                CharacterWorldData characterData,
+                ActiveCharacterContext active,
                 PartyWorldData data,
                 Party party) {
-            return new PartyContext(
-                    character,
-                    characterData,
-                    data,
-                    party,
-                    PartyErrorId.NONE);
+            return new PartyContext(active, data, party, PartyErrorId.NONE);
         }
 
         private static PartyContext failure(PartyErrorId errorId) {
-            return new PartyContext(null, null, null, null, errorId);
+            return new PartyContext(null, null, null, errorId);
         }
 
         private boolean isValid() {
             return this.errorId == PartyErrorId.NONE
-                    && this.character != null
-                    && this.characterData != null
+                    && this.active != null && this.active.isValid()
                     && this.partyData != null
                     && this.party != null;
+        }
+
+        private UUID gameplayId() {
+            return this.active.gameplayId();
         }
     }
 
@@ -1100,6 +1112,11 @@ public final class PartyService {
             return ownerId != null
                     && (this.characters.containsKey(ownerId)
                             || this.rosterOwnerIds.contains(ownerId));
+        }
+
+        /** Whether the id is a player's own: the account as a playable identity. */
+        boolean isAccountOwner(UUID id) {
+            return id != null && this.rosterOwnerIds.contains(id);
         }
     }
 }

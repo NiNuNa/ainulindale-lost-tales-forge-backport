@@ -292,6 +292,7 @@ final class LostTalesChatOverlayRenderer {
         List<ChatLine> lines = own != null ? own
                 : ClientChatChannelViews.visibleLines(drawn, filter);
         frame.lines = lines;
+        frame.peakLines = Math.max(frame.peakLines, lines.size());
         frame.view = view;
         if (tabs.isEmpty()) {
             // Nothing the player can see lives here right now.

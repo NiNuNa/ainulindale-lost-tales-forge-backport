@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.sync;
 
+import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.CharacterSlotState;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
@@ -98,6 +99,11 @@ public final class CharacterRosterSnapshot {
 
     public CharacterSummary getActiveCharacter() {
         return getCharacter(this.activeCharacterId);
+    }
+
+    /** The id gameplay keys on: the active character's, or the owner's own when on the account. */
+    public UUID getActiveGameplayId() {
+        return PlayableIdentity.gameplayId(this.activeCharacterId, this.ownerId);
     }
 
     public long getRevision() {

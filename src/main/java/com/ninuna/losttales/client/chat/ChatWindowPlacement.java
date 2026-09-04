@@ -269,9 +269,11 @@ public final class ChatWindowPlacement {
      * The lines the window currently shows. A window given a height of
      * its own keeps exactly that height: fewer messages than it has room
      * for show as empty rows above them, so resizing never moves the
-     * window. One following the game setting is as tall as the whole
-     * lines it holds, at least one, at most its {@link #lineCap}; a
-     * window not drawn yet shows one.
+     * window. One following the game setting is as tall as the most
+     * whole lines any of its tabs has held, at least one, at most its
+     * {@link #lineCap} — one height for every tab of the window, so
+     * bringing another tab forward never resizes it; a window not drawn
+     * yet shows one.
      */
     public static double currentLines(ChatWindow window,
                                       Minecraft minecraft) {
@@ -284,7 +286,8 @@ public final class ChatWindowPlacement {
         if (frame == null || frame.lines == null) {
             return 1.0D;
         }
-        return Math.max(1.0D, Math.min(cap, frame.lines.size()));
+        return Math.max(1.0D, Math.min(cap,
+                Math.max(frame.lines.size(), frame.peakLines)));
     }
 
     /** Pixels of message room {@code lines} lines take at this scale,

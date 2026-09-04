@@ -8,7 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -34,9 +33,11 @@ import org.lwjgl.opengl.GL11;
  * and fading to nothing at both ends.
  *
  * <p>Every tab carries a settings cog and a close cross, and its name
- * gives way before they do: a crowded row shortens the labels with an
- * ellipsis, widest first, down to a first letter, and only when even
- * that is not enough does it give anything else up — the counters,
+ * gives way before they do: a crowded row gives the labels less room,
+ * widest first, down to a first letter, drawing each name whole and
+ * cutting it where its room ends — resting the pointer on such a tab
+ * slides the name along to show the rest — and only when even that is
+ * not enough does it give anything else up — the counters,
  * then the other tabs' cogs, then their crosses, the selected tab
  * keeping its own controls throughout. The row's other controls stand at its two ends:
  * the restore {@code +} follows the last tab, since what it opens joins
@@ -149,6 +150,17 @@ final class ChatChannelTabBar {
     private static final int SWAP_UNDO = 4;
     /** How long the tabs a dragged one passed take to close up behind it. */
     private static final double SLIDE_SECONDS = 0.10D;
+    /** Pixels past its first letter a name keeps at the narrowest a row may cut it. */
+    private static final int LABEL_FLOOR_SLACK = 2;
+    /**
+     * The hover marquee that shows a cut name whole: it waits for the
+     * pointer to rest, slides the name left about three letters a second
+     * until the end is in view, rests there long enough to read, and
+     * slides back — and again for as long as the pointer stays.
+     */
+    static final double MARQUEE_START_DELAY_SECONDS = 0.5D;
+    static final double MARQUEE_SPEED_PX_PER_SECOND = 20.0D;
+    static final double MARQUEE_END_PAUSE_SECONDS = 0.8D;
     /** The hairline dividing the row's controls. */
     private static final int DIVIDER_WIDTH =
             LostTalesChatVisualStyle.DIVIDER_WIDTH;
@@ -340,10 +352,17 @@ final class ChatChannelTabBar {
     static final class Hit {
         final HitKind kind;
         final ChatTab tab;
+        /** Whether the tab's name is cut short in the row; false for anything but a tab. */
+        final boolean labelClipped;
 
         Hit(HitKind kind, ChatTab tab) {
+            this(kind, tab, false);
+        }
+
+        Hit(HitKind kind, ChatTab tab, boolean labelClipped) {
             this.kind = kind;
             this.tab = tab;
+            this.labelClipped = labelClipped;
         }
     }
 
@@ -460,7 +479,7 @@ final class ChatChannelTabBar {
                     && localX < tab.settingsX + CONTROL_SIZE + 1) {
                 return new Hit(HitKind.SETTINGS, tab.tab);
             }
-            return new Hit(HitKind.TAB, tab.tab);
+            return new Hit(HitKind.TAB, tab.tab, tab.labelWidth > tab.labelRoom);
         }
         if (hitsControl(localX, row.left + SEARCH_INSET, SEARCH_WIDTH)) {
             return new Hit(HitKind.SEARCH, null);
@@ -782,17 +801,31 @@ final class ChatChannelTabBar {
         // Text is always at full opacity; a muted tab is told by its
         // italics alone.
         int textAlpha = scaled(Math.round(255 * dim));
+        // A name the row has cut short is read whole by resting the
+        // pointer on it: the marquee runs on the clock while the tab is
+        // hovered and glides home once it is not, so a pointer sweeping
+        // the row starts nothing and a name that fits never moves.
+        int overflow = tab.labelWidth - tab.labelRoom;
+        boolean labelHovered = hovered != null && hovered.kind == HitKind.TAB
+                && tab.tab.equals(hovered.tab);
+        if (labelHovered && overflow > 0 && LostTalesConfig.enableChatAnimations) {
+            tab.hoverSeconds += this.frameElapsed;
+            tab.marqueeOffset = (float) marqueeOffset(tab.hoverSeconds, overflow);
+        } else {
+            tab.hoverSeconds = 0.0D;
+            tab.marqueeOffset = eased(tab.marqueeOffset, 0.0F, this.frameElapsed);
+        }
         // Everything inside the tab is cut off at the tab's own edge as
-        // it narrows, the way a browser cuts a tab's label, rather than
-        // the name being shortened again by whole letters every few
-        // pixels. The row's own lower cut goes with it, since a scissor
-        // replaces the one before it rather than narrowing it.
+        // it narrows, the way a browser cuts a tab's label. The row's
+        // own lower cut goes with it, since a scissor replaces the one
+        // before it rather than narrowing it.
         boolean clipped = LostTalesChatOverlayRenderer.beginClip(
                 Minecraft.getMinecraft(), left, right - BORDER_WIDTH,
                 Double.NaN, this.rowClipBottom, true);
         try {
-            drawTabContents(font, tab, row, hovered, left, top + INTERIOR_TOP,
-                    shift, stretch, textAlpha, scaled(Math.round(0xFF * dim)));
+            drawTabContents(font, tab, row, hovered, left, right,
+                    top + INTERIOR_TOP, shift, stretch, textAlpha,
+                    scaled(Math.round(0xFF * dim)));
         } finally {
             LostTalesChatOverlayRenderer.endVerticalClip(clipped);
         }
@@ -807,50 +840,105 @@ final class ChatChannelTabBar {
      * shows as much of them as it has room for.
      */
     private void drawTabContents(FontRenderer font, Tab tab, Row row,
-                                 Hit hovered, float left, int interiorTop,
-                                 float shift, float stretch, int textAlpha,
-                                 int controlAlpha) {
+                                 Hit hovered, float left, float right,
+                                 int interiorTop, float shift, float stretch,
+                                 int textAlpha, int controlAlpha) {
         // The words are drawn at whole coordinates inside a matrix moved
         // by whatever fraction of a pixel the tab stands on, since the
         // font draws at whole ones: the glyphs then land on the same
         // display pixels the tab's own artwork does.
         int wholeLeft = (int)Math.floor(left);
-        GL11.glPushMatrix();
-        GL11.glTranslatef(left - wholeLeft, 0.0F, 0.0F);
-        try {
-            drawTabText(font, tab, wholeLeft, interiorTop, textAlpha);
-        } finally {
-            GL11.glPopMatrix();
+        float fraction = left - wholeLeft;
+        int textX = wholeLeft + PADDING_X;
+        int textY = centredInInterior(interiorTop, CAP_HEIGHT);
+        if (tab.icon != null) {
+            GL11.glPushMatrix();
+            GL11.glTranslatef(fraction, 0.0F, 0.0F);
+            try {
+                ChatChannelIcons.draw(Minecraft.getMinecraft(), tab.tab, textX,
+                        centredInInterior(interiorTop, ChatChannelIcons.SIZE),
+                        textAlpha);
+            } finally {
+                GL11.glPopMatrix();
+            }
+            textX += ChatChannelIcons.SIZE + ChatChannelIcons.GAP;
         }
+        drawTabLabel(font, tab, textX, fraction, textY, textAlpha, left, right);
+        drawTabCounters(font, tab, textX + tab.labelRoom, fraction, textY,
+                textAlpha);
         drawTabControls(tab, row, hovered, shift, stretch, interiorTop,
                 controlAlpha);
     }
 
-    /** The icon, the name and the counters, left to right. */
-    private void drawTabText(FontRenderer font, Tab tab, int left,
-                             int interiorTop, int textAlpha) {
-        int textX = left + PADDING_X;
-        int textY = centredInInterior(interiorTop, CAP_HEIGHT);
-        if (tab.icon != null) {
-            ChatChannelIcons.draw(Minecraft.getMinecraft(), tab.tab, textX,
-                    centredInInterior(interiorTop, ChatChannelIcons.SIZE),
+    /**
+     * The name, whole, in the room the row gave it. A name wider than
+     * its room is cut at the room's end — inside the tab's own cut, both
+     * given to the scissor at once since one replaces the other — and
+     * slid left by the marquee while hovered, its offset laid on a
+     * display pixel so the glyphs stay on theirs.
+     */
+    private void drawTabLabel(FontRenderer font, Tab tab, int textX,
+                              float fraction, int textY, int textAlpha,
+                              float tabLeft, float tabRight) {
+        String text = tab.muted ? "§o" + tab.label : tab.label;
+        if (tab.labelWidth <= tab.labelRoom) {
+            drawWords(font, text, textX, fraction, textY, textAlpha);
+            return;
+        }
+        double roomLeft = textX + fraction;
+        double clipLeft = Math.max(tabLeft, roomLeft);
+        double clipRight = Math.min(tabRight - BORDER_WIDTH,
+                roomLeft + tab.labelRoom);
+        if (clipRight <= clipLeft) {
+            return;
+        }
+        boolean clipped = LostTalesChatOverlayRenderer.beginClip(
+                Minecraft.getMinecraft(), clipLeft, clipRight, Double.NaN,
+                this.rowClipBottom, true);
+        try {
+            double offset = snapped(tab.marqueeOffset, displayStep());
+            drawWords(font, text, textX, (float)(fraction - offset), textY,
                     textAlpha);
-            textX += ChatChannelIcons.SIZE + ChatChannelIcons.GAP;
+        } finally {
+            LostTalesChatOverlayRenderer.endVerticalClip(clipped);
         }
-        LostTalesChatVisualStyle.drawPlain(font,
-                tab.muted ? "§o" + tab.label : tab.label,
-                textX, textY, textAlpha);
-        textX += tab.labelWidth;
-        if (tab.pingText.length() > 0) {
-            textX += COUNTER_GAP;
-            LostTalesChatVisualStyle.drawColored(font, tab.pingText,
-                    textX, textY, PING_COUNTER_RGB, textAlpha);
-            textX += tab.pingWidth;
+    }
+
+    /** Text at a whole x inside a matrix moved by the fraction it stands on. */
+    private static void drawWords(FontRenderer font, String text, int x,
+                                  float fraction, int y, int alpha) {
+        GL11.glPushMatrix();
+        GL11.glTranslatef(fraction, 0.0F, 0.0F);
+        try {
+            LostTalesChatVisualStyle.drawPlain(font, text, x, y, alpha);
+        } finally {
+            GL11.glPopMatrix();
         }
-        if (tab.otherText.length() > 0) {
-            textX += COUNTER_GAP;
-            LostTalesChatVisualStyle.drawColored(font, tab.otherText,
-                    textX, textY, UNREAD_COUNTER_RGB, textAlpha);
+    }
+
+    /** The counters after the name's room, left to right. */
+    private static void drawTabCounters(FontRenderer font, Tab tab, int textX,
+                                        float fraction, int textY,
+                                        int textAlpha) {
+        if (tab.pingText.length() == 0 && tab.otherText.length() == 0) {
+            return;
+        }
+        GL11.glPushMatrix();
+        GL11.glTranslatef(fraction, 0.0F, 0.0F);
+        try {
+            if (tab.pingText.length() > 0) {
+                textX += COUNTER_GAP;
+                LostTalesChatVisualStyle.drawColored(font, tab.pingText,
+                        textX, textY, PING_COUNTER_RGB, textAlpha);
+                textX += tab.pingWidth;
+            }
+            if (tab.otherText.length() > 0) {
+                textX += COUNTER_GAP;
+                LostTalesChatVisualStyle.drawColored(font, tab.otherText,
+                        textX, textY, UNREAD_COUNTER_RGB, textAlpha);
+            }
+        } finally {
+            GL11.glPopMatrix();
         }
     }
 
@@ -1228,6 +1316,38 @@ final class ChatChannelTabBar {
         return tab != null && row.draggedLeft != Integer.MIN_VALUE
                 && (tab.equals(row.dragging)
                         || row.draggedGroup.contains(tab));
+    }
+
+    /**
+     * How far left a hovered name is shifted after {@code elapsedSeconds}
+     * of hovering, given the {@code overflowPx} of it the tab cannot
+     * show: nothing during the start delay, then out to the overflow,
+     * a pause, back to nothing, a pause, and round again. Zero when
+     * nothing overflows. A pure reading of the clock, so it looks the
+     * same at any frame rate.
+     */
+    static double marqueeOffset(double elapsedSeconds, int overflowPx) {
+        if (overflowPx <= 0) {
+            return 0.0D;
+        }
+        double time = elapsedSeconds - MARQUEE_START_DELAY_SECONDS;
+        if (time <= 0.0D) {
+            return 0.0D;
+        }
+        double slide = overflowPx / MARQUEE_SPEED_PX_PER_SECOND;
+        double cycle = 2.0D * (slide + MARQUEE_END_PAUSE_SECONDS);
+        double phase = time % cycle;
+        if (phase < slide) {
+            return phase * MARQUEE_SPEED_PX_PER_SECOND;
+        }
+        if (phase < slide + MARQUEE_END_PAUSE_SECONDS) {
+            return overflowPx;
+        }
+        if (phase < 2.0D * slide + MARQUEE_END_PAUSE_SECONDS) {
+            return overflowPx - (phase - slide - MARQUEE_END_PAUSE_SECONDS)
+                    * MARQUEE_SPEED_PX_PER_SECOND;
+        }
+        return 0.0D;
     }
 
     /** One step toward {@code target}, arriving rather than creeping. */
@@ -1728,9 +1848,9 @@ final class ChatChannelTabBar {
         int first = 0;
         int last = count - 1;
         if (!controlsEverywhere) {
-            // The names give way first: a crowded row shortens them —
-            // down to a first letter and its ellipsis — while every tab
-            // keeps its cog and its cross. Only when even those short
+            // The names give way first: a crowded row gives them less
+            // room — down to a first letter — while every tab keeps its
+            // cog and its cross. Only when even those short
             // names cannot pay for the room does anything else go, and
             // then one thing at a time: the counters, then the other
             // tabs' cogs, then their crosses. The selected tab keeps
@@ -1788,19 +1908,23 @@ final class ChatChannelTabBar {
         for (int index = first; index <= last; index++) {
             ChatTab channel = channels.get(index);
             boolean selected = channel.equals(row.selected);
-            String label = LostTalesSkyrimUiStyle.trimToWidth(font,
-                    this.cachedLabels.get(channel), labelRoom[index]);
+            // The whole name, drawn into the room the row gives it and
+            // cut where that room ends: a narrowing tab shows a little
+            // less of its name with every pixel, never a letter less
+            // every few.
+            String label = this.cachedLabels.get(channel);
+            int labelWidth = labelWidths[index];
+            int room = Math.max(0, Math.min(labelWidth, labelRoom[index]));
             String pingText = showCounters
                     ? ClientChatChannelViews.counterText(
                             count(this.cachedPings, channel)) : "";
             String otherText = showCounters
                     ? ClientChatChannelViews.counterText(
                             count(this.cachedOther, channel)) : "";
-            int labelWidth = font.getStringWidth(label);
             int pingWidth = font.getStringWidth(pingText);
             int otherWidth = font.getStringWidth(otherText);
             ChatEmoji icon = ChatChannelIcons.iconOf(channel);
-            int width = labelWidth + PADDING_X * 2 + iconWidth(channel)
+            int width = room + PADDING_X * 2 + iconWidth(channel)
                     + countersWidth(pingWidth, otherWidth);
             int settingsX = -1;
             int closeX = -1;
@@ -1814,8 +1938,8 @@ final class ChatChannelTabBar {
             }
             Boolean muted = this.cachedMuted.get(channel);
             Tab built = new Tab(channel, index, icon, label, labelWidth,
-                    pingText, pingWidth, otherText, otherWidth, x, width,
-                    settingsX, closeX,
+                    room, pingText, pingWidth, otherText, otherWidth, x,
+                    width, settingsX, closeX,
                     muted != null && muted.booleanValue());
             // A tab the row has not held before stands in its own place
             // at its own size; one it has keeps what it was drawn at
@@ -1841,6 +1965,8 @@ final class ChatChannelTabBar {
                     built.hoverFade = was.hoverFade;
                     built.cogFade = was.cogFade;
                     built.closeFade = was.closeFade;
+                    built.hoverSeconds = was.hoverSeconds;
+                    built.marqueeOffset = was.marqueeOffset;
                     break;
                 }
             }
@@ -2122,7 +2248,7 @@ final class ChatChannelTabBar {
      * The chat width below which the row would have to leave one of its
      * tabs out of the strip altogether: every tab with its padding, its
      * icon and enough of its name to read as a name — its first letter
-     * and the ellipsis that says the rest was cut — the controls the tab
+     * and a hair of the next — the controls the tab
      * in front keeps, the seams between them, and the room the end
      * controls hold. Counters and the other tabs' controls are left
      * out: a row this narrow has already given them up, stage by stage.
@@ -2130,7 +2256,7 @@ final class ChatChannelTabBar {
      *
      * <p>This is what bounds a resize. A window may be dragged as narrow
      * as its own tabs allow and no narrower, so a tab can never be made
-     * to vanish by pulling an edge — the row shortens names down to a
+     * to vanish by pulling an edge — the row cuts names down to a
      * letter and then stops giving way.</p>
      */
     static int chatWidthForNarrowestRow(Minecraft minecraft,
@@ -2161,8 +2287,8 @@ final class ChatChannelTabBar {
 
     /**
      * The least room a tab's name may be given and still say which tab
-     * it is: its first letter and the ellipsis, or the whole name when
-     * that is shorter than the two together.
+     * it is: its first letter whole and a hair of the next, or the whole
+     * name when that is shorter.
      */
     private static int narrowestLabelWidth(FontRenderer font, ChatTab tab) {
         return narrowestLabelWidth(font,
@@ -2175,8 +2301,7 @@ final class ChatChannelTabBar {
             return 0;
         }
         int whole = font.getStringWidth(name);
-        int cut = font.getStringWidth(name.substring(0, 1))
-                + font.getStringWidth("...");
+        int cut = font.getStringWidth(name.substring(0, 1)) + LABEL_FLOOR_SLACK;
         return Math.min(whole, cut);
     }
 
@@ -2226,13 +2351,13 @@ final class ChatChannelTabBar {
     }
 
     /**
-     * Whether the window's row is already shortening its tab names: the
+     * Whether the window's row is already cutting its tab names: the
      * same width model {@link #layout} draws with — the end controls'
      * reserved room, and each tab's padding, icon, counters, controls
      * and whole label, since names are the first thing a crowded row
      * gives up. This is what the auto-open policy asks before filing a
      * new tab into a window: a row whose names are whole takes the tab,
-     * one already ellipsizing is full and the channel opens elsewhere.
+     * one already cutting them is full and the channel opens elsewhere.
      * The restore control's room is always counted, so the answer does
      * not flap as the {@code +} comes and goes. Without a renderer to
      * measure with the answer is "not crowded", which keeps the layout
@@ -2284,10 +2409,18 @@ final class ChatChannelTabBar {
         final int rowIndex;
         /** The channel's emoji before the label, or null. */
         final ChatEmoji icon;
-        /** The name as the row's layout cut it to fit; a tab narrower
-         *  than that shows as much of it as the clip leaves. */
+        /** The whole name; the draw shows as much of it as {@link #labelRoom} leaves. */
         final String label;
         final int labelWidth;
+        /** Pixels the row gives the name; less than the name is wide when the row is crowded. */
+        final int labelRoom;
+        /**
+         * How far the name is shifted left to show its hidden end while
+         * the tab is hovered, and how long the pointer has rested on it;
+         * both carried on when the row is laid out again.
+         */
+        float marqueeOffset;
+        double hoverSeconds;
         /** {@code [p]} unread pings, or empty. */
         final String pingText;
         final int pingWidth;
@@ -2345,7 +2478,7 @@ final class ChatChannelTabBar {
         final boolean muted;
 
         Tab(ChatTab tab, int rowIndex, ChatEmoji icon, String label,
-            int labelWidth, String pingText, int pingWidth,
+            int labelWidth, int labelRoom, String pingText, int pingWidth,
             String otherText, int otherWidth, int x, int width,
             int settingsX, int closeX, boolean muted) {
             this.tab = tab;
@@ -2353,6 +2486,7 @@ final class ChatChannelTabBar {
             this.icon = icon;
             this.label = label;
             this.labelWidth = labelWidth;
+            this.labelRoom = labelRoom;
             this.pingText = pingText;
             this.pingWidth = pingWidth;
             this.otherText = otherText;
