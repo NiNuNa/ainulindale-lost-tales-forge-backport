@@ -26,7 +26,6 @@ import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.compat.discord.DiscordAvatarUrl;
 import com.ninuna.losttales.compat.discord.DiscordBridgePolicy;
 import com.ninuna.losttales.compat.discord.DiscordMessageSanitizer;
-import com.ninuna.losttales.compat.discord.DiscordChannelLabel;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.compat.lotr.LostTalesWaystonePermissionPolicy;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
@@ -248,12 +247,6 @@ public final class LostTalesChatService {
             sender.addChatMessage(new ChatComponentTranslation(
                     "chat.losttales.channel.admin_unavailable"));
             return;
-        } else if (channel.getAccess() == ChatChannelAccess.DISCORD_BRIDGE
-                && !LostTalesDiscordBridge.getInstance().offersDiscordChannel()) {
-            sendAccess(sender);
-            sender.addChatMessage(new ChatComponentTranslation(
-                    "chat.losttales.channel.discord_unavailable"));
-            return;
         }
 
         String accountName = sender.getGameProfile() == null
@@ -365,23 +358,13 @@ public final class LostTalesChatService {
         // so the post can be linked to its Discord copy and a reply can
         // point at the Discord original.
         if (DiscordBridgePolicy.relaysOutbound(ChatMessageOrigin.PLAYER, channel)) {
-            // The card wears the channel's colour and name — for Faction
-            // chat the sender's faction's, as the chat itself shows it —
-            // and names the account behind a character's name, the way
-            // the chat's own hover card does.
             LostTalesDiscordBridge.getInstance().relayToDiscord(channel,
                     factionId,
-                    DiscordChannelLabel.of(channel,
-                            channel == ChatChannel.FACTION
-                                    ? presentation.factionName : ""),
-                    channel == ChatChannel.FACTION
-                            ? presentation.nameColor : channel.getDisplayColor(),
                     accountLine ? identityName : ChatEpithet.titledName(
                             identityName, presentation.factionName,
                             presentation.title),
                     DiscordAvatarUrl.of(LostTalesConfig.discordAvatarUrlTemplate,
                             accountName, sender.getUniqueID()),
-                    accountLine ? "" : accountName,
                     DiscordMessageSanitizer.outbound(message),
                     packet.getMessageId(), reply);
         }
@@ -845,9 +828,11 @@ public final class LostTalesChatService {
             return;
         }
         boolean operator = LostTalesWaystonePermissionPolicy.isOperator(player);
+        // The second flag once gated a Discord tab of its own; OOC &
+        // Discord exists for everyone, so it is always granted, which
+        // keeps an older client's tab and sends its lines here.
         LostTalesNetworkHandler.CHANNEL.sendTo(
-                new LostTalesChatAccessPacket(operator,
-                        LostTalesDiscordBridge.getInstance().offersDiscordChannel(),
+                new LostTalesChatAccessPacket(operator, true,
                         ChatAccountRoleResolver.resolve(player),
                         roleHolders,
                         operator ? mutedSenders(player)

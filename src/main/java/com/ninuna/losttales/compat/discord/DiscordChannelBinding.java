@@ -6,23 +6,35 @@ import com.ninuna.losttales.chat.ChatChannel;
  * One game channel tied to one Discord channel: which channel, for the
  * Faction channel which faction, the Discord channel the bot reads, the
  * webhook the bridge posts through, and which way lines cross. The key
- * is what everything else carries about it — {@code all}, {@code discord},
- * {@code faction:gondor} — so a binding is named the same in the config,
- * the log and the bridge's memory of which post went where.
+ * names the game channel — {@code all}, {@code ooc},
+ * {@code faction:gondor} — and several bindings may share it, one per
+ * Discord channel the game channel goes to; the id tells them apart,
+ * the key for the first and {@code ooc#2} for the next, and is what the
+ * log and the bridge's memory of which post went where carry.
  */
 public final class DiscordChannelBinding {
     /** Separates the channel id from a faction scope in a key. */
     static final char SCOPE_SEPARATOR = ':';
+    /** Separates the key from the ordinal in a binding's id. */
+    static final char ORDINAL_SEPARATOR = '#';
 
     private final ChatChannel channel;
     private final String factionScope;
     private final String discordChannelId;
     private final String webhookUrl;
     private final DiscordBridgeDirection direction;
+    private final String id;
 
     DiscordChannelBinding(ChatChannel channel, String factionScope,
                           String discordChannelId, String webhookUrl,
                           DiscordBridgeDirection direction) {
+        this(channel, factionScope, discordChannelId, webhookUrl, direction,
+                null);
+    }
+
+    private DiscordChannelBinding(ChatChannel channel, String factionScope,
+                                  String discordChannelId, String webhookUrl,
+                                  DiscordBridgeDirection direction, String id) {
         if (channel == null || direction == null) {
             throw new IllegalArgumentException("channel and direction are required");
         }
@@ -31,6 +43,15 @@ public final class DiscordChannelBinding {
         this.discordChannelId = discordChannelId == null ? "" : discordChannelId.trim();
         this.webhookUrl = webhookUrl == null ? "" : webhookUrl.trim();
         this.direction = direction;
+        this.id = id == null || id.length() == 0 ? key() : id;
+    }
+
+    /**
+     * What names this binding alone: its key, or the key and an ordinal
+     * where the same game channel is bound more than once.
+     */
+    public String id() {
+        return this.id;
     }
 
     public ChatChannel getChannel() {
@@ -66,15 +87,19 @@ public final class DiscordChannelBinding {
         return this.direction.readsFromDiscord() && this.discordChannelId.length() > 0;
     }
 
-    /** Whether this is the game's own Discord channel, the one both ways. */
-    public boolean isDiscordChannel() {
-        return this.channel == ChatChannel.DISCORD;
-    }
-
     DiscordChannelBinding withDirection(DiscordBridgeDirection replacement) {
         return replacement == this.direction ? this : new DiscordChannelBinding(
                 this.channel, this.factionScope, this.discordChannelId,
-                this.webhookUrl, replacement);
+                this.webhookUrl, replacement, this.id);
+    }
+
+    /** The same binding under the id its place among its key's bindings gives it. */
+    DiscordChannelBinding withOrdinal(int ordinal) {
+        String named = ordinal <= 1 ? key()
+                : key() + ORDINAL_SEPARATOR + ordinal;
+        return named.equals(this.id) ? this : new DiscordChannelBinding(
+                this.channel, this.factionScope, this.discordChannelId,
+                this.webhookUrl, this.direction, named);
     }
 
     static String keyOf(ChatChannel channel, String factionScope) {
@@ -85,6 +110,6 @@ public final class DiscordChannelBinding {
 
     @Override
     public String toString() {
-        return key() + "=" + this.direction.name();
+        return this.id + "=" + this.direction.name();
     }
 }

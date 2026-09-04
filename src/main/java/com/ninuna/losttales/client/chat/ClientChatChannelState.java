@@ -56,8 +56,6 @@ public final class ClientChatChannelState {
     private static long cachedFactionNanos;
     /** Server-stated operator status; the Admin tab exists only with it. */
     private static boolean adminAccess;
-    /** Server-stated Discord bridge; the Discord tab exists only with it. */
-    private static boolean discordAccess;
     /** Server-stated roles of this player; what {@code @Operator} reaches. */
     private static int roleMask;
     /** Server-stated muted senders; filled for operators only. */
@@ -319,7 +317,7 @@ public final class ClientChatChannelState {
      * Identity no longer gates a channel — any channel is spoken with
      * any appearance, the account included — so only the channel's own
      * access does: membership for Faction and Party, the server's word
-     * for the staff and Discord channels.
+     * for the staff channel.
      */
     public static synchronized boolean canSend(ChatChannel channel) {
         if (channel == null) {
@@ -328,9 +326,6 @@ public final class ClientChatChannelState {
         ChatChannelAccess access = channel.getAccess();
         if (access == ChatChannelAccess.OPERATOR) {
             return adminAccess;
-        }
-        if (access == ChatChannelAccess.DISCORD_BRIDGE) {
-            return discordAccess;
         }
         if (access == ChatChannelAccess.CHARACTER_FACTION) {
             CharacterSummary active = activeCharacter();
@@ -611,16 +606,6 @@ public final class ClientChatChannelState {
         return adminAccess;
     }
 
-    /** Applies the server's statement of whether Discord is bridged. */
-    public static synchronized void setDiscordAccess(boolean access) {
-        discordAccess = access;
-        ensureAvailable();
-    }
-
-    public static synchronized boolean hasDiscordAccess() {
-        return discordAccess;
-    }
-
     /**
      * Remembers the selected tab's unsent input so closing the screen or
      * switching tabs does not lose it.
@@ -689,7 +674,6 @@ public final class ClientChatChannelState {
         cachedFactionName = "";
         cachedFactionNanos = 0L;
         adminAccess = false;
-        discordAccess = false;
         roleMask = 0;
         ROLE_HOLDERS.clear();
         MUTED_SENDERS.clear();

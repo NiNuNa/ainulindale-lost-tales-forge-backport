@@ -223,7 +223,7 @@ final class ChatChannelIcons {
             case FACTION:
                 return ChatEmoji.SMIRK;
             case OOC:
-                return ChatEmoji.ZANY_FACE;
+                return ChatEmoji.DISCORD;
             case PARTY:
                 return ChatEmoji.JOY;
             case ADMIN:
@@ -232,8 +232,6 @@ final class ChatChannelIcons {
                 return ChatEmoji.CONSOLE;
             case WHISPER:
                 return ChatEmoji.BLUSH;
-            case DISCORD:
-                return ChatEmoji.DISCORD;
             default:
                 return ChatEmoji.SLIGHT_SMILE;
         }

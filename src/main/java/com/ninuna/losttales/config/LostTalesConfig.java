@@ -164,13 +164,12 @@ public final class LostTalesConfig {
     public static String discordBotToken = "";
     public static int discordPollIntervalSeconds = 3;
     /**
-     * The bindings a fresh file offers: the Discord channel, Global and
-     * OOC, each switched off until its channel and webhook are filled in.
+     * The bindings a fresh file offers: OOC &amp; Discord and Global, each
+     * switched off until its channel and webhook are filled in.
      */
     private static final String[] DEFAULT_DISCORD_BINDINGS = {
-            "discord=DISABLED;channel=;webhook=",
+            "ooc=DISABLED;channel=;webhook=",
             "all=DISABLED;webhook=",
-            "ooc=DISABLED;webhook=",
     };
     /** The single-channel keys of older files, migrated into the bindings once and dropped. */
     private static final String[] LEGACY_DISCORD_KEYS = {
@@ -900,7 +899,7 @@ public final class LostTalesConfig {
                     "enabled",
                     CATEGORY_DISCORD,
                     discordEnabled,
-                    "Server only: bridge game channels to Discord text channels as channelBindings says, game to Discord through webhooks and Discord to game by polling with a bot. Players get the Discord tab only while this is on and the discord binding is not DISABLED."
+                    "Server only: bridge game channels to Discord text channels as channelBindings says, game to Discord through webhooks and Discord to game by polling with a bot. OOC & Discord exists for players whether or not this is on; the switch only says whether anything crosses."
             );
             discordBotToken = config.getString(
                     "botToken",
@@ -936,7 +935,7 @@ public final class LostTalesConfig {
                     CATEGORY_DISCORD,
                     "channelBindings",
                     DEFAULT_DISCORD_BINDINGS,
-                    "Server only, secrets: one entry per game channel bound to a Discord channel, as <channel>=<direction>;channel=<Discord channel id>;webhook=<webhook URL>. The channel is a wire id (all, proximity, faction, ooc, admin, discord) or faction:<faction id> for one faction's Faction chat, with the id as LOTR names it (faction:lotr:gondor); the direction is DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL. channel= is needed to read, webhook= to post. Party, Console and whispers are private and refused."
+                    "Server only, secrets: one entry per game channel and Discord channel it goes to, as <channel>=<direction>;channel=<Discord channel id>;webhook=<webhook URL>. A game channel may have several entries, one per Discord channel, in any guild the bot is in; a Discord channel is read into one game channel only. The channel is a wire id (all, proximity, faction, ooc, admin; ooc is OOC & Discord, the channel the bridge carries by default, and an entry an older file names discord is read and rewritten as ooc) or faction:<faction id> for one faction's Faction chat, with the id as LOTR names it (faction:lotr:gondor); the direction is DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL. channel= is needed to read, webhook= to post. Party, Console and whispers are private and refused."
             );
             if (migratedBindings.length > 0) {
                 // An untouched list is replaced by what the old keys meant;
@@ -945,6 +944,14 @@ public final class LostTalesConfig {
                 String[] current = bindingsProperty.getStringList();
                 bindingsProperty.set(isUntouched(current, DEFAULT_DISCORD_BINDINGS)
                         ? migratedBindings : mergeBindings(current, migratedBindings));
+                legacyDropped = true;
+            }
+            // An older file named the channel OOC & Discord took in by its
+            // old id; such an entry is rewritten once under today's id.
+            String[] named = bindingsProperty.getStringList();
+            String[] renamed = DiscordChannelBindings.renameLegacyKeys(named);
+            if (!java.util.Arrays.equals(named, renamed)) {
+                bindingsProperty.set(renamed);
                 legacyDropped = true;
             }
             if (legacyDropped || retiredDropped) {
@@ -961,25 +968,25 @@ public final class LostTalesConfig {
                     "serverEvents",
                     CATEGORY_DISCORD,
                     discordServerEvents,
-                    "Server only: post a notice when the server starts or shuts down and when a player joins or leaves, to the discord binding's webhook or else the first webhook that posts."
+                    "Server only: post a notice when the server starts or shuts down and when a player joins or leaves, to every Discord channel a binding posts to, once each."
             );
             discordDeathMessages = config.getBoolean(
                     "deathMessages",
                     CATEGORY_DISCORD,
                     discordDeathMessages,
-                    "Server only: post every player's death message, worded exactly as the game announces it, to the discord binding's webhook or else the first webhook that posts."
+                    "Server only: post every player's death message, worded exactly as the game announces it, to every Discord channel a binding posts to, once each."
             );
             discordAchievements = config.getBoolean(
                     "achievements",
                     CATEGORY_DISCORD,
                     discordAchievements,
-                    "Server only: post vanilla and Middle-earth achievement announcements, worded exactly as the game announces them, to the discord binding's webhook or else the first webhook that posts."
+                    "Server only: post vanilla and Middle-earth achievement announcements, worded exactly as the game announces them, to every Discord channel a binding posts to, once each."
             );
             discordChannelStatus = config.getBoolean(
                     "channelStatus",
                     CATEGORY_DISCORD,
                     discordChannelStatus,
-                    "Server only: keep the discord binding's channel topic saying whether the server is online and how many players are on (online, 3/20 players). Needs the bot token and that binding's channel id, and the bot needs the Manage Channels permission there."
+                    "Server only: keep the topic of every bound Discord channel saying whether the server is online and how many players are on (online, 3/20 players). Needs the bot token and the channel ids in the bindings, and the bot needs the Manage Channels permission in each channel."
             );
             discordChannelStatusIntervalSeconds = config.getInt(
                     "channelStatusIntervalSeconds",
@@ -1096,7 +1103,7 @@ public final class LostTalesConfig {
                     "showChatSpeechBubbles",
                     CATEGORY_CLIENT,
                     showChatSpeechBubbles,
-                    "Show what a player says in character over their head, the way LOTR shows an NPC's speech. In-character channels only (Global, Proximity, Party, Faction); never OOC, whispers, the operator channel, the console or the Discord bridge."
+                    "Show what a player says in character over their head, the way LOTR shows an NPC's speech. In-character channels only (Global, Proximity, Party, Faction); never OOC & Discord, whispers, the operator channel or the console."
             );
             enableChatAnimations = config.getBoolean(
                     "enableChatAnimations",

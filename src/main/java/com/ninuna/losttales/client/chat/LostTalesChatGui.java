@@ -2383,12 +2383,11 @@ public final class LostTalesChatGui extends GuiChat {
             }
             // The row is laid out in whole pixels and shifted by the
             // window's fractional remainder, so it sits exactly where the
-            // lines do while the window glides.
+            // lines do while the window glides. The row is told the same
+            // remainder, since its scissors are cut outside this matrix.
             GL11.glPushMatrix();
             try {
-                GL11.glTranslatef((float)(frame.drawnLeft() - Math.floor(
-                        frame.drawnLeft())), (float)(frame.tabRowBottom()
-                        - Math.floor(frame.tabRowBottom())), 0.0F);
+                GL11.glTranslatef(row.fractionX, row.fractionY, 0.0F);
                 frame.tabBar.draw(this.fontRendererObj, this.regions, row,
                         mouseX, mouseY, opening.getOpacity());
             } finally {
@@ -2483,6 +2482,9 @@ public final class LostTalesChatGui extends GuiChat {
         // the fractional remainder is applied when the row is drawn.
         row.rowBottom = (int)Math.floor(frame.tabRowBottom());
         row.rowBottomExact = frame.tabRowBottom();
+        row.fractionX = (float)(frame.drawnLeft()
+                - Math.floor(frame.drawnLeft()));
+        row.fractionY = (float)(row.rowBottomExact - row.rowBottom);
         row.left = (int)Math.floor(frame.drawnLeft()) + 2;
         row.right = (int)Math.floor(frame.drawnLeft()) + (int)Math.round(
                 frame.boxRight - frame.boxLeft) - 2;
@@ -2538,17 +2540,17 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
-     * The label a hovered row control offers. A tab whose name the row
-     * cut short shows it whole by the marquee in the tab itself, and
-     * only names itself here when animation is off; the grip speaks only
-     * for its own glyph, so the empty strip that also drags stays silent.
+     * The label a hovered row control offers. A tab names itself whole
+     * whether or not the row cut its name short — the marquee in the tab
+     * shows the rest of a cut name too, and the tip says it plainly; the
+     * grip speaks only for its own glyph, so the empty strip that also
+     * drags stays silent.
      */
     private static String tipFor(ChatChannelTabBar.Hit hit,
                                  ChatWindow window, boolean overGrip) {
         switch (hit.kind) {
             case TAB:
-                return hit.labelClipped && !LostTalesConfig.enableChatAnimations
-                        ? ClientChatChannelState.displayName(hit.tab) : "";
+                return ClientChatChannelState.displayName(hit.tab);
             case CLOSE:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.tab.close");

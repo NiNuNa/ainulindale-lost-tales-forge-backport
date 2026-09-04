@@ -11,8 +11,8 @@ public final class ChatChannelTest {
     @Test
     public void presentationOrderIsGlobalProximityFactionOocParty() {
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY,
-                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.DISCORD,
-                ChatChannel.PARTY, ChatChannel.ADMIN, ChatChannel.CONSOLE),
+                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY,
+                ChatChannel.ADMIN, ChatChannel.CONSOLE),
                 ChatChannel.presentationOrder());
         // Every channel but Whisper is presented exactly once (whispers
         // are tabs per conversation, never a channel tab).
@@ -35,12 +35,26 @@ public final class ChatChannelTest {
         assertEquals("ooc", ChatChannel.OOC.getId());
         assertEquals("admin", ChatChannel.ADMIN.getId());
         assertEquals("console", ChatChannel.CONSOLE.getId());
-        assertEquals("discord", ChatChannel.DISCORD.getId());
         assertEquals(ChatChannel.PARTY, ChatChannel.fromId(" Party "));
         // Every id resolves back to its own channel, so no two collide.
         for (ChatChannel channel : ChatChannel.values()) {
             assertEquals(channel, ChatChannel.fromId(channel.getId()));
         }
+        assertEquals(null, ChatChannel.fromId("trade"));
+        assertEquals(null, ChatChannel.fromId(null));
+    }
+
+    /**
+     * An older build kept a Discord channel of its own; OOC &amp; Discord
+     * took it in, and its id still names that channel wherever a file
+     * or a packet from that build carries it.
+     */
+    @Test
+    public void theOldDiscordIdNamesOocAndDiscord() {
+        assertEquals(ChatChannel.OOC, ChatChannel.fromId("discord"));
+        assertEquals(ChatChannel.OOC, ChatChannel.fromId(" Discord "));
+        assertEquals("ooc", ChatChannel.OOC.getId());
+        assertEquals("OOC & Discord", ChatChannel.OOC.getDisplayName());
         assertEquals(ChatRecipientRule.SELF,
                 ChatChannel.CONSOLE.getRecipientRule());
         assertEquals(ChatRecipientRule.OPERATORS,
@@ -65,12 +79,12 @@ public final class ChatChannelTest {
                 ChatChannel.PARTY.getAccess());
         assertEquals(ChatChannelAccess.OPERATOR,
                 ChatChannel.ADMIN.getAccess());
-        assertEquals(ChatChannelAccess.DISCORD_BRIDGE,
-                ChatChannel.DISCORD.getAccess());
-        // Routing and access are separate facts: the Discord channel
-        // routes globally yet exists only while the bridge is on.
+        // OOC & Discord is a room everyone is in, bridged or not; the
+        // bridge is the server's configuration and never a gate.
         assertEquals(ChatRecipientRule.GLOBAL,
-                ChatChannel.DISCORD.getRecipientRule());
+                ChatChannel.OOC.getRecipientRule());
+        assertEquals(ChatIdentityType.ACCOUNT,
+                ChatChannel.OOC.getIdentityType());
     }
 
     /** Private conversations never leave the game, whatever the bridge is told. */
@@ -81,7 +95,6 @@ public final class ChatChannelTest {
         assertEquals(true, ChatChannel.FACTION.isBridgeable());
         assertEquals(true, ChatChannel.OOC.isBridgeable());
         assertEquals(true, ChatChannel.ADMIN.isBridgeable());
-        assertEquals(true, ChatChannel.DISCORD.isBridgeable());
         assertEquals(false, ChatChannel.PARTY.isBridgeable());
         assertEquals(false, ChatChannel.CONSOLE.isBridgeable());
         assertEquals(false, ChatChannel.WHISPER.isBridgeable());

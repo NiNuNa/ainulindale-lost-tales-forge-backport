@@ -101,6 +101,18 @@ final class DiscordHttp {
     }
 
     /**
+     * Reads a channel object by its id with the bot: what says at start
+     * whether a channel the bindings read exists and is the bot's to
+     * see, and which guild holds it.
+     */
+    static Reply getChannel(String botToken, String channelId) throws IOException {
+        HttpURLConnection connection = open(
+                API_BASE + "/channels/" + channelId, "GET");
+        connection.setRequestProperty("Authorization", "Bot " + botToken);
+        return exchange(connection, null);
+    }
+
+    /**
      * Rewrites a message the webhook itself posted; Discord answers 200
      * with the message. Only the webhook's own posts can be rewritten,
      * which is exactly the set the bridge ever asks about.

@@ -16,12 +16,16 @@ import java.io.IOException;
  * already announced. A refused write (no Manage Channels, a bad token,
  * a JVM that cannot PATCH) switches the updater off for the session
  * with one log line; any other failure backs off on its own clock and
- * never delays the chat relay.
+ * never delays the chat relay. One of these stands for each Discord
+ * channel whose topic the bridge keeps, so a channel refused or limited
+ * on its own never holds the others back.
  */
 final class DiscordChannelStatus {
     private static final long MIN_BACKOFF_MILLIS = 5000L;
     private static final long MAX_BACKOFF_MILLIS = 60000L;
 
+    /** The Discord channel this topic belongs to, for its log lines. */
+    private final String channelId;
     private String desired = "";
     private String applied = "";
     private long notBeforeMillis;
@@ -29,6 +33,15 @@ final class DiscordChannelStatus {
     private long backoffMillis = MIN_BACKOFF_MILLIS;
     private boolean disabled;
     private boolean healthy = true;
+
+    DiscordChannelStatus(String channelId) {
+        this.channelId = channelId == null ? "" : channelId;
+    }
+
+    /** The Discord channel this topic belongs to. */
+    String channelId() {
+        return this.channelId;
+    }
 
     /** States the topic the channel should show; any thread. */
     synchronized void request(String topic) {
@@ -67,8 +80,7 @@ final class DiscordChannelStatus {
      * interval starts at a successful write; a failure starts a backoff
      * of its own, doubling up to a minute.
      */
-    void flush(String botToken, String channelId, long intervalMillis,
-               boolean finalAttempt) {
+    void flush(String botToken, long intervalMillis, boolean finalAttempt) {
         long now = System.currentTimeMillis();
         String topic;
         synchronized (this) {
@@ -79,7 +91,7 @@ final class DiscordChannelStatus {
         }
         DiscordHttp.Reply reply;
         try {
-            reply = DiscordHttp.patchChannel(botToken, channelId,
+            reply = DiscordHttp.patchChannel(botToken, this.channelId,
                     DiscordJson.channelTopicBody(topic));
         } catch (DiscordHttp.PatchUnsupportedException unsupported) {
             disable("this Java runtime cannot send the request: "
@@ -99,9 +111,9 @@ final class DiscordChannelStatus {
                 this.rateLimitedUntilMillis = now + retryAfter;
                 this.notBeforeMillis = this.rateLimitedUntilMillis;
             }
-            FMLLog.info("[%s] Discord limited the channel topic write; "
+            FMLLog.info("[%s] Discord limited the topic write of channel %s; "
                     + "retrying in %d s", LostTalesMetaData.MOD_ID,
-                    Long.valueOf(retryAfter / 1000L));
+                    this.channelId, Long.valueOf(retryAfter / 1000L));
             return;
         }
         if (reply.status == 401 || reply.status == 403) {
@@ -120,8 +132,8 @@ final class DiscordChannelStatus {
             this.backoffMillis = MIN_BACKOFF_MILLIS;
             if (!this.healthy) {
                 this.healthy = true;
-                FMLLog.info("[%s] Discord channel topic updates recovered",
-                        LostTalesMetaData.MOD_ID);
+                FMLLog.info("[%s] Discord topic updates of channel %s recovered",
+                        LostTalesMetaData.MOD_ID, this.channelId);
             }
         }
     }
@@ -132,9 +144,9 @@ final class DiscordChannelStatus {
                 this.backoffMillis * 2L);
         if (this.healthy) {
             this.healthy = false;
-            FMLLog.warning("[%s] Discord channel topic update failing, "
+            FMLLog.warning("[%s] Discord topic update of channel %s failing, "
                     + "retrying with backoff: %s", LostTalesMetaData.MOD_ID,
-                    reason);
+                    this.channelId, reason);
         }
     }
 
@@ -143,7 +155,8 @@ final class DiscordChannelStatus {
             return;
         }
         this.disabled = true;
-        FMLLog.severe("[%s] Discord channel topic updates are off until the "
-                + "server restarts: %s", LostTalesMetaData.MOD_ID, reason);
+        FMLLog.severe("[%s] Discord topic updates of channel %s are off until "
+                + "the server restarts: %s", LostTalesMetaData.MOD_ID,
+                this.channelId, reason);
     }
 }

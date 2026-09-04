@@ -95,7 +95,7 @@ public final class ChatStackRowsTest {
      */
     @Test
     public void theScrollCeilingReachesTheDividersRow() {
-        ChatTab tab = ChatTab.of(ChatChannel.DISCORD);
+        ChatTab tab = ChatTab.of(ChatChannel.OOC);
         int lines = 30;
         int rows = lines + 1;
         double room = 10.0D;

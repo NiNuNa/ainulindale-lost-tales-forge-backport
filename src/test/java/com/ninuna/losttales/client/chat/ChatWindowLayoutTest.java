@@ -51,7 +51,7 @@ public final class ChatWindowLayoutTest {
         ChatWindow conversation = ChatWindowLayout.windows().get(1);
         assertEquals("w2", conversation.getId());
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY,
-                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.DISCORD,
+                ChatChannel.FACTION, ChatChannel.OOC,
                 ChatChannel.PARTY), conversation.getChannels());
         assertEquals(ChatChannel.ALL, conversation.getActiveChannel());
         assertEquals(0.0D, conversation.getOffsetX(), 0.0D);
@@ -65,7 +65,7 @@ public final class ChatWindowLayoutTest {
         assertTrue(ChatWindowLayout.closedChannels().isEmpty());
         assertEquals(Arrays.asList(ChatChannel.CONSOLE, ChatChannel.ADMIN,
                 ChatChannel.ALL, ChatChannel.PROXIMITY, ChatChannel.FACTION,
-                ChatChannel.OOC, ChatChannel.DISCORD, ChatChannel.PARTY),
+                ChatChannel.OOC, ChatChannel.PARTY),
                 ChatWindowLayout.orderChannels());
     }
 
@@ -229,7 +229,7 @@ public final class ChatWindowLayoutTest {
     /** Every tab closes, down to no tab and no window at all. */
     @Test
     public void everyTabClosesAndTheEmptyLayoutIsValid() {
-        assertEquals(8, ChatWindowLayout.openTabCount());
+        assertEquals(7, ChatWindowLayout.openTabCount());
         List<ChatChannel> order = new ArrayList<ChatChannel>(
                 ChatWindowLayout.orderChannels());
         for (int index = 0; index < order.size(); index++) {
@@ -625,15 +625,24 @@ public final class ChatWindowLayoutTest {
                 detached++;
             }
         }
-        // Every window that could be split was, once: six new windows,
-        // one per channel, which with eight channels meets the cap exactly.
-        assertEquals(6, detached);
-        assertEquals(8, ChatWindowLayout.windows().size());
-        assertTrue(ChatWindowLayout.windows().size()
-                <= ChatWindowLayout.MAX_WINDOWS);
+        // Every window that could be split was, once: five new windows,
+        // one per channel, which with seven channels leaves one place
+        // under the cap.
+        assertEquals(5, detached);
+        assertEquals(7, ChatWindowLayout.windows().size());
         for (ChatWindow window : ChatWindowLayout.windows()) {
             assertEquals(1, window.getChannels().size());
         }
+        // A conversation takes the last place, and the cap refuses the
+        // next one a window of its own.
+        ChatTab frodo = ChatWindowLayout.openTab(ChatTab.whisper("Frodo"), "w1");
+        assertNotNull(ChatWindowLayout.detach(frodo, 0.0D, 0.0D));
+        assertEquals(ChatWindowLayout.MAX_WINDOWS,
+                ChatWindowLayout.windows().size());
+        ChatTab sam = ChatWindowLayout.openTab(ChatTab.whisper("Sam"), "w1");
+        assertNull(ChatWindowLayout.detach(sam, 0.0D, 0.0D));
+        assertEquals(ChatWindowLayout.MAX_WINDOWS,
+                ChatWindowLayout.windows().size());
     }
 
     @Test
@@ -667,7 +676,7 @@ public final class ChatWindowLayoutTest {
         // Party keeps its first placement; the unplaced channels land
         // in the first window.
         assertEquals(Arrays.asList(ChatChannel.PARTY, ChatChannel.OOC,
-                ChatChannel.FACTION, ChatChannel.DISCORD, ChatChannel.CONSOLE),
+                ChatChannel.FACTION, ChatChannel.CONSOLE),
                 w3.getChannels());
         assertEquals(ChatChannel.OOC, w3.getActiveChannel());
         assertTrue(w3.isLocked());
@@ -706,7 +715,7 @@ public final class ChatWindowLayoutTest {
         ChatWindow only = ChatWindowLayout.firstWindow();
         assertEquals("w1", only.getId());
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY,
-                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.DISCORD, ChatChannel.PARTY,
+                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY,
                 ChatChannel.CONSOLE), only.getChannels());
         assertEquals(ChatChannel.ALL, only.getActiveChannel());
         assertEquals(100.0D, only.getOffsetY(), 0.0D);

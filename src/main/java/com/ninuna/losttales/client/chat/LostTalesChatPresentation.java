@@ -83,11 +83,14 @@ public final class LostTalesChatPresentation {
             return;
         }
         ChatChannel channel = packet.getChannel();
-        // A Discord sender has no Minecraft account to look a skin up
-        // for. Whether the line wears the account is the line's own
-        // word, not the channel's: appearances let a character speak in
-        // OOC and the account in Global.
-        if (packet.isAccountLine() && channel != ChatChannel.DISCORD) {
+        // A Discord member has no Minecraft account to look a skin up
+        // for, and is known by the sender id the bridge signs with, not
+        // by the channel: a Discord line and a player's line share OOC
+        // & Discord. Whether the line wears the account is the line's
+        // own word too: appearances let a character speak there and the
+        // account in Global.
+        if (packet.isAccountLine() && !LostTalesChatMessagePacket
+                .isDiscordSender(packet.getSenderId())) {
             LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
                     minecraft, packet.getSenderId(),
                     packet.getIdentityName());

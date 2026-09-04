@@ -682,9 +682,10 @@ public final class ChatWindowPlacement {
     /**
      * The narrowest box <em>this</em> window may be dragged to: the
      * readable minimum above, or the width its own tab row needs to keep
-     * every tab in the strip, whichever is greater. A window with more
-     * tabs therefore has a wider floor, so pulling an edge shortens the
-     * names down to a letter each and then stops rather than dropping a
+     * every tab in the strip — the widest whole, the others at their
+     * icons — whichever is greater. A window with more tabs therefore
+     * has a wider floor, so pulling an edge shortens the other tabs'
+     * names down to their icons and then stops rather than dropping a
      * tab out of sight.
      */
     public static double minBoxWidth(Minecraft minecraft,

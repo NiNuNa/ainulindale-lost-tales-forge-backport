@@ -35,9 +35,16 @@ public enum ChatChannel {
     FACTION("faction", "Faction", ChatIdentityType.CHARACTER,
             ChatRecipientRule.FACTION, ChatChannelAccess.CHARACTER_FACTION,
             LostTalesColors.rgb(LostTalesColors.HONEY), true),
-    OOC("ooc", "OOC", ChatIdentityType.ACCOUNT,
+    /**
+     * Out-of-character conversation, and the channel the Discord bridge
+     * carries by default: account identity, everyone online reads it,
+     * and it is there whether or not the server bridges anything. An
+     * older build kept a Discord channel of its own beside it; its id
+     * still resolves here, see {@link #fromId}.
+     */
+    OOC("ooc", "OOC & Discord", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE), true),
+            LostTalesColors.rgb(LostTalesColors.STEEL_BLUE), true),
     /** Staff channel: operators only, account identity; the wire id stays. */
     ADMIN("admin", "Operator", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.OPERATORS, ChatChannelAccess.OPERATOR,
@@ -57,24 +64,23 @@ public enum ChatChannel {
      */
     WHISPER("whisper", "Whisper", ChatIdentityType.ACCOUNT,
             ChatRecipientRule.WHISPER, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.APRICOT), false),
-    /**
-     * The server's Discord channel, bridged both ways by the server's
-     * own bridge: account identity, everyone in the game reads it, and
-     * the tab exists only while the server says the bridge is on.
-     */
-    DISCORD("discord", "Discord", ChatIdentityType.ACCOUNT,
-            ChatRecipientRule.GLOBAL, ChatChannelAccess.DISCORD_BRIDGE,
-            LostTalesColors.rgb(LostTalesColors.STEEL_BLUE), true);
+            LostTalesColors.rgb(LostTalesColors.APRICOT), false);
 
     /** Tab, indicator, and cycle order: the two global channels bracket
-     *  the scoped role-play ones, Discord beside OOC as the other account
-     *  conversation, then Party, staff, and the console. Whispers are not
-     *  listed: their tabs exist per conversation. */
+     *  the scoped role-play ones, then Party, staff, and the console.
+     *  Whispers are not listed: their tabs exist per conversation. */
     private static final List<ChatChannel> PRESENTATION_ORDER =
             Collections.unmodifiableList(Arrays.asList(
-                    ALL, PROXIMITY, FACTION, OOC, DISCORD, PARTY, ADMIN,
-                    CONSOLE));
+                    ALL, PROXIMITY, FACTION, OOC, PARTY, ADMIN, CONSOLE));
+
+    /**
+     * The id an older build wrote for a channel that since became part
+     * of another: {@code discord}, the Discord channel OOC &amp; Discord
+     * took in. A layout file, a packet from an older client and a
+     * configuration entry naming it all resolve to the channel that
+     * took it in.
+     */
+    private static final String LEGACY_DISCORD_ID = "discord";
 
     private final ChatChannelDescriptor descriptor;
 
@@ -110,6 +116,10 @@ public enum ChatChannel {
         return PRESENTATION_ORDER;
     }
 
+    /**
+     * The channel an id names, an older build's id for a channel since
+     * merged included; null for anything unknown.
+     */
     public static ChatChannel fromId(String id) {
         String normalized = id == null ? ""
                 : id.trim().toLowerCase(Locale.ROOT);
@@ -118,6 +128,6 @@ public enum ChatChannel {
                 return channel;
             }
         }
-        return null;
+        return LEGACY_DISCORD_ID.equals(normalized) ? OOC : null;
     }
 }

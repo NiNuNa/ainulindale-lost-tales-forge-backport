@@ -125,7 +125,7 @@ public final class DiscordJsonTest {
 
     @Test
     public void webhookInfoNeedsBothIds() {
-        DiscordJson.WebhookInfo info = DiscordJson.parseWebhookInfo(
+        DiscordJson.ChannelInfo info = DiscordJson.parseWebhookInfo(
                 "{\"guild_id\":\"9\",\"channel_id\":\"8\",\"name\":\"hook\"}");
         assertEquals("9", info.guildId);
         assertEquals("8", info.channelId);
@@ -137,68 +137,61 @@ public final class DiscordJsonTest {
     }
 
     @Test
-    public void lineBodiesAreCardsInTheChannelsColour() {
-        DiscordJson.LineCard card = new DiscordJson.LineCard("\uD83D\uDEE1\uFE0F Gondor",
-                0x1234AB, "Player890", 1700000000000L, "> header\n");
+    public void channelInfoIsReadFromTheChannelObject() {
+        DiscordJson.ChannelInfo info = DiscordJson.parseChannelInfo(
+                "{\"id\":\"8\",\"guild_id\":\"9\",\"type\":0,\"name\":\"ooc\"}");
+        assertEquals("9", info.guildId);
+        assertEquals("8", info.channelId);
+        // A channel outside any guild is nothing the bridge binds.
+        assertEquals(null, DiscordJson.parseChannelInfo("{\"id\":\"8\",\"type\":1}"));
+        assertEquals(null, DiscordJson.parseChannelInfo("{\"message\":\"Unknown Channel\"}"));
+        assertEquals(null, DiscordJson.parseChannelInfo("[]"));
+        assertEquals(null, DiscordJson.parseChannelInfo(null));
+    }
+
+    @Test
+    public void lineBodiesAreTextUnderTheSendersNameAndPicture() {
         JsonObject body = new JsonParser().parse(
                 DiscordJson.webhookLineBody("Aragorn, the Gondor Farmer",
-                        "https://heads/Aragorn", card, "@everyone hi"))
+                        "https://heads/Aragorn", "-# header\n@everyone hi"))
                 .getAsJsonObject();
         assertEquals("Aragorn, the Gondor Farmer", body.get("username").getAsString());
         assertEquals("https://heads/Aragorn", body.get("avatar_url").getAsString());
-        assertFalse("everything is on the card", body.has("content"));
-        JsonObject embed = body.getAsJsonArray("embeds").get(0).getAsJsonObject();
-        assertEquals(0x1234AB, embed.get("color").getAsInt());
-        assertEquals("\uD83D\uDEE1\uFE0F Gondor",
-                embed.getAsJsonObject("author").get("name").getAsString());
         assertEquals("the reply opens the text",
-                "> header\n@everyone hi", embed.get("description").getAsString());
-        assertEquals("Player890",
-                embed.getAsJsonObject("footer").get("text").getAsString());
-        assertEquals("2023-11-14T22:13:20Z", embed.get("timestamp").getAsString());
+                "-# header\n@everyone hi", body.get("content").getAsString());
+        assertFalse("a line is text, never a card", body.has("embeds"));
         assertEquals(0, body.getAsJsonObject("allowed_mentions")
                 .getAsJsonArray("parse").size());
     }
 
     @Test
-    public void aBareCardIsJustTheLine() {
+    public void aBareLineNamesNobodyAndShowsNoPicture() {
         JsonObject body = new JsonParser().parse(
-                DiscordJson.webhookLineBody("", "", DiscordJson.LineCard.NONE, "hi"))
+                DiscordJson.webhookLineBody("", "", "hi")).getAsJsonObject();
+        assertFalse(body.has("username"));
+        assertFalse(body.has("avatar_url"));
+        assertFalse(body.has("embeds"));
+        assertEquals("hi", body.get("content").getAsString());
+        // Nothing at all still makes a well-formed body.
+        assertEquals("", new JsonParser().parse(
+                DiscordJson.webhookLineBody(null, null, null))
+                .getAsJsonObject().get("content").getAsString());
+    }
+
+    @Test
+    public void lineEditBodiesCarryOnlyTheNewTextAndPingNobody() {
+        JsonObject body = new JsonParser().parse(
+                DiscordJson.webhookLineEditBody("-# q\n@everyone corrected"))
                 .getAsJsonObject();
         assertFalse(body.has("username"));
         assertFalse(body.has("avatar_url"));
-        assertFalse(body.has("content"));
-        JsonObject embed = body.getAsJsonArray("embeds").get(0).getAsJsonObject();
-        assertEquals("hi", embed.get("description").getAsString());
-        assertFalse(embed.has("author"));
-        assertFalse(embed.has("footer"));
-        assertFalse(embed.has("timestamp"));
-        assertEquals(0, embed.get("color").getAsInt());
-        // A missing card draws the same.
-        assertEquals(body, new JsonParser().parse(
-                DiscordJson.webhookLineBody("", "", null, "hi")));
-    }
-
-    @Test
-    public void lineEditBodiesDrawTheCardAgainAndPingNobody() {
-        DiscordJson.LineCard card = new DiscordJson.LineCard("\uD83C\uDF0D Global",
-                0x00FF00, "", 1700000000000L, "");
-        JsonObject body = new JsonParser().parse(
-                DiscordJson.webhookLineEditBody(card, "@everyone corrected"))
-                .getAsJsonObject();
-        assertFalse(body.has("username"));
-        assertFalse(body.has("content"));
-        JsonObject embed = body.getAsJsonArray("embeds").get(0).getAsJsonObject();
-        assertEquals("@everyone corrected", embed.get("description").getAsString());
-        assertEquals("\uD83C\uDF0D Global",
-                embed.getAsJsonObject("author").get("name").getAsString());
-        assertFalse("an account line names no account twice", embed.has("footer"));
-        assertEquals("the original time stays", "2023-11-14T22:13:20Z",
-                embed.get("timestamp").getAsString());
+        assertFalse(body.has("embeds"));
+        assertEquals("-# q\n@everyone corrected", body.get("content").getAsString());
         assertEquals(0, body.getAsJsonObject("allowed_mentions")
                 .getAsJsonArray("parse").size());
-        assertEquals("> q\n", card.withHeader("> q\n").header);
-        assertEquals("", DiscordJson.LineCard.NONE.withHeader(null).header);
+        assertEquals("", new JsonParser().parse(
+                DiscordJson.webhookLineEditBody(null))
+                .getAsJsonObject().get("content").getAsString());
     }
 
     @Test

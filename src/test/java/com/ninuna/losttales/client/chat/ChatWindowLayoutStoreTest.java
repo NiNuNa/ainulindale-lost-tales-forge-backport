@@ -70,7 +70,7 @@ public final class ChatWindowLayoutStoreTest {
         assertTrue(lines.contains("window w1 locked=false x=0.00 y=0.00 "
                 + "active=console tabs=console"));
         assertTrue(lines.contains("window w2 locked=false x=3.00 y=97.50 "
-                + "active=ooc tabs=all,proximity,ooc,discord"));
+                + "active=ooc tabs=all,proximity,ooc"));
         assertTrue(lines.contains("window w3 locked=true x=62.50 y=8.00 "
                 + "active=faction link=w2:above tabs=party,faction"));
         assertTrue(lines.contains("closed admin"));
@@ -85,7 +85,7 @@ public final class ChatWindowLayoutStoreTest {
         assertEquals(88.0D, ChatWindowLayout.feedOffsetY(), 0.0001D);
         ChatWindow w2 = ChatWindowLayout.window("w2");
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY,
-                ChatChannel.OOC, ChatChannel.DISCORD), w2.getChannels());
+                ChatChannel.OOC), w2.getChannels());
         assertEquals(3.0D, w2.getOffsetX(), 0.0001D);
         assertEquals(97.5D, w2.getOffsetY(), 0.0001D);
         assertEquals(ChatChannel.OOC, w2.getActiveChannel());
@@ -142,7 +142,7 @@ public final class ChatWindowLayoutStoreTest {
         // Unknown ids dropped, unplaced channels appended, Admin closed.
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.OOC,
                 ChatChannel.PROXIMITY, ChatChannel.FACTION,
-                ChatChannel.DISCORD, ChatChannel.CONSOLE), main.getChannels());
+                ChatChannel.CONSOLE), main.getChannels());
         assertEquals(ChatChannel.ALL, main.getActiveChannel());
         assertEquals(2, ChatWindowLayout.windows().size());
         ChatWindow w2 = ChatWindowLayout.window("w2");
@@ -156,5 +156,37 @@ public final class ChatWindowLayoutStoreTest {
         assertTrue(ChatWindowLayout.isMuted(ChatChannel.CONSOLE));
         // An older file's feed-only mute reads as today's mute.
         assertTrue(ChatWindowLayout.isMuted(ChatChannel.FACTION));
+    }
+
+    /**
+     * An older build wrote a Discord tab of its own; OOC &amp; Discord took
+     * it in, so every line naming it — a tab, the front tab, a mute, a
+     * hidden mark — reads as that channel, and a layout naming both
+     * keeps one tab in the place the first of them had.
+     */
+    @Test
+    public void anOlderFilesDiscordTabReadsAsOocAndDiscord() {
+        ChatWindowLayoutStore.load(Arrays.asList(
+                "window w1 x=0.00 y=100.00 active=discord "
+                        + "tabs=all,discord,ooc,console",
+                "muted discord",
+                "hidden DISCORD"));
+        ChatWindow only = ChatWindowLayout.firstWindow();
+        assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.OOC,
+                ChatChannel.CONSOLE), only.getChannels().subList(0, 3));
+        assertEquals(1, Collections.frequency(only.getChannels(),
+                ChatChannel.OOC));
+        assertEquals(ChatChannel.OOC, only.getActiveChannel());
+        assertTrue(ChatWindowLayout.isMuted(ChatChannel.OOC));
+        assertTrue(ChatWindowLayout.isHidden(ChatChannel.OOC));
+        // Written back, the file names the channel by today's id only.
+        for (String line : ChatWindowLayoutStore.describe()) {
+            assertFalse(line, line.contains("discord"));
+        }
+
+        ChatWindowLayout.reset();
+        ChatWindowLayoutStore.load(Arrays.asList("closed discord"));
+        assertEquals(Collections.singletonList(ChatChannel.OOC),
+                ChatWindowLayout.closedChannels());
     }
 }

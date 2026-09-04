@@ -31,8 +31,6 @@ public final class DiscordMessageSanitizer {
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
     /** Discord display names are bounded; the chat bounds them again. */
     private static final int MAX_NAME_LENGTH = 32;
-    /** Discord's own bound on the name a webhook post is made under. */
-    static final int MAX_WEBHOOK_NAME_LENGTH = 80;
 
     private DiscordMessageSanitizer() {}
 
@@ -124,12 +122,12 @@ public final class DiscordMessageSanitizer {
     }
 
     /**
-     * The line a game line's card opens with when the message answers
-     * one Discord holds: a block quote of an arrow, the quoted author in
-     * bold and the quoted text — linked to the original when a jump URL
-     * is known, plain when it is not. The closest thing to a native
-     * reply a webhook can carry: Discord accepts no
-     * {@code message_reference} on a webhook execution, so the quote
+     * The line a webhook post opens with when the game message answers
+     * one Discord holds: Discord's small subtext, an arrow, the quoted
+     * author in bold and the quoted text — linked to the original when
+     * a jump URL is known, plain when it is not. The closest thing to a
+     * native reply a webhook can carry: Discord accepts no
+     * {@code message_reference} on a webhook execution, so the header
      * says in markdown what the reply banner would have said.
      */
     public static String replyHeader(String author, String excerpt,
@@ -141,7 +139,7 @@ public final class DiscordMessageSanitizer {
         if (jumpUrl != null && jumpUrl.length() > 0) {
             body = "[" + body + "](" + jumpUrl + ")";
         }
-        return "> ↩ " + body + "\n";
+        return "-# ↩ " + body + "\n";
     }
 
     /**

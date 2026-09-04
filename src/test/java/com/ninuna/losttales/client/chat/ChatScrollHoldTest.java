@@ -86,7 +86,7 @@ public final class ChatScrollHoldTest {
 
     @Test
     public void anUnreadDividerOpeningARowDoesNotMoveThePage() {
-        ChatTab tab = ChatTab.of(ChatChannel.DISCORD);
+        ChatTab tab = ChatTab.of(ChatChannel.OOC);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
         ClientChatChannelViews.scroll(tab, 5, lines.size(), 3.0D);
         ClientChatChannelViews.holdPosition(tab, frameOver(lines, -1));

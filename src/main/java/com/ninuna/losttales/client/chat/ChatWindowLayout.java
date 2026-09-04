@@ -541,18 +541,18 @@ public final class ChatWindowLayout {
         if (tab == null || channel == ChatChannel.WHISPER || isOpen(tab)) {
             return false;
         }
-        ChatWindow window = receivingWindow();
+        ChatWindow window = receivingWindow(null, tab);
         return window != null && restore(channel, window.getId());
     }
 
     /**
      * The window a tab that opens by itself — a conversation, the
      * console answering a command — belongs in. The window it is asked
-     * for takes it when that window is unlocked and has room; otherwise
-     * the most recently used window that does, front of the stack
-     * first; then, while the layout has room for another, a new window
-     * cascaded from the one asked for, or from the front window. With
-     * no room for another, the front-most unlocked window takes it
+     * for takes it when that window is unlocked and has room for it;
+     * otherwise the most recently used window that does, front of the
+     * stack first; then, while the layout has room for another, a new
+     * window cascaded from the one asked for, or from the front window.
+     * With no room for another, the front-most unlocked window takes it
      * anyway, since losing the message would be worse than crowding a
      * row, and a layout of locked windows alone hands it to the first.
      *
@@ -561,27 +561,24 @@ public final class ChatWindowLayout {
      * it unread and shows it in the closed-chat feed; the player decides
      * when a window comes back.</p>
      */
-    static synchronized ChatWindow receivingWindow() {
-        return receivingWindow(null);
-    }
-
-    /** As above, with the window the tab was asked to open in, or null. */
-    static synchronized ChatWindow receivingWindow(ChatWindow preferred) {
+    static synchronized ChatWindow receivingWindow(ChatWindow preferred,
+                                                   ChatTab tab) {
         if (isEmpty()) {
             return null;
         }
+        List<ChatTab> candidate = Collections.singletonList(tab);
         if (preferred != null && WINDOWS.contains(preferred)
-                && !preferred.isLocked() && !isCrowded(preferred)) {
+                && !preferred.isLocked() && hasRoomFor(preferred, candidate)) {
             return preferred;
         }
-        // A window whose row is already cutting its tab names is full:
-        // the window last brought to the front with room takes the tab,
-        // and when every unlocked window is full a new window opens
-        // instead of cutting anyone's names further.
+        // A window whose row cannot hold one more tab at its least — the
+        // widest tab whole, every other down to its icon — is full: the
+        // window last brought to the front with room takes the tab, and
+        // when every unlocked window is full a new window opens instead.
         List<ChatWindow> byRecency = byRecency();
         for (int index = 0; index < byRecency.size(); index++) {
             ChatWindow window = byRecency.get(index);
-            if (!window.isLocked() && !isCrowded(window)) {
+            if (!window.isLocked() && hasRoomFor(window, candidate)) {
                 return window;
             }
         }
@@ -623,18 +620,19 @@ public final class ChatWindowLayout {
     }
 
     /**
-     * Whether the window's row is already cutting its tab names short.
-     * The width model is the tab bar's; without a renderer to measure
-     * with — headless tests, a broken frame — the answer is no.
+     * Whether the window's row has room for these tabs besides the ones
+     * it shows. The width model is the tab bar's; without a renderer to
+     * measure with — headless tests, a broken frame — the answer is yes.
      */
-    private static boolean isCrowded(ChatWindow window) {
+    private static boolean hasRoomFor(ChatWindow window, List<ChatTab> tabs) {
         try {
-            return ChatChannelTabBar.rowIsCrowded(
-                    net.minecraft.client.Minecraft.getMinecraft(), window);
+            return ChatChannelTabBar.rowHasRoomFor(
+                    net.minecraft.client.Minecraft.getMinecraft(), window,
+                    tabs);
         } catch (RuntimeException unavailable) {
-            return false;
+            return true;
         } catch (LinkageError unavailable) {
-            return false;
+            return true;
         }
     }
 
@@ -684,7 +682,7 @@ public final class ChatWindowLayout {
         // The window asked for takes the tab first; a locked or a full
         // one hands it to another with room, or to a new one cascaded
         // from it.
-        ChatWindow window = receivingWindow(window(preferredWindowId));
+        ChatWindow window = receivingWindow(window(preferredWindowId), tab);
         if (window == null) {
             // No window left to open it in; the tab stays closed and its
             // channel keeps receiving.
@@ -739,8 +737,9 @@ public final class ChatWindowLayout {
      * been lifted out, so a non-contiguous selection lands as one run
      * and a reorder is described by where the tabs go rather than by
      * which neighbour they land beside. Every tab must be open in one
-     * and the same source window; a locked source or target refuses, and
-     * a source emptied by the move disappears.
+     * and the same source window; a locked source or target refuses, so
+     * does a target whose row has no room for the tabs at their least,
+     * and a source emptied by the move disappears.
      */
     public static synchronized boolean moveTabs(List<ChatTab> tabs,
                                                 String targetWindowId,
@@ -784,6 +783,12 @@ public final class ChatWindowLayout {
                 changed();
             }
             return true;
+        }
+        // A dock is refused where the row could not hold the tabs at
+        // their least; the drag carries on and the tabs stay where they
+        // are, rather than a row showing fewer tabs than it holds.
+        if (!hasRoomFor(target, moved)) {
+            return false;
         }
         list.removeAll(moved);
         if (list.isEmpty()) {

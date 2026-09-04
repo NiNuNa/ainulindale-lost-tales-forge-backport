@@ -483,7 +483,6 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     public void handleChatAccess(LostTalesChatAccessPacket packet) {
         if (packet != null && !packet.isMalformed()) {
             ClientChatChannelState.setAdminAccess(packet.hasAdminAccess());
-            ClientChatChannelState.setDiscordAccess(packet.hasDiscordAccess());
             ClientChatChannelState.setRoleMask(packet.getRoleMask());
             java.util.LinkedHashMap<String, Integer> holders =
                     new java.util.LinkedHashMap<String, Integer>();

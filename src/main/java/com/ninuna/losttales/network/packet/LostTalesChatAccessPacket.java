@@ -14,12 +14,15 @@ import java.util.UUID;
 /**
  * Server-to-client: which restricted chat channels the player may use,
  * and which roles the player holds. The client cannot know its own
- * operator status on a dedicated server, nor whether the server bridges
- * Discord, so the server states both on login and whenever a refused
- * message makes it worth saying again; the server still checks on every
- * send regardless. The role mask is presentation only — it is what lets
- * this client notice that {@code @Operator} was addressed to it — and,
- * like every other role fact, it is the server's word alone.
+ * operator status on a dedicated server, so the server states it on
+ * login and whenever a refused message makes it worth saying again; the
+ * server still checks on every send regardless. The role mask is
+ * presentation only — it is what lets this client notice that
+ * {@code @Operator} was addressed to it — and, like every other role
+ * fact, it is the server's word alone. The second flag on the wire once
+ * gated a Discord channel of its own; that channel is OOC & Discord now
+ * and exists for everyone, so the server always sends it set and this
+ * client reads nothing from it.
  *
  * <p>Appended after the personal fields travels the <em>role roster</em>:
  * every online account that holds a role, with its mask. Account names
@@ -188,7 +191,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
     public boolean hasAdminAccess() { return this.adminAccess; }
     /** The roles the server says this player holds, as a bit set. */
     public int getRoleMask() { return this.roleMask; }
-    /** Whether the server bridges the Discord channel right now. */
+    /** The flag an older client gated its Discord tab on; always sent set. */
     public boolean hasDiscordAccess() { return this.discordAccess; }
     /** Every online account holding a role, as the server states it. */
     public List<RoleHolder> getRoleHolders() { return this.roleHolders; }
