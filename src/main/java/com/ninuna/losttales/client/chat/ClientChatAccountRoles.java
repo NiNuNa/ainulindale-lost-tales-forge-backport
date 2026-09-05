@@ -57,7 +57,7 @@ public final class ClientChatAccountRoles {
      */
     public static synchronized int colorOf(String name) {
         ChatAccountRole primary = ChatAccountRole.primary(rolesOf(name));
-        return primary == ChatAccountRole.NONE ? -1 : primary.getColor();
+        return primary.isNone() ? -1 : primary.getColor();
     }
 
     public static synchronized void clear() {

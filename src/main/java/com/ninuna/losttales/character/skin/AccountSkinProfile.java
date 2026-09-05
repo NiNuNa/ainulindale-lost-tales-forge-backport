@@ -1,4 +1,4 @@
-package com.ninuna.losttales.client.skin;
+package com.ninuna.losttales.character.skin;
 
 /**
  * What an account's profile says about its skin: where the texture is, the

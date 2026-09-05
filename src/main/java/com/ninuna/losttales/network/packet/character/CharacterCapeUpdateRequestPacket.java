@@ -13,8 +13,15 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 import java.util.UUID;
 
-/** Client request to update one owned character's persistent cape settings. */
+/**
+ * Client request to update the persistent cape settings of one owned
+ * identity: a character by id, or the account itself (a null id; on the
+ * wire the id slot holds the nil UUID and an appended flag names the
+ * account).
+ */
 public final class CharacterCapeUpdateRequestPacket implements IMessage {
+
+    private static final UUID NIL_UUID = new UUID(0L, 0L);
 
     private int requestId;
     private long expectedRosterRevision;
@@ -30,7 +37,7 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
                                             UUID characterId,
                                             boolean showMinecraftCape,
                                             int cosmeticCapeId) {
-        if (expectedRosterRevision < 0L || characterId == null
+        if (expectedRosterRevision < 0L
                 || !CharacterCapeCatalog.isValidSelection(cosmeticCapeId)) {
             throw new IllegalArgumentException("invalid cape update request");
         }
@@ -46,9 +53,16 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
         try {
             this.requestId = buffer.readInt();
             this.expectedRosterRevision = buffer.readLong();
-            this.characterId = CharacterPacketCodec.readUuid(buffer);
+            UUID characterId = CharacterPacketCodec.readUuid(buffer);
             this.showMinecraftCape = buffer.readBoolean();
             this.cosmeticCapeId = buffer.readUnsignedShort();
+            // Appended: whether the request is the account's own. An older
+            // client never sends it and never names the account.
+            boolean forAccount = buffer.readableBytes() >= 1 && buffer.readBoolean();
+            this.characterId = forAccount ? null : characterId;
+            if (!forAccount && NIL_UUID.equals(characterId)) {
+                throw new CharacterPacketCodec.DecodeException("nil character id");
+            }
             CharacterPacketCodec.requireFinished(buffer);
             if (this.expectedRosterRevision < 0L) {
                 throw new CharacterPacketCodec.DecodeException(
@@ -69,9 +83,24 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
     public void toBytes(ByteBuf buffer) {
         buffer.writeInt(this.requestId);
         buffer.writeLong(this.expectedRosterRevision);
-        CharacterPacketCodec.writeUuid(buffer, this.characterId);
+        CharacterPacketCodec.writeUuid(buffer,
+                this.characterId == null ? NIL_UUID : this.characterId);
         buffer.writeBoolean(this.showMinecraftCape);
         buffer.writeShort(this.cosmeticCapeId);
+        buffer.writeBoolean(this.characterId == null);
+    }
+
+    /** The character asked about; null for the account itself. */
+    public UUID getCharacterId() {
+        return this.characterId;
+    }
+
+    public int getCosmeticCapeId() {
+        return this.cosmeticCapeId;
+    }
+
+    public boolean isMalformed() {
+        return this.malformed;
     }
 
     public static final class Handler

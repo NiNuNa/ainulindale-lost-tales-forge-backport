@@ -1,4 +1,4 @@
-package com.ninuna.losttales.client.skin;
+package com.ninuna.losttales.character.skin;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;

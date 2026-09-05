@@ -201,7 +201,7 @@ public final class CharacterDeletionService {
                         target.getUniqueID(), characterId);
                 return CharacterDeletionMaintenanceResult.RECONCILED;
             }
-            if (containsCharacterId(characterData, characterId)) {
+            if (characterData.containsCharacter(characterId)) {
                 return CharacterDeletionMaintenanceResult.CHARACTER_ID_CONFLICT;
             }
 
@@ -295,7 +295,7 @@ public final class CharacterDeletionService {
             if (!tombstone.isPurgeAllowed(System.currentTimeMillis())) {
                 return CharacterDeletionMaintenanceResult.RETENTION_ACTIVE;
             }
-            if (containsCharacterId(characterData, characterId)) {
+            if (characterData.containsCharacter(characterId)) {
                 return CharacterDeletionMaintenanceResult.CHARACTER_ID_CONFLICT;
             }
 
@@ -410,16 +410,6 @@ public final class CharacterDeletionService {
             EntityPlayerMP target, UUID characterId) {
         return target != null && target.worldObj != null
                 && !target.worldObj.isRemote && characterId != null;
-    }
-
-    private static boolean containsCharacterId(
-            CharacterWorldData data, UUID characterId) {
-        for (CharacterRoster candidate : data.getRosters()) {
-            if (candidate.getCharacter(characterId) != null) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static CharacterErrorId mapPartyCleanupError(

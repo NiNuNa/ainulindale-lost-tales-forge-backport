@@ -46,6 +46,9 @@ import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntit
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererStatue;
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererWaystone;
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererUrn;
+import com.ninuna.losttales.chat.ChatRoleCatalog;
+import com.ninuna.losttales.compat.minecraft.ModDisableabilityAccess;
+import com.ninuna.losttales.config.client.ClientServerConfigCache;
 import com.ninuna.losttales.config.client.LostTalesConfigGuiEventHandler;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
 import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneGuard;
@@ -65,6 +68,8 @@ import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
+import com.ninuna.losttales.network.packet.LostTalesServerConfigResultPacket;
+import com.ninuna.losttales.network.packet.LostTalesServerConfigSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.client.chat.ClientChatAccountRoles;
@@ -166,6 +171,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         RenderingRegistry.registerEntityRenderingHandler(LostTalesEntityOdaneGuard.class, new LOTRRenderBreeMan());
 
         super.init(event);
+        // A coremod is not something the Mods list can switch off.
+        ModDisableabilityAccess.markNeverDisableable();
     }
 
 
@@ -482,6 +489,16 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleChatAccess(LostTalesChatAccessPacket packet) {
         if (packet != null && !packet.isMalformed()) {
+            // The catalogue first: every mask below is read against it.
+            // Remembered name colours are dropped when the roles' bits
+            // changed shape, since they were read against the old one.
+            ChatRoleCatalog catalog = ChatRoleCatalog.fromWire(packet.getCatalog());
+            if (!catalog.signature().equals(ChatRoleCatalog.current().signature())) {
+                ClientChatAccountRoles.clear();
+            }
+            ChatRoleCatalog.install(catalog);
+            ClientChatChannelState.setChannelGates(
+                    packet.getReadableChannels(), packet.getSendableChannels());
             ClientChatChannelState.setAdminAccess(packet.hasAdminAccess());
             ClientChatChannelState.setRoleMask(packet.getRoleMask());
             java.util.LinkedHashMap<String, Integer> holders =
@@ -522,6 +539,20 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleChatUpdate(LostTalesChatUpdatePacket packet) {
         LostTalesChatPresentation.applyUpdate(packet);
+    }
+
+    @Override
+    public void handleServerConfigSync(LostTalesServerConfigSyncPacket packet) {
+        if (packet != null && !packet.isMalformed()) {
+            ClientServerConfigCache.acceptSnapshot(packet.getEntries());
+        }
+    }
+
+    @Override
+    public void handleServerConfigResult(LostTalesServerConfigResultPacket packet) {
+        if (packet != null && !packet.isMalformed()) {
+            ClientServerConfigCache.acceptResult(packet.getResult());
+        }
     }
 
     @Override

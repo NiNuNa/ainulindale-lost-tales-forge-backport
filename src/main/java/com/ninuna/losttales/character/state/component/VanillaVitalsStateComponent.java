@@ -12,12 +12,26 @@ import net.minecraft.network.play.server.S06PacketUpdateHealth;
 import net.minecraft.network.play.server.S1FPacketSetExperience;
 import net.minecraftforge.common.util.Constants;
 
-/** Health, absorption, food, exhaustion, and vanilla experience. */
+/**
+ * Health, absorption, food, exhaustion, vanilla experience, and the three
+ * short-lived conditions the entity carries: the breath left, the fire on
+ * it, and the nether-portal cooldown. Version 2 added those three; a
+ * version 1 snapshot reads them as full breath, no fire, no cooldown.
+ */
 public final class VanillaVitalsStateComponent implements CharacterStateComponent {
 
     public static final String ID = "vanilla_vitals";
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
+    private static final int FIRST_VERSION = 1;
     private static final String TAG_VERSION = "Version";
+    private static final String TAG_AIR = "Air";
+    private static final String TAG_FIRE = "Fire";
+    private static final String TAG_PORTAL_COOLDOWN = "PortalCooldown";
+    /** Vanilla's full breath, and how far below empty it may run. */
+    private static final int MAX_AIR = 300;
+    private static final int MIN_AIR = -20;
+    private static final int MAX_FIRE_TICKS = Short.MAX_VALUE;
+    private static final int MAX_PORTAL_COOLDOWN = 65535;
     private static final String TAG_HEALTH = "Health";
     private static final String TAG_FULL_HEALTH = "FullHealth";
     private static final String TAG_ABSORPTION = "Absorption";
@@ -48,6 +62,9 @@ public final class VanillaVitalsStateComponent implements CharacterStateComponen
         player.getFoodStats().writeNBT(food);
         NBTTagCompound state = new NBTTagCompound();
         state.setInteger(TAG_VERSION, VERSION);
+        state.setInteger(TAG_AIR, player.getAir());
+        state.setInteger(TAG_FIRE, fireTicks(player));
+        state.setInteger(TAG_PORTAL_COOLDOWN, player.timeUntilPortal);
         state.setFloat(TAG_HEALTH, player.getHealth());
         state.setBoolean(TAG_FULL_HEALTH, false);
         state.setFloat(TAG_ABSORPTION, player.getAbsorptionAmount());
@@ -69,6 +86,9 @@ public final class VanillaVitalsStateComponent implements CharacterStateComponen
 
         NBTTagCompound state = new NBTTagCompound();
         state.setInteger(TAG_VERSION, VERSION);
+        state.setInteger(TAG_AIR, MAX_AIR);
+        state.setInteger(TAG_FIRE, 0);
+        state.setInteger(TAG_PORTAL_COOLDOWN, 0);
         state.setFloat(TAG_HEALTH, 20.0F);
         state.setBoolean(TAG_FULL_HEALTH, true);
         state.setFloat(TAG_ABSORPTION, 0.0F);
@@ -101,6 +121,14 @@ public final class VanillaVitalsStateComponent implements CharacterStateComponen
         if (state.getInteger(TAG_EXPERIENCE_LEVEL) < 0
                 || state.getInteger(TAG_EXPERIENCE_TOTAL) < 0) {
             throw new CharacterStateValidationException("Stored experience totals are invalid");
+        }
+        int air = air(state);
+        int fire = fire(state);
+        int portalCooldown = portalCooldown(state);
+        if (air < MIN_AIR || air > MAX_AIR || fire < -MAX_FIRE_TICKS
+                || fire > MAX_FIRE_TICKS || portalCooldown < 0
+                || portalCooldown > MAX_PORTAL_COOLDOWN) {
+            throw new CharacterStateValidationException("Stored conditions are invalid");
         }
         if (!state.hasKey(TAG_FOOD, Constants.NBT.TAG_COMPOUND)) {
             throw new CharacterStateValidationException("Food state is missing");
@@ -139,6 +167,15 @@ public final class VanillaVitalsStateComponent implements CharacterStateComponen
         player.experienceLevel = state.getInteger(TAG_EXPERIENCE_LEVEL);
         player.experienceTotal = state.getInteger(TAG_EXPERIENCE_TOTAL);
         player.setAbsorptionAmount(state.getFloat(TAG_ABSORPTION));
+        player.setAir(air(state));
+        player.timeUntilPortal = portalCooldown(state);
+        // The fire field has no setter for a tick count: put it out, then
+        // light it for the stored whole seconds when it was burning.
+        player.extinguish();
+        int fire = fire(state);
+        if (fire > 0) {
+            player.setFire((fire + 19) / 20);
+        }
 
         float maximum = getMaximumHealth(player);
         float requested = state.getBoolean(TAG_FULL_HEALTH)
@@ -177,9 +214,40 @@ public final class VanillaVitalsStateComponent implements CharacterStateComponen
             throw new CharacterStateValidationException("Vitals component version is missing");
         }
         int version = state.getInteger(TAG_VERSION);
-        if (version != VERSION) {
+        if (version < FIRST_VERSION || version > VERSION) {
             throw new CharacterStateValidationException(
                     "Unsupported vitals component version " + version);
         }
+    }
+
+    /** The breath left; a version 1 snapshot has full breath. */
+    private static int air(NBTTagCompound state) {
+        return state.hasKey(TAG_AIR, Constants.NBT.TAG_INT)
+                ? state.getInteger(TAG_AIR) : MAX_AIR;
+    }
+
+    /** The fire ticks; a version 1 snapshot is not burning. */
+    private static int fire(NBTTagCompound state) {
+        return state.hasKey(TAG_FIRE, Constants.NBT.TAG_INT)
+                ? state.getInteger(TAG_FIRE) : 0;
+    }
+
+    private static int portalCooldown(NBTTagCompound state) {
+        return state.hasKey(TAG_PORTAL_COOLDOWN, Constants.NBT.TAG_INT)
+                ? state.getInteger(TAG_PORTAL_COOLDOWN) : 0;
+    }
+
+    /**
+     * The fire ticks on the entity, read the way the entity itself saves
+     * them, since the field has no getter. Not burning reads as zero.
+     */
+    private static int fireTicks(EntityPlayerMP player) {
+        if (!player.isBurning()) {
+            return 0;
+        }
+        NBTTagCompound entity = new NBTTagCompound();
+        player.writeToNBT(entity);
+        int fire = entity.getShort(TAG_FIRE);
+        return Math.max(0, Math.min(MAX_FIRE_TICKS, fire));
     }
 }

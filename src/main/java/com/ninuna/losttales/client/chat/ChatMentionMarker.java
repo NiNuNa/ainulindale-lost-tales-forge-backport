@@ -40,14 +40,12 @@ final class ChatMentionMarker {
     /** As above for a role mention; the target is the role itself. */
     static ChatComponentText applyRole(ChatComponentText component,
                                        int color, ChatAccountRole role) {
-        if (component != null && role != null
-                && role != ChatAccountRole.NONE) {
+        if (component != null && role != null && !role.isNone()) {
             component.setChatStyle(component.getChatStyle()
                     .setChatClickEvent(new ClickEvent(
                             ClickEvent.Action.SUGGEST_COMMAND,
                             PREFIX + colorHex(color) + ":"
-                                    + ROLE_TARGET_PREFIX
-                                    + role.name().toLowerCase(Locale.ROOT))));
+                                    + ROLE_TARGET_PREFIX + role.getId())));
         }
         return component;
     }
@@ -115,16 +113,10 @@ final class ChatMentionMarker {
             if (!this.account.startsWith(ROLE_TARGET_PREFIX)) {
                 return null;
             }
-            String name = this.account.substring(
-                    ROLE_TARGET_PREFIX.length())
-                    .toUpperCase(Locale.ROOT);
-            for (ChatAccountRole role : ChatAccountRole.values()) {
-                if (role != ChatAccountRole.NONE
-                        && role.name().equals(name)) {
-                    return role;
-                }
-            }
-            return null;
+            ChatAccountRole role = ChatAccountRole.byId(
+                    this.account.substring(ROLE_TARGET_PREFIX.length())
+                            .toLowerCase(Locale.ROOT));
+            return role.isNone() ? null : role;
         }
     }
 }

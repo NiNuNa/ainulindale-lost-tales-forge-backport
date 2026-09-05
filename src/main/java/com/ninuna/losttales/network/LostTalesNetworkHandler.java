@@ -24,6 +24,10 @@ import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatDeletePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatEditPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
+import com.ninuna.losttales.network.packet.LostTalesServerConfigApplyPacket;
+import com.ninuna.losttales.network.packet.LostTalesServerConfigRequestPacket;
+import com.ninuna.losttales.network.packet.LostTalesServerConfigResultPacket;
+import com.ninuna.losttales.network.packet.LostTalesServerConfigSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
@@ -104,11 +108,15 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesFastTravelArrivalPacket.Handler.class, LostTalesFastTravelArrivalPacket.class, 38, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesChatTypingSyncPacket.Handler.class, LostTalesChatTypingSyncPacket.class, 40, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesChatUpdatePacket.Handler.class, LostTalesChatUpdatePacket.class, 43, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesServerConfigSyncPacket.Handler.class, LostTalesServerConfigSyncPacket.class, 45, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesServerConfigResultPacket.Handler.class, LostTalesServerConfigResultPacket.class, 47, Side.CLIENT);
 
         // Client -> server requests registered after the snapshots they answer
         // with. Ids are allocated in order of addition and are never reused, so
         // a later request keeps its higher id.
         CHANNEL.registerMessage(LostTalesChatEditPacket.Handler.class, LostTalesChatEditPacket.class, 41, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChatDeletePacket.Handler.class, LostTalesChatDeletePacket.class, 42, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesServerConfigRequestPacket.Handler.class, LostTalesServerConfigRequestPacket.class, 44, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesServerConfigApplyPacket.Handler.class, LostTalesServerConfigApplyPacket.class, 46, Side.SERVER);
     }
 }

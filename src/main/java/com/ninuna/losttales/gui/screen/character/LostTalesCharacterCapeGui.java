@@ -11,7 +11,10 @@ import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
+import com.ninuna.losttales.client.skin.LostTalesAccountSkins;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiInventory;
@@ -24,7 +27,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Client-only editor for server-authoritative persistent cape settings. */
+/**
+ * Client-only editor for server-authoritative persistent cape settings, for
+ * the identity being played: the active character, or the account itself
+ * when none is.
+ */
 public final class LostTalesCharacterCapeGui extends GuiScreen {
 
     private static final int BUTTON_NORMAL_CAPE = 1;
@@ -118,13 +125,17 @@ public final class LostTalesCharacterCapeGui extends GuiScreen {
         if (this.initializedFromSnapshot) {
             return;
         }
-        CharacterSummary active = getActiveCharacter();
-        if (active == null) {
+        CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
+        if (snapshot == null) {
             return;
         }
-        this.showMinecraftCape = active.isMinecraftCapeVisible();
-        int index = this.cosmeticCapeIds.indexOf(
-                Integer.valueOf(active.getCosmeticCapeId()));
+        CharacterSummary active = snapshot.getActiveCharacter();
+        this.showMinecraftCape = active == null
+                ? snapshot.isAccountMinecraftCapeVisible()
+                : active.isMinecraftCapeVisible();
+        int index = this.cosmeticCapeIds.indexOf(Integer.valueOf(active == null
+                ? snapshot.getAccountCosmeticCapeId()
+                : active.getCosmeticCapeId()));
         this.cosmeticCapeIndex = index < 0 ? 0 : index;
         this.initializedFromSnapshot = true;
     }
@@ -166,7 +177,7 @@ public final class LostTalesCharacterCapeGui extends GuiScreen {
     private void updateButtonState() {
         boolean pending = this.pendingRequestId != 0
                 && ClientCharacterRosterCache.isRequestPending(this.pendingRequestId);
-        CharacterSummary active = getActiveCharacter();
+        boolean loaded = ClientCharacterRosterCache.getSnapshot() != null;
         for (Object object : this.buttonList) {
             GuiButton button = (GuiButton)object;
             button.enabled = button.id == BUTTON_CANCEL || !pending;
@@ -178,7 +189,7 @@ public final class LostTalesCharacterCapeGui extends GuiScreen {
                             : "gui.losttales.character.cape.normal_disabled");
         }
         if (this.saveButton != null) {
-            this.saveButton.enabled = !pending && active != null;
+            this.saveButton.enabled = !pending && loaded;
         }
     }
 
@@ -216,20 +227,21 @@ public final class LostTalesCharacterCapeGui extends GuiScreen {
 
     private void submitUpdate() {
         CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
-        CharacterSummary active = snapshot == null ? null : snapshot.getActiveCharacter();
-        if (snapshot == null || active == null) {
+        if (snapshot == null) {
             this.statusMessage = I18n.format(
                     "gui.losttales.character.loading_detail");
             this.statusError = true;
             return;
         }
+        // A null character id asks for the account's own cape.
+        CharacterSummary active = snapshot.getActiveCharacter();
         int capeId = selectedCapeId();
         this.statusMessage = I18n.format(
                 "gui.losttales.character.cape.saving");
         this.statusError = false;
         this.pendingRequestId = ClientCharacterNetwork.updateCapeSettings(
                 snapshot.getRevision(),
-                active.getCharacterId(),
+                active == null ? null : active.getCharacterId(),
                 this.showMinecraftCape,
                 capeId);
     }
@@ -241,9 +253,9 @@ public final class LostTalesCharacterCapeGui extends GuiScreen {
         LostTalesSkyrimUiStyle.drawCenteredHeader(
                 this.fontRendererObj,
                 I18n.format("gui.losttales.character.cape.editor"),
-                active == null
+                ClientCharacterRosterCache.getSnapshot() == null
                         ? I18n.format("gui.losttales.character.loading")
-                        : active.getName(),
+                        : active == null ? accountName() : active.getName(),
                 this.width,
                 12);
 
@@ -326,26 +338,32 @@ public final class LostTalesCharacterCapeGui extends GuiScreen {
 
     private void drawAppearancePreview(int x, int y, int mouseX, int mouseY) {
         EntityPlayer player = this.mc == null ? null : this.mc.thePlayer;
-        CharacterSummary active = getActiveCharacter();
-        if (player == null || player.getUniqueID() == null || active == null) {
+        if (player == null || player.getUniqueID() == null
+                || ClientCharacterRosterCache.getSnapshot() == null) {
             return;
         }
-        CharacterAppearance preview = CharacterAppearance.preview(
-                player.getUniqueID(),
-                active.getRaceId(),
-                active.getGenderId(),
-                active.getSkinId(),
-                active.getBodyTypeId(),
-                active.getChestTypeId(),
-                this.showMinecraftCape,
-                selectedCapeId());
+        CharacterSummary active = getActiveCharacter();
+        // The account previews as itself: the account skin on the plain
+        // human body, with the arm width the local profile skin declares.
+        CharacterAppearance preview = active == null
+                ? CharacterAppearance.forAccount(player.getUniqueID(), accountName(),
+                        localAccountBodyType(player), this.showMinecraftCape,
+                        selectedCapeId())
+                : CharacterAppearance.preview(
+                        player.getUniqueID(),
+                        active.getRaceId(),
+                        active.getGenderId(),
+                        active.getSkinId(),
+                        active.getBodyTypeId(),
+                        active.getChestTypeId(),
+                        this.showMinecraftCape,
+                        selectedCapeId());
+        String raceId = preview.getRaceId();
         ClientCharacterAppearanceCache.setPreview(preview);
         boolean previousDebugBoundingBox = RenderManager.debugBoundingBox;
         try {
-            int previewY = CharacterGuiPreviewLayout.baselineY(
-                    active.getRaceId(), y);
-            int previewScale = CharacterGuiPreviewLayout.scale(
-                    active.getRaceId(), 42);
+            int previewY = CharacterGuiPreviewLayout.baselineY(raceId, y);
+            int previewScale = CharacterGuiPreviewLayout.scale(raceId, 42);
             RenderManager.debugBoundingBox = false;
             GuiInventory.func_147046_a(
                     x,
@@ -363,6 +381,20 @@ public final class LostTalesCharacterCapeGui extends GuiScreen {
     private CharacterSummary getActiveCharacter() {
         CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
         return snapshot == null ? null : snapshot.getActiveCharacter();
+    }
+
+    private String accountName() {
+        return this.mc == null || this.mc.thePlayer == null
+                ? I18n.format("gui.losttales.character.unknown")
+                : this.mc.thePlayer.getCommandSenderName();
+    }
+
+    /** The arm width the local player's own skin declares, for the preview. */
+    private static String localAccountBodyType(EntityPlayer player) {
+        return player instanceof AbstractClientPlayer
+                ? LostTalesAccountSkins.resolve((AbstractClientPlayer)player)
+                        .getBodyTypeId()
+                : CharacterBodyTypeRegistry.WIDE;
     }
 
     private int selectedCapeId() {

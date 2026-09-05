@@ -616,7 +616,7 @@ final class ChatInputCompletion {
                 new HashMap<String, CharacterAppearance>();
         for (CharacterAppearance appearance
                 : ClientCharacterAppearanceCache.snapshot().values()) {
-            if (appearance != null && appearance.isPresent()
+            if (appearance != null && appearance.hasCharacter()
                     && appearance.getAccountName().length() > 0) {
                 byAccount.put(appearance.getAccountName()
                         .toLowerCase(Locale.ROOT), appearance);
@@ -659,11 +659,10 @@ final class ChatInputCompletion {
         List<ChatMentionCandidate> result =
                 new ArrayList<ChatMentionCandidate>();
         for (ChatAccountRole role : ChatAccountRole.mentionable()) {
-            String name = StatCollector.translateToLocal(role.getNameKey());
+            String name = role.getDisplayName();
             if (name.length() > 0 && !name.equals(role.getNameKey())) {
                 result.add(ChatMentionCandidate.role(
-                        "role:" + role.name().toLowerCase(Locale.ROOT),
-                        name, role.getColor()));
+                        "role:" + role.getId(), name, role.getColor()));
             }
         }
         result.add(candidate(selfId == null ? "self" : selfId.toString(),

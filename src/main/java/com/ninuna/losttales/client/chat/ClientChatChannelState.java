@@ -58,6 +58,9 @@ public final class ClientChatChannelState {
     private static boolean adminAccess;
     /** Server-stated roles of this player; what {@code @Operator} reaches. */
     private static int roleMask;
+    /** Server-stated channel gates for this player, one bit per channel. */
+    private static int readableChannels = -1;
+    private static int sendableChannels = -1;
     /** Server-stated muted senders; filled for operators only. */
     private static final java.util.Set<UUID> MUTED_SENDERS =
             new java.util.HashSet<UUID>();
@@ -304,8 +307,24 @@ public final class ClientChatChannelState {
         if (channel == null) {
             return false;
         }
+        if (!isGateOpen(readableChannels, channel)) {
+            return false;
+        }
         return channel.getAccess() == ChatChannelAccess.NONE
                 || canSend(channel);
+    }
+
+    /** Whether the server's gate for this player lets the channel be used. */
+    private static boolean isGateOpen(int gates, ChatChannel channel) {
+        int bit = channel.ordinal();
+        return bit >= 32 || (gates & (1 << bit)) != 0;
+    }
+
+    /** The server's word on the channels this player may read and send into. */
+    public static synchronized void setChannelGates(int readable, int sendable) {
+        readableChannels = readable;
+        sendableChannels = sendable;
+        ensureAvailable();
     }
 
     public static synchronized boolean canSend(ChatTab tab) {
@@ -321,6 +340,9 @@ public final class ClientChatChannelState {
      */
     public static synchronized boolean canSend(ChatChannel channel) {
         if (channel == null) {
+            return false;
+        }
+        if (!isGateOpen(sendableChannels, channel)) {
             return false;
         }
         ChatChannelAccess access = channel.getAccess();
@@ -568,7 +590,7 @@ public final class ClientChatChannelState {
     /** Online accounts holding the role, in the server's order. */
     public static synchronized List<String> roleHolders(
             ChatAccountRole role) {
-        if (role == null || role == ChatAccountRole.NONE) {
+        if (role == null || role.isNone()) {
             return Collections.emptyList();
         }
         List<String> names = new ArrayList<String>();
@@ -675,6 +697,8 @@ public final class ClientChatChannelState {
         cachedFactionNanos = 0L;
         adminAccess = false;
         roleMask = 0;
+        readableChannels = -1;
+        sendableChannels = -1;
         ROLE_HOLDERS.clear();
         MUTED_SENDERS.clear();
         DRAFTS.clear();

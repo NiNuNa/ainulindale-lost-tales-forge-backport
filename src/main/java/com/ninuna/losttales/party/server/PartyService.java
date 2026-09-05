@@ -4,9 +4,9 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
 import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
-import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.storage.CharacterStorage;
+import com.ninuna.losttales.character.storage.CharacterIndex;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.party.model.Party;
@@ -25,11 +25,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.DimensionManager;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -669,7 +665,7 @@ public final class PartyService {
             return false;
         }
 
-        CharacterIndex index = buildCharacterIndex(characterData);
+        CharacterIndex index = characterData.characterIndex();
         List<Party> parties = new ArrayList<Party>(partyData.getParties());
         for (Party party : parties) {
             boolean changed = false;
@@ -677,7 +673,7 @@ public final class PartyService {
                     new ArrayList<PartyMember>(party.getMembers());
             for (PartyMember member : members) {
                 UUID characterId = member.getCharacterId();
-                RoleplayCharacter character = index.characters.get(characterId);
+                RoleplayCharacter character = index.find(characterId);
                 // A member whose id is its own owner's is that account
                 // playing as itself; it stands as long as the account has
                 // a roster, exactly as a character stands while it exists.
@@ -685,7 +681,7 @@ public final class PartyService {
                         && characterId.equals(member.getOwnerId())
                         && index.isAccountOwner(characterId);
                 String removalReason = null;
-                if (index.ambiguousCharacterIds.contains(characterId)) {
+                if (index.isAmbiguous(characterId)) {
                     removalReason = "ambiguous_character_uuid";
                 } else if (character == null && !accountMember) {
                     removalReason = "missing_character";
@@ -775,7 +771,7 @@ public final class PartyService {
                     resolution.getIdentity(), null,
                     player.getCommandSenderName());
         }
-        int matches = countCharacters(data, character.getCharacterId());
+        int matches = data.characterIndex().countOf(character.getCharacterId());
         if (matches == 0) {
             return ActiveCharacterContext.failure(
                     PartyErrorId.CHARACTER_NOT_FOUND);
@@ -805,41 +801,6 @@ public final class PartyService {
             return PartyErrorId.CHARACTER_STORAGE_READ_ONLY;
         }
         return PartyErrorId.INTERNAL_ERROR;
-    }
-
-    CharacterIndex buildCharacterIndex(CharacterWorldData data) {
-        Map<UUID, RoleplayCharacter> characters =
-                new HashMap<UUID, RoleplayCharacter>();
-        Set<UUID> ambiguous = new HashSet<UUID>();
-        Set<UUID> rosterOwners = new HashSet<UUID>();
-        for (CharacterRoster roster : data.getRosters()) {
-            if (roster.getOwnerId() != null) {
-                rosterOwners.add(roster.getOwnerId());
-            }
-            for (RoleplayCharacter character : roster.getCharacters()) {
-                UUID characterId = character.getCharacterId();
-                if (ambiguous.contains(characterId)) {
-                    continue;
-                }
-                if (characters.containsKey(characterId)) {
-                    characters.remove(characterId);
-                    ambiguous.add(characterId);
-                } else {
-                    characters.put(characterId, character);
-                }
-            }
-        }
-        return new CharacterIndex(characters, ambiguous, rosterOwners);
-    }
-
-    private int countCharacters(CharacterWorldData data, UUID characterId) {
-        int count = 0;
-        for (CharacterRoster roster : data.getRosters()) {
-            if (roster.getCharacter(characterId) != null) {
-                count++;
-            }
-        }
-        return count;
     }
 
     private PartyErrorId validateRevision(Party party,
@@ -894,12 +855,12 @@ public final class PartyService {
             CharacterWorldData characterData,
             PartyGoHereMarkerWorldData markerData) {
         int removed = 0;
-        CharacterIndex characters = buildCharacterIndex(characterData);
+        CharacterIndex characters = characterData.characterIndex();
         List<PartyGoHereMarker> markers =
                 new ArrayList<PartyGoHereMarker>(markerData.getMarkers());
         for (PartyGoHereMarker marker : markers) {
             String reason = null;
-            if (characters.ambiguousCharacterIds.contains(
+            if (characters.isAmbiguous(
                     marker.getOwnerCharacterId())) {
                 reason = "ambiguous_owner_character";
             } else if (!characters.hasOwner(
@@ -1097,34 +1058,4 @@ public final class PartyService {
         }
     }
 
-    static final class CharacterIndex {
-        final Map<UUID, RoleplayCharacter> characters;
-        final Set<UUID> ambiguousCharacterIds;
-        /**
-         * The players who own a roster. A personal marker may be filed under
-         * one of these instead of under a character, because a player who has
-         * no character selected owns their marker themselves.
-         */
-        final Set<UUID> rosterOwnerIds;
-
-        private CharacterIndex(Map<UUID, RoleplayCharacter> characters,
-                               Set<UUID> ambiguousCharacterIds,
-                               Set<UUID> rosterOwnerIds) {
-            this.characters = characters;
-            this.ambiguousCharacterIds = ambiguousCharacterIds;
-            this.rosterOwnerIds = rosterOwnerIds;
-        }
-
-        /** Whether a personal marker filed under this id still has an owner. */
-        boolean hasOwner(UUID ownerId) {
-            return ownerId != null
-                    && (this.characters.containsKey(ownerId)
-                            || this.rosterOwnerIds.contains(ownerId));
-        }
-
-        /** Whether the id is a player's own: the account as a playable identity. */
-        boolean isAccountOwner(UUID id) {
-            return id != null && this.rosterOwnerIds.contains(id);
-        }
-    }
 }

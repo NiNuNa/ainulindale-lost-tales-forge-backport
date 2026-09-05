@@ -364,6 +364,16 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 throw new LostTalesPacketCodec.DecodeException(
                         "invalid chat message id");
             }
+            // Appended: the whole role mask. The byte above carries its
+            // low eight bits, which is all an older layout had room for.
+            if (buffer.readableBytes() >= 4) {
+                int wide = buffer.readInt();
+                if ((wide & 0xFF) != this.roles) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "inconsistent role mask");
+                }
+                this.roles = wide;
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -457,7 +467,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 buffer, this.factionName, MAX_FACTION_NAME_BYTES);
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.partner, MAX_ACCOUNT_NAME_BYTES);
-        buffer.writeByte(this.roles);
+        buffer.writeByte(this.roles & 0xFF);
         buffer.writeBoolean(this.accountLine);
         buffer.writeLong(this.messageId);
         buffer.writeLong(this.reply.getMessageId());
@@ -472,6 +482,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                     this.reply.getExcerpt(),
                     ChatReplyReference.MAX_EXCERPT_BYTES);
         }
+        buffer.writeInt(this.roles);
     }
 
     private void validate() {
@@ -495,7 +506,6 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || (ChatChannel.fromId(this.channelId) == ChatChannel.WHISPER
                         && this.partner.length() == 0)
                 || this.timestampMillis <= 0L
-                || this.roles < 0 || this.roles > 0xFF
                 || !ChatAccountRole.isValidMask(this.roles)
                 || this.showcases.size() > ChatShareTokenParser.MAX_TOKENS
                 || ChatShowcase.serializedBytes(this.showcases)

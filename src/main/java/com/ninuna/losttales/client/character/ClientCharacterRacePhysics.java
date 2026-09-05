@@ -31,12 +31,12 @@ public final class ClientCharacterRacePhysics {
         CharacterAppearance appearance =
                 ClientCharacterAppearanceCache.getAuthoritative(player.getUniqueID());
         CharacterRaceGameplayProfile profile =
-                appearance == null || !appearance.isPresent()
+                appearance == null || !appearance.hasCharacter()
                         ? CharacterRaceGameplayRegistry.DEFAULT
                         : LotrRaceProfileAdapter.getInstance().resolve(
                                 player.worldObj, appearance.getRaceId());
 
-        boolean hasRace = appearance != null && appearance.isPresent();
+        boolean hasRace = appearance != null && appearance.hasCharacter();
         CharacterRaceDimensions dimensions =
                 CharacterRaceDimensions.fromProfile(
                         hasRace ? appearance.getRaceId() : "", profile);

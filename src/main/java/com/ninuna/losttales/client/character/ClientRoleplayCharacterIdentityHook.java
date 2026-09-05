@@ -14,7 +14,7 @@ public final class ClientRoleplayCharacterIdentityHook {
         CharacterAppearance appearance =
                 ClientCharacterAppearanceCache.getAuthoritative(
                         profile.getId());
-        if (appearance != null && appearance.isPresent()) {
+        if (appearance != null && appearance.hasCharacter()) {
             String name = appearance.getCharacterName();
             if (name != null && name.trim().length() > 0) {
                 return name;

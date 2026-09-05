@@ -1,6 +1,11 @@
 package com.ninuna.losttales.config;
 
 import java.io.File;
+import cpw.mods.fml.common.FMLLog;
+import com.ninuna.losttales.chat.ChatRoleConfig;
+import com.ninuna.losttales.chat.ChatRoleCatalog;
+import com.ninuna.losttales.chat.ChatChannelGates;
+import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.compat.discord.DiscordChannelBindings;
 import net.minecraftforge.common.config.ConfigCategory;
 import net.minecraftforge.common.config.Configuration;
@@ -155,6 +160,12 @@ public final class LostTalesConfig {
     public static boolean showChatTypingIndicators = true;
     /** Server switch for relaying typing presence at all. */
     public static boolean chatTypingIndicators = true;
+    /** The config-defined chat roles; see {@code ChatRoleConfig}. */
+    public static String[] chatRoles = new String[0];
+    /** The accounts assigned each role, by UUID. */
+    public static String[] chatRoleMembers = new String[0];
+    /** The roles a channel asks for, to read and to send. */
+    public static String[] chatChannelRoles = new String[0];
     /**
      * The server's Discord bridge; read on the server only. The token
      * and the webhook URL are secrets: they stay in this file and are
@@ -191,6 +202,9 @@ public final class LostTalesConfig {
     public static boolean discordChannelStatus = true;
     /** Least seconds between two topic writes; Discord allows two per ten minutes. */
     public static int discordChannelStatusIntervalSeconds = 300;
+    /** Connect the bot to Discord's gateway for instant relay and slash commands. */
+    public static boolean discordGateway = true;
+    public static boolean discordSlashCommands = true;
     public static int chatAnimationDurationMillis = 180;
     public static int chatInputAnimationDurationMillis = 180;
     public static int chatSelectorAnimationDurationMillis = 140;
@@ -895,6 +909,25 @@ public final class LostTalesConfig {
                     365,
                     "Days of chat audit files kept; files older than this are deleted when the server starts and as the day rolls over."
             );
+            chatRoles = config.getStringList(
+                    "roles",
+                    CATEGORY_CHAT,
+                    chatRoles,
+                    "Server only: the chat roles besides the built-in Operator and Lost Tales Team, one per line as <id>=name:<text>;tag:<[Text]>;color:<RRGGBB>;mention:<true|false>;rank:<number>;op:<level>;faction:<FACTION>@<rank>;desc:<text>. Every option is optional: a role is granted to the accounts listed under roleMembers, to anyone with the op level, and to anyone whose played identity holds the LOTR faction rank (a rank code name such as gondor.knight, or an alignment number). Lower rank comes first and colours the name. An entry for operator only restyles the built-in operator role; the team mark is the code's alone and cannot be listed. Edit live from the Server Settings screen or /losttales role."
+            );
+            chatRoleMembers = config.getStringList(
+                    "roleMembers",
+                    CATEGORY_CHAT,
+                    chatRoleMembers,
+                    "Server only: the accounts assigned each role, one role per line as <id>=<uuid>,<uuid>. /losttales role assign writes this."
+            );
+            chatChannelRoles = config.getStringList(
+                    "channelRoles",
+                    CATEGORY_CHAT,
+                    chatChannelRoles,
+                    "Server only: the roles a channel asks for, one channel per line as <channel>=read:<role,role|any>;send:<role,role|any>. A side left out is open to everyone the channel already admits. The Operator channel asks for operator on both sides unless listed here."
+            );
+            installChatRoles();
             discordEnabled = config.getBoolean(
                     "enabled",
                     CATEGORY_DISCORD,
@@ -995,6 +1028,18 @@ public final class LostTalesConfig {
                     60,
                     3600,
                     "Server only: the least time between two topic writes, in seconds. Discord allows a channel's topic to change only twice per ten minutes, so the default of five minutes is the fastest that never waits; joins and leaves inside the interval are folded into the next write."
+            );
+            discordGateway = config.getBoolean(
+                    "gateway",
+                    CATEGORY_DISCORD,
+                    discordGateway,
+                    "Server only: keep the bot connected to Discord's gateway, so Discord messages reach the game the moment they are sent and the bot's slash commands work. Needs botToken. Off, or a gateway Discord refuses, leaves polling to do the reading as before."
+            );
+            discordSlashCommands = config.getBoolean(
+                    "slashCommands",
+                    CATEGORY_DISCORD,
+                    discordSlashCommands,
+                    "Server only: register the bot's slash commands (/online, /who, /server) in every guild the bot is in when the gateway connects, and answer them. Needs gateway."
             );
             showChatTimestamps = config.getBoolean(
                     "showTimestamps",
@@ -1410,6 +1455,19 @@ public final class LostTalesConfig {
         return loadedConfigFile;
     }
 
+    /** Puts the roles and gates the file describes in force on this side. */
+    private static void installChatRoles() {
+        ChatRoleConfig.Warnings warnings = new ChatRoleConfig.Warnings() {
+            @Override
+            public void warn(String message) {
+                FMLLog.warning("[%s] %s", LostTalesMetaData.MOD_ID, message);
+            }
+        };
+        ChatRoleCatalog catalog = ChatRoleConfig.parse(chatRoles, chatRoleMembers, warnings);
+        ChatRoleCatalog.installServer(catalog);
+        ChatChannelGates.install(ChatRoleConfig.parseGates(chatChannelRoles, catalog, warnings));
+    }
+
     public static synchronized Configuration createConfiguration() {
         pendingGuiConfiguration = loadedConfigFile == null
                 ? null : new Configuration(loadedConfigFile);
@@ -1819,6 +1877,9 @@ public final class LostTalesConfig {
                 enableChargeTiers).set(enableChargeTiers);
         config.get(CATEGORY_CHAT, "proximityRadius",
                 chatProximityRadius).set(chatProximityRadius);
+        config.get(CATEGORY_CHAT, "roles", chatRoles).set(chatRoles);
+        config.get(CATEGORY_CHAT, "roleMembers", chatRoleMembers).set(chatRoleMembers);
+        config.get(CATEGORY_CHAT, "channelRoles", chatChannelRoles).set(chatChannelRoles);
         config.get(CATEGORY_CLIENT, "showTimestamps",
                 showChatTimestamps).set(showChatTimestamps);
         config.get(CATEGORY_CLIENT, "enableChatEmojis",

@@ -169,12 +169,12 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
                 LostTalesSkyrimUiStyle.HUD_LABEL);
     }
 
-    /** Cape settings belong to a character; the account wears its own Minecraft cape. */
+    /** Cape settings belong to the identity being played, the account included. */
     private void updateCapeButton(CharacterRosterSnapshot snapshot) {
         for (Object object : this.buttonList) {
             GuiButton button = (GuiButton) object;
             if (button.id == BUTTON_CAPE) {
-                button.enabled = snapshot != null && snapshot.getActiveCharacter() != null;
+                button.enabled = snapshot != null;
             }
         }
     }

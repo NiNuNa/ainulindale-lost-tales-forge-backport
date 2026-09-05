@@ -2,6 +2,7 @@ package com.ninuna.losttales.character.switching;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
+import com.ninuna.losttales.compat.lotr.hired.LotrHiredUnitCustody;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterOperationResult;
@@ -527,6 +528,9 @@ public final class CharacterSwitchCoordinator {
                 // can fail so the client never retains a stale pre-switch view.
                 this.playerStateService.synchronize(player);
             }
+            // The source's hired units hold still from here: whichever
+            // identity is played next, they are not its to command.
+            LotrHiredUnitCustody.park(player, source, roster);
             // The live state is the source's, whichever identity that is; an
             // account that has never been left gets its record from this.
             sourceSnapshot = this.playerStateService.captureOrCreate(
@@ -638,6 +642,7 @@ public final class CharacterSwitchCoordinator {
             commitFlushed = true;
 
             CharacterRaceGameplayHandler.apply(player, targetCharacter);
+            LotrHiredUnitCustody.settle(player, target, roster);
             this.playerStateService.synchronize(player);
             if (!checkpointActiveStateLocked(
                     player, roster, account, stores)) {
@@ -695,6 +700,7 @@ public final class CharacterSwitchCoordinator {
                                 "Source equipment could not be restored safely");
                     }
                     CharacterRaceGameplayHandler.apply(player, sourceCharacter);
+                    LotrHiredUnitCustody.settle(player, source, roster);
                     this.playerStateService.synchronize(player);
                 }
                 if (rosterChanged

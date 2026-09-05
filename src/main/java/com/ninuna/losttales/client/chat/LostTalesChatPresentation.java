@@ -628,8 +628,7 @@ public final class LostTalesChatPresentation {
         List<String> names = localMentionNames(minecraft);
         for (ChatAccountRole role : ClientChatChannelState.localRoles()) {
             if (role.isMentionable()) {
-                names.add(StatCollector.translateToLocal(
-                        role.getNameKey()));
+                names.add(role.getDisplayName());
             }
         }
         return ChatMentions.mentionsAny(message, names);
@@ -839,9 +838,8 @@ public final class LostTalesChatPresentation {
         for (ChatAccountRole role : ChatAccountRole.fromMask(
                 packet.getRoles())) {
             root.appendSibling(ChatMentionMarker.applyRole(
-                    text(StatCollector.translateToLocal(role.getTagKey())
-                            + " ", nearestFormatting(role.getColor()),
-                            false),
+                    text(role.getDisplayTag() + " ",
+                            nearestFormatting(role.getColor()), false),
                     role.getColor(), role));
         }
         // The brackets are part of the name: they answer to a hover

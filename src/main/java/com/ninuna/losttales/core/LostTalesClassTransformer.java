@@ -101,6 +101,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.serverBroadcastTransformer.active";
     public static final String DEATH_MESSAGE_ACTIVE_PROPERTY =
             "losttales.deathMessageTransformer.active";
+    public static final String LOTR_HIRED_UNIT_ACTIVE_PROPERTY =
+            "losttales.lotrHiredUnitTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
@@ -310,6 +312,15 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     private static final int VANILLA_MENU_FRAMERATE = 30;
     private static final String LOTR_PLAYER_DATA =
             "lotr.common.LOTRPlayerData";
+    private static final String LOTR_HIRED_NPC_INFO =
+            "lotr.common.entity.npc.LOTRHiredNPCInfo";
+    private static final String LOTR_HIRED_UNIT_HOOK_OWNER =
+            "com/ninuna/losttales/compat/lotr/hired/LostTalesLotrHiredUnitHook";
+    private static final String LOTR_HIRE_UNIT_DESC =
+            "(Lnet/minecraft/entity/player/EntityPlayer;Z"
+                    + "Llotr/common/fac/LOTRFaction;"
+                    + "Llotr/common/entity/npc/LOTRUnitTradeEntry;"
+                    + "Ljava/lang/String;Lnet/minecraft/entity/Entity;)V";
     private static final String FAST_TRAVEL_ARRIVAL_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/"
                     + "LostTalesLotrFastTravelArrivalHook";
@@ -341,6 +352,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
         if (LOTR_PLAYER_DATA.equals(transformedName)) {
             return transformLotrFastTravelArrival(basicClass);
+        }
+        if (LOTR_HIRED_NPC_INFO.equals(transformedName)) {
+            return transformLotrHiredUnit(basicClass);
         }
         if (GUI_CONTAINER.equals(transformedName)) {
             return transformGuiContainer(basicClass);
@@ -2890,6 +2904,64 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return basicClass;
         } catch (Throwable throwable) {
             warn("Failed to patch LOTR fast travel completion: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Tags a unit with the identity that hired it.
+     *
+     * <p>{@code LOTRHiredNPCInfo.hireUnit} is where every hire ends, with
+     * the info and the hiring player on hand. The info and the player are
+     * handed to {@code LostTalesLotrHiredUnitHook.onHired} just before
+     * the method returns, once LOTR has finished the hire, so the unit is
+     * marked with the character or account that hired it and a later
+     * switch knows whose it is. Without the patch a unit is tagged when
+     * its owner first switches away instead.</p>
+     */
+    private static byte[] transformLotrHiredUnit(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"hireUnit".equals(method.name)
+                        || !LOTR_HIRE_UNIT_DESC.equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, LOTR_HIRED_UNIT_HOOK_OWNER, "onHired")) {
+                    System.setProperty(LOTR_HIRED_UNIT_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                int patched = 0;
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (instruction.getOpcode() != Opcodes.RETURN) {
+                        continue;
+                    }
+                    InsnList call = new InsnList();
+                    call.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    call.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                    call.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                            LOTR_HIRED_UNIT_HOOK_OWNER, "onHired",
+                            "(Llotr/common/entity/npc/LOTRHiredNPCInfo;"
+                                    + "Lnet/minecraft/entity/player/EntityPlayer;)V"));
+                    method.instructions.insertBefore(instruction, call);
+                    patched++;
+                }
+                if (patched == 0) {
+                    warn("LOTRHiredNPCInfo#hireUnit has no return to patch; "
+                            + "hired units will be tagged on the first switch instead");
+                    return basicClass;
+                }
+                System.setProperty(LOTR_HIRED_UNIT_ACTIVE_PROPERTY, "true");
+                info("Patched LOTR unit hiring to tag units with the hiring identity");
+                return write(owner);
+            }
+            warn("Could not locate LOTRHiredNPCInfo#hireUnit; hired units will "
+                    + "be tagged on the first switch instead");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch LOTR unit hiring: " + throwable);
             return basicClass;
         }
     }

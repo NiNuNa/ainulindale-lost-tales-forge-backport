@@ -2,6 +2,7 @@ package com.ninuna.losttales.gui.screen.character;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.CharacterSlotState;
+import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.sync.CharacterOperationFeedback;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
@@ -10,7 +11,10 @@ import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
+import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
+import com.ninuna.losttales.client.skin.LostTalesAccountSkins;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
@@ -30,10 +34,13 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
     private static final int BUTTON_BACK = 3;
     private static final int BUTTON_REFRESH = 4;
     private static final int BUTTON_LORE_CHARACTERS = 5;
+    private static final int BUTTON_CAPE = 6;
 
     /** The account's row stands in for a slot index it does not have. */
     private static final int ACCOUNT_SLOT = -1;
     private static final int ACCOUNT_ROW_HEIGHT = 26;
+    /** The account head drawn at the left of its row. */
+    private static final int ACCOUNT_HEAD_SIZE = 16;
 
     private final GuiScreen parent;
     private int selectedSlot = ACCOUNT_SLOT;
@@ -53,6 +60,7 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
     private GuiButton primaryButton;
     private GuiButton deleteButton;
     private GuiButton refreshButton;
+    private GuiButton capeButton;
 
     public LostTalesCharacterRosterGui(GuiScreen parent) {
         this.parent = parent;
@@ -75,6 +83,11 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
         this.buttonList.add(this.refreshButton);
         this.buttonList.add(new GuiButton(BUTTON_BACK, 8, y, 80, 20,
                 I18n.format("gui.back")));
+        // The cape editor edits the identity being played; offered from the
+        // roster while that identity is the one selected here.
+        this.capeButton = new GuiButton(BUTTON_CAPE, this.width - 88, y, 80, 20,
+                I18n.format("gui.losttales.character.cape.button"));
+        this.buttonList.add(this.capeButton);
 
         if (ClientCharacterRosterCache.getState() == ClientCharacterRosterCache.SyncState.UNKNOWN
                 || ClientCharacterRosterCache.getState() == ClientCharacterRosterCache.SyncState.ERROR) {
@@ -172,6 +185,13 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
                 && ClientLoreCharacterCache.findOwnedCharacter(
                 selected.getCharacterId()) == null;
         this.refreshButton.enabled = !pending;
+        if (this.capeButton != null) {
+            boolean selectedIsPlayed = snapshot != null && (isAccountSelected()
+                    ? snapshot.getActiveCharacterId() == null
+                    : selected != null && selected.getCharacterId().equals(
+                            snapshot.getActiveCharacterId()));
+            this.capeButton.enabled = selectedIsPlayed && !pending;
+        }
     }
 
     @Override
@@ -188,6 +208,10 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
         }
         if (button.id == BUTTON_LORE_CHARACTERS) {
             this.mc.displayGuiScreen(new LostTalesLoreCharactersGui(this));
+            return;
+        }
+        if (button.id == BUTTON_CAPE) {
+            this.mc.displayGuiScreen(new LostTalesCharacterCapeGui(this));
             return;
         }
         if (snapshot == null || this.pendingRequestId != 0) {
@@ -276,7 +300,8 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
         if (isAccountSelected()) {
             String lineOne = getAccountName() + "  •  "
                     + ClientCharacterDisplayNames.race(CharacterRaceRegistry.HUMAN) + "  •  "
-                    + I18n.format("gui.losttales.character.account_faction_none");
+                    + ClientCharacterDisplayNames.bodyType(accountBodyType()) + "  •  "
+                    + ClientCharacterDisplayNames.cape(snapshot.getAccountCosmeticCapeId());
             this.fontRendererObj.drawStringWithShadow(
                     LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, lineOne, width),
                     x, y, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
@@ -319,22 +344,32 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
         boolean hovered = mouseX >= x && mouseX < x + width
                 && mouseY >= y && mouseY < y + ACCOUNT_ROW_HEIGHT;
         drawTileFrame(x, y, width, ACCOUNT_ROW_HEIGHT, isAccountSelected(), hovered);
+        // The account's own face, from its Minecraft skin, at the left.
+        int textX = x + 6;
+        if (this.mc != null && this.mc.thePlayer != null
+                && LostTalesCharacterHeadIconRenderer.drawAccountHead(this.mc,
+                        this.mc.thePlayer.getUniqueID(), x + 5,
+                        y + (ACCOUNT_ROW_HEIGHT - ACCOUNT_HEAD_SIZE) / 2,
+                        ACCOUNT_HEAD_SIZE, 1.0F, 1.0F)) {
+            textX += ACCOUNT_HEAD_SIZE + 4;
+        }
         this.fontRendererObj.drawStringWithShadow(
-                I18n.format("gui.losttales.character.account_tile"), x + 6, y + 4,
+                I18n.format("gui.losttales.character.account_tile"), textX, y + 4,
                 LostTalesSkyrimUiStyle.TEXT_MUTED);
         if (snapshot == null) {
             this.fontRendererObj.drawStringWithShadow(I18n.format("gui.losttales.character.loading"),
-                    x + 6, y + 14, LostTalesSkyrimUiStyle.TEXT_DIM);
+                    textX, y + 14, LostTalesSkyrimUiStyle.TEXT_DIM);
             return;
         }
         boolean active = snapshot.getActiveCharacterId() == null;
         int nameWidth = width / 2 - 12;
         this.fontRendererObj.drawStringWithShadow(
-                LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, getAccountName(), nameWidth),
-                x + 6, y + 14,
+                LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, getAccountName(),
+                        nameWidth - (textX - x - 6)),
+                textX, y + 14,
                 active ? LostTalesSkyrimUiStyle.GOLD : LostTalesSkyrimUiStyle.TEXT_BRIGHT);
         String details = ClientCharacterDisplayNames.race(CharacterRaceRegistry.HUMAN)
-                + "  •  " + I18n.format("gui.losttales.character.account_faction_none");
+                + "  •  " + ClientCharacterDisplayNames.bodyType(accountBodyType());
         this.fontRendererObj.drawStringWithShadow(
                 LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, details, nameWidth - 42),
                 x + width / 2, y + 14, LostTalesSkyrimUiStyle.TEXT_MUTED);
@@ -412,6 +447,14 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
         return this.mc == null || this.mc.thePlayer == null
                 ? I18n.format("gui.losttales.character.unknown")
                 : this.mc.thePlayer.getCommandSenderName();
+    }
+
+    /** The arm width the local player's own skin declares. */
+    private String accountBodyType() {
+        return this.mc != null && this.mc.thePlayer instanceof AbstractClientPlayer
+                ? LostTalesAccountSkins.resolve(
+                        (AbstractClientPlayer)this.mc.thePlayer).getBodyTypeId()
+                : CharacterBodyTypeRegistry.WIDE;
     }
 
     @Override

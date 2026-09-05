@@ -27,6 +27,11 @@ public class CharacterWorldData extends WorldSavedData {
 
     private final Map<UUID, CharacterRoster> rosters = new LinkedHashMap<UUID, CharacterRoster>();
     private final List<NBTTagCompound> quarantinedEntries = new ArrayList<NBTTagCompound>();
+    /**
+     * Every character by id, built on first use and dropped whenever a
+     * roster is written back, which every mutation ends with.
+     */
+    private CharacterIndex index;
     private boolean readOnlyForNewerVersion;
     private int unsupportedDataVersion = -1;
     private NBTTagCompound preservedNewerData;
@@ -43,6 +48,7 @@ public class CharacterWorldData extends WorldSavedData {
     public void readFromNBT(NBTTagCompound compound) {
         this.rosters.clear();
         this.quarantinedEntries.clear();
+        this.index = null;
         this.readOnlyForNewerVersion = false;
         this.unsupportedDataVersion = -1;
         this.preservedNewerData = null;
@@ -93,6 +99,7 @@ public class CharacterWorldData extends WorldSavedData {
         if (roster == null) {
             roster = new CharacterRoster(ownerId);
             this.rosters.put(ownerId, roster);
+            this.index = null;
             markDirty();
         }
         return roster;
@@ -108,6 +115,7 @@ public class CharacterWorldData extends WorldSavedData {
             throw new IllegalArgumentException("roster must not be null");
         }
         this.rosters.put(roster.getOwnerId(), roster);
+        this.index = null;
         markDirty();
     }
 
@@ -120,22 +128,32 @@ public class CharacterWorldData extends WorldSavedData {
     }
 
     /**
+     * Every character in the world by id. Rosters are changed in place and
+     * written back with {@link #saveRoster}, so the index is current from
+     * one write to the next; a character added and looked up before its
+     * roster is written is not yet in it.
+     */
+    public CharacterIndex characterIndex() {
+        if (this.index == null) {
+            this.index = CharacterIndex.build(this.rosters.values());
+        }
+        return this.index;
+    }
+
+    /**
      * Resolves a globally unique roleplay-character identity without exposing
      * mutable roster internals. This is used by integrations, such as LOTR
      * faction bounties, whose persisted records contain the character UUID
-     * instead of the owning Minecraft account UUID.
+     * instead of the owning Minecraft account UUID. An id held by more than
+     * one roster answers nothing.
      */
     public RoleplayCharacter findCharacter(UUID characterId) {
-        if (characterId == null) {
-            return null;
-        }
-        for (CharacterRoster roster : this.rosters.values()) {
-            RoleplayCharacter character = roster.getCharacter(characterId);
-            if (character != null) {
-                return character;
-            }
-        }
-        return null;
+        return characterIndex().find(characterId);
+    }
+
+    /** Whether any roster holds the character id, ambiguous ones included. */
+    public boolean containsCharacter(UUID characterId) {
+        return characterIndex().contains(characterId);
     }
 
     public int getQuarantinedEntryCount() {

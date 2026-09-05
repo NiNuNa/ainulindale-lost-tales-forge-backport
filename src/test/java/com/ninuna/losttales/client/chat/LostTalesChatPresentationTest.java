@@ -453,15 +453,15 @@ public final class LostTalesChatPresentationTest {
         try {
             LostTalesChatMessagePacket tagged = new LostTalesChatMessagePacket(
                     ChatChannel.OOC, UUID.randomUUID(), "Steve", "Steve", "",
-                    0xFCECD1, ChatAccountRole.DEVELOPER.getColor(), "hello",
+                    0xFCECD1, ChatAccountRole.TEAM.getColor(), "hello",
                     123456789L, "", null, "", "",
                     ChatAccountRole.maskOf(ChatAccountRole.OPERATOR,
-                            ChatAccountRole.DEVELOPER));
+                            ChatAccountRole.TEAM));
             // Without a loaded language a tag reads as its key.
             String operatorTag = StatCollector.translateToLocal(
                     ChatAccountRole.OPERATOR.getTagKey()) + " ";
             String developerTag = StatCollector.translateToLocal(
-                    ChatAccountRole.DEVELOPER.getTagKey()) + " ";
+                    ChatAccountRole.TEAM.getTagKey()) + " ";
             StringBuilder plain = new StringBuilder();
             Integer operatorRgb = null;
             Integer developerRgb = null;
@@ -481,7 +481,7 @@ public final class LostTalesChatPresentationTest {
                     openingBracketRgb = replyOf(part);
                 }
             }
-            // Developer first, Operator second, both ahead of the bracket.
+            // The team mark first, Operator second, both ahead of the bracket.
             int developer = plain.indexOf(developerTag);
             int operator = plain.indexOf(operatorTag);
             assertTrue(developer >= 0 && developer < operator);
@@ -495,7 +495,7 @@ public final class LostTalesChatPresentationTest {
             // The bracket answers as the name does; the name's colour is
             // the packet's, which the server set to the primary role's.
             assertEquals(Integer.valueOf(1), openingBracketRgb);
-            assertEquals(ChatAccountRole.DEVELOPER.getColor(),
+            assertEquals(ChatAccountRole.TEAM.getColor(),
                     markerOf(LostTalesChatPresentation.build(tagged)).nameColor);
 
             LostTalesChatMessagePacket plainPacket =

@@ -95,7 +95,7 @@ final class LostTalesChatHoverCard {
             // "role:<name>", the same token the mention marker carries.
             for (ChatAccountRole role : ChatAccountRole.mentionable()) {
                 if (candidate.getKey().equalsIgnoreCase(
-                        "role:" + role.name())) {
+                        "role:" + role.getId())) {
                     drawRoleCard(minecraft, role, mouseX, mouseY,
                             screenWidth, screenHeight);
                     return;
@@ -115,7 +115,7 @@ final class LostTalesChatHoverCard {
         CharacterAppearance appearance =
                 ClientCharacterAppearanceCache.getAuthoritative(playerId);
         boolean accountIdentity = appearance == null
-                || !appearance.isPresent()
+                || !appearance.hasCharacter()
                 || candidate.getCharacterName().length() == 0;
         if (accountIdentity) {
             LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
@@ -276,13 +276,8 @@ final class LostTalesChatHoverCard {
             return;
         }
         FontRenderer font = minecraft.fontRenderer;
-        String name = "@" + StatCollector.translateToLocal(
-                role.getNameKey());
-        String descriptionKey = role.getNameKey() + ".description";
-        String description = StatCollector.translateToLocal(descriptionKey);
-        if (description.equals(descriptionKey)) {
-            description = "";
-        }
+        String name = "@" + role.getDisplayName();
+        String description = role.getDisplayDescription();
         List<String> members = ClientChatChannelState.roleHolders(role);
         String membersLabel = StatCollector.translateToLocal(
                 "gui.losttales.chat.card.role.members");
@@ -524,7 +519,7 @@ final class LostTalesChatHoverCard {
         CharacterAppearance appearance =
                 ClientCharacterAppearanceCache.getAuthoritative(playerId);
         boolean accountIdentity = appearance == null
-                || !appearance.isPresent()
+                || !appearance.hasCharacter()
                 || appearance.getCharacterName().length() == 0;
         if (accountIdentity) {
             LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
@@ -653,7 +648,7 @@ final class LostTalesChatHoverCard {
         CharacterAppearance appearance =
                 ClientCharacterAppearanceCache.getAuthoritative(
                         target.playerId);
-        if (appearance == null || !appearance.isPresent()) {
+        if (appearance == null || !appearance.hasCharacter()) {
             return null;
         }
         if (!LostTalesChatVisualStyle.removeColorCodes(

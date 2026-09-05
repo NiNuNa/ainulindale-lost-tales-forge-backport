@@ -4,7 +4,10 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.validation.CharacterValidationResult;
 import net.minecraft.entity.player.EntityPlayerMP;
 
-/** Replaceable server-side validation point for cosmetic cape eligibility. */
+/**
+ * Replaceable server-side validation point for cosmetic cape eligibility.
+ * The character is null when the account itself is asking.
+ */
 public interface CharacterCapeEligibilityPolicy {
 
     CharacterValidationResult validate(EntityPlayerMP player,

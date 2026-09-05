@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.model;
 
+import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 
 import java.util.ArrayList;
@@ -31,6 +32,9 @@ public class CharacterRoster {
     private UUID activeCharacterId;
     private long revision;
     private int dataVersion;
+    /** The cape the account wears when played as itself. */
+    private boolean accountShowMinecraftCape = RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE;
+    private int accountCosmeticCapeId = RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID;
 
     public CharacterRoster(UUID ownerId) {
         this(ownerId, INITIAL_UNLOCKED_SLOTS, null, 0L, CURRENT_DATA_VERSION);
@@ -111,6 +115,27 @@ public class CharacterRoster {
 
     public int getDataVersion() {
         return this.dataVersion;
+    }
+
+    public boolean isAccountMinecraftCapeVisible() {
+        return this.accountShowMinecraftCape;
+    }
+
+    public int getAccountCosmeticCapeId() {
+        return this.accountCosmeticCapeId;
+    }
+
+    /**
+     * The account's cape settings; called only after server-side catalog
+     * and eligibility validation. Answers whether anything changed.
+     */
+    public boolean setAccountCapeSettings(boolean showMinecraftCape, int cosmeticCapeId) {
+        int normalizedCapeId = CharacterCapeCatalog.normalizeSelection(cosmeticCapeId);
+        boolean changed = this.accountShowMinecraftCape != showMinecraftCape
+                || this.accountCosmeticCapeId != normalizedCapeId;
+        this.accountShowMinecraftCape = showMinecraftCape;
+        this.accountCosmeticCapeId = normalizedCapeId;
+        return changed;
     }
 
     public int getCharacterCount() {

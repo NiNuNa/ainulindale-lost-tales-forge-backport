@@ -11,8 +11,8 @@ import com.ninuna.losttales.chat.ChatAccountRole;
 public enum ELostTalesUserRecognition {
     /** Listed for credits only; no chat role. */
     NONE(ChatAccountRole.NONE),
-    /** A member of the Lost Tales team; wears the Developer chat role. */
-    DEVELOPER(ChatAccountRole.DEVELOPER);
+    /** A member of the Lost Tales team; wears the Lost Tales Team chat mark. */
+    TEAM(ChatAccountRole.TEAM);
 
     private final ChatAccountRole chatRole;
 

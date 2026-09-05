@@ -19,6 +19,7 @@ import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferStorage
 import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferWorldData;
 import com.ninuna.losttales.character.server.CharacterRaceGameplayHandler;
 import com.ninuna.losttales.character.server.CharacterSpawnOriginHandler;
+import com.ninuna.losttales.compat.lotr.hired.LotrHiredUnitCustodyHandler;
 import com.ninuna.losttales.character.server.CharacterStateCheckpointHandler;
 import com.ninuna.losttales.character.switching.CharacterLifecycleStateTracker;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
@@ -56,6 +57,8 @@ import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
+import com.ninuna.losttales.network.packet.LostTalesServerConfigResultPacket;
+import com.ninuna.losttales.network.packet.LostTalesServerConfigSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
@@ -146,6 +149,7 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(characterPlayerEventHandler);
         MinecraftForge.EVENT_BUS.register(characterRaceGameplayHandler);
         MinecraftForge.EVENT_BUS.register(characterSpawnOriginHandler);
+        MinecraftForge.EVENT_BUS.register(new LotrHiredUnitCustodyHandler());
         MinecraftForge.EVENT_BUS.register(questObjectiveEventHandler);
         MinecraftForge.EVENT_BUS.register(mobAggroEventHandler);
         MinecraftForge.EVENT_BUS.register(projectileAimHandler);
@@ -292,6 +296,10 @@ public class LostTalesCommonProxy {
     public void handleChatTyping(LostTalesChatTypingSyncPacket packet) {}
 
     public void handleChatUpdate(LostTalesChatUpdatePacket packet) {}
+
+    public void handleServerConfigSync(LostTalesServerConfigSyncPacket packet) {}
+
+    public void handleServerConfigResult(LostTalesServerConfigResultPacket packet) {}
 
     public void handleFastTravelArrival(
             LostTalesFastTravelArrivalPacket packet) {}

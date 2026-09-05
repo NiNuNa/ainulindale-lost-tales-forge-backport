@@ -5,7 +5,7 @@ import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar;
 import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar.Hint;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
-import com.ninuna.losttales.config.client.LostTalesConfigGui;
+import com.ninuna.losttales.config.client.LostTalesSettingsHubGui;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileRouterGui;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
@@ -254,7 +254,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
     @Override
     protected void actionPerformed(GuiButton button) {
         if (button != null && button.id == BUTTON_SETTINGS && this.mc != null) {
-            this.mc.displayGuiScreen(new LostTalesConfigGui(this));
+            this.mc.displayGuiScreen(new LostTalesSettingsHubGui(this));
         }
     }
 

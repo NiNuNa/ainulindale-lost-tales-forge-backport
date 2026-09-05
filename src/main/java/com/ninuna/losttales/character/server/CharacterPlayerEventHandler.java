@@ -7,6 +7,8 @@ import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.character.switching.CharacterLifecycleStateTracker;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
+import com.ninuna.losttales.character.identity.PlayableIdentity;
+import com.ninuna.losttales.compat.lotr.hired.LotrHiredUnitCustody;
 import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferCoordinator;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import cpw.mods.fml.common.FMLLog;
@@ -150,6 +152,13 @@ public final class CharacterPlayerEventHandler {
             LostTalesChatService.sendAccess(serverPlayer);
         }
         CharacterRaceGameplayHandler.apply(serverPlayer);
+        if (action == LifecycleAction.LOGIN && result.getRoster() != null) {
+            // Units that changed hands while the owner was away are settled
+            // against the identity the roster says is being played.
+            LotrHiredUnitCustody.settle(serverPlayer,
+                    PlayableIdentity.fromRoster(result.getRoster()),
+                    result.getRoster());
+        }
         CharacterAppearanceSyncManager.broadcastPlayer(serverPlayer, result.getRoster());
         AccessoryRecoveryService.recover(serverPlayer);
         AccessoryInventorySyncManager.send(serverPlayer);

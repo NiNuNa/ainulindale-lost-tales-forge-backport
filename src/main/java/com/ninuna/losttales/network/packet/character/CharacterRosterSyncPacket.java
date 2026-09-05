@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet.character;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterRoster;
+import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -108,6 +109,17 @@ public final class CharacterRosterSyncPacket implements IMessage {
                         chestTypeId
                 ));
             }
+            // Appended after every character: the cape the account wears
+            // when played as itself. A shorter payload wears the defaults.
+            boolean accountShowMinecraftCape = RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE;
+            int accountCosmeticCapeId = RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID;
+            if (buffer.readableBytes() >= 3) {
+                accountShowMinecraftCape = buffer.readBoolean();
+                accountCosmeticCapeId = buffer.readUnsignedShort();
+                if (!CharacterCapeCatalog.isValidSelection(accountCosmeticCapeId)) {
+                    throw new CharacterPacketCodec.DecodeException("invalid account cape");
+                }
+            }
             CharacterPacketCodec.requireFinished(buffer);
             this.snapshot = new CharacterRosterSnapshot(
                     ownerId,
@@ -115,7 +127,9 @@ public final class CharacterRosterSyncPacket implements IMessage {
                     activeCharacterId,
                     revision,
                     dataVersion,
-                    characters
+                    characters,
+                    accountShowMinecraftCape,
+                    accountCosmeticCapeId
             );
             if (activeCharacterId != null && this.snapshot.getActiveCharacterId() == null) {
                 throw new CharacterPacketCodec.DecodeException("invalid active character reference");
@@ -167,6 +181,8 @@ public final class CharacterRosterSyncPacket implements IMessage {
                     buffer, character.getChestTypeId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         }
+        buffer.writeBoolean(this.snapshot.isAccountMinecraftCapeVisible());
+        buffer.writeShort(this.snapshot.getAccountCosmeticCapeId());
     }
 
     public int getRequestId() {

@@ -35,7 +35,16 @@ public enum ELostTalesSubCommand {
             "character", "characters", "char"),
     CHAT(new LostTalesCommandChatModeration(),
             "chat <mute|unmute|mutes>",
-            "chat");
+            "chat"),
+    CONFIG(new LostTalesCommandConfig(),
+            "config <list|get|set|reload> ...",
+            "config", "cfg"),
+    DISCORD(new LostTalesCommandDiscord(),
+            "discord <list|bind|unbind|reload> ...",
+            "discord"),
+    ROLE(new LostTalesCommandRole(),
+            "role <list|assign|unassign|create|edit|delete> ...",
+            "role", "roles");
 
     private final CommandBase command;
     private final String usage;

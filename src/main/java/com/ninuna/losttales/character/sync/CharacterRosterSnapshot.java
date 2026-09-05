@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.sync;
 
+import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.CharacterSlotState;
@@ -24,11 +25,24 @@ public final class CharacterRosterSnapshot {
     private final List<CharacterSummary> characters;
     private final Map<UUID, CharacterSummary> charactersById;
     private final Map<Integer, CharacterSummary> charactersBySlot;
+    private final boolean accountShowMinecraftCape;
+    private final int accountCosmeticCapeId;
 
     public CharacterRosterSnapshot(UUID ownerId, int unlockedSlotCount,
                                    UUID activeCharacterId, long revision,
                                    int dataVersion,
                                    List<CharacterSummary> characters) {
+        this(ownerId, unlockedSlotCount, activeCharacterId, revision, dataVersion,
+                characters, RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID);
+    }
+
+    public CharacterRosterSnapshot(UUID ownerId, int unlockedSlotCount,
+                                   UUID activeCharacterId, long revision,
+                                   int dataVersion,
+                                   List<CharacterSummary> characters,
+                                   boolean accountShowMinecraftCape,
+                                   int accountCosmeticCapeId) {
         if (ownerId == null) {
             throw new IllegalArgumentException("ownerId must not be null");
         }
@@ -65,6 +79,8 @@ public final class CharacterRosterSnapshot {
         this.charactersBySlot = Collections.unmodifiableMap(bySlot);
         this.activeCharacterId = activeCharacterId != null && byId.containsKey(activeCharacterId)
                 ? activeCharacterId : null;
+        this.accountShowMinecraftCape = accountShowMinecraftCape;
+        this.accountCosmeticCapeId = CharacterCapeCatalog.normalizeSelection(accountCosmeticCapeId);
     }
 
     public static CharacterRosterSnapshot fromRoster(CharacterRoster roster) {
@@ -81,8 +97,19 @@ public final class CharacterRosterSnapshot {
                 roster.getActiveCharacterId(),
                 roster.getRevision(),
                 roster.getDataVersion(),
-                summaries
+                summaries,
+                roster.isAccountMinecraftCapeVisible(),
+                roster.getAccountCosmeticCapeId()
         );
+    }
+
+    /** The cape the account wears when played as itself. */
+    public boolean isAccountMinecraftCapeVisible() {
+        return this.accountShowMinecraftCape;
+    }
+
+    public int getAccountCosmeticCapeId() {
+        return this.accountCosmeticCapeId;
     }
 
     public UUID getOwnerId() {

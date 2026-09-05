@@ -14,7 +14,6 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiPlayerInfo;
-import net.minecraft.util.StatCollector;
 
 /**
  * What colour an {@code @mention} inside a message is drawn in.
@@ -61,8 +60,7 @@ final class ChatMentionColors {
             return -1;
         }
         for (ChatAccountRole role : ChatAccountRole.mentionable()) {
-            if (name.equalsIgnoreCase(StatCollector.translateToLocal(
-                    role.getNameKey()))) {
+            if (name.equalsIgnoreCase(role.getDisplayName())) {
                 return role.getColor();
             }
         }
@@ -99,7 +97,7 @@ final class ChatMentionColors {
         }
         ChatAccountRole listed = ChatAccountRole.primary(
                 ClientChatChannelState.rosterRolesOf(account));
-        if (listed != ChatAccountRole.NONE) {
+        if (!listed.isNone()) {
             return listed.getColor();
         }
         Minecraft minecraft = Minecraft.getMinecraft();
@@ -108,7 +106,7 @@ final class ChatMentionColors {
                         minecraft.thePlayer.getCommandSenderName())) {
             ChatAccountRole primary = ChatAccountRole.primary(
                     ClientChatChannelState.getRoleMask());
-            return primary == ChatAccountRole.NONE ? -1 : primary.getColor();
+            return primary.isNone() ? -1 : primary.getColor();
         }
         return -1;
     }
@@ -144,8 +142,7 @@ final class ChatMentionColors {
             return null;
         }
         for (ChatAccountRole role : ChatAccountRole.mentionable()) {
-            if (name.equalsIgnoreCase(StatCollector.translateToLocal(
-                    role.getNameKey()))) {
+            if (name.equalsIgnoreCase(role.getDisplayName())) {
                 return role;
             }
         }
@@ -186,7 +183,7 @@ final class ChatMentionColors {
         }
         for (CharacterAppearance appearance
                 : ClientCharacterAppearanceCache.snapshot().values()) {
-            if (appearance != null && appearance.isPresent()
+            if (appearance != null && appearance.hasCharacter()
                     && account.equalsIgnoreCase(
                             appearance.getAccountName())) {
                 return normalized(appearance.getCharacterName());
@@ -226,7 +223,7 @@ final class ChatMentionColors {
         }
         for (CharacterAppearance appearance
                 : ClientCharacterAppearanceCache.snapshot().values()) {
-            if (appearance != null && appearance.isPresent()
+            if (appearance != null && appearance.hasCharacter()
                     && account.equalsIgnoreCase(
                             appearance.getAccountName())) {
                 return LotrCharacterAdapter.getInstance().getFactionColor(
@@ -262,7 +259,7 @@ final class ChatMentionColors {
         }
         for (CharacterAppearance appearance
                 : ClientCharacterAppearanceCache.snapshot().values()) {
-            if (appearance != null && appearance.isPresent()
+            if (appearance != null && appearance.hasCharacter()
                     && appearance.getCharacterName()
                             .toLowerCase(Locale.ROOT).equals(wanted)
                     && appearance.getAccountName().length() > 0) {

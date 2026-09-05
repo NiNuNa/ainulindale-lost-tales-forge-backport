@@ -2,6 +2,7 @@ package com.ninuna.losttales.party.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.storage.CharacterIndex;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyColor;
@@ -169,8 +170,8 @@ final class PartyInvitationCoordinator {
                     null);
         }
 
-        PartyService.CharacterIndex acceptanceIndex =
-                this.partyService.buildCharacterIndex(active.characterData);
+        CharacterIndex acceptanceIndex =
+                active.characterData.characterIndex();
         String corruptionReason = getInvitationCorruptionReason(
                 invitation, acceptanceIndex);
         if (corruptionReason != null) {
@@ -340,8 +341,8 @@ final class PartyInvitationCoordinator {
             CharacterWorldData characterData,
             long now) {
         int removed = invitationData.removeExpired(now);
-        PartyService.CharacterIndex index =
-                this.partyService.buildCharacterIndex(characterData);
+        CharacterIndex index =
+                characterData.characterIndex();
         List<PartyInvitation> invitations =
                 new ArrayList<PartyInvitation>(invitationData.getInvitations());
         for (PartyInvitation invitation : invitations) {
@@ -391,8 +392,8 @@ final class PartyInvitationCoordinator {
                 invitation.getTargetCharacterId()) != null) {
             return PartyErrorId.TARGET_ALREADY_IN_PARTY;
         }
-        PartyService.CharacterIndex index =
-                this.partyService.buildCharacterIndex(characterData);
+        CharacterIndex index =
+                characterData.characterIndex();
         if (getInvitationCorruptionReason(invitation, index) != null) {
             return PartyErrorId.INVITATION_INVALID;
         }
@@ -401,19 +402,19 @@ final class PartyInvitationCoordinator {
 
     private String getInvitationCorruptionReason(
             PartyInvitation invitation,
-            PartyService.CharacterIndex index) {
+            CharacterIndex index) {
         UUID invitingId = invitation.getInvitingCharacterId();
         UUID targetId = invitation.getTargetCharacterId();
-        if (index.ambiguousCharacterIds.contains(invitingId)) {
+        if (index.isAmbiguous(invitingId)) {
             return "ambiguous_inviting_character_uuid";
         }
-        if (index.ambiguousCharacterIds.contains(targetId)) {
+        if (index.isAmbiguous(targetId)) {
             return "ambiguous_target_character_uuid";
         }
         // Either side may be an account playing as itself: its id is then
         // its own owner's and stands as long as that account has a roster.
-        RoleplayCharacter inviting = index.characters.get(invitingId);
-        RoleplayCharacter target = index.characters.get(targetId);
+        RoleplayCharacter inviting = index.find(invitingId);
+        RoleplayCharacter target = index.find(targetId);
         boolean invitingAccount = inviting == null
                 && invitingId.equals(invitation.getInvitingOwnerId())
                 && index.isAccountOwner(invitingId);

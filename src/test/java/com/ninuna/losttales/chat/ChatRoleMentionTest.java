@@ -23,22 +23,22 @@ public final class ChatRoleMentionTest {
         List<ChatAccountRole> roles = ChatAccountRole.mentionable();
         assertFalse(roles.isEmpty());
         for (ChatAccountRole role : roles) {
-            assertFalse(role == ChatAccountRole.NONE);
+            assertFalse(role.isNone());
             assertTrue(role.isMentionable());
-            assertTrue(role.getNameKey().length() > 0);
-            // The plain name is its own key, never the bracketed tag.
-            assertFalse(role.getNameKey().equals(role.getTagKey()));
+            assertTrue(role.getDisplayName().length() > 0);
+            // The plain name is its own, never the bracketed tag.
+            assertFalse(role.getDisplayName().equals(role.getDisplayTag()));
         }
         assertTrue(roles.contains(ChatAccountRole.OPERATOR));
         // A vanity mark is worn and never called.
-        assertFalse(ChatAccountRole.DEVELOPER.isMentionable());
-        assertFalse(roles.contains(ChatAccountRole.DEVELOPER));
+        assertFalse(ChatAccountRole.TEAM.isMentionable());
+        assertFalse(roles.contains(ChatAccountRole.TEAM));
         assertFalse(ChatAccountRole.NONE.isMentionable());
         assertEquals("", ChatAccountRole.NONE.getNameKey());
         // Wearing it is untouched: it still tags and colours a name.
-        assertTrue(ChatAccountRole.DEVELOPER.getTagKey().length() > 0);
-        assertEquals(ChatAccountRole.DEVELOPER, ChatAccountRole.primary(
-                ChatAccountRole.maskOf(ChatAccountRole.DEVELOPER)));
+        assertTrue(ChatAccountRole.TEAM.getTagKey().length() > 0);
+        assertEquals(ChatAccountRole.TEAM, ChatAccountRole.primary(
+                ChatAccountRole.maskOf(ChatAccountRole.TEAM)));
     }
 
     @Test

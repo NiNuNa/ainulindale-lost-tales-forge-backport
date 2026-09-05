@@ -18,13 +18,13 @@ import java.util.UUID;
 public enum ELostTalesUser {
     //  LostTales - Team.
     NINUNA("NiNuNa", "42c208f1-bdde-445b-91f6-b76a3606f333",
-            ELostTalesUserRecognition.DEVELOPER),
+            ELostTalesUserRecognition.TEAM),
     SCOSHER("Scosher", "d0269a66-bbce-4123-bbc4-472623201eda",
-            ELostTalesUserRecognition.DEVELOPER),
+            ELostTalesUserRecognition.TEAM),
     BALARAUKO("Balarauko", "e1968bbb-813c-425a-998e-3f75e8aa1b68",
-            ELostTalesUserRecognition.DEVELOPER),
+            ELostTalesUserRecognition.TEAM),
     CAPTAIN_CHEESE("captainCheese", "d36e696d-dbbe-48ed-a878-bc8eb480a29c",
-            ELostTalesUserRecognition.DEVELOPER),
+            ELostTalesUserRecognition.TEAM),
 
     //  LostTales - Community.
 

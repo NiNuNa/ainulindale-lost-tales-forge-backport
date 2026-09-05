@@ -6,7 +6,10 @@ import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.server.ChatMessageLog;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
+import com.ninuna.losttales.compat.discord.gateway.DiscordGatewayClient;
+import com.ninuna.losttales.compat.discord.gateway.DiscordGatewayProtocol;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.google.gson.JsonObject;
 import com.ninuna.losttales.core.LostTalesClassTransformer;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.FMLLog;
@@ -19,6 +22,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -30,9 +34,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.server.MinecraftServer;
 
 /**
- * The server's own Discord bridge, no library behind it: a worker
- * thread polls the Discord channels the bindings read for new messages
- * through the REST API, posts the game's lines and the server's notices
+ * The server's own Discord bridge, no library behind it: the bot sits
+ * on Discord's gateway ({@code compat.discord.gateway}) and hands each
+ * message in a bound channel over as it is sent, while a worker thread
+ * polls those channels through the REST API whenever the gateway is
+ * down, posts the game's lines and the server's notices
  * to the webhooks they name, and keeps every bound Discord channel's
  * topic saying whether the server is up, while the server thread only
  * ever touches two bounded queues and a wanted topic. Which game channel
@@ -119,6 +125,22 @@ public final class LostTalesDiscordBridge {
     /** The bindings read at the last start; empty while the bridge is stopped. */
     private volatile DiscordChannelBindings bindings = DiscordChannelBindings.EMPTY;
     /**
+     * The bot's gateway connection, when the config asks for one: it
+     * hands Discord messages in as they are sent and hears the slash
+     * commands; the worker's polling stands in while it is down.
+     */
+    private volatile DiscordGatewayClient gateway;
+    private volatile boolean gatewayLive;
+    /** The bot's application id, from the gateway's READY; empty until then. */
+    private volatile String applicationId = "";
+    /** The newest message id seen per Discord channel, by either reader. */
+    private final Map<String, String> lastSeenByChannel =
+            new ConcurrentHashMap<String, String>();
+    /** Message ids already queued, so the two readers never deliver one twice. */
+    private final LinkedHashSet<String> recentInboundIds = new LinkedHashSet<String>();
+    private static final int MAX_RECENT_INBOUND_IDS = 512;
+    private volatile long serverStartedMillis;
+    /**
      * Where the bindings' findings go: the log, once each at start — a
      * trimmed entry as a warning, a refused one as an error, so a
      * Discord channel bound into two game channels is not missed.
@@ -197,6 +219,13 @@ public final class LostTalesDiscordBridge {
         Worker started = new Worker(configured, reads, posts, manages);
         this.worker = started;
         started.start();
+        if (botPresent && LostTalesConfig.discordGateway
+                && (reads || LostTalesConfig.discordSlashCommands)) {
+            DiscordGatewayClient client = new DiscordGatewayClient(
+                    LostTalesConfig.discordBotToken.trim(), new GatewayListener(configured));
+            this.gateway = client;
+            client.start();
+        }
         FMLLog.info("[%s] Discord bridge started (%s%s): %s", LostTalesMetaData.MOD_ID,
                 reads && posts ? "both ways" : reads ? "Discord to game"
                         : posts ? "game to Discord" : "topic only",
@@ -211,6 +240,17 @@ public final class LostTalesDiscordBridge {
     public synchronized void stop() {
         Worker running = this.worker;
         this.worker = null;
+        DiscordGatewayClient client = this.gateway;
+        this.gateway = null;
+        this.gatewayLive = false;
+        if (client != null) {
+            client.shutdown();
+        }
+        this.applicationId = "";
+        this.lastSeenByChannel.clear();
+        synchronized (this.recentInboundIds) {
+            this.recentInboundIds.clear();
+        }
         if (this.registered) {
             FMLCommonHandler.instance().bus().unregister(this);
             FMLCommonHandler.instance().bus().unregister(this.relay);
@@ -372,11 +412,10 @@ public final class LostTalesDiscordBridge {
      * the rest. A binding that names no Discord channel is asked its
      * webhook's channel once, since the bot must know where to type.
      *
-     * <p>Only this direction is possible over the bridge as it is built.
-     * Discord publishes a user's own typing on its gateway alone, which
-     * is a WebSocket the bridge deliberately does not open — it is
-     * plain HTTP and the polling API carries no typing at all — so a
-     * Discord member typing cannot be shown in game.</p>
+     * <p>Only this direction crosses. Discord publishes a member's own
+     * typing on the gateway as {@code TYPING_START}, which the bridge
+     * does not subscribe to (it asks for no presence intent), so a
+     * Discord member typing is not shown in game.</p>
      */
     public void relayTyping(ChatChannel channel, String factionId) {
         for (DiscordChannelBinding binding : this.bindings.forGame(channel, factionId)) {
@@ -430,6 +469,7 @@ public final class LostTalesDiscordBridge {
 
     /** The server is up and accepting players; say so. Server thread. */
     public void onServerStarted() {
+        this.serverStartedMillis = System.currentTimeMillis();
         announce(DiscordServerNotices.serverStarted());
         requestStatusRefresh();
     }
@@ -493,6 +533,10 @@ public final class LostTalesDiscordBridge {
 
     /** One inbound entry, on the server thread. */
     private void deliver(Inbound message) {
+        if (message.kind == Inbound.Kind.COMMAND) {
+            answerCommand(message.interaction);
+            return;
+        }
         if (message.kind == Inbound.Kind.EDIT) {
             // Word about a message already delivered: it reaches the
             // game only while the bridge still knows which line it is.
@@ -551,13 +595,258 @@ public final class LostTalesDiscordBridge {
         if (this.inboundCount.get() >= MAX_QUEUED_INBOUND) {
             return;
         }
+        if (entry.kind == Inbound.Kind.MESSAGE && !noteInboundId(entry.discordId)) {
+            // The other reader already queued it.
+            return;
+        }
         this.inboundCount.incrementAndGet();
         this.inbound.add(entry);
     }
 
+    /** Whether the message id is new to this session's readers. */
+    private boolean noteInboundId(String discordId) {
+        if (discordId == null || discordId.length() == 0) {
+            return true;
+        }
+        synchronized (this.recentInboundIds) {
+            if (!this.recentInboundIds.add(discordId)) {
+                return false;
+            }
+            while (this.recentInboundIds.size() > MAX_RECENT_INBOUND_IDS) {
+                Iterator<String> oldest = this.recentInboundIds.iterator();
+                oldest.next();
+                oldest.remove();
+            }
+            return true;
+        }
+    }
+
+    /**
+     * Answers a slash command: the deferred reply already went out from
+     * the gateway, so this fills it in with what the live server says,
+     * over the gateway's own job thread.
+     */
+    private void answerCommand(final DiscordJson.Interaction interaction) {
+        final DiscordGatewayClient client = this.gateway;
+        if (interaction == null || client == null) {
+            return;
+        }
+        final String content = DiscordSlashCommands.answer(interaction.name,
+                interaction.options, this.serverStartedMillis);
+        if (content.length() == 0) {
+            return;
+        }
+        final String appId = interaction.applicationId.length() > 0
+                ? interaction.applicationId : this.applicationId;
+        client.submit(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    DiscordHttp.Reply reply = DiscordHttp.patchInteractionOriginal(
+                            appId, interaction.token, DiscordJson.followUpBody(content));
+                    if (!reply.isSuccess()) {
+                        FMLLog.info("[%s] Discord did not take the answer to /%s (HTTP %d)",
+                                LostTalesMetaData.MOD_ID, interaction.name,
+                                Integer.valueOf(reply.status));
+                    }
+                } catch (IOException exception) {
+                    FMLLog.info("[%s] Could not answer /%s on Discord: %s",
+                            LostTalesMetaData.MOD_ID, interaction.name, exception.toString());
+                }
+            }
+        });
+    }
+
+    /** The newer of two message ids, which are snowflakes: numeric, and ordered. */
+    static String newerId(String left, String right) {
+        if (left == null || left.length() == 0) {
+            return right == null ? "" : right;
+        }
+        if (right == null || right.length() == 0) {
+            return left;
+        }
+        try {
+            return Long.parseLong(left) >= Long.parseLong(right) ? left : right;
+        } catch (NumberFormatException notASnowflake) {
+            return left.compareTo(right) >= 0 ? left : right;
+        }
+    }
+
+    /**
+     * What the gateway reports: messages in bound channels become the
+     * same inbound entries polling makes, and slash commands are
+     * deferred at once and answered on the server thread.
+     */
+    private final class GatewayListener implements DiscordGatewayClient.Listener {
+        private final DiscordChannelBindings bound;
+        private boolean readRefusedLogged;
+
+        GatewayListener(DiscordChannelBindings bound) {
+            this.bound = bound;
+        }
+
+        @Override
+        public String fetchGatewayUrl() throws IOException {
+            DiscordHttp.Reply reply = DiscordHttp.getGateway(
+                    LostTalesConfig.discordBotToken.trim());
+            if (reply.status == 401) {
+                if (!this.readRefusedLogged) {
+                    this.readRefusedLogged = true;
+                    FMLLog.severe("[%s] Discord refused the bot (HTTP 401) when asked "
+                            + "for its gateway: check the token", LostTalesMetaData.MOD_ID);
+                }
+                return "";
+            }
+            return reply.isSuccess() ? DiscordJson.parseGatewayUrl(reply.body) : "";
+        }
+
+        @Override
+        public void onReady(JsonObject ready, String sessionId) {
+            applicationId = DiscordGatewayProtocol.applicationId(ready);
+            if (!LostTalesConfig.discordSlashCommands || applicationId.length() == 0) {
+                return;
+            }
+            final DiscordGatewayClient client = gateway;
+            if (client == null) {
+                return;
+            }
+            for (final String guildId : DiscordGatewayProtocol.guildIds(ready)) {
+                client.submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        registerCommands(guildId);
+                    }
+                });
+            }
+        }
+
+        private void registerCommands(String guildId) {
+            try {
+                DiscordHttp.Reply reply = DiscordHttp.putGuildCommands(
+                        LostTalesConfig.discordBotToken.trim(), applicationId, guildId,
+                        DiscordSlashCommands.definitionsBody());
+                if (reply.isSuccess()) {
+                    FMLLog.info("[%s] Discord slash commands registered in guild %s",
+                            LostTalesMetaData.MOD_ID, guildId);
+                } else {
+                    FMLLog.warning("[%s] Discord refused the slash commands for guild %s "
+                            + "(HTTP %d); the bot may lack the applications.commands scope "
+                            + "there", LostTalesMetaData.MOD_ID, guildId,
+                            Integer.valueOf(reply.status));
+                }
+            } catch (IOException exception) {
+                FMLLog.warning("[%s] Could not register the slash commands in guild %s: %s",
+                        LostTalesMetaData.MOD_ID, guildId, exception.toString());
+            }
+        }
+
+        @Override
+        public void onEvent(String name, JsonObject data) {
+            if ("MESSAGE_CREATE".equals(name)) {
+                DiscordJson.Message message = DiscordJson.parseMessage(data);
+                DiscordChannelBinding binding = message == null ? null
+                        : readingBindingOf(message.channelId);
+                if (binding == null) {
+                    return;
+                }
+                lastSeenByChannel.put(message.channelId,
+                        newerId(lastSeenByChannel.get(message.channelId), message.id));
+                if (message.bot) {
+                    return;
+                }
+                String author = DiscordMessageSanitizer.inboundName(message.authorName);
+                String text = DiscordMessageSanitizer.inbound(message.content,
+                        message.mentionNames);
+                if (author.length() > 0 && text.length() > 0) {
+                    rememberAuthor(author, message.authorId);
+                    enqueueInbound(new Inbound(Inbound.Kind.MESSAGE, author,
+                            message.authorId, text, message.id,
+                            message.referencedMessageId, binding.id()));
+                }
+            } else if ("MESSAGE_UPDATE".equals(name)) {
+                DiscordJson.Message message = DiscordJson.parseMessage(data);
+                DiscordChannelBinding binding = message == null ? null
+                        : readingBindingOf(message.channelId);
+                if (binding == null || message.bot) {
+                    return;
+                }
+                String text = DiscordMessageSanitizer.inbound(message.content,
+                        message.mentionNames);
+                if (text.length() > 0) {
+                    enqueueInbound(new Inbound(Inbound.Kind.EDIT, "", "", text,
+                            message.id, "", binding.id()));
+                }
+            } else if ("MESSAGE_DELETE".equals(name)) {
+                String id = data.has("id") && data.get("id").isJsonPrimitive()
+                        ? data.get("id").getAsString() : "";
+                String channelId = data.has("channel_id")
+                        && data.get("channel_id").isJsonPrimitive()
+                        ? data.get("channel_id").getAsString() : "";
+                DiscordChannelBinding binding = readingBindingOf(channelId);
+                if (binding != null && id.length() > 0) {
+                    enqueueInbound(new Inbound(Inbound.Kind.DELETE, "", "", "", id, "",
+                            binding.id()));
+                }
+            } else if ("INTERACTION_CREATE".equals(name)) {
+                final DiscordJson.Interaction interaction = DiscordJson.parseInteraction(data);
+                final DiscordGatewayClient client = gateway;
+                if (interaction == null || client == null
+                        || !LostTalesConfig.discordSlashCommands) {
+                    return;
+                }
+                // Discord gives three seconds: the deferred answer goes
+                // out now, the real one once the server thread has it.
+                client.submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            DiscordHttp.postInteractionCallback(interaction.id,
+                                    interaction.token, DiscordJson.deferredReplyBody(true));
+                        } catch (IOException exception) {
+                            FMLLog.info("[%s] Could not acknowledge /%s on Discord: %s",
+                                    LostTalesMetaData.MOD_ID, interaction.name,
+                                    exception.toString());
+                        }
+                    }
+                });
+                enqueueInbound(new Inbound(interaction));
+            }
+        }
+
+        private DiscordChannelBinding readingBindingOf(String channelId) {
+            if (channelId == null || channelId.length() == 0) {
+                return null;
+            }
+            for (DiscordChannelBinding binding : this.bound.reading()) {
+                if (channelId.equals(binding.getDiscordChannelId())) {
+                    return binding;
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public void onConnected() {
+            if (!gatewayLive) {
+                gatewayLive = true;
+                FMLLog.info("[%s] Discord gateway connected; messages arrive as sent",
+                        LostTalesMetaData.MOD_ID);
+            }
+        }
+
+        @Override
+        public void onDisconnected() {
+            if (gatewayLive) {
+                gatewayLive = false;
+                FMLLog.info("[%s] Discord gateway disconnected; polling reads until "
+                        + "it is back", LostTalesMetaData.MOD_ID);
+            }
+        }
+    }
+
     private static final class Inbound {
-        /** What reached the game: a message, or word about an old one. */
-        enum Kind { MESSAGE, EDIT, DELETE }
+        /** What reached the game: a message, word about an old one, or a command. */
+        enum Kind { MESSAGE, EDIT, DELETE, COMMAND }
 
         final Kind kind;
         final String name;
@@ -571,10 +860,23 @@ public final class LostTalesDiscordBridge {
         final String referencedDiscordId;
         /** The id of the binding it was read through; empty for word about an old message. */
         final String bindingKey;
+        /** The slash command a COMMAND entry answers; null otherwise. */
+        final DiscordJson.Interaction interaction;
 
         Inbound(Kind kind, String name, String authorId, String text,
                 String discordId, String referencedDiscordId,
                 String bindingKey) {
+            this(kind, name, authorId, text, discordId, referencedDiscordId,
+                    bindingKey, null);
+        }
+
+        Inbound(DiscordJson.Interaction interaction) {
+            this(Kind.COMMAND, interaction.name, "", "", "", "", "", interaction);
+        }
+
+        private Inbound(Kind kind, String name, String authorId, String text,
+                        String discordId, String referencedDiscordId,
+                        String bindingKey, DiscordJson.Interaction interaction) {
             this.kind = kind;
             this.name = name;
             this.authorId = authorId;
@@ -582,6 +884,7 @@ public final class LostTalesDiscordBridge {
             this.discordId = discordId;
             this.referencedDiscordId = referencedDiscordId;
             this.bindingKey = bindingKey;
+            this.interaction = interaction;
         }
     }
 
@@ -692,7 +995,9 @@ public final class LostTalesDiscordBridge {
                 long sleepMillis = Math.max(2L, Math.min(60L,
                         LostTalesConfig.discordPollIntervalSeconds)) * 1000L;
                 try {
-                    if (this.reads && !this.readingDisabled) {
+                    // While the gateway is up it hears every message and
+                    // every edit; polling stands in only while it is down.
+                    if (this.reads && !this.readingDisabled && !gatewayLive) {
                         poll();
                         sweepChannels();
                     }
@@ -1001,6 +1306,13 @@ public final class LostTalesDiscordBridge {
                 if (cursor.disabled) {
                     continue;
                 }
+                // Whatever the gateway saw last in this channel is where
+                // polling goes on from, so a gateway drop loses nothing.
+                String seen = lastSeenByChannel.get(binding.getDiscordChannelId());
+                if (seen != null && seen.length() > 0) {
+                    cursor.after = newerId(cursor.after, seen);
+                    cursor.primed = true;
+                }
                 DiscordHttp.Reply reply = DiscordHttp.getMessages(token,
                         binding.getDiscordChannelId(),
                         cursor.primed ? cursor.after : "",
@@ -1019,6 +1331,9 @@ public final class LostTalesDiscordBridge {
                         DiscordJson.parseMessages(reply.body);
                 if (!messages.isEmpty()) {
                     cursor.after = messages.get(messages.size() - 1).id;
+                    lastSeenByChannel.put(binding.getDiscordChannelId(), newerId(
+                            lastSeenByChannel.get(binding.getDiscordChannelId()),
+                            cursor.after));
                 }
                 if (!cursor.primed) {
                     cursor.primed = true;

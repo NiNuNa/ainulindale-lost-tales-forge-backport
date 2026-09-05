@@ -8,8 +8,10 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 /**
  * Default policy: every entry in the server-owned catalog is cosmetic-only and
- * does not require an inventory item. Replacing this policy can add possession,
- * permission, faction, or achievement requirements without changing rendering.
+ * does not require an inventory item, for a character and for the account
+ * alike (a null character is the account). Replacing this policy can add
+ * possession, permission, faction, or achievement requirements without
+ * changing rendering.
  */
 public final class AllowlistedCharacterCapeEligibilityPolicy
         implements CharacterCapeEligibilityPolicy {
@@ -18,7 +20,7 @@ public final class AllowlistedCharacterCapeEligibilityPolicy
     public CharacterValidationResult validate(EntityPlayerMP player,
                                                RoleplayCharacter character,
                                                int cosmeticCapeId) {
-        if (player == null || character == null) {
+        if (player == null) {
             return CharacterValidationResult.failure(CharacterErrorId.INVALID_PLAYER);
         }
         if (!CharacterCapeCatalog.isValidSelection(cosmeticCapeId)) {

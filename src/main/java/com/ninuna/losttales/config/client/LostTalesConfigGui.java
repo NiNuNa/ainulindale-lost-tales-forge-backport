@@ -17,11 +17,17 @@ import net.minecraftforge.common.config.ConfigElement;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
 /**
- * Standard Forge 1.7.10 config screen opened from the Mods list.
+ * Standard Forge 1.7.10 config screen, reached through the settings hub
+ * from the Mods list and the character menu: the client's own settings,
+ * and nothing a server decides. The values stay in LostTalesConfig so commands, keybinds, and
+ * the GUI all edit one source of truth; dummy grouping nodes make the
+ * client category easier to browse without moving values on disk.
  *
- * The actual values stay in LostTalesConfig so commands, keybinds, and the GUI
- * all edit one source of truth. The GUI uses dummy grouping nodes so the config
- * is easier to browse without moving existing values to new on-disk categories.
+ * <p>Every other category of the file belongs to a server and is edited
+ * where it can be changed, from {@link LostTalesSettingsHubGui}: the
+ * settings of the server this client is on, offered only once that
+ * server has said the player is an operator, or in the main menu the
+ * local file's server categories — the server this game hosts.</p>
  */
 public class LostTalesConfigGui extends GuiConfig {
     private static final int BUTTON_HUD_PLACEMENT = 62100;
@@ -85,11 +91,6 @@ public class LostTalesConfigGui extends GuiConfig {
         }
 
         List<IConfigElement> client = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_CLIENT)).getChildElements();
-        List<IConfigElement> quests = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_QUESTS)).getChildElements();
-        List<IConfigElement> missives = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_MISSIVES)).getChildElements();
-        List<IConfigElement> combatMarkers = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_COMBAT_MARKERS)).getChildElements();
-        List<IConfigElement> party = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_PARTY)).getChildElements();
-        List<IConfigElement> chat = new ConfigElement(config.getCategory(LostTalesConfig.CATEGORY_CHAT)).getChildElements();
 
         elements.add(group("hud", "losttales.config.category.client.hud", pick(client,
                 "showLostTalesHud", "hudPlacementPreset",
@@ -110,14 +111,15 @@ public class LostTalesConfigGui extends GuiConfig {
                 "questHudMaxObjectives", "questHudMaxTrackedQuests", "questHudObjectiveLineCount",
                 "showQuestHudNotifications", "showWorldQuestMarkers", "showDiscoveredWorldMapMarkers",
                 "worldQuestMarkerMaxDistance", "showQuestChatFeedback", "playQuestSounds")));
-        List<IConfigElement> chatOptions = pick(client,
-                "showTimestamps", "enableChatAnimations",
-                "chatAnimationDurationMillis",
+        elements.add(group("chat", "losttales.config.category.client.chat", pick(client,
+                "showTimestamps", "enableChatEmojis", "convertChatEmoticons",
+                "enableChatMessageGrouping", "enableChatBackgroundBlur",
+                "enableChatPings", "chatPingSound", "chatHistoryLines",
+                "sendChatTypingStatus", "showChatTypingIndicators",
+                "enableNpcChatStyling", "showChatSpeechBubbles",
+                "enableChatAnimations", "chatAnimationDurationMillis",
                 "chatInputAnimationDurationMillis",
-                "chatSelectorAnimationDurationMillis");
-        chatOptions.addAll(chat);
-        elements.add(group("chat", "losttales.config.category.chat",
-                chatOptions));
+                "chatSelectorAnimationDurationMillis")));
         elements.add(group("guiAnimation",
                 "losttales.config.category.client.guiAnimation",
                 pick(client, "enableGuiAnimations",
@@ -131,11 +133,6 @@ public class LostTalesConfigGui extends GuiConfig {
                 "losttales.config.category.client.inventoryAnimation",
                 pick(client, "enableSmoothInventoryMovement",
                         "smoothInventoryAnimationDurationMillis")));
-        elements.add(group("questRules", "losttales.config.category.quests.rules", quests));
-        elements.add(group("missives", "losttales.config.category.missives", missives));
-        elements.add(group("combatMarkers", "losttales.config.category.combatMarkers", combatMarkers));
-        elements.add(group("party", "losttales.config.category.party", party));
-
         List<IConfigElement> leftovers = leftovers(client, elements);
         if (!leftovers.isEmpty()) {
             elements.add(group("other", "losttales.config.category.client.other", leftovers));

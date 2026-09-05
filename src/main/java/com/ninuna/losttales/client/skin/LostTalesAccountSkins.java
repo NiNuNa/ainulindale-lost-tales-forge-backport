@@ -4,6 +4,8 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.mojang.authlib.GameProfile;
+import com.ninuna.losttales.character.skin.AccountSkinProfile;
+import com.ninuna.losttales.character.skin.ProfileTexturesDecoder;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.AbstractClientPlayer;

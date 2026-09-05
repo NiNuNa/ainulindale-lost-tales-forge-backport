@@ -170,8 +170,10 @@ public final class CharacterService {
             return CharacterOperationResult.failure(CharacterErrorId.STORAGE_READ_ONLY, null);
         }
         CharacterRoster roster = data.getOrCreateRoster(player.getUniqueID());
-        CharacterValidationResult referenceValidation =
-                CharacterValidator.validateCharacterReference(
+        // A null character id names the account: the roster keeps its cape.
+        CharacterValidationResult referenceValidation = characterId == null
+                ? CharacterValidator.validateExpectedRevision(roster, expectedRosterRevision)
+                : CharacterValidator.validateCharacterReference(
                         roster, characterId, expectedRosterRevision);
         if (!referenceValidation.isValid()) {
             return CharacterOperationResult.failure(
@@ -192,8 +194,9 @@ public final class CharacterService {
             return CharacterOperationResult.failure(error, roster);
         }
 
-        boolean changed = character.setCapeSettings(
-                showMinecraftCape, cosmeticCapeId);
+        boolean changed = character == null
+                ? roster.setAccountCapeSettings(showMinecraftCape, cosmeticCapeId)
+                : character.setCapeSettings(showMinecraftCape, cosmeticCapeId);
         if (changed) {
             roster.incrementRevision();
             data.saveRoster(roster);
@@ -285,7 +288,7 @@ public final class CharacterService {
                                                      ValidatedCharacterCreation creation) {
         for (int attempt = 0; attempt < UUID_GENERATION_ATTEMPTS; attempt++) {
             UUID characterId = UUID.randomUUID();
-            if (containsCharacterId(data, characterId)) {
+            if (data.containsCharacter(characterId)) {
                 continue;
             }
             return RoleplayCharacter.builder(characterId, ownerId)
@@ -305,18 +308,6 @@ public final class CharacterService {
                     .build();
         }
         return null;
-    }
-
-    private boolean containsCharacterId(CharacterWorldData data, UUID characterId) {
-        if (data == null || characterId == null) {
-            return false;
-        }
-        for (CharacterRoster roster : data.getRosters()) {
-            if (roster != null && roster.getCharacter(characterId) != null) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static final class Holder {

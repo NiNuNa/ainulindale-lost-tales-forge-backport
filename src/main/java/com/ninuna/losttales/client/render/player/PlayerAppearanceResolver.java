@@ -21,9 +21,11 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Turns a player's synchronized character appearance into the model, texture,
- * and scale the renderer draws with. A player without a character is a plain
- * human on the Lost Tales player body, wearing the account skin.
+ * Turns a player's synchronized appearance into the model, texture, and
+ * scale the renderer draws with. The account is an identity of its own: a
+ * plain human on the Lost Tales player body, wearing the account skin with
+ * the arm width the server read off the profile; a player with no entry
+ * yet is drawn the same way from the local skin alone.
  *
  * The answer is cached per player and recomputed only when the appearance
  * cache hands out a different {@link CharacterAppearance} instance, which is
@@ -94,6 +96,15 @@ public final class PlayerAppearanceResolver {
     static ResolvedPlayerAppearance resolve(UUID playerId, CharacterAppearance appearance) {
         if (appearance == null || !appearance.isPresent()) {
             return null;
+        }
+        if (appearance.isAccount()) {
+            return new ResolvedPlayerAppearance(
+                    CharacterRaceRegistry.HUMAN,
+                    CharacterBodyModelRegistry.LOSTTALES_PLAYER,
+                    CharacterSkinLayout.MINECRAFT_64X64,
+                    CharacterBodyTypeRegistry.normalizeOrWide(appearance.getBodyTypeId()),
+                    CharacterChestTypeRegistry.NONE,
+                    1.0F, true, null);
         }
         String raceId = appearance.getRaceId();
         CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);

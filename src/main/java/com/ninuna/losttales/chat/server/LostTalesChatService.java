@@ -2,6 +2,8 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatChannelGates;
+import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatEpithet;
@@ -206,13 +208,15 @@ public final class LostTalesChatService {
             sender.addChatMessage(new ChatComponentTranslation(
                     "chat.losttales.channel.faction_unavailable"));
             return;
-        } else if (channel.getAccess() == ChatChannelAccess.OPERATOR
-                && !LostTalesWaystonePermissionPolicy.isOperator(sender)) {
-            // The client only offers the tab while it believes the player
-            // is an operator; tell it again so a revoked op loses the tab.
+        } else if (!ChatChannelGates.current().canSend(
+                ChatAccountRoleResolver.resolve(sender), channel)) {
+            // The client only offers the tab while the server last said
+            // it may; tell it again so a lost role loses the tab.
             sendAccess(sender);
             sender.addChatMessage(new ChatComponentTranslation(
-                    "chat.losttales.channel.admin_unavailable"));
+                    channel == ChatChannel.ADMIN
+                            ? "chat.losttales.channel.admin_unavailable"
+                            : "chat.losttales.channel.role_unavailable"));
             return;
         }
 
@@ -790,17 +794,38 @@ public final class LostTalesChatService {
             return;
         }
         boolean operator = LostTalesWaystonePermissionPolicy.isOperator(player);
+        int roles = ChatAccountRoleResolver.resolve(player);
+        ChatChannelGates gates = ChatChannelGates.current();
         // The second flag stays on the wire for older clients, whose
         // separate Discord tab it gates; OOC & Discord exists for
         // everyone, so it is always granted, which keeps that tab open
-        // and sends its lines here.
+        // and sends its lines here. The first is the Operator channel's
+        // send gate, which is the operator role unless configured
+        // otherwise; the mute list follows real operator status.
         LostTalesNetworkHandler.CHANNEL.sendTo(
-                new LostTalesChatAccessPacket(operator, true,
-                        ChatAccountRoleResolver.resolve(player),
+                new LostTalesChatAccessPacket(
+                        gates.canSend(roles, ChatChannel.ADMIN), true, roles,
                         roleHolders,
                         operator ? mutedSenders(player)
-                                : Collections.<UUID>emptyList()),
+                                : Collections.<UUID>emptyList(),
+                        ChatRoleCatalog.server().roles(),
+                        channelMask(gates, roles, true),
+                        channelMask(gates, roles, false)),
                 player);
+    }
+
+    /** One bit per channel ordinal: what the gates let these roles do. */
+    private static int channelMask(ChatChannelGates gates, int roles, boolean read) {
+        int mask = 0;
+        ChatChannel[] channels = ChatChannel.values();
+        for (int index = 0; index < channels.length && index < 32; index++) {
+            boolean allowed = read ? gates.canRead(roles, channels[index])
+                    : gates.canSend(roles, channels[index]);
+            if (allowed) {
+                mask |= 1 << index;
+            }
+        }
+        return mask;
     }
 
     /**
@@ -1102,21 +1127,25 @@ public final class LostTalesChatService {
         @SuppressWarnings("unchecked")
         List<EntityPlayerMP> online =
                 server.getConfigurationManager().playerEntityList;
+        ChatChannelGates gates = ChatChannelGates.current();
+        boolean gated = gates.isGated(channel);
         for (EntityPlayerMP candidate : online) {
             if (candidate == null || candidate.getUniqueID() == null) {
                 continue;
             }
-            if (channel.getRecipientRule() == ChatRecipientRule.GLOBAL) {
+            // A gated channel reaches only those holding a role its read
+            // side names; the Operator channel's gate is the operators.
+            if (gated && !gates.canRead(
+                    ChatAccountRoleResolver.resolve(candidate), channel)) {
+                continue;
+            }
+            if (channel.getRecipientRule() == ChatRecipientRule.GLOBAL
+                    || channel.getRecipientRule() == ChatRecipientRule.OPERATORS) {
                 result.add(candidate);
             } else if (channel.getRecipientRule() == ChatRecipientRule.SELF
                     || channel.getRecipientRule()
                     == ChatRecipientRule.WHISPER) {
                 if (candidate == sender) {
-                    result.add(candidate);
-                }
-            } else if (channel.getRecipientRule()
-                    == ChatRecipientRule.OPERATORS) {
-                if (LostTalesWaystonePermissionPolicy.isOperator(candidate)) {
                     result.add(candidate);
                 }
             } else if (channel.getRecipientRule()

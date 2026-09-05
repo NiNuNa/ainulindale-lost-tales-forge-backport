@@ -1,4 +1,4 @@
-package com.ninuna.losttales.client.skin;
+package com.ninuna.losttales.character.skin;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
  */
 public final class ProfileTexturesDecoder {
 
-    static final String TEXTURES_PROPERTY = "textures";
+    public static final String TEXTURES_PROPERTY = "textures";
     static final int MAX_PAYLOAD_CHARACTERS = 16 * 1024;
 
     private static final Set<String> ALLOWED_HOSTS = new HashSet<String>(Arrays.asList(

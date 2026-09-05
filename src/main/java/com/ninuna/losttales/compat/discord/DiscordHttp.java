@@ -144,6 +144,49 @@ final class DiscordHttp {
         return base + "/messages/" + messageId;
     }
 
+    /** Where the gateway is, and how many sessions the bot may open. */
+    static Reply getGateway(String botToken) throws IOException {
+        HttpURLConnection connection = open(API_BASE + "/gateway/bot", "GET");
+        connection.setRequestProperty("Authorization", "Bot " + botToken);
+        return exchange(connection, null);
+    }
+
+    /**
+     * Replaces the bot's slash commands in one guild with the given
+     * list; guild commands are usable at once. Discord answers 200.
+     */
+    static Reply putGuildCommands(String botToken, String applicationId, String guildId,
+                                  String body) throws IOException {
+        HttpURLConnection connection = open(API_BASE + "/applications/" + applicationId
+                + "/guilds/" + guildId + "/commands", "PUT");
+        connection.setRequestProperty("Authorization", "Bot " + botToken);
+        connection.setRequestProperty("Content-Type", "application/json");
+        return exchange(connection, body);
+    }
+
+    /**
+     * The first answer to an interaction, within Discord's three seconds:
+     * here always the deferred one, which buys the time the real answer
+     * needs. No bot header: the interaction's own token authorises it.
+     */
+    static Reply postInteractionCallback(String interactionId, String interactionToken,
+                                         String body) throws IOException {
+        HttpURLConnection connection = open(API_BASE + "/interactions/" + interactionId
+                + "/" + interactionToken + "/callback", "POST");
+        connection.setRequestProperty("Content-Type", "application/json");
+        return exchange(connection, body);
+    }
+
+    /** Fills the deferred answer in; the interaction's token authorises it. */
+    static Reply patchInteractionOriginal(String applicationId, String interactionToken,
+                                          String body) throws IOException {
+        HttpURLConnection connection = open(API_BASE + "/webhooks/" + applicationId + "/"
+                + interactionToken + "/messages/@original", "POST");
+        DiscordHttpPatch.apply(connection);
+        connection.setRequestProperty("Content-Type", "application/json");
+        return exchange(connection, body);
+    }
+
     /**
      * Modifies the channel with a JSON body (the topic, here); the bot
      * needs Manage Channels. Discord answers 200 with the channel.

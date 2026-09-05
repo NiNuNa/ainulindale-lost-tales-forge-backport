@@ -15,7 +15,7 @@ public class LostTalesConfigGuiFactory implements IModGuiFactory {
 
     @Override
     public Class<? extends GuiScreen> mainConfigGuiClass() {
-        return LostTalesConfigGui.class;
+        return LostTalesSettingsHubGui.class;
     }
 
     @Override

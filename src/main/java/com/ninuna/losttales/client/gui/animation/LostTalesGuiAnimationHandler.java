@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.gui.animation;
 
+import com.ninuna.losttales.client.LostTalesClientThread;
 import com.ninuna.losttales.client.chat.LostTalesChatGui;
 import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.common.eventhandler.EventPriority;
@@ -114,10 +115,16 @@ public final class LostTalesGuiAnimationHandler
         LostTalesGuiRegionBlur.getInstance().resetAfterResourceReload();
     }
 
+    /** Fired on the network thread; the textures released here are the client thread's. */
     @SubscribeEvent
     public void onClientDisconnect(
             ClientDisconnectionFromServerEvent event) {
-        clear();
+        LostTalesClientThread.run(new Runnable() {
+            @Override
+            public void run() {
+                clear();
+            }
+        });
     }
 
     public void clear() {

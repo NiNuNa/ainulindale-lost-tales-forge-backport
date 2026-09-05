@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet.character;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
+import com.ninuna.losttales.character.sync.CharacterAppearanceKind;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -81,6 +82,12 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String chestTypeId = CharacterPacketCodec.readString(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                int kindCode = buffer.readUnsignedByte();
+                CharacterAppearanceKind kind = CharacterAppearanceKind.fromCode(kindCode);
+                if (kind == CharacterAppearanceKind.NONE && kindCode != kind.getCode()) {
+                    throw new CharacterPacketCodec.DecodeException(
+                            "unknown appearance kind");
+                }
                 if (!playerIds.add(playerId)) {
                     throw new CharacterPacketCodec.DecodeException(
                             "duplicate appearance player UUID");
@@ -94,7 +101,7 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                     throw new CharacterPacketCodec.DecodeException(
                             "invalid appearance details");
                 }
-                decoded.add(new CharacterAppearance(
+                decoded.add(new CharacterAppearance(kind,
                         playerId, accountName, characterName, raceId,
                         genderId, skinId, showMinecraftCape, cosmeticCapeId,
                         startingFactionId, roleplayLevel, age, description,
@@ -155,6 +162,9 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
             CharacterPacketCodec.writeString(
                     buffer, appearance.getChestTypeId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            // Appended again: which identity this is, so the account can
+            // be drawn from its own entry rather than reconstructed.
+            buffer.writeByte(appearance.getKind().getCode());
         }
     }
 

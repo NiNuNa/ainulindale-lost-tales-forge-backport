@@ -140,6 +140,22 @@ public final class PlayerAppearanceResolverTest {
     }
 
     @Test
+    public void theAccountIdentityIsThePlayerBodyWithTheProfileArmWidth() {
+        ResolvedPlayerAppearance resolved = PlayerAppearanceResolver.resolve(
+                PLAYER, CharacterAppearance.forAccount(PLAYER, "Steve",
+                        "losttales:slim", true, 0));
+        assertNotNull(resolved);
+        assertEquals(CharacterRaceRegistry.HUMAN, resolved.getRaceId());
+        assertEquals(CharacterBodyModelRegistry.LOSTTALES_PLAYER, resolved.getModelId());
+        assertEquals(CharacterSkinLayout.MINECRAFT_64X64, resolved.getLayout());
+        assertEquals("losttales:slim", resolved.getBodyTypeId());
+        assertTrue(resolved.usesAccountSkin());
+        assertNull(resolved.getTexture());
+        assertFalse(resolved.hasChest());
+        assertEquals(1.0F, resolved.getRendererScale(), 0.0F);
+    }
+
+    @Test
     public void otherRacesWearTheAccountSkinOnTheirOwnBody() {
         ResolvedPlayerAppearance elf = PlayerAppearanceResolver.resolve(
                 PLAYER, new CharacterAppearance(PLAYER, CharacterRaceRegistry.ELF,

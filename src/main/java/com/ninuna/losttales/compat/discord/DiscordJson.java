@@ -47,10 +47,21 @@ public final class DiscordJson {
          * every edit, which is how a re-read page betrays one.
          */
         public final String editedTimestamp;
+        /** The channel the message is in; empty when the listing did not say. */
+        public final String channelId;
 
         Message(String id, String authorId, String authorName, boolean bot,
                 String content, Map<String, String> mentionNames,
                 String referencedMessageId, String editedTimestamp) {
+            this(id, authorId, authorName, bot, content, mentionNames,
+                    referencedMessageId, editedTimestamp, "");
+        }
+
+        Message(String id, String authorId, String authorName, boolean bot,
+                String content, Map<String, String> mentionNames,
+                String referencedMessageId, String editedTimestamp,
+                String channelId) {
+            this.channelId = channelId == null ? "" : channelId;
             this.id = id;
             this.authorId = authorId;
             this.authorName = authorName;
@@ -121,7 +132,115 @@ public final class DiscordJson {
                 string(object, "content"),
                 Collections.unmodifiableMap(mentions),
                 referencedMessageId(object),
-                string(object, "edited_timestamp"));
+                string(object, "edited_timestamp"),
+                string(object, "channel_id"));
+    }
+
+    /** One message object as the gateway delivers it, or null for anything else. */
+    public static Message parseMessage(JsonObject object) {
+        return parseMessage((JsonElement)object);
+    }
+
+    /**
+     * A slash command being used, as {@code INTERACTION_CREATE} carries
+     * it: what to answer, and the id and token the answer goes back by.
+     */
+    public static final class Interaction {
+        public final String id;
+        public final String token;
+        public final String applicationId;
+        public final String name;
+        /** Option name to its value as text. */
+        public final Map<String, String> options;
+        public final String channelId;
+        public final String guildId;
+        public final String userName;
+
+        Interaction(String id, String token, String applicationId, String name,
+                    Map<String, String> options, String channelId, String guildId,
+                    String userName) {
+            this.id = id;
+            this.token = token;
+            this.applicationId = applicationId;
+            this.name = name;
+            this.options = options;
+            this.channelId = channelId;
+            this.guildId = guildId;
+            this.userName = userName;
+        }
+    }
+
+    /** The interaction when it is a slash command with its name and token; else null. */
+    public static Interaction parseInteraction(JsonObject object) {
+        if (object == null) {
+            return null;
+        }
+        JsonElement typeValue = object.get("type");
+        int type;
+        try {
+            type = typeValue != null && typeValue.isJsonPrimitive() ? typeValue.getAsInt() : 0;
+        } catch (RuntimeException malformed) {
+            return null;
+        }
+        String id = string(object, "id");
+        String token = string(object, "token");
+        JsonObject data = object.has("data") && object.get("data").isJsonObject()
+                ? object.getAsJsonObject("data") : null;
+        if (type != 2 || id.length() == 0 || token.length() == 0 || data == null) {
+            return null;
+        }
+        String name = string(data, "name");
+        if (name.length() == 0) {
+            return null;
+        }
+        Map<String, String> options = new HashMap<String, String>();
+        if (data.has("options") && data.get("options").isJsonArray()) {
+            for (JsonElement option : data.getAsJsonArray("options")) {
+                if (option.isJsonObject()) {
+                    JsonObject entry = option.getAsJsonObject();
+                    String optionName = string(entry, "name");
+                    if (optionName.length() > 0) {
+                        options.put(optionName, string(entry, "value"));
+                    }
+                }
+            }
+        }
+        JsonObject user = object.has("user") && object.get("user").isJsonObject()
+                ? object.getAsJsonObject("user") : null;
+        if (user == null && object.has("member") && object.get("member").isJsonObject()) {
+            JsonObject member = object.getAsJsonObject("member");
+            user = member.has("user") && member.get("user").isJsonObject()
+                    ? member.getAsJsonObject("user") : null;
+        }
+        return new Interaction(id, token, string(object, "application_id"), name,
+                Collections.unmodifiableMap(options), string(object, "channel_id"),
+                string(object, "guild_id"), user == null ? "" : displayName(user));
+    }
+
+    /** The gateway URL {@code GET /gateway/bot} answers with; empty for anything else. */
+    public static String parseGatewayUrl(String json) {
+        JsonObject object = parseObject(json);
+        return object == null ? "" : string(object, "url");
+    }
+
+    /** "Working on it": the deferred answer to a command, only the asker to see. */
+    public static String deferredReplyBody(boolean ephemeral) {
+        JsonObject data = new JsonObject();
+        if (ephemeral) {
+            data.addProperty("flags", Integer.valueOf(64));
+        }
+        JsonObject body = new JsonObject();
+        body.addProperty("type", Integer.valueOf(5));
+        body.add("data", data);
+        return body.toString();
+    }
+
+    /** The answer itself, filled into the deferred reply; pings nobody. */
+    public static String followUpBody(String content) {
+        JsonObject body = new JsonObject();
+        body.addProperty("content", content == null ? "" : content);
+        body.add("allowed_mentions", noMentions());
+        return body.toString();
     }
 
     /**

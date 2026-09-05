@@ -12,17 +12,20 @@ import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import java.util.UUID;
 
 /**
- * Public projection of an online player's active character: what other
+ * Public projection of an online player's active identity: what other
  * clients need to render it and to describe it in the chat player card
  * (name, race, gender, body and chest type, starting faction, level, age,
- * biography). Nothing here is private roster state — slots, experience,
- * waypoints, and the switch state stay in {@link CharacterSummary} for the
- * owner only.
+ * biography). The account is an identity too: it wears the account skin
+ * on the plain human body, with the arm width its skin declares and the
+ * cape settings kept on the roster. Nothing here is private roster state
+ * — slots, experience, waypoints, and the switch state stay in
+ * {@link CharacterSummary} for the owner only.
  */
 public final class CharacterAppearance {
     /** Biography length bound, the same one character creation enforces. */
     public static final int MAX_DESCRIPTION_LENGTH = 256;
 
+    private final CharacterAppearanceKind kind;
     private final UUID playerId;
     private final String accountName;
     private final String characterName;
@@ -131,8 +134,30 @@ public final class CharacterAppearance {
                 CharacterChestTypeRegistry.defaultFor(genderId));
     }
 
+    /**
+     * A character projection; one with no race is a removal. The kind
+     * follows from the race so every existing caller keeps its meaning.
+     */
     public CharacterAppearance(UUID playerId, String accountName,
                                String characterName,
+                               String raceId, String genderId, String skinId,
+                               boolean showMinecraftCape, int cosmeticCapeId,
+                               String startingFactionId, int roleplayLevel,
+                               int age, String description, String bodyTypeId,
+                               String chestTypeId) {
+        this(CharacterAppearanceKind.CHARACTER, playerId, accountName,
+                characterName, raceId, genderId, skinId, showMinecraftCape,
+                cosmeticCapeId, startingFactionId, roleplayLevel, age,
+                description, bodyTypeId, chestTypeId);
+    }
+
+    /**
+     * The canonical projection. A character kind with no race, and any
+     * kind whose race the registry does not know, becomes {@link
+     * CharacterAppearanceKind#NONE}: nothing can be drawn from it.
+     */
+    public CharacterAppearance(CharacterAppearanceKind kind, UUID playerId,
+                               String accountName, String characterName,
                                String raceId, String genderId, String skinId,
                                boolean showMinecraftCape, int cosmeticCapeId,
                                String startingFactionId, int roleplayLevel,
@@ -160,17 +185,52 @@ public final class CharacterAppearance {
         this.roleplayLevel = Math.max(0, roleplayLevel);
         this.age = Math.max(0, age);
         this.description = normalizeDescription(description);
+        this.kind = kind == null || this.raceId.isEmpty()
+                ? CharacterAppearanceKind.NONE : kind;
+    }
+
+    /**
+     * The account as an identity: a plain human on the Lost Tales body,
+     * wearing the account skin with the arm width the skin declares, and
+     * the cape settings the roster keeps for it.
+     */
+    public static CharacterAppearance forAccount(UUID playerId, String accountName,
+                                                 String bodyTypeId,
+                                                 boolean showMinecraftCape,
+                                                 int cosmeticCapeId) {
+        return new CharacterAppearance(CharacterAppearanceKind.ACCOUNT, playerId,
+                accountName, "", CharacterRaceRegistry.HUMAN, "",
+                CharacterSkinRegistry.ACCOUNT_SKIN_ID, showMinecraftCape,
+                cosmeticCapeId, "", 0, 0, "",
+                CharacterBodyTypeRegistry.normalizeOrWide(bodyTypeId),
+                CharacterChestTypeRegistry.NONE);
     }
 
     public static CharacterAppearance fromRoster(UUID playerId, CharacterRoster roster) {
-        return fromRoster(playerId, "", roster);
+        return fromRoster(playerId, "", roster, CharacterBodyTypeRegistry.WIDE);
     }
 
     public static CharacterAppearance fromRoster(UUID playerId, String accountName,
                                                  CharacterRoster roster) {
+        return fromRoster(playerId, accountName, roster, CharacterBodyTypeRegistry.WIDE);
+    }
+
+    /**
+     * The identity the roster says is being played: its active character,
+     * else the account with the arm width its skin declares and the
+     * account cape settings the roster keeps. A missing roster is an
+     * account that has not been written yet.
+     */
+    public static CharacterAppearance fromRoster(UUID playerId, String accountName,
+                                                 CharacterRoster roster,
+                                                 String accountBodyTypeId) {
         RoleplayCharacter active = roster == null ? null : roster.getActiveCharacter();
         return active == null
-                ? removed(playerId)
+                ? forAccount(playerId, accountName, accountBodyTypeId,
+                        roster == null ? RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE
+                                : roster.isAccountMinecraftCapeVisible(),
+                        roster == null ? RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID
+                                : roster.getAccountCosmeticCapeId())
                 : new CharacterAppearance(
                         playerId,
                         accountName,
@@ -192,6 +252,10 @@ public final class CharacterAppearance {
         return new CharacterAppearance(playerId, "", "", "", "",
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
                 RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID);
+    }
+
+    public CharacterAppearanceKind getKind() {
+        return this.kind;
     }
 
     public UUID getPlayerId() {
@@ -261,8 +325,19 @@ public final class CharacterAppearance {
         return this.description;
     }
 
+    /** Whether there is an identity to draw at all; false for a removal. */
     public boolean isPresent() {
-        return !this.raceId.isEmpty();
+        return this.kind != CharacterAppearanceKind.NONE;
+    }
+
+    /** Whether the identity is a roleplay character rather than the account. */
+    public boolean hasCharacter() {
+        return this.kind == CharacterAppearanceKind.CHARACTER;
+    }
+
+    /** Whether the identity is the Minecraft account played as itself. */
+    public boolean isAccount() {
+        return this.kind == CharacterAppearanceKind.ACCOUNT;
     }
 
     private static String normalizeName(String value) {

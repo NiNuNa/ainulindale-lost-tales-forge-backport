@@ -39,7 +39,10 @@ public final class LostTalesRequestRateLimiter {
         CHAT_TYPING(8, 5000L),
         // Correcting a typo or taking a line back is deliberate and rare
         // next to sending; a handful in five seconds covers a fumbled edit.
-        CHAT_REVISION(10, 5000L);
+        CHAT_REVISION(10, 5000L),
+        // An operator opens the settings screen and saves it; a few of each
+        // in five seconds is already impatient.
+        SERVER_CONFIG(6, 5000L);
 
         private final int maximumRequests;
         private final long windowMillis;

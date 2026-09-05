@@ -95,12 +95,13 @@ public final class ClientCharacterNetwork {
         });
     }
 
+    /** A null character id asks for the account's own cape settings. */
     public static int updateCapeSettings(final long expectedRosterRevision,
                                          final UUID characterId,
                                          final boolean showMinecraftCape,
                                          final int cosmeticCapeId) {
-        if (expectedRosterRevision < 0L || characterId == null) {
-            throw new IllegalArgumentException("revision and characterId must be valid");
+        if (expectedRosterRevision < 0L) {
+            throw new IllegalArgumentException("revision must be valid");
         }
         final int requestId = nextRequestId();
         return send(requestId, CharacterOperationType.CAPE_UPDATE, new Runnable() {

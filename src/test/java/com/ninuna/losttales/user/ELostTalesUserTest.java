@@ -40,14 +40,14 @@ public final class ELostTalesUserTest {
     }
 
     @Test
-    public void theTeamWearsTheDeveloperRole() {
+    public void theTeamWearsTheTeamMark() {
         ELostTalesUser[] team = { ELostTalesUser.NINUNA,
                 ELostTalesUser.SCOSHER, ELostTalesUser.BALARAUKO,
                 ELostTalesUser.CAPTAIN_CHEESE };
         for (ELostTalesUser member : team) {
-            assertEquals(ELostTalesUserRecognition.DEVELOPER,
+            assertEquals(ELostTalesUserRecognition.TEAM,
                     member.getRecognition());
-            assertEquals(ChatAccountRole.DEVELOPER,
+            assertEquals(ChatAccountRole.TEAM,
                     member.getRecognition().getChatRole());
         }
     }

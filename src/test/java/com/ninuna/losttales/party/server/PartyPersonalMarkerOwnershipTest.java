@@ -3,6 +3,7 @@ package com.ninuna.losttales.party.server;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.ninuna.losttales.character.storage.CharacterIndex;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import java.util.UUID;
 import org.junit.Test;
@@ -23,9 +24,7 @@ public final class PartyPersonalMarkerOwnershipTest {
                 CharacterWorldData.DATA_NAME);
         data.getOrCreateRoster(playerId);
 
-        PartyService.CharacterIndex index =
-                PartyService.getInstance()
-                        .buildCharacterIndex(data);
+        CharacterIndex index = data.characterIndex();
 
         assertTrue("an account is an owner in its own right",
                 index.hasOwner(playerId));
@@ -38,9 +37,7 @@ public final class PartyPersonalMarkerOwnershipTest {
                 CharacterWorldData.DATA_NAME);
         data.getOrCreateRoster(playerId);
 
-        PartyService.CharacterIndex index =
-                PartyService.getInstance()
-                        .buildCharacterIndex(data);
+        CharacterIndex index = data.characterIndex();
 
         assertFalse("a marker left by a deleted character is still an orphan",
                 index.hasOwner(UUID.randomUUID()));

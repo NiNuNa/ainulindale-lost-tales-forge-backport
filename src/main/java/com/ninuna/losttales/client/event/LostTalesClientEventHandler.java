@@ -3,6 +3,9 @@ package com.ninuna.losttales.client.event;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.accessory.inventory.LostTalesContainerPlayer;
 import com.ninuna.losttales.accessory.player.AccessoryInventory;
+import com.ninuna.losttales.chat.ChatRoleCatalog;
+import com.ninuna.losttales.client.LostTalesClientThread;
+import com.ninuna.losttales.config.client.ClientServerConfigCache;
 import com.ninuna.losttales.client.accessory.ClientAccessoryEffectCache;
 import com.ninuna.losttales.client.accessory.WraithWorldVisualEffect;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
@@ -13,7 +16,6 @@ import com.ninuna.losttales.client.camera.ThirdPersonHeadRenderHook;
 import com.ninuna.losttales.client.camera.ThirdPersonProjectileTrajectoryRenderer;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
-import com.ninuna.losttales.client.character.CharacterClientTaskQueue;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
@@ -80,7 +82,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiContainerCreative;
 import net.minecraft.client.gui.inventory.GuiInventory;
 import net.minecraft.inventory.Slot;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.client.resources.IResourceManagerReloadListener;
@@ -115,8 +116,23 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientQuestDefinitionStore.reloadFromResources(resManager);
     }
 
+    /**
+     * FML fires this on the network thread; the clears below delete
+     * textures and meshes, which only the client thread may do, so the
+     * whole of it hops there. The connect handler hops the same way, so
+     * a disconnect and the next connect keep their order.
+     */
     @SubscribeEvent
     public void onClientDisconnect(ClientDisconnectionFromServerEvent event) {
+        LostTalesClientThread.run(new Runnable() {
+            @Override
+            public void run() {
+                clearSessionState();
+            }
+        });
+    }
+
+    private static void clearSessionState() {
         LostTalesClientQuestProgressStore.clear();
         LostTalesClientQuestNotificationStore.clear();
         LostTalesClientQuestDefinitionStore.clearDynamicQuestDefinitions();
@@ -146,6 +162,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientPartyTrackingCache.clear();
         // Words over a head belong to the world they were spoken in.
         ChatSpeechBubbles.clear();
+        ClientServerConfigCache.clear();
         // Chat is the one client state that outlives a disconnect: the
         // game keeps its own message history for as long as it runs, and
         // everything Lost Tales knows about those messages — their tabs,
@@ -161,7 +178,6 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientChatIgnores.clearSessionNames();
         ClientAccessoryEffectCache.clear();
         WraithWorldVisualEffect.reset();
-        CharacterClientTaskQueue.clear();
         LostTalesQuickLootHudRenderer.resetHud();
         LotrRaceProfileAdapter.getInstance().clear();
         ThirdPersonCameraRuntime.resetSession();
@@ -175,6 +191,15 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
      */
     @SubscribeEvent
     public void onClientConnect(ClientConnectedToServerEvent event) {
+        LostTalesClientThread.run(new Runnable() {
+            @Override
+            public void run() {
+                beginSession();
+            }
+        });
+    }
+
+    private static void beginSession() {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (ClientChatSession.resume(minecraft)) {
             return;
@@ -184,6 +209,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         }
         ClientChatChannelState.clear();
         ClientChatChannelViews.clear();
+        ChatRoleCatalog.resetToBuiltIn();
         ClientChatShowcaseStore.clear();
         LostTalesChatPresentation.clear();
         LostTalesCharacterHeadIconRenderer.clearAccountSkinCache();
@@ -246,7 +272,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         CharacterAppearance appearance =
                 ClientCharacterAppearanceCache.getAuthoritative(
                         event.entityPlayer.getUniqueID());
-        if (appearance != null && appearance.isPresent()
+        if (appearance != null && appearance.hasCharacter()
                 && appearance.getCharacterName().length() > 0) {
             String characterName = appearance.getCharacterName();
             String displayName = event.displayname;
