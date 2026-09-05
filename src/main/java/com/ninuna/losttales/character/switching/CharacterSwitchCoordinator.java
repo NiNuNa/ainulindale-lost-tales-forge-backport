@@ -414,9 +414,17 @@ public final class CharacterSwitchCoordinator {
         }
     }
 
+    /**
+     * Forgets an account that has logged out: its request cache, its
+     * components' runtime state and its lock. Every switch runs on the
+     * server thread, as does the logout, so nothing holds the lock when
+     * it goes; the next login makes a fresh one. Without this the lock
+     * map would keep one entry per account ever seen.
+     */
     public void clearRuntimeState(UUID ownerId) {
         if (ownerId != null) {
             this.requestCaches.remove(ownerId);
+            this.accountLocks.remove(ownerId);
             this.playerStateService.clearRuntimeState(ownerId);
         }
     }

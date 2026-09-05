@@ -94,13 +94,12 @@ final class LostTalesChatOverlayRenderer {
     private static final float HEAD_LEFT_OFFSET =
             ChatInlineIcons.HEAD_SLOT_INSET;
     /**
-     * How a line's backdrop thins out across its width. It held full
-     * strength for two thirds and then fell away in a straight line,
-     * which left a visible edge where the two met: the eye reads the
-     * corner in the opacity, not the opacity itself. It now leans away
+     * How a line's backdrop thins out across its width: it leans away
      * from the very first pixel along a curve that is flat where it
-     * starts, so there is no corner anywhere to see, and it spends the
-     * same total opacity across the band as the old profile did.
+     * starts, so there is no corner anywhere to see — the eye reads a
+     * corner in the opacity, not the opacity itself — and the total
+     * opacity across the band is what a two-thirds plateau with a
+     * straight fall-off would spend.
      */
     private static final int BACKDROP_FADE_POWER = 5;
     /**
@@ -162,9 +161,8 @@ final class LostTalesChatOverlayRenderer {
      * two columns carry it exactly; the vertical one is eased, and each
      * row is a straight segment of that curve, so the rows are what
      * decides whether the gradient bands. Against the blurred, flat
-     * backdrop the chat now opens over, a coarse ramp shows its seams,
-     * so the curve is cut finely — and, with the columns gone, into
-     * fewer quads than the coarse mesh took.
+     * backdrop the chat opens over, a coarse ramp shows its seams, so
+     * the curve is cut finely; one column keeps the quad count small.
      */
     private static final int EDGE_FADE_ROWS = 32;
     private static final int EDGE_FADE_COLUMNS = 1;
@@ -842,12 +840,10 @@ final class LostTalesChatOverlayRenderer {
             GL11.glScalef(scale, scale, 1.0F);
             if (open) {
                 // One backdrop for the whole area between the rules,
-                // laid before the stack. The lines used to bring a band
-                // each and two strips carried the colour out to the
-                // rules; every one of those edges was somewhere a seam
-                // could open, and a stack sliding under a scroll opened
-                // them. A window has one panel, and the messages are
-                // drawn on it.
+                // laid before the stack: a window has one panel, and
+                // the messages are drawn on it. A band per line would
+                // give every line an edge where a seam could open, and
+                // a stack sliding under a scroll would open them.
                 drawChatBackdrop(panelLeft, topEdge, panelRight,
                         bottomEdge, backdropAlpha(opacity, opening) / 2,
                         CHAT_BACKDROP_RGB);

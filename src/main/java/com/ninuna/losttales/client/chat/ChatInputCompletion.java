@@ -1,0 +1,726 @@
+package com.ninuna.losttales.client.chat;
+
+import com.google.common.collect.ObjectArrays;
+import com.ninuna.losttales.character.sync.CharacterAppearance;
+import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
+import com.ninuna.losttales.character.sync.CharacterSummary;
+import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatIdentityType;
+import com.ninuna.losttales.chat.ChatMentionCandidate;
+import com.ninuna.losttales.chat.ChatNameSuggester;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.chat.emoji.ChatEmojiSuggester;
+import com.ninuna.losttales.chat.share.ChatShareSuggester;
+import com.ninuna.losttales.chat.share.ChatShareTokenParser;
+import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
+import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.config.LostTalesConfig;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.gui.GuiPlayerInfo;
+import net.minecraft.network.play.client.C14PacketTabComplete;
+import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.StatCollector;
+import net.minecraftforge.client.ClientCommandHandler;
+import org.apache.commons.lang3.StringUtils;
+import org.lwjgl.input.Keyboard;
+
+/**
+ * Everything that offers to finish what is being typed into the chat's
+ * field: the emoji, mention and share completion lists that open above
+ * the input as a shortcode, an {@code @} or a share opener is typed;
+ * command tab completion, owned here rather than left to vanilla so the
+ * candidate list is filed under the tab that was selected when Tab was
+ * pressed instead of falling into the console as an untracked line;
+ * and the tokens the pickers and the lists insert. The screen hands it
+ * the keys, the clicks and the frame; it hands the screen back whether
+ * it took them.
+ */
+final class ChatInputCompletion {
+    /** What a suggestion list's keys ask for. */
+    private static final int KEY_NONE = 0;
+    private static final int KEY_UP = 1;
+    private static final int KEY_DOWN = 2;
+    private static final int KEY_ACCEPT = 3;
+    private static final int KEY_DISMISS = 4;
+
+    /** Mention candidates are rebuilt at most this often while typing. */
+    private static final long MENTION_REFRESH_NANOS = 500L * 1000000L;
+
+    private final ChatNoticeSink notices;
+    private Minecraft mc;
+    private FontRenderer font;
+    private ChatPointerRegions regions;
+    private ChatInputField field;
+
+    private final ChatEmojiSuggestionBox emojiSuggestions =
+            new ChatEmojiSuggestionBox();
+    private final ChatNameSuggestionBox nameSuggestions =
+            new ChatNameSuggestionBox();
+    private final ChatShareSuggestionBox shareSuggestions =
+            new ChatShareSuggestionBox();
+    /**
+     * The states of command completion mirror {@code GuiChat}'s private
+     * completion fields, which a subclass cannot reach.
+     */
+    private final List<String> completionCandidates = new ArrayList<String>();
+    /** Index of the candidate standing in the field; -1 for none yet. */
+    private int completionCycleIndex = -1;
+    /** Set while further Tabs walk {@link #completionCandidates}. */
+    private boolean completionCycling;
+    /** Set between sending a completion request and its answer. */
+    private boolean completionWaiting;
+    /** The tab whose input the pending or walked completion belongs to. */
+    private ChatTab completionTab;
+    /** The candidates as a popup over the input, never a chat line. */
+    private final ChatCommandSuggestionBox commandSuggestions =
+            new ChatCommandSuggestionBox();
+
+    private List<ChatMentionCandidate> mentionCandidates =
+            Collections.emptyList();
+    private int mentionRevision;
+    private long mentionBuiltNanos;
+    private ChatChannel mentionChannel;
+
+    ChatInputCompletion(ChatNoticeSink notices) {
+        this.notices = notices;
+    }
+
+    /**
+     * Takes the field the screen just built; called from {@code initGui},
+     * which also runs on every resize, when vanilla has replaced the
+     * field. The lists and the walk keep their state across it.
+     */
+    void bind(Minecraft mc, FontRenderer font, ChatPointerRegions regions,
+              ChatInputField field) {
+        this.mc = mc;
+        this.font = font;
+        this.regions = regions;
+        this.field = field;
+    }
+
+    /* ---- Keys ---- */
+
+    /**
+     * The first thing every key does: vanilla's own rule is that any key
+     * ends a pending completion request, and while the candidate popup
+     * is open Up and Down walk it and Escape only closes it. True when
+     * the key was the popup's and is spent.
+     */
+    boolean handleCommandPopupKey(int keyCode) {
+        this.completionWaiting = false;
+        if (!this.commandSuggestions.isActive()) {
+            return false;
+        }
+        if (keyCode == Keyboard.KEY_UP) {
+            stepCompletion(-1);
+            return true;
+        }
+        if (keyCode == Keyboard.KEY_DOWN) {
+            stepCompletion(1);
+            return true;
+        }
+        if (keyCode == Keyboard.KEY_ESCAPE) {
+            dismissCompletion();
+            return true;
+        }
+        return false;
+    }
+
+    /** Any key but Tab ends the walk through the candidates. */
+    void onKeyNotTab() {
+        this.completionCycling = false;
+        this.commandSuggestions.clear();
+    }
+
+    /**
+     * Offers the key to whichever suggestion list is open — the emoji
+     * list first, then the mention list, then the share list, each
+     * refreshed against the field before it is asked — and answers
+     * whether one took it. Up and Down move the selection, Tab and
+     * Enter accept it, Escape closes the list; every other key passes.
+     */
+    boolean handleSuggestionKey(int keyCode) {
+        if (LostTalesConfig.enableChatEmojis) {
+            this.emojiSuggestions.update(this.field.getText(),
+                    this.field.getCursorPosition());
+            if (this.emojiSuggestions.isActive()
+                    && serveEmojiKey(suggestionAction(keyCode))) {
+                return true;
+            }
+        }
+        if (LostTalesConfig.enableChatPings) {
+            refreshNameSuggestions();
+            if (this.nameSuggestions.isActive()
+                    && serveNameKey(suggestionAction(keyCode))) {
+                return true;
+            }
+        }
+        refreshShareSuggestions();
+        return this.shareSuggestions.isActive()
+                && serveShareKey(suggestionAction(keyCode));
+    }
+
+    /** What a key means to an open suggestion list. */
+    static int suggestionAction(int keyCode) {
+        if (keyCode == Keyboard.KEY_UP) {
+            return KEY_UP;
+        }
+        if (keyCode == Keyboard.KEY_DOWN) {
+            return KEY_DOWN;
+        }
+        if (keyCode == Keyboard.KEY_TAB || keyCode == Keyboard.KEY_RETURN
+                || keyCode == Keyboard.KEY_NUMPADENTER) {
+            return KEY_ACCEPT;
+        }
+        if (keyCode == Keyboard.KEY_ESCAPE) {
+            return KEY_DISMISS;
+        }
+        return KEY_NONE;
+    }
+
+    private boolean serveEmojiKey(int action) {
+        switch (action) {
+            case KEY_UP:
+                this.emojiSuggestions.moveSelection(-1);
+                return true;
+            case KEY_DOWN:
+                this.emojiSuggestions.moveSelection(1);
+                return true;
+            case KEY_ACCEPT:
+                acceptSuggestion(this.emojiSuggestions.getSelected());
+                return true;
+            case KEY_DISMISS:
+                this.emojiSuggestions.dismiss();
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private boolean serveNameKey(int action) {
+        switch (action) {
+            case KEY_UP:
+                this.nameSuggestions.moveSelection(-1);
+                return true;
+            case KEY_DOWN:
+                this.nameSuggestions.moveSelection(1);
+                return true;
+            case KEY_ACCEPT:
+                acceptNameSuggestion(this.nameSuggestions.getSelected());
+                return true;
+            case KEY_DISMISS:
+                this.nameSuggestions.dismiss();
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private boolean serveShareKey(int action) {
+        switch (action) {
+            case KEY_UP:
+                this.shareSuggestions.moveSelection(-1);
+                return true;
+            case KEY_DOWN:
+                this.shareSuggestions.moveSelection(1);
+                return true;
+            case KEY_ACCEPT:
+                acceptShareSuggestion(this.shareSuggestions.getSelected());
+                return true;
+            case KEY_DISMISS:
+                this.shareSuggestions.dismiss();
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /** Brings every list up to date with what the field now holds. */
+    void refreshAfterTyping() {
+        if (LostTalesConfig.enableChatEmojis) {
+            this.emojiSuggestions.update(this.field.getText(),
+                    this.field.getCursorPosition());
+        }
+        if (LostTalesConfig.enableChatPings) {
+            refreshNameSuggestions();
+        }
+        refreshShareSuggestions();
+    }
+
+    private void refreshNameSuggestions() {
+        this.nameSuggestions.update(this.field.getText(),
+                this.field.getCursorPosition(),
+                mentionCandidates(), this.mentionRevision);
+    }
+
+    private void refreshShareSuggestions() {
+        this.shareSuggestions.update(this.field.getText(),
+                this.field.getCursorPosition(), this.mc.thePlayer);
+    }
+
+    /* ---- Command completion ---- */
+
+    /**
+     * Tab in a non-empty field: walk an answered candidate list, or ask
+     * for one. The request path is vanilla's — client commands complete
+     * locally through {@code ClientCommandHandler}, everything else is
+     * asked of the server — but the answer comes back to
+     * {@link #onServerCompletions}, which files the candidate list under
+     * the tab the request was typed in.
+     */
+    void completeInput() {
+        if (this.completionCycling && !this.completionCandidates.isEmpty()) {
+            if (ClientChatChannelState.getSelected().equals(
+                    this.completionTab)) {
+                insertCompletion((this.completionCycleIndex + 1)
+                        % this.completionCandidates.size());
+                return;
+            }
+            // The walked list belongs to another tab's input; the field
+            // now holds this tab's draft, so start over on it.
+            dismissCompletion();
+        }
+        String beforeCursor = this.field.getText().substring(0,
+                this.field.getCursorPosition());
+        if (beforeCursor.length() < 1 || this.mc.thePlayer == null
+                || this.mc.thePlayer.sendQueue == null) {
+            return;
+        }
+        int wordStart = this.field.func_146197_a(-1,
+                this.field.getCursorPosition(), false);
+        ClientCommandHandler.instance.autoComplete(beforeCursor,
+                this.field.getText().substring(wordStart)
+                        .toLowerCase(Locale.ROOT));
+        this.mc.thePlayer.sendQueue.addToSendQueue(
+                new C14PacketTabComplete(beforeCursor));
+        this.completionWaiting = true;
+        this.completionTab = ClientChatChannelState.getSelected();
+    }
+
+    /**
+     * The completion answer. Inserts the candidates' common prefix, or —
+     * when the word already is that prefix — starts walking the list and
+     * shows it as a popup over the input. An answer arriving after the
+     * selection moved is dropped: the field holds another tab's draft,
+     * and splicing into that would corrupt it.
+     */
+    void onServerCompletions(String[] serverCompletions) {
+        if (!this.completionWaiting || serverCompletions == null) {
+            return;
+        }
+        this.completionWaiting = false;
+        this.completionCycling = false;
+        this.completionCandidates.clear();
+        this.completionCycleIndex = -1;
+        this.commandSuggestions.clear();
+        ChatTab owner = this.completionTab;
+        if (owner == null
+                || !owner.equals(ClientChatChannelState.getSelected())) {
+            return;
+        }
+        String[] merged = serverCompletions;
+        String[] client = ClientCommandHandler.instance.latestAutoComplete;
+        if (client != null) {
+            merged = ObjectArrays.concat(client, serverCompletions,
+                    String.class);
+        }
+        for (String candidate : merged) {
+            if (candidate != null && candidate.length() > 0) {
+                this.completionCandidates.add(candidate);
+            }
+        }
+        // Vanilla's shape: the prefix is the server candidates' alone.
+        String word = this.field.getText().substring(
+                this.field.func_146197_a(-1,
+                        this.field.getCursorPosition(), false));
+        String prefix = EnumChatFormatting.getTextWithoutFormattingCodes(
+                StringUtils.getCommonPrefix(serverCompletions));
+        if (prefix != null && prefix.length() > 0
+                && !word.equalsIgnoreCase(prefix)) {
+            this.field.deleteFromCursor(
+                    this.field.func_146197_a(-1,
+                            this.field.getCursorPosition(), false)
+                            - this.field.getCursorPosition());
+            this.field.writeText(prefix);
+            // The prefix leaves several ways forward; the popup shows
+            // them, nothing highlighted until the walk starts.
+            if (this.completionCandidates.size() > 1) {
+                this.commandSuggestions.show(this.completionCandidates);
+            }
+        } else if (!this.completionCandidates.isEmpty()) {
+            this.completionCycling = true;
+            if (this.completionCandidates.size() > 1) {
+                this.commandSuggestions.show(this.completionCandidates);
+            }
+            insertCompletion(0);
+        }
+    }
+
+    /** Replaces the word at the cursor with the indexed candidate. */
+    private void insertCompletion(int index) {
+        this.field.deleteFromCursor(
+                this.field.func_146197_a(-1,
+                        this.field.getCursorPosition(), false)
+                        - this.field.getCursorPosition());
+        this.field.writeText(
+                EnumChatFormatting.getTextWithoutFormattingCodes(
+                        this.completionCandidates.get(index)));
+        this.completionCycleIndex = index;
+        this.commandSuggestions.setSelected(index);
+    }
+
+    /** Up or Down while the popup is open: walk the list either way. */
+    private void stepCompletion(int delta) {
+        if (this.completionCandidates.isEmpty()) {
+            return;
+        }
+        this.completionCycling = true;
+        int size = this.completionCandidates.size();
+        int index = this.completionCycleIndex < 0
+                ? (delta > 0 ? 0 : size - 1)
+                : ((this.completionCycleIndex + delta) % size + size) % size;
+        insertCompletion(index);
+    }
+
+    /** Closes the popup and ends the walk; the field keeps its text. */
+    void dismissCompletion() {
+        this.completionCycling = false;
+        this.commandSuggestions.clear();
+    }
+
+    /** The mention candidates are shaped per channel identity. */
+    void invalidateMentionCandidates() {
+        this.mentionBuiltNanos = 0L;
+    }
+
+    /* ---- Frame ---- */
+
+    /**
+     * Draws whichever lists are open above the input, each brought up
+     * to date with the field first. Called inside the bar's own
+     * transform; {@code anchor} is the bar's top and {@code inputX} the
+     * field's left edge in that space.
+     */
+    void draw(int anchor, int inputX, int mouseX, int mouseY) {
+        if (LostTalesConfig.enableChatEmojis) {
+            this.emojiSuggestions.update(this.field.getText(),
+                    this.field.getCursorPosition());
+            this.emojiSuggestions.draw(this.mc, this.font, this.regions,
+                    anchor, inputX, mouseX, mouseY);
+        }
+        if (LostTalesConfig.enableChatPings) {
+            refreshNameSuggestions();
+            this.nameSuggestions.draw(this.mc, this.font, this.regions,
+                    anchor, inputX, mouseX, mouseY);
+        }
+        refreshShareSuggestions();
+        this.shareSuggestions.draw(this.mc, this.font, this.regions, anchor,
+                inputX, mouseX, mouseY);
+        this.commandSuggestions.draw(this.font, this.regions, anchor, inputX,
+                mouseX, mouseY);
+    }
+
+    /** The mention candidate the pointer is on, for its hover card, or null. */
+    ChatMentionCandidate hoveredMention(int mouseX, int mouseY, int anchor,
+                                        int inputX) {
+        return LostTalesConfig.enableChatPings
+                ? this.nameSuggestions.suggestionAt(this.font, mouseX, mouseY,
+                        anchor, inputX)
+                : null;
+    }
+
+    /**
+     * A click on a row of an open list accepts that row; true when one
+     * did, so the screen looks no further.
+     */
+    boolean click(int mouseX, int mouseY, int button, int anchor,
+                  int inputX) {
+        if (button != 0) {
+            return false;
+        }
+        if (LostTalesConfig.enableChatEmojis
+                && this.emojiSuggestions.isActive()) {
+            ChatEmoji suggested = this.emojiSuggestions.suggestionAt(
+                    this.font, mouseX, mouseY, anchor, inputX);
+            if (suggested != null) {
+                acceptSuggestion(suggested);
+                return true;
+            }
+        }
+        if (LostTalesConfig.enableChatPings
+                && this.nameSuggestions.isActive()) {
+            ChatMentionCandidate suggested = this.nameSuggestions.suggestionAt(
+                    this.font, mouseX, mouseY, anchor, inputX);
+            if (suggested != null) {
+                acceptNameSuggestion(suggested);
+                return true;
+            }
+        }
+        if (this.shareSuggestions.isActive()) {
+            ChatShareCandidates.Entry suggested =
+                    this.shareSuggestions.suggestionAt(this.font, mouseX,
+                            mouseY, anchor, inputX);
+            if (suggested != null) {
+                acceptShareSuggestion(suggested);
+                return true;
+            }
+        }
+        if (this.commandSuggestions.isActive()) {
+            int candidate = this.commandSuggestions.candidateAt(
+                    this.font, mouseX, mouseY, anchor, inputX);
+            if (candidate >= 0) {
+                this.completionCycling = true;
+                insertCompletion(candidate);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /* ---- Insertions ---- */
+
+    /**
+     * Replaces the {@code :prefix} at the cursor with the full
+     * shortcode, a space behind it like every other inserted token, so
+     * the next word stands apart from the emoji.
+     */
+    private void acceptSuggestion(ChatEmoji emoji) {
+        ChatEmojiSuggester.Query query = this.emojiSuggestions.getQuery();
+        if (emoji == null || query == null) {
+            return;
+        }
+        replaceAtCursor(query.colonIndex, emoji.getShortcode() + " ");
+        this.emojiSuggestions.update(this.field.getText(),
+                this.field.getCursorPosition());
+    }
+
+    /** Replaces the {@code @prefix} at the cursor with the full mention. */
+    private void acceptNameSuggestion(ChatMentionCandidate candidate) {
+        ChatNameSuggester.Query query = this.nameSuggestions.getQuery();
+        if (candidate == null || query == null) {
+            return;
+        }
+        replaceAtCursor(query.atIndex, "@" + candidate.getDisplayName() + " ");
+        refreshNameSuggestions();
+    }
+
+    /** Replaces the open share opener at the cursor with a full token. */
+    private void acceptShareSuggestion(ChatShareCandidates.Entry entry) {
+        ChatShareSuggester.Query query = this.shareSuggestions.getQuery();
+        if (entry == null || query == null
+                || refusesAnotherShareToken(entry.token())) {
+            return;
+        }
+        replaceAtCursor(query.openIndex, entry.token() + " ");
+        refreshShareSuggestions();
+    }
+
+    /**
+     * The share-token ceiling is a wall like the character counter's:
+     * the server attaches at most {@link ChatShareTokenParser#MAX_TOKENS}
+     * showcases to a message and delivers anything beyond them as the
+     * literal text, so a pick that would become dead text is refused
+     * with a notice instead of inserted. Only complete tokens count —
+     * the opener being completed is not one yet — and only share tokens
+     * are walled; an emoji is no showcase.
+     */
+    private boolean refusesAnotherShareToken(String insertion) {
+        if (insertion == null
+                || ChatShareTokenParser.parse(insertion).isEmpty()) {
+            return false;
+        }
+        if (ChatShareTokenParser.parse(this.field.getText()).size()
+                < ChatShareTokenParser.MAX_TOKENS) {
+            return false;
+        }
+        this.notices.showNotice(StatCollector.translateToLocalFormatted(
+                "gui.losttales.chat.too_many_shares",
+                Integer.valueOf(ChatShareTokenParser.MAX_TOKENS)));
+        return true;
+    }
+
+    /**
+     * Inserts a token picked from a menu — an emoji, an item or a
+     * marker share — as a word of its own: a space is put before it
+     * unless the text before the cursor is empty or already ends in one,
+     * and one follows it, so two picks in a row never run together and
+     * the next typed word stands apart.
+     */
+    void insertToken(String token) {
+        String word = token == null ? "" : token.trim();
+        if (word.length() == 0 || refusesAnotherShareToken(word)) {
+            return;
+        }
+        String text = this.field.getText();
+        int cursor = Math.max(0, Math.min(
+                this.field.getCursorPosition(), text.length()));
+        boolean separated = cursor == 0
+                || Character.isWhitespace(text.charAt(cursor - 1));
+        this.field.writeText((separated ? "" : " ") + word + " ");
+    }
+
+    /** Replaces the text from {@code from} to the cursor with a completion. */
+    private void replaceAtCursor(int from, String replacement) {
+        String text = this.field.getText();
+        int start = Math.max(0, Math.min(from, text.length()));
+        int cursor = Math.max(start, Math.min(
+                this.field.getCursorPosition(), text.length()));
+        this.field.setText(text.substring(0, start)
+                + replacement + text.substring(cursor));
+        this.field.setCursorPosition(Math.min(
+                this.field.getText().length(),
+                start + replacement.length()));
+    }
+
+    /* ---- Mention candidates ---- */
+
+    /**
+     * One candidate per online player, shaped for the selected channel,
+     * rebuilt on an interval rather than per keystroke or frame.
+     */
+    private List<ChatMentionCandidate> mentionCandidates() {
+        ChatChannel channel = ClientChatChannelState.getSelectedChannel();
+        long now = System.nanoTime();
+        if (channel == this.mentionChannel && this.mentionBuiltNanos != 0L
+                && now - this.mentionBuiltNanos < MENTION_REFRESH_NANOS) {
+            return this.mentionCandidates;
+        }
+        this.mentionBuiltNanos = now;
+        this.mentionChannel = channel;
+        List<ChatMentionCandidate> built = buildMentionCandidates(channel);
+        if (!sameCandidates(built, this.mentionCandidates)) {
+            this.mentionCandidates = built;
+            this.mentionRevision++;
+        }
+        return this.mentionCandidates;
+    }
+
+    /** The live player list and appearance cache, handed to the pure builder. */
+    private List<ChatMentionCandidate> buildMentionCandidates(
+            ChatChannel channel) {
+        if (this.mc.thePlayer == null) {
+            return new ArrayList<ChatMentionCandidate>();
+        }
+        Map<String, CharacterAppearance> byAccount =
+                new HashMap<String, CharacterAppearance>();
+        for (CharacterAppearance appearance
+                : ClientCharacterAppearanceCache.snapshot().values()) {
+            if (appearance != null && appearance.isPresent()
+                    && appearance.getAccountName().length() > 0) {
+                byAccount.put(appearance.getAccountName()
+                        .toLowerCase(Locale.ROOT), appearance);
+            }
+        }
+        CharacterRosterSnapshot snapshot =
+                ClientCharacterRosterCache.getSnapshot();
+        CharacterSummary active = snapshot == null
+                ? null : snapshot.getActiveCharacter();
+        List<String> online = new ArrayList<String>();
+        if (this.mc.thePlayer.sendQueue != null
+                && this.mc.thePlayer.sendQueue.playerInfoList != null) {
+            for (Object value : this.mc.thePlayer.sendQueue.playerInfoList) {
+                if (value instanceof GuiPlayerInfo) {
+                    online.add(((GuiPlayerInfo)value).name);
+                }
+            }
+        }
+        return mentionCandidatesFor(
+                channel.getIdentityType() == ChatIdentityType.ACCOUNT,
+                this.mc.thePlayer.getUniqueID(),
+                this.mc.thePlayer.getCommandSenderName(),
+                active == null ? "" : active.getName(), online, byAccount);
+    }
+
+    /**
+     * The candidates for one channel: the mentionable roles first, since
+     * addressing a whole group is never buried under a list of names;
+     * then the player themself; then everyone else online, alphabetical.
+     * An account channel displays and inserts the account name, a
+     * role-play channel the active character name; both names remain
+     * searchable aliases. The stable key is the player's UUID from the
+     * appearance sync where one is known, so an account and its
+     * character never appear as two entries.
+     */
+    static List<ChatMentionCandidate> mentionCandidatesFor(
+            boolean accountIdentity, UUID selfId, String selfAccount,
+            String selfCharacter, List<String> onlineAccounts,
+            Map<String, CharacterAppearance> appearancesByAccount) {
+        List<ChatMentionCandidate> result =
+                new ArrayList<ChatMentionCandidate>();
+        for (ChatAccountRole role : ChatAccountRole.mentionable()) {
+            String name = StatCollector.translateToLocal(role.getNameKey());
+            if (name.length() > 0 && !name.equals(role.getNameKey())) {
+                result.add(ChatMentionCandidate.role(
+                        "role:" + role.name().toLowerCase(Locale.ROOT),
+                        name, role.getColor()));
+            }
+        }
+        result.add(candidate(selfId == null ? "self" : selfId.toString(),
+                selfAccount, selfCharacter, accountIdentity,
+                selfId == null ? "" : selfId.toString()));
+        List<ChatMentionCandidate> others =
+                new ArrayList<ChatMentionCandidate>();
+        for (String account : onlineAccounts) {
+            if (account == null || account.trim().length() == 0
+                    || account.equalsIgnoreCase(selfAccount)) {
+                continue;
+            }
+            CharacterAppearance appearance = appearancesByAccount.get(
+                    account.toLowerCase(Locale.ROOT));
+            String key = appearance == null
+                    ? "account:" + account.toLowerCase(Locale.ROOT)
+                    : appearance.getPlayerId().toString();
+            others.add(candidate(key, account, appearance == null
+                    ? "" : appearance.getCharacterName(),
+                    accountIdentity, appearance == null ? ""
+                            : appearance.getPlayerId().toString()));
+        }
+        Collections.sort(others, new Comparator<ChatMentionCandidate>() {
+            @Override
+            public int compare(ChatMentionCandidate left,
+                               ChatMentionCandidate right) {
+                return left.getDisplayName().compareToIgnoreCase(
+                        right.getDisplayName());
+            }
+        });
+        result.addAll(others);
+        return result;
+    }
+
+    private static ChatMentionCandidate candidate(
+            String key, String account, String character,
+            boolean accountIdentity, String accountId) {
+        String display = accountIdentity || character == null
+                || character.trim().length() == 0 ? account : character;
+        return ChatMentionCandidate.player(key, display, account, character,
+                accountId, Arrays.asList(account, character));
+    }
+
+    static boolean sameCandidates(List<ChatMentionCandidate> left,
+                                  List<ChatMentionCandidate> right) {
+        if (left.size() != right.size()) {
+            return false;
+        }
+        for (int index = 0; index < left.size(); index++) {
+            ChatMentionCandidate a = left.get(index);
+            ChatMentionCandidate b = right.get(index);
+            if (!a.getKey().equals(b.getKey())
+                    || !a.getDisplayName().equals(b.getDisplayName())
+                    || !a.getAliases().equals(b.getAliases())) {
+                return false;
+            }
+        }
+        return true;
+    }
+}

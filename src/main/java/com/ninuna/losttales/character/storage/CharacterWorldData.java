@@ -111,15 +111,6 @@ public class CharacterWorldData extends WorldSavedData {
         markDirty();
     }
 
-    public CharacterRoster removeRoster(UUID ownerId) {
-        ensureWritable();
-        CharacterRoster removed = ownerId == null ? null : this.rosters.remove(ownerId);
-        if (removed != null) {
-            markDirty();
-        }
-        return removed;
-    }
-
     public int getRosterCount() {
         return this.rosters.size();
     }

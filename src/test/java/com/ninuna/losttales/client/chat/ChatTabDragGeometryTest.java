@@ -16,28 +16,28 @@ public final class ChatTabDragGeometryTest {
     public void comingBackIsAShorterReachThanLeaving() {
         // The band between the two is what stops a shaking hand tearing
         // a tab out and having it handed straight back.
-        assertTrue(LostTalesChatGui.RETURN_DISTANCE
-                < LostTalesChatGui.DETACH_DISTANCE);
+        assertTrue(ChatWindowGestures.RETURN_DISTANCE
+                < ChatWindowGestures.DETACH_DISTANCE);
         // And a row is only offered a run near its band at all within
         // the reach that would take it back, so targeting and taking
         // back cannot argue either.
-        assertTrue(LostTalesChatGui.DOCK_BAND_SLACK
-                < LostTalesChatGui.RETURN_DISTANCE);
+        assertTrue(ChatWindowGestures.DOCK_BAND_SLACK
+                < ChatWindowGestures.RETURN_DISTANCE);
     }
 
     @Test
     public void theBandBetweenLeavingAndReturningOutlastsAHandTremor() {
         // A tremor too small to start a drag cannot cross the band.
-        assertTrue(LostTalesChatGui.DETACH_DISTANCE
-                - LostTalesChatGui.RETURN_DISTANCE
-                > LostTalesChatGui.DRAG_THRESHOLD);
+        assertTrue(ChatWindowGestures.DETACH_DISTANCE
+                - ChatWindowGestures.RETURN_DISTANCE
+                > ChatWindowGestures.DRAG_THRESHOLD);
     }
 
     @Test
     public void leavingTakesLessThanARow() {
         // A run comes free before the pointer has crossed a whole tab
         // row of the window it is leaving.
-        assertTrue(LostTalesChatGui.DETACH_DISTANCE
+        assertTrue(ChatWindowGestures.DETACH_DISTANCE
                 < ChatChannelTabBar.ROW_HEIGHT);
     }
 
@@ -48,20 +48,20 @@ public final class ChatTabDragGeometryTest {
      */
     @Test
     public void escapeDistanceIsTheSameInEveryDirection() {
-        int reach = LostTalesChatGui.DETACH_DISTANCE;
+        int reach = ChatWindowGestures.DETACH_DISTANCE;
         // Straight off the band, straight past the end: the full pull.
-        assertTrue(LostTalesChatGui.pulledBeyond(reach, 0, reach));
-        assertTrue(LostTalesChatGui.pulledBeyond(0, reach, reach));
-        assertFalse(LostTalesChatGui.pulledBeyond(reach - 1, 0, reach));
-        assertFalse(LostTalesChatGui.pulledBeyond(0, reach - 1, reach));
+        assertTrue(ChatWindowGestures.pulledBeyond(reach, 0, reach));
+        assertTrue(ChatWindowGestures.pulledBeyond(0, reach, reach));
+        assertFalse(ChatWindowGestures.pulledBeyond(reach - 1, 0, reach));
+        assertFalse(ChatWindowGestures.pulledBeyond(0, reach - 1, reach));
         // Diagonally the two overhangs add as one pull: each may be
         // well short of the reach while together they are past it.
         int corner = (int)Math.ceil(reach / Math.sqrt(2.0D));
-        assertTrue(LostTalesChatGui.pulledBeyond(corner, corner, reach));
-        assertFalse(LostTalesChatGui.pulledBeyond(corner - 2, corner - 2,
+        assertTrue(ChatWindowGestures.pulledBeyond(corner, corner, reach));
+        assertFalse(ChatWindowGestures.pulledBeyond(corner - 2, corner - 2,
                 reach));
         // Resting anywhere on the strip is no pull at all.
-        assertFalse(LostTalesChatGui.pulledBeyond(0, 0, reach));
+        assertFalse(ChatWindowGestures.pulledBeyond(0, 0, reach));
     }
 
     @Test

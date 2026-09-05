@@ -63,10 +63,6 @@ public final class DiscordChannelBindingsTest {
         assertEquals("lotr:gondor", gondor.getFactionScope());
         assertTrue(gondor.readsFromDiscord());
         assertFalse(gondor.sendsToDiscord());
-        assertSame(gondor, bindings.readerOf("987654321"));
-        assertSame(ooc, bindings.readerOf("123456789"));
-        assertNull(bindings.readerOf("555"));
-        assertNull(bindings.readerOf(null));
         assertEquals(Arrays.asList(ooc, gondor), bindings.reading());
         assertEquals(Arrays.asList(ooc, global), bindings.destinations());
         assertEquals(Arrays.asList("123456789", "987654321"), bindings.channels());
@@ -156,7 +152,6 @@ public final class DiscordChannelBindingsTest {
         assertTrue(warnings.refusals.get(0),
                 warnings.refusals.get(0).contains("'all' reads Discord channel 111")
                         && warnings.refusals.get(0).contains("'ooc' reads already"));
-        assertSame(bindings.byId("ooc"), bindings.readerOf("111"));
         assertEquals(Arrays.asList(bindings.byId("ooc")), bindings.reading());
         assertEquals(DiscordBridgeDirection.DISABLED,
                 bindings.byId("all").getDirection());
@@ -300,7 +295,7 @@ public final class DiscordChannelBindingsTest {
                 "party=GAME_TO_DISCORD;webhook=" + WEBHOOK,
                 "console=DISCORD_TO_GAME;channel=123",
         }, true, warnings);
-        assertTrue(bindings.isEmpty());
+        assertTrue(bindings.all().isEmpty());
         assertEquals(3, warnings.messages.size());
         for (String message : warnings.messages) {
             assertTrue(message, message.contains("private"));

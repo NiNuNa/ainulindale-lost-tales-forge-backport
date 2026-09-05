@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.server;
 
+import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.physics.CharacterEntitySizeHelper;
 import com.ninuna.losttales.character.physics.CharacterRaceDimensions;
@@ -52,7 +53,15 @@ public final class CharacterRaceGameplayHandler {
         }
 
         EntityPlayerMP player = (EntityPlayerMP)event.player;
-        RoleplayCharacter character = CharacterActiveResolver.get(player);
+        PlayableIdentityResolver.Resolution identity =
+                PlayableIdentityResolver.resolve(player);
+        if (!identity.isAvailable()) {
+            // The roster cannot be read: what was last applied stands,
+            // since taking the race away would be a guess about a
+            // player who may well still be playing one.
+            return;
+        }
+        RoleplayCharacter character = identity.getCharacter();
 
         // Equipment is checked every tick so inventory clicks, dispensers,
         // commands, and other mods cannot leave invalid armor equipped.

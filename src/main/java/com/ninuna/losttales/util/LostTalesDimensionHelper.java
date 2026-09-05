@@ -2,9 +2,49 @@ package com.ninuna.losttales.util;
 
 import java.util.Locale;
 import lotr.common.LOTRDimension;
-/** Small dimension-name adapter for modern JSON ids in a Forge 1.7.10 world. */
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldServer;
+import net.minecraft.world.storage.MapStorage;
+
+/**
+ * Dimension names and the one world every Lost Tales store lives in.
+ * World-scoped data is kept in dimension 0's {@link MapStorage} whatever
+ * dimension the player is in, so every storage accessor resolves the
+ * overworld through {@link #overworld} and flushes through
+ * {@link #flushOverworldStorage}.
+ */
 public final class LostTalesDimensionHelper {
     private LostTalesDimensionHelper() {}
+
+    /**
+     * The server's overworld: the running server's dimension 0, or the
+     * given world when it is that dimension itself. Throws when neither
+     * can be had, since a store cannot be read from nowhere.
+     */
+    public static WorldServer overworld(World world) {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server != null) {
+            WorldServer overworld = server.worldServerForDimension(0);
+            if (overworld != null) {
+                return overworld;
+            }
+        }
+        if (world instanceof WorldServer && world.provider.dimensionId == 0) {
+            return (WorldServer)world;
+        }
+        throw new IllegalStateException(
+                "Unable to resolve the server overworld for world storage");
+    }
+
+    /**
+     * Writes every dirty store of the overworld to disk now. There is no
+     * narrower write in 1.7.10 — {@code MapStorage.saveData} is private —
+     * so a caller asking for one store's durability gets them all.
+     */
+    public static void flushOverworldStorage(World world) {
+        overworld(world).mapStorage.saveAllData();
+    }
 
     public static int parseDimensionId(String dimensionName, int fallback) {
         if (dimensionName == null || dimensionName.length() == 0) {

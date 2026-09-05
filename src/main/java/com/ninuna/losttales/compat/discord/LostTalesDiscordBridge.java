@@ -177,11 +177,12 @@ public final class LostTalesDiscordBridge {
                     + "a topic; nothing will be relayed", LostTalesMetaData.MOD_ID);
             return;
         }
-        if (!this.registered) {
-            FMLCommonHandler.instance().bus().register(this);
-            FMLCommonHandler.instance().bus().register(this.relay);
-            this.registered = true;
-        }
+        // Registered for this run and unregistered with it, so a stopped
+        // bridge hears no ticks, logins or logouts: the relay would
+        // otherwise go on queueing notices nobody sends.
+        FMLCommonHandler.instance().bus().register(this);
+        FMLCommonHandler.instance().bus().register(this.relay);
+        this.registered = true;
         if (posts && (LostTalesConfig.discordDeathMessages
                 || LostTalesConfig.discordAchievements)
                 && !Boolean.getBoolean(LostTalesClassTransformer
@@ -210,6 +211,11 @@ public final class LostTalesDiscordBridge {
     public synchronized void stop() {
         Worker running = this.worker;
         this.worker = null;
+        if (this.registered) {
+            FMLCommonHandler.instance().bus().unregister(this);
+            FMLCommonHandler.instance().bus().unregister(this.relay);
+            this.registered = false;
+        }
         if (running != null) {
             running.shutdown();
             try {
@@ -528,7 +534,8 @@ public final class LostTalesDiscordBridge {
         long messageId = LostTalesChatService.sendFromDiscord(
                 binding.getChannel(), binding.getFactionScope(),
                 message.name, message.authorId, message.text, reply);
-        this.links.link(messageId, message.discordId, "", destination);
+        // A line that came from Discord went through no webhook of ours.
+        this.links.link(messageId, message.discordId, "", destination, "");
     }
 
     /**
@@ -659,6 +666,9 @@ public final class LostTalesDiscordBridge {
                 new HashMap<String, DiscordJson.ChannelInfo>();
         /** Whether the no-PATCH warning has been said this session. */
         private boolean patchWarned;
+        /** Posts each full lane has refused, for the warning that says so. */
+        private final Map<String, Integer> droppedByLane =
+                new HashMap<String, Integer>();
 
         Worker(DiscordChannelBindings bindings, boolean reads, boolean posts,
                boolean manages) {
@@ -751,11 +761,13 @@ public final class LostTalesDiscordBridge {
                 this.typingSentMillis.put(key, Long.valueOf(now));
                 try {
                     DiscordHttp.postTyping(token, channel);
-                } catch (IOException ignored) {
+                } catch (IOException exception) {
                     // Presence that did not arrive is presence not worth
-                    // chasing; the next keystroke asks again.
-                } catch (RuntimeException ignored) {
-                    // As above.
+                    // chasing; the next keystroke asks again. Said once,
+                    // so a token that cannot type is not a mystery.
+                    noteTypingFailure(exception);
+                } catch (RuntimeException exception) {
+                    noteTypingFailure(exception);
                 }
             }
         }
@@ -1177,7 +1189,7 @@ public final class LostTalesDiscordBridge {
                     DiscordChannelBinding binding = this.bindings.byId(next.bindingKey);
                     String webhook = binding == null ? "" : binding.getWebhookUrl();
                     if (webhook.length() > 0 && !this.postingDisabled.contains(webhook)) {
-                        this.lanes.add(webhook, next);
+                        queueOnLane(webhook, next);
                     }
                     continue;
                 }
@@ -1198,9 +1210,30 @@ public final class LostTalesDiscordBridge {
                 }
                 for (String webhook : webhooks) {
                     if (!this.postingDisabled.contains(webhook)) {
-                        this.lanes.add(webhook, next);
+                        queueOnLane(webhook, next);
                     }
                 }
+            }
+        }
+
+        /**
+         * Puts an entry on a webhook's lane, or drops it when the lane
+         * is full — a webhook Discord keeps limiting — saying so once
+         * per lane, with a count of what it has cost since, so a
+         * silent gap in a channel can be read back to its cause.
+         */
+        private void queueOnLane(String webhook, Outbound entry) {
+            if (this.lanes.add(webhook, entry)) {
+                return;
+            }
+            Integer dropped = this.droppedByLane.get(webhook);
+            int count = (dropped == null ? 0 : dropped.intValue()) + 1;
+            this.droppedByLane.put(webhook, Integer.valueOf(count));
+            if (count == 1) {
+                FMLLog.warning("[%s] A Discord webhook has %d posts waiting "
+                        + "and is not taking more; newer posts to it are "
+                        + "dropped until it catches up", LostTalesMetaData.MOD_ID,
+                        Integer.valueOf(DiscordOutboundLanes.MAX_PER_LANE));
             }
         }
 
@@ -1345,15 +1378,45 @@ public final class LostTalesDiscordBridge {
                             DiscordHttp.getWebhookInfo(webhookUrl);
                     if (reply.isSuccess()) {
                         info = DiscordJson.parseWebhookInfo(reply.body);
+                    } else {
+                        noteWebhookInfoFailure("HTTP " + reply.status);
                     }
-                } catch (IOException ignored) {
-                    // As above: plain quotes, not a bridge failure.
-                } catch (RuntimeException ignored) {
-                    // As above.
+                } catch (IOException exception) {
+                    noteWebhookInfoFailure(exception.toString());
+                } catch (RuntimeException exception) {
+                    noteWebhookInfoFailure(exception.toString());
                 }
                 this.webhookInfos.put(webhookUrl, info);
             }
             return this.webhookInfos.get(webhookUrl);
+        }
+
+        private boolean typingFailureLogged;
+        private boolean webhookInfoFailureLogged;
+
+        private void noteTypingFailure(Exception exception) {
+            if (this.typingFailureLogged) {
+                return;
+            }
+            this.typingFailureLogged = true;
+            FMLLog.warning("[%s] The Discord bot could not show typing "
+                    + "presence; it will keep trying quietly: %s",
+                    LostTalesMetaData.MOD_ID, exception.toString());
+        }
+
+        /**
+         * Plain quotes rather than a bridge failure — but said once,
+         * since a jump link that never appears otherwise has no
+         * explanation anywhere.
+         */
+        private void noteWebhookInfoFailure(String cause) {
+            if (this.webhookInfoFailureLogged) {
+                return;
+            }
+            this.webhookInfoFailureLogged = true;
+            FMLLog.warning("[%s] A webhook's channel could not be read, so "
+                    + "reply quotes posted through it carry no jump link: %s",
+                    LostTalesMetaData.MOD_ID, cause);
         }
 
         private long failed(String reason) {

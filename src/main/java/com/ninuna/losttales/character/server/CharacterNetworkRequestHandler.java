@@ -21,7 +21,7 @@ public final class CharacterNetworkRequestHandler {
         execute(player, requestId, CharacterOperationType.REQUEST_ROSTER, new Operation() {
             @Override
             public CharacterOperationResult run() {
-                return CharacterService.getInstance().getRoster(player);
+                return CharacterService.getInstance().ensureRoster(player);
             }
         });
     }

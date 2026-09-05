@@ -39,11 +39,6 @@ public final class LostTalesQuestStateComponent implements CharacterStateCompone
     }
 
     @Override
-    public int getVersion() {
-        return VERSION;
-    }
-
-    @Override
     public CharacterStateApplyPhase getApplyPhase() {
         return CharacterStateApplyPhase.BEFORE_ATTRIBUTES;
     }

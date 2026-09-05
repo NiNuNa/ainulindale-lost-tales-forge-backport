@@ -101,6 +101,8 @@ import com.ninuna.losttales.chat.moderation.ChatAuditLog;
 import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
 import com.ninuna.losttales.chat.server.ChatMessageLog;
 import com.ninuna.losttales.chat.server.LostTalesChatRoleRosterWatcher;
+import com.ninuna.losttales.chat.server.LostTalesChatService;
+import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
 import com.ninuna.losttales.world.waystone.LostTalesWaystoneGenerationHandler;
 import software.bernie.geckolib3.GeckoLib;
 
@@ -312,7 +314,10 @@ public class LostTalesCommonProxy {
         LostTalesChatRoleRosterWatcher.clear();
         ChatMessageIdAllocator.reset();
         ChatMessageLog.clear();
+        LostTalesChatService.clear();
         ChatAuditLog.onServerStarting();
+        LostTalesMobAggroEventHandler.clearAll();
+        LotrRaceProfileAdapter.getInstance().clear();
         ELostTalesCommand.initAndRegisterCommands(event);
         LostTalesDiscordBridge.getInstance().start();
     }
@@ -379,7 +384,9 @@ public class LostTalesCommonProxy {
         LostTalesChatRoleRosterWatcher.clear();
         ChatMessageIdAllocator.reset();
         ChatMessageLog.clear();
+        LostTalesChatService.clear();
         ChatAuditLog.onServerStopping();
         LostTalesMobAggroEventHandler.clearAll();
+        LotrRaceProfileAdapter.getInstance().clear();
     }
 }

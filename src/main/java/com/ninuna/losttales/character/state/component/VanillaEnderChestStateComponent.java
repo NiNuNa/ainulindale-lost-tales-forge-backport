@@ -26,11 +26,6 @@ public final class VanillaEnderChestStateComponent implements CharacterStateComp
     }
 
     @Override
-    public int getVersion() {
-        return VERSION;
-    }
-
-    @Override
     public CharacterStateApplyPhase getApplyPhase() {
         return CharacterStateApplyPhase.BEFORE_ATTRIBUTES;
     }

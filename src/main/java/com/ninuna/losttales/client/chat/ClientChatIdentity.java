@@ -11,13 +11,14 @@ import net.minecraft.client.Minecraft;
 /**
  * How this client signs a line of its own. The server signs every line
  * it routes — name, colour, roles and skin — and nothing here is ever
- * sent or trusted by anyone else; the one line the client builds for
- * itself is the player's own half of an NPC conversation, which nobody
- * is on the other end of.
+ * sent or trusted by anyone else: the lines the client builds for
+ * itself are the ones nobody else sees as such — a message shown before
+ * the server's copy replaces it, the player's own half of an NPC
+ * conversation, the echo of a command.
  *
- * <p>It follows the same rules the server signs by, so a conversation
- * with an NPC reads exactly like one with a player: the appearance the
- * tab currently speaks as decides the name, an account line takes its
+ * <p>It follows the same rules the server signs by, so a locally built
+ * line reads exactly like a served one: the appearance the tab
+ * currently speaks as decides the name, an account line takes its
  * roles and the colour they give it from {@link ChatAccountRole}, and a
  * character line takes its own faction's colour. The LOTR title is the
  * server's to resolve, so a locally signed line carries none.</p>

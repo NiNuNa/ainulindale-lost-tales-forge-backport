@@ -314,7 +314,7 @@ public final class ClientChatChannelState {
 
     /**
      * Whether the local player may currently send into the channel.
-     * Identity no longer gates a channel — any channel is spoken with
+     * Identity does not gate a channel — any channel is spoken with
      * any appearance, the account included — so only the channel's own
      * access does: membership for Faction and Party, the server's word
      * for the staff channel.

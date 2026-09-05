@@ -538,11 +538,20 @@ public final class ChatWindowLayout {
         ChatTab tab = ChatTab.of(channel);
         // Asked before a window is chosen: picking one may create it,
         // and a refused restore must not leave an empty window behind.
-        if (tab == null || channel == ChatChannel.WHISPER || isOpen(tab)) {
+        if (!isRestorable(tab)) {
             return false;
         }
         ChatWindow window = receivingWindow(null, tab);
         return window != null && restore(channel, window.getId());
+    }
+
+    /**
+     * Whether a closed channel's tab may be reopened at all: it must
+     * be a plain channel's — a whisper has no tab to restore, its
+     * conversations reopen with their next line — and not open already.
+     */
+    private static boolean isRestorable(ChatTab tab) {
+        return tab != null && !tab.isWhisper() && !isOpen(tab);
     }
 
     /**
@@ -641,8 +650,7 @@ public final class ChatWindowLayout {
                                                String windowId) {
         ChatWindow window = window(windowId);
         ChatTab tab = ChatTab.of(channel);
-        if (tab == null || channel == ChatChannel.WHISPER || isOpen(tab)
-                || window == null || window.isLocked()) {
+        if (!isRestorable(tab) || window == null || window.isLocked()) {
             return false;
         }
         window.tabs().add(tab);

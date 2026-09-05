@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -507,11 +506,17 @@ public final class LostTalesClassTransformerTest {
     @Test
     public void playerDeathMessagesUseRoleplayCharacterNames()
             throws Exception {
+        System.clearProperty(
+                LostTalesClassTransformer.DEATH_MESSAGE_ACTIVE_PROPERTY);
         ClassNode transformed = transform(
                 "net.minecraft.entity.player.EntityPlayerMP");
         assertTrue(containsStaticHook(
                 transformed, "onDeath", HOOK_OWNER,
                 "resolveDeathMessage"));
+        // The patch says it applied, like every other transformer, so a
+        // runtime can tell whether roleplay death names are in force.
+        assertTrue(Boolean.getBoolean(
+                LostTalesClassTransformer.DEATH_MESSAGE_ACTIVE_PROPERTY));
     }
 
     @Test

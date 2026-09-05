@@ -10,12 +10,12 @@ import net.minecraft.client.multiplayer.ServerData;
  * <p>Minecraft keeps its own chat history for as long as the game is
  * running — {@code GuiIngame} and its {@code GuiNewChat} are built once —
  * so leaving a server and coming back does not lose the messages. What
- * used to be lost with them was everything Lost Tales knows <em>about</em>
- * those messages: which tab each line belongs to, the open conversations,
- * the scroll offsets. Rejoining therefore looked like an empty chat even
- * though the lines were still there.</p>
+ * Lost Tales knows <em>about</em> those messages — which tab each line
+ * belongs to, the open conversations, the scroll offsets — has to
+ * outlive the disconnect with them, or rejoining would show an empty
+ * chat with the lines still in the history.</p>
  *
- * <p>The session keeps that state instead, and drops it only when the
+ * <p>The session keeps that state, and drops it only when the
  * player arrives somewhere else: a different server address, or a
  * different single-player world. That is as close to "until the server
  * restarts" as a client can get on its own — the server never tells a
@@ -39,11 +39,6 @@ public final class ClientChatSession {
         boolean same = key.length() > 0 && key.equals(serverKey);
         serverKey = key;
         return same;
-    }
-
-    /** Forgets the session, so the next join starts a clean chat. */
-    public static synchronized void forget() {
-        serverKey = "";
     }
 
     /**

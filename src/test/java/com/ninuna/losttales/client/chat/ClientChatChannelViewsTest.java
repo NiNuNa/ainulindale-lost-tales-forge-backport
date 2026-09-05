@@ -77,27 +77,27 @@ public final class ClientChatChannelViewsTest {
         drawn.add(line(0));
         drawn.add(line(-10));
 
-        ChatLineFilter window = ChatLineFilter.ofChannels(java.util.Arrays.asList(
-                ChatChannel.ALL, ChatChannel.PARTY));
+        ChatLineFilter window = ChatLineFilter.of(java.util.Arrays.asList(
+                ChatTab.of(ChatChannel.ALL), ChatTab.of(ChatChannel.PARTY)));
         List<ChatLine> lines = ClientChatChannelViews.visibleLines(drawn, window);
         assertEquals(2, lines.size());
         assertEquals(-11, lines.get(0).getChatLineID());
         assertEquals(-10, lines.get(1).getChatLineID());
         assertSame(lines, ClientChatChannelViews.visibleLines(drawn,
-                ChatLineFilter.ofChannels(java.util.Arrays.asList(
-                        ChatChannel.PARTY, ChatChannel.ALL))));
+                ChatLineFilter.of(java.util.Arrays.asList(
+                        ChatTab.of(ChatChannel.PARTY), ChatTab.of(ChatChannel.ALL)))));
         // The console channel brings the untracked line with it.
         List<ChatLine> withConsole = ClientChatChannelViews.visibleLines(
-                drawn, ChatLineFilter.ofChannels(java.util.Arrays.asList(
-                        ChatChannel.OOC, ChatChannel.CONSOLE)));
+                drawn, ChatLineFilter.of(java.util.Arrays.asList(
+                        ChatTab.of(ChatChannel.OOC), ChatTab.of(ChatChannel.CONSOLE))));
         assertEquals(2, withConsole.size());
         assertEquals(-12, withConsole.get(0).getChatLineID());
         assertEquals(0, withConsole.get(1).getChatLineID());
         assertTrue(ClientChatChannelViews.visibleLines(drawn,
-                ChatLineFilter.ofChannels(java.util.Collections.<ChatChannel>emptyList()))
+                ChatLineFilter.of(java.util.Collections.<ChatTab>emptyList()))
                 .isEmpty());
-        assertTrue(ChatLineFilter.of(ChatChannel.CONSOLE).accepts(null));
-        assertFalse(ChatLineFilter.of(ChatChannel.ALL).accepts(null));
+        assertTrue(ChatLineFilter.of(ChatTab.of(ChatChannel.CONSOLE)).accepts(null));
+        assertFalse(ChatLineFilter.of(ChatTab.of(ChatChannel.ALL)).accepts(null));
         // Separate filters keep separate cached results.
         assertEquals(1, ClientChatChannelViews.visibleLines(drawn,
                 ChatChannel.OOC).size());

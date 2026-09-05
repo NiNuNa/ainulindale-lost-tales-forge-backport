@@ -68,31 +68,13 @@ final class DiscordMessageLinks {
         }
     }
 
-    /** Remembers one pair; ignores anything without both halves. */
-    void link(long messageId, String discordId) {
-        link(messageId, discordId, "", "");
-    }
-
     /**
-     * As above, with the reply header the message was posted under, for
-     * an edit to open with again; empty for a headerless line.
-     */
-    void link(long messageId, String discordId, String header) {
-        link(messageId, discordId, header, "");
-    }
-
-    /**
-     * As above, saying as well which destination the copy is in, so a
-     * correction and a quote find the copy in the right channel.
-     */
-    void link(long messageId, String discordId, String header,
-              String destination) {
-        link(messageId, discordId, header, destination, "");
-    }
-
-    /**
-     * As above, with the webhook the copy was posted through, so an edit
-     * or a removal can be sent where the post went. A message already
+     * Remembers one copy of a game message: its Discord id, the reply
+     * header it was posted under (for an edit to open with again; empty
+     * for a headerless line), the destination it is in (so a correction
+     * and a quote find the copy in the right channel) and the webhook it
+     * went through (so an edit or a removal is sent where the post
+     * went). Anything without both ids is ignored; a message already
      * holding a copy in the same destination has that copy replaced.
      */
     synchronized void link(long messageId, String discordId, String header,
@@ -132,12 +114,6 @@ final class DiscordMessageLinks {
         }
     }
 
-    /** The Discord id of a game message's first copy, or empty for none known. */
-    synchronized String discordIdOf(long messageId) {
-        List<Copy> copies = this.copiesByMessage.get(Long.valueOf(messageId));
-        return copies == null || copies.isEmpty() ? "" : copies.get(0).discordId;
-    }
-
     /** The Discord id of a game message's copy in {@code destination}, or empty. */
     synchronized String discordIdOf(long messageId, String destination) {
         List<Copy> copies = this.copiesByMessage.get(Long.valueOf(messageId));
@@ -173,18 +149,6 @@ final class DiscordMessageLinks {
             }
         }
         return null;
-    }
-
-    /** The reply header a game message's first copy was posted under; empty for none. */
-    synchronized String headerOf(long messageId) {
-        List<Copy> copies = this.copiesByMessage.get(Long.valueOf(messageId));
-        return copies == null || copies.isEmpty() ? "" : copies.get(0).header;
-    }
-
-    /** The destination of a game message's first copy; empty for none known. */
-    synchronized String destinationOf(long messageId) {
-        List<Copy> copies = this.copiesByMessage.get(Long.valueOf(messageId));
-        return copies == null || copies.isEmpty() ? "" : copies.get(0).destination;
     }
 
     /**

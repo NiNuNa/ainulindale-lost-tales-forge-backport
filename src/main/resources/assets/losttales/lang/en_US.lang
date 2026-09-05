@@ -791,6 +791,7 @@ gui.losttales.chat.ignore_full=The ignore list is full
 gui.losttales.chat.message.gone=That message is no longer here.
 gui.losttales.chat.too_many_shares=A message can hold at most %s shared items or markers.
 chat.losttales.title.suffix=, the %s
+chat.losttales.command.used=Used the command:
 chat.losttales.waystone.break_denied=Only this waystone's owner or a server operator may remove it.
 losttales.config.category.waystones=Waystones
 gui.losttales.missive_board.accept=Accept

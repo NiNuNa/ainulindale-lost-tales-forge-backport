@@ -75,8 +75,7 @@ public final class DiscordChannelBindings {
     private final Map<String, DiscordChannelBinding> byId;
     /** The bindings of each game channel key, in config order. */
     private final Map<String, List<DiscordChannelBinding>> byKey;
-    /** The one binding that reads each Discord channel, by its id. */
-    private final Map<String, DiscordChannelBinding> readerByChannel;
+    /** The bindings that read a Discord channel, one per channel, in config order. */
     private final List<DiscordChannelBinding> reading;
     /**
      * Where the bridge posts, once per webhook: the first binding to
@@ -101,8 +100,6 @@ public final class DiscordChannelBindings {
                 new LinkedHashMap<String, DiscordChannelBinding>();
         LinkedHashMap<String, List<DiscordChannelBinding>> keyed =
                 new LinkedHashMap<String, List<DiscordChannelBinding>>();
-        LinkedHashMap<String, DiscordChannelBinding> readers =
-                new LinkedHashMap<String, DiscordChannelBinding>();
         ArrayList<DiscordChannelBinding> reads = new ArrayList<DiscordChannelBinding>();
         LinkedHashMap<String, DiscordChannelBinding> posting =
                 new LinkedHashMap<String, DiscordChannelBinding>();
@@ -116,7 +113,6 @@ public final class DiscordChannelBindings {
             }
             ofKey.add(binding);
             if (binding.readsFromDiscord()) {
-                readers.put(binding.getDiscordChannelId(), binding);
                 reads.add(binding);
             }
             if (binding.sendsToDiscord()
@@ -132,7 +128,6 @@ public final class DiscordChannelBindings {
         }
         this.byId = Collections.unmodifiableMap(ids);
         this.byKey = Collections.unmodifiableMap(keyed);
-        this.readerByChannel = Collections.unmodifiableMap(readers);
         this.reading = Collections.unmodifiableList(reads);
         this.destinations = Collections.unmodifiableList(
                 new ArrayList<DiscordChannelBinding>(posting.values()));
@@ -583,12 +578,6 @@ public final class DiscordChannelBindings {
         return own == null ? Collections.<DiscordChannelBinding>emptyList() : own;
     }
 
-    /** The one binding that reads the given Discord channel, or null. */
-    public DiscordChannelBinding readerOf(String discordChannelId) {
-        return discordChannelId == null ? null
-                : this.readerByChannel.get(discordChannelId);
-    }
-
     /** The binding with this id, or null. */
     public DiscordChannelBinding byId(String id) {
         return id == null ? null : this.byId.get(id);
@@ -623,10 +612,6 @@ public final class DiscordChannelBindings {
 
     public boolean sendsAnything() {
         return !this.destinations.isEmpty();
-    }
-
-    public boolean isEmpty() {
-        return this.bindings.isEmpty();
     }
 
     /** The ids and directions, for the start-up log; never a secret. */

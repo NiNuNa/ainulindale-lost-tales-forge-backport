@@ -40,11 +40,6 @@ public final class VanillaLocationStateComponent implements CharacterStateCompon
     }
 
     @Override
-    public int getVersion() {
-        return VERSION;
-    }
-
-    @Override
     public CharacterStateApplyPhase getApplyPhase() {
         return CharacterStateApplyPhase.COORDINATOR_ONLY;
     }
@@ -158,15 +153,16 @@ public final class VanillaLocationStateComponent implements CharacterStateCompon
         // The transition service sends the authoritative location packet.
     }
 
-    public String getKind(NBTTagCompound state)
-            throws CharacterStateValidationException {
-        validate(state);
+    /**
+     * The fields of a location the caller has already passed through
+     * {@link #validate}: the transition service validates once and reads
+     * every field of the same compound after it.
+     */
+    public String getKind(NBTTagCompound state) {
         return state.getString(TAG_KIND);
     }
 
-    public int getDimension(NBTTagCompound state)
-            throws CharacterStateValidationException {
-        validate(state);
+    public int getDimension(NBTTagCompound state) {
         return state.getInteger(TAG_DIMENSION);
     }
 

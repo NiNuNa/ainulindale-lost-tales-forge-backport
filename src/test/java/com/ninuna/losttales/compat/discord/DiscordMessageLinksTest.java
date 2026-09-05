@@ -14,13 +14,13 @@ public final class DiscordMessageLinksTest {
     @Test
     public void linksAnswerInBothDirections() {
         DiscordMessageLinks links = new DiscordMessageLinks();
-        links.link(1000L, "111");
-        links.link(2000L, "222");
-        assertEquals("111", links.discordIdOf(1000L));
-        assertEquals("222", links.discordIdOf(2000L));
+        links.link(1000L, "111", "", "", "");
+        links.link(2000L, "222", "", "", "");
+        assertEquals("111", firstDiscordIdOf(links, 1000L));
+        assertEquals("222", firstDiscordIdOf(links, 2000L));
         assertEquals(1000L, links.messageIdOf("111"));
         assertEquals(2000L, links.messageIdOf("222"));
-        assertEquals("", links.discordIdOf(3000L));
+        assertEquals("", firstDiscordIdOf(links, 3000L));
         assertEquals(ChatMessageIds.NONE, links.messageIdOf("333"));
         assertEquals(ChatMessageIds.NONE, links.messageIdOf(null));
     }
@@ -28,32 +28,32 @@ public final class DiscordMessageLinksTest {
     @Test
     public void headersAreKeptForTheEditThatSaysThemAgain() {
         DiscordMessageLinks links = new DiscordMessageLinks();
-        links.link(1000L, "111", "-# reply header\n");
-        links.link(2000L, "222");
-        assertEquals("-# reply header\n", links.headerOf(1000L));
-        assertEquals("", links.headerOf(2000L));
-        assertEquals("", links.headerOf(3000L));
-        links.link(1000L, "111", null);
-        assertEquals("", links.headerOf(1000L));
+        links.link(1000L, "111", "-# reply header\n", "", "");
+        links.link(2000L, "222", "", "", "");
+        assertEquals("-# reply header\n", firstHeaderOf(links, 1000L));
+        assertEquals("", firstHeaderOf(links, 2000L));
+        assertEquals("", firstHeaderOf(links, 3000L));
+        links.link(1000L, "111", null, "", "");
+        assertEquals("", firstHeaderOf(links, 1000L));
     }
 
     @Test
     public void copiesRememberTheDestinationTheyLiveIn() {
         DiscordMessageLinks links = new DiscordMessageLinks();
-        links.link(1000L, "111", "", "channel:5");
-        links.link(2000L, "222", "-# header\n", "channel:6");
-        links.link(3000L, "333");
-        assertEquals("channel:5", links.destinationOf(1000L));
-        assertEquals("channel:6", links.destinationOf(2000L));
-        assertEquals("", links.destinationOf(3000L));
-        assertEquals("", links.destinationOf(4000L));
+        links.link(1000L, "111", "", "channel:5", "");
+        links.link(2000L, "222", "-# header\n", "channel:6", "");
+        links.link(3000L, "333", "", "", "");
+        assertEquals("channel:5", firstDestinationOf(links, 1000L));
+        assertEquals("channel:6", firstDestinationOf(links, 2000L));
+        assertEquals("", firstDestinationOf(links, 3000L));
+        assertEquals("", firstDestinationOf(links, 4000L));
         assertTrue(links.hasCopyIn(1000L, "channel:5"));
         assertFalse(links.hasCopyIn(1000L, "channel:6"));
         assertFalse(links.hasCopyIn(1000L, null));
         assertEquals("111", links.discordIdOf(1000L, "channel:5"));
         assertEquals("", links.discordIdOf(1000L, "channel:6"));
         // Both directions still answer for a placed copy.
-        assertEquals("111", links.discordIdOf(1000L));
+        assertEquals("111", firstDiscordIdOf(links, 1000L));
         assertEquals(1000L, links.messageIdOf("111"));
     }
 
@@ -76,7 +76,7 @@ public final class DiscordMessageLinksTest {
         assertEquals("222", copies.get(1).discordId);
         assertEquals("channel:6", copies.get(1).destination);
         assertEquals("-# h\n", copies.get(1).header);
-        assertEquals("111", links.discordIdOf(1000L));
+        assertEquals("111", firstDiscordIdOf(links, 1000L));
         assertEquals("222", links.discordIdOf(1000L, "channel:6"));
         assertEquals(1000L, links.messageIdOf("111"));
         assertEquals(1000L, links.messageIdOf("222"));
@@ -101,18 +101,18 @@ public final class DiscordMessageLinksTest {
     @Test
     public void halfALinkIsNoLink() {
         DiscordMessageLinks links = new DiscordMessageLinks();
-        links.link(ChatMessageIds.NONE, "111");
-        links.link(1000L, "");
-        links.link(1000L, null);
+        links.link(ChatMessageIds.NONE, "111", "", "", "");
+        links.link(1000L, "", "", "", "");
+        links.link(1000L, null, "", "", "");
         assertEquals(0, links.size());
     }
 
     @Test
     public void relinkingAMessageReplacesItsPair() {
         DiscordMessageLinks links = new DiscordMessageLinks();
-        links.link(1000L, "111");
-        links.link(1000L, "112");
-        assertEquals("112", links.discordIdOf(1000L));
+        links.link(1000L, "111", "", "", "");
+        links.link(1000L, "112", "", "", "");
+        assertEquals("112", firstDiscordIdOf(links, 1000L));
         assertEquals(1000L, links.messageIdOf("112"));
         assertEquals(ChatMessageIds.NONE, links.messageIdOf("111"));
         assertEquals(1, links.copiesOf(1000L).size());
@@ -122,34 +122,53 @@ public final class DiscordMessageLinksTest {
     public void theOldestMessagesGoFirst() {
         DiscordMessageLinks links = new DiscordMessageLinks();
         for (int index = 0; index < 600; index++) {
-            links.link(1000L + index, "d" + index);
+            links.link(1000L + index, "d" + index, "", "", "");
         }
         assertEquals(512, links.size());
-        assertEquals("", links.discordIdOf(1000L));
+        assertEquals("", firstDiscordIdOf(links, 1000L));
         assertEquals(ChatMessageIds.NONE, links.messageIdOf("d0"));
-        assertEquals("d599", links.discordIdOf(1599L));
+        assertEquals("d599", firstDiscordIdOf(links, 1599L));
         assertEquals(1599L, links.messageIdOf("d599"));
         // A message given a second copy counts as the newest again.
-        links.link(1088L, "d88b", "", "channel:2");
+        links.link(1088L, "d88b", "", "channel:2", "");
         for (int index = 600; index < 1111; index++) {
-            links.link(1000L + index, "d" + index);
+            links.link(1000L + index, "d" + index, "", "", "");
         }
         assertEquals(512, links.size());
-        assertEquals("d88", links.discordIdOf(1088L));
+        assertEquals("d88", firstDiscordIdOf(links, 1088L));
         assertEquals("d88b", links.discordIdOf(1088L, "channel:2"));
         // The messages that were older than the re-put one went first.
-        assertEquals("", links.discordIdOf(1089L));
-        assertEquals("", links.discordIdOf(1599L));
-        assertEquals("d600", links.discordIdOf(1600L));
+        assertEquals("", firstDiscordIdOf(links, 1089L));
+        assertEquals("", firstDiscordIdOf(links, 1599L));
+        assertEquals("d600", firstDiscordIdOf(links, 1600L));
     }
 
     @Test
     public void clearingForgetsEverything() {
         DiscordMessageLinks links = new DiscordMessageLinks();
-        links.link(1000L, "111");
+        links.link(1000L, "111", "", "", "");
         links.clear();
         assertEquals(0, links.size());
-        assertEquals("", links.discordIdOf(1000L));
+        assertEquals("", firstDiscordIdOf(links, 1000L));
         assertEquals(ChatMessageIds.NONE, links.messageIdOf("111"));
+    }
+
+    /** The Discord id of a game message's first copy, or empty for none. */
+    private static String firstDiscordIdOf(DiscordMessageLinks links,
+                                           long messageId) {
+        List<DiscordMessageLinks.Copy> copies = links.copiesOf(messageId);
+        return copies.isEmpty() ? "" : copies.get(0).discordId;
+    }
+
+    private static String firstHeaderOf(DiscordMessageLinks links,
+                                        long messageId) {
+        List<DiscordMessageLinks.Copy> copies = links.copiesOf(messageId);
+        return copies.isEmpty() ? "" : copies.get(0).header;
+    }
+
+    private static String firstDestinationOf(DiscordMessageLinks links,
+                                             long messageId) {
+        List<DiscordMessageLinks.Copy> copies = links.copiesOf(messageId);
+        return copies.isEmpty() ? "" : copies.get(0).destination;
     }
 }

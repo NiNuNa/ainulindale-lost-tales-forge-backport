@@ -26,11 +26,6 @@ public final class VanillaInventoryStateComponent implements CharacterStateCompo
     }
 
     @Override
-    public int getVersion() {
-        return VERSION;
-    }
-
-    @Override
     public CharacterStateApplyPhase getApplyPhase() {
         return CharacterStateApplyPhase.BEFORE_ATTRIBUTES;
     }

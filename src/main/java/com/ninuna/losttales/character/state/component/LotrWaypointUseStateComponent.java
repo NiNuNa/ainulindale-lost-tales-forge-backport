@@ -29,11 +29,6 @@ public final class LotrWaypointUseStateComponent
     }
 
     @Override
-    public int getVersion() {
-        return VERSION;
-    }
-
-    @Override
     public CharacterStateApplyPhase getApplyPhase() {
         return CharacterStateApplyPhase.BEFORE_ATTRIBUTES;
     }

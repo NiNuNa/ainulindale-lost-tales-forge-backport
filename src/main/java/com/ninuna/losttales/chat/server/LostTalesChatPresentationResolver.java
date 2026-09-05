@@ -1,10 +1,10 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.faction.FactionDemonyms;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import java.util.regex.Pattern;
 import lotr.common.LOTRLevelData;
 import lotr.common.LOTRPlayerData;
 import lotr.common.LOTRTitle;
@@ -12,14 +12,6 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 /** Reads optional LOTR presentation fields without making routing depend on them. */
 final class LostTalesChatPresentationResolver {
-    /**
-     * Vanilla's own formatting-code pattern. Not
-     * {@code EnumChatFormatting.getTextWithoutFormattingCodes}: that is
-     * {@code @SideOnly(CLIENT)} in 1.7.10 and does not exist on a
-     * dedicated server.
-     */
-    private static final Pattern FORMATTING_CODES =
-            Pattern.compile("(?i)§[0-9A-FK-OR]");
 
     private LostTalesChatPresentationResolver() {}
 
@@ -52,8 +44,7 @@ final class LostTalesChatPresentationResolver {
             // colours the title.
             String name = LotrCharacterAdapter.getInstance()
                     .getFactionDisplayName(character.getStartingFactionId());
-            String plain = name == null ? ""
-                    : FORMATTING_CODES.matcher(name).replaceAll("").trim();
+            String plain = ChatFormattingCodes.stripSectionCodes(name).trim();
             factionName = FactionDemonyms.of(
                     character.getStartingFactionId(), plain);
         }

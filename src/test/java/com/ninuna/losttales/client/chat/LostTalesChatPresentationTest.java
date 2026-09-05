@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -15,6 +16,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public final class LostTalesChatPresentationTest {
@@ -199,9 +201,9 @@ public final class LostTalesChatPresentationTest {
             }
             assertEquals("Global: <  Aldric> Good harvest.",
                     plainText.toString());
-            assertEquals("Farmer", LostTalesChatPresentation.epithet("", "Farmer"));
+            assertEquals("Farmer", ChatEpithet.epithet("", "Farmer"));
             assertEquals("Gondor Farmer",
-                    LostTalesChatPresentation.epithet(" Gondor ", "Farmer "));
+                    ChatEpithet.epithet(" Gondor ", "Farmer "));
         } finally {
             LostTalesConfig.showChatTimestamps = originalTimestamps;
         }
@@ -618,6 +620,104 @@ public final class LostTalesChatPresentationTest {
         } finally {
             LostTalesConfig.showChatTimestamps = originalTimestamps;
         }
+    }
+
+    /**
+     * A command echo is a line of the sender's like any other: the same
+     * header, part for part, and a body row that opens with the words
+     * saying it was a command instead of the chevron. The body is the
+     * command exactly as typed — nothing in it is markup, an emoji or a
+     * mention — and its grouped form carries the same words.
+     */
+    @Test
+    public void commandEchoesShareTheHeaderAndKeepTheBodyVerbatim() {
+        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
+        boolean originalEmojis = LostTalesConfig.enableChatEmojis;
+        LostTalesConfig.showChatTimestamps = false;
+        LostTalesConfig.enableChatEmojis = true;
+        try {
+            String command = "/losttales hud **bold** :smile: @Arathorn";
+            LostTalesChatMessagePacket packet =
+                    new LostTalesChatMessagePacket(
+                            ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                            "RangerOfTheNorth", "", 0x55AA55, 0x336633,
+                            command, 123456789L,
+                            "losttales:human_ranger_male_2");
+            IChatComponent said = LostTalesChatPresentation.build(packet,
+                    ChatTab.of(ChatChannel.ALL), new int[0], false,
+                    ChatBodyKind.MESSAGE);
+            IChatComponent used = LostTalesChatPresentation.build(packet,
+                    ChatTab.of(ChatChannel.ALL), new int[0], false,
+                    ChatBodyKind.COMMAND);
+
+            assertEquals(headerOf(said), headerOf(used));
+            assertEquals("Global: <  Arathorn> ", headerOf(used));
+            assertNull(labelOf(said));
+            assertEquals("Used the command: ", labelOf(used));
+
+            java.util.List<IChatComponent> body = bodyOf(used);
+            assertEquals(1, body.size());
+            assertEquals(command, body.get(0).getUnformattedTextForChat());
+            assertEquals(EnumChatFormatting.WHITE,
+                    body.get(0).getChatStyle().getColor());
+            assertNull(body.get(0).getChatStyle().getChatClickEvent());
+            // The message form of the same words is read for markup.
+            assertTrue(bodyOf(said).size() > 1);
+
+            IChatComponent grouped = LostTalesChatPresentation.build(
+                    packet, ChatTab.of(ChatChannel.ALL), new int[0], true,
+                    ChatBodyKind.COMMAND);
+            assertEquals("", headerOf(grouped));
+            assertEquals("Used the command: ", labelOf(grouped));
+            assertEquals(command,
+                    bodyOf(grouped).get(0).getUnformattedTextForChat());
+        } finally {
+            LostTalesConfig.showChatTimestamps = originalTimestamps;
+            LostTalesConfig.enableChatEmojis = originalEmojis;
+        }
+    }
+
+    /** The line's text before its body break. */
+    private static String headerOf(IChatComponent message) {
+        StringBuilder header = new StringBuilder();
+        for (Object value : message) {
+            IChatComponent part = (IChatComponent)value;
+            if (ChatLayoutMarker.isBodyBreak(part)) {
+                break;
+            }
+            header.append(part.getUnformattedTextForChat());
+        }
+        return header.toString();
+    }
+
+    /** The label the line's body break carries, or null for the chevron. */
+    private static String labelOf(IChatComponent message) {
+        for (Object value : message) {
+            IChatComponent part = (IChatComponent)value;
+            if (ChatLayoutMarker.isBodyBreak(part)) {
+                return ChatLayoutMarker.bodyLabel(part);
+            }
+        }
+        return null;
+    }
+
+    /** The parts after the line's body break. */
+    private static java.util.List<IChatComponent> bodyOf(
+            IChatComponent message) {
+        java.util.List<IChatComponent> body =
+                new java.util.ArrayList<IChatComponent>();
+        boolean started = false;
+        for (Object value : message) {
+            IChatComponent part = (IChatComponent)value;
+            if (ChatLayoutMarker.isBodyBreak(part)) {
+                started = true;
+                continue;
+            }
+            if (started) {
+                body.add(part);
+            }
+        }
+        return body;
     }
 
     private static ChatHeadMarker.Data markerOf(IChatComponent message) {

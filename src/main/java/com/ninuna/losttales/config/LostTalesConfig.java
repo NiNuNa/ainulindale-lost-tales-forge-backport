@@ -147,10 +147,10 @@ public final class LostTalesConfig {
      * a preference: the coremod feeds it to vanilla's own trimming.
      */
     public static int chatHistoryLines = 1000;
-    /** Tell others when this player is typing; show others' typing. */
     /** Server only: the opt-in moderation record of what was said. */
     public static boolean chatAuditLogEnabled = false;
     public static int chatAuditRetentionDays = 30;
+    /** Tell others when this player is typing; show others' typing. */
     public static boolean sendChatTypingStatus = true;
     public static boolean showChatTypingIndicators = true;
     /** Server switch for relaying typing presence at all. */

@@ -38,29 +38,9 @@ final class DiscordChannelStatus {
         this.channelId = channelId == null ? "" : channelId;
     }
 
-    /** The Discord channel this topic belongs to. */
-    String channelId() {
-        return this.channelId;
-    }
-
     /** States the topic the channel should show; any thread. */
     synchronized void request(String topic) {
         this.desired = topic == null ? "" : topic;
-    }
-
-    /** Forgets what was applied, so the next session writes afresh. */
-    synchronized void reset() {
-        this.desired = "";
-        this.applied = "";
-        this.notBeforeMillis = 0L;
-        this.rateLimitedUntilMillis = 0L;
-        this.backoffMillis = MIN_BACKOFF_MILLIS;
-        this.disabled = false;
-        this.healthy = true;
-    }
-
-    synchronized boolean isDisabled() {
-        return this.disabled;
     }
 
     /** Whether a write is wanted and allowed now; the worker asks before each loop. */

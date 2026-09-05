@@ -242,37 +242,26 @@ public final class CharacterValidator {
         return CharacterValidationResult.success();
     }
 
+    /** A name as stored: NFC, trimmed, one space between words. */
     public static String normalizeName(String input) {
-        if (input == null) {
-            return "";
-        }
-        String normalized = Normalizer.normalize(input, Normalizer.Form.NFC);
-        StringBuilder output = new StringBuilder(normalized.length());
-        boolean pendingSpace = false;
-        for (int offset = 0; offset < normalized.length();) {
-            int codePoint = normalized.codePointAt(offset);
-            offset += Character.charCount(codePoint);
-            if (Character.isWhitespace(codePoint)) {
-                if (output.length() > 0) {
-                    pendingSpace = true;
-                }
-                continue;
-            }
-            if (pendingSpace) {
-                output.append(' ');
-                pendingSpace = false;
-            }
-            output.appendCodePoint(codePoint);
-        }
-        return output.toString();
+        return normalizeWhitespace(input);
     }
 
     public static String normalizeNameKey(String input) {
         return normalizeName(input).toLowerCase(Locale.ROOT);
     }
 
-    /** Normalizes user biography whitespace without permitting formatting codes. */
+    /** A biography as stored: the same rule a name follows. */
     public static String normalizeDescription(String input) {
+        return normalizeWhitespace(input);
+    }
+
+    /**
+     * NFC-normalised text with its whitespace folded: none leading or
+     * trailing, one plain space between words. Formatting codes are
+     * not touched here; the validators refuse them.
+     */
+    private static String normalizeWhitespace(String input) {
         if (input == null) {
             return "";
         }

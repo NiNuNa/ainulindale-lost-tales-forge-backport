@@ -317,16 +317,7 @@ public final class LostTalesChatSendPacket implements IMessage {
                     new LostTalesServerTaskQueue.PlayerTask() {
                         @Override
                         public void run(EntityPlayerMP livePlayer) {
-                            LostTalesChatService.send(
-                                    livePlayer, message.getChannel(),
-                                    message.getMessage(),
-                                    message.getReferences(),
-                                    message.getTarget(),
-                                    message.getAppearanceKind(),
-                                    message.getAppearanceCharacterId(),
-                                    message.getReplyToMessageId(),
-                                    message.getTargetIdentity(),
-                                    message.getEchoNonce());
+                            LostTalesChatService.send(livePlayer, message);
                         }
                     });
             return null;

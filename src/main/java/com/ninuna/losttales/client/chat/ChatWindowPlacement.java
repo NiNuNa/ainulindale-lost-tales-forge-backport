@@ -442,33 +442,6 @@ public final class ChatWindowPlacement {
                 room);
     }
 
-    /**
-     * The box the window would occupy at the given anchor percents once
-     * it has grown to its full line cap: what the auto-open placement
-     * measures candidate spots with, so a fresh window is judged by the
-     * room it is about to take rather than by the one empty line it
-     * starts with.
-     */
-    static Box prospectiveBounds(ChatWindow window, double offsetX,
-                                 double offsetY, Minecraft minecraft,
-                                 int screenWidth, int screenHeight) {
-        int width = windowWidth(window, minecraft);
-        double room = roomForLines(Math.max(1.0D,
-                lineCap(window, minecraft)), minecraft);
-        double height = heightForRoom(room, minecraft);
-        double maxHeight = Math.max(minHeight(minecraft),
-                screenHeight - 2.0D * HudPlacementLayout.SCREEN_MARGIN);
-        if (height > maxHeight) {
-            room = Math.max(1.0D, room - (height - maxHeight));
-            height = heightForRoom(room, minecraft);
-        }
-        int barHeight = barHeight(minecraft);
-        double baseline = keepOnScreen(baselineFor(offsetY, minecraft,
-                screenHeight), height, barHeight, screenHeight);
-        return new Box(position(offsetX, screenWidth, width),
-                baseline - (height - barHeight), width, height, barHeight,
-                room);
-    }
 
     /**
      * Pushes a baseline down when the box above it would cross the top
@@ -694,23 +667,6 @@ public final class ChatWindowPlacement {
                 window);
         return boxWidthForChatWidth(
                 Math.max(minChatWidth(minecraft), row), minecraft);
-    }
-
-    /**
-     * Gives one window a width of its own. The window lays its own lines
-     * out at it, so nothing else in the chat — no other window, and not
-     * the closed-chat feed — changes with it.
-     */
-    public static void applyWindowWidth(Minecraft minecraft,
-                                        ChatWindow window, int chatWidth) {
-        if (window == null) {
-            return;
-        }
-        if (!ChatWindowLines.isAvailable()) {
-            ChatWindowLines.logUnavailableOnce();
-            return;
-        }
-        ChatWindowLayout.setWindowWidth(window.getId(), chatWidth, true);
     }
 
     public static double preciseMouseX(Minecraft minecraft, int screenWidth) {

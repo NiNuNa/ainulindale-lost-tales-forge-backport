@@ -150,12 +150,8 @@ public final class LostTalesChatClientHandler {
             ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
             if (!ChatWindowLayout.isOpen(console)
                     && !ChatWindowLayout.isHidden(console)) {
-                // The active window takes the tab first, like any other
-                // reopening channel.
-                ChatWindow selectedWindow = ChatWindowLayout.windowOf(
-                        ClientChatChannelState.getSelected());
-                ChatWindowLayout.openTab(console, selectedWindow == null
-                        ? null : selectedWindow.getId());
+                ChatWindowLayout.openTab(console,
+                        LostTalesChatPresentation.windowIdOfSelection());
             }
         } catch (RuntimeException ignored) {
             // Watching is best-effort; the chat itself is untouched.

@@ -1,7 +1,7 @@
 package com.ninuna.losttales.compat.discord;
 
+import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import java.util.regex.Pattern;
 
 /**
  * The words, colours and icons of the bridge's own posts, and the words
@@ -25,16 +25,6 @@ public final class DiscordServerNotices {
     private static final String SEPARATOR = " • ";
     /** Discord caps a channel topic at 1024 characters; ours is far shorter. */
     private static final int MAX_TOPIC_LENGTH = 1024;
-    /**
-     * Vanilla's own formatting-code pattern: a team colour on a name, a
-     * coloured item name in a death message. Discord shows the codes as
-     * text, so they go. Not
-     * {@code EnumChatFormatting.getTextWithoutFormattingCodes}, which is
-     * client-only in 1.7.10.
-     */
-    private static final Pattern FORMATTING_CODES =
-            Pattern.compile("(?i)§[0-9A-FK-OR]");
-
     private DiscordServerNotices() {}
 
     public static DiscordNotice serverStarted() {
@@ -109,11 +99,10 @@ public final class DiscordServerNotices {
      * breaks and runs of whitespace folded to one space, trimmed.
      */
     static String plain(String text) {
-        if (text == null) {
-            return "";
-        }
-        String stripped = FORMATTING_CODES.matcher(text).replaceAll("");
-        return stripped.replaceAll("\\s+", " ").trim();
+        // Discord shows a formatting code — a team colour on a name, a
+        // coloured item name in a death message — as text, so they go.
+        return ChatFormattingCodes.stripSectionCodes(text)
+                .replaceAll("\\s+", " ").trim();
     }
 
     private static String bound(String topic) {

@@ -19,10 +19,11 @@ import net.minecraft.util.IChatComponent;
  * the message — the quote a reply opens with — and the rest of the line
  * is laid out after it exactly as an unbroken one would be. A <em>body
  * break</em> marker after the sender ends the header row and opens the
- * message body on the next one, behind the chevron the wrapper draws in
- * the sender's colour ({@link ChatBodyMarker}); it carries that colour,
- * since a grouped continuation has no head marker to read it from. An
- * <em>indent</em>
+ * message body on the next one, behind the separator the wrapper draws
+ * in the sender's colour ({@link ChatBodyMarker}) — the chat's chevron,
+ * or a label the line names itself, such as the words a command echo
+ * opens with; it carries that colour, since a grouped continuation has
+ * no head marker to read it from. An <em>indent</em>
  * marker opens every continuation line of a wrapped message and records
  * the anchor's offset twice — for the closed HUD (channel prefix shown)
  * and the open screen (prefix hidden) — so continuation lines land under
@@ -54,12 +55,27 @@ final class ChatLayoutMarker {
     /**
      * Ends the header row and opens the message body. Everything before
      * it is the message's header; everything after it is its body, which
-     * begins on a row of its own. {@code senderColor} is the colour the
-     * body's chevron is drawn in: the marker carries it because a
-     * grouped line has no head marker to read it from.
+     * begins on a row of its own behind the chat's chevron.
+     * {@code senderColor} is the colour the chevron is drawn in: the
+     * marker carries it because a grouped line has no head marker to
+     * read it from.
      */
     static ChatComponentText bodyBreak(int senderColor) {
         return marker(PREFIX + BODY + (senderColor & 0xFFFFFF));
+    }
+
+    /**
+     * As above, opening the body behind {@code label} instead of the
+     * chevron: the words a line puts between its sender and its body,
+     * drawn in the sender's colour exactly as the chevron is. An empty
+     * label is the chevron.
+     */
+    static ChatComponentText bodyBreak(int senderColor, String label) {
+        if (label == null || label.length() == 0) {
+            return bodyBreak(senderColor);
+        }
+        return marker(PREFIX + BODY + (senderColor & 0xFFFFFF) + ':'
+                + label);
     }
 
     static ChatComponentText indent(int closedWidth, int openWidth) {
@@ -161,12 +177,32 @@ final class ChatLayoutMarker {
         if (payload == null || !payload.startsWith(BODY)) {
             return -1;
         }
+        String fields = payload.substring(BODY.length());
+        int labelStart = fields.indexOf(':');
         try {
-            return Integer.parseInt(payload.substring(BODY.length()))
-                    & 0xFFFFFF;
+            return Integer.parseInt(labelStart < 0 ? fields
+                    : fields.substring(0, labelStart)) & 0xFFFFFF;
         } catch (NumberFormatException ignored) {
             return -1;
         }
+    }
+
+    /**
+     * The label a body break opens the body with, or null for the
+     * chat's chevron — and null as well when the component is not a
+     * body break at all.
+     */
+    static String bodyLabel(IChatComponent component) {
+        String payload = payloadOf(component);
+        if (payload == null || !payload.startsWith(BODY)) {
+            return null;
+        }
+        String fields = payload.substring(BODY.length());
+        int labelStart = fields.indexOf(':');
+        if (labelStart < 0 || labelStart + 1 >= fields.length()) {
+            return null;
+        }
+        return fields.substring(labelStart + 1);
     }
 
     static final class Data {

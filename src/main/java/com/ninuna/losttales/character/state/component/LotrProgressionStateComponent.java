@@ -28,11 +28,6 @@ public final class LotrProgressionStateComponent implements CharacterStateCompon
     }
 
     @Override
-    public int getVersion() {
-        return VERSION;
-    }
-
-    @Override
     public CharacterStateApplyPhase getApplyPhase() {
         return CharacterStateApplyPhase.BEFORE_ATTRIBUTES;
     }

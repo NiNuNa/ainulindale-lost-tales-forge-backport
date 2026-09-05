@@ -34,11 +34,6 @@ public final class VanillaVitalsStateComponent implements CharacterStateComponen
     }
 
     @Override
-    public int getVersion() {
-        return VERSION;
-    }
-
-    @Override
     public CharacterStateApplyPhase getApplyPhase() {
         return CharacterStateApplyPhase.AFTER_ATTRIBUTES;
     }

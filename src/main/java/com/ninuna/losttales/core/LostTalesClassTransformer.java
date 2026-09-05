@@ -99,6 +99,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.lotrFastTravelArrivalTransformer.active";
     public static final String SERVER_BROADCAST_ACTIVE_PROPERTY =
             "losttales.serverBroadcastTransformer.active";
+    public static final String DEATH_MESSAGE_ACTIVE_PROPERTY =
+            "losttales.deathMessageTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
@@ -836,6 +838,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 if (containsHook(
                         method, ROLEPLAY_IDENTITY_HOOK_OWNER,
                         "resolveDeathMessage")) {
+                    System.setProperty(DEATH_MESSAGE_ACTIVE_PROPERTY, "true");
                     return basicClass;
                 }
                 for (AbstractInsnNode instruction =
@@ -863,6 +866,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             "resolveDeathMessage",
                             DEATH_MESSAGE_HOOK_DESC));
                     method.instructions.insert(invocation, hook);
+                    System.setProperty(DEATH_MESSAGE_ACTIVE_PROPERTY, "true");
                     info("Patched player death messages with roleplay names");
                     return write(owner);
                 }

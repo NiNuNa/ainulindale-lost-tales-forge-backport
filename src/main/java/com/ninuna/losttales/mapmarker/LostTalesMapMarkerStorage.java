@@ -1,6 +1,6 @@
 package com.ninuna.losttales.mapmarker;
 
-import net.minecraft.server.MinecraftServer;
+import com.ninuna.losttales.util.LostTalesDimensionHelper;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.storage.MapStorage;
@@ -17,7 +17,7 @@ public final class LostTalesMapMarkerStorage {
             throw new IllegalArgumentException(
                     "Map marker storage is server-side only");
         }
-        WorldServer overworld = resolveOverworld(world);
+        WorldServer overworld = LostTalesDimensionHelper.overworld(world);
         MapStorage storage = overworld.mapStorage;
         LostTalesMapMarkerWorldData data =
                 (LostTalesMapMarkerWorldData)storage.loadData(
@@ -32,21 +32,5 @@ public final class LostTalesMapMarkerStorage {
         LostTalesMapMarkerCatalog.ensureLoaded();
         data.seedDefinitions(LostTalesMapMarkerCatalog.getMarkers());
         return data;
-    }
-
-    private static WorldServer resolveOverworld(World world) {
-        MinecraftServer server = MinecraftServer.getServer();
-        if (server != null) {
-            WorldServer overworld = server.worldServerForDimension(0);
-            if (overworld != null) {
-                return overworld;
-            }
-        }
-        if (world instanceof WorldServer
-                && world.provider.dimensionId == 0) {
-            return (WorldServer)world;
-        }
-        throw new IllegalStateException(
-                "Unable to resolve overworld marker storage");
     }
 }

@@ -305,12 +305,6 @@ public final class CharacterLifecycleStateTracker {
         lastDisconnectedCombatPruneAt = 0L;
     }
 
-    public static void clearAll() {
-        STATES.clear();
-        DISCONNECTED_COMBAT.clear();
-        lastDisconnectedCombatPruneAt = 0L;
-    }
-
     private static void beginTransition(EntityPlayerMP player, boolean respawning) {
         if (!isServerPlayer(player)) {
             return;

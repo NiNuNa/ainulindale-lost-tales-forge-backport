@@ -1,6 +1,6 @@
 package com.ninuna.losttales.character.switching;
 
-import net.minecraft.server.MinecraftServer;
+import com.ninuna.losttales.util.LostTalesDimensionHelper;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.storage.MapStorage;
@@ -11,7 +11,7 @@ public final class CharacterSwitchStorage {
     private CharacterSwitchStorage() {}
 
     public static CharacterSwitchWorldData get(World world) {
-        WorldServer overworld = resolveOverworld(world);
+        WorldServer overworld = LostTalesDimensionHelper.overworld(world);
         MapStorage storage = overworld.mapStorage;
         CharacterSwitchWorldData data = (CharacterSwitchWorldData) storage.loadData(
                 CharacterSwitchWorldData.class,
@@ -29,26 +29,6 @@ public final class CharacterSwitchStorage {
      * dirty overworld map data to disk instead of waiting for the next autosave.
      */
     public static void flush(World world) {
-        resolveOverworld(world).mapStorage.saveAllData();
-    }
-
-    private static WorldServer resolveOverworld(World world) {
-        if (world == null) {
-            throw new IllegalArgumentException("world must not be null");
-        }
-        if (world.isRemote) {
-            throw new IllegalArgumentException("Character switch storage is server-side only");
-        }
-        MinecraftServer server = MinecraftServer.getServer();
-        if (server != null) {
-            WorldServer overworld = server.worldServerForDimension(0);
-            if (overworld != null) {
-                return overworld;
-            }
-        }
-        if (world instanceof WorldServer && world.provider.dimensionId == 0) {
-            return (WorldServer) world;
-        }
-        throw new IllegalStateException("Unable to resolve server overworld for character switch storage");
+        LostTalesDimensionHelper.flushOverworldStorage(world);
     }
 }

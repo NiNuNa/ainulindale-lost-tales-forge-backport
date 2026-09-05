@@ -64,7 +64,6 @@ final class DiscordHttp {
         return exchange(connection, null);
     }
 
-    /** Posts a webhook body; Discord answers 204 with nothing on success. */
     /**
      * Tells Discord the bot is typing in the channel, which shows its
      * own indicator there for about ten seconds. Presence only: no text

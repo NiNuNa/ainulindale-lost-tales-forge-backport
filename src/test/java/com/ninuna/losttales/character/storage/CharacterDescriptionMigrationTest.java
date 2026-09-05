@@ -1,6 +1,5 @@
 package com.ninuna.losttales.character.storage;
 
-import com.ninuna.losttales.character.model.CharacterProgression;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
@@ -52,16 +51,11 @@ public final class CharacterDescriptionMigrationTest {
         String skinId = CharacterSkinRegistry.getCompatibleSkins(
                 CharacterRaceRegistry.HUMAN,
                 CharacterGenderRegistry.MALE).get(0).getId();
-        return new RoleplayCharacter(
-                CHARACTER, OWNER, 0, "Traveller",
-                CharacterRaceRegistry.HUMAN,
-                CharacterGenderRegistry.MALE,
-                skinId, 30, "lotr:bree",
-                RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL,
-                new CharacterProgression(), 1L,
-                RoleplayCharacter.CURRENT_DATA_VERSION,
-                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
-                "", false, description);
+        return RoleplayCharacter.builder(CHARACTER, OWNER)
+                .name("Traveller").race(CharacterRaceRegistry.HUMAN)
+                .gender(CharacterGenderRegistry.MALE).skin(skinId).age(30)
+                .startingFaction("lotr:bree").createdAt(1L)
+                .description(description)
+                .build();
     }
 }

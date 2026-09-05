@@ -7,7 +7,7 @@ import com.ninuna.losttales.chat.moderation.ChatMuteWorldData;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
-import java.util.ArrayList;
+import com.ninuna.losttales.util.LostTalesServerPlayers;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.command.ICommandSender;
@@ -89,7 +89,7 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
                     + "/losttales chat mute <player> [30s|15m|2h|7d] [reason]");
             return;
         }
-        EntityPlayerMP target = findOnlinePlayer(args[1]);
+        EntityPlayerMP target = LostTalesServerPlayers.findOnline(args[1]);
         DiscordMember member = target == null
                 ? DiscordMember.parse(args[1]) : null;
         if (target == null && member == null) {
@@ -139,7 +139,7 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
                     + "/losttales chat unmute <player>");
             return;
         }
-        EntityPlayerMP online = findOnlinePlayer(args[1]);
+        EntityPlayerMP online = LostTalesServerPlayers.findOnline(args[1]);
         DiscordMember member = online == null
                 ? DiscordMember.parse(args[1]) : null;
         ChatMuteEntry lifted = online != null
@@ -279,25 +279,6 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
         return joined.toString();
     }
 
-    private static EntityPlayerMP findOnlinePlayer(String name) {
-        MinecraftServer server = MinecraftServer.getServer();
-        String wanted = name == null ? "" : name.trim();
-        if (wanted.length() == 0 || server == null
-                || server.getConfigurationManager() == null
-                || server.getConfigurationManager().playerEntityList == null) {
-            return null;
-        }
-        @SuppressWarnings("unchecked")
-        List<EntityPlayerMP> online =
-                server.getConfigurationManager().playerEntityList;
-        for (EntityPlayerMP candidate : online) {
-            if (candidate != null && wanted.equalsIgnoreCase(
-                    candidate.getCommandSenderName())) {
-                return candidate;
-            }
-        }
-        return null;
-    }
 
     private World resolveWorld(ICommandSender sender) {
         if (sender instanceof EntityPlayerMP) {

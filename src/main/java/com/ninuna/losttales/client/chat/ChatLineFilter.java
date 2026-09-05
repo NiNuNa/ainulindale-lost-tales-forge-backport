@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.chat.ChatChannel;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -31,10 +30,6 @@ final class ChatLineFilter {
                 tab.getChannel() == ClientChatChannelViews.SYSTEM_LINE_VIEW);
     }
 
-    static ChatLineFilter of(ChatChannel channel) {
-        return of(ChatTab.of(channel));
-    }
-
     /** Several tabs; untracked lines ride with the console tab. */
     static ChatLineFilter of(Collection<ChatTab> tabs) {
         Set<ChatTab> set = new HashSet<ChatTab>();
@@ -49,19 +44,6 @@ final class ChatLineFilter {
             }
         }
         return new ChatLineFilter(set, untracked);
-    }
-
-    /** Several plain channels. */
-    static ChatLineFilter ofChannels(Collection<ChatChannel> channels) {
-        Set<ChatTab> set = new HashSet<ChatTab>();
-        if (channels != null) {
-            for (ChatChannel channel : channels) {
-                if (channel != null) {
-                    set.add(ChatTab.of(channel));
-                }
-            }
-        }
-        return of(set);
     }
 
     boolean isEmpty() {

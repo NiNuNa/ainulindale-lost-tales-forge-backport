@@ -7,7 +7,6 @@ import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipRecor
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipResult;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorldData;
-import com.ninuna.losttales.character.model.CharacterProgression;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
@@ -499,17 +498,14 @@ public final class LoreCharacterTransferCoordinator {
         if (faction == null) return null;
         String waypoint = LotrCharacterAdapter.getInstance()
                 .resolveStartingWaypointId(faction, "", false);
-        return new RoleplayCharacter(
-                characterId, ownerId, slotIndex, definition.getName(),
-                appearance.getRaceId(), appearance.getGenderId(),
-                appearance.getSkinId(), 18, faction,
-                RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL,
-                new CharacterProgression(), System.currentTimeMillis(),
-                RoleplayCharacter.CURRENT_DATA_VERSION,
-                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
-                waypoint == null ? "" : waypoint,
-                false, definition.getDescription());
+        return RoleplayCharacter.builder(characterId, ownerId)
+                .slot(slotIndex).name(definition.getName())
+                .race(appearance.getRaceId()).gender(appearance.getGenderId())
+                .skin(appearance.getSkinId()).age(18).startingFaction(faction)
+                .createdAt(System.currentTimeMillis())
+                .startingWaypoint(waypoint)
+                .description(definition.getDescription())
+                .build();
     }
 
     private static String chooseFaction(
@@ -551,17 +547,10 @@ public final class LoreCharacterTransferCoordinator {
 
     private static RoleplayCharacter rebind(
             RoleplayCharacter source, UUID ownerId, int slotIndex) {
-        return new RoleplayCharacter(
-                source.getCharacterId(), ownerId, slotIndex, source.getName(),
-                source.getRaceId(), source.getGenderId(), source.getSkinId(),
-                source.getAge(), source.getStartingFactionId(),
-                source.getRoleplayLevel(), source.getProgression(),
-                source.getCreationTimestamp(),
-                RoleplayCharacter.CURRENT_DATA_VERSION,
-                source.isMinecraftCapeVisible(), source.getCosmeticCapeId(),
-                source.getStartingWaypointId(),
-                source.hasUnconventionalSettings(), source.getDescription(),
-                source.getBodyTypeId(), source.getChestTypeId());
+        return RoleplayCharacter.builder(source)
+                .owner(ownerId).slot(slotIndex)
+                .dataVersion(RoleplayCharacter.CURRENT_DATA_VERSION)
+                .build();
     }
 
     private static UUID uniqueId(Stores stores) {

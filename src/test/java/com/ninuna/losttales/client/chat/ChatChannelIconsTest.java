@@ -16,6 +16,11 @@ public final class ChatChannelIconsTest {
         for (ChatChannel channel : ChatChannel.values()) {
             assertNotNull(channel + " has no icon",
                     ChatChannelIcons.iconOf(channel));
+            if (channel == ChatChannel.WHISPER) {
+                // A whisper has no plain tab: each names a partner.
+                assertNull(ChatTab.of(channel));
+                continue;
+            }
             assertEquals(ChatChannelIcons.iconOf(channel),
                     ChatChannelIcons.iconOf(ChatTab.of(channel)));
         }

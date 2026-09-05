@@ -681,28 +681,22 @@ public final class CharacterNbtCodec {
                     rosterOwnerId, characterId, source));
         }
 
-        RoleplayCharacter character = new RoleplayCharacter(
-                characterId,
-                characterOwnerId,
-                slotIndex,
-                name,
-                raceId,
-                genderId,
-                skinId,
-                age,
-                startingFactionId,
-                roleplayLevel,
-                progressionResult.progression,
-                creationTimestamp,
-                RoleplayCharacter.CURRENT_DATA_VERSION,
-                showMinecraftCape,
-                cosmeticCapeId,
-                startingWaypointId,
-                unconventionalSettings,
-                description,
-                bodyTypeId,
-                chestTypeId
-        );
+        RoleplayCharacter character = RoleplayCharacter
+                .builder(characterId, characterOwnerId)
+                .slot(slotIndex).name(name).race(raceId).gender(genderId)
+                .skin(skinId).age(age).startingFaction(startingFactionId)
+                .roleplayLevel(roleplayLevel)
+                .progression(progressionResult.progression)
+                .createdAt(creationTimestamp)
+                .dataVersion(RoleplayCharacter.CURRENT_DATA_VERSION)
+                .minecraftCapeVisible(showMinecraftCape)
+                .cosmeticCape(cosmeticCapeId)
+                .startingWaypoint(startingWaypointId)
+                .unconventionalSettings(unconventionalSettings)
+                .description(description)
+                .bodyType(bodyTypeId)
+                .chestType(chestTypeId)
+                .build();
         return CharacterReadResult.success(character, repaired, quarantinedEntries);
     }
 

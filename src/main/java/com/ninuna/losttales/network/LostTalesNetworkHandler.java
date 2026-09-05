@@ -103,8 +103,12 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesChatAccessPacket.Handler.class, LostTalesChatAccessPacket.class, 37, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesFastTravelArrivalPacket.Handler.class, LostTalesFastTravelArrivalPacket.class, 38, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesChatTypingSyncPacket.Handler.class, LostTalesChatTypingSyncPacket.class, 40, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesChatUpdatePacket.Handler.class, LostTalesChatUpdatePacket.class, 43, Side.CLIENT);
+
+        // Client -> server requests registered after the snapshots they answer
+        // with. Ids are allocated in order of addition and are never reused, so
+        // a later request keeps its higher id.
         CHANNEL.registerMessage(LostTalesChatEditPacket.Handler.class, LostTalesChatEditPacket.class, 41, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChatDeletePacket.Handler.class, LostTalesChatDeletePacket.class, 42, Side.SERVER);
-        CHANNEL.registerMessage(LostTalesChatUpdatePacket.Handler.class, LostTalesChatUpdatePacket.class, 43, Side.CLIENT);
     }
 }

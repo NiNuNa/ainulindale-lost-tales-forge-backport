@@ -2,11 +2,13 @@ package com.ninuna.losttales.party.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
+import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
 import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
+import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyPersonalMarkerOwner;
 import com.ninuna.losttales.party.model.PartyColor;
@@ -750,32 +752,27 @@ public final class PartyService {
         return PartyContext.success(active, partyData, party);
     }
 
+    /**
+     * The identity the player is playing, as the party system needs it:
+     * the shared resolver's answer — the account, a character, or a
+     * store that cannot say — plus the party's own integrity checks on a
+     * character, since a member is filed by character id and an id held
+     * by two rosters or by another owner would file it under the wrong
+     * person.
+     */
     ActiveCharacterContext resolveActiveCharacter(
             EntityPlayerMP player) {
-        if (player == null || player.worldObj == null) {
+        PlayableIdentityResolver.Resolution resolution =
+                PlayableIdentityResolver.resolve(player);
+        if (!resolution.isAvailable()) {
             return ActiveCharacterContext.failure(
-                    PartyErrorId.INVALID_PLAYER);
+                    partyErrorOf(resolution.getError()));
         }
-        if (player.worldObj.isRemote) {
-            return ActiveCharacterContext.failure(
-                    PartyErrorId.CLIENT_SIDE_REQUEST);
-        }
-        CharacterWorldData data = getCharacterData(player.worldObj);
-        if (data == null) {
-            return ActiveCharacterContext.failure(
-                    PartyErrorId.INTERNAL_ERROR);
-        }
-        if (data.isReadOnlyForNewerVersion()) {
-            return ActiveCharacterContext.failure(
-                    PartyErrorId.CHARACTER_STORAGE_READ_ONLY);
-        }
-        // No roster yet, or no active character, is the account playing as
-        // itself: a full identity, filed under the account's own id.
-        CharacterRoster roster = data.getRoster(player.getUniqueID());
-        RoleplayCharacter character = roster == null ? null : roster.getActiveCharacter();
+        CharacterWorldData data = resolution.getData();
+        RoleplayCharacter character = resolution.getCharacter();
         if (character == null) {
             return ActiveCharacterContext.success(data,
-                    PlayableIdentity.account(player.getUniqueID()), null,
+                    resolution.getIdentity(), null,
                     player.getCommandSenderName());
         }
         int matches = countCharacters(data, character.getCharacterId());
@@ -791,12 +788,23 @@ public final class PartyService {
             return ActiveCharacterContext.failure(
                     PartyErrorId.CHARACTER_NOT_FOUND);
         }
-        String name = character.getName() == null
-                || character.getName().trim().length() == 0
-                ? player.getCommandSenderName() : character.getName();
         return ActiveCharacterContext.success(data,
-                PlayableIdentity.character(player.getUniqueID(), character.getCharacterId()),
-                character, name);
+                resolution.getIdentity(), character,
+                PlayableIdentityResolver.displayName(resolution, player));
+    }
+
+    /** The party's word for the shared resolver's failure. */
+    private static PartyErrorId partyErrorOf(CharacterErrorId error) {
+        if (error == CharacterErrorId.INVALID_PLAYER) {
+            return PartyErrorId.INVALID_PLAYER;
+        }
+        if (error == CharacterErrorId.CLIENT_SIDE_REQUEST) {
+            return PartyErrorId.CLIENT_SIDE_REQUEST;
+        }
+        if (error == CharacterErrorId.STORAGE_READ_ONLY) {
+            return PartyErrorId.CHARACTER_STORAGE_READ_ONLY;
+        }
+        return PartyErrorId.INTERNAL_ERROR;
     }
 
     CharacterIndex buildCharacterIndex(CharacterWorldData data) {

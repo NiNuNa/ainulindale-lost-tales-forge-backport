@@ -209,11 +209,6 @@ final class ChatWindowLines {
         }
     }
 
-    /** How many views the cache is holding; for tests and diagnostics. */
-    static synchronized int cachedViewCount() {
-        return CACHE.size();
-    }
-
     /**
      * Rewrites the message drawn under {@code chatLineId} where it
      * stands, so an edited line stays in the order it was said in

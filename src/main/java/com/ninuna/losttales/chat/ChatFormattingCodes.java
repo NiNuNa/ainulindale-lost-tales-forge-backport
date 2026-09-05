@@ -31,6 +31,33 @@ public final class ChatFormattingCodes {
         return translated.toString();
     }
 
+    /**
+     * Removes every section-sign code — a team colour on a name, a
+     * coloured item name in a death message — from text the server
+     * built, leaving the words. Server-safe, unlike
+     * {@code EnumChatFormatting.getTextWithoutFormattingCodes}, which is
+     * client-only in 1.7.10.
+     */
+    public static String stripSectionCodes(String text) {
+        if (text == null) {
+            return "";
+        }
+        if (text.indexOf(SECTION_SIGN) < 0) {
+            return text;
+        }
+        StringBuilder stripped = new StringBuilder(text.length());
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            if (character == SECTION_SIGN && index + 1 < text.length()
+                    && isFormattingCode(text.charAt(index + 1))) {
+                index++;
+                continue;
+            }
+            stripped.append(character);
+        }
+        return stripped.toString();
+    }
+
     private static boolean isFormattingCode(char character) {
         char lower = Character.toLowerCase(character);
         return (lower >= '0' && lower <= '9')

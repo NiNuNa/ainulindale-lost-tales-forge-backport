@@ -2,13 +2,11 @@ package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
-import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent;
-import java.util.List;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.event.ClickEvent;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.IChatComponent;
 
@@ -50,7 +48,8 @@ public final class DiscordGameEventRelay {
         EntityPlayerMP player = (EntityPlayerMP)event.player;
         LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
         bridge.announce(DiscordServerNotices.playerJoined(
-                player.getCommandSenderName(), avatarOf(player)));
+                player.getCommandSenderName(),
+                DiscordAvatarUrl.forPlayer(player)));
         bridge.requestStatusRefresh();
     }
 
@@ -62,7 +61,8 @@ public final class DiscordGameEventRelay {
         EntityPlayerMP player = (EntityPlayerMP)event.player;
         LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
         bridge.announce(DiscordServerNotices.playerLeft(
-                player.getCommandSenderName(), avatarOf(player)));
+                player.getCommandSenderName(),
+                DiscordAvatarUrl.forPlayer(player)));
         // The player is still on the list while this fires; the count
         // is taken on the next tick, when they are gone.
         bridge.requestStatusRefresh();
@@ -99,13 +99,14 @@ public final class DiscordGameEventRelay {
         // The line names its subject by account; the client shows it
         // naming the character the subject is playing, and so does the
         // notice. A death line was already renamed where it was made.
-        EntityPlayerMP subject = findOnlinePlayer(subjectAccountName(message));
+        EntityPlayerMP subject = LostTalesServerPlayers.findOnline(
+                subjectAccountName(message));
         String text = RoleplayCharacterIdentityHook.resolveSubjectName(
                 message, subject).getUnformattedText();
         if (text == null || text.trim().length() == 0) {
             return null;
         }
-        String icon = avatarOf(subject);
+        String icon = DiscordAvatarUrl.forPlayer(subject);
         return kind == ChatSystemLineClassifier.Kind.DEATH
                 ? DiscordServerNotices.playerDied(text, icon)
                 : DiscordServerNotices.achievement(text, icon);
@@ -135,36 +136,5 @@ public final class DiscordGameEventRelay {
             return "";
         }
         return value.substring(WHISPER_COMMAND_PREFIX.length()).trim();
-    }
-
-    /** The head picture for an online account; empty for none. */
-    private static String avatarOf(EntityPlayerMP player) {
-        if (player == null) {
-            return "";
-        }
-        String accountName = player.getGameProfile() == null
-                ? player.getCommandSenderName()
-                : player.getGameProfile().getName();
-        return DiscordAvatarUrl.of(LostTalesConfig.discordAvatarUrlTemplate,
-                accountName, player.getUniqueID());
-    }
-
-    private static EntityPlayerMP findOnlinePlayer(String accountName) {
-        MinecraftServer server = MinecraftServer.getServer();
-        if (accountName == null || accountName.length() == 0
-                || server == null || server.getConfigurationManager() == null
-                || server.getConfigurationManager().playerEntityList == null) {
-            return null;
-        }
-        @SuppressWarnings("unchecked")
-        List<EntityPlayerMP> online =
-                server.getConfigurationManager().playerEntityList;
-        for (EntityPlayerMP candidate : online) {
-            if (candidate != null && accountName.equalsIgnoreCase(
-                    candidate.getCommandSenderName())) {
-                return candidate;
-            }
-        }
-        return null;
     }
 }

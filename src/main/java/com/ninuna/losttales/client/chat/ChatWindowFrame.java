@@ -206,6 +206,17 @@ final class ChatWindowFrame {
         return FEED;
     }
 
+    /** The frontmost drawn window under a screen point, or null. */
+    static ChatWindowFrame drawnAt(int mouseX, int mouseY) {
+        List<ChatWindowFrame> frames = drawnFrames();
+        for (int index = frames.size() - 1; index >= 0; index--) {
+            if (frames.get(index).contains(mouseX, mouseY)) {
+                return frames.get(index);
+            }
+        }
+        return null;
+    }
+
     /** Frames of windows drawn this frame, back to front. */
     static synchronized List<ChatWindowFrame> drawnFrames() {
         List<ChatWindowFrame> result = new ArrayList<ChatWindowFrame>();

@@ -752,10 +752,4 @@ public final class ClientChatChannelViews {
     static synchronized int trackedLineCount() {
         return TAB_BY_LINE_ID.size();
     }
-
-    /** Convenience for tests: the map view of tracked lines. */
-    static synchronized Map<Integer, ChatTab> trackedLines() {
-        return Collections.unmodifiableMap(
-                new LinkedHashMap<Integer, ChatTab>(TAB_BY_LINE_ID));
-    }
 }

@@ -107,26 +107,8 @@ public final class CharacterDeletionTombstone {
                         progression.getDataVersion(),
                         progression.getExperiencePoints(),
                         progression.getExtensionDataCopy());
-        return new RoleplayCharacter(
-                source.getCharacterId(),
-                source.getOwnerId(),
-                source.getSlotIndex(),
-                source.getName(),
-                source.getRaceId(),
-                source.getGenderId(),
-                source.getSkinId(),
-                source.getAge(),
-                source.getStartingFactionId(),
-                source.getRoleplayLevel(),
-                progressionCopy,
-                source.getCreationTimestamp(),
-                source.getDataVersion(),
-                source.isMinecraftCapeVisible(),
-                source.getCosmeticCapeId(),
-                source.getStartingWaypointId(),
-                source.hasUnconventionalSettings(),
-                source.getDescription(),
-                source.getBodyTypeId(),
-                source.getChestTypeId());
+        return RoleplayCharacter.builder(source)
+                .progression(progressionCopy)
+                .build();
     }
 }

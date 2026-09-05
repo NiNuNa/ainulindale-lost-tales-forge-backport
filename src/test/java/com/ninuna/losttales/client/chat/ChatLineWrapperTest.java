@@ -5,7 +5,6 @@ import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.event.ClickEvent;
@@ -384,6 +383,66 @@ public final class ChatLineWrapperTest {
                     assertEquals(separator,
                             indentOf(lines.get(index), chatOpen));
                 }
+            }
+        } finally {
+            LostTalesConfig.showChatTimestamps = originalTimestamps;
+        }
+    }
+
+    /**
+     * A line naming its own separator — a command echo's "Used the
+     * command:" — opens its body behind those words where a message
+     * opens behind the chevron, and its continuations are inset by the
+     * words' width up to the same ceiling a long header's indent has,
+     * so a wide label cannot push the wrapped rest past half the width.
+     * The words are the chat's, not the sender's: a copy reads the
+     * command alone.
+     */
+    @Test
+    public void labelledBodyBreaksOpenTheBodyBehindTheLabel() {
+        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
+        LostTalesConfig.showChatTimestamps = false;
+        try {
+            String command = "/losttales mapmarker add a marker with a "
+                    + "name long enough to wrap around the window";
+            IChatComponent line = LostTalesChatPresentation.build(
+                    new LostTalesChatMessagePacket(
+                            ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                            "Ranger", "", 0x55AA55, 0x336633, command, 1L,
+                            "losttales:human_ranger_male_2"),
+                    ChatTab.of(ChatChannel.ALL), new int[0], false,
+                    ChatBodyKind.COMMAND);
+            String label = "Used the command: ";
+            int labelWidth = METRICS.width(label);
+            int ceiling = Math.round(200 * ChatLineWrapper.MAX_INDENT_RATIO);
+            assertTrue(labelWidth > ceiling);
+            for (int state = 0; state < 2; state++) {
+                boolean chatOpen = state == 1;
+                List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
+                        line, 200, chatOpen);
+                assertNotNull(lines);
+                assertTrue(lines.size() > 2);
+                assertEquals("Global: <  Arathorn> ", plain(lines.get(0)));
+                assertTrue(plain(lines.get(1)).startsWith(label));
+                assertEquals(-1, indentOf(lines.get(1), chatOpen));
+                for (int index = 2; index < lines.size(); index++) {
+                    assertEquals(ceiling,
+                            indentOf(lines.get(index), chatOpen));
+                }
+                assertEquals("Global: <  Arathorn> " + command,
+                        joinedText(lines));
+                // The separator carries the sender's colour, as the
+                // chevron does.
+                Integer color = null;
+                for (Object value : lines.get(1)) {
+                    IChatComponent part = (IChatComponent)value;
+                    if (ChatBodyMarker.isMarker(part)) {
+                        color = ChatBodyMarker.decode(part);
+                        assertEquals(label,
+                                part.getUnformattedTextForChat());
+                    }
+                }
+                assertEquals(Integer.valueOf(0x336633), color);
             }
         } finally {
             LostTalesConfig.showChatTimestamps = originalTimestamps;

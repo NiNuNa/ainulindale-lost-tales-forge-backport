@@ -1,8 +1,10 @@
 package com.ninuna.losttales.compat.discord;
 
+import com.ninuna.losttales.config.LostTalesConfig;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.UUID;
+import net.minecraft.entity.player.EntityPlayerMP;
 
 /**
  * The picture a webhook post carries: the server's configured template
@@ -13,6 +15,21 @@ import java.util.UUID;
  */
 public final class DiscordAvatarUrl {
     private DiscordAvatarUrl() {}
+
+    /**
+     * The avatar URL for an online account under the server's configured
+     * template; empty for no player or a template that gives none.
+     */
+    public static String forPlayer(EntityPlayerMP player) {
+        if (player == null) {
+            return "";
+        }
+        String accountName = player.getGameProfile() == null
+                ? player.getCommandSenderName()
+                : player.getGameProfile().getName();
+        return of(LostTalesConfig.discordAvatarUrlTemplate, accountName,
+                player.getUniqueID());
+    }
 
     /** The avatar URL for the sender, or empty when the template gives none. */
     public static String of(String template, String accountName, UUID accountId) {

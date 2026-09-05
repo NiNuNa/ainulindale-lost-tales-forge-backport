@@ -18,7 +18,8 @@ import net.minecraft.server.MinecraftServer;
 
 /**
  * The server's opt-in record of what was said: one JSON line per
- * accepted message, edit, and deletion, appended to a file per UTC day
+ * accepted message — channel line, whisper, and Discord line alike —
+ * edit, and deletion, appended to a file per UTC day
  * under {@code logs/losttales-chat/}. It exists for moderation — the
  * investigation the live chat window cannot reach back to — and it
  * records private whispers, which is why it is off by default and why
@@ -74,6 +75,20 @@ public final class ChatAuditLog {
                                   String whisperTarget, String text) {
         append("message", messageId, account, accountName, characterId,
                 identityName, channelId, whisperTarget, text);
+    }
+
+    /**
+     * A line a Discord member sent into a bridged channel. The account
+     * is the member's own sender id — the id a mute names them by — and
+     * the name is what they are called on Discord; the event names the
+     * origin, so a reader tells the two apart without knowing the id's
+     * shape.
+     */
+    public static void logDiscordMessage(long messageId, String channelId,
+                                         UUID senderId, String displayName,
+                                         String text) {
+        append("discord_message", messageId, senderId, displayName, null,
+                "", channelId, "", text);
     }
 
     public static void logEdit(long messageId, UUID account,

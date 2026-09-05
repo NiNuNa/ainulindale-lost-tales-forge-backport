@@ -6,7 +6,6 @@ import com.ninuna.losttales.character.deletion.CharacterDeletionService;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorldData;
-import com.ninuna.losttales.character.model.CharacterProgression;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterFactionResolver;
@@ -58,6 +57,11 @@ public final class CharacterService {
         return Holder.INSTANCE;
     }
 
+    /**
+     * The player's roster, made on first sight: the result says whether
+     * it was just created (then with no active character) or already
+     * existed. What a login and a roster request both ask for.
+     */
     public synchronized CharacterOperationResult ensureRoster(EntityPlayerMP player) {
         CharacterValidationResult playerValidation = validateServerPlayer(player);
         if (!playerValidation.isValid()) {
@@ -77,26 +81,6 @@ public final class CharacterService {
         }
         CharacterRoster created = data.getOrCreateRoster(player.getUniqueID());
         return CharacterOperationResult.success(true, created, null);
-    }
-
-    public synchronized CharacterOperationResult getRoster(EntityPlayerMP player) {
-        CharacterValidationResult playerValidation = validateServerPlayer(player);
-        if (!playerValidation.isValid()) {
-            return CharacterOperationResult.failure(playerValidation.getErrorId(), null);
-        }
-        CharacterWorldData data = getData(player);
-        if (data == null) {
-            return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, null);
-        }
-        if (data.isReadOnlyForNewerVersion()) {
-            return CharacterOperationResult.failure(CharacterErrorId.STORAGE_READ_ONLY, null);
-        }
-        CharacterRoster roster = data.getRoster(player.getUniqueID());
-        if (roster == null) {
-            roster = data.getOrCreateRoster(player.getUniqueID());
-            return CharacterOperationResult.success(true, roster, null);
-        }
-        return CharacterOperationResult.success(false, roster, roster.getActiveCharacter());
     }
 
     public synchronized CharacterOperationResult createCharacter(
@@ -304,28 +288,21 @@ public final class CharacterService {
             if (containsCharacterId(data, characterId)) {
                 continue;
             }
-            return new RoleplayCharacter(
-                    characterId,
-                    ownerId,
-                    creation.getSlotIndex(),
-                    creation.getName(),
-                    creation.getRaceId(),
-                    creation.getGenderId(),
-                    creation.getSkinId(),
-                    creation.getAge(),
-                    creation.getStartingFactionId(),
-                    RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL,
-                    new CharacterProgression(),
-                    System.currentTimeMillis(),
-                    RoleplayCharacter.CURRENT_DATA_VERSION,
-                    RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                    RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
-                    creation.getStartingWaypointId(),
-                    creation.hasUnconventionalSettings(),
-                    creation.getDescription(),
-                    creation.getBodyTypeId(),
-                    creation.getChestTypeId()
-            );
+            return RoleplayCharacter.builder(characterId, ownerId)
+                    .slot(creation.getSlotIndex())
+                    .name(creation.getName())
+                    .race(creation.getRaceId())
+                    .gender(creation.getGenderId())
+                    .skin(creation.getSkinId())
+                    .age(creation.getAge())
+                    .startingFaction(creation.getStartingFactionId())
+                    .createdAt(System.currentTimeMillis())
+                    .startingWaypoint(creation.getStartingWaypointId())
+                    .unconventionalSettings(creation.hasUnconventionalSettings())
+                    .description(creation.getDescription())
+                    .bodyType(creation.getBodyTypeId())
+                    .chestType(creation.getChestTypeId())
+                    .build();
         }
         return null;
     }

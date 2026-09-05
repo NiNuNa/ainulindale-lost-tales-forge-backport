@@ -27,8 +27,10 @@ import net.minecraft.util.IChatComponent;
  * grouping, hover, scrolling and removal all still see a single
  * message. A grouped continuation carries no sender at all and so has
  * no header row; its body starts on the row it is already on, behind
- * the same chevron, and the run stays aligned. The chevron is the
- * chat's own punctuation rather than the sender's words: it is added
+ * the same chevron, and the run stays aligned. A line may name its own
+ * separator instead of the chevron — the words a command echo opens its
+ * body with — and is laid out the same way behind it. The separator is
+ * the chat's own punctuation rather than the sender's words: it is added
  * here, so the stored message never holds it and copying a line copies
  * what was said.</p>
  *
@@ -155,8 +157,8 @@ final class ChatLineWrapper {
         // full-width continuation reads better there than an indent
         // aligning with a prefix several lines up.
         Builder builder = new Builder(metrics, width, 0,
-                Math.min(openPrefix, maxIndent), chatOpen, nameColor,
-                titleColor);
+                Math.min(openPrefix, maxIndent), maxIndent, chatOpen,
+                nameColor, titleColor);
         if (breakIndex >= 0) {
             placeLeadingRow(builder, metrics, parts, breakIndex, width);
             builder.breakLine();
@@ -173,8 +175,10 @@ final class ChatLineWrapper {
             IChatComponent part = parts.get(index);
             if (ChatLayoutMarker.isBodyBreak(part)) {
                 int senderColor = ChatLayoutMarker.bodyColor(part);
+                String label = ChatLayoutMarker.bodyLabel(part);
                 builder.beginBody(senderColor < 0 ? nameColor
-                        : senderColor);
+                        : senderColor,
+                        label == null ? BODY_SEPARATOR : label);
             } else if (isAtomic(part)) {
                 builder.appendAtomic(part);
             } else {
@@ -314,12 +318,14 @@ final class ChatLineWrapper {
          * Inset every continuation line of the run being laid out opens
          * with, in each of the two states. The header's own
          * continuations align under the header; from the body break on,
-         * both are {@link #BODY_INDENT}.
+         * both are the body separator's width.
          */
         private int closedIndent;
         private int openIndent;
         /** The one of the two this layout reserves on every line. */
         private int indent;
+        /** The most any continuation line may be inset by. */
+        private final int maxIndent;
         /** The sender's colours, carried onto every continuation line. */
         private final int nameColor;
         private final int titleColor;
@@ -335,12 +341,13 @@ final class ChatLineWrapper {
         private boolean fresh;
 
         Builder(TextMetrics metrics, int width, int closedIndent,
-                int openIndent, boolean chatOpen, int nameColor,
-                int titleColor) {
+                int openIndent, int maxIndent, boolean chatOpen,
+                int nameColor, int titleColor) {
             this.metrics = metrics;
             this.width = width;
             this.closedIndent = closedIndent;
             this.openIndent = openIndent;
+            this.maxIndent = maxIndent;
             this.indent = chatOpen ? openIndent : closedIndent;
             this.nameColor = nameColor;
             this.titleColor = titleColor;
@@ -348,17 +355,20 @@ final class ChatLineWrapper {
 
         /**
          * Ends the header and opens the message body at the left edge,
-         * behind the chevron. A header that drew nothing — a grouped
-         * continuation, whose runs are all hidden in this state — keeps
-         * the row it is on, so the body of a run always begins in the
-         * same place. From here on every continuation line is inset by
-         * the chevron's width.
+         * behind {@code separator} — the chat's chevron, or the label a
+         * line names — drawn in the sender's colour. A header that drew
+         * nothing — a grouped continuation, whose runs are all hidden in
+         * this state — keeps the row it is on, so the body of a run
+         * always begins in the same place. From here on every
+         * continuation line is inset by the separator's width, up to
+         * the same ceiling a long header's indent has.
          */
-        void beginBody(int senderColor) {
-            int separator = this.metrics.width(BODY_SEPARATOR);
-            this.closedIndent = separator;
-            this.openIndent = separator;
-            this.indent = separator;
+        void beginBody(int senderColor, String separator) {
+            int separatorWidth = this.metrics.width(separator);
+            int inset = Math.min(separatorWidth, this.maxIndent);
+            this.closedIndent = inset;
+            this.openIndent = inset;
+            this.indent = inset;
             if (this.used > 0) {
                 // The header's row is finished; the body opens the next
                 // one, at the edge rather than at an indent.
@@ -367,9 +377,9 @@ final class ChatLineWrapper {
                 this.firstLine = false;
             }
             this.used = 0;
-            place(ChatBodyMarker.separator(BODY_SEPARATOR, senderColor),
-                    separator);
-            this.lineStart = separator;
+            place(ChatBodyMarker.separator(separator, senderColor),
+                    separatorWidth);
+            this.lineStart = separatorWidth;
         }
 
         void place(IChatComponent piece, int pieceWidth) {

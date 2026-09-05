@@ -38,7 +38,10 @@ public final class ChatTab {
 
     static {
         for (ChatChannel channel : ChatChannel.values()) {
-            PLAIN[channel.ordinal()] = new ChatTab(channel, "");
+            // A whisper is always with someone: it has no plain tab.
+            if (channel != ChatChannel.WHISPER) {
+                PLAIN[channel.ordinal()] = new ChatTab(channel, "");
+            }
         }
     }
 
@@ -64,7 +67,10 @@ public final class ChatTab {
         this.npc = npc;
     }
 
-    /** The tab of a plain channel. */
+    /**
+     * The tab of a plain channel; null for the whisper channel, whose
+     * tabs each name a partner and come from {@link #whisper}.
+     */
     public static ChatTab of(ChatChannel channel) {
         return channel == null ? null : PLAIN[channel.ordinal()];
     }

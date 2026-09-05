@@ -41,6 +41,17 @@ public final class ChatAuditLogTest {
                 + ",\"text\":\"psst\"}",
                 ChatAuditLog.buildLine(NOON, "message", 43L, ACCOUNT,
                         "Nils", null, "", "whisper", "Beren", "psst"));
+        // A Discord line names its origin in the event and the member
+        // by the sender id a mute would use.
+        assertEquals("{\"at\":\"2026-09-01T12:00:00Z\""
+                + ",\"event\":\"discord_message\",\"messageId\":44"
+                + ",\"account\":\"" + ACCOUNT + "\""
+                + ",\"accountName\":\"nils#1234\""
+                + ",\"channel\":\"ooc\""
+                + ",\"text\":\"hello from discord\"}",
+                ChatAuditLog.buildLine(NOON, "discord_message", 44L,
+                        ACCOUNT, "nils#1234", null, "", "ooc", "",
+                        "hello from discord"));
         assertEquals("{\"at\":\"2026-09-01T12:00:00Z\""
                 + ",\"event\":\"delete\",\"messageId\":42"
                 + ",\"account\":\"" + ACCOUNT + "\""

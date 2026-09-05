@@ -1,6 +1,5 @@
 package com.ninuna.losttales.character.storage;
 
-import com.ninuna.losttales.character.model.CharacterProgression;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
@@ -68,16 +67,16 @@ public final class CharacterBodyTypeMigrationTest {
     @Test
     public void accountSkinSurvivesTheRoundTrip() {
         RoleplayCharacter loaded = CharacterNbtCodec.readCharacterRecord(
-                CharacterNbtCodec.writeCharacterRecord(new RoleplayCharacter(
-                        CHARACTER, OWNER, 0, "Traveller",
-                        CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.FEMALE,
-                        CharacterSkinRegistry.ACCOUNT_SKIN_ID, 30, "lotr:bree",
-                        RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL,
-                        new CharacterProgression(), 1L,
-                        RoleplayCharacter.CURRENT_DATA_VERSION,
-                        RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                        RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
-                        "", false, "", CharacterBodyTypeRegistry.WIDE)),
+                CharacterNbtCodec.writeCharacterRecord(
+                        RoleplayCharacter.builder(CHARACTER, OWNER)
+                                .name("Traveller")
+                                .race(CharacterRaceRegistry.HUMAN)
+                                .gender(CharacterGenderRegistry.FEMALE)
+                                .skin(CharacterSkinRegistry.ACCOUNT_SKIN_ID)
+                                .age(30).startingFaction("lotr:bree")
+                                .createdAt(1L)
+                                .bodyType(CharacterBodyTypeRegistry.WIDE)
+                                .build()),
                 OWNER);
         assertNotNull(loaded);
         assertEquals(CharacterSkinRegistry.ACCOUNT_SKIN_ID, loaded.getSkinId());
@@ -87,15 +86,11 @@ public final class CharacterBodyTypeMigrationTest {
     private static RoleplayCharacter character(String genderId, String bodyTypeId) {
         String skinId = CharacterSkinRegistry.getDefaultSkinId(
                 CharacterRaceRegistry.HUMAN, genderId, CHARACTER);
-        return new RoleplayCharacter(
-                CHARACTER, OWNER, 0, "Traveller",
-                CharacterRaceRegistry.HUMAN, genderId,
-                skinId, 30, "lotr:bree",
-                RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL,
-                new CharacterProgression(), 1L,
-                RoleplayCharacter.CURRENT_DATA_VERSION,
-                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
-                "", false, "", bodyTypeId);
+        return RoleplayCharacter.builder(CHARACTER, OWNER)
+                .name("Traveller").race(CharacterRaceRegistry.HUMAN)
+                .gender(genderId).skin(skinId).age(30)
+                .startingFaction("lotr:bree").createdAt(1L)
+                .bodyType(bodyTypeId)
+                .build();
     }
 }
