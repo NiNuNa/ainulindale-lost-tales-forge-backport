@@ -144,9 +144,10 @@ final class LostTalesChatClipboard {
 
     private static boolean sameMessage(ChatLine line, int chatLineId,
                                        int updateCounter) {
-        return line != null && (chatLineId != 0
-                ? line.getChatLineID() == chatLineId
-                : line.getUpdatedCounter() == updateCounter);
+        return line != null && !ChatWindowLines.isSpacer(line)
+                && (chatLineId != 0
+                        ? line.getChatLineID() == chatLineId
+                        : line.getUpdatedCounter() == updateCounter);
     }
 
     private static ChatHeadMarker.Data findMarker(IChatComponent line) {

@@ -1,5 +1,7 @@
 package com.ninuna.losttales.network.packet;
 
+import com.ninuna.losttales.chat.ChatConsoleEvent;
+import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.config.server.LostTalesServerConfigService;
 import com.ninuna.losttales.config.server.ServerConfigApplyResult;
 import com.ninuna.losttales.config.server.ServerConfigChange;
@@ -94,11 +96,17 @@ public final class LostTalesServerConfigApplyPacket implements IMessage {
                     new LostTalesServerTaskQueue.PlayerTask() {
                         @Override
                         public void run(EntityPlayerMP livePlayer) {
-                            if (!LostTalesServerConfigService.isOperator(livePlayer)) {
+                            if (!LostTalesServerConfigService.canEditServerConfig(livePlayer)) {
                                 return;
                             }
                             ServerConfigApplyResult result =
                                     LostTalesServerConfigService.apply(message.getChanges());
+                            if (!result.getApplied().isEmpty()) {
+                                LostTalesChatService.console(ChatConsoleEvent.Kind.CONFIG,
+                                        ChatConsoleEvent.Severity.NOTICE,
+                                        livePlayer.getCommandSenderName(),
+                                        "changed server settings: " + result.getApplied());
+                            }
                             LostTalesNetworkHandler.CHANNEL.sendTo(
                                     new LostTalesServerConfigResultPacket(result), livePlayer);
                         }

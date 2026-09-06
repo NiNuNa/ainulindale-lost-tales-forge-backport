@@ -190,6 +190,11 @@ final class LostTalesChatHoverCard {
         addDetail(lines, "gui.losttales.chat.card.level",
                 details == null || details.getRoleplayLevel() <= 0
                         ? "" : String.valueOf(details.getRoleplayLevel()));
+        // The roles belong to the account behind the identity, whichever
+        // channel the line was said in: a role not worn on an in-character
+        // line is still held, and the card is where it shows.
+        addDetail(lines, "gui.losttales.chat.card.roles", target.npcIdentity
+                ? "" : roleNames(ChatMentionColors.rolesFor(account)));
         addDetail(lines, "gui.losttales.character.gender",
                 details == null || details.getGenderId().length() == 0
                         ? "" : ClientCharacterDisplayNames.gender(
@@ -354,6 +359,21 @@ final class LostTalesChatHoverCard {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glEnable(GL11.GL_ALPHA_TEST);
         }
+    }
+
+    /**
+     * The roles in a mask as the card lists them: every one, highest
+     * display priority first, separated by commas; empty for none.
+     */
+    static String roleNames(int mask) {
+        StringBuilder names = new StringBuilder();
+        for (ChatAccountRole role : ChatAccountRole.fromMask(mask)) {
+            if (names.length() > 0) {
+                names.append(", ");
+            }
+            names.append(role.getDisplayName());
+        }
+        return names.toString();
     }
 
     private static void addDetail(List<String> lines, String labelKey,
@@ -694,6 +714,49 @@ final class LostTalesChatHoverCard {
                             float right, float bottom) {
         return x >= Math.min(left, right) && x < Math.max(left, right)
                 && y >= Math.min(top, bottom) && y < Math.max(top, bottom);
+    }
+
+    /**
+     * A tooltip of plain lines, drawn as every other card is: the chat's
+     * panel, the chat's shadow, and vanilla's colour codes in the
+     * palette's own tones. What the achievement and text hover cards
+     * and the shared-marker tooltip draw with, in place of vanilla's
+     * hovering text, so nothing hanging off a chat line reads in vanilla's
+     * colours beside the chat's.
+     */
+    static void drawTextCard(Minecraft minecraft, List<String> lines,
+                             int mouseX, int mouseY,
+                             int screenWidth, int screenHeight) {
+        if (minecraft == null || minecraft.fontRenderer == null
+                || lines == null || lines.isEmpty()) {
+            return;
+        }
+        FontRenderer font = minecraft.fontRenderer;
+        int contentWidth = 0;
+        for (int index = 0; index < lines.size(); index++) {
+            contentWidth = Math.max(contentWidth,
+                    font.getStringWidth(lines.get(index) == null ? "" : lines.get(index)));
+        }
+        int width = Math.min(PADDING * 2 + contentWidth, Math.max(40, screenWidth - 8));
+        int height = PADDING * 2 + lines.size() * font.FONT_HEIGHT;
+        int x = cardX(mouseX, width, screenWidth);
+        int y = cardY(mouseY, height, screenHeight);
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(0.0F, 0.0F, 300.0F);
+            LostTalesSkyrimUiStyle.drawPanel(x, y, width, height);
+            int textY = y + PADDING;
+            for (int index = 0; index < lines.size(); index++) {
+                LostTalesChatVisualStyle.drawLegacyFormatted(font,
+                        lines.get(index) == null ? "" : lines.get(index),
+                        x + PADDING, textY, 255);
+                textY += font.FONT_HEIGHT;
+            }
+        } finally {
+            GL11.glPopMatrix();
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glEnable(GL11.GL_ALPHA_TEST);
+        }
     }
 
     static int cardX(int mouseX, int width, int screenWidth) {

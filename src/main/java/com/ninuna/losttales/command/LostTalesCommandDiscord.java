@@ -8,6 +8,7 @@ import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.config.server.LostTalesServerConfigService;
 import com.ninuna.losttales.config.server.ServerConfigChange;
+import com.ninuna.losttales.permission.LostTalesCapability;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.relauncher.Side;
 import java.util.ArrayList;
@@ -40,6 +41,11 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
     @Override
     public int getRequiredPermissionLevel() {
         return 2;
+    }
+
+    @Override
+    public LostTalesCapability getCapability() {
+        return LostTalesCapability.SERVER_CONFIG;
     }
 
     @Override

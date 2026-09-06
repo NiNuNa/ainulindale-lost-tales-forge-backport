@@ -1,35 +1,19 @@
 package com.ninuna.losttales.chat;
 
 /**
- * Player-typed formatting codes. Minecraft rejects the section sign in
- * chat input, so — like most servers — players write {@code &6gold} and the
- * client translates it for display. The wire format keeps the ampersand
- * form: it survives validation, copying, and unsupported clients unchanged.
+ * Vanilla's section-sign formatting codes, as text the <em>server</em>
+ * built may carry them: a team colour on a name, a coloured item name
+ * in a death message. Players never get to write them — Minecraft
+ * kicks a client that sends a section sign, {@code ChatMessageValidator}
+ * refuses one, and an ampersand in a message is an ampersand: the
+ * markup ({@code ChatMarkdown}) is the one styling a player's own words
+ * carry, which is what keeps every line readable and every colour the
+ * palette's.
  */
 public final class ChatFormattingCodes {
     private static final char SECTION_SIGN = 167;
 
     private ChatFormattingCodes() {}
-
-    /** Translates {@code &x} to a section-sign code for valid codes only. */
-    public static String translateAmpersand(String text) {
-        if (text == null || text.indexOf('&') < 0) {
-            return text == null ? "" : text;
-        }
-        StringBuilder translated = new StringBuilder(text.length());
-        for (int index = 0; index < text.length(); index++) {
-            char character = text.charAt(index);
-            if (character == '&' && index + 1 < text.length()
-                    && isFormattingCode(text.charAt(index + 1))) {
-                translated.append(SECTION_SIGN).append(Character
-                        .toLowerCase(text.charAt(index + 1)));
-                index++;
-                continue;
-            }
-            translated.append(character);
-        }
-        return translated.toString();
-    }
 
     /**
      * Removes every section-sign code — a team colour on a name, a

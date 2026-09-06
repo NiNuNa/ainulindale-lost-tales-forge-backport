@@ -7,6 +7,7 @@ import com.ninuna.losttales.chat.moderation.ChatMuteWorldData;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import java.util.List;
 import java.util.UUID;
@@ -19,9 +20,10 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
 /**
- * Operator chat moderation: mute an account, lift a mute, list what is
- * in force. Mutes are account-keyed, so no character switch or rename
- * slips one, and they persist with the world. Muting needs the player
+ * Chat moderation for whoever holds {@code chat.moderate}: mute an
+ * account, lift a mute, list what is in force. Mutes are account-keyed,
+ * so no character switch or rename slips one, and they persist with the
+ * world. Muting needs the player
  * online — you mute whoever is talking — while unmuting also works by
  * the stored name after they leave.
  */
@@ -39,6 +41,11 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
     @Override
     public int getRequiredPermissionLevel() {
         return 2;
+    }
+
+    @Override
+    public LostTalesCapability getCapability() {
+        return LostTalesCapability.CHAT_MODERATE;
     }
 
     @Override
@@ -123,7 +130,7 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
         if (target != null) {
             tellMuted(target, entry, now);
         }
-        LostTalesChatService.sendAccessToOperators();
+        LostTalesChatService.sendAccessToModerators();
         send(sender, EnumChatFormatting.GREEN + "Muted "
                 + entry.getAccountName()
                 + (entry.isPermanent() ? " permanently"
@@ -155,7 +162,7 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
             send(sender, EnumChatFormatting.RED + args[1] + " is not muted.");
             return;
         }
-        LostTalesChatService.sendAccessToOperators();
+        LostTalesChatService.sendAccessToModerators();
         send(sender, EnumChatFormatting.GREEN + "Unmuted "
                 + lifted.getAccountName() + ".");
         if (online != null) {

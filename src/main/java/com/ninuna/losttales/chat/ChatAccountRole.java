@@ -1,12 +1,15 @@
 package com.ninuna.losttales.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.permission.LostTalesCapability;
 import net.minecraft.util.StatCollector;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * A role an account line can show ahead of the sender's name on the
@@ -24,7 +27,10 @@ import java.util.Locale;
  * is a bit set, one bit per role in the catalogue's order, so a role can
  * be added without disturbing the layout. Precedence — which role
  * colours the name, which tag comes first — is the catalogue's order,
- * by rank.</p>
+ * by rank. Rank is presentation only: what a role lets its holders
+ * <em>do</em> is the set of {@link LostTalesCapability} grants the
+ * config gives it, read by {@code LostTalesPermissions} on the server
+ * and never sent to a client.</p>
  */
 public final class ChatAccountRole {
 
@@ -36,22 +42,27 @@ public final class ChatAccountRole {
 
     /** The absence of a role; never tagged, never a bit. */
     public static final ChatAccountRole NONE = new ChatAccountRole("", -1, "", "", "",
-            "", "", 0, false, true, Integer.MAX_VALUE, Collections.<ChatRoleSource>emptyList());
+            "", "", 0, false, true, Integer.MAX_VALUE, Collections.<ChatRoleSource>emptyList(),
+            null);
     /**
      * A member of the Lost Tales team, recognised by account id in the
      * code and by nothing else. A vanity mark: it names nobody the server
-     * has business with, cannot be addressed, and no config or command
-     * edits or assigns it.
+     * has business with, cannot be addressed, grants nothing, and no
+     * config or command edits or assigns it.
      */
     public static final ChatAccountRole TEAM = new ChatAccountRole(TEAM_ID, 0,
             "chat.losttales.role.team", "chat.losttales.tag.team", "", "", "",
             LostTalesColors.rgb(LostTalesColors.MULBERRY), false, true, 0,
-            Collections.<ChatRoleSource>emptyList());
-    /** A server operator, as the server's permission check states it. */
+            Collections.<ChatRoleSource>emptyList(), null);
+    /**
+     * A server operator, as the server's permission check states it. It
+     * carries no grants of its own: every capability names the operator
+     * level that holds it, so the check passes before roles are asked.
+     */
     public static final ChatAccountRole OPERATOR = new ChatAccountRole(OPERATOR_ID, 1,
             "chat.losttales.role.operator", "chat.losttales.tag.operator", "", "", "",
             LostTalesColors.rgb(LostTalesColors.CRIMSON), true, false, 10,
-            Collections.singletonList(ChatRoleSource.opLevel(2)));
+            Collections.singletonList(ChatRoleSource.opLevel(2)), null);
 
     private final String id;
     private final int bitIndex;
@@ -65,11 +76,13 @@ public final class ChatAccountRole {
     private final boolean locked;
     private final int rank;
     private final List<ChatRoleSource> sources;
+    private final Set<LostTalesCapability> grants;
 
     ChatAccountRole(String id, int bitIndex, String nameKey, String tagKey,
                     String name, String tag, String description, int color,
                     boolean mentionable, boolean locked, int rank,
-                    List<ChatRoleSource> sources) {
+                    List<ChatRoleSource> sources,
+                    Set<LostTalesCapability> grants) {
         this.id = id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
         this.bitIndex = bitIndex;
         this.nameKey = nameKey == null ? "" : nameKey;
@@ -83,37 +96,52 @@ public final class ChatAccountRole {
         this.rank = rank;
         this.sources = sources == null ? Collections.<ChatRoleSource>emptyList()
                 : Collections.unmodifiableList(new ArrayList<ChatRoleSource>(sources));
+        this.grants = grants == null || grants.isEmpty()
+                ? Collections.<LostTalesCapability>emptySet()
+                : Collections.unmodifiableSet(EnumSet.copyOf(grants));
     }
 
     /** The same role at another bit, which is the catalogue's to give. */
     ChatAccountRole withBit(int bitIndex) {
         return new ChatAccountRole(this.id, bitIndex, this.nameKey, this.tagKey, this.name,
                 this.tag, this.description, this.color, this.mentionable, this.locked,
-                this.rank, this.sources);
+                this.rank, this.sources, this.grants);
     }
 
     /** The same role with another look; what an edit of a built-in changes. */
     public ChatAccountRole withLook(String name, String tag, String description, int color,
                                     boolean mentionable, int rank) {
         return new ChatAccountRole(this.id, this.bitIndex, this.nameKey, this.tagKey, name,
-                tag, description, color, mentionable, this.locked, rank, this.sources);
+                tag, description, color, mentionable, this.locked, rank, this.sources,
+                this.grants);
     }
 
-    /** A config-defined role, before the catalogue gives it a bit. */
+    /** A config-defined role that grants nothing, before the catalogue gives it a bit. */
     public static ChatAccountRole custom(String id, String name, String tag, String description,
                                          int color, boolean mentionable, int rank,
                                          List<ChatRoleSource> sources) {
-        return new ChatAccountRole(id, -1, "", "", name, tag, description, color,
-                mentionable, false, rank, sources);
+        return custom(id, name, tag, description, color, mentionable, rank, sources, null);
     }
 
-    /** A role as the wire describes it, with its bit already given. */
+    /** A config-defined role with its grants, before the catalogue gives it a bit. */
+    public static ChatAccountRole custom(String id, String name, String tag, String description,
+                                         int color, boolean mentionable, int rank,
+                                         List<ChatRoleSource> sources,
+                                         Set<LostTalesCapability> grants) {
+        return new ChatAccountRole(id, -1, "", "", name, tag, description, color,
+                mentionable, false, rank, sources, grants);
+    }
+
+    /**
+     * A role as the wire describes it, with its bit already given. The
+     * wire carries no grants: what a role allows is the server's alone.
+     */
     public static ChatAccountRole fromWire(String id, int bitIndex, String nameKey,
                                            String tagKey, String name, String tag,
                                            String description, int color,
                                            boolean mentionable, boolean locked, int rank) {
         return new ChatAccountRole(id, bitIndex, nameKey, tagKey, name, tag, description,
-                color, mentionable, locked, rank, null);
+                color, mentionable, locked, rank, null, null);
     }
 
     public String getId() {
@@ -181,6 +209,19 @@ public final class ChatAccountRole {
     /** What the config states grants the role; empty for the team mark. */
     public List<ChatRoleSource> getSources() {
         return this.sources;
+    }
+
+    /**
+     * The capabilities the config grants the role's holders; empty for
+     * both built-ins and for a role read off the wire.
+     */
+    public Set<LostTalesCapability> getGrants() {
+        return this.grants;
+    }
+
+    /** Whether the role grants the capability. */
+    public boolean grants(LostTalesCapability capability) {
+        return capability != null && this.grants.contains(capability);
     }
 
     /**

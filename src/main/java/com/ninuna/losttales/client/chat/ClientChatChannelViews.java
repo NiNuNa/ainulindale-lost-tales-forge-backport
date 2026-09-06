@@ -205,7 +205,10 @@ public final class ClientChatChannelViews {
         int index = Math.max(0, Math.min(lines.size() - 1,
                 LostTalesChatOverlayRenderer.lineOfRow(
                         (int)Math.floor(current), divider)));
-        ChatLine line = lines.get(index);
+        // A blank row between runs stands for no message and cannot be
+        // held: the nearest message's row is.
+        index = ChatWindowLines.nearestMessageRow(lines, index);
+        ChatLine line = index < 0 ? null : lines.get(index);
         if (line == null) {
             ANCHORS.remove(view);
             return;
@@ -704,6 +707,7 @@ public final class ClientChatChannelViews {
         ChatWindowFrame.clear();
         ClientChatAccountRoles.clear();
         ClientChatAppearances.clear();
+        ClientChatConsoleEvents.clear();
         ChatTabSelection.clear();
         // The history is gone with the world, and so are its conversations
         // and what was said in them.

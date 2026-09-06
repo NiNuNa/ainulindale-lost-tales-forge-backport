@@ -1,6 +1,8 @@
 package com.ninuna.losttales.chat;
 
+import com.ninuna.losttales.permission.LostTalesCapability;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,15 +18,17 @@ import java.util.regex.Pattern;
  *
  * <p>{@code chat.roles}, one role per entry:</p>
  * <pre>
- * moderator=name:Moderator;tag:[Mod];color:A94B54;mention:true;rank:15;op:1;faction:GONDOR@gondor.knight;desc:Keeps the peace.
+ * moderator=name:Moderator;tag:[Mod];color:A94B54;mention:true;rank:15;op:1;faction:GONDOR@gondor.knight;grant:chat.moderate;desc:Keeps the peace.
  * operator=name:Staff;tag:[Staff];color:A94B54
  * </pre>
  * Options are optional and case-insensitive; a role without a name is
  * named by its id, one without a tag wears its name in brackets. The
  * operator entry restyles the built-in operator role and may name no
- * source: op level 2 is what grants it. The team entry is refused: the
- * team mark is the code's alone. {@code op:<level>} and
- * {@code faction:<FACTION>@<rank>} may repeat.
+ * source or grant: op level 2 is what grants it, and an operator holds
+ * every capability already. The team entry is refused: the team mark is
+ * the code's alone. {@code op:<level>}, {@code faction:<FACTION>@<rank>}
+ * and {@code grant:<capability>} may repeat; a grant naming no
+ * {@link LostTalesCapability} is skipped with a warning.
  *
  * <p>{@code chat.roleMembers}, one role per entry:
  * {@code moderator=<uuid>,<uuid>}.</p>
@@ -92,6 +96,10 @@ public final class ChatRoleConfig {
                     out.warn("Chat role 'operator' is granted by op level 2; its "
                             + "sources in the config are ignored");
                 }
+                if (!role.getGrants().isEmpty()) {
+                    out.warn("Chat role 'operator' holds every capability already; its "
+                            + "grants in the config are ignored");
+                }
                 operatorLook = ChatAccountRole.OPERATOR.withLook(role.getName(),
                         role.getTag(), role.getDescription(), role.getColor(),
                         role.isMentionable(), ChatAccountRole.OPERATOR.getRank());
@@ -153,8 +161,18 @@ public final class ChatRoleConfig {
             sources.add(ChatRoleSource.factionRank(faction.substring(0, at),
                     faction.substring(at + 1)));
         }
+        Set<LostTalesCapability> grants = EnumSet.noneOf(LostTalesCapability.class);
+        for (String grant : all(options, "grant")) {
+            LostTalesCapability capability = LostTalesCapability.byId(grant);
+            if (capability == null) {
+                out.warn("Chat role '" + id + "' grants '" + grant
+                        + "', which is not a capability; that grant is skipped");
+                continue;
+            }
+            grants.add(capability);
+        }
         return ChatAccountRole.custom(id, name.length() == 0 ? id : name, tag, description,
-                color, mentionable, rank, sources);
+                color, mentionable, rank, sources, grants);
     }
 
     private static Map<String, Set<UUID>> parseMembers(String[] entries,
@@ -258,6 +276,9 @@ public final class ChatRoleConfig {
             entry.append(";rank:").append(role.getRank());
             for (ChatRoleSource source : role.getSources()) {
                 entry.append(';').append(source.toConfigOption());
+            }
+            for (LostTalesCapability capability : role.getGrants()) {
+                entry.append(";grant:").append(capability.getId());
             }
         }
         if (role.getDescription().length() > 0) {

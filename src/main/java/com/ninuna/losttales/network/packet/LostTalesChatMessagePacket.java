@@ -76,7 +76,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
         return Long.toUnsignedString(senderId.getLeastSignificantBits());
     }
 
-    private static final int MAX_PACKET_BYTES = 2048
+    /** The most one line takes on the wire; the history batch reads it too. */
+    static final int MAX_PACKET_BYTES = 2048
             + ChatMessageValidator.MAX_UTF8_BYTES
             + ChatShowcase.MAX_TOTAL_BYTES
             + ChatReplyReference.MAX_AUTHOR_BYTES
@@ -117,8 +118,11 @@ public final class LostTalesChatMessagePacket implements IMessage {
      */
     private long echoNonce;
     /**
-     * The sender's {@link ChatAccountRole}s as a mask; set only on account
-     * lines, where the server also colours the name by the primary role.
+     * The sender's {@link ChatAccountRole}s as a mask, tagged ahead of
+     * the name. Set only on lines of the account-identity channels,
+     * where the server also colours the name by the primary role; a line
+     * of an in-character channel carries none whoever speaks it
+     * ({@code ChatRolePresentation}).
      */
     private int roles;
     /**

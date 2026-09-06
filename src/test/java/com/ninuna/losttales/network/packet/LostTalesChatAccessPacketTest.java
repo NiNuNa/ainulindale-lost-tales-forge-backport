@@ -22,8 +22,9 @@ import static org.junit.Assert.assertTrue;
  * The chat access packet carries the player's own roles beside the two
  * channel flags, so the client can notice a mention addressed to one of
  * them. The roles sit at the end of the layout: a payload written before
- * they existed still reads, and names none. The catalogue in force and
- * the channel gates ride after them the same way.
+ * they existed still reads, and names none. The catalogue in force, the
+ * channel gates and the two capability flags ride after them the same
+ * way.
  */
 public final class LostTalesChatAccessPacketTest {
 
@@ -134,6 +135,42 @@ public final class LostTalesChatAccessPacketTest {
         assertEquals(Arrays.asList("team", "operator", "moderator"), ids(roles));
         assertEquals(readable, decoded.getReadableChannels());
         assertEquals(sendable, decoded.getSendableChannels());
+        assertFalse(decoded.canModerate());
+        assertFalse(decoded.canEditServerConfig());
+    }
+
+    /** The capability flags ride last; a payload without them says no to both. */
+    @Test
+    public void theCapabilityFlagsRoundTripAndDefaultToNo() {
+        LostTalesChatAccessPacket packet = new LostTalesChatAccessPacket(false, true, 0,
+                Collections.<LostTalesChatAccessPacket.RoleHolder>emptyList(),
+                Collections.<UUID>emptyList(), ChatRoleCatalog.builtIn().roles(),
+                LostTalesChatAccessPacket.ALL_CHANNELS,
+                LostTalesChatAccessPacket.ALL_CHANNELS, true, false);
+        ByteBuf buffer = Unpooled.buffer();
+        packet.toBytes(buffer);
+        LostTalesChatAccessPacket decoded = new LostTalesChatAccessPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertTrue(decoded.canModerate());
+        assertFalse(decoded.canEditServerConfig());
+
+        // Written by a build before the flags: everything up to the gates.
+        ByteBuf older = Unpooled.buffer();
+        older.writeBoolean(true);
+        older.writeBoolean(true);
+        older.writeInt(0);
+        older.writeShort(0);
+        older.writeShort(0);
+        older.writeByte(0);
+        older.writeInt(LostTalesChatAccessPacket.ALL_CHANNELS);
+        older.writeInt(LostTalesChatAccessPacket.ALL_CHANNELS);
+        LostTalesChatAccessPacket fromOlder = new LostTalesChatAccessPacket();
+        fromOlder.fromBytes(older);
+        assertFalse(fromOlder.isMalformed());
+        assertTrue(fromOlder.hasAdminAccess());
+        assertFalse(fromOlder.canModerate());
+        assertFalse(fromOlder.canEditServerConfig());
     }
 
     private static List<String> ids(List<ChatAccountRole> roles) {

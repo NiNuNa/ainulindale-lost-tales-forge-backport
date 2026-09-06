@@ -101,8 +101,8 @@ final class ChatTabActions {
             }
             this.bar.updateInputBounds();
             swapDraft(previous, selected);
-            // An unlocked appearance falls back to the new channel's
-            // default; a locked one rides along.
+            // A passing choice ends with the tab it was made on; every
+            // tab's lock stays with that tab.
             ClientChatAppearances.onChannelSwitched();
         }
         List<ChatWindow> windows = ChatWindowLayout.windows();

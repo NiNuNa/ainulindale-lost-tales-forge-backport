@@ -1,5 +1,6 @@
 package com.ninuna.losttales.chat;
 
+import com.ninuna.losttales.permission.LostTalesCapability;
 import org.junit.After;
 import org.junit.Test;
 
@@ -105,6 +106,30 @@ public final class ChatRoleConfigTest {
         assertTrue(catalog.membersOf("team").isEmpty());
         assertTrue(catalog.membersOf("ghost").isEmpty());
         assertEquals(6, warnings.size());
+    }
+
+    /**
+     * A grant names a capability; one naming nothing known is skipped
+     * with a warning, and the operator's are ignored because an operator
+     * holds every capability already.
+     */
+    @Test
+    public void grantsAreReadWarnedAndKeptOffTheOperator() {
+        ChatRoleCatalog catalog = ChatRoleConfig.parse(new String[] {
+                "moderator=name:Moderator;grant:chat.moderate;grant:Server.Config",
+                "builder=grant:build.everything",
+                "operator=grant:chat.moderate",
+        }, null, collect);
+        assertEquals(java.util.EnumSet.of(LostTalesCapability.CHAT_MODERATE,
+                LostTalesCapability.SERVER_CONFIG), catalog.byId("moderator").getGrants());
+        assertTrue(catalog.byId("builder").getGrants().isEmpty());
+        assertTrue(catalog.operator().getGrants().isEmpty());
+        assertEquals(2, warnings.size());
+        assertTrue(warnings.get(0).contains("build.everything"));
+        assertTrue(warnings.get(1).contains("operator"));
+        assertTrue(ChatRoleConfig.formatRole(catalog.byId("moderator"))
+                .endsWith(";grant:chat.moderate;grant:server.config"));
+        assertFalse(ChatRoleConfig.formatRole(catalog.operator()).contains("grant:"));
     }
 
     @Test

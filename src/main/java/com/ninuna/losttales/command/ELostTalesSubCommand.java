@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.command.CommandBase;
+import net.minecraft.command.ICommandSender;
 
 /**
  * The sub-commands of {@code /losttales}, each with the names it answers
@@ -86,11 +87,22 @@ public enum ELostTalesSubCommand {
         return null;
     }
 
-    /** Every primary name, in declaration order, for tab completion. */
+    /** Every primary name, in declaration order, for the usage line. */
     public static String[] primaryNames() {
         List<String> names = new ArrayList<String>(values().length);
         for (ELostTalesSubCommand candidate : values()) {
             names.add(candidate.getPrimaryName());
+        }
+        return names.toArray(new String[names.size()]);
+    }
+
+    /** The primary names of the sub-commands the sender may run, for tab completion. */
+    public static String[] primaryNamesFor(ICommandSender sender) {
+        List<String> names = new ArrayList<String>(values().length);
+        for (ELostTalesSubCommand candidate : values()) {
+            if (candidate.command.canCommandSenderUseCommand(sender)) {
+                names.add(candidate.getPrimaryName());
+            }
         }
         return names.toArray(new String[names.size()]);
     }

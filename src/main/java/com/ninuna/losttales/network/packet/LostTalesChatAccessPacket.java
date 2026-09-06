@@ -39,6 +39,14 @@ import java.util.UUID;
  * client may read it and one whether it may send into it, the server's
  * answer for this player alone. A payload written before either
  * existed reads as the built-in roles with every channel open.</p>
+ *
+ * <p>Last come two capability flags: whether this player may
+ * <em>moderate</em> the chat — mute, unmute, take anyone's message back
+ * — which is what the client's moderation menus are offered on, and
+ * whether they may edit the server's settings, which is what the Server
+ * Settings button is shown on. Presentation only, like every flag here:
+ * the server decides again on each request. A payload written before
+ * they travelled reads both as no.</p>
  */
 public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_HOLDERS = 256;
@@ -54,7 +62,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_PACKET_BYTES = 16
             + MAX_HOLDERS * (MAX_HOLDER_NAME_BYTES + 8)
             + 2 + MAX_MUTED_SENDERS * 16
-            + 1 + ChatRoleCatalog.MAX_ROLES * MAX_ROLE_BYTES + 8;
+            + 1 + ChatRoleCatalog.MAX_ROLES * MAX_ROLE_BYTES + 8 + 2;
     /** Every channel open: what a payload without gates means. */
     public static final int ALL_CHANNELS = -1;
 
@@ -73,6 +81,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
     private List<ChatAccountRole> catalog = Collections.emptyList();
     private int readableChannels = ALL_CHANNELS;
     private int sendableChannels = ALL_CHANNELS;
+    private boolean canModerate;
+    private boolean canEditServerConfig;
     private boolean malformed;
 
     public LostTalesChatAccessPacket() {}
@@ -109,7 +119,20 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
                                      int readableChannels, int sendableChannels) {
+        this(adminAccess, discordAccess, roleMask, roleHolders, mutedSenders, catalog,
+                readableChannels, sendableChannels, false, false);
+    }
+
+    public LostTalesChatAccessPacket(boolean adminAccess,
+                                     boolean discordAccess, int roleMask,
+                                     List<RoleHolder> roleHolders,
+                                     List<UUID> mutedSenders,
+                                     List<ChatAccountRole> catalog,
+                                     int readableChannels, int sendableChannels,
+                                     boolean canModerate, boolean canEditServerConfig) {
         this.adminAccess = adminAccess;
+        this.canModerate = canModerate;
+        this.canEditServerConfig = canEditServerConfig;
         this.discordAccess = discordAccess;
         this.roleMask = roleMask;
         this.roleHolders = roleHolders == null || roleHolders.isEmpty()
@@ -211,6 +234,9 @@ public final class LostTalesChatAccessPacket implements IMessage {
                 readable = buffer.readInt();
                 sendable = buffer.readInt();
             }
+            // Appended last of all: the two capability flags.
+            boolean moderate = buffer.readableBytes() >= 1 && buffer.readBoolean();
+            boolean editConfig = buffer.readableBytes() >= 1 && buffer.readBoolean();
             LostTalesPacketCodec.requireFinished(buffer);
             for (RoleHolder holder : holders) {
                 if ((holder.getMask() & ~known.knownMask()) != 0) {
@@ -223,6 +249,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.catalog = Collections.unmodifiableList(known.roles());
             this.readableChannels = readable;
             this.sendableChannels = sendable;
+            this.canModerate = moderate;
+            this.canEditServerConfig = editConfig;
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.adminAccess = false;
@@ -233,6 +261,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.catalog = Collections.emptyList();
             this.readableChannels = ALL_CHANNELS;
             this.sendableChannels = ALL_CHANNELS;
+            this.canModerate = false;
+            this.canEditServerConfig = false;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -290,6 +320,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
         }
         buffer.writeInt(this.readableChannels);
         buffer.writeInt(this.sendableChannels);
+        buffer.writeBoolean(this.canModerate);
+        buffer.writeBoolean(this.canEditServerConfig);
     }
 
     public boolean hasAdminAccess() { return this.adminAccess; }
@@ -308,6 +340,10 @@ public final class LostTalesChatAccessPacket implements IMessage {
     public int getReadableChannels() { return this.readableChannels; }
     /** One bit per channel ordinal: whether this player may send into it. */
     public int getSendableChannels() { return this.sendableChannels; }
+    /** Whether the server says this player may moderate the chat. */
+    public boolean canModerate() { return this.canModerate; }
+    /** Whether the server says this player may edit its settings. */
+    public boolean canEditServerConfig() { return this.canEditServerConfig; }
     public boolean isMalformed() { return this.malformed; }
 
     /** One online account and the roles it holds; masks are never zero. */

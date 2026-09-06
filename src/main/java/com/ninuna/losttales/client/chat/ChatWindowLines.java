@@ -15,6 +15,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiNewChat;
+import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.IChatComponent;
 
 /**
@@ -36,7 +37,12 @@ import net.minecraft.util.IChatComponent;
  * own window and the interleaved feed do not see the same one. Vanilla's
  * history keeps every message in full; {@link ChatGroupRuns} holds the
  * grouped form beside it, and each view picks between them message by
- * message.</p>
+ * message. Where one run ends and the next begins the view lays a
+ * blank row ({@link #SPACER}), so groups read apart the way they do in
+ * any messenger; a row of nothing, with no message behind it, that
+ * neither the pointer nor the clipboard nor a scroll hold answers to.
+ * Two system lines side by side — command output, a run of notices —
+ * are not groups and are not spaced.</p>
  *
  * <p>The feed shows the channel prefix on every line; the open screen
  * hides it — the tabs already name the channel — so a window gives that
@@ -52,6 +58,13 @@ import net.minecraft.util.IChatComponent;
  * the whole history.</p>
  */
 final class ChatWindowLines {
+    /**
+     * The one component every blank row between runs is made of: it
+     * draws nothing, measures nothing, carries no marker, and is the
+     * same instance on every spacer so a row is known for one by
+     * identity. A spacer line carries no chat line id.
+     */
+    static final IChatComponent SPACER = new ChatComponentText("");
     /** Vanilla's unwrapped history, newest first. */
     private static final Field CHAT_LINES = resolveChatLines();
     private static final Map<String, Cached> CACHE =
@@ -70,6 +83,56 @@ final class ChatWindowLines {
     /** Whether a window can be laid out for itself at all. */
     static boolean isAvailable() {
         return CHAT_LINES != null;
+    }
+
+    /** Whether the row is a blank between two runs rather than a message's. */
+    static boolean isSpacer(ChatLine line) {
+        return line != null && line.func_151461_a() == SPACER;
+    }
+
+    /**
+     * The row of a message nearest to {@code index}, looking at the
+     * newer side first, or -1 when every row is a spacer: what a scroll
+     * takes hold of instead of a blank row, which stands for nothing.
+     */
+    static int nearestMessageRow(List<ChatLine> lines, int index) {
+        if (lines == null || lines.isEmpty()) {
+            return -1;
+        }
+        int start = Math.max(0, Math.min(lines.size() - 1, index));
+        for (int distance = 0; distance < lines.size(); distance++) {
+            int before = start - distance;
+            if (before >= 0 && lines.get(before) != null
+                    && !isSpacer(lines.get(before))) {
+                return before;
+            }
+            int after = start + distance;
+            if (after < lines.size() && lines.get(after) != null
+                    && !isSpacer(lines.get(after))) {
+                return after;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Where the view lays a blank row: after the message at each index
+     * (newest first) that opens a run and has an older message behind it,
+     * when at least one of the two is a message with an identity. A
+     * system line beside a system line opens no group, so nothing is
+     * spaced there; a system line beside a player's message is.
+     */
+    static boolean[] spacersAfter(int[] lineIdsNewestFirst, boolean[] grouped) {
+        int count = lineIdsNewestFirst == null ? 0 : lineIdsNewestFirst.length;
+        boolean[] spacers = new boolean[count];
+        for (int index = 0; index + 1 < count; index++) {
+            boolean runHead = grouped == null || index >= grouped.length
+                    || !grouped[index];
+            spacers[index] = runHead
+                    && (ChatGroupRuns.of(lineIdsNewestFirst[index]) != null
+                            || ChatGroupRuns.of(lineIdsNewestFirst[index + 1]) != null);
+        }
+        return spacers;
     }
 
     /**
@@ -398,6 +461,7 @@ final class ChatWindowLines {
             boolean[] grouped = this.fading
                     ? ChatGroupRuns.continuationsInFeed(lineIds)
                     : ChatGroupRuns.continuationsOf(lineIds);
+            boolean[] spacers = spacersAfter(lineIds, grouped);
             Map<ChatLine, Piece> kept = new IdentityHashMap<ChatLine, Piece>(
                     this.wrapped.size() + 1);
             List<ChatLine> result =
@@ -424,6 +488,12 @@ final class ChatWindowLines {
                 }
                 kept.put(message, piece);
                 result.addAll(piece.lines);
+                if (spacers[index]) {
+                    // The blank row between this run and the older one
+                    // below it, on this run's clock so the feed lets it
+                    // go with the run it belongs to.
+                    result.add(new ChatLine(counter, SPACER, 0));
+                }
             }
             this.wrapped = kept;
             this.lines = Collections.unmodifiableList(result);

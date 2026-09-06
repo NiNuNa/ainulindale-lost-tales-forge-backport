@@ -2,6 +2,7 @@ package com.ninuna.losttales.config.client;
 
 import com.ninuna.losttales.client.camera.CameraPresetId;
 import com.ninuna.losttales.client.camera.CameraPresetFileStore;
+import com.ninuna.losttales.config.LostTalesConfigFiles;
 import java.io.File;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
@@ -9,7 +10,6 @@ import net.minecraftforge.common.config.Property;
 /** Client-only options for the optional third-person camera overhaul. */
 public final class LostTalesThirdPersonConfig {
     public static final String CATEGORY_CAMERA = "third_person_camera";
-    private static final String FILE_NAME = "losttales-third-person.cfg";
     private static final double ORIGINAL_HEAD_TRACKING_ANGLE = 35.0D;
     private static final double PREVIOUS_HEAD_TRACKING_ANGLE = 65.0D;
     private static final double RECENT_HEAD_TRACKING_ANGLE = 70.0D;
@@ -83,11 +83,10 @@ public final class LostTalesThirdPersonConfig {
 
     private LostTalesThirdPersonConfig() {}
 
+    /** Reads the camera options from the mod's folder under Forge's config directory. */
     public static void load(File configDirectory) {
-        if (configDirectory == null) {
-            throw new IllegalArgumentException("configDirectory is required");
-        }
-        loadedConfigFile = new File(configDirectory, FILE_NAME);
+        loadedConfigFile = LostTalesConfigFiles.file(configDirectory,
+                LostTalesConfigFiles.CAMERA_OPTIONS);
         loadConfiguration(new Configuration(loadedConfigFile));
     }
 

@@ -392,8 +392,13 @@ public final class LostTalesChatPresentationTest {
                 ChatChannel.PARTY.getDisplayColor());
     }
 
+    /**
+     * An ampersand code is not formatting: a player's own words carry
+     * only the markup, so nothing typed can paint a line in a colour the
+     * palette does not give it.
+     */
     @Test
-    public void ampersandCodesRenderInTheMessageBodyOnly() {
+    public void ampersandCodesStayLiteral() {
         boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
         LostTalesConfig.showChatTimestamps = false;
         try {
@@ -413,8 +418,8 @@ public final class LostTalesChatPresentationTest {
                     marker = ChatHeadMarker.decode(part);
                 }
             }
-            assertTrue(plainText.toString().endsWith(
-                    "\u00a76gold words"));
+            assertTrue(plainText.toString().endsWith("&6gold words"));
+            assertFalse(plainText.toString().indexOf('\u00a7') >= 0);
             assertNotNull(marker);
             // Copying yields exactly what the sender typed.
             assertEquals("&6gold words", marker.copyText);

@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertEquals;
 
 import cpw.mods.fml.relauncher.FMLInjectionData;
+import com.ninuna.losttales.config.LostTalesConfigFiles;
 import java.io.File;
 import java.lang.reflect.Field;
 import net.minecraftforge.common.config.Configuration;
@@ -39,7 +40,7 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
         LostTalesThirdPersonConfig.savePendingGuiConfiguration();
 
         Configuration persisted = new Configuration(
-                new File(directory, "losttales-third-person.cfg"));
+                LostTalesConfigFiles.file(directory, LostTalesConfigFiles.CAMERA_OPTIONS));
         persisted.load();
         assertTrue(persisted.getBoolean(
                 "enabled",
@@ -64,7 +65,7 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
         LostTalesThirdPersonConfig.savePendingGuiConfiguration();
 
         Configuration persistedAgain = new Configuration(
-                new File(directory, "losttales-third-person.cfg"));
+                LostTalesConfigFiles.file(directory, LostTalesConfigFiles.CAMERA_OPTIONS));
         persistedAgain.load();
         assertFalse(persistedAgain.getBoolean(
                 "enabled",
@@ -77,8 +78,7 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
             throws Exception {
         File directory = temporaryFolder.newFolder("legacy-head-config");
         initializeForgeHome(directory.getParentFile());
-        File configFile = new File(directory,
-                "losttales-third-person.cfg");
+        File configFile = LostTalesConfigFiles.file(directory, LostTalesConfigFiles.CAMERA_OPTIONS);
         Configuration legacy = new Configuration(configFile);
         legacy.load();
         legacy.get(LostTalesThirdPersonConfig.CATEGORY_CAMERA,
@@ -101,8 +101,7 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
             throws Exception {
         File directory = temporaryFolder.newFolder("previous-head-config");
         initializeForgeHome(directory.getParentFile());
-        File configFile = new File(directory,
-                "losttales-third-person.cfg");
+        File configFile = LostTalesConfigFiles.file(directory, LostTalesConfigFiles.CAMERA_OPTIONS);
         Configuration previous = new Configuration(configFile);
         previous.load();
         previous.get(LostTalesThirdPersonConfig.CATEGORY_CAMERA,
@@ -125,8 +124,7 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
             throws Exception {
         File directory = temporaryFolder.newFolder("recent-head-config");
         initializeForgeHome(directory.getParentFile());
-        File configFile = new File(directory,
-                "losttales-third-person.cfg");
+        File configFile = LostTalesConfigFiles.file(directory, LostTalesConfigFiles.CAMERA_OPTIONS);
         Configuration recent = new Configuration(configFile);
         recent.load();
         recent.get(LostTalesThirdPersonConfig.CATEGORY_CAMERA,
@@ -149,8 +147,7 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
             throws Exception {
         File directory = temporaryFolder.newFolder("last-head-config");
         initializeForgeHome(directory.getParentFile());
-        File configFile = new File(directory,
-                "losttales-third-person.cfg");
+        File configFile = LostTalesConfigFiles.file(directory, LostTalesConfigFiles.CAMERA_OPTIONS);
         Configuration previous = new Configuration(configFile);
         previous.load();
         previous.get(LostTalesThirdPersonConfig.CATEGORY_CAMERA,
@@ -173,8 +170,7 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
             throws Exception {
         File directory = temporaryFolder.newFolder("former-head-config");
         initializeForgeHome(directory.getParentFile());
-        File configFile = new File(directory,
-                "losttales-third-person.cfg");
+        File configFile = LostTalesConfigFiles.file(directory, LostTalesConfigFiles.CAMERA_OPTIONS);
         Configuration previous = new Configuration(configFile);
         previous.load();
         previous.get(LostTalesThirdPersonConfig.CATEGORY_CAMERA,

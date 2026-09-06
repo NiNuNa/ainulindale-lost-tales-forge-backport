@@ -2,22 +2,25 @@ package com.ninuna.losttales.compat.lotr;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
+import com.ninuna.losttales.permission.LostTalesPermissions;
 import cpw.mods.fml.common.FMLLog;
 import java.util.UUID;
 import lotr.common.LOTRBannerProtection;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.world.World;
 
-/** Central server-side ownership, op, and LOTR banner-protection policy. */
+/**
+ * Central server-side ownership and LOTR banner-protection policy for
+ * waystones and markers. Operator status is {@link LostTalesPermissions}'
+ * answer; it is read here so the marker code has one word for it.
+ */
 public final class LostTalesWaystonePermissionPolicy {
     private static boolean warnedIncompatibleBannerApi;
 
     private LostTalesWaystonePermissionPolicy() {}
 
     public static boolean isOperator(EntityPlayerMP player) {
-        return player != null
-                && player.canCommandSenderUseCommand(
-                        2, "losttales.waystone");
+        return LostTalesPermissions.isOperator(player);
     }
 
     public static boolean isOwnerOrOperator(

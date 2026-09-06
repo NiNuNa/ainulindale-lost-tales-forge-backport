@@ -8,6 +8,8 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.item.ItemStack;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 import org.lwjgl.opengl.GL11;
@@ -177,6 +179,101 @@ final class LostTalesChatVisualStyle {
     static void drawColored(FontRenderer font, String text,
                             int x, int y, int rgb, int alpha) {
         drawColored(font, text, x, y, rgb, alpha, 1.0F);
+    }
+
+    /**
+     * A string carrying vanilla's section-sign codes, drawn in the
+     * palette: each colour code becomes the palette's tone of that
+     * colour ({@link #paletteRgb}), the decorations stay, and a reset
+     * returns to ivory. What the hover cards for achievements and text
+     * components draw with, so a tooltip reads in the same sixteen
+     * colours as the line it hangs from.
+     */
+    static void drawLegacyFormatted(FontRenderer font, String text,
+                                    int x, int y, int alpha) {
+        if (font == null || text == null) {
+            return;
+        }
+        int cursor = x;
+        for (LegacyRun run : legacyRuns(text)) {
+            drawColored(font, run.text, cursor, y, run.rgb, alpha);
+            cursor += font.getStringWidth(run.text);
+        }
+    }
+
+    /**
+     * The runs a section-sign-coded string is drawn as: the text of each
+     * with its decoration codes ahead of it, and the palette colour it
+     * is drawn in. A colour code starts a run and clears the
+     * decorations, as vanilla does; a reset does both and returns to
+     * ivory; a code with nothing after it is not a code.
+     */
+    static List<LegacyRun> legacyRuns(String text) {
+        List<LegacyRun> runs = new ArrayList<LegacyRun>();
+        if (text == null || text.length() == 0) {
+            return runs;
+        }
+        int rgb = IVORY;
+        StringBuilder styles = new StringBuilder();
+        StringBuilder pending = new StringBuilder();
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            if (character != '\u00a7' || index + 1 >= text.length()) {
+                pending.append(character);
+                continue;
+            }
+            char code = Character.toLowerCase(text.charAt(index + 1));
+            EnumChatFormatting formatting = formattingOf(code);
+            index++;
+            if (formatting == null) {
+                // FontRenderer treats an unknown code as white; the pair
+                // is consumed and the run goes on.
+                continue;
+            }
+            // Text before a code is drawn as it stood; the code shapes
+            // what follows.
+            if (pending.length() > 0) {
+                runs.add(new LegacyRun(prefix(styles) + pending, rgb));
+                pending.setLength(0);
+            }
+            if (formatting.isFancyStyling()) {
+                styles.append('\u00a7').append(code);
+                continue;
+            }
+            styles.setLength(0);
+            rgb = formatting == EnumChatFormatting.RESET ? IVORY
+                    : paletteRgb(formatting);
+        }
+        if (pending.length() > 0) {
+            runs.add(new LegacyRun(prefix(styles) + pending, rgb));
+        }
+        return runs;
+    }
+
+    private static String prefix(StringBuilder styles) {
+        return styles.length() == 0 ? "" : styles.toString();
+    }
+
+    private static EnumChatFormatting formattingOf(char code) {
+        for (EnumChatFormatting formatting : EnumChatFormatting.values()) {
+            String written = formatting.toString();
+            if (written.length() == 2 && written.charAt(1) == code) {
+                return formatting;
+            }
+        }
+        return null;
+    }
+
+    /** One run of a legacy-coded string: what is drawn, and in what colour. */
+    static final class LegacyRun {
+        /** The text with its decoration codes ahead of it, colours gone. */
+        final String text;
+        final int rgb;
+
+        LegacyRun(String text, int rgb) {
+            this.text = text;
+            this.rgb = rgb & 0xFFFFFF;
+        }
     }
 
     /**

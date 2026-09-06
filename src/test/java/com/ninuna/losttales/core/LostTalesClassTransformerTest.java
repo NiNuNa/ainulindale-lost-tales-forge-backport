@@ -49,6 +49,8 @@ public final class LostTalesClassTransformerTest {
             "com/ninuna/losttales/compat/lotr/LostTalesLotrFastTravelArrivalHook";
     private static final String HIRED_UNIT_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/hired/LostTalesLotrHiredUnitHook";
+    private static final String TRADER_NOTICE_HOOK_OWNER =
+            "com/ninuna/losttales/compat/lotr/LostTalesLotrTraderNoticeHook";
     private static final String SERVER_BROADCAST_HOOK_OWNER =
             "com/ninuna/losttales/chat/server/LostTalesServerBroadcastHook";
     private static final String DEBUG_HOOK_OWNER =
@@ -346,6 +348,46 @@ public final class LostTalesClassTransformerTest {
             }
         }
         assertTrue(ordered);
+    }
+
+    /**
+     * Every trader notice — arrival, arrival to a player, departure —
+     * is handed to the hook with the trader right before LOTR sends it.
+     */
+    @Test
+    public void lotrTraderNoticesAreColouredByTheTradersFaction() throws Exception {
+        ClassNode info = transform("lotr.common.entity.npc.LOTRTravellingTraderInfo");
+        assertTrue(containsStaticHook(info, "startVisiting",
+                TRADER_NOTICE_HOOK_OWNER, "decorate"));
+        assertTrue(containsStaticHook(info, "onUpdate",
+                TRADER_NOTICE_HOOK_OWNER, "decorate"));
+        int notices = 0;
+        int decorated = 0;
+        for (Object value : info.methods) {
+            MethodNode method = (MethodNode)value;
+            for (AbstractInsnNode instruction = method.instructions.getFirst();
+                 instruction != null; instruction = instruction.getNext()) {
+                if (!(instruction instanceof MethodInsnNode)) {
+                    continue;
+                }
+                MethodInsnNode call = (MethodInsnNode)instruction;
+                if ("messageAllPlayersInWorld".equals(call.name)) {
+                    notices++;
+                    // The hook's answer is what LOTR sends: it sits right
+                    // before the send, fed by the trader field.
+                    AbstractInsnNode before = previousCode(call);
+                    decorated += before instanceof MethodInsnNode
+                            && "decorate".equals(((MethodInsnNode)before).name)
+                            && previousCode(before).getOpcode() == Opcodes.GETFIELD
+                            ? 1 : 0;
+                }
+            }
+        }
+        // One send for arriving (both wordings share it), one for leaving.
+        assertTrue(notices >= 2);
+        assertEquals(notices, decorated);
+        assertEquals("true", System.getProperty(
+                LostTalesClassTransformer.LOTR_TRADER_NOTICE_ACTIVE_PROPERTY));
     }
 
     @Test

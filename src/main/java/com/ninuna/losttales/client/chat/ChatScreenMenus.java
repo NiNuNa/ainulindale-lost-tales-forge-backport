@@ -765,10 +765,10 @@ final class ChatScreenMenus {
                                 ? "gui.losttales.chat.message.unignore"
                                 : "gui.losttales.chat.message.ignore",
                         person.accountName)));
-        if (ClientChatChannelState.hasAdminAccess()) {
-            // The server's mute, for operators: the row offers to lift
+        if (ClientChatChannelState.canModerate()) {
+            // The server's mute, for moderators: the row offers to lift
             // the mute the server says is in force, else to lay one. The
-            // server tells operators the muted set with their access and
+            // server tells moderators the muted set with their access and
             // again whenever it changes, and decides for itself anyway.
             boolean muted = ClientChatChannelState.isMutedSender(
                     person.playerId);
@@ -794,14 +794,15 @@ final class ChatScreenMenus {
 
     /**
      * The menu's rows: the selected character on top — the identity the
-     * tab currently speaks as, with the lock control beside it — then
-     * the account and every roster character to choose from.
+     * tab currently speaks as, with the lock control beside it, which
+     * locks this tab and this tab alone — then the account and every
+     * roster character to choose from.
      */
     private List<ChatPopupMenu.Entry> characterSelectionEntries() {
         ChatTab selected = ClientChatChannelState.getSelected();
         UUID self = this.mc.thePlayer == null ? null
                 : this.mc.thePlayer.getUniqueID();
-        boolean locked = ClientChatAppearances.isLocked();
+        boolean locked = ClientChatAppearances.isLocked(selected);
         ClientChatAppearances.Appearance current =
                 ClientChatAppearances.effectiveFor(selected);
         List<ChatPopupMenu.Entry> entries =
@@ -854,11 +855,13 @@ final class ChatScreenMenus {
                 null).withHead(self, appearance.skinId);
     }
 
+    /** A choice applies to the selected tab: as its lock if it has one, else until the next switch. */
     private static void handleCharacterSelectionEntry(
             ChatPopupMenu.Entry entry) {
+        ChatTab selected = ClientChatChannelState.getSelected();
         if ("characters:account".equals(entry.id)) {
             ClientChatAppearances.select(
-                    ClientChatAppearances.accountAppearance());
+                    ClientChatAppearances.accountAppearance(), selected);
             return;
         }
         if (!entry.id.startsWith("characters:char:")) {
@@ -874,14 +877,14 @@ final class ChatScreenMenus {
         for (ClientChatAppearances.Appearance appearance
                 : ClientChatAppearances.characterAppearances()) {
             if (characterId.equals(appearance.characterId)) {
-                ClientChatAppearances.select(appearance);
+                ClientChatAppearances.select(appearance, selected);
                 return;
             }
         }
         for (ClientChatAppearances.Appearance appearance
                 : ClientChatAppearances.loreAppearances()) {
             if (characterId.equals(appearance.characterId)) {
-                ClientChatAppearances.select(appearance);
+                ClientChatAppearances.select(appearance, selected);
                 return;
             }
         }
@@ -928,14 +931,14 @@ final class ChatScreenMenus {
     }
 
     /**
-     * Whether this player, as an operator, may take the message the menu
+     * Whether this player, as a moderator, may take the message the menu
      * was opened over back from everyone: any line the server can still
      * be asked about, another player's or a Discord member's alike. The
-     * server checks operator status again on the request.
+     * server checks the capability again on the request.
      */
     private boolean canModerateMessage() {
         return ChatMessageIds.isServerId(this.menuMessageId)
-                && ClientChatChannelState.hasAdminAccess();
+                && ClientChatChannelState.canModerate();
     }
 
     /**

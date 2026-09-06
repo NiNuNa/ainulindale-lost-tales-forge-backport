@@ -14,6 +14,7 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.gui.ChatLine;
@@ -847,7 +848,8 @@ public final class LostTalesChatGui extends GuiChat {
             // The lock in the character selection menu answers with the
             // same tip its states answer with everywhere else.
             this.hoverTip = StatCollector.translateToLocal(
-                    ClientChatAppearances.isLocked()
+                    ClientChatAppearances.isLocked(
+                            ClientChatChannelState.getSelected())
                             ? "gui.losttales.chat.character_selection.unlock"
                             : "gui.losttales.chat.character_selection.lock");
             this.hoverTipX = mouseX;
@@ -1235,9 +1237,12 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
-     * Hover cards for item, text, and achievement components reproduced
-     * from vanilla, plus the tooltips of shared items and markers, drawn
-     * after the popups so they layer above everything in the stack. The
+     * Hover cards for item, text, and achievement components, plus the
+     * tooltips of shared items and markers, drawn after the popups so
+     * they layer above everything in the stack. An item keeps the game's
+     * own item tooltip, the one every inventory shows; text and
+     * achievement cards are drawn as the chat's cards are, in the
+     * palette, so they read beside the line rather than against it. The
      * hit position is the pointer's fractional coordinate; the tooltip
      * itself anchors on the whole-pixel one.
      */
@@ -1283,7 +1288,8 @@ public final class LostTalesChatGui extends GuiChat {
         lines.add("X " + Math.round(marker.x) + "   Z " + Math.round(marker.z));
         lines.add(EnumChatFormatting.GRAY + StatCollector.translateToLocal(
                 "gui.losttales.chat.marker.open"));
-        this.func_146283_a(lines, mouseX, mouseY);
+        LostTalesChatHoverCard.drawTextCard(this.mc, lines, mouseX, mouseY,
+                this.width, this.height);
         GL11.glDisable(GL11.GL_LIGHTING);
     }
 
@@ -1303,14 +1309,14 @@ public final class LostTalesChatGui extends GuiChat {
             if (stack != null) {
                 this.renderToolTip(stack, mouseX, mouseY);
             } else {
-                this.drawCreativeTabHoveringText(
-                        EnumChatFormatting.RED + "Invalid Item!",
-                        mouseX, mouseY);
+                LostTalesChatHoverCard.drawTextCard(this.mc, Collections.singletonList(
+                        EnumChatFormatting.RED + "Invalid Item!"),
+                        mouseX, mouseY, this.width, this.height);
             }
         } else if (hoverEvent.getAction() == HoverEvent.Action.SHOW_TEXT) {
-            this.func_146283_a(Splitter.on("\n").splitToList(
+            LostTalesChatHoverCard.drawTextCard(this.mc, Splitter.on("\n").splitToList(
                     hoverEvent.getValue().getFormattedText()),
-                    mouseX, mouseY);
+                    mouseX, mouseY, this.width, this.height);
         } else if (hoverEvent.getAction()
                 == HoverEvent.Action.SHOW_ACHIEVEMENT) {
             StatBase stat = StatList.func_151177_a(
@@ -1333,11 +1339,12 @@ public final class LostTalesChatGui extends GuiChat {
                             .listFormattedStringToWidth(description, 150);
                     lines.addAll(wrapped);
                 }
-                this.func_146283_a(lines, mouseX, mouseY);
+                LostTalesChatHoverCard.drawTextCard(this.mc, lines, mouseX, mouseY,
+                        this.width, this.height);
             } else {
-                this.drawCreativeTabHoveringText(EnumChatFormatting.RED
-                        + "Invalid statistic/achievement!",
-                        mouseX, mouseY);
+                LostTalesChatHoverCard.drawTextCard(this.mc, Collections.singletonList(
+                        EnumChatFormatting.RED + "Invalid statistic/achievement!"),
+                        mouseX, mouseY, this.width, this.height);
             }
         }
     }

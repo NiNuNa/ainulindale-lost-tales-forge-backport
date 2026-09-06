@@ -3,6 +3,7 @@ package com.ninuna.losttales.command;
 import com.ninuna.losttales.config.server.LostTalesServerConfigService;
 import com.ninuna.losttales.config.server.ServerConfigApplyResult;
 import com.ninuna.losttales.config.server.ServerConfigChange;
+import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.config.server.ServerConfigEntry;
 import com.ninuna.losttales.config.server.ServerConfigSnapshot;
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -36,6 +37,11 @@ public final class LostTalesCommandConfig extends LostTalesCommandBase {
     @Override
     public int getRequiredPermissionLevel() {
         return 2;
+    }
+
+    @Override
+    public LostTalesCapability getCapability() {
+        return LostTalesCapability.SERVER_CONFIG;
     }
 
     @Override

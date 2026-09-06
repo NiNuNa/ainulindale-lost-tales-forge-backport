@@ -47,23 +47,6 @@ public final class ChatMentionsTest {
     }
 
     @Test
-    public void ampersandCodesTranslateOnlyValidCodes() {
-        assertEquals("\u00a76gold \u00a7lbold\u00a7r plain",
-                ChatFormattingCodes.translateAmpersand(
-                        "&6gold &lbold&r plain"));
-        assertEquals("\u00a7agreen", ChatFormattingCodes
-                .translateAmpersand("&Agreen"));
-        assertEquals("fish & chips & you",
-                ChatFormattingCodes.translateAmpersand(
-                        "fish & chips & you"));
-        assertEquals("&zinvalid tail&",
-                ChatFormattingCodes.translateAmpersand(
-                        "&zinvalid tail&"));
-        assertEquals("", ChatFormattingCodes.translateAmpersand(null));
-        assertEquals("plain", ChatFormattingCodes
-                .translateAmpersand("plain"));
-    }
-@Test
     public void mentionNamesTagsBareNamesAtWordBoundaries() {
         java.util.List<String> names = java.util.Arrays.asList(
                 "Player500", "Aragorn");

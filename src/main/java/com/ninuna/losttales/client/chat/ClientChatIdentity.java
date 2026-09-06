@@ -1,11 +1,11 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
-import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
-import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.compat.lotr.LotrFactionColors;
 import net.minecraft.client.Minecraft;
 
 /**
@@ -18,10 +18,10 @@ import net.minecraft.client.Minecraft;
  *
  * <p>It follows the same rules the server signs by, so a locally built
  * line reads exactly like a served one: the appearance the tab
- * currently speaks as decides the name, an account line takes its
- * roles and the colour they give it from {@link ChatAccountRole}, and a
- * character line takes its own faction's colour. The LOTR title is the
- * server's to resolve, so a locally signed line carries none.</p>
+ * currently speaks as decides the name and the head, and the tab's
+ * channel decides whether the roles are tagged and what colours the
+ * name ({@link ChatRolePresentation}). The LOTR title is the server's
+ * to resolve, so a locally signed line carries none.</p>
  */
 final class ClientChatIdentity {
 
@@ -34,14 +34,19 @@ final class ClientChatIdentity {
                 ? "" : minecraft.thePlayer.getCommandSenderName();
         ClientChatAppearances.Appearance appearance =
                 ClientChatAppearances.effectiveFor(tab);
+        ChatChannel channel = tab == null ? null : tab.getChannel();
+        int roles = ChatRolePresentation.rolesShown(channel,
+                ClientChatChannelState.getRoleMask());
         if (appearance == null || appearance.account
                 || appearance.name.length() == 0) {
-            int roles = ClientChatChannelState.getRoleMask();
             return new Signature(account, account,
-                    ChatAccountRole.nameColor(roles), "", roles, true);
+                    ChatRolePresentation.nameColor(channel, roles, true, 0),
+                    "", roles, true);
         }
         return new Signature(appearance.name, account,
-                factionColor(appearance), appearance.skinId, 0, false);
+                ChatRolePresentation.nameColor(channel, roles, false,
+                        factionColor(appearance)),
+                appearance.skinId, roles, false);
     }
 
     /**
@@ -51,13 +56,13 @@ final class ClientChatIdentity {
      */
     private static int factionColor(
             ClientChatAppearances.Appearance appearance) {
-        int ivory = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
+        int ivory = ChatRolePresentation.unassignedColor();
         CharacterRosterSnapshot roster =
                 ClientCharacterRosterCache.getSnapshot();
         CharacterSummary summary = roster == null ? null
                 : roster.getCharacter(appearance.characterId);
         return summary == null ? ivory
-                : LotrCharacterAdapter.getInstance().getFactionColor(
+                : LotrFactionColors.forFactionId(
                         summary.getStartingFactionId(), ivory);
     }
 

@@ -8,7 +8,7 @@ import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
-import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
+import com.ninuna.losttales.compat.lotr.LotrFactionColors;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.Locale;
@@ -84,31 +84,43 @@ final class ChatMentionColors {
     }
 
     /**
-     * The account's primary role colour, or -1 for none: what the roles
-     * store has seen the name signed with, what the server's role
-     * roster lists it as, and for the local player what the server
-     * granted with the chat access — the first of them that answers, so
-     * a role holder is coloured before they have said anything.
+     * The account's primary role colour, or -1 for none; see
+     * {@link #rolesFor}.
      */
     private static int roleColorFor(String account) {
-        int known = ClientChatAccountRoles.colorOf(account);
-        if (known >= 0) {
-            return known;
+        ChatAccountRole primary = ChatAccountRole.primary(rolesFor(account));
+        return primary.isNone() ? -1 : primary.getColor();
+    }
+
+    /**
+     * Every role this client knows the account to hold, or zero: what
+     * the server's role roster lists it as, else what the roles store
+     * has seen the name signed with, and for the local player what the
+     * server granted with the chat access — the first of them that
+     * answers, so a role holder is coloured before they have said
+     * anything. The roster comes first because it is the server's
+     * current word, while a remembered line may be an evening old. The
+     * mention colours and the player card both read this.
+     */
+    static int rolesFor(String account) {
+        if (account == null || account.trim().length() == 0) {
+            return 0;
         }
-        ChatAccountRole listed = ChatAccountRole.primary(
-                ClientChatChannelState.rosterRolesOf(account));
-        if (!listed.isNone()) {
-            return listed.getColor();
+        int listed = ClientChatChannelState.rosterRolesOf(account);
+        if (listed != 0) {
+            return listed;
+        }
+        int known = ClientChatAccountRoles.rolesOf(account);
+        if (known != 0) {
+            return known;
         }
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft != null && minecraft.thePlayer != null
-                && account.equalsIgnoreCase(
+                && account.trim().equalsIgnoreCase(
                         minecraft.thePlayer.getCommandSenderName())) {
-            ChatAccountRole primary = ChatAccountRole.primary(
-                    ClientChatChannelState.getRoleMask());
-            return primary.isNone() ? -1 : primary.getColor();
+            return ClientChatChannelState.getRoleMask();
         }
-        return -1;
+        return 0;
     }
 
     /**
@@ -218,7 +230,7 @@ final class ChatMentionColors {
             CharacterSummary active = snapshot == null
                     ? null : snapshot.getActiveCharacter();
             return active == null ? fallback
-                    : LotrCharacterAdapter.getInstance().getFactionColor(
+                    : LotrFactionColors.forFactionId(
                             active.getStartingFactionId(), fallback);
         }
         for (CharacterAppearance appearance
@@ -226,7 +238,7 @@ final class ChatMentionColors {
             if (appearance != null && appearance.hasCharacter()
                     && account.equalsIgnoreCase(
                             appearance.getAccountName())) {
-                return LotrCharacterAdapter.getInstance().getFactionColor(
+                return LotrFactionColors.forFactionId(
                         appearance.getStartingFactionId(), fallback);
             }
         }

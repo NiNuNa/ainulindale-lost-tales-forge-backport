@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.render.EntityRenderTextureAccess;
+import com.ninuna.losttales.compat.lotr.LotrFactionColors;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import cpw.mods.fml.common.FMLLog;
@@ -173,25 +174,22 @@ public final class LostTalesNpcChatHook {
     }
 
     /**
-     * The colour the NPC speaks in: its faction's, exactly as the
-     * faction explorer and player lines colour it. Factionless
-     * wanderers belong to LOTR's UNALIGNED faction, whose colour is
-     * pure black and unreadable on the chat — they speak in the
-     * palette's light grey instead — and an NPC whose faction cannot be
-     * read at all keeps LOTR's yellow-name honey.
+     * The colour the NPC speaks in: its faction's, as
+     * {@link LotrFactionColors} decides it for every faction-coloured
+     * name; an NPC whose faction cannot be read keeps LOTR's yellow-name
+     * honey.
      */
     private static int nameColor(LOTREntityNPC npc) {
+        LOTRFaction faction;
         try {
-            LOTRFaction faction = npc.getFaction();
-            if (faction != null) {
-                int color = faction.getFactionColor() & 0xFFFFFF;
-                return color != 0 ? color
-                        : LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
-            }
+            faction = npc.getFaction();
         } catch (LinkageError ignored) {
+            faction = null;
         } catch (RuntimeException ignored) {
+            faction = null;
         }
-        return LostTalesColors.rgb(LostTalesColors.HONEY);
+        return LotrFactionColors.forFaction(faction,
+                LostTalesColors.rgb(LostTalesColors.HONEY));
     }
 
     /**

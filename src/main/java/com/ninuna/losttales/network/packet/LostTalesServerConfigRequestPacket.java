@@ -58,7 +58,7 @@ public final class LostTalesServerConfigRequestPacket implements IMessage {
                     new LostTalesServerTaskQueue.PlayerTask() {
                         @Override
                         public void run(EntityPlayerMP livePlayer) {
-                            if (!LostTalesServerConfigService.isOperator(livePlayer)) {
+                            if (!LostTalesServerConfigService.canEditServerConfig(livePlayer)) {
                                 return;
                             }
                             LostTalesNetworkHandler.CHANNEL.sendTo(

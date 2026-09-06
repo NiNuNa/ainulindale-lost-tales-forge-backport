@@ -8,8 +8,8 @@ import java.util.Locale;
 /**
  * Which roles the client has seen a name signed with.
  *
- * <p>Every account line the server sends carries the sender's roles, and
- * that is where a name's colour comes from: a mention of an operator is
+ * <p>Every out-of-character line the server sends carries the sender's
+ * roles, and that is where a name's colour comes from: a mention of an operator is
  * drawn in the operator's red, in the message, in the completion list and
  * in the input bar alike, so one name reads the same everywhere it
  * appears. The local player's own roles come from the chat access the

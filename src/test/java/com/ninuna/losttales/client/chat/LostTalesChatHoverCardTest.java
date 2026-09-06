@@ -1,5 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatRoleCatalog;
+import net.minecraft.util.StatCollector;
+import org.junit.After;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -7,6 +11,34 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public final class LostTalesChatHoverCardTest {
+
+    @After
+    public void tearDown() {
+        ChatRoleCatalog.resetToBuiltIn();
+    }
+
+    /**
+     * The card lists every held role, highest display priority first:
+     * the team mark before Operator, Operator before a config role of
+     * the default rank, however the mask orders their bits.
+     */
+    @Test
+    public void theCardListsEveryRoleByDisplayPriority() {
+        ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator",
+                "", "", 0xA94B54, true, 20, null);
+        ChatRoleCatalog.install(ChatRoleCatalog.of(
+                java.util.Collections.singletonList(moderator), null, null));
+        int held = ChatRoleCatalog.current().byId("moderator").bit()
+                | ChatAccountRole.OPERATOR.bit() | ChatAccountRole.TEAM.bit();
+        String team = StatCollector.translateToLocal(ChatAccountRole.TEAM.getNameKey());
+        String operator = StatCollector.translateToLocal(
+                ChatAccountRole.OPERATOR.getNameKey());
+        assertEquals(team + ", " + operator + ", Moderator",
+                LostTalesChatHoverCard.roleNames(held));
+        assertEquals(operator, LostTalesChatHoverCard.roleNames(
+                ChatAccountRole.OPERATOR.bit()));
+        assertEquals("", LostTalesChatHoverCard.roleNames(0));
+    }
     @Test
     public void hitBoundsHandleScaledAnimatedGeometry() {
         assertTrue(LostTalesChatHoverCard.contains(

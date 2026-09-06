@@ -23,6 +23,8 @@ import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatDeletePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatEditPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatConsoleSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatHistorySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigApplyPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigRequestPacket;
@@ -110,6 +112,8 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesChatUpdatePacket.Handler.class, LostTalesChatUpdatePacket.class, 43, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesServerConfigSyncPacket.Handler.class, LostTalesServerConfigSyncPacket.class, 45, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesServerConfigResultPacket.Handler.class, LostTalesServerConfigResultPacket.class, 47, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesChatHistorySyncPacket.Handler.class, LostTalesChatHistorySyncPacket.class, 48, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesChatConsoleSyncPacket.Handler.class, LostTalesChatConsoleSyncPacket.class, 49, Side.CLIENT);
 
         // Client -> server requests registered after the snapshots they answer
         // with. Ids are allocated in order of addition and are never reused, so

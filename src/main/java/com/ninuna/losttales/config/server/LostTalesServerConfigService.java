@@ -4,6 +4,8 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.permission.LostTalesCapability;
+import com.ninuna.losttales.permission.LostTalesPermissions;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraftforge.common.config.ConfigCategory;
@@ -28,15 +30,16 @@ import java.util.Set;
  */
 public final class LostTalesServerConfigService {
 
-    public static final String PERMISSION_NODE = "losttales.config";
-    private static final int OPERATOR_LEVEL = 2;
-
     private LostTalesServerConfigService() {}
 
-    /** Whether this player may read and change the server's config. */
-    public static boolean isOperator(EntityPlayerMP player) {
-        return player != null && player.canCommandSenderUseCommand(
-                OPERATOR_LEVEL, PERMISSION_NODE);
+    /**
+     * Whether this player may read and change the server's config: the
+     * {@link LostTalesCapability#SERVER_CONFIG} capability, held by
+     * operators and by any role the config grants it to. A holder can
+     * edit the roles themselves, so granting it is granting everything.
+     */
+    public static boolean canEditServerConfig(EntityPlayerMP player) {
+        return LostTalesPermissions.has(player, LostTalesCapability.SERVER_CONFIG);
     }
 
     /** Every server-side key as the file holds it now; empty without a file. */

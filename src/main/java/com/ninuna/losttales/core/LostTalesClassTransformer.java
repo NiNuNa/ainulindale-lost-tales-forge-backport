@@ -103,6 +103,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.deathMessageTransformer.active";
     public static final String LOTR_HIRED_UNIT_ACTIVE_PROPERTY =
             "losttales.lotrHiredUnitTransformer.active";
+    public static final String LOTR_TRADER_NOTICE_ACTIVE_PROPERTY =
+            "losttales.lotrTraderNoticeTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
@@ -314,6 +316,12 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "lotr.common.LOTRPlayerData";
     private static final String LOTR_HIRED_NPC_INFO =
             "lotr.common.entity.npc.LOTRHiredNPCInfo";
+    private static final String LOTR_TRAVELLING_TRADER_INFO =
+            "lotr.common.entity.npc.LOTRTravellingTraderInfo";
+    private static final String LOTR_TRADER_NOTICE_HOOK_OWNER =
+            "com/ninuna/losttales/compat/lotr/LostTalesLotrTraderNoticeHook";
+    private static final String LOTR_MESSAGE_ALL_PLAYERS_DESC =
+            "(Lnet/minecraft/world/World;Lnet/minecraft/util/IChatComponent;)V";
     private static final String LOTR_HIRED_UNIT_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/hired/LostTalesLotrHiredUnitHook";
     private static final String LOTR_HIRE_UNIT_DESC =
@@ -398,6 +406,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
         if (LOTR_SPEECH.equals(transformedName)) {
             return transformLotrSpeech(basicClass);
+        }
+        if (LOTR_TRAVELLING_TRADER_INFO.equals(transformedName)) {
+            return transformLotrTraderNotice(basicClass);
         }
         if (LOTR_NPC_SPEECH_HANDLER.equals(transformedName)) {
             return transformLotrNpcSpeechHandler(basicClass);
@@ -2962,6 +2973,77 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return basicClass;
         } catch (Throwable throwable) {
             warn("Failed to patch LOTR unit hiring: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Colours a travelling trader's notices by the trader's faction.
+     *
+     * <p>{@code LOTRTravellingTraderInfo} announces a trader arriving and
+     * departing by handing each notice to
+     * {@code LOTRSpeech.messageAllPlayersInWorld}, with the trader's name
+     * in plain yellow. Just before every such call the notice and the
+     * trader ({@code this.theEntity}) are handed to
+     * {@code LostTalesLotrTraderNoticeHook.decorate}, which marks the name
+     * with the faction colour and hands the notice back; the stack is
+     * left as LOTR built it, so who is told and what is said do not
+     * change. Without the patch the notices stay yellow.</p>
+     */
+    private static byte[] transformLotrTraderNotice(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            int patched = 0;
+            boolean present = false;
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if ((method.access & Opcodes.ACC_STATIC) != 0) {
+                    continue;
+                }
+                if (containsHook(method, LOTR_TRADER_NOTICE_HOOK_OWNER, "decorate")) {
+                    present = true;
+                    continue;
+                }
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (instruction.getOpcode() != Opcodes.INVOKESTATIC
+                            || !(instruction instanceof MethodInsnNode)) {
+                        continue;
+                    }
+                    MethodInsnNode call = (MethodInsnNode)instruction;
+                    if (!"messageAllPlayersInWorld".equals(call.name)
+                            || !LOTR_MESSAGE_ALL_PLAYERS_DESC.equals(call.desc)) {
+                        continue;
+                    }
+                    InsnList decorate = new InsnList();
+                    decorate.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    decorate.add(new FieldInsnNode(Opcodes.GETFIELD,
+                            owner.name, "theEntity",
+                            "Llotr/common/entity/npc/LOTREntityNPC;"));
+                    decorate.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                            LOTR_TRADER_NOTICE_HOOK_OWNER, "decorate",
+                            "(Lnet/minecraft/util/IChatComponent;"
+                                    + "Llotr/common/entity/npc/LOTREntityNPC;)"
+                                    + "Lnet/minecraft/util/IChatComponent;"));
+                    method.instructions.insertBefore(call, decorate);
+                    patched++;
+                }
+            }
+            if (patched == 0) {
+                if (present) {
+                    System.setProperty(LOTR_TRADER_NOTICE_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                warn("Could not locate a travelling trader notice in "
+                        + "LOTRTravellingTraderInfo; the notices stay yellow");
+                return basicClass;
+            }
+            System.setProperty(LOTR_TRADER_NOTICE_ACTIVE_PROPERTY, "true");
+            info("Patched " + patched + " LOTR travelling trader notices to wear "
+                    + "the trader's faction colour");
+            return write(owner);
+        } catch (Throwable throwable) {
+            warn("Failed to patch LOTR travelling trader notices: " + throwable);
             return basicClass;
         }
     }

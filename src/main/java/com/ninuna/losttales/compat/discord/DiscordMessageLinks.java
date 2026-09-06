@@ -34,7 +34,7 @@ import java.util.Map;
  * <p>Only lines of bridgeable channels are ever linked, so a Discord id
  * can never lead to a line from a private one. Bounded to the newest
  * {@link #MAX_LINKS} messages — the same order of reach the chat's own
- * {@link com.ninuna.losttales.chat.server.ChatMessageLog} has — and
+ * {@link com.ninuna.losttales.chat.server.ChatHistory} has — and
  * cleared when the bridge stops: a link is about one session, exactly
  * like the history it indexes into. Written from the server thread
  * (inbound) and the bridge's worker (outbound), so every touch is

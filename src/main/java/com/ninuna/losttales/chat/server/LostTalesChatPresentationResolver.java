@@ -3,6 +3,7 @@ package com.ninuna.losttales.chat.server;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
+import com.ninuna.losttales.compat.lotr.LotrFactionColors;
 import com.ninuna.losttales.faction.FactionDemonyms;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import lotr.common.LOTRLevelData;
@@ -35,9 +36,8 @@ final class LostTalesChatPresentationResolver {
                 LostTalesColors.HUD_LABEL);
         String factionName = "";
         if (character != null) {
-            factionColor = LotrCharacterAdapter.getInstance()
-                    .getFactionColor(character.getStartingFactionId(),
-                            factionColor);
+            factionColor = LotrFactionColors.forFactionId(
+                    character.getStartingFactionId(), factionColor);
             // The epithet names the sender's people, which is not always
             // what the realm is called: a Lothlórien character is a
             // Galadhrim Miner. Formatting codes stay behind; the client

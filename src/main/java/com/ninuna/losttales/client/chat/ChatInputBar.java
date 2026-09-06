@@ -567,7 +567,8 @@ final class ChatInputBar {
                         1.0F, 1.0F);
             }
         }
-        if (ClientChatAppearances.isLocked()) {
+        if (ClientChatAppearances.isLocked(
+                ClientChatChannelState.getSelected())) {
             ChatLockAnimation.drawShut(
                     buttonLeft + ChatPickerPanel.BUTTON_SIZE
                             - ChatLockAnimation.SHUT_WIDTH,

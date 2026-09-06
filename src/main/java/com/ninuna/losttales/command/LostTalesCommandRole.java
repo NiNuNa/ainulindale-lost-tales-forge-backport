@@ -8,6 +8,7 @@ import com.ninuna.losttales.chat.ChatRoleSource;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.config.server.LostTalesServerConfigService;
 import com.ninuna.losttales.config.server.ServerConfigChange;
+import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.relauncher.Side;
@@ -26,10 +27,10 @@ import net.minecraft.util.EnumChatFormatting;
 
 /**
  * The chat roles, live: list them, assign one to an account and take it
- * away, create, restyle and delete config roles. Every change is written
- * to the config through the same service the settings screen uses, so
- * the file, the screen and the running server agree, and the chat
- * access of everyone online follows. The Lost Tales Team mark is shown
+ * away, create, restyle and delete config roles, their grants included.
+ * Every change is written to the config through the same service the
+ * settings screen uses, so the file, the screen and the running server
+ * agree, and the chat access of everyone online follows. The Lost Tales Team mark is shown
  * and refused by every verb: it belongs to the code.
  */
 public final class LostTalesCommandRole extends LostTalesCommandBase {
@@ -49,6 +50,11 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
     @Override
     public int getRequiredPermissionLevel() {
         return 2;
+    }
+
+    @Override
+    public LostTalesCapability getCapability() {
+        return LostTalesCapability.ROLES_MANAGE;
     }
 
     @Override
@@ -93,6 +99,9 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
             } else {
                 for (ChatRoleSource source : role.getSources()) {
                     line.append(' ').append(source.toConfigOption());
+                }
+                for (LostTalesCapability capability : role.getGrants()) {
+                    line.append(" grant:").append(capability.getId());
                 }
                 int members = catalog.membersOf(role.getId()).size();
                 if (members > 0) {
@@ -144,14 +153,16 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
      * {@code create <id> [option ...]} and {@code edit <id> <option ...>}
      * take the options of a config entry ({@code name:Text tag:[Text]
      * color:RRGGBB mention:true rank:15 op:1 faction:GONDOR@gondor.knight
-     * desc:Text}), space-separated; an edit keeps whatever it does not name.
+     * grant:chat.moderate desc:Text}), space-separated; an edit keeps
+     * whatever it does not name. {@code op:}, {@code faction:} and
+     * {@code grant:} with nothing after the colon clear that kind.
      */
     private void define(ICommandSender sender, String[] args, boolean create) {
         if (args.length < 2 || (!create && args.length < 3)) {
             LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + "/losttales role "
                     + (create ? "create" : "edit") + " <id> [name:<text>] [tag:<[Text]>] "
                     + "[color:<RRGGBB>] [mention:<true|false>] [rank:<n>] [op:<level>] "
-                    + "[faction:<FACTION>@<rank>] [desc:<text>]");
+                    + "[faction:<FACTION>@<rank>] [grant:<capability>] [desc:<text>]");
             return;
         }
         String id = args[1].toLowerCase(Locale.ROOT);
@@ -234,7 +245,8 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         String rest = equals < 0 ? "" : entry.substring(equals + 1);
         List<String> parts = new ArrayList<String>();
         boolean replaced = false;
-        boolean repeatable = "op".equals(lower) || "faction".equals(lower);
+        boolean repeatable = "op".equals(lower) || "faction".equals(lower)
+                || "grant".equals(lower);
         for (String part : rest.split(";")) {
             if (part.trim().length() == 0) {
                 continue;
@@ -266,6 +278,18 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
             joined.append(parts.get(index));
         }
         return joined.toString();
+    }
+
+    /** Every capability a grant may name, comma-separated, for the usage. */
+    private static String capabilityIds() {
+        StringBuilder ids = new StringBuilder();
+        for (LostTalesCapability capability : LostTalesCapability.values()) {
+            if (ids.length() > 0) {
+                ids.append(", ");
+            }
+            ids.append(capability.getId());
+        }
+        return ids.toString();
     }
 
     private static UUID resolveAccount(String name) {
@@ -305,7 +329,9 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
                 + "/losttales role create <id> [name:<text>] [tag:<[Text]>] [color:<RRGGBB>] "
                 + "[mention:<true|false>] [rank:<n>] [op:<level>] [faction:<FACTION>@<rank>] "
-                + "[desc:<text>]");
+                + "[grant:<capability>] [desc:<text>]");
+        LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
+                + "  capabilities: " + capabilityIds());
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
                 + "/losttales role edit <id> <option ...>");
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + "/losttales role delete <id>");

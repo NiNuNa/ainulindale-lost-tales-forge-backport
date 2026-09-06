@@ -8,6 +8,7 @@ import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
+import com.ninuna.losttales.compat.lotr.LotrFactionColors;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.party.model.PartyColor;
 import com.ninuna.losttales.party.sync.PartyMemberSnapshot;
@@ -56,6 +57,10 @@ public final class ClientChatChannelState {
     private static long cachedFactionNanos;
     /** Server-stated operator status; the Admin tab exists only with it. */
     private static boolean adminAccess;
+    /** The server's word on whether this player may moderate the chat. */
+    private static boolean canModerate;
+    /** The server's word on whether this player may edit its settings. */
+    private static boolean canEditServerConfig;
     /** Server-stated roles of this player; what {@code @Operator} reaches. */
     private static int roleMask;
     /** Server-stated channel gates for this player, one bit per channel. */
@@ -441,7 +446,7 @@ public final class ClientChatChannelState {
         if (channel == ChatChannel.FACTION) {
             CharacterSummary active = activeCharacter();
             return active == null ? channel.getDisplayColor()
-                    : LotrCharacterAdapter.getInstance().getFactionColor(
+                    : LotrFactionColors.forFactionId(
                             active.getStartingFactionId(),
                             channel.getDisplayColor());
         }
@@ -618,7 +623,7 @@ public final class ClientChatChannelState {
         return 0;
     }
 
-    /** Applies the server's statement of operator status. */
+    /** Applies the server's statement of Operator-channel access. */
     public static synchronized void setAdminAccess(boolean access) {
         adminAccess = access;
         ensureAvailable();
@@ -626,6 +631,30 @@ public final class ClientChatChannelState {
 
     public static synchronized boolean hasAdminAccess() {
         return adminAccess;
+    }
+
+    /** Applies the server's statement of whether this player may moderate. */
+    public static synchronized void setCanModerate(boolean allowed) {
+        canModerate = allowed;
+    }
+
+    /**
+     * Whether the moderation menus — mute, unmute, remove anyone's
+     * message — are offered. The server said so with the access, and
+     * decides again on every request.
+     */
+    public static synchronized boolean canModerate() {
+        return canModerate;
+    }
+
+    /** Applies the server's statement of whether this player may edit its settings. */
+    public static synchronized void setCanEditServerConfig(boolean allowed) {
+        canEditServerConfig = allowed;
+    }
+
+    /** Whether the Server Settings button is offered; the server decides again on the request. */
+    public static synchronized boolean canEditServerConfig() {
+        return canEditServerConfig;
     }
 
     /**
@@ -696,6 +725,8 @@ public final class ClientChatChannelState {
         cachedFactionName = "";
         cachedFactionNanos = 0L;
         adminAccess = false;
+        canModerate = false;
+        canEditServerConfig = false;
         roleMask = 0;
         readableChannels = -1;
         sendableChannels = -1;

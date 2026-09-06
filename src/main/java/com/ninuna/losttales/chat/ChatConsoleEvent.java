@@ -1,0 +1,93 @@
+package com.ninuna.losttales.chat;
+
+/**
+ * One entry of the shared operator console: something administrative
+ * that happened on the server, said once for every staff member to
+ * read. Not a chat message — nobody signs it, nobody replies to it,
+ * nothing bridges it — and not a mirror of the server log either: only
+ * what a moderator has a use for becomes an entry, and every entry is
+ * built by the server from facts it holds, never from a line a client
+ * typed. Free of Minecraft imports: the packet and the client read the
+ * same class.
+ */
+public final class ChatConsoleEvent {
+
+    /** What kind of thing happened; the client labels and colours by it. */
+    public enum Kind {
+        /** A command a player or the console ran. */
+        COMMAND,
+        /** A mute, an unmute, a message taken back by a moderator. */
+        MODERATION,
+        /** A role made, changed, deleted, given or taken. */
+        ROLES,
+        /** A server setting changed live. */
+        CONFIG,
+        /** The server itself: started, a bridge came up. */
+        SERVER,
+        /** Something the mod could not do and staff should know about. */
+        WARNING;
+
+        /** The kind at that ordinal, or null for none. */
+        public static Kind fromOrdinal(int ordinal) {
+            Kind[] kinds = values();
+            return ordinal < 0 || ordinal >= kinds.length ? null : kinds[ordinal];
+        }
+    }
+
+    /** How loudly the entry reads. */
+    public enum Severity {
+        INFO,
+        NOTICE,
+        WARNING;
+
+        public static Severity fromOrdinal(int ordinal) {
+            Severity[] severities = values();
+            return ordinal < 0 || ordinal >= severities.length ? null
+                    : severities[ordinal];
+        }
+    }
+
+    public static final int MAX_ACTOR_LENGTH = 64;
+    public static final int MAX_TEXT_LENGTH = 512;
+
+    private final long id;
+    private final long timestampMillis;
+    private final Kind kind;
+    private final Severity severity;
+    /** Who did it: an account name, {@code Server} for the console, empty for nobody. */
+    private final String actor;
+    private final String text;
+
+    public ChatConsoleEvent(long id, long timestampMillis, Kind kind,
+                            Severity severity, String actor, String text) {
+        if (kind == null || severity == null) {
+            throw new IllegalArgumentException("a console event has a kind and a severity");
+        }
+        this.id = id;
+        this.timestampMillis = timestampMillis;
+        this.kind = kind;
+        this.severity = severity;
+        this.actor = clip(actor, MAX_ACTOR_LENGTH);
+        this.text = clip(text, MAX_TEXT_LENGTH);
+        if (this.text.length() == 0) {
+            throw new IllegalArgumentException("a console event says something");
+        }
+    }
+
+    public long getId() { return this.id; }
+    public long getTimestampMillis() { return this.timestampMillis; }
+    public Kind getKind() { return this.kind; }
+    public Severity getSeverity() { return this.severity; }
+    public String getActor() { return this.actor; }
+    public String getText() { return this.text; }
+
+    private static String clip(String value, int maximum) {
+        String text = value == null ? "" : value.trim();
+        return text.length() > maximum ? text.substring(0, maximum) : text;
+    }
+
+    @Override
+    public String toString() {
+        return this.kind + "/" + this.severity + " " + this.actor + ": " + this.text;
+    }
+}

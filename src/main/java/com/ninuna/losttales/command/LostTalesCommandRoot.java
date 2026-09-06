@@ -12,8 +12,10 @@ import net.minecraft.util.EnumChatFormatting;
 /**
  * The one command Lost Tales registers: {@code /losttales <sub-command>
  * ...}, dispatched to the sub-commands {@link ELostTalesSubCommand}
- * lists. The root needs operator level two; a sub-command may ask for
- * more, and is asked before it runs.
+ * lists. The root is open to operators of level two and to anyone who
+ * may use at least one sub-command through a capability their roles
+ * grant; each sub-command is asked for itself before it runs, so the
+ * root opening never opens more than the sub-commands do.
  */
 public class LostTalesCommandRoot extends LostTalesCommandBase {
 
@@ -33,6 +35,22 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
     @Override
     public int getRequiredPermissionLevel() {
         return 2;
+    }
+
+    @Override
+    public boolean canCommandSenderUseCommand(ICommandSender sender) {
+        if (super.canCommandSenderUseCommand(sender)) {
+            return true;
+        }
+        for (ELostTalesSubCommand subCommand : ELostTalesSubCommand.values()) {
+            CommandBase command = subCommand.getCommand();
+            if (command instanceof LostTalesCommandBase
+                    && ((LostTalesCommandBase)command).getCapability() != null
+                    && command.canCommandSenderUseCommand(sender)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -70,11 +88,14 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
         return Arrays.copyOfRange(args, 1, args.length);
     }
 
+    /** Lists only what the sender may run; the rest would be refused anyway. */
     private void sendUsage(ICommandSender sender) {
         send(sender, EnumChatFormatting.GOLD + "Lost Tales commands:");
         for (ELostTalesSubCommand subCommand : ELostTalesSubCommand.values()) {
-            send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " "
-                    + subCommand.getUsage());
+            if (subCommand.getCommand().canCommandSenderUseCommand(sender)) {
+                send(sender, EnumChatFormatting.GRAY + "/" + getCommandName() + " "
+                        + subCommand.getUsage());
+            }
         }
     }
 
@@ -86,7 +107,7 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
     public List addTabCompletionOptions(ICommandSender sender, String[] args) {
         if (args.length == 1) {
             return getListOfStringsMatchingLastWord(args,
-                    ELostTalesSubCommand.primaryNames());
+                    ELostTalesSubCommand.primaryNamesFor(sender));
         }
 
         ELostTalesSubCommand subCommand = ELostTalesSubCommand.byName(args[0]);

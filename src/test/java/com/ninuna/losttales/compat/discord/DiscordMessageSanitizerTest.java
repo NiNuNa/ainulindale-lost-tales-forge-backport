@@ -26,6 +26,29 @@ public final class DiscordMessageSanitizerTest {
         assertEquals("", DiscordMessageSanitizer.inbound(null, null));
     }
 
+    /** Discord's block markup folds into the inline marks the chat reads. */
+    @Test
+    public void discordBlockMarkupFoldsIntoTheSharedInlineMarks() {
+        assertEquals("**bold** *it* __u__ ~~s~~ ||sp|| `c`",
+                DiscordMessageSanitizer.normalizeMarkdown(
+                        "**bold** *it* __u__ ~~s~~ ||sp|| `c`"));
+        assertEquals("*it* and snake_case_name and a_b",
+                DiscordMessageSanitizer.normalizeMarkdown(
+                        "_it_ and snake_case_name and a_b"));
+        assertEquals("run `System.out.println('x');` now",
+                DiscordMessageSanitizer.normalizeMarkdown(
+                        "run ```java\nSystem.out.println(`x`);\n``` now"));
+        assertEquals("Title\nquoted\nsmall\nmore",
+                DiscordMessageSanitizer.normalizeMarkdown(
+                        "# Title\n> quoted\n-# small\n>>> more"));
+        assertEquals("", DiscordMessageSanitizer.normalizeMarkdown("``````"));
+        assertEquals("", DiscordMessageSanitizer.normalizeMarkdown(null));
+        // Through the whole inbound path the line is one the chat accepts.
+        assertEquals("Title quoted `code` *it*",
+                DiscordMessageSanitizer.inbound(
+                        "# Title\n> quoted\n```\ncode\n```\n_it_", null));
+    }
+
     @Test
     public void longMessagesAreCutToTheChatLimit() {
         StringBuilder text = new StringBuilder();

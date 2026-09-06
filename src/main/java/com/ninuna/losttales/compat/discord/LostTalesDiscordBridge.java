@@ -4,7 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
-import com.ninuna.losttales.chat.server.ChatMessageLog;
+import com.ninuna.losttales.chat.server.ChatHistory;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.compat.discord.gateway.DiscordGatewayClient;
 import com.ninuna.losttales.compat.discord.gateway.DiscordGatewayProtocol;
@@ -573,7 +573,7 @@ public final class LostTalesDiscordBridge {
                 message.referencedDiscordId);
         if (referenced != ChatMessageIds.NONE
                 && this.links.hasCopyIn(referenced, destination)) {
-            reply = ChatMessageLog.quoteForDiscordChannel(referenced);
+            reply = ChatHistory.quoteForDiscordChannel(referenced);
         }
         long messageId = LostTalesChatService.sendFromDiscord(
                 binding.getChannel(), binding.getFactionScope(),

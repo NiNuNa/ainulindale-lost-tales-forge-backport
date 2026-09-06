@@ -146,8 +146,10 @@ public final class CharacterPlayerEventHandler {
         CharacterAppearanceSyncManager.sendFullSnapshot(serverPlayer);
         if (action == LifecycleAction.LOGIN) {
             // Everyone's role roster follows the join, the joiner's own
-            // access included.
+            // access included; then what was said while they were away.
             LostTalesChatService.sendAccessToAll(null);
+            LostTalesChatService.sendHistory(serverPlayer);
+            LostTalesChatService.sendConsoleHistory(serverPlayer);
         } else {
             LostTalesChatService.sendAccess(serverPlayer);
         }

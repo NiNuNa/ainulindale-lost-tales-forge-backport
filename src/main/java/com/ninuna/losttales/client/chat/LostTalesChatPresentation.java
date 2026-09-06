@@ -2,13 +2,14 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatIdentityType;
-import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.chat.ChatMarkdown;
 import com.ninuna.losttales.chat.ChatMentions;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.chat.share.ChatShareKind;
@@ -77,9 +78,26 @@ public final class LostTalesChatPresentation {
     private LostTalesChatPresentation() {}
 
     public static void receive(LostTalesChatMessagePacket packet) {
+        receive(packet, false);
+    }
+
+    /**
+     * Shows a line the server sent. A {@code replayed} line is one the
+     * server is catching this player up on from its history: it is
+     * filed, grouped and counted exactly as a live line is, but earns no
+     * sound and confirms no pending echo, since nothing was typed for
+     * it here. A message this client already holds is never shown twice,
+     * whichever way it arrives.
+     */
+    public static void receive(LostTalesChatMessagePacket packet,
+                               boolean replayed) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (packet == null || packet.isMalformed() || minecraft == null
                 || minecraft.ingameGUI == null) {
+            return;
+        }
+        if (ChatMessageIds.isServerId(packet.getMessageId())
+                && ClientChatMessages.get(packet.getMessageId()) != null) {
             return;
         }
         ChatChannel channel = packet.getChannel();
@@ -97,8 +115,13 @@ public final class LostTalesChatPresentation {
         }
         // The name this line was signed with, and what the server says
         // it wears: that is where a mention of it takes its colour from.
-        ClientChatAccountRoles.remember(packet.getIdentityName(),
-                packet.getRoles());
+        // An in-character line says nothing about roles — none are worn
+        // there — so it is not allowed to forget what an out-of-character
+        // line stated.
+        if (ChatRolePresentation.showsRoles(channel)) {
+            ClientChatAccountRoles.remember(packet.getIdentityName(),
+                    packet.getRoles());
+        }
         boolean mentioned = LostTalesConfig.enableChatPings
                 && isLocalPlayerMentioned(minecraft, packet.getMessage());
         // A whisper lands in the tab of its conversation, opened on the
@@ -131,7 +154,8 @@ public final class LostTalesChatPresentation {
         }
         // A message this client already showed is not printed again:
         // the line it is standing on becomes the real one, in place.
-        int confirmed = confirmPendingEcho(minecraft, packet, tab);
+        int confirmed = replayed ? 0
+                : confirmPendingEcho(minecraft, packet, tab);
         int chatLineId = confirmed != 0 ? confirmed
                 : print(minecraft, packet, tab, mentioned);
         if (mentioned || tab.isWhisper()) {
@@ -140,8 +164,9 @@ public final class LostTalesChatPresentation {
             }
             // The highlight stays for when the tab is read; the cue is
             // silenced by the tab's own preference alone — a closed tab
-            // still receives — and a whisper is always a cue.
-            if (ChatWindowLayout.isPingAudible(tab)) {
+            // still receives — and a whisper is always a cue. A replayed
+            // line was said before this player arrived and sounds no cue.
+            if (!replayed && ChatWindowLayout.isPingAudible(tab)) {
                 playPingSound(minecraft);
             }
         }
@@ -1006,6 +1031,15 @@ public final class LostTalesChatPresentation {
     public static boolean receiveSystemLine(IChatComponent message,
                                             ChatChannel channel,
                                             boolean audibleMentionCue) {
+        return receiveSystemLine(message, channel, audibleMentionCue,
+                System.currentTimeMillis());
+    }
+
+    /** As above, stamped with the time the line was said rather than shown. */
+    public static boolean receiveSystemLine(IChatComponent message,
+                                            ChatChannel channel,
+                                            boolean audibleMentionCue,
+                                            long timestampMillis) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (message == null || channel == null || minecraft == null
                 || minecraft.ingameGUI == null) {
@@ -1035,7 +1069,7 @@ public final class LostTalesChatPresentation {
         }
         int chatLineId = allocateChatLineId();
         GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
-        long now = System.currentTimeMillis();
+        long now = timestampMillis;
         chat.printChatMessageWithOptionalDeletion(
                 buildSystemLine(shown, channel, now), chatLineId);
         ClientChatChannelViews.record(chatLineId, tab,
@@ -1056,6 +1090,59 @@ public final class LostTalesChatPresentation {
             printLocalLine(chat, shown.createCopy(), asked, now);
         }
         return true;
+    }
+
+    /**
+     * Shows one entry of the shared operator console, once: a bracketed
+     * label saying what kind of thing it is, in the kind's colour, then
+     * who did it and what. Filed in the Console tab like every console
+     * line, stamped with when it happened, and never a cue: the console
+     * is read, not answered. The server sent it only because this player
+     * may read the console; nothing here decides that.
+     */
+    public static void receiveConsoleEvent(ChatConsoleEvent event) {
+        if (event == null || !ClientChatConsoleEvents.noteShown(event.getId())) {
+            return;
+        }
+        ChatComponentText line = new ChatComponentText("");
+        line.appendSibling(text("[" + StatCollector.translateToLocal(
+                "gui.losttales.chat.console."
+                        + event.getKind().name().toLowerCase(java.util.Locale.ROOT))
+                + "] ", consoleKindFormatting(event), true));
+        if (event.getActor().length() > 0) {
+            line.appendSibling(text(event.getActor() + ": ",
+                    EnumChatFormatting.WHITE, false));
+        }
+        line.appendSibling(text(event.getText(),
+                event.getSeverity() == ChatConsoleEvent.Severity.WARNING
+                        ? EnumChatFormatting.RED : EnumChatFormatting.GRAY, false));
+        receiveSystemLine(line, ChatChannel.CONSOLE, false,
+                event.getTimestampMillis());
+    }
+
+    /**
+     * The vanilla colour a console entry's label wears; the renderer
+     * draws it in the palette's own tone of it. A warning is red
+     * whatever its kind.
+     */
+    private static EnumChatFormatting consoleKindFormatting(ChatConsoleEvent event) {
+        if (event.getSeverity() == ChatConsoleEvent.Severity.WARNING) {
+            return EnumChatFormatting.RED;
+        }
+        switch (event.getKind()) {
+            case MODERATION:
+                return EnumChatFormatting.DARK_RED;
+            case ROLES:
+                return EnumChatFormatting.DARK_PURPLE;
+            case CONFIG:
+                return EnumChatFormatting.GOLD;
+            case SERVER:
+                return EnumChatFormatting.GREEN;
+            case WARNING:
+                return EnumChatFormatting.RED;
+            default:
+                return EnumChatFormatting.GRAY;
+        }
     }
 
     /**
@@ -1673,9 +1760,10 @@ public final class LostTalesChatPresentation {
     private static void appendStyledText(ChatComponentText root,
                                          String rawText,
                                          ChatChannel channel) {
-        // Player-typed &-codes become renderable formatting only here, at
-        // display time; the wire and copy text keep the ampersand form.
-        String displayed = ChatFormattingCodes.translateAmpersand(rawText);
+        // The markup is the only styling a player's words carry: an
+        // ampersand is an ampersand, and a section sign never reaches the
+        // wire (ChatMessageValidator refuses it).
+        String displayed = rawText;
         if (!ChatMarkdown.hasMarkup(displayed)) {
             appendEmojiRuns(root, displayed, channel);
             return;
@@ -1742,6 +1830,9 @@ public final class LostTalesChatPresentation {
         }
         if (span.isStrikethrough()) {
             style.setStrikethrough(Boolean.TRUE);
+        }
+        if (span.isUnderlined()) {
+            style.setUnderlined(Boolean.TRUE);
         }
         if (span.isSpoiler()) {
             style.setObfuscated(Boolean.TRUE);

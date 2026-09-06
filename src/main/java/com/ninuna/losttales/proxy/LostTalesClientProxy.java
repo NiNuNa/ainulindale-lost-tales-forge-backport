@@ -67,6 +67,9 @@ import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
+import com.ninuna.losttales.chat.ChatConsoleEvent;
+import com.ninuna.losttales.network.packet.LostTalesChatConsoleSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatHistorySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigResultPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigSyncPacket;
@@ -500,6 +503,9 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             ClientChatChannelState.setChannelGates(
                     packet.getReadableChannels(), packet.getSendableChannels());
             ClientChatChannelState.setAdminAccess(packet.hasAdminAccess());
+            ClientChatChannelState.setCanModerate(packet.canModerate());
+            ClientChatChannelState.setCanEditServerConfig(
+                    packet.canEditServerConfig());
             ClientChatChannelState.setRoleMask(packet.getRoleMask());
             java.util.LinkedHashMap<String, Integer> holders =
                     new java.util.LinkedHashMap<String, Integer>();
@@ -539,6 +545,35 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleChatUpdate(LostTalesChatUpdatePacket packet) {
         LostTalesChatPresentation.applyUpdate(packet);
+    }
+
+    /**
+     * Recent lines the server replays on joining, oldest first, each
+     * shown through the path a live line takes — ignored accounts
+     * dropped the same way — without the cues a live line earns: no
+     * sound, no echo to confirm, and no speech bubble over a head that
+     * spoke before this player arrived.
+     */
+    @Override
+    public void handleChatConsole(LostTalesChatConsoleSyncPacket packet) {
+        if (packet == null || packet.isMalformed()) {
+            return;
+        }
+        for (ChatConsoleEvent event : packet.getEvents()) {
+            LostTalesChatPresentation.receiveConsoleEvent(event);
+        }
+    }
+
+    @Override
+    public void handleChatHistory(LostTalesChatHistorySyncPacket packet) {
+        if (packet == null || packet.isMalformed()) {
+            return;
+        }
+        for (LostTalesChatMessagePacket line : packet.getMessages()) {
+            if (!isIgnoredLine(line)) {
+                LostTalesChatPresentation.receive(line, true);
+            }
+        }
     }
 
     @Override

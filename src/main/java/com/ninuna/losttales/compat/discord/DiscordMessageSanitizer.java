@@ -15,9 +15,11 @@ import java.util.regex.Pattern;
  * becomes {@code @name} from the message's own mention list, {@code <#id>}
  * a {@code #channel}, a custom {@code <:name:id>} its {@code :name:} —
  * registered Unicode emoji and alias shortcodes become their canonical
- * {@code :name:}, line breaks collapse to spaces, control characters,
- * section signs and whatever emoji the registry does not carry go, and
- * the result is cut to the chat's own length. Outbound, a canonical
+ * {@code :name:}, Discord's block markup is folded into the inline
+ * marks the chat reads ({@link #normalizeMarkdown}), line breaks
+ * collapse to spaces, control characters, section signs and whatever
+ * emoji the registry does not carry go, and the result is cut to the
+ * chat's own length. Outbound, a canonical
  * shortcode becomes the Unicode emoji Discord renders — the mod's own
  * sprites stay literal text — and nothing else is rewritten: the webhook
  * is told to ping nobody instead.
@@ -29,6 +31,15 @@ public final class DiscordMessageSanitizer {
     private static final Pattern CUSTOM_EMOJI =
             Pattern.compile("<a?:([A-Za-z0-9_]+):\\d+>");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    /** A fenced block, with or without a language tag on its first line. */
+    private static final Pattern CODE_FENCE =
+            Pattern.compile("```(?:[A-Za-z0-9_+-]*\\n)?([\\s\\S]*?)```");
+    /** A line's leading header, block quote or subtext mark. */
+    private static final Pattern LINE_MARK =
+            Pattern.compile("(?m)^[ \\t]*(?:#{1,3} |>>> |> |-# )");
+    /** Discord's underscore italics, at word boundaries only. */
+    private static final Pattern UNDERSCORE_ITALIC =
+            Pattern.compile("(?<![\\w*_])_([^_\\s](?:[^_]*?[^_\\s])?)_(?![\\w_])");
     /** Discord display names are bounded; the chat bounds them again. */
     private static final int MAX_NAME_LENGTH = 32;
 
@@ -59,6 +70,7 @@ public final class DiscordMessageSanitizer {
         emoji.appendTail(emojis);
         text = ChatEmojiParser.normalizeAliases(emojis.toString());
         text = unicodeToShortcodes(text);
+        text = normalizeMarkdown(text);
         text = stripUnsendable(text);
         text = WHITESPACE.matcher(text).replaceAll(" ").trim();
         if (text.length() > ChatMessageValidator.MAX_CHARACTERS) {
@@ -69,9 +81,43 @@ public final class DiscordMessageSanitizer {
     }
 
     /**
+     * Discord's markup as the chat reads it. The inline marks are the
+     * same on both sides — {@code **}, {@code *}, {@code __}, {@code ~~},
+     * {@code ||}, {@code `} — and pass through untouched; what Discord has
+     * and a chat line has no room for is folded: a fenced block becomes
+     * an inline code span, a header, a block quote or a subtext mark
+     * loses its leading mark, and {@code _italic_} becomes {@code *italic*}.
+     * Nothing is escaped or dropped, so what a member typed is still what
+     * the line says.
+     */
+    static String normalizeMarkdown(String text) {
+        if (text == null || text.length() == 0) {
+            return text == null ? "" : text;
+        }
+        String folded = text;
+        if (folded.indexOf("```") >= 0) {
+            Matcher fence = CODE_FENCE.matcher(folded);
+            StringBuffer fenced = new StringBuffer();
+            while (fence.find()) {
+                String inner = fence.group(1).trim().replace('`', '\'');
+                fence.appendReplacement(fenced, Matcher.quoteReplacement(
+                        inner.length() == 0 ? "" : "`" + inner + "`"));
+            }
+            fence.appendTail(fenced);
+            folded = fenced.toString();
+        }
+        folded = LINE_MARK.matcher(folded).replaceAll("");
+        if (folded.indexOf('_') >= 0) {
+            folded = UNDERSCORE_ITALIC.matcher(folded).replaceAll("*$1*");
+        }
+        return folded;
+    }
+
+    /**
      * The Discord text for a game message: every canonical shortcode
      * with a Unicode form becomes that emoji; the mod's own sprites and
-     * everything else stay exactly as typed.
+     * everything else stay exactly as typed — the chat's marks are
+     * Discord's marks.
      */
     public static String outbound(String message) {
         if (message == null || message.indexOf(':') < 0) {

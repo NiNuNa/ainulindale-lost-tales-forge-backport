@@ -32,9 +32,33 @@ public final class ChatMarkdownTest {
         assertTrue(bold.get(0).isPlain() && bold.get(2).isPlain());
 
         assertTrue(ChatMarkdown.parse("*x*").get(0).isItalic());
+        assertTrue(ChatMarkdown.parse("__x__").get(0).isUnderlined());
         assertTrue(ChatMarkdown.parse("~~x~~").get(0).isStrikethrough());
         assertTrue(ChatMarkdown.parse("`x`").get(0).isCode());
         assertTrue(ChatMarkdown.parse("||x||").get(0).isSpoiler());
+    }
+
+    /**
+     * Underline is two underscores, as Discord writes it; the single
+     * underscores of a name are not marks, and an underline nests like
+     * the rest.
+     */
+    @Test
+    public void underlineIsTwoUnderscoresAndNamesKeepTheirs() {
+        List<ChatMarkdown.Span> spans = ChatMarkdown.parse("see __this__ Player_531");
+        assertEquals(3, spans.size());
+        assertEquals("this", spans.get(1).getText());
+        assertTrue(spans.get(1).isUnderlined());
+        assertFalse(spans.get(1).isBold());
+        assertEquals(" Player_531", spans.get(2).getText());
+        assertTrue(spans.get(2).isPlain());
+        assertEquals("__init__ method", plainOf(ChatMarkdown.parse("__init__ method"))
+                .replace("init", "__init__"));
+        List<ChatMarkdown.Span> nested = ChatMarkdown.parse("**__both__**");
+        assertEquals(1, nested.size());
+        assertTrue(nested.get(0).isBold() && nested.get(0).isUnderlined());
+        assertEquals("a __ b", plainOf(ChatMarkdown.parse("a __ b")));
+        assertTrue(ChatMarkdown.hasMarkup("__u__"));
     }
 
     /** Marks nest, so a run can carry more than one. */

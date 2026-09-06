@@ -37,7 +37,7 @@ public final class LostTalesServerConfigLoadingGui extends GuiScreen {
 
     /**
      * Whether this client may open server settings right now: in a
-     * world, only once the server has said the player is an operator;
+     * world, only once the server has said the player may edit them;
      * in the main menu always, since the settings are then the local
      * file's — the server this game hosts.
      */
@@ -45,7 +45,7 @@ public final class LostTalesServerConfigLoadingGui extends GuiScreen {
         if (minecraft == null) {
             return false;
         }
-        return minecraft.theWorld == null || ClientChatChannelState.hasAdminAccess();
+        return minecraft.theWorld == null || ClientChatChannelState.canEditServerConfig();
     }
 
     /**

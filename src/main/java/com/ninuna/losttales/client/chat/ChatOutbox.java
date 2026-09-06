@@ -135,8 +135,8 @@ final class ChatOutbox {
         LostTalesNetworkHandler.CHANNEL.sendToServer(
                 new LostTalesChatSendPacket(tab.getChannel(), outgoing,
                         resolveShareReferences(outgoing), tab.getPartner(),
-                        ClientChatAppearances.wireKind(),
-                        ClientChatAppearances.wireCharacterId(),
+                        ClientChatAppearances.wireKind(tab),
+                        ClientChatAppearances.wireCharacterId(tab),
                         reply.getMessageId(),
                         tab.isWhisper() ? tab.getPartnerIdentity() : "",
                         echoNonce));

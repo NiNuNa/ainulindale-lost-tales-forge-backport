@@ -6,8 +6,10 @@ import java.util.List;
 
 /**
  * The light markup a message may be typed with, as the chat shows it:
- * {@code **bold**}, {@code *italic*}, {@code ~~struck~~},
- * {@code `code`} and {@code ||spoiler||}.
+ * {@code **bold**}, {@code *italic*}, {@code __underlined__},
+ * {@code ~~struck~~}, {@code `code`} and {@code ||spoiler||} — the
+ * inline marks Discord reads the same way, so a message reads alike on
+ * both sides of the bridge without being rewritten for either.
  *
  * <p>Display only. The wire, the copy text and the log keep exactly what
  * was typed, markers and all, so nothing here can change what a message
@@ -28,7 +30,7 @@ public final class ChatMarkdown {
     /** How deep spans may nest before the rest is left literal. */
     private static final int MAX_DEPTH = 8;
     private static final String[] DELIMITERS = {
-            "**", "~~", "||", "*", "`" };
+            "**", "__", "~~", "||", "*", "`" };
 
     private ChatMarkdown() {}
 
@@ -146,6 +148,9 @@ public final class ChatMarkdown {
         if ("**".equals(delimiter)) {
             return Span.BOLD;
         }
+        if ("__".equals(delimiter)) {
+            return Span.UNDERLINE;
+        }
         if ("~~".equals(delimiter)) {
             return Span.STRIKETHROUGH;
         }
@@ -169,6 +174,7 @@ public final class ChatMarkdown {
         public static final int STRIKETHROUGH = 4;
         public static final int CODE = 8;
         public static final int SPOILER = 16;
+        public static final int UNDERLINE = 32;
 
         private final String text;
         private final int style;
@@ -193,6 +199,10 @@ public final class ChatMarkdown {
 
         public boolean isStrikethrough() {
             return (this.style & STRIKETHROUGH) != 0;
+        }
+
+        public boolean isUnderlined() {
+            return (this.style & UNDERLINE) != 0;
         }
 
         public boolean isCode() {

@@ -1,17 +1,18 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
-import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelAccess;
+import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageOrigin;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.moderation.ChatAuditLog;
 import com.ninuna.losttales.chat.moderation.ChatMuteDurations;
@@ -31,7 +32,6 @@ import com.ninuna.losttales.compat.discord.DiscordAvatarUrl;
 import com.ninuna.losttales.compat.discord.DiscordBridgePolicy;
 import com.ninuna.losttales.compat.discord.DiscordMessageSanitizer;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
-import com.ninuna.losttales.compat.lotr.LostTalesWaystonePermissionPolicy;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
@@ -40,6 +40,8 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibilityPolicy;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatConsoleSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatHistorySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
@@ -47,6 +49,8 @@ import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
 import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyMember;
 import com.ninuna.losttales.party.server.PartyService;
+import com.ninuna.losttales.permission.LostTalesCapability;
+import com.ninuna.losttales.permission.LostTalesPermissions;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
 import java.util.ArrayList;
@@ -223,11 +227,11 @@ public final class LostTalesChatService {
         String accountName = sender.getGameProfile() == null
                 ? sender.getCommandSenderName()
                 : sender.getGameProfile().getName();
-        // Account lines say which roles their sender holds and take the
-        // primary role's colour for the name; role-play lines belong to
-        // the character, not the account, and carry neither. What makes
-        // a line an account line is the appearance it wears, not the
-        // channel it goes to.
+        // What makes a line an account line — the head it wears, the
+        // skin it is drawn with — is the appearance, not the channel.
+        // Whether the sender's roles are tagged on it, and what colours
+        // the name, is the channel's: out of character the roles show,
+        // in character nobody wears a role (ChatRolePresentation).
         boolean accountLine = appearance == null;
         String identityName = accountLine ? accountName
                 : characterNameOrFallback(appearance, accountName);
@@ -235,11 +239,12 @@ public final class LostTalesChatService {
                 LostTalesChatPresentationResolver.resolve(sender, appearance);
         List<ChatShowcase> showcases =
                 resolveShowcases(sender, message, references);
-        int roles = accountLine ? ChatAccountRoleResolver.resolve(sender) : 0;
-        int ivory = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
+        int roles = ChatRolePresentation.rolesShown(channel,
+                ChatAccountRoleResolver.resolve(sender));
+        int ivory = ChatRolePresentation.unassignedColor();
         ChatReplyReference reply = ChatMessageIds.NONE == replyToMessageId
                 ? ChatReplyReference.NONE
-                : ChatMessageLog.quoteFor(replyToMessageId,
+                : ChatHistory.quoteFor(replyToMessageId,
                         sender.getUniqueID());
         if (replyToMessageId != ChatMessageIds.NONE && !reply.exists()) {
             sender.addChatMessage(new ChatComponentTranslation(
@@ -250,8 +255,8 @@ public final class LostTalesChatService {
                 accountName,
                 accountLine ? "" : presentation.title,
                 accountLine ? ivory : presentation.titleColor,
-                accountLine ? ChatAccountRole.nameColor(roles)
-                        : presentation.nameColor,
+                ChatRolePresentation.nameColor(channel, roles, accountLine,
+                        presentation.nameColor),
                 message, System.currentTimeMillis(),
                 accountLine ? "" : appearance.getSkinId(),
                 showcases,
@@ -291,20 +296,23 @@ public final class LostTalesChatService {
                         : whisperTarget.getCommandSenderName(),
                 message);
         if (whisperTarget != null) {
-            // Each side is told who the other party is.
+            // Each side is told who the other party is, and the history
+            // keeps both tellings: a replay hands each party their own.
+            LostTalesChatMessagePacket partnerCopy = withPartner(
+                    packet.withoutEcho(), accountName, identityName);
             LostTalesNetworkHandler.CHANNEL.sendTo(packet, sender);
-            LostTalesNetworkHandler.CHANNEL.sendTo(withPartner(
-                    packet.withoutEcho(), accountName, identityName),
-                    whisperTarget);
-            ChatMessageLog.record(packet.getMessageId(),
+            LostTalesNetworkHandler.CHANNEL.sendTo(partnerCopy, whisperTarget);
+            List<UUID> parties = Arrays.asList(sender.getUniqueID(),
+                    whisperTarget.getUniqueID());
+            ChatHistory.record(packet.getMessageId(),
                     sender.getUniqueID(), identityName,
-                    message, Arrays.asList(sender.getUniqueID(),
-                            whisperTarget.getUniqueID()));
+                    packet.withoutEcho(), partnerCopy, parties,
+                    ChatHistory.Audience.accounts(parties, false));
             return;
         }
         deliver(packet, sender, resolveRecipients(
                 sender, channel, party, factionId), sender.getUniqueID(),
-                identityName);
+                identityName, party, factionId);
         // Out to Discord through the channel's binding, when it has one
         // that posts. Only a player's own line in a channel that may be
         // bridged ever leaves: the policy is asked here, before the
@@ -390,7 +398,8 @@ public final class LostTalesChatService {
         // staff channel, the faction's members for a faction binding.
         deliver(packet, null, resolveRecipients(
                 null, channel, null, factionScope == null ? "" : factionScope),
-                LostTalesChatMessagePacket.DISCORD_SENDER_ID, displayName);
+                LostTalesChatMessagePacket.DISCORD_SENDER_ID, displayName,
+                null, factionScope == null ? "" : factionScope);
         // Recorded under the member's own sender id, the same id a mute
         // names them by, so the audit and the moderation tools agree on
         // who a Discord line is from.
@@ -435,6 +444,73 @@ public final class LostTalesChatService {
                 + "the chat runs without it until the server restarts%s",
                 LostTalesMetaData.MOD_ID, what,
                 exception == null ? "" : ": " + exception.toString());
+        console(ChatConsoleEvent.Kind.WARNING, ChatConsoleEvent.Severity.WARNING, "",
+                "Chat could not read " + what + " from world storage; the chat runs "
+                        + "without it until the server restarts");
+    }
+
+    /* ---- the shared operator console ---- */
+
+    /**
+     * Records one administrative event and shows it at once to every
+     * online player who may read the console
+     * ({@link LostTalesCapability#CHAT_CONSOLE_READ}). The capability is
+     * asked of each recipient here, and asked again of a joining player
+     * before the kept entries are replayed to them; the client is never
+     * the one deciding.
+     */
+    public static void console(ChatConsoleEvent.Kind kind,
+                               ChatConsoleEvent.Severity severity, String actor,
+                               String text) {
+        if (kind == null || severity == null || text == null
+                || text.trim().length() == 0) {
+            return;
+        }
+        ChatConsoleEvent event;
+        try {
+            event = new ChatConsoleEvent(ChatMessageIdAllocator.next(),
+                    System.currentTimeMillis(), kind, severity, actor, text);
+        } catch (IllegalArgumentException refused) {
+            return;
+        }
+        ChatConsoleStream.record(event);
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null
+                || server.getConfigurationManager().playerEntityList == null) {
+            return;
+        }
+        LostTalesChatConsoleSyncPacket packet = new LostTalesChatConsoleSyncPacket(
+                Collections.singletonList(event));
+        @SuppressWarnings("unchecked")
+        List<EntityPlayerMP> online = server.getConfigurationManager().playerEntityList;
+        for (EntityPlayerMP player : online) {
+            if (player != null && readsConsole(player)) {
+                LostTalesNetworkHandler.CHANNEL.sendTo(packet, player);
+            }
+        }
+    }
+
+    /** Whether the player may read the shared operator console right now. */
+    static boolean readsConsole(EntityPlayerMP player) {
+        return LostTalesPermissions.has(player, LostTalesCapability.CHAT_CONSOLE_READ);
+    }
+
+    /**
+     * Replays the kept console entries to a player who has just joined,
+     * oldest first and in batches, if they may read the console.
+     */
+    public static void sendConsoleHistory(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null || player.worldObj.isRemote
+                || !readsConsole(player)) {
+            return;
+        }
+        List<ChatConsoleEvent> events = ChatConsoleStream.replay(0L);
+        for (int from = 0; from < events.size();
+             from += LostTalesChatConsoleSyncPacket.MAX_EVENTS) {
+            LostTalesNetworkHandler.CHANNEL.sendTo(new LostTalesChatConsoleSyncPacket(
+                    events.subList(from, Math.min(events.size(),
+                            from + LostTalesChatConsoleSyncPacket.MAX_EVENTS))), player);
+        }
     }
 
     /** Cleared with the rest of the server's chat state. */
@@ -455,7 +531,7 @@ public final class LostTalesChatService {
         if (!ChatMessageValidator.isValid(message)) {
             return;
         }
-        Set<UUID> recipients = ChatMessageLog.applyEdit(messageId,
+        Set<UUID> recipients = ChatHistory.applyEdit(messageId,
                 LostTalesChatMessagePacket.DISCORD_SENDER_ID, message);
         if (recipients == null) {
             return;
@@ -471,7 +547,7 @@ public final class LostTalesChatService {
      * the line is taken back from everyone who was sent it.
      */
     public static void deleteFromDiscord(long messageId) {
-        Set<UUID> recipients = ChatMessageLog.remove(messageId,
+        Set<UUID> recipients = ChatHistory.remove(messageId,
                 LostTalesChatMessagePacket.DISCORD_SENDER_ID);
         if (recipients == null) {
             return;
@@ -537,8 +613,10 @@ public final class LostTalesChatService {
         } else if (channel.getAccess() == ChatChannelAccess.CHARACTER_FACTION
                 && factionId.length() == 0) {
             return;
-        } else if (channel.getAccess() == ChatChannelAccess.OPERATOR
-                && !LostTalesWaystonePermissionPolicy.isOperator(sender)) {
+        } else if (!ChatChannelGates.current().canSend(
+                ChatAccountRoleResolver.resolve(sender), channel)) {
+            // The same gate a send passes, so presence never promises a
+            // message the channel would refuse.
             return;
         }
         if (typing && DiscordBridgePolicy.relaysOutbound(
@@ -587,7 +665,7 @@ public final class LostTalesChatService {
             tellMuted(editor, mute);
             return;
         }
-        Set<UUID> recipients = ChatMessageLog.applyEdit(messageId,
+        Set<UUID> recipients = ChatHistory.applyEdit(messageId,
                 editor.getUniqueID(), message);
         if (recipients == null) {
             return;
@@ -607,39 +685,43 @@ public final class LostTalesChatService {
 
     /**
      * Takes one of {@code remover}'s own messages back, on the same
-     * terms as {@link #edit}, or — when the remover is an operator —
-     * anyone's message that is still within reach. Everyone who was
-     * sent it is told to drop it; nobody else hears that it ever
-     * existed. Operators may remove but never edit another's words: a
-     * removal is visibly a removal. Operator status is read here, from
-     * the server's own list, never from the request.
+     * terms as {@link #edit}, or — when the remover may moderate the
+     * chat ({@link LostTalesCapability#CHAT_MODERATE}) — anyone's message
+     * that is still within reach. Everyone who was sent it is told to
+     * drop it; nobody else hears that it ever existed. A moderator may
+     * remove but never edit another's words: a removal is visibly a
+     * removal. The capability is read here, from the server's own
+     * permissions, never from the request.
      */
     public static void delete(EntityPlayerMP remover, long messageId) {
         if (remover == null || remover.worldObj == null
                 || remover.worldObj.isRemote) {
             return;
         }
-        Set<UUID> recipients = ChatMessageLog.remove(messageId,
+        Set<UUID> recipients = ChatHistory.remove(messageId,
                 remover.getUniqueID());
         boolean fromDiscord = false;
         if (recipients == null) {
-            if (!LostTalesWaystonePermissionPolicy.isOperator(remover)) {
+            if (!LostTalesPermissions.has(remover, LostTalesCapability.CHAT_MODERATE)) {
                 return;
             }
-            ChatMessageLog.Removal removal =
-                    ChatMessageLog.removeByOperator(messageId);
+            ChatHistory.Removal removal =
+                    ChatHistory.removeByOperator(messageId);
             if (removal == null) {
                 return;
             }
             recipients = removal.recipients;
             fromDiscord = LostTalesChatMessagePacket.DISCORD_SENDER_ID
                     .equals(removal.authorId);
-            FMLLog.info("[losttales/chat/delete] operator <%s> removed "
+            FMLLog.info("[losttales/chat/delete] moderator <%s> removed "
                     + "message %d of <%s>", remover.getCommandSenderName(),
                     Long.valueOf(messageId), removal.author);
             ChatAuditLog.logModerationDelete(messageId,
                     remover.getUniqueID(), remover.getCommandSenderName(),
                     removal.author);
+            console(ChatConsoleEvent.Kind.MODERATION, ChatConsoleEvent.Severity.NOTICE,
+                    remover.getCommandSenderName(),
+                    "removed a message of " + removal.author);
         } else {
             FMLLog.info("[losttales/chat/delete] <%s> message %d",
                     remover.getCommandSenderName(), Long.valueOf(messageId));
@@ -659,9 +741,9 @@ public final class LostTalesChatService {
 
     /**
      * Sends one update to whichever of the recorded recipients are
-     * still online. Anyone who has logged out simply never hears about
-     * it: chat is not replayed on join, so there is no stale line of
-     * theirs left to correct.
+     * still online. Anyone who has logged out never hears about it, and
+     * needs to hear nothing: the history they are replayed on joining
+     * already says what the message says now, or no longer holds it.
      */
     private static void tellRecipients(Set<UUID> recipients,
                                        LostTalesChatUpdatePacket update) {
@@ -774,10 +856,10 @@ public final class LostTalesChatService {
 
 
     /**
-     * Tells one client which channels its operator status unlocks, and
-     * which roles it holds. Sent on login and whenever a staff-channel
-     * message is refused, so the Admin tab follows the server's view of
-     * op status without the client ever deciding it; the roles travel
+     * Tells one client which channels it may use, which roles it holds,
+     * and whether it may moderate the chat. Sent on login and whenever a
+     * staff-channel message is refused, so the Admin tab follows the
+     * server's view without the client ever deciding it; the roles travel
      * with it so the client can notice a mention addressed to one of
      * them. The roster of every online role holder rides along, which
      * is what the role hover card names its members from.
@@ -793,7 +875,8 @@ public final class LostTalesChatService {
                 || player.worldObj.isRemote) {
             return;
         }
-        boolean operator = LostTalesWaystonePermissionPolicy.isOperator(player);
+        boolean moderator = LostTalesPermissions.has(player,
+                LostTalesCapability.CHAT_MODERATE);
         int roles = ChatAccountRoleResolver.resolve(player);
         ChatChannelGates gates = ChatChannelGates.current();
         // The second flag stays on the wire for older clients, whose
@@ -801,16 +884,22 @@ public final class LostTalesChatService {
         // everyone, so it is always granted, which keeps that tab open
         // and sends its lines here. The first is the Operator channel's
         // send gate, which is the operator role unless configured
-        // otherwise; the mute list follows real operator status.
+        // otherwise. The mute list, and the moderation flag the client
+        // offers its moderation menus on, follow the moderation
+        // capability; the settings flag follows its own. The server
+        // decides again on every request.
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new LostTalesChatAccessPacket(
                         gates.canSend(roles, ChatChannel.ADMIN), true, roles,
                         roleHolders,
-                        operator ? mutedSenders(player)
+                        moderator ? mutedSenders(player)
                                 : Collections.<UUID>emptyList(),
                         ChatRoleCatalog.server().roles(),
                         channelMask(gates, roles, true),
-                        channelMask(gates, roles, false)),
+                        channelMask(gates, roles, false),
+                        moderator,
+                        LostTalesPermissions.has(player,
+                                LostTalesCapability.SERVER_CONFIG)),
                 player);
     }
 
@@ -829,13 +918,13 @@ public final class LostTalesChatService {
     }
 
     /**
-     * Every sender id under a mute right now, for an operator's menus.
+     * Every sender id under a mute right now, for a moderator's menus.
      * A store that cannot be read names nobody, which only costs the
      * menu its foreknowledge — the server still answers the command.
      */
-    private static List<UUID> mutedSenders(EntityPlayerMP operator) {
+    private static List<UUID> mutedSenders(EntityPlayerMP moderator) {
         try {
-            List<ChatMuteEntry> active = ChatMuteStorage.get(operator.worldObj)
+            List<ChatMuteEntry> active = ChatMuteStorage.get(moderator.worldObj)
                     .getActiveMutes(System.currentTimeMillis());
             List<UUID> ids = new ArrayList<UUID>(active.size());
             for (ChatMuteEntry mute : active) {
@@ -849,11 +938,11 @@ public final class LostTalesChatService {
     }
 
     /**
-     * Sends every online operator their access again: what a mute or an
+     * Sends every online moderator their access again: what a mute or an
      * unmute calls, so their menus follow the store the moment it
      * changes. Nobody else is sent anything.
      */
-    public static void sendAccessToOperators() {
+    public static void sendAccessToModerators() {
         MinecraftServer server = MinecraftServer.getServer();
         if (server == null || server.getConfigurationManager() == null
                 || server.getConfigurationManager().playerEntityList == null) {
@@ -864,8 +953,8 @@ public final class LostTalesChatService {
         List<EntityPlayerMP> online =
                 server.getConfigurationManager().playerEntityList;
         for (EntityPlayerMP player : online) {
-            if (player != null
-                    && LostTalesWaystonePermissionPolicy.isOperator(player)) {
+            if (player != null && LostTalesPermissions.has(player,
+                    LostTalesCapability.CHAT_MODERATE)) {
                 sendAccess(player, holders);
             }
         }
@@ -1053,16 +1142,20 @@ public final class LostTalesChatService {
 
     /**
      * Sends one line to everyone it resolved to and records who was
-     * sent it. The sender, when there is one, is the only recipient to
-     * get the line under their own private name for it; everyone else
-     * gets it without. The log is written from the list the message
-     * actually went to, so a reply to it is checked against who was
-     * sent it rather than against who would be sent one now.
+     * sent it, and who may still be shown it. The sender, when there is
+     * one, is the only recipient to get the line under their own private
+     * name for it; everyone else gets it without. The history is written
+     * from the list the message actually went to, so a reply to it is
+     * checked against who was sent it rather than against who would be
+     * sent one now; {@code party} and {@code factionId} are the
+     * membership the line was routed by, which is what a later replay
+     * asks of the player it is shown to.
      */
     private static void deliver(LostTalesChatMessagePacket packet,
                                 EntityPlayerMP sender,
                                 List<EntityPlayerMP> recipients,
-                                UUID authorId, String identityName) {
+                                UUID authorId, String identityName,
+                                Party party, String factionId) {
         List<UUID> recipientIds = new ArrayList<UUID>(recipients.size());
         LostTalesChatMessagePacket shared = packet.withoutEcho();
         for (EntityPlayerMP recipient : recipients) {
@@ -1071,8 +1164,99 @@ public final class LostTalesChatService {
                     recipient);
             recipientIds.add(recipient.getUniqueID());
         }
-        ChatMessageLog.record(packet.getMessageId(), authorId, identityName,
-                packet.getMessage(), recipientIds);
+        ChatHistory.record(packet.getMessageId(), authorId, identityName,
+                packet.withoutEcho(), shared, recipientIds,
+                audienceFor(packet.getChannel(), party, factionId, recipientIds));
+    }
+
+    /**
+     * Who may be shown the line after the fact, from how it was routed.
+     * An open world-wide channel reaches everyone, later joiners
+     * included. A channel whose read side asks for a role reaches only
+     * those who were sent the line and may still read it, so a role
+     * granted afterwards opens nothing said before. A party line reaches
+     * the accounts of the party's members then, while they are still in
+     * it; a faction line the characters of the faction then and now;
+     * everything else — proximity above all — exactly who was sent it.
+     */
+    static ChatHistory.Audience audienceFor(ChatChannel channel,
+                                                    Party party,
+                                                    String factionId,
+                                                    List<UUID> recipientIds) {
+        boolean readGated = !ChatChannelGates.current().gateOf(channel)
+                .getReadRoles().isEmpty();
+        switch (channel.getRecipientRule()) {
+            case GLOBAL:
+                return readGated
+                        ? ChatHistory.Audience.accounts(recipientIds, true)
+                        : ChatHistory.Audience.everyone();
+            case OPERATORS:
+                return ChatHistory.Audience.accounts(recipientIds, true);
+            case PARTY:
+                List<UUID> owners = new ArrayList<UUID>();
+                if (party != null) {
+                    for (PartyMember member : party.getMembers()) {
+                        if (member != null && member.getOwnerId() != null) {
+                            owners.add(member.getOwnerId());
+                        }
+                    }
+                }
+                return ChatHistory.Audience.party(
+                        party == null ? null : party.getPartyId(), owners);
+            case FACTION:
+                return ChatHistory.Audience.faction(factionId, recipientIds,
+                        readGated);
+            default:
+                // A console line typed among staff stays among those who
+                // were sent it and may still read the console.
+                return ChatHistory.Audience.accounts(recipientIds,
+                        channel == ChatChannel.CONSOLE);
+        }
+    }
+
+    /**
+     * Replays to a player who has just joined the recent messages they
+     * are entitled to, oldest first and in batches, exactly as they
+     * would have been sent them at the time. Who they are — account,
+     * played character and its faction, party, the channels they may
+     * read — is read from the live server here and nowhere else, and
+     * the history decides message by message against what it recorded
+     * when each was sent.
+     */
+    public static void sendHistory(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null
+                || player.worldObj.isRemote) {
+            return;
+        }
+        RoleplayCharacter character = CharacterActiveResolver.get(player);
+        String factionId = character == null ? ""
+                : LotrCharacterAdapter.normalizeFactionId(
+                        character.getStartingFactionId());
+        Party party = PartyService.getInstance()
+                .getPartyForActiveCharacter(player);
+        int roles = ChatAccountRoleResolver.resolve(player);
+        ChatChannelGates gates = ChatChannelGates.current();
+        List<ChatChannel> readable = new ArrayList<ChatChannel>();
+        boolean console = readsConsole(player);
+        for (ChatChannel channel : ChatChannel.values()) {
+            if (gates.canRead(roles, channel)
+                    && (channel != ChatChannel.CONSOLE || console)) {
+                readable.add(channel);
+            }
+        }
+        List<LostTalesChatMessagePacket> lines = ChatHistory.replayFor(
+                new ChatHistory.Requester(player.getUniqueID(), factionId,
+                        character == null ? 0L : character.getCreationTimestamp(),
+                        party == null ? null : party.getPartyId(), readable),
+                ChatMessageIds.NONE);
+        for (int from = 0; from < lines.size();
+             from += LostTalesChatHistorySyncPacket.MAX_MESSAGES) {
+            LostTalesNetworkHandler.CHANNEL.sendTo(
+                    new LostTalesChatHistorySyncPacket(lines.subList(from,
+                            Math.min(lines.size(), from
+                                    + LostTalesChatHistorySyncPacket.MAX_MESSAGES))),
+                    player);
+        }
     }
 
     /**
@@ -1129,6 +1313,11 @@ public final class LostTalesChatService {
                 server.getConfigurationManager().playerEntityList;
         ChatChannelGates gates = ChatChannelGates.current();
         boolean gated = gates.isGated(channel);
+        // A line typed in the Console by someone who may read the shared
+        // console is staff talk and reaches every reader of it; typed by
+        // anyone else it is their private note and reaches them alone.
+        boolean staffConsole = channel == ChatChannel.CONSOLE && sender != null
+                && readsConsole(sender);
         for (EntityPlayerMP candidate : online) {
             if (candidate == null || candidate.getUniqueID() == null) {
                 continue;
@@ -1145,7 +1334,8 @@ public final class LostTalesChatService {
             } else if (channel.getRecipientRule() == ChatRecipientRule.SELF
                     || channel.getRecipientRule()
                     == ChatRecipientRule.WHISPER) {
-                if (candidate == sender) {
+                if (candidate == sender
+                        || (staffConsole && readsConsole(candidate))) {
                     result.add(candidate);
                 }
             } else if (channel.getRecipientRule()

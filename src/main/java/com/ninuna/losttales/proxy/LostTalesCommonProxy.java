@@ -33,6 +33,7 @@ import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.command.ELostTalesCommand;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.config.LostTalesConfigFiles;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.crafting.ELostTalesCrafting;
 import com.ninuna.losttales.entity.ELostTalesEntity;
@@ -56,6 +57,8 @@ import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatConsoleSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatHistorySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigResultPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigSyncPacket;
@@ -102,7 +105,10 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
 import com.ninuna.losttales.chat.moderation.ChatAuditLog;
 import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
-import com.ninuna.losttales.chat.server.ChatMessageLog;
+import com.ninuna.losttales.chat.ChatConsoleEvent;
+import com.ninuna.losttales.chat.server.ChatConsoleCommandHandler;
+import com.ninuna.losttales.chat.server.ChatConsoleStream;
+import com.ninuna.losttales.chat.server.ChatHistory;
 import com.ninuna.losttales.chat.server.LostTalesChatRoleRosterWatcher;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
@@ -112,7 +118,8 @@ import software.bernie.geckolib3.GeckoLib;
 public class LostTalesCommonProxy {
 
     public void preInit(FMLPreInitializationEvent event) {
-        LostTalesConfig.load(event.getSuggestedConfigurationFile());
+        LostTalesConfig.load(LostTalesConfigFiles.file(
+                event.getModConfigurationDirectory(), LostTalesConfigFiles.MAIN_OPTIONS));
         LoreCharacterRegistry.load(event.getModConfigurationDirectory());
         GeckoLib.initialize();
         LostTalesNetworkHandler.registerCommonPackets();
@@ -155,6 +162,7 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(projectileAimHandler);
         MinecraftForge.EVENT_BUS.register(chargeService);
         MinecraftForge.EVENT_BUS.register(waystoneGenerationHandler);
+        MinecraftForge.EVENT_BUS.register(new ChatConsoleCommandHandler());
         MinecraftForge.TERRAIN_GEN_BUS.register(waystoneGenerationHandler);
         GameRegistry.registerWorldGenerator(
                 waystoneGenerationHandler, 1000);
@@ -297,6 +305,10 @@ public class LostTalesCommonProxy {
 
     public void handleChatUpdate(LostTalesChatUpdatePacket packet) {}
 
+    public void handleChatHistory(LostTalesChatHistorySyncPacket packet) {}
+
+    public void handleChatConsole(LostTalesChatConsoleSyncPacket packet) {}
+
     public void handleServerConfigSync(LostTalesServerConfigSyncPacket packet) {}
 
     public void handleServerConfigResult(LostTalesServerConfigResultPacket packet) {}
@@ -321,8 +333,11 @@ public class LostTalesCommonProxy {
         PartyTrackingSyncManager.clear();
         LostTalesChatRoleRosterWatcher.clear();
         ChatMessageIdAllocator.reset();
-        ChatMessageLog.clear();
+        ChatHistory.clear();
+        ChatConsoleStream.clear();
         LostTalesChatService.clear();
+        LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
+                ChatConsoleEvent.Severity.INFO, "Server", "Server started");
         ChatAuditLog.onServerStarting();
         LostTalesMobAggroEventHandler.clearAll();
         LotrRaceProfileAdapter.getInstance().clear();
@@ -391,7 +406,8 @@ public class LostTalesCommonProxy {
         PartyTrackingSyncManager.clear();
         LostTalesChatRoleRosterWatcher.clear();
         ChatMessageIdAllocator.reset();
-        ChatMessageLog.clear();
+        ChatHistory.clear();
+        ChatConsoleStream.clear();
         LostTalesChatService.clear();
         ChatAuditLog.onServerStopping();
         LostTalesMobAggroEventHandler.clearAll();
