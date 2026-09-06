@@ -689,7 +689,7 @@ public final class LostTalesChatPacketTest {
         buffer = Unpooled.buffer();
         account.toBytes(buffer);
         // A tail claiming a character on an account line is refused.
-        buffer.setBoolean(buffer.writerIndex()
+        buffer.setBoolean(buffer.writerIndex() - scopeTailBytes("")
                 - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES, true);
         LostTalesChatMessagePacket forged = new LostTalesChatMessagePacket();
         forged.fromBytes(buffer);
@@ -733,10 +733,11 @@ public final class LostTalesChatPacketTest {
         buffer = Unpooled.buffer();
         whisper.toBytes(buffer);
         LostTalesChatMessagePacket cut = new LostTalesChatMessagePacket();
-        cut.fromBytes(buffer.slice(0, buffer.readableBytes() - 5));
+        cut.fromBytes(buffer.slice(0,
+                buffer.readableBytes() - scopeTailBytes("") - 5));
         assertTrue(cut.isMalformed());
         LostTalesChatMessagePacket older = new LostTalesChatMessagePacket();
-        older.fromBytes(buffer.slice(0, buffer.readableBytes()
+        older.fromBytes(buffer.slice(0, buffer.readableBytes() - scopeTailBytes("")
                 - 2 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES));
         assertFalse(older.isMalformed());
         assertNull(older.getOwnCharacterId());
@@ -750,11 +751,56 @@ public final class LostTalesChatPacketTest {
         assertNull(plain.getPartnerCharacterId());
         buffer = Unpooled.buffer();
         plain.toBytes(buffer);
-        buffer.setBoolean(buffer.writerIndex()
+        buffer.setBoolean(buffer.writerIndex() - scopeTailBytes("")
                 - LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES, true);
         LostTalesChatMessagePacket forged = new LostTalesChatMessagePacket();
         forged.fromBytes(buffer);
         assertTrue(forged.isMalformed());
+    }
+
+    /**
+     * A scoped channel says which of its conversations a line is in, so
+     * an account with characters in two factions never sees one under
+     * the other. A channel that is only ever one conversation carries
+     * none, and a payload claiming one is refused.
+     */
+    @Test
+    public void aScopedLineSaysWhichConversationItIsIn() {
+        LostTalesChatMessagePacket faction = new LostTalesChatMessagePacket(
+                ChatChannel.FACTION, UUID.randomUUID(), "Aldric", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "for Gondor", 1L, "skin", null, "Gondor", "", 0,
+                false, ChatMessageIds.NONE, null, "", 0L, UUID.randomUUID())
+                .withScope("lotr:gondor");
+        assertEquals("lotr:gondor", faction.getScopeValue());
+        ByteBuf buffer = Unpooled.buffer();
+        faction.toBytes(buffer);
+        LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals("lotr:gondor", decoded.getScopeValue());
+        // It survives every rebuild the client and the server do.
+        assertEquals("lotr:gondor", decoded.withMessage("edited").getScopeValue());
+        assertEquals("lotr:gondor", decoded.withoutEcho().getScopeValue());
+
+        // A channel that is one conversation carries none, whatever it
+        // is built with, and a payload claiming one is refused.
+        LostTalesChatMessagePacket global = new LostTalesChatMessagePacket(
+                ChatChannel.ALL, UUID.randomUUID(), "Aldric", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "hello", 1L, "skin", null, "", "", 0,
+                false, ChatMessageIds.NONE, null, "", 0L, UUID.randomUUID())
+                .withScope("lotr:gondor");
+        assertEquals("", global.getScopeValue());
+        buffer = Unpooled.buffer();
+        faction.toBytes(buffer);
+        ByteBuf forged = Unpooled.buffer();
+        forged.writeBytes(buffer.slice(0, buffer.readableBytes()
+                - scopeTailBytes("lotr:gondor")));
+        LostTalesPacketCodec.writeUtf8String(forged, "", 128);
+        LostTalesChatMessagePacket unscoped = new LostTalesChatMessagePacket();
+        unscoped.fromBytes(forged);
+        assertFalse("a faction line may name no conversation at all",
+                unscoped.isMalformed());
+        assertEquals("", unscoped.getScopeValue());
     }
 
     /** A whisper addresses the partner's character by id when the client knows it. */
@@ -789,5 +835,17 @@ public final class LostTalesChatPacketTest {
         assertEquals("Aldric", older.getTargetIdentity());
         assertNull(new LostTalesChatSendPacket(ChatChannel.OOC, "hi")
                 .getTargetCharacterId());
+    }
+
+    /**
+     * How many bytes the conversation a line belongs to takes at the end
+     * of the payload. Measured rather than assumed, so a test that walks
+     * back from the end of a packet keeps saying what it means when
+     * another field is appended after this one.
+     */
+    private static int scopeTailBytes(String scopeValue) {
+        ByteBuf probe = Unpooled.buffer();
+        LostTalesPacketCodec.writeUtf8String(probe, scopeValue, 128);
+        return probe.readableBytes();
     }
 }

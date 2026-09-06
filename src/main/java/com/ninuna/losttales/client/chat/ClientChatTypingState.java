@@ -97,7 +97,7 @@ public final class ClientChatTypingState {
             }
         }
         if (names.isEmpty()) {
-            TYPING.remove(tab);
+            TYPING.remove(keyOf(tab));
             return Collections.emptyList();
         }
         return Collections.unmodifiableList(

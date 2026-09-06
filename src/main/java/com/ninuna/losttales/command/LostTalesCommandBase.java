@@ -38,6 +38,18 @@ public class LostTalesCommandBase extends CommandBase {
         return null;
     }
 
+    /**
+     * The operator level that holds the command without any role: the
+     * capability's own, so the two cannot say different things, and
+     * vanilla's for a command that names none.
+     */
+    @Override
+    public int getRequiredPermissionLevel() {
+        LostTalesCapability capability = getCapability();
+        return capability == null ? super.getRequiredPermissionLevel()
+                : capability.getRequiredOpLevel();
+    }
+
     @Override
     public boolean canCommandSenderUseCommand(ICommandSender sender) {
         LostTalesCapability capability = getCapability();

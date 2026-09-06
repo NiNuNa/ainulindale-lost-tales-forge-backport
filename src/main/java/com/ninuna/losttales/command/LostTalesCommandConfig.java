@@ -34,10 +34,6 @@ public final class LostTalesCommandConfig extends LostTalesCommandBase {
         return "/losttales config <list|get|set|reload> ...";
     }
 
-    @Override
-    public int getRequiredPermissionLevel() {
-        return 2;
-    }
 
     @Override
     public LostTalesCapability getCapability() {

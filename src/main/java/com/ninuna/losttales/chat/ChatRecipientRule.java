@@ -8,7 +8,14 @@ public enum ChatRecipientRule {
     FACTION,
     /** Only the sender: a private console that echoes back to its author. */
     SELF,
-    /** Only server operators; sending also requires operator status. */
+    /**
+     * Everyone the channel's gate admits, and nobody else: the routing
+     * a staff channel takes. The rule itself names no role — who may
+     * read and send is the gate the config puts on the channel
+     * ({@link ChatChannelGates}), which a fresh file seeds with the
+     * operator role. What it does say is that a line said here is
+     * never opened to anyone by a role granted afterwards.
+     */
     OPERATORS,
     /** The sender and one named online player. */
     WHISPER

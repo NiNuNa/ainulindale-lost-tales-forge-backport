@@ -1,8 +1,10 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
+import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
+import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatChannelGates;
@@ -15,7 +17,9 @@ import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.permission.LostTalesPermissions;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
@@ -132,7 +136,7 @@ public final class ChatChannelPolicy {
                     reached = isCurrentOnlinePartyMember(candidate, party);
                     break;
                 case FACTION:
-                    reached = isCurrentFactionMember(candidate, factionId);
+                    reached = ownsCharacterInFaction(candidate, factionId);
                     break;
                 default:
                     reached = false;
@@ -224,11 +228,76 @@ public final class ChatChannelPolicy {
         return member != null && player.getUniqueID().equals(member.getOwnerId());
     }
 
-    private static boolean isCurrentFactionMember(EntityPlayerMP player, String factionId) {
+    /**
+     * Whether a faction line reaches the player: they have a character
+     * in that faction, whichever one they happen to be playing. An
+     * account may play any of its characters at will, so what it could
+     * read by switching is what it may read; the client shows the line
+     * under that character's own tab and nowhere else. A character made
+     * after the line was said is not counted, so joining a faction
+     * opens nothing that was said before.
+     */
+    private static boolean ownsCharacterInFaction(EntityPlayerMP player, String factionId) {
+        return earliestCharacterIn(player, factionId) != null;
+    }
+
+    /**
+     * When the account's earliest character in the faction was made, or
+     * null when it has none. The one place the ownership rule is stated;
+     * routing asks it for now, the history for then.
+     */
+    public static Long earliestCharacterIn(EntityPlayerMP player, String factionId) {
         if (player == null || factionId == null || factionId.length() == 0) {
-            return false;
+            return null;
         }
-        return factionId.equals(playedFactionId(CharacterActiveResolver.get(player)));
+        Long earliest = null;
+        for (RoleplayCharacter character : charactersOf(player)) {
+            if (factionId.equals(playedFactionId(character))
+                    && (earliest == null
+                            || character.getCreationTimestamp() < earliest.longValue())) {
+                earliest = Long.valueOf(character.getCreationTimestamp());
+            }
+        }
+        return earliest;
+    }
+
+    /**
+     * Every faction the account has a character in, and when its
+     * earliest such character was made. What a history replay is
+     * decided against, read once for the player rather than per line.
+     */
+    public static Map<String, Long> ownedFactions(EntityPlayerMP player) {
+        Map<String, Long> owned = new HashMap<String, Long>();
+        for (RoleplayCharacter character : charactersOf(player)) {
+            String factionId = playedFactionId(character);
+            if (factionId.length() == 0) {
+                continue;
+            }
+            Long earliest = owned.get(factionId);
+            if (earliest == null
+                    || character.getCreationTimestamp() < earliest.longValue()) {
+                owned.put(factionId, Long.valueOf(character.getCreationTimestamp()));
+            }
+        }
+        return owned;
+    }
+
+    /**
+     * The account's characters, or none when the roster cannot be read.
+     * A store that cannot answer reaches nobody rather than everybody.
+     */
+    private static List<RoleplayCharacter> charactersOf(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null) {
+            return Collections.emptyList();
+        }
+        try {
+            CharacterRoster roster = CharacterStorage.get(player.worldObj)
+                    .getRoster(player.getUniqueID());
+            return roster == null ? Collections.<RoleplayCharacter>emptyList()
+                    : roster.getCharacters();
+        } catch (RuntimeException unreadable) {
+            return Collections.emptyList();
+        }
     }
 
     private static double proximityDistanceSquared() {

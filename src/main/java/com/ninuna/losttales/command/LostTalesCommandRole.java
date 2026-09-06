@@ -14,6 +14,8 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.config.server.LostTalesServerConfigService;
 import com.ninuna.losttales.config.server.ServerConfigChange;
 import com.ninuna.losttales.permission.LostTalesCapability;
+import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
+import com.ninuna.losttales.permission.LostTalesPermissions;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.relauncher.Side;
@@ -53,10 +55,6 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         return "/losttales role <list|assign|unassign|create|edit|delete> ...";
     }
 
-    @Override
-    public int getRequiredPermissionLevel() {
-        return 2;
-    }
 
     @Override
     public LostTalesCapability getCapability() {
@@ -106,8 +104,13 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
                 for (ChatRoleSource source : role.getSources()) {
                     line.append(' ').append(source.toConfigOption());
                 }
-                for (LostTalesCapability capability : role.getGrants()) {
-                    line.append(" grant:").append(capability.getId());
+                for (String granted : role.getGrants()) {
+                    line.append(" grant:").append(granted);
+                    if (!LostTalesPermissionCatalog.current().isKnown(granted)) {
+                        line.append(EnumChatFormatting.DARK_GRAY)
+                                .append("(allows nothing)")
+                                .append(EnumChatFormatting.GRAY);
+                    }
                 }
                 int members = catalog.membersOf(role.getId()).size();
                 if (members > 0) {
@@ -146,6 +149,13 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         if (role.isLocked()) {
             LostTalesCommandConfig.send(sender, EnumChatFormatting.RED
                     + "The Lost Tales Team mark is never assigned; it belongs to the code.");
+            return;
+        }
+        String withheld = grant ? withheldGrant(sender, role) : null;
+        if (withheld != null) {
+            LostTalesCommandConfig.send(sender, EnumChatFormatting.RED
+                    + "The role " + role.getId() + " grants " + withheld
+                    + ", which you do not hold; handing it on is not yours to do.");
             return;
         }
         Subject subject = resolveSubject(sender, joinFrom(args, 2));
@@ -354,6 +364,13 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
                     + "The entry could not be read; nothing was changed.");
             return;
         }
+        String withheld = withheldGrant(sender, role);
+        if (withheld != null) {
+            LostTalesCommandConfig.send(sender, EnumChatFormatting.RED
+                    + "The role " + id + " would grant " + withheld
+                    + ", which you do not hold; nothing was changed.");
+            return;
+        }
         List<String> entries = ChatRoleConfig.upsertRole(LostTalesConfig.chatRoles, role);
         LostTalesCommandConfig.report(sender, LostTalesServerConfigService.apply(
                 java.util.Collections.singletonList(new ServerConfigChange(
@@ -392,6 +409,28 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         changes.add(new ServerConfigChange(LostTalesConfig.CATEGORY_ROLES, MEMBERS_KEY, true,
                 ChatRoleConfig.removeKey(LostTalesConfig.chatRoleMembers, id)));
         LostTalesCommandConfig.report(sender, LostTalesServerConfigService.apply(changes));
+    }
+
+    /**
+     * The first capability the role grants that {@code sender} does not
+     * hold, or null when it grants nothing beyond them. Managing roles
+     * is not a way around the capabilities: a role may only be written
+     * or handed on by someone who could already do everything it
+     * allows, so nobody grants themselves — or a friend — what they
+     * were not given. An operator holds every capability by level, so
+     * this refuses an operator nothing.
+     */
+    static String withheldGrant(ICommandSender sender, ChatAccountRole role) {
+        LostTalesPermissionCatalog permissions = LostTalesPermissionCatalog.current();
+        for (String granted : role.getGrants()) {
+            for (LostTalesCapability capability : LostTalesCapability.all()) {
+                if (permissions.reaches(granted, capability)
+                        && !LostTalesPermissions.has(sender, capability)) {
+                    return capability.getId();
+                }
+            }
+        }
+        return null;
     }
 
     /** The entry with one option replaced, or appended; a repeatable one is added. */
@@ -437,10 +476,16 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         return joined.toString();
     }
 
-    /** Every capability a grant may name, comma-separated, for the usage. */
+    /** Every permission and capability a grant may name, for the usage. */
     private static String capabilityIds() {
         StringBuilder ids = new StringBuilder();
-        for (LostTalesCapability capability : LostTalesCapability.values()) {
+        for (String permission : LostTalesPermissionCatalog.current().ids()) {
+            if (ids.length() > 0) {
+                ids.append(", ");
+            }
+            ids.append(permission);
+        }
+        for (LostTalesCapability capability : LostTalesCapability.all()) {
             if (ids.length() > 0) {
                 ids.append(", ");
             }

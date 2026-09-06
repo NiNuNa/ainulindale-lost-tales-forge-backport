@@ -31,7 +31,7 @@ public final class LostTalesPermissions {
      * {@code me}, and {@code seed} in single player); anything else is
      * decided by the level alone.
      */
-    private static final String NODE = "losttales.permission";
+    public static final String NODE = "losttales.permission";
     /** The level vanilla gives an operator by default; what "operator" means here. */
     public static final int OPERATOR_LEVEL = 2;
 
@@ -51,11 +51,28 @@ public final class LostTalesPermissions {
         if (player == null || capability == null) {
             return false;
         }
+        // The level answers on its own, and is asked first: resolving
+        // roles reads the config catalogue and, for a faction source,
+        // LOTR's player data, and this is asked per recipient on the
+        // routing path. An operator never pays for it.
         if (player.canCommandSenderUseCommand(capability.getRequiredOpLevel(), NODE)) {
             return true;
         }
-        return isGranted(ChatAccountRoleResolver.resolve(player), capability,
-                ChatRoleCatalog.server());
+        return decide(false, ChatAccountRoleResolver.resolve(player), capability,
+                ChatRoleCatalog.server(), LostTalesPermissionCatalog.current());
+    }
+
+    /**
+     * The rule itself, once the two facts are known: the operator level
+     * the capability names, or a role the account holds that grants it.
+     * Pure, so the rule can be checked without a server; the lookups
+     * that feed it are {@link #has}'s.
+     */
+    public static boolean decide(boolean hasOperatorLevel, int roleMask,
+                                 LostTalesCapability capability,
+                                 ChatRoleCatalog catalog,
+                                 LostTalesPermissionCatalog permissions) {
+        return hasOperatorLevel || isGranted(roleMask, capability, catalog, permissions);
     }
 
     /**
@@ -75,18 +92,23 @@ public final class LostTalesPermissions {
     }
 
     /**
-     * Whether any role set in the mask grants the capability, read
-     * against the given catalogue. Pure: what {@link #has} decides once
+     * Whether any role set in the mask reaches the capability: the
+     * role's granted ids are read as permissions, and a permission as
+     * the capabilities it names. Pure: what {@link #has} decides once
      * operator status has said no, kept apart so it can be checked
      * without a server.
      */
     public static boolean isGranted(int roleMask, LostTalesCapability capability,
-                                    ChatRoleCatalog catalog) {
+                                    ChatRoleCatalog catalog,
+                                    LostTalesPermissionCatalog permissions) {
         if (roleMask == 0 || capability == null || catalog == null) {
             return false;
         }
+        LostTalesPermissionCatalog defined = permissions == null
+                ? LostTalesPermissionCatalog.empty() : permissions;
         for (ChatAccountRole role : catalog.roles()) {
-            if ((roleMask & role.bit()) != 0 && role.grants(capability)) {
+            if ((roleMask & role.bit()) != 0
+                    && defined.reachesAny(role.getGrants(), capability)) {
                 return true;
             }
         }

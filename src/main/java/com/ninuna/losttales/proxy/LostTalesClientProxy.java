@@ -504,6 +504,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             ClientChatChannelState.setChannelGates(
                     packet.getReadableChannels(), packet.getSendableChannels());
             ClientChatChannelState.setAdminAccess(packet.hasAdminAccess());
+            ClientChatChannelState.setCapabilities(packet.getCapabilities());
             ClientChatChannelState.setCanModerate(packet.canModerate());
             ClientChatChannelState.setCanEditServerConfig(
                     packet.canEditServerConfig());

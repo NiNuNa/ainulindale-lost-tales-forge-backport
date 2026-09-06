@@ -34,7 +34,8 @@ public enum ChatChannel {
     // honey is only the indicator/selector fallback.
     FACTION("faction", "Faction", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.FACTION, ChatChannelAccess.CHARACTER_FACTION,
-            LostTalesColors.rgb(LostTalesColors.HONEY), true),
+            LostTalesColors.rgb(LostTalesColors.HONEY), true,
+            ChatChannelScope.FACTION),
     /**
      * Out-of-character conversation, and the channel the Discord bridge
      * carries by default: out of character, everyone online reads it,
@@ -89,9 +90,18 @@ public enum ChatChannel {
                 ChatRecipientRule recipientRule,
                 ChatChannelAccess access, int displayColor,
                 boolean bridgeable) {
+        this(id, displayName, presentation, recipientRule, access, displayColor,
+                bridgeable, ChatChannelScope.NONE);
+    }
+
+    ChatChannel(String id, String displayName,
+                ChatPresentationMode presentation,
+                ChatRecipientRule recipientRule,
+                ChatChannelAccess access, int displayColor,
+                boolean bridgeable, ChatChannelScope scope) {
         this.descriptor = new ChatChannelDescriptor(id, displayName,
                 presentation, recipientRule, access, displayColor,
-                bridgeable);
+                bridgeable, scope);
     }
 
     public String getId() { return this.descriptor.getId(); }
@@ -109,6 +119,10 @@ public enum ChatChannel {
     public int getDisplayColor() { return this.descriptor.getDisplayColor(); }
     /** Whether the Discord bridge may carry this channel at all; see {@link ChatChannelDescriptor#isBridgeable}. */
     public boolean isBridgeable() { return this.descriptor.isBridgeable(); }
+    /** What tells one conversation on the channel from another. */
+    public ChatChannelScope getScope() { return this.descriptor.getScope(); }
+    /** Whether a tab here carries the identity it is read as. */
+    public boolean isIdentityScoped() { return this.descriptor.getScope().isIdentityScoped(); }
     /** The channel as the facts that describe it. */
     public ChatChannelDescriptor getDescriptor() { return this.descriptor; }
 

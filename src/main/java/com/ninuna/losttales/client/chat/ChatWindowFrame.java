@@ -286,7 +286,11 @@ final class ChatWindowFrame {
         for (int index = 0; index < windows.size(); index++) {
             List<ChatTab> tabs = windows.get(index).getTabs();
             for (int tab = 0; tab < tabs.size(); tab++) {
+                // A conversation the chat is not being read as is out
+                // of the feed as well as off the row: hiding the tab and
+                // still showing its lines would say two things at once.
                 if (tabs.get(tab).isWhisper()
+                        && ClientChatChannelState.isAvailable(tabs.get(tab))
                         && ChatWindowLayout.isInFeed(tabs.get(tab))) {
                     audible.add(tabs.get(tab));
                 }

@@ -150,9 +150,18 @@ final class ChatTabActions {
         this.completion.invalidateMentionCandidates();
     }
 
-    /** Opens (and selects) the whisper tab with an account's own identity. */
+    /**
+     * Opens (and selects) the conversation a name names: with the
+     * account when the name is theirs, and with the person as they are
+     * playing when it is the name on their lines. A name nobody online
+     * answers to opens the account conversation, which is what the
+     * server refuses if it is nobody's — the notice is the server's to
+     * give, not a guess made here.
+     */
     ChatTab openWhisperTab(String account) {
-        return openWhisperTab(account, "");
+        String[] played = ClientChatChannelState.playedBy(account);
+        return played == null ? openWhisperTab(account, "")
+                : openWhisperTab(played[0], played[1]);
     }
 
     /** As above with one identity of that account; empty is its own. */

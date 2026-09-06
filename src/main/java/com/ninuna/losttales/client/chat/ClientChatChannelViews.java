@@ -279,6 +279,7 @@ public final class ClientChatChannelViews {
 
     /** Called while a view is on screen; clears its unread counters. */
     public static synchronized void markViewed(ChatTab tab) {
+        tab = ChatTab.viewed(tab);
         if (tab != null) {
             UNREAD_PINGS.remove(tab);
             UNREAD_OTHER.remove(tab);
@@ -382,16 +383,19 @@ public final class ClientChatChannelViews {
 
     /** Unread messages that mentioned the player, capped at MAX_UNREAD + 1. */
     public static synchronized int unreadPingCount(ChatTab tab) {
+        tab = ChatTab.viewed(tab);
         return count(UNREAD_PINGS, tab);
     }
 
     /** Unread messages other than pings, capped at MAX_UNREAD + 1. */
     public static synchronized int unreadOtherCount(ChatTab tab) {
+        tab = ChatTab.viewed(tab);
         return count(UNREAD_OTHER, tab);
     }
 
     /** Every unread message, pings included, capped at MAX_UNREAD + 1. */
     public static synchronized int unreadCount(ChatTab tab) {
+        tab = ChatTab.viewed(tab);
         return Math.min(MAX_UNREAD + 1,
                 unreadPingCount(tab) + unreadOtherCount(tab));
     }
@@ -421,6 +425,7 @@ public final class ClientChatChannelViews {
     }
 
     public static synchronized boolean hasUnread(ChatTab tab) {
+        tab = ChatTab.viewed(tab);
         return unreadPingCount(tab) + unreadOtherCount(tab) > 0;
     }
 
@@ -429,6 +434,7 @@ public final class ClientChatChannelViews {
     }
 
     public static synchronized boolean hasUnreadMention(ChatTab tab) {
+        tab = ChatTab.viewed(tab);
         return unreadPingCount(tab) > 0;
     }
 
@@ -456,6 +462,13 @@ public final class ClientChatChannelViews {
         if (view == null) {
             return drawnLines == null
                     ? Collections.<ChatLine>emptyList() : drawnLines;
+        }
+        // Reading a conversation this client has never been sent — one
+        // of another of the player's characters — asks for it once.
+        ChatTab read = ChatTab.viewed(view);
+        String scope = ClientChatContextHistory.scopeOf(read);
+        if (scope.length() > 0) {
+            ClientChatContextHistory.request(read, scope);
         }
         return visibleLines(drawnLines, ChatLineFilter.of(view));
     }
@@ -688,6 +701,7 @@ public final class ClientChatChannelViews {
     }
 
     public static synchronized void clear() {
+        ClientChatContextHistory.clear();
         TAB_BY_LINE_ID.clear();
         SCROLL.clear();
         RENDERED.clear();

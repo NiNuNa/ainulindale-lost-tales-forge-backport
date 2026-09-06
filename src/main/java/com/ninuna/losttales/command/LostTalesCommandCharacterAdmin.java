@@ -29,6 +29,7 @@ import com.ninuna.losttales.character.switching.CharacterSwitchStorage;
 import com.ninuna.losttales.character.switching.CharacterSwitchTransaction;
 import com.ninuna.losttales.character.switching.CharacterSwitchWorldData;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import com.ninuna.losttales.permission.LostTalesCapability;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.command.ICommandSender;
@@ -53,8 +54,8 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
     }
 
     @Override
-    public int getRequiredPermissionLevel() {
-        return 2;
+    public LostTalesCapability getCapability() {
+        return LostTalesCapability.CHARACTER_ADMIN;
     }
 
     @Override

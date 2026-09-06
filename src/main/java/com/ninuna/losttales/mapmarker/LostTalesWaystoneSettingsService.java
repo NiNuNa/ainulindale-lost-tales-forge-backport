@@ -111,7 +111,7 @@ public final class LostTalesWaystoneSettingsService {
             return;
         }
         boolean operator =
-                LostTalesWaystonePermissionPolicy.isOperator(player);
+                LostTalesWaystonePermissionPolicy.managesWaystones(player);
         boolean canEdit =
                 LostTalesWaystonePermissionPolicy.canBreakOrEdit(
                         player, record, player.worldObj,

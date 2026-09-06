@@ -97,6 +97,78 @@ public final class LostTalesChatAccessPacketTest {
         assertEquals(0, decoded.getRoleMask());
     }
 
+    /**
+     * The capabilities the player holds travel by id, so the client's
+     * menus follow what the server can actually do rather than a flag
+     * per capability. A payload written before they travelled names
+     * none, and the two flags before them still say what they said.
+     */
+    @Test
+    public void theHeldCapabilitiesRoundTrip() {
+        List<String> held = Arrays.asList(
+                com.ninuna.losttales.permission.LostTalesCapability.CHAT_MODERATE.getId(),
+                com.ninuna.losttales.permission.LostTalesCapability.WAYSTONE_MANAGE.getId());
+        LostTalesChatAccessPacket packet = new LostTalesChatAccessPacket(false, true, 0,
+                Collections.<LostTalesChatAccessPacket.RoleHolder>emptyList(),
+                Collections.<UUID>emptyList(),
+                Collections.<ChatAccountRole>emptyList(),
+                LostTalesChatAccessPacket.ALL_CHANNELS,
+                LostTalesChatAccessPacket.ALL_CHANNELS,
+                true, false, held);
+        ByteBuf buffer = Unpooled.buffer();
+        packet.toBytes(buffer);
+        LostTalesChatAccessPacket decoded = new LostTalesChatAccessPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(held, decoded.getCapabilities());
+        assertTrue(decoded.canModerate());
+        assertFalse(decoded.canEditServerConfig());
+    }
+
+    /** A payload that stops before the capabilities names none and is not malformed. */
+    @Test
+    public void aPayloadWithoutCapabilitiesNamesNone() {
+        LostTalesChatAccessPacket packet = new LostTalesChatAccessPacket(true, true, 0,
+                Collections.<LostTalesChatAccessPacket.RoleHolder>emptyList(),
+                Collections.<UUID>emptyList(),
+                Collections.<ChatAccountRole>emptyList(),
+                LostTalesChatAccessPacket.ALL_CHANNELS,
+                LostTalesChatAccessPacket.ALL_CHANNELS,
+                true, true);
+        ByteBuf buffer = Unpooled.buffer();
+        packet.toBytes(buffer);
+        // Everything the older payload carried, up to and including the
+        // two flags, and nothing after them.
+        ByteBuf older = buffer.copy(0, buffer.readableBytes() - 2);
+        LostTalesChatAccessPacket decoded = new LostTalesChatAccessPacket();
+        decoded.fromBytes(older);
+        assertFalse(decoded.isMalformed());
+        assertTrue(decoded.getCapabilities().isEmpty());
+        assertTrue(decoded.canModerate());
+        assertTrue(decoded.canEditServerConfig());
+    }
+
+    /** More capability ids than a player could hold is a malformed payload. */
+    @Test
+    public void tooManyCapabilitiesAreRefused() {
+        ByteBuf buffer = Unpooled.buffer();
+        buffer.writeBoolean(true);
+        buffer.writeBoolean(true);
+        buffer.writeInt(0);
+        buffer.writeShort(0);
+        buffer.writeShort(0);
+        buffer.writeByte(0);
+        buffer.writeInt(LostTalesChatAccessPacket.ALL_CHANNELS);
+        buffer.writeInt(LostTalesChatAccessPacket.ALL_CHANNELS);
+        buffer.writeBoolean(false);
+        buffer.writeBoolean(false);
+        buffer.writeShort(LostTalesChatAccessPacket.MAX_CAPABILITIES + 1);
+        LostTalesChatAccessPacket decoded = new LostTalesChatAccessPacket();
+        decoded.fromBytes(buffer);
+        assertTrue(decoded.isMalformed());
+        assertTrue(decoded.getCapabilities().isEmpty());
+    }
+
     /** The catalogue the server sends is what the masks are read against. */
     @Test
     public void theCatalogueAndTheGatesRoundTrip() {

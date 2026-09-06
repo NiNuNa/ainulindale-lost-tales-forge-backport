@@ -36,7 +36,7 @@ final class ClientChatIdentity {
                 ClientChatAppearances.effectiveFor(tab);
         ChatChannel channel = tab == null ? null : tab.getChannel();
         int roles = ChatRolePresentation.rolesShown(channel,
-                ClientChatChannelState.getRoleMask());
+                statedRoleMask(appearance));
         if (appearance == null || appearance.account
                 || appearance.name.length() == 0) {
             return new Signature(account, account,
@@ -47,6 +47,35 @@ final class ClientChatIdentity {
                 ChatRolePresentation.nameColor(channel, roles, false,
                         factionColor(appearance)),
                 appearance.skinId, roles, false);
+    }
+
+    /**
+     * The roles the server last stated, but only for an identity it
+     * stated them for. The access packet carries one mask, resolved for
+     * the account together with the character being played, so a line
+     * signed as another of the player's characters would claim roles
+     * nobody said that character holds. It wears none instead, and the
+     * served copy — signed with the worn character's own roles — takes
+     * its place a moment later.
+     *
+     * <p>An account line still uses the stated mask: the account's own
+     * roles are all but always the whole of it. Telling the account's
+     * roles apart from the played character's needs the server to state
+     * them separately, which the access packet does not yet do.</p>
+     */
+    private static int statedRoleMask(
+            ClientChatAppearances.Appearance appearance) {
+        if (appearance == null || appearance.account
+                || appearance.characterId == null) {
+            return ClientChatChannelState.getRoleMask();
+        }
+        CharacterRosterSnapshot roster =
+                ClientCharacterRosterCache.getSnapshot();
+        CharacterSummary active = roster == null ? null
+                : roster.getActiveCharacter();
+        return active != null
+                && appearance.characterId.equals(active.getCharacterId())
+                ? ClientChatChannelState.getRoleMask() : 0;
     }
 
     /**

@@ -90,6 +90,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
     private static final int MAX_TITLE_BYTES = 256;
     private static final int MAX_SKIN_ID_BYTES = 128;
     private static final int MAX_FACTION_NAME_BYTES = 128;
+    /** A scope value is a normalized faction id; well past any of them. */
+    private static final int MAX_SCOPE_VALUE_BYTES = 128;
 
     private String channelId = "";
     private UUID senderId;
@@ -150,6 +152,14 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * characters keep separate threads. Appended; null from an older
      * server.
      */
+    /**
+     * Which conversation on a scoped channel the line belongs to: the
+     * faction it was spoken to, normalized. Empty on every channel that
+     * is one conversation. The client files the line under the tab of
+     * the identity that conversation is read as, so an account with
+     * characters in two factions keeps the two apart.
+     */
+    private String scopeValue = "";
     private UUID ownCharacterId;
     /**
      * For a whisper, the character of the other party the conversation
@@ -333,6 +343,26 @@ public final class LostTalesChatMessagePacket implements IMessage {
             String partnerIdentity, long echoNonce,
             UUID identityCharacterId, UUID ownCharacterId,
             UUID partnerCharacterId) {
+        this(channel, senderId, identityName, accountName, title, titleColor,
+                nameColor, message, timestampMillis, skinId, showcases, factionName,
+                partner, roles, accountLine, messageId, reply, partnerIdentity,
+                echoNonce, identityCharacterId, ownCharacterId, partnerCharacterId,
+                "");
+    }
+
+    private LostTalesChatMessagePacket(
+            ChatChannel channel, UUID senderId, String identityName,
+            String accountName, String title,
+            int titleColor, int nameColor,
+            String message, long timestampMillis, String skinId,
+            List<ChatShowcase> showcases, String factionName,
+            String partner, int roles, boolean accountLine,
+            long messageId, ChatReplyReference reply,
+            String partnerIdentity, long echoNonce,
+            UUID identityCharacterId, UUID ownCharacterId,
+            UUID partnerCharacterId, String scopeValue) {
+        this.scopeValue = scopedChannel(channel) && scopeValue != null
+                ? scopeValue.trim() : "";
         this.identityCharacterId = accountLine ? null : identityCharacterId;
         boolean whisper = channel == ChatChannel.WHISPER;
         this.ownCharacterId = whisper ? ownCharacterId : null;
@@ -465,6 +495,19 @@ public final class LostTalesChatMessagePacket implements IMessage {
                             "conversation ids on a line that is not a whisper");
                 }
             }
+            // Appended last: which conversation on a scoped channel the
+            // line belongs to. A payload written before it names none,
+            // which is what an unscoped channel says anyway.
+            this.scopeValue = "";
+            if (buffer.readableBytes() >= 1) {
+                String scope = LostTalesPacketCodec.readUtf8String(
+                        buffer, MAX_SCOPE_VALUE_BYTES);
+                if (scope.length() > 0 && !scopedChannel(getChannel())) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "a conversation on a channel that has only one");
+                }
+                this.scopeValue = scope;
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -477,6 +520,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.identityCharacterId = null;
             this.ownCharacterId = null;
             this.partnerCharacterId = null;
+            this.scopeValue = "";
             this.messageId = ChatMessageIds.NONE;
             this.reply = ChatReplyReference.NONE;
             this.partnerIdentity = "";
@@ -580,6 +624,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
         writeOptionalUuid(buffer, this.identityCharacterId);
         writeOptionalUuid(buffer, this.ownCharacterId);
         writeOptionalUuid(buffer, this.partnerCharacterId);
+        LostTalesPacketCodec.writeUtf8String(buffer, this.scopeValue,
+                MAX_SCOPE_VALUE_BYTES);
     }
 
     /** A presence flag and a UUID, always {@link #IDENTITY_ID_TAIL_BYTES} long. */
@@ -701,7 +747,31 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 this.factionName, partner, this.roles,
                 this.accountLine, this.messageId, reply,
                 partnerIdentity, echoNonce, this.identityCharacterId,
-                ownCharacterId, partnerCharacterId);
+                ownCharacterId, partnerCharacterId, this.scopeValue);
+    }
+
+    /**
+     * The same line, said in one conversation of a scoped channel: the
+     * faction it was spoken to. Ignored on a channel that is only ever
+     * one conversation.
+     */
+    public LostTalesChatMessagePacket withScope(String scopeValue) {
+        return new LostTalesChatMessagePacket(getChannel(), this.senderId,
+                this.identityName, this.accountName, this.title,
+                this.titleColor, this.nameColor, this.message,
+                this.timestampMillis, this.skinId, this.showcases,
+                this.factionName, this.partner, this.roles,
+                this.accountLine, this.messageId, this.reply,
+                this.partnerIdentity, this.echoNonce, this.identityCharacterId,
+                this.ownCharacterId, this.partnerCharacterId, scopeValue);
+    }
+
+    /** Which conversation on a scoped channel the line is in; empty for one. */
+    public String getScopeValue() { return this.scopeValue; }
+
+    /** Whether the channel is as many conversations as it has scope values. */
+    private static boolean scopedChannel(ChatChannel channel) {
+        return channel != null && channel.isIdentityScoped();
     }
 
     public ChatChannel getChannel() {

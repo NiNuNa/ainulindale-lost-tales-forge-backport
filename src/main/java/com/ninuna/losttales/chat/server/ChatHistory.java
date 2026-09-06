@@ -33,8 +33,8 @@ import java.util.UUID;
  *
  * <p>The audience is decided when the message is sent and checked again
  * when it is replayed, and both have to agree: a whisper reaches its two
- * parties, a party line the members the party had, a faction line the
- * characters that were in the faction then and are still in it now, a
+ * parties, a party line the members the party had, a faction line every
+ * account with a character that was in the faction then, a
  * staff line those who were sent it and may still read the channel.
  * Gaining a role, a party or a faction afterwards never opens what was
  * said before. Proximity lines reach only those who were near, since
@@ -245,6 +245,47 @@ public final class ChatHistory {
         return lines;
     }
 
+    /**
+     * The recent messages of one conversation the requester may be shown,
+     * oldest first: every kept message newer than {@code sinceMessageId}
+     * that was said in {@code scopeValue} on {@code channel} and whose
+     * audience admits them, at most {@link #MAX_REPLAY_PER_CHANNEL}. The
+     * requester's own entitlement decides, exactly as it does for a
+     * whole replay, so asking about a conversation the account has no
+     * character in answers with nothing.
+     */
+    public static synchronized List<LostTalesChatMessagePacket> replayForContext(
+            Requester requester, ChatChannel channel, String scopeValue,
+            long sinceMessageId) {
+        if (requester == null || channel == null || scopeValue == null
+                || scopeValue.length() == 0) {
+            return Collections.emptyList();
+        }
+        String channelId = channel.getId();
+        List<Entry> admitted = new ArrayList<Entry>();
+        List<Entry> all = new ArrayList<Entry>(ENTRIES.values());
+        for (int index = all.size() - 1; index >= 0
+                && admitted.size() < MAX_REPLAY_PER_CHANNEL; index--) {
+            Entry entry = all.get(index);
+            if (entry.forOthers.getMessageId() <= sinceMessageId
+                    || !channelId.equals(entry.channelId)
+                    || !scopeValue.equals(entry.forOthers.getScopeValue())
+                    || !entry.audience.admits(requester, entry)) {
+                continue;
+            }
+            admitted.add(entry);
+        }
+        List<LostTalesChatMessagePacket> lines =
+                new ArrayList<LostTalesChatMessagePacket>(admitted.size());
+        for (int index = admitted.size() - 1; index >= 0; index--) {
+            Entry entry = admitted.get(index);
+            lines.add(requester.accountId != null
+                    && requester.accountId.equals(entry.authorId)
+                    ? entry.forSender : entry.forOthers);
+        }
+        return lines;
+    }
+
     /** A message a moderator took back: whose it was and who saw it. */
     public static final class Removal {
         public final UUID authorId;
@@ -309,10 +350,11 @@ public final class ChatHistory {
         }
 
         /**
-         * Everyone whose played character was in the faction when the
-         * line was said and still is. A character's faction is fixed
-         * when it is made, so "was in it then" is "existed then".
-         * {@code gated} asks the channel's read gate again besides.
+         * Every account with a character in the faction, made before the
+         * line was said. A character's faction is fixed when it is made,
+         * so "was in it then" is "existed then", and an account may play
+         * any of its characters at will, so owning one is being reachable
+         * by it. {@code gated} asks the channel's read gate again besides.
          */
         public static Audience faction(String factionId, Collection<UUID> sentTo,
                                        boolean gated) {
@@ -333,8 +375,9 @@ public final class ChatHistory {
                 return false;
             }
             if (this.factionId != null) {
-                if (!this.factionId.equals(requester.factionId)
-                        || requester.characterCreatedAt > entry.timestampMillis) {
+                Long earliest = requester.earliestCharacterIn(this.factionId);
+                if (earliest == null
+                        || earliest.longValue() > entry.timestampMillis) {
                     return false;
                 }
             }
@@ -348,20 +391,24 @@ public final class ChatHistory {
      */
     public static final class Requester {
         final UUID accountId;
-        /** The played character's faction, normalised; empty on the account. */
-        final String factionId;
-        /** When the played character was made; irrelevant on the account. */
-        final long characterCreatedAt;
+        /**
+         * Every faction the account has a character in, and when its
+         * earliest such character was made. A faction line is replayed
+         * to whoever could read it by playing that character.
+         */
+        final Map<String, Long> ownedFactions;
         /** The party the played identity is in; null for none. */
         final UUID partyId;
         /** The ids of the channels the player may read right now. */
         final Set<String> readableChannels;
 
-        public Requester(UUID accountId, String factionId, long characterCreatedAt,
+        public Requester(UUID accountId, Map<String, Long> ownedFactions,
                          UUID partyId, Collection<ChatChannel> readable) {
             this.accountId = accountId;
-            this.factionId = factionId == null ? "" : factionId;
-            this.characterCreatedAt = characterCreatedAt;
+            this.ownedFactions = ownedFactions == null
+                    ? Collections.<String, Long>emptyMap()
+                    : Collections.unmodifiableMap(
+                            new HashMap<String, Long>(ownedFactions));
             this.partyId = partyId;
             Set<String> ids = new HashSet<String>();
             if (readable != null) {
@@ -372,6 +419,32 @@ public final class ChatHistory {
                 }
             }
             this.readableChannels = Collections.unmodifiableSet(ids);
+        }
+
+        /**
+         * An account with one character, in that faction, made then; a
+         * faction id of nothing is an account with no character in any.
+         * The shape most callers and every test have to describe.
+         */
+        public Requester(UUID accountId, String factionId, long characterCreatedAt,
+                         UUID partyId, Collection<ChatChannel> readable) {
+            this(accountId, oneFaction(factionId, characterCreatedAt), partyId,
+                    readable);
+        }
+
+        private static Map<String, Long> oneFaction(String factionId,
+                                                    long characterCreatedAt) {
+            if (factionId == null || factionId.length() == 0) {
+                return Collections.emptyMap();
+            }
+            Map<String, Long> owned = new HashMap<String, Long>();
+            owned.put(factionId, Long.valueOf(characterCreatedAt));
+            return owned;
+        }
+
+        /** When the earliest character in that faction was made; null for none. */
+        Long earliestCharacterIn(String factionId) {
+            return factionId == null ? null : this.ownedFactions.get(factionId);
         }
     }
 

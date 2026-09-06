@@ -296,10 +296,121 @@ public final class ChatHistoryTest {
         assertTrue(ChatHistory.replayFor(null, ChatMessageIds.NONE).isEmpty());
     }
 
+    /**
+     * An account with characters in two factions is replayed both
+     * conversations, each from when its own character was made: it may
+     * play either at will, so what it could read by switching is what it
+     * may read. The two are still separate lines, filed under separate
+     * tabs on the client.
+     */
+    @Test
+    public void anAccountIsReplayedEveryFactionItHasACharacterIn() {
+        long gondorLine = record(ChatChannel.FACTION, ALICE, "for Gondor",
+                Arrays.asList(ALICE),
+                ChatHistory.Audience.faction(GONDOR, Arrays.asList(ALICE), false));
+        long mordorLine = record(ChatChannel.FACTION, BOB, "for Mordor",
+                Arrays.asList(BOB),
+                ChatHistory.Audience.faction("MORDOR", Arrays.asList(BOB), false));
+
+        java.util.Map<String, Long> both = new java.util.HashMap<String, Long>();
+        both.put(GONDOR, Long.valueOf(SENT_AT - 1L));
+        both.put("MORDOR", Long.valueOf(SENT_AT - 1L));
+        List<LostTalesChatMessagePacket> lines = ChatHistory.replayFor(
+                new ChatHistory.Requester(CAROL, both, null, EVERY_CHANNEL),
+                ChatMessageIds.NONE);
+        assertEquals(2, lines.size());
+
+        // One of the two alone is replayed one of the two.
+        java.util.Map<String, Long> gondorOnly = new java.util.HashMap<String, Long>();
+        gondorOnly.put(GONDOR, Long.valueOf(SENT_AT - 1L));
+        List<LostTalesChatMessagePacket> gondor = ChatHistory.replayFor(
+                new ChatHistory.Requester(CAROL, gondorOnly, null, EVERY_CHANNEL),
+                ChatMessageIds.NONE);
+        assertEquals(1, gondor.size());
+        assertEquals(gondorLine, gondor.get(0).getMessageId());
+
+        // Each faction is asked about its own character's age, not the
+        // account's: a Mordor character made after the Mordor line was
+        // said is shown Gondor's and not Mordor's.
+        java.util.Map<String, Long> laterMordor = new java.util.HashMap<String, Long>();
+        laterMordor.put(GONDOR, Long.valueOf(SENT_AT - 1L));
+        laterMordor.put("MORDOR", Long.valueOf(SENT_AT + 1L));
+        List<LostTalesChatMessagePacket> mixed = ChatHistory.replayFor(
+                new ChatHistory.Requester(CAROL, laterMordor, null, EVERY_CHANNEL),
+                ChatMessageIds.NONE);
+        assertEquals(1, mixed.size());
+        assertEquals(gondorLine, mixed.get(0).getMessageId());
+        assertTrue("the Mordor line stays unread", mordorLine != mixed.get(0).getMessageId());
+    }
+
+    /**
+     * Asking for one conversation answers with that conversation alone,
+     * only what is newer than the client holds, and nothing at all to an
+     * account with no character in it. Sending only the newer lines is
+     * what makes asking safe to repeat: the client appends what it is
+     * sent without clearing.
+     */
+    @Test
+    public void oneConversationIsReplayedOnItsOwnAndOnlyWhatIsNew() {
+        long first = record(ChatChannel.FACTION, ALICE, "for Gondor",
+                Arrays.asList(ALICE),
+                ChatHistory.Audience.faction(GONDOR, Arrays.asList(ALICE), false),
+                GONDOR);
+        long second = record(ChatChannel.FACTION, ALICE, "and again",
+                Arrays.asList(ALICE),
+                ChatHistory.Audience.faction(GONDOR, Arrays.asList(ALICE), false),
+                GONDOR);
+        record(ChatChannel.FACTION, BOB, "for Mordor", Arrays.asList(BOB),
+                ChatHistory.Audience.faction("MORDOR", Arrays.asList(BOB), false),
+                "MORDOR");
+        record(ChatChannel.ALL, ALICE, "hello", Arrays.asList(ALICE),
+                ChatHistory.Audience.everyone());
+
+        java.util.Map<String, Long> gondor = new java.util.HashMap<String, Long>();
+        gondor.put(GONDOR, Long.valueOf(SENT_AT - 1L));
+        ChatHistory.Requester requester =
+                new ChatHistory.Requester(CAROL, gondor, null, EVERY_CHANNEL);
+
+        List<LostTalesChatMessagePacket> all = ChatHistory.replayForContext(
+                requester, ChatChannel.FACTION, GONDOR, ChatMessageIds.NONE);
+        assertEquals("Gondor's two lines and nothing else", 2, all.size());
+        assertEquals(first, all.get(0).getMessageId());
+        assertEquals(second, all.get(1).getMessageId());
+
+        List<LostTalesChatMessagePacket> since = ChatHistory.replayForContext(
+                requester, ChatChannel.FACTION, GONDOR, first);
+        assertEquals(1, since.size());
+        assertEquals(second, since.get(0).getMessageId());
+        assertTrue("nothing is repeated once it is all held",
+                ChatHistory.replayForContext(requester, ChatChannel.FACTION,
+                        GONDOR, second).isEmpty());
+
+        // A conversation the account has no character in answers nothing,
+        // whatever it asks for.
+        assertTrue(ChatHistory.replayForContext(requester, ChatChannel.FACTION,
+                "MORDOR", ChatMessageIds.NONE).isEmpty());
+        // And a conversation nobody named is nothing to ask about.
+        assertTrue(ChatHistory.replayForContext(requester, ChatChannel.FACTION,
+                "", ChatMessageIds.NONE).isEmpty());
+        assertTrue(ChatHistory.replayForContext(null, ChatChannel.FACTION,
+                GONDOR, ChatMessageIds.NONE).isEmpty());
+    }
+
     /* ---- helpers ---- */
 
     private static ChatHistory.Requester requester(UUID account) {
         return new ChatHistory.Requester(account, "", 0L, null, EVERY_CHANNEL);
+    }
+
+    /** As below, with the conversation of a scoped channel stamped on the line. */
+    private static long record(ChatChannel channel, UUID author, String text,
+                               List<UUID> sentTo, ChatHistory.Audience audience,
+                               String scopeValue) {
+        long id = ChatMessageIdAllocator.next();
+        ChatHistory.record(id, author, "Aldric", null,
+                line(id, channel, author, text).withScope(scopeValue),
+                sentTo, audience);
+        return id;
     }
 
     private static long record(ChatChannel channel, UUID author, String text,

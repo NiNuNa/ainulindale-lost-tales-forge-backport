@@ -782,16 +782,30 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * The tab a packet would be filed under, read from the packet alone:
-     * a whisper's conversation with the partner's identity, held as the
-     * character this copy says it is held as.
+     * The tab a packet would be filed under: a whisper's conversation
+     * with the partner's identity, held as the character this copy says
+     * it is held as; a scoped channel's line under the identity of this
+     * player's that is in the conversation it was said in.
      */
     private static ChatTab tabOf(LostTalesChatMessagePacket packet) {
-        return packet.getChannel() == ChatChannel.WHISPER
-                ? ChatTab.whisper(packet.getPartner(),
-                        packet.getPartnerIdentity(),
-                        ChatTab.ownerKeyOf(packet.getOwnCharacterId()))
-                : ChatTab.of(packet.getChannel());
+        ChatTab filed = fileUnder(packet);
+        ClientChatContextHistory.remember(filed, packet.getMessageId());
+        return filed;
+    }
+
+    private static ChatTab fileUnder(LostTalesChatMessagePacket packet) {
+        if (packet.getChannel() == ChatChannel.WHISPER) {
+            return ChatTab.whisper(packet.getPartner(),
+                    packet.getPartnerIdentity(),
+                    ChatTab.ownerKeyOf(packet.getOwnCharacterId()));
+        }
+        // A line of a scoped channel belongs to the conversation it was
+        // said in, and so to the identity of this player's that reads
+        // that conversation: a Gondor line is Gondor's character's, and
+        // is never shown under the Rohan one's tab.
+        return ChatTab.of(packet.getChannel(),
+                ClientChatChannelState.ownerKeyReading(packet.getChannel(),
+                        packet.getScopeValue()));
     }
 
     /**

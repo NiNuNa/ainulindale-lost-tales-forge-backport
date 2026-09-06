@@ -332,6 +332,11 @@ public class LostTalesCommonProxy {
             LostTalesFastTravelArrivalPacket packet) {}
 
     public void onServerStarting(FMLServerStartingEvent event) {
+        // First, so the roles, gates and settings everything below reads
+        // are the ones on disk now: the files may have been edited since
+        // pre-init, and a client hosting a world installs its catalogue
+        // here rather than at pre-init.
+        LostTalesConfig.reload();
         CharacterLifecycleStateTracker.markServerStarting();
         initializeLoreCharacterOwnership(event);
         CharacterStateCheckpointHandler.reset();

@@ -6,6 +6,8 @@ import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatRoleConfig;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatChannelGates;
+import com.ninuna.losttales.character.sync.CharacterAppearance;
+import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
@@ -68,6 +70,13 @@ public final class ClientChatChannelState {
     /** Server-stated operator status; the Admin tab exists only with it. */
     private static boolean adminAccess;
     /** The server's word on whether this player may moderate the chat. */
+    /**
+     * Every capability the server says this player holds, by id. The
+     * menus ask this rather than a flag of their own, so a capability
+     * the code gains later needs no new field here.
+     */
+    private static java.util.Set<String> capabilities =
+            java.util.Collections.emptySet();
     private static boolean canModerate;
     /** The server's word on whether this player may edit its settings. */
     private static boolean canEditServerConfig;
@@ -285,18 +294,23 @@ public final class ClientChatChannelState {
 
     /**
      * Whether the tab's history is readable and its tab shown. A
-     * conversation is shown only while the identity it is held as is
-     * the active one: what the player said as one character is not on
-     * screen while they play another. Its lines are still filed and
-     * counted, and it shows again when that identity is played again.
+     * conversation is shown only while the chat is being read as the
+     * identity it is held as: what the player said as one character is
+     * not on screen while they read as another. Its lines are still
+     * filed and counted, and it shows again the moment that identity is
+     * read as again. An NPC conversation belongs to nobody in particular
+     * and is always shown; so is every plain channel, a scoped one
+     * included — one row entry, showing the conversation being read.
      */
     public static synchronized boolean isAvailable(ChatTab tab) {
         if (tab == null || !isAvailable(tab.getChannel())) {
             return false;
         }
-        return !tab.isWhisper() || tab.isNpc()
-                || tab.getOwnerKey().equals(
-                        ClientChatAppearances.activeIdentityKey());
+        if (tab.isNpc() || !tab.isWhisper()) {
+            return true;
+        }
+        return tab.getOwnerKey().equals(
+                ClientChatAppearances.viewIdentityKey());
     }
 
     /**
@@ -713,6 +727,30 @@ public final class ClientChatChannelState {
         return canModerate;
     }
 
+    /**
+     * States which capabilities the player holds. A server that named
+     * none — an older one, whose payload carried the two flags alone —
+     * leaves the flags to speak for themselves.
+     */
+    public static synchronized void setCapabilities(
+            java.util.Collection<String> held) {
+        java.util.Set<String> ids = new java.util.HashSet<String>();
+        if (held != null) {
+            for (String id : held) {
+                if (id != null && id.trim().length() > 0) {
+                    ids.add(id.trim().toLowerCase(java.util.Locale.ROOT));
+                }
+            }
+        }
+        capabilities = java.util.Collections.unmodifiableSet(ids);
+    }
+
+    /** Whether the server said this player holds the capability. */
+    public static synchronized boolean holds(
+            com.ninuna.losttales.permission.LostTalesCapability capability) {
+        return capability != null && capabilities.contains(capability.getId());
+    }
+
     /** Applies the server's statement of whether this player may edit its settings. */
     public static synchronized void setCanEditServerConfig(boolean allowed) {
         canEditServerConfig = allowed;
@@ -794,6 +832,7 @@ public final class ClientChatChannelState {
         adminAccess = false;
         canModerate = false;
         canEditServerConfig = false;
+        capabilities = java.util.Collections.emptySet();
         roleMask = 0;
         readableChannels = DEFAULT_READABLE;
         sendableChannels = DEFAULT_SENDABLE;
@@ -817,9 +856,98 @@ public final class ClientChatChannelState {
      * all read this, so they follow the worn identity as the server's
      * routing does.
      */
+    /**
+     * Which of this player's identities reads a line said in one
+     * conversation of a scoped channel: the character in that faction,
+     * by its id, or the account's empty key when the channel is only
+     * ever one conversation. A conversation nothing of this player's is
+     * in — which the server does not send — files under the plain tab,
+     * where it is counted and not shown.
+     */
+    public static synchronized String ownerKeyReading(ChatChannel channel,
+                                                      String scopeValue) {
+        if (channel == null || !channel.isIdentityScoped()
+                || scopeValue == null || scopeValue.length() == 0) {
+            return "";
+        }
+        CharacterRosterSnapshot roster = ClientCharacterRosterCache.getSnapshot();
+        if (roster == null) {
+            return "";
+        }
+        for (CharacterSummary character : roster.getCharacters()) {
+            if (character != null && scopeValue.equals(
+                    LotrCharacterAdapter.normalizeFactionId(
+                            character.getStartingFactionId()))) {
+                return ChatTab.ownerKeyOf(character.getCharacterId());
+            }
+        }
+        return "";
+    }
+
+    /**
+     * Whom a name names, when it is the name someone is playing under
+     * rather than their account: the account and the character, as the
+     * server states them on every line that player sends. Null when no
+     * online player is wearing the name — an account name included,
+     * which the caller resolves for itself.
+     */
+    public static synchronized String[] playedBy(String characterName) {
+        String named = characterName == null ? "" : characterName.trim();
+        if (named.length() == 0) {
+            return null;
+        }
+        for (CharacterAppearance appearance
+                : ClientCharacterAppearanceCache.snapshot().values()) {
+            if (appearance != null
+                    && named.equalsIgnoreCase(appearance.getCharacterName())
+                    && appearance.getAccountName().length() > 0) {
+                return new String[] {appearance.getAccountName(),
+                        appearance.getCharacterName()};
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The conversation one of this player's identities is in on a scoped
+     * channel: the faction of the character the owner key names. Empty
+     * for the account, which is in none, and for a character the roster
+     * no longer holds.
+     */
+    public static synchronized String scopeOfIdentity(ChatChannel channel,
+                                                      String ownerKey) {
+        if (channel == null || !channel.isIdentityScoped()
+                || ownerKey == null || ownerKey.length() == 0) {
+            return "";
+        }
+        CharacterRosterSnapshot roster = ClientCharacterRosterCache.getSnapshot();
+        if (roster == null) {
+            return "";
+        }
+        for (CharacterSummary character : roster.getCharacters()) {
+            if (character != null && ownerKey.equals(
+                    ChatTab.ownerKeyOf(character.getCharacterId()))) {
+                return LotrCharacterAdapter.normalizeFactionId(
+                        character.getStartingFactionId());
+            }
+        }
+        return "";
+    }
+
+    /**
+     * The tab of a scoped channel this player reads right now: the one
+     * for the identity the chat is being read as. What the tab row, the
+     * selection and the composer point at.
+     */
+    public static synchronized ChatTab tabRead(ChatChannel channel) {
+        return channel == null || !channel.isIdentityScoped()
+                ? ChatTab.of(channel)
+                : ChatTab.of(channel, ClientChatAppearances.viewIdentityKey());
+    }
+
     public static synchronized String wornFactionId(ChatChannel channel) {
         ClientChatAppearances.Appearance worn =
-                ClientChatAppearances.effectiveFor(ChatTab.of(channel));
+                ClientChatAppearances.effectiveFor(tabRead(channel));
         if (worn == null || worn.account || worn.characterId == null) {
             return "";
         }

@@ -95,25 +95,46 @@ public final class ClientChatAppearancesTest {
                 ClientChatAppearances.wireKind(global));
     }
 
+    /**
+     * Picking an identity is picking who the player is in the chat: it
+     * is read and spoken as everywhere, and stays so until another is
+     * picked. It changes nothing about the character being played.
+     */
     @Test
-    public void aPassingChoiceHoldsForItsTabUntilTheNextSwitch() {
+    public void pickingAnIdentityIsPickingWhoThePlayerIsInTheChat() {
         roster(ARAGORN, ARAGORN, LEGOLAS);
         ClientChatAppearances.select(appearanceOf(LEGOLAS), global);
         assertEquals(LEGOLAS, ClientChatAppearances.effectiveFor(global).characterId);
-        assertEquals(ARAGORN, ClientChatAppearances.effectiveFor(proximity).characterId);
+        assertEquals("every unlocked tab follows it, not the tab it was picked on",
+                LEGOLAS, ClientChatAppearances.effectiveFor(proximity).characterId);
+        assertEquals(LEGOLAS.toString().toLowerCase(java.util.Locale.ROOT),
+                ClientChatAppearances.viewIdentityKey());
+        assertEquals("the character being played is untouched",
+                ARAGORN.toString().toLowerCase(java.util.Locale.ROOT),
+                ClientChatAppearances.activeIdentityKey());
         assertEquals(LostTalesChatSendPacket.APPEARANCE_CHARACTER,
                 ClientChatAppearances.wireKind(global));
         assertTrue(ClientChatAppearances.isEffective(appearanceOf(LEGOLAS), global));
-        assertFalse(ClientChatAppearances.isEffective(appearanceOf(LEGOLAS), proximity));
 
+        // A tab switch is not a change of identity.
         ClientChatAppearances.onChannelSwitched();
+        assertEquals(LEGOLAS, ClientChatAppearances.effectiveFor(global).characterId);
+
+        // Reading as the character being played again.
+        ClientChatAppearances.followThePlayedIdentity();
         assertEquals(ARAGORN, ClientChatAppearances.effectiveFor(global).characterId);
+        assertEquals(ARAGORN.toString().toLowerCase(java.util.Locale.ROOT),
+                ClientChatAppearances.viewIdentityKey());
 
         // Choosing the account on an in-character tab, then locking it,
-        // makes the account that tab's own.
+        // makes the account that tab's own while the rest follow on.
         ClientChatAppearances.select(ClientChatAppearances.accountAppearance(), global);
         ClientChatAppearances.toggleLocked(global);
-        ClientChatAppearances.onChannelSwitched();
+        ClientChatAppearances.select(appearanceOf(LEGOLAS), proximity);
+        assertEquals("the lock holds against a later pick",
+                true, ClientChatAppearances.effectiveFor(global).account);
+        assertEquals(LEGOLAS, ClientChatAppearances.effectiveFor(proximity).characterId);
+        ClientChatAppearances.select(ClientChatAppearances.accountAppearance(), proximity);
         assertTrue(ClientChatAppearances.effectiveFor(global).account);
         assertEquals(LostTalesChatSendPacket.APPEARANCE_ACCOUNT,
                 ClientChatAppearances.wireKind(global));

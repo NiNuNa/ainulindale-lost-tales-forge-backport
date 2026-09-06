@@ -25,11 +25,18 @@ import net.minecraft.client.Minecraft;
  * lock belongs to the tab it was set on and to no other: Global locked
  * to one character leaves Proximity following the active one.</p>
  *
- * <p>A choice made without locking is a passing one: it holds for the
- * tab it was made on until another tab is selected, then the default
- * applies again. A lock or a choice naming a character the roster no
- * longer holds — deleted, or a lore character handed on — gives way to
- * the default the moment it is read.</p>
+ * <p>A lock naming a character the roster no longer holds — deleted,
+ * or a lore character handed on — gives way to the default the
+ * moment it is read.</p>
+ *
+ * <p>Beside the tab it speaks as, the chat is <em>read</em> as one
+ * identity: the one whose conversations are on screen. Picking an
+ * identity sets it, and it decides which whispers are shown and which
+ * conversation of a scoped channel — the Faction tab above all — is
+ * the one being read. It is not the character being played: choosing
+ * it changes nothing in the world, and the character switch screen is
+ * the only thing that does. Left alone it follows the character being
+ * played, which is what it was before anyone chose.</p>
  *
  * <p>Presentation only and client-held: the server validates the
  * character against the sender's own roster before signing a line with
@@ -58,27 +65,67 @@ final class ClientChatAppearances {
     /** The identity each locked tab holds. */
     private static final Map<ChatTab, Appearance> LOCKS =
             new HashMap<ChatTab, Appearance>();
-    /** A passing choice, and the tab it was made on; null for none. */
-    private static Appearance pending;
-    private static ChatTab pendingTab;
+    /**
+     * The identity the chat is read as; null while it follows the
+     * character being played.
+     */
+    private static Appearance viewing;
 
     private ClientChatAppearances() {}
 
     /**
-     * Chooses the identity the tab speaks as. On a locked tab the lock
-     * itself takes the new identity; on any other the choice holds until
-     * the tab is switched.
+     * Chooses the identity the chat is read and spoken as. Every tab
+     * follows it but the locked ones, which keep the identity they were
+     * pinned to; a locked tab picked on takes the new identity as its
+     * lock, since choosing on a tab is choosing for that tab first.
      */
     static synchronized void select(Appearance appearance, ChatTab tab) {
         if (appearance == null || tab == null) {
             return;
         }
+        // Picking an identity is picking who the player is in the chat:
+        // the conversations shown are that identity's from here on. The
+        // tab it was picked on speaks as it too, unless the tab holds an
+        // identity of its own.
+        viewing = appearance;
         if (LOCKS.containsKey(tab)) {
             LOCKS.put(tab, appearance);
-            return;
         }
-        pending = appearance;
-        pendingTab = tab;
+    }
+
+    /**
+     * The identity the chat is read as: the one last picked while the
+     * roster still holds it, else the character being played, else the
+     * account. What decides which conversations are on screen.
+     */
+    static synchronized Appearance viewing() {
+        if (viewing != null && isHeld(viewing)) {
+            return viewing;
+        }
+        viewing = null;
+        CharacterSummary active = activeCharacter();
+        return active == null ? accountAppearance() : of(active);
+    }
+
+    /**
+     * The key of the identity the chat is read as: a character's id, or
+     * empty for the account. A tab holding another identity is not this
+     * player's to read right now.
+     */
+    public static synchronized String viewIdentityKey() {
+        // The roster alone answers this: a tab is resolved through it on
+        // every draw, so it must never reach for the running game.
+        if (viewing != null && isHeld(viewing)) {
+            return viewing.account ? ""
+                    : ChatTab.ownerKeyOf(viewing.characterId);
+        }
+        viewing = null;
+        return activeIdentityKey();
+    }
+
+    /** Reads the chat as the character being played again. */
+    static synchronized void followThePlayedIdentity() {
+        viewing = null;
     }
 
     /** Whether the tab is locked to an identity of its own. */
@@ -101,23 +148,21 @@ final class ClientChatAppearances {
             return;
         }
         LOCKS.put(tab, effectiveFor(tab));
-        if (tab.equals(pendingTab)) {
-            pending = null;
-            pendingTab = null;
-        }
     }
 
-    /** A tab switch ends a passing choice; every lock stays where it is. */
+    /**
+     * A tab switch changes nothing about who the player is: the
+     * identity they read and speak as is theirs until they pick another,
+     * and every lock stays where it is.
+     */
     static synchronized void onChannelSwitched() {
-        pending = null;
-        pendingTab = null;
     }
 
     /**
      * The identity the tab speaks as right now: its lock, else the
-     * passing choice made on it, else the default — the active
-     * character on every channel, and the account whenever no character
-     * is active.
+     * passing choice made on it, else the identity the chat is being
+     * read as — which is the character being played until one is
+     * picked, and the account whenever there is none.
      */
     static synchronized Appearance effectiveFor(ChatTab tab) {
         Appearance explicit = explicitFor(tab);
@@ -125,28 +170,41 @@ final class ClientChatAppearances {
             return explicit;
         }
         if (tab != null && !tab.isNpc() && tab.getChannel() != null) {
-            CharacterSummary active = activeCharacter();
-            if (active != null) {
-                return of(active);
-            }
+            return viewing();
         }
         return accountAppearance();
     }
 
-    /** The tab's explicit identity for the wire, as the send packet encodes it. */
+    /**
+     * The identity the wire states for a line typed here: the tab's own
+     * when it holds one, else the identity the player picked. Left
+     * unpicked it states none, and the server signs the line with the
+     * character being played — which is also what keeps a send safe
+     * when the roster cannot be read, since only the server can say
+     * then whether there is a character at all.
+     */
     static synchronized int wireKind(ChatTab tab) {
-        Appearance explicit = explicitFor(tab);
-        if (explicit == null) {
+        Appearance stated = statedFor(tab);
+        if (stated == null) {
             return LostTalesChatSendPacket.APPEARANCE_DEFAULT;
         }
-        return explicit.account
+        return stated.account
                 ? LostTalesChatSendPacket.APPEARANCE_ACCOUNT
                 : LostTalesChatSendPacket.APPEARANCE_CHARACTER;
     }
 
     static synchronized UUID wireCharacterId(ChatTab tab) {
+        Appearance stated = statedFor(tab);
+        return stated == null ? null : stated.characterId;
+    }
+
+    /** The identity chosen for this line, or null to follow the played one. */
+    private static Appearance statedFor(ChatTab tab) {
         Appearance explicit = explicitFor(tab);
-        return explicit == null ? null : explicit.characterId;
+        if (explicit != null) {
+            return explicit;
+        }
+        return viewing != null && isHeld(viewing) ? viewing : null;
     }
 
     /** Whether the appearance is this tab's current effective one. */
@@ -163,10 +221,10 @@ final class ClientChatAppearances {
     }
 
     /**
-     * The identity the tab was explicitly given, lock first, or null
-     * when the default applies. A choice whose character has left the
-     * roster is dropped here, so a stale lock never outlives the
-     * character it named.
+     * The identity the tab holds of its own — a conversation's own, or
+     * a lock — or null when it follows the identity being read as. A
+     * lock whose character has left the roster is dropped here, so it
+     * never outlives the character it named.
      */
     private static Appearance explicitFor(ChatTab tab) {
         if (tab == null) {
@@ -180,18 +238,7 @@ final class ClientChatAppearances {
                 return held;
             }
         }
-        Appearance lock = validLock(tab);
-        if (lock != null) {
-            return lock;
-        }
-        if (tab.equals(pendingTab)) {
-            if (isHeld(pending)) {
-                return pending;
-            }
-            pending = null;
-            pendingTab = null;
-        }
-        return null;
+        return validLock(tab);
     }
 
     /**
@@ -219,9 +266,11 @@ final class ClientChatAppearances {
     }
 
     /**
-     * The key a whisper opened now is held under: the active
-     * character's id, or empty for the account. Read from the roster
-     * cache alone, so any lock may be held while calling it.
+     * The key of the character being played, or empty for the account.
+     * Read from the roster cache alone, so any lock may be held while
+     * calling it. What a conversation is held under is
+     * {@link #viewIdentityKey}, which is this until an identity is
+     * picked.
      */
     public static String activeIdentityKey() {
         CharacterSummary active = activeCharacter();
@@ -311,7 +360,6 @@ final class ClientChatAppearances {
     /** The conversation ends with the world, and so do the locks. */
     static synchronized void clear() {
         LOCKS.clear();
-        pending = null;
-        pendingTab = null;
+        viewing = null;
     }
 }

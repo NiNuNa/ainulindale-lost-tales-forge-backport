@@ -16,6 +16,7 @@ public final class ChatChannelDescriptor {
     private final ChatChannelAccess access;
     private final int displayColor;
     private final boolean bridgeable;
+    private final ChatChannelScope scope;
 
     public ChatChannelDescriptor(String id, String displayName,
                                  ChatPresentationMode presentation,
@@ -23,6 +24,17 @@ public final class ChatChannelDescriptor {
                                  ChatChannelAccess access,
                                  int displayColor,
                                  boolean bridgeable) {
+        this(id, displayName, presentation, recipientRule, access, displayColor,
+                bridgeable, ChatChannelScope.NONE);
+    }
+
+    public ChatChannelDescriptor(String id, String displayName,
+                                 ChatPresentationMode presentation,
+                                 ChatRecipientRule recipientRule,
+                                 ChatChannelAccess access,
+                                 int displayColor,
+                                 boolean bridgeable,
+                                 ChatChannelScope scope) {
         if (id == null || id.trim().length() == 0) {
             throw new IllegalArgumentException("id must not be empty");
         }
@@ -38,6 +50,7 @@ public final class ChatChannelDescriptor {
         this.access = access;
         this.displayColor = displayColor;
         this.bridgeable = bridgeable;
+        this.scope = scope == null ? ChatChannelScope.NONE : scope;
     }
 
     public String getId() { return this.id; }
@@ -54,6 +67,13 @@ public final class ChatChannelDescriptor {
      * configured.
      */
     public boolean isBridgeable() { return this.bridgeable; }
+
+    /**
+     * What tells one conversation on the channel from another; see
+     * {@link ChatChannelScope}. A scoped channel's tabs carry the
+     * identity they are read as.
+     */
+    public ChatChannelScope getScope() { return this.scope; }
 
     @Override
     public String toString() {

@@ -13,8 +13,10 @@ import cpw.mods.fml.common.FMLLog;
 import com.ninuna.losttales.chat.ChatRoleConfig;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatChannelGates;
+import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.compat.discord.DiscordChannelBindings;
+import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.common.config.ConfigCategory;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
@@ -56,8 +58,8 @@ public final class LostTalesConfig {
 
     /**
      * The categories the client decides for itself; every other category
-     * is the server's. The one place this split is stated: the loader,
-     * the file migration and the server settings snapshot all read it.
+     * is the server's. The one place this split is stated: the loader
+     * and the server settings snapshot both read it.
      */
     public static final Set<String> CLIENT_CATEGORIES = Collections.unmodifiableSet(
             new HashSet<String>(Arrays.asList(CATEGORY_CLIENT)));
@@ -184,6 +186,8 @@ public final class LostTalesConfig {
     public static boolean showChatTypingIndicators = true;
     /** Server switch for relaying typing presence at all. */
     public static boolean chatTypingIndicators = true;
+    /** The config-defined permissions a role may grant; see {@code ChatRoleConfig}. */
+    public static String[] chatPermissions = new String[0];
     /** The config-defined chat roles; see {@code ChatRoleConfig}. */
     public static String[] chatRoles = new String[0];
     /** The accounts assigned each role, by UUID. */
@@ -331,6 +335,11 @@ public final class LostTalesConfig {
             {CATEGORY_CLIENT, "chestSize", "guiAnimationSpeed", "questNotificationsRightAligned",
                     "useSkyrimCompassStyle", "useSkyrimQuestUiStyle",
                     "onlyShowAggroHostileCompassMarkers"},
+            // The roles and gates moved to files of their own; a file
+            // written before they did still holds them here, where they
+            // read as settings nothing consults.
+            {CATEGORY_CHAT, "roles", "roleMembers", "channelRoles"},
+            {CATEGORY_DISCORD, "joinLeaveStyle"},
     };
 
     /** Drops every retired key the file still holds; true when it held any. */
@@ -957,11 +966,17 @@ public final class LostTalesConfig {
                     365,
                     "Days of chat audit files kept; files older than this are deleted when the server starts and as the day rolls over."
             );
+            chatPermissions = config.getStringList(
+                    "permissions",
+                    CATEGORY_ROLES,
+                    chatPermissions,
+                    "What a role may grant, in the server's own words, one per line as <id>=capability:<id>;capability:<id>;desc:<text>. capability may repeat and names something the code can do: chat.moderate (mute, unmute, remove any message), chat.console.read (the shared operator console), roles.manage (/losttales role), server.config (the server settings, which includes these roles and permissions), character.admin, quest.admin, party.admin, mapmarker.manage, waystone.manage, hud.admin. A permission naming no capability the code has is kept and allows nothing. A role's grant naming no permission here is read as the capability of that id, so grant:chat.moderate needs nothing defined."
+            );
             chatRoles = config.getStringList(
                     "definitions",
                     CATEGORY_ROLES,
                     new String[] {ChatRoleConfig.DEFAULT_OPERATOR_ENTRY},
-                    "The chat roles, one per line as <id>=name:<text>;tag:<[Text]>;color:<RRGGBB>;mention:<true|false>;rank:<number>;op:<level>;faction:<FACTION>@<rank>;grant:<capability>;desc:<text>. Every option is optional: a role is held by the accounts and characters listed under members, by anyone with the op level, and by anyone whose played identity holds the LOTR faction rank (a rank code name such as gondor.knight, or an alignment number). Lower rank comes first and colours the name; rank never grants anything. grant names what account holders may do besides operators: chat.moderate (mute, unmute, remove any message), roles.manage (/losttales role), server.config (the server settings, which includes these roles), chat.console.read (the shared operator console). grant may repeat. The operator entry a fresh file starts with is a role like any other; the Lost Tales Team mark is the code's alone and cannot be listed. Edit live from the Server Settings screen or /losttales role."
+                    "The chat roles, one per line as <id>=name:<text>;tag:<[Text]>;color:<RRGGBB>;mention:<true|false>;rank:<number>;op:<level>;faction:<FACTION>@<rank>;grant:<permission>;desc:<text>. Every option is optional: a role is held by the accounts and characters listed under members, by anyone with the op level, and by anyone whose played identity holds the LOTR faction rank (a rank code name such as gondor.knight, or an alignment number). Lower rank comes first and colours the name; rank never grants anything. grant names a permission from the permissions list, or a capability directly; it may repeat, and one naming neither is kept and allows nothing until a permission of that id is defined. The operator entry a fresh file starts with is a role like any other; the Lost Tales Team mark is the code's alone and cannot be listed. Edit live from the Server Settings screen or /losttales role."
             );
             chatRoleMembers = config.getStringList(
                     "members",
@@ -1535,17 +1550,45 @@ public final class LostTalesConfig {
         return files;
     }
 
-    /** Puts the roles and gates the file describes in force on this side. */
+    /**
+     * Puts the roles and gates the file describes in force, on the side
+     * that owns them: the logical server. A client reading its own files
+     * while connected to someone else's server leaves the catalogue the
+     * access packet gave it alone, so saving client settings mid-session
+     * cannot restyle the server's roles; before any server exists the
+     * catalogue stays the built-in team mark, which is what a client
+     * falls back to anyway. The server installs on start, so a
+     * hand-edited file is picked up by loading a world.
+     */
     private static void installChatRoles() {
+        if (!isLogicalServer()) {
+            return;
+        }
         ChatRoleConfig.Warnings warnings = new ChatRoleConfig.Warnings() {
             @Override
             public void warn(String message) {
                 FMLLog.warning("[%s] %s", LostTalesMetaData.MOD_ID, message);
             }
         };
-        ChatRoleCatalog catalog = ChatRoleConfig.parse(chatRoles, chatRoleMembers, warnings);
+        LostTalesPermissionCatalog permissions =
+                ChatRoleConfig.parsePermissions(chatPermissions, warnings);
+        LostTalesPermissionCatalog.install(permissions);
+        ChatRoleCatalog catalog = ChatRoleConfig.parse(chatRoles, chatRoleMembers,
+                permissions, warnings);
         ChatRoleCatalog.installServer(catalog);
         ChatChannelGates.install(ChatRoleConfig.parseGates(chatChannelRoles, catalog, warnings));
+    }
+
+    /**
+     * Whether this side is the server the roles belong to: one is
+     * running here, and has not stopped. A client that has left a world
+     * of its own still holds the server it hosted, so the running flag
+     * is asked besides — otherwise the last world played would keep
+     * installing its roles over the ones a remote server states.
+     */
+    private static boolean isLogicalServer() {
+        MinecraftServer server = MinecraftServer.getServer();
+        return server != null && server.isServerRunning();
     }
 
     /**
@@ -1965,6 +2008,7 @@ public final class LostTalesConfig {
                 enableChargeTiers).set(enableChargeTiers);
         config.get(CATEGORY_CHAT, "proximityRadius",
                 chatProximityRadius).set(chatProximityRadius);
+        config.get(CATEGORY_ROLES, "permissions", chatPermissions).set(chatPermissions);
         config.get(CATEGORY_ROLES, "definitions", chatRoles).set(chatRoles);
         config.get(CATEGORY_ROLES, "members", chatRoleMembers).set(chatRoleMembers);
         config.get(CATEGORY_CHANNELS, "gates", chatChannelRoles).set(chatChannelRoles);

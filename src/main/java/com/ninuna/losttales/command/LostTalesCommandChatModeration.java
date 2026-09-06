@@ -38,10 +38,6 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
         return "/losttales chat <mute|unmute|mutes>";
     }
 
-    @Override
-    public int getRequiredPermissionLevel() {
-        return 2;
-    }
 
     @Override
     public LostTalesCapability getCapability() {

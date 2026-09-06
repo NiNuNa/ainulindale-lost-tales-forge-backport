@@ -2,6 +2,7 @@ package com.ninuna.losttales.command;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.permission.LostTalesCapability;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.relauncher.Side;
 import java.util.List;
@@ -34,8 +35,8 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
     }
 
     @Override
-    public int getRequiredPermissionLevel() {
-        return 2;
+    public LostTalesCapability getCapability() {
+        return LostTalesCapability.HUD_ADMIN;
     }
 
     @Override

@@ -1,10 +1,11 @@
 package com.ninuna.losttales.chat;
 
 import com.ninuna.losttales.permission.LostTalesCapability;
+import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -60,6 +61,8 @@ public final class ChatRoleConfig {
     };
 
     private static final Pattern ROLE_ID = Pattern.compile("[a-z0-9_]{1,32}");
+    /** What a granted id and a permission id may be made of. */
+    private static final Pattern GRANT_ID = Pattern.compile("[a-z0-9_.]{1,64}");
     private static final Pattern COLOR = Pattern.compile("#?[0-9a-fA-F]{6}");
     private static final int DEFAULT_CUSTOM_RANK = 20;
     /** The prefix a member entry gives a character id rather than an account id. */
@@ -81,7 +84,21 @@ public final class ChatRoleConfig {
     /** The catalogue the entries describe, members included. */
     public static ChatRoleCatalog parse(String[] roleEntries, String[] memberEntries,
                                         Warnings warnings) {
+        return parse(roleEntries, memberEntries, LostTalesPermissionCatalog.empty(),
+                warnings);
+    }
+
+    /**
+     * The catalogue the entries describe, read against the permissions
+     * in force so a grant naming neither a permission nor a capability
+     * can be reported as it is read.
+     */
+    public static ChatRoleCatalog parse(String[] roleEntries, String[] memberEntries,
+                                        LostTalesPermissionCatalog permissions,
+                                        Warnings warnings) {
         Warnings out = warnings == null ? SILENT : warnings;
+        LostTalesPermissionCatalog defined = permissions == null
+                ? LostTalesPermissionCatalog.empty() : permissions;
         List<ChatAccountRole> custom = new ArrayList<ChatAccountRole>();
         Set<String> seen = new HashSet<String>();
         for (String entry : roleEntries == null ? new String[0] : roleEntries) {
@@ -103,12 +120,7 @@ public final class ChatRoleConfig {
                 out.warn("Chat role '" + id + "' is listed twice; the later entry is skipped");
                 continue;
             }
-            Map<String, List<String>> options = optionsOf(entry);
-            ChatAccountRole role = roleOf(id, options, out);
-            if (role == null) {
-                continue;
-            }
-            custom.add(role);
+            custom.add(roleOf(id, optionsOf(entry), defined, out));
         }
         if (custom.size() > ChatRoleCatalog.MAX_ROLES - 1) {
             out.warn("More than " + (ChatRoleCatalog.MAX_ROLES - 1)
@@ -122,6 +134,7 @@ public final class ChatRoleConfig {
     }
 
     private static ChatAccountRole roleOf(String id, Map<String, List<String>> options,
+                                          LostTalesPermissionCatalog permissions,
                                           Warnings out) {
         String name = first(options, "name");
         String tag = first(options, "tag");
@@ -166,18 +179,52 @@ public final class ChatRoleConfig {
             sources.add(ChatRoleSource.factionRank(faction.substring(0, at),
                     faction.substring(at + 1)));
         }
-        Set<LostTalesCapability> grants = EnumSet.noneOf(LostTalesCapability.class);
+        Set<String> grants = new LinkedHashSet<String>();
         for (String grant : all(options, "grant")) {
-            LostTalesCapability capability = LostTalesCapability.byId(grant);
-            if (capability == null) {
-                out.warn("Chat role '" + id + "' grants '" + grant
-                        + "', which is not a capability; that grant is skipped");
+            String granted = grant == null ? "" : grant.trim().toLowerCase(Locale.ROOT);
+            if (granted.length() == 0) {
                 continue;
             }
-            grants.add(capability);
+            if (!GRANT_ID.matcher(granted).matches()) {
+                out.warn("Chat role '" + id + "' grants '" + grant + "', which is not a "
+                        + "usable id (letters, digits, dots and underscores, up to 64); "
+                        + "that grant is skipped");
+                continue;
+            }
+            if (!permissions.isKnown(granted)) {
+                out.warn("Chat role '" + id + "' grants '" + granted + "', which names "
+                        + "no permission and no capability; it is kept and allows "
+                        + "nothing until a permission of that id is defined");
+            }
+            grants.add(granted);
         }
+        warnIfGrantsFollowAFaction(id, sources, grants, out);
         return ChatAccountRole.custom(id, name.length() == 0 ? id : name, tag, description,
                 color, mentionable, rank, sources, grants);
+    }
+
+    /**
+     * Says so when a role is both earned by a LOTR faction rank and
+     * grants a capability. A faction rank is the played character's, so
+     * the role comes and goes with the character being played, while
+     * what it allows is the account's everywhere else — a capability
+     * held only while one character is played is rarely what the entry
+     * means. The entry is kept as written; this only tells the operator.
+     */
+    private static void warnIfGrantsFollowAFaction(String id, List<ChatRoleSource> sources,
+                                                   Set<String> grants,
+                                                   Warnings out) {
+        if (grants.isEmpty()) {
+            return;
+        }
+        for (ChatRoleSource source : sources) {
+            if (source.getKind() == ChatRoleSource.Kind.FACTION_RANK) {
+                out.warn("Chat role '" + id + "' is earned by a faction rank, which the "
+                        + "played character holds, and grants a capability besides; that "
+                        + "capability comes and goes as the account switches character");
+                return;
+            }
+        }
     }
 
     private static void parseMembers(String[] entries, ChatRoleCatalog catalog,
@@ -224,6 +271,85 @@ public final class ChatRoleConfig {
                 }
             }
         }
+    }
+
+    /**
+     * The permissions the entries describe:
+     * <pre>
+     * keeper=capability:chat.moderate;capability:chat.console.read;desc:Keeps the peace.
+     * </pre>
+     * {@code capability:} may repeat and names a capability the code
+     * registers; one naming none is skipped with a warning and the rest
+     * of the permission stands. A permission that ends up naming no
+     * capability at all is kept exactly as written and reaches nothing —
+     * a name with nothing behind it must never read as a name with
+     * everything behind it. Ids are permanent, and a role grants them.
+     */
+    public static LostTalesPermissionCatalog parsePermissions(String[] entries,
+                                                              Warnings warnings) {
+        Warnings out = warnings == null ? SILENT : warnings;
+        Map<String, Set<String>> capabilities = new LinkedHashMap<String, Set<String>>();
+        Map<String, String> descriptions = new LinkedHashMap<String, String>();
+        for (String entry : entries == null ? new String[0] : entries) {
+            if (isBlankOrComment(entry)) {
+                continue;
+            }
+            String id = keyOf(entry);
+            if (!GRANT_ID.matcher(id).matches()) {
+                out.warn("Permission entry '" + entry + "' has no usable id (letters, "
+                        + "digits, dots and underscores, up to 64); skipped");
+                continue;
+            }
+            if (capabilities.containsKey(id)) {
+                out.warn("Permission '" + id + "' is listed twice; the later entry is "
+                        + "skipped");
+                continue;
+            }
+            if (capabilities.size() >= LostTalesPermissionCatalog.MAX_PERMISSIONS) {
+                out.warn("More than " + LostTalesPermissionCatalog.MAX_PERMISSIONS
+                        + " permissions are configured; the rest are dropped");
+                break;
+            }
+            Map<String, List<String>> options = optionsOf(entry);
+            Set<String> named = new LinkedHashSet<String>();
+            for (String capability : all(options, "capability")) {
+                LostTalesCapability known = LostTalesCapability.byId(capability);
+                if (known == null) {
+                    out.warn("Permission '" + id + "' names capability '" + capability
+                            + "', which the code does not have; that one is skipped");
+                    continue;
+                }
+                named.add(known.getId());
+            }
+            if (named.isEmpty()) {
+                out.warn("Permission '" + id + "' names no capability the code has; it "
+                        + "is kept and allows nothing");
+            }
+            capabilities.put(id, named);
+            String description = first(options, "desc");
+            if (description.length() > 0) {
+                descriptions.put(id, description);
+            }
+        }
+        return LostTalesPermissionCatalog.of(capabilities, descriptions);
+    }
+
+    /** The entry a permission is written as. */
+    public static String formatPermission(String id, Set<String> capabilityIds,
+                                          String description) {
+        StringBuilder entry = new StringBuilder(id == null ? ""
+                : id.trim().toLowerCase(Locale.ROOT));
+        entry.append('=');
+        boolean first = true;
+        for (String capability : capabilityIds == null
+                ? Collections.<String>emptySet() : capabilityIds) {
+            entry.append(first ? "" : ";").append("capability:").append(capability);
+            first = false;
+        }
+        if (description != null && description.trim().length() > 0) {
+            entry.append(first ? "" : ";").append("desc:").append(description.trim());
+        }
+        return entry.toString();
     }
 
     /** The gates the entries describe, over the roles of {@code catalog}. */
@@ -298,8 +424,8 @@ public final class ChatRoleConfig {
         for (ChatRoleSource source : role.getSources()) {
             entry.append(';').append(source.toConfigOption());
         }
-        for (LostTalesCapability capability : role.getGrants()) {
-            entry.append(";grant:").append(capability.getId());
+        for (String granted : role.getGrants()) {
+            entry.append(";grant:").append(granted);
         }
         if (role.getDescription().length() > 0) {
             entry.append(";desc:").append(role.getDescription());

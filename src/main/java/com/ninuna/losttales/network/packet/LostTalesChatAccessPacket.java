@@ -40,17 +40,25 @@ import java.util.UUID;
  * answer for this player alone. A payload written before either
  * existed reads as the built-in roles with every channel open.</p>
  *
- * <p>Last come two capability flags: whether this player may
+ * <p>Then come two capability flags: whether this player may
  * <em>moderate</em> the chat — mute, unmute, take anyone's message back
  * — which is what the client's moderation menus are offered on, and
  * whether they may edit the server's settings, which is what the Server
  * Settings button is shown on. Presentation only, like every flag here:
  * the server decides again on each request. A payload written before
  * they travelled reads both as no.</p>
+ *
+ * <p>Last travels the list of every capability the player holds, by id,
+ * which is what the client offers its menus on: a capability the code
+ * gains later needs no flag of its own here. The two flags above stay
+ * for a payload written before the list did, and say the same thing.</p>
  */
 public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_HOLDERS = 256;
     private static final int MAX_HOLDER_NAME_BYTES = 64;
+    /** As many capability ids as a player could plausibly hold. */
+    public static final int MAX_CAPABILITIES = 128;
+    private static final int MAX_CAPABILITY_ID_BYTES = 64;
     /** As many as the mute store holds; an operator is told them all. */
     public static final int MAX_MUTED_SENDERS = 1024;
     private static final int MAX_ROLE_ID_BYTES = ChatAccountRole.MAX_ID_LENGTH * 4;
@@ -62,7 +70,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_PACKET_BYTES = 16
             + MAX_HOLDERS * (MAX_HOLDER_NAME_BYTES + 8)
             + 2 + MAX_MUTED_SENDERS * 16
-            + 1 + ChatRoleCatalog.MAX_ROLES * MAX_ROLE_BYTES + 8 + 2;
+            + 1 + ChatRoleCatalog.MAX_ROLES * MAX_ROLE_BYTES + 8 + 2
+            + 2 + MAX_CAPABILITIES * MAX_CAPABILITY_ID_BYTES;
     /** Every channel open: what a payload without gates means. */
     public static final int ALL_CHANNELS = -1;
 
@@ -83,6 +92,13 @@ public final class LostTalesChatAccessPacket implements IMessage {
     private int sendableChannels = ALL_CHANNELS;
     private boolean canModerate;
     private boolean canEditServerConfig;
+    /**
+     * Every capability the server says this player holds, by id. What
+     * the client offers its menus on, so a capability added later needs
+     * no new flag. Presentation only: the server decides again on the
+     * request.
+     */
+    private List<String> capabilities = Collections.emptyList();
     private boolean malformed;
 
     public LostTalesChatAccessPacket() {}
@@ -130,6 +146,29 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                      List<ChatAccountRole> catalog,
                                      int readableChannels, int sendableChannels,
                                      boolean canModerate, boolean canEditServerConfig) {
+        this(adminAccess, discordAccess, roleMask, roleHolders, mutedSenders, catalog,
+                readableChannels, sendableChannels, canModerate, canEditServerConfig,
+                Collections.<String>emptyList());
+    }
+
+    public LostTalesChatAccessPacket(boolean adminAccess,
+                                     boolean discordAccess, int roleMask,
+                                     List<RoleHolder> roleHolders,
+                                     List<UUID> mutedSenders,
+                                     List<ChatAccountRole> catalog,
+                                     int readableChannels, int sendableChannels,
+                                     boolean canModerate, boolean canEditServerConfig,
+                                     List<String> capabilities) {
+        List<String> held = new ArrayList<String>();
+        if (capabilities != null) {
+            for (String capability : capabilities) {
+                if (capability != null && capability.trim().length() > 0
+                        && held.size() < MAX_CAPABILITIES) {
+                    held.add(capability.trim());
+                }
+            }
+        }
+        this.capabilities = Collections.unmodifiableList(held);
         this.adminAccess = adminAccess;
         this.canModerate = canModerate;
         this.canEditServerConfig = canEditServerConfig;
@@ -237,6 +276,26 @@ public final class LostTalesChatAccessPacket implements IMessage {
             // Appended last of all: the two capability flags.
             boolean moderate = buffer.readableBytes() >= 1 && buffer.readBoolean();
             boolean editConfig = buffer.readableBytes() >= 1 && buffer.readBoolean();
+            // Appended after the two flags: every capability held, by id.
+            // A payload written before they travelled names none, and the
+            // two flags stand for themselves.
+            List<String> held = new ArrayList<String>();
+            if (buffer.readableBytes() >= 2) {
+                int count = buffer.readUnsignedShort();
+                if (count > MAX_CAPABILITIES) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "too many capabilities");
+                }
+                for (int index = 0; index < count; index++) {
+                    String id = LostTalesPacketCodec.readUtf8String(
+                            buffer, MAX_CAPABILITY_ID_BYTES);
+                    if (id.trim().length() == 0) {
+                        throw new LostTalesPacketCodec.DecodeException(
+                                "invalid capability id");
+                    }
+                    held.add(id.trim());
+                }
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             for (RoleHolder holder : holders) {
                 if ((holder.getMask() & ~known.knownMask()) != 0) {
@@ -251,6 +310,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.sendableChannels = sendable;
             this.canModerate = moderate;
             this.canEditServerConfig = editConfig;
+            this.capabilities = Collections.unmodifiableList(held);
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.adminAccess = false;
@@ -263,6 +323,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.sendableChannels = ALL_CHANNELS;
             this.canModerate = false;
             this.canEditServerConfig = false;
+            this.capabilities = Collections.emptyList();
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -322,6 +383,11 @@ public final class LostTalesChatAccessPacket implements IMessage {
         buffer.writeInt(this.sendableChannels);
         buffer.writeBoolean(this.canModerate);
         buffer.writeBoolean(this.canEditServerConfig);
+        buffer.writeShort(this.capabilities.size());
+        for (String capability : this.capabilities) {
+            LostTalesPacketCodec.writeUtf8String(buffer, capability,
+                    MAX_CAPABILITY_ID_BYTES);
+        }
     }
 
     public boolean hasAdminAccess() { return this.adminAccess; }
@@ -344,6 +410,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
     public boolean canModerate() { return this.canModerate; }
     /** Whether the server says this player may edit its settings. */
     public boolean canEditServerConfig() { return this.canEditServerConfig; }
+    /** Every capability the server says this player holds, by id. */
+    public List<String> getCapabilities() { return this.capabilities; }
     public boolean isMalformed() { return this.malformed; }
 
     /** One online account and the roles it holds; masks are never zero. */

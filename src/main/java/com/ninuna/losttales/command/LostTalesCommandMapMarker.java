@@ -29,6 +29,7 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.WorldServer;
 import com.ninuna.losttales.world.waystone.LostTalesWaystonePlacementResult;
 import com.ninuna.losttales.world.waystone.LostTalesWaystonePlacementService;
+import com.ninuna.losttales.permission.LostTalesCapability;
 import cpw.mods.fml.common.FMLLog;
 /**
  * Legacy Forge companion to the modern map-marker command.
@@ -55,8 +56,8 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
     }
 
     @Override
-    public int getRequiredPermissionLevel() {
-        return 2;
+    public LostTalesCapability getCapability() {
+        return LostTalesCapability.MAPMARKER_MANAGE;
     }
 
     @Override

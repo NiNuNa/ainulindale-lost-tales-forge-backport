@@ -1,12 +1,11 @@
 package com.ninuna.losttales.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.permission.LostTalesCapability;
 import net.minecraft.util.StatCollector;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -28,9 +27,9 @@ import java.util.Set;
  * be added without disturbing the layout. Precedence — which role
  * colours the name, which tag comes first — is the catalogue's order,
  * by rank. Rank is presentation only: what a role lets its holders
- * <em>do</em> is the set of {@link LostTalesCapability} grants the
- * config gives it, read by {@code LostTalesPermissions} on the server
- * and never sent to a client.</p>
+ * <em>do</em> is the permissions the config grants it, read by
+ * {@code LostTalesPermissions} against the permissions in force and
+ * never sent to a client.</p>
  */
 public final class ChatAccountRole {
 
@@ -65,13 +64,13 @@ public final class ChatAccountRole {
     private final boolean locked;
     private final int rank;
     private final List<ChatRoleSource> sources;
-    private final Set<LostTalesCapability> grants;
+    private final Set<String> grants;
 
     ChatAccountRole(String id, int bitIndex, String nameKey, String tagKey,
                     String name, String tag, String description, int color,
                     boolean mentionable, boolean locked, int rank,
                     List<ChatRoleSource> sources,
-                    Set<LostTalesCapability> grants) {
+                    Set<String> grants) {
         this.id = id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
         this.bitIndex = bitIndex;
         this.nameKey = nameKey == null ? "" : nameKey;
@@ -85,9 +84,7 @@ public final class ChatAccountRole {
         this.rank = rank;
         this.sources = sources == null ? Collections.<ChatRoleSource>emptyList()
                 : Collections.unmodifiableList(new ArrayList<ChatRoleSource>(sources));
-        this.grants = grants == null || grants.isEmpty()
-                ? Collections.<LostTalesCapability>emptySet()
-                : Collections.unmodifiableSet(EnumSet.copyOf(grants));
+        this.grants = Collections.unmodifiableSet(normalized(grants));
     }
 
     /** The same role at another bit, which is the catalogue's to give. */
@@ -116,7 +113,7 @@ public final class ChatAccountRole {
     public static ChatAccountRole custom(String id, String name, String tag, String description,
                                          int color, boolean mentionable, int rank,
                                          List<ChatRoleSource> sources,
-                                         Set<LostTalesCapability> grants) {
+                                         Set<String> grants) {
         return new ChatAccountRole(id, -1, "", "", name, tag, description, color,
                 mentionable, false, rank, sources, grants);
     }
@@ -201,16 +198,14 @@ public final class ChatAccountRole {
     }
 
     /**
-     * The capabilities the config grants the role's holders; empty for
-     * both built-ins and for a role read off the wire.
+     * The permissions the config grants the role's holders, by id, in
+     * the order the entry names them; empty for both built-ins and for
+     * a role read off the wire. An id naming no permission is read as a
+     * capability of that id, and one naming neither is kept and reaches
+     * nothing — {@code LostTalesPermissionCatalog} is what resolves them.
      */
-    public Set<LostTalesCapability> getGrants() {
+    public Set<String> getGrants() {
         return this.grants;
-    }
-
-    /** Whether the role grants the capability. */
-    public boolean grants(LostTalesCapability capability) {
-        return capability != null && this.grants.contains(capability);
     }
 
     /**
@@ -347,6 +342,20 @@ public final class ChatAccountRole {
     @Override
     public String toString() {
         return this.id.length() == 0 ? "NONE" : this.id;
+    }
+
+    /** The granted ids, trimmed and lower-cased, in the order given, blanks left out. */
+    private static Set<String> normalized(Set<String> grants) {
+        Set<String> ids = new LinkedHashSet<String>();
+        if (grants != null) {
+            for (String grant : grants) {
+                String id = grant == null ? "" : grant.trim().toLowerCase(Locale.ROOT);
+                if (id.length() > 0) {
+                    ids.add(id);
+                }
+            }
+        }
+        return ids;
     }
 
     private static String clip(String value, int maximum) {

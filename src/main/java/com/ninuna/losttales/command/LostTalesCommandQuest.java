@@ -5,6 +5,7 @@ import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
+import com.ninuna.losttales.permission.LostTalesCapability;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -43,8 +44,8 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
     }
 
     @Override
-    public int getRequiredPermissionLevel() {
-        return 2;
+    public LostTalesCapability getCapability() {
+        return LostTalesCapability.QUEST_ADMIN;
     }
 
     @Override

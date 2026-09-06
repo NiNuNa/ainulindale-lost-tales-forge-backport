@@ -22,7 +22,7 @@ public final class LostTalesMapMarkerVisibilityPolicy {
                 ? Collections.<UUID>emptyList()
                 : lotrData.getFellowshipIDs();
         return canView(record, player.getUniqueID(),
-                LostTalesWaystonePermissionPolicy.isOperator(player),
+                LostTalesWaystonePermissionPolicy.managesMarkers(player),
                 fellowshipIds);
     }
 

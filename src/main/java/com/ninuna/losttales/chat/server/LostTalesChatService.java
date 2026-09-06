@@ -48,6 +48,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
 import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.server.PartyService;
 import com.ninuna.losttales.permission.LostTalesCapability;
+import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.permission.LostTalesPermissions;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
@@ -55,6 +56,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import cpw.mods.fml.common.FMLLog;
@@ -118,8 +120,9 @@ public final class LostTalesChatService {
                              List<ChatShareReference> references,
                              String target, int appearanceKind,
                              UUID appearanceCharacterId,
-                             long replyToMessageId, String targetIdentity,
+                             long replyToMessageId, String requestedIdentity,
                              long echoNonce, UUID targetCharacterId) {
+        String targetIdentity = requestedIdentity == null ? "" : requestedIdentity;
         if (sender == null || sender.worldObj == null
                 || sender.worldObj.isRemote || channel == null
                 || !ChatMessageValidator.isValid(message)) {
@@ -139,6 +142,17 @@ public final class LostTalesChatService {
         UUID whisperCharacterId = null;
         if (channel.getRecipientRule() == ChatRecipientRule.WHISPER) {
             whisperTarget = LostTalesServerPlayers.findOnline(target);
+            if (whisperTarget == null) {
+                // A name nobody answers to as an account may be the one
+                // somebody is playing under: a conversation is with a
+                // person as they present themselves, so the name shown
+                // on their lines is a name that reaches them.
+                whisperTarget = findOnlinePlayingAs(target);
+                if (whisperTarget != null && targetIdentity.length() == 0
+                        && targetCharacterId == null) {
+                    targetIdentity = target;
+                }
+            }
             if (whisperTarget == null || whisperTarget == sender) {
                 sender.addChatMessage(new ChatComponentTranslation(
                         whisperTarget == sender
@@ -205,10 +219,16 @@ public final class LostTalesChatService {
             party = PartyService.getInstance()
                     .getPartyForActiveCharacter(sender);
         }
+        // The roles the sender holds as the identity this line wears:
+        // the account's, and those assigned to the worn character. The
+        // gate is passed with the same roles the line will show, so a
+        // character-scoped role opens the channel for the lines that
+        // wear it and for no others.
+        int wornRoles = ChatAccountRoleResolver.resolve(sender,
+                appearance == null ? null : appearance.getCharacterId());
         String refusal = ChatChannelPolicy.sendRefusal(channel, party,
                 RoleplayCharacterIdentityHook.resolveGameplayId(sender), factionId,
-                ChatAccountRoleResolver.resolve(sender,
-                        character == null ? null : character.getCharacterId()));
+                wornRoles);
         if (refusal != null) {
             if (ChatChannelPolicy.isGateRefusal(refusal)) {
                 // The client only offers the tab while the server last said
@@ -237,9 +257,7 @@ public final class LostTalesChatService {
         // The roles the line wears are the account's and the worn
         // character's own: a character-scoped role shows on that
         // character's lines and on nobody else's.
-        int roles = ChatRolePresentation.rolesShown(channel,
-                ChatAccountRoleResolver.resolve(sender,
-                        appearance == null ? null : appearance.getCharacterId()));
+        int roles = ChatRolePresentation.rolesShown(channel, wornRoles);
         int ivory = ChatRolePresentation.unassignedColor();
         ChatReplyReference reply = ChatMessageIds.NONE == replyToMessageId
                 ? ChatReplyReference.NONE
@@ -279,7 +297,11 @@ public final class LostTalesChatService {
                 // The worn character by its stable id, so a client can
                 // key conversations and mentions by it rather than by a
                 // name; null for a line worn by the account.
-                appearance == null ? null : appearance.getCharacterId());
+                appearance == null ? null : appearance.getCharacterId())
+                // Which conversation of a scoped channel this is: the
+                // faction it was spoken to. The client files it under
+                // the tab of the identity that faction is read as.
+                .withScope(factionId);
 
         FMLLog.info("[losttales/chat/%s] <%s (%s)> %s%s%s",
                 channel.getId(), identityName, accountName, message,
@@ -399,7 +421,8 @@ public final class LostTalesChatService {
                 channel, senderId, displayName,
                 displayName, "", ivory, ivory, message,
                 System.currentTimeMillis(), "", null, "", "", 0, true,
-                messageId, reply);
+                messageId, reply)
+                .withScope(factionScope == null ? "" : factionScope);
         FMLLog.info("[losttales/chat/%s] <%s (discord)> %s", channel.getId(),
                 displayName, message);
         // Routed by the channel's own rule with no sender behind the
@@ -819,6 +842,36 @@ public final class LostTalesChatService {
     }
 
     /**
+     * The online player whose played character bears the name, or null
+     * for none. Only the character being played answers: a conversation
+     * is with someone as they are presenting themselves, and a name a
+     * player is not wearing names nobody to talk to. The first match
+     * wins, which is the same rule the account lookup keeps.
+     */
+    private static EntityPlayerMP findOnlinePlayingAs(String characterName) {
+        String named = characterName == null ? "" : characterName.trim();
+        if (named.length() == 0) {
+            return null;
+        }
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null
+                || server.getConfigurationManager().playerEntityList == null) {
+            return null;
+        }
+        for (Object candidate : server.getConfigurationManager().playerEntityList) {
+            if (!(candidate instanceof EntityPlayerMP)) {
+                continue;
+            }
+            EntityPlayerMP player = (EntityPlayerMP)candidate;
+            RoleplayCharacter played = CharacterActiveResolver.get(player);
+            if (played != null && named.equalsIgnoreCase(played.getName())) {
+                return player;
+            }
+        }
+        return null;
+    }
+
+    /**
      * A character of the sender's own roster, by id — anyone else's, or
      * an id the roster does not hold, is nobody.
      */
@@ -908,8 +961,34 @@ public final class LostTalesChatService {
                         channelMask(gates, roles, false),
                         moderator,
                         LostTalesPermissions.has(player,
-                                LostTalesCapability.SERVER_CONFIG)),
+                                LostTalesCapability.SERVER_CONFIG),
+                        heldCapabilityIds(player)),
                 player);
+    }
+
+    /**
+     * Every capability the player holds, by id, for the client's menus.
+     * Asked of the permissions in force at this moment, like every other
+     * answer here, and never trusted back: the server decides again on
+     * the request the menu makes.
+     */
+    private static List<String> heldCapabilityIds(EntityPlayerMP player) {
+        // The account's roles are resolved once, not once per
+        // capability: resolving reads the catalogue and, for a faction
+        // source, LOTR's player data.
+        int accountRoles = ChatAccountRoleResolver.resolve(player);
+        ChatRoleCatalog roles = ChatRoleCatalog.server();
+        LostTalesPermissionCatalog permissions = LostTalesPermissionCatalog.current();
+        List<String> held = new ArrayList<String>();
+        for (LostTalesCapability capability : LostTalesCapability.all()) {
+            if (LostTalesPermissions.decide(
+                    player.canCommandSenderUseCommand(capability.getRequiredOpLevel(),
+                            LostTalesPermissions.NODE),
+                    accountRoles, capability, roles, permissions)) {
+                held.add(capability.getId());
+            }
+        }
+        return held;
     }
 
     /** One bit per channel ordinal: what the gates let these roles do. */
@@ -1174,28 +1253,11 @@ public final class LostTalesChatService {
                 packet.withoutEcho(), shared, routing.recipientIds(), routing.audience);
     }
 
-    /**
-     * Replays to a player who has just joined the recent messages they
-     * are entitled to, oldest first and in batches, exactly as they
-     * would have been sent them at the time. Who they are — account,
-     * played character and its faction, party, the channels they may
-     * read — is read from the live server here and nowhere else, and
-     * the history decides message by message against what it recorded
-     * when each was sent.
-     */
-    public static void sendHistory(EntityPlayerMP player) {
-        if (player == null || player.worldObj == null
-                || player.worldObj.isRemote) {
-            return;
-        }
-        RoleplayCharacter character = CharacterActiveResolver.get(player);
-        String factionId = character == null ? ""
-                : LotrCharacterAdapter.normalizeFactionId(
-                        character.getStartingFactionId());
-        Party party = PartyService.getInstance()
-                .getPartyForActiveCharacter(player);
+    /** The channels the player may read right now; the console asks besides. */
+    private static List<ChatChannel> readableChannels(EntityPlayerMP player) {
+        RoleplayCharacter active = CharacterActiveResolver.get(player);
         int roles = ChatAccountRoleResolver.resolve(player,
-                character == null ? null : character.getCharacterId());
+                active == null ? null : active.getCharacterId());
         ChatChannelGates gates = ChatChannelGates.current();
         List<ChatChannel> readable = new ArrayList<ChatChannel>();
         boolean console = ChatChannelPolicy.readsConsole(player);
@@ -1205,9 +1267,72 @@ public final class LostTalesChatService {
                 readable.add(channel);
             }
         }
+        return readable;
+    }
+
+    /**
+     * Answers a client asking what was said in one conversation of a
+     * channel that has more than one — a faction's talk — before it was
+     * shown any of it. The account's own characters decide what it may
+     * be shown, re-read here from the live roster: a conversation it has
+     * no character in answers with nothing, whatever the request says.
+     * Only what is newer than the client already holds is sent, so
+     * asking twice never shows a line twice.
+     */
+    public static void sendContextHistory(EntityPlayerMP player, ChatChannel channel,
+                                          String scopeValue, long sinceMessageId) {
+        if (player == null || player.worldObj == null || player.worldObj.isRemote
+                || channel == null || !channel.isIdentityScoped()
+                || scopeValue == null || scopeValue.length() == 0) {
+            return;
+        }
+        Map<String, Long> owned = ChatChannelPolicy.ownedFactions(player);
+        if (!owned.containsKey(scopeValue)) {
+            return;
+        }
+        Party party = PartyService.getInstance().getPartyForActiveCharacter(player);
+        List<LostTalesChatMessagePacket> lines = ChatHistory.replayForContext(
+                new ChatHistory.Requester(player.getUniqueID(), owned,
+                        party == null ? null : party.getPartyId(),
+                        readableChannels(player)),
+                channel, scopeValue, sinceMessageId);
+        if (lines.isEmpty()) {
+            return;
+        }
+        for (int from = 0; from < lines.size();
+             from += LostTalesChatHistorySyncPacket.MAX_MESSAGES) {
+            LostTalesNetworkHandler.CHANNEL.sendTo(
+                    new LostTalesChatHistorySyncPacket(lines.subList(from,
+                            Math.min(lines.size(), from
+                                    + LostTalesChatHistorySyncPacket.MAX_MESSAGES))),
+                    player);
+        }
+        FMLLog.info("[losttales/chat/history] replayed %d lines of %s/%s to %s",
+                Integer.valueOf(lines.size()), channel.getId(), scopeValue,
+                player.getCommandSenderName());
+    }
+
+    /**
+     * Replays to a player who has just joined the recent messages they
+     * are entitled to, oldest first and in batches, exactly as they
+     * would have been sent them at the time. Who they are — account,
+     * the factions their characters are in, party, the channels they
+     * may read — is read from the live server here and nowhere else,
+     * and the history decides message by message against what it
+     * recorded when each was sent.
+     */
+    public static void sendHistory(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null
+                || player.worldObj.isRemote) {
+            return;
+        }
+        RoleplayCharacter character = CharacterActiveResolver.get(player);
+        Party party = PartyService.getInstance()
+                .getPartyForActiveCharacter(player);
+        List<ChatChannel> readable = readableChannels(player);
         List<LostTalesChatMessagePacket> lines = ChatHistory.replayFor(
-                new ChatHistory.Requester(player.getUniqueID(), factionId,
-                        character == null ? 0L : character.getCreationTimestamp(),
+                new ChatHistory.Requester(player.getUniqueID(),
+                        ChatChannelPolicy.ownedFactions(player),
                         party == null ? null : party.getPartyId(), readable),
                 ChatMessageIds.NONE);
         int packets = 0;

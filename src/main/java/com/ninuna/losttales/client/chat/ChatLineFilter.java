@@ -8,7 +8,9 @@ import java.util.Set;
 /**
  * Which lines of the shared history a view shows: a set of tabs plus
  * whether untracked lines — those Lost Tales did not route, which belong
- * to the console — are included. One tab is its open view; a window's
+ * to the console — are included. A tab standing for a channel that is
+ * more than one conversation is taken as the conversation being read
+ * ({@link ChatTab#viewed}), so one Faction row shows one faction. One tab is its open view; a window's
  * tabs minus the muted ones are its closed-chat feed. Value semantics,
  * so {@link ClientChatChannelViews} can cache per filter.
  */
@@ -26,7 +28,7 @@ final class ChatLineFilter {
         if (tab == null) {
             return new ChatLineFilter(Collections.<ChatTab>emptySet(), false);
         }
-        return new ChatLineFilter(Collections.singleton(tab),
+        return new ChatLineFilter(Collections.singleton(ChatTab.viewed(tab)),
                 tab.getChannel() == ClientChatChannelViews.SYSTEM_LINE_VIEW);
     }
 
@@ -37,7 +39,7 @@ final class ChatLineFilter {
         if (tabs != null) {
             for (ChatTab tab : tabs) {
                 if (tab != null) {
-                    set.add(tab);
+                    set.add(ChatTab.viewed(tab));
                     untracked |= tab.getChannel()
                             == ClientChatChannelViews.SYSTEM_LINE_VIEW;
                 }
@@ -51,7 +53,11 @@ final class ChatLineFilter {
     }
 
     boolean accepts(ChatTab tab) {
-        return tab == null ? this.includeUntracked : this.tabs.contains(tab);
+        // Asked with a line's own tab, which already names the
+        // conversation, or with a channel's row entry, which stands for
+        // whichever conversation is being read: both answer the same.
+        return tab == null ? this.includeUntracked
+                : this.tabs.contains(ChatTab.viewed(tab));
     }
 
     @Override

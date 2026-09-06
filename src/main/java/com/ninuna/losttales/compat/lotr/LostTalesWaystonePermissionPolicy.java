@@ -2,6 +2,7 @@ package com.ninuna.losttales.compat.lotr;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
+import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.permission.LostTalesPermissions;
 import cpw.mods.fml.common.FMLLog;
 import java.util.UUID;
@@ -11,22 +12,30 @@ import net.minecraft.world.World;
 
 /**
  * Central server-side ownership and LOTR banner-protection policy for
- * waystones and markers. Operator status is {@link LostTalesPermissions}'
- * answer; it is read here so the marker code has one word for it.
+ * waystones and markers. Who may manage them is
+ * {@link LostTalesPermissions}' answer, asked here so the marker code
+ * has one word for it: an operator by level, or a role the server's
+ * config grants the capability to.
  */
 public final class LostTalesWaystonePermissionPolicy {
     private static boolean warnedIncompatibleBannerApi;
 
     private LostTalesWaystonePermissionPolicy() {}
 
-    public static boolean isOperator(EntityPlayerMP player) {
-        return LostTalesPermissions.isOperator(player);
+    /** Whether the player may manage the markers everyone sees. */
+    public static boolean managesMarkers(EntityPlayerMP player) {
+        return LostTalesPermissions.has(player, LostTalesCapability.MAPMARKER_MANAGE);
+    }
+
+    /** Whether the player may place a public waystone and change its settings. */
+    public static boolean managesWaystones(EntityPlayerMP player) {
+        return LostTalesPermissions.has(player, LostTalesCapability.WAYSTONE_MANAGE);
     }
 
     public static boolean isOwnerOrOperator(
             LostTalesMapMarkerRecord record,
-            UUID playerId, boolean operator) {
-        if (operator) {
+            UUID playerId, boolean manages) {
+        if (manages) {
             return true;
         }
         return record != null
@@ -37,12 +46,12 @@ public final class LostTalesWaystonePermissionPolicy {
     public static boolean canBreakOrEdit(
             EntityPlayerMP player, LostTalesMapMarkerRecord record,
             World world, int x, int y, int z, boolean warnPlayer) {
-        boolean operator = isOperator(player);
+        boolean manages = managesMarkers(player);
         if (!isOwnerOrOperator(record,
-                player == null ? null : player.getUniqueID(), operator)) {
+                player == null ? null : player.getUniqueID(), manages)) {
             return false;
         }
-        if (operator) {
+        if (manages) {
             return true;
         }
         if (world == null || world.isRemote) {
@@ -65,7 +74,7 @@ public final class LostTalesWaystonePermissionPolicy {
     }
 
     public static boolean canMakePublic(EntityPlayerMP player) {
-        return isOperator(player);
+        return managesMarkers(player);
     }
 
     /** Automated preset generation never overwrites a protected banner area. */

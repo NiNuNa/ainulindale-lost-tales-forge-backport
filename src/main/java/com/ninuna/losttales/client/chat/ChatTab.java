@@ -78,10 +78,47 @@ public final class ChatTab {
 
     /**
      * The tab of a plain channel; null for the whisper channel, whose
-     * tabs each name a partner and come from {@link #whisper}.
+     * tabs each name a partner and come from {@link #whisper}. This is
+     * the entry the row and the layout hold, one per channel. A channel
+     * that is more than one conversation
+     * ({@link ChatChannel#isIdentityScoped}) files its lines under a tab
+     * per identity — see {@link #of(ChatChannel, String)} — and the one
+     * being read is {@link #viewed}.
      */
     public static ChatTab of(ChatChannel channel) {
         return channel == null ? null : PLAIN[channel.ordinal()];
+    }
+
+    /**
+     * The tab whose lines are shown while this one is on screen. A
+     * channel that is one conversation is its own; a scoped channel's
+     * row entry stands for whichever of its conversations the chat is
+     * being read as, so the lines shown under it are that identity's.
+     * The row holds one Faction tab; which faction it is showing
+     * follows the identity, and nothing else in the layout has to know.
+     */
+    public static ChatTab viewed(ChatTab tab) {
+        if (tab == null || tab.isWhisper() || tab.channel == null
+                || !tab.channel.isIdentityScoped()
+                || tab.ownerKey.length() > 0) {
+            return tab;
+        }
+        return of(tab.channel, ClientChatAppearances.viewIdentityKey());
+    }
+
+    /**
+     * The tab of a plain channel as one identity reads it: a scoped
+     * channel is a conversation per identity, so a character in Gondor
+     * and a character in Rohan have a Faction tab each and neither
+     * shows the other's lines. A channel that is only ever one
+     * conversation ignores the identity and answers with its one tab.
+     */
+    public static ChatTab of(ChatChannel channel, String ownerKey) {
+        if (channel == null || !channel.isIdentityScoped()
+                || ownerKey == null || ownerKey.trim().length() == 0) {
+            return of(channel);
+        }
+        return new ChatTab(channel, "", "", ownerKey, false);
     }
 
     /** The whisper tab with an account's own identity, held as this account; null for no name. */
@@ -134,8 +171,10 @@ public final class ChatTab {
      */
     public String getPartnerIdentity() { return this.identity; }
     /**
-     * This player's identity the conversation is held as: a character's
-     * id, lower-cased, or empty for the account. Plain tabs carry none.
+     * This player's identity the tab is read and spoken as: a
+     * character's id, lower-cased, or empty for the account. A whisper
+     * carries the identity the conversation is held as; a plain tab
+     * carries one only on a channel that is more than one conversation.
      */
     public String getOwnerKey() { return this.ownerKey; }
     /** Whether the conversation is with the account rather than a character. */
@@ -147,7 +186,8 @@ public final class ChatTab {
     public boolean isNpc() { return this.npc; }
 
     /**
-     * Stable id: the channel id, {@code whisper:Name},
+     * Stable id: the channel id, {@code channel|own:<character id>} for a
+     * channel read as one identity, {@code whisper:Name},
      * {@code whisper:Name|Identity|own:<character id>} or {@code npc:Name}.
      */
     public String id() {
@@ -155,7 +195,9 @@ public final class ChatTab {
             return NPC_ID_PREFIX + this.partner;
         }
         if (!isWhisper()) {
-            return this.channel.getId();
+            return this.ownerKey.length() == 0 ? this.channel.getId()
+                    : this.channel.getId() + IDENTITY_SEPARATOR
+                            + OWNER_MARK + this.ownerKey;
         }
         StringBuilder id = new StringBuilder(WHISPER_ID_PREFIX).append(this.partner);
         if (!isAccountConversation() || this.ownerKey.length() > 0) {
@@ -190,9 +232,22 @@ public final class ChatTab {
         if (trimmed.toLowerCase(Locale.ROOT).startsWith(NPC_ID_PREFIX)) {
             return npc(trimmed.substring(NPC_ID_PREFIX.length()));
         }
-        ChatChannel channel = ChatChannel.fromId(trimmed);
-        return channel == null || channel == ChatChannel.WHISPER ? null
-                : of(channel);
+        String owner = "";
+        String channelPart = trimmed;
+        int separator = trimmed.indexOf(IDENTITY_SEPARATOR);
+        if (separator >= 0) {
+            String rest = trimmed.substring(separator + 1);
+            if (!rest.toLowerCase(Locale.ROOT).startsWith(OWNER_MARK)) {
+                return null;
+            }
+            owner = rest.substring(OWNER_MARK.length());
+            channelPart = trimmed.substring(0, separator);
+        }
+        ChatChannel channel = ChatChannel.fromId(channelPart);
+        if (channel == null || channel == ChatChannel.WHISPER) {
+            return null;
+        }
+        return owner.length() == 0 ? of(channel) : of(channel, owner);
     }
 
     @Override

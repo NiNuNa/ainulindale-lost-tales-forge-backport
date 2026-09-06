@@ -41,19 +41,40 @@ public final class ChatAccountRoleResolver {
             return 0;
         }
         ChatRoleCatalog catalog = ChatRoleCatalog.server();
-        int mask = 0;
+        int mask = assignedMask(catalog, player.getUniqueID(), characterId);
         if (ELostTalesUser.byUniqueId(player.getUniqueID()).getRecognition()
                 .getChatRole() == ChatAccountRole.TEAM) {
             mask |= ChatAccountRole.TEAM.bit();
         }
         for (ChatAccountRole role : catalog.roles()) {
+            if (!role.isLocked() && grantedBySource(player, role)) {
+                mask |= role.bit();
+            }
+        }
+        return mask;
+    }
+
+    /**
+     * The bits the catalogue's own assignments give: every role the
+     * account is listed in, and — only when a character is named — every
+     * role that character is listed in. A character's assignment is the
+     * character's alone, so asking without one, as a capability check
+     * does, never sees it. Pure, so the scoping rule can be checked
+     * without a server; the team mark and the role sources are
+     * {@link #resolve}'s, since both are the player's own facts.
+     */
+    static int assignedMask(ChatRoleCatalog catalog, UUID accountId, UUID characterId) {
+        if (catalog == null) {
+            return 0;
+        }
+        int mask = 0;
+        for (ChatAccountRole role : catalog.roles()) {
             if (role.isLocked()) {
                 continue;
             }
-            if (catalog.membersOf(role.getId()).contains(player.getUniqueID())
+            if ((accountId != null && catalog.membersOf(role.getId()).contains(accountId))
                     || (characterId != null
-                            && catalog.characterMembersOf(role.getId()).contains(characterId))
-                    || grantedBySource(player, role)) {
+                            && catalog.characterMembersOf(role.getId()).contains(characterId))) {
                 mask |= role.bit();
             }
         }

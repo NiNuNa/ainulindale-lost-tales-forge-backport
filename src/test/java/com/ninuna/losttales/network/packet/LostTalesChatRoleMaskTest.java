@@ -60,7 +60,8 @@ public final class LostTalesChatRoleMaskTest {
         // A payload cut short is malformed, never half-read.
         buffer = Unpooled.buffer();
         tagged.toBytes(buffer);
-        ByteBuf truncated = buffer.readSlice(buffer.readableBytes() - 1);
+        ByteBuf truncated = buffer.readSlice(
+                buffer.readableBytes() - scopeTailBytes("") - 1);
         decoded = new LostTalesChatMessagePacket();
         decoded.fromBytes(truncated);
         assertTrue(decoded.isMalformed());
@@ -134,5 +135,17 @@ public final class LostTalesChatRoleMaskTest {
         assertEquals(ChatRoleFixtures.OPERATOR.bit(), decoded.getRoles());
         assertEquals(Collections.singletonList(ChatRoleFixtures.OPERATOR),
                 ChatAccountRole.fromMask(decoded.getRoles()));
+    }
+
+    /**
+     * How many bytes the conversation a line belongs to takes at the end
+     * of the payload. Measured rather than assumed, so a test that walks
+     * back from the end of a packet keeps saying what it means when
+     * another field is appended after this one.
+     */
+    private static int scopeTailBytes(String scopeValue) {
+        ByteBuf probe = Unpooled.buffer();
+        LostTalesPacketCodec.writeUtf8String(probe, scopeValue, 128);
+        return probe.readableBytes();
     }
 }

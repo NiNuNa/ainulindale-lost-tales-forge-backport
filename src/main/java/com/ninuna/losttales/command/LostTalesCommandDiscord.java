@@ -38,10 +38,6 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
         return "/losttales discord <list|bind|unbind|reload> ...";
     }
 
-    @Override
-    public int getRequiredPermissionLevel() {
-        return 2;
-    }
 
     @Override
     public LostTalesCapability getCapability() {

@@ -40,6 +40,10 @@ public final class LostTalesRequestRateLimiter {
         // Correcting a typo or taking a line back is deliberate and rare
         // next to sending; a handful in five seconds covers a fumbled edit.
         CHAT_REVISION(10, 5000L),
+        // One ask per conversation the first time it is read, and only
+        // for a channel that has more than one; a handful covers a
+        // player moving between their characters.
+        CHAT_HISTORY(6, 5000L),
         // An operator opens the settings screen and saves it; a few of each
         // in five seconds is already impatient.
         SERVER_CONFIG(6, 5000L);

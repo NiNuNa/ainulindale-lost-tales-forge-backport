@@ -8,6 +8,7 @@ import com.ninuna.losttales.party.storage.PartyInvitationStorage;
 import com.ninuna.losttales.party.storage.PartyInvitationWorldData;
 import com.ninuna.losttales.party.storage.PartyStorage;
 import com.ninuna.losttales.party.storage.PartyWorldData;
+import com.ninuna.losttales.permission.LostTalesCapability;
 import java.util.List;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -28,8 +29,8 @@ public final class LostTalesCommandPartyAdmin extends LostTalesCommandBase {
     }
 
     @Override
-    public int getRequiredPermissionLevel() {
-        return 2;
+    public LostTalesCapability getCapability() {
+        return LostTalesCapability.PARTY_ADMIN;
     }
 
     @Override

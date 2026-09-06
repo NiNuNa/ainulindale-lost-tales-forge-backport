@@ -673,7 +673,10 @@ public final class ChatWindowLayout {
     public static synchronized ChatTab openWhisper(
             String partner, String identity, String preferredWindowId) {
         return openTab(ChatTab.whisper(partner, identity,
-                ClientChatAppearances.activeIdentityKey()), preferredWindowId);
+                // Held as the identity the chat is being read as:
+                // opening a conversation opens it as whoever the
+                // player is in the chat, which is who speaks in it.
+                ClientChatAppearances.viewIdentityKey()), preferredWindowId);
     }
 
     /** Opens a conversation tab (a player's or an NPC's) the same way. */

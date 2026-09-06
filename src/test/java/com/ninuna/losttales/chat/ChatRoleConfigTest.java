@@ -113,7 +113,8 @@ public final class ChatRoleConfigTest {
         assertEquals("Staff", staff.getDisplayName());
         assertEquals(0x00FF00, staff.getColor());
         assertEquals(4, staff.getSources().get(0).getLevel());
-        assertEquals(java.util.EnumSet.of(LostTalesCapability.CHAT_MODERATE), staff.getGrants());
+        assertEquals(java.util.Collections.singleton(
+                LostTalesCapability.CHAT_MODERATE.getId()), staff.getGrants());
         assertTrue(warnings.isEmpty());
     }
 
@@ -136,20 +137,32 @@ public final class ChatRoleConfigTest {
         assertEquals(5, warnings.size());
     }
 
-    /** A grant names a capability; one naming nothing known is skipped with a warning. */
+    /**
+     * A grant names a permission, or a capability directly; one naming
+     * neither is kept, warned about, and allows nothing until a
+     * permission of that id is defined.
+     */
     @Test
     public void grantsAreReadAndWarned() {
         ChatRoleCatalog catalog = ChatRoleConfig.parse(new String[] {
                 "moderator=name:Moderator;grant:chat.moderate;grant:Server.Config",
                 "builder=grant:build.everything",
         }, null, collect);
-        assertEquals(java.util.EnumSet.of(LostTalesCapability.CHAT_MODERATE,
-                LostTalesCapability.SERVER_CONFIG), catalog.byId("moderator").getGrants());
-        assertTrue(catalog.byId("builder").getGrants().isEmpty());
+        assertEquals(new java.util.LinkedHashSet<String>(java.util.Arrays.asList(
+                        LostTalesCapability.CHAT_MODERATE.getId(),
+                        LostTalesCapability.SERVER_CONFIG.getId())),
+                catalog.byId("moderator").getGrants());
+        // A grant naming nothing known is kept as written, so a
+        // permission defined later starts working without the role
+        // being rewritten; the operator is told it allows nothing yet.
+        assertEquals(java.util.Collections.singleton("build.everything"),
+                catalog.byId("builder").getGrants());
         assertEquals(1, warnings.size());
         assertTrue(warnings.get(0).contains("build.everything"));
         assertTrue(ChatRoleConfig.formatRole(catalog.byId("moderator"))
                 .endsWith(";grant:chat.moderate;grant:server.config"));
+        assertTrue(ChatRoleConfig.formatRole(catalog.byId("builder"))
+                .endsWith(";grant:build.everything"));
     }
 
     /**
