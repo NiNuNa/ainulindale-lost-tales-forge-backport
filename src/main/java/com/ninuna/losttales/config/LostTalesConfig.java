@@ -1,6 +1,14 @@
 package com.ninuna.losttales.config;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.Set;
 import cpw.mods.fml.common.FMLLog;
 import com.ninuna.losttales.chat.ChatRoleConfig;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
@@ -27,6 +35,10 @@ public final class LostTalesConfig {
     public static final String CATEGORY_RANGED_COMBAT = "ranged_combat";
     public static final String CATEGORY_WAYSTONES = "waystones";
     public static final String CATEGORY_DISCORD = "discord";
+    /** The chat roles and their assignments; a server file of its own. */
+    public static final String CATEGORY_ROLES = "roles";
+    /** The chat channels' gates and definitions; a server file of its own. */
+    public static final String CATEGORY_CHANNELS = "channels";
 
     public static final String HUD_PRESET_CUSTOM = "custom";
     public static final String HUD_PRESET_DEFAULT = "default";
@@ -42,8 +54,20 @@ public final class LostTalesConfig {
             HUD_PRESET_MINIMAL
     };
 
-    private static File loadedConfigFile;
+    /**
+     * The categories the client decides for itself; every other category
+     * is the server's. The one place this split is stated: the loader,
+     * the file migration and the server settings snapshot all read it.
+     */
+    public static final Set<String> CLIENT_CATEGORIES = Collections.unmodifiableSet(
+            new HashSet<String>(Arrays.asList(CATEGORY_CLIENT)));
+
+    private static File loadedClientFile;
+    private static File loadedServerFile;
+    private static File loadedRolesFile;
+    private static File loadedChannelsFile;
     private static Configuration pendingGuiConfiguration;
+
 
     public static boolean showLostTalesHud = true;
     public static String hudPlacementPreset = HUD_PRESET_CUSTOM;
@@ -321,9 +345,33 @@ public final class LostTalesConfig {
         return dropped;
     }
 
-    public static void load(File configFile) {
-        loadedConfigFile = configFile;
-        Configuration config = new Configuration(configFile);
+    /** Whether the category is the client's own; see {@link #CLIENT_CATEGORIES}. */
+    public static boolean isClientCategory(String category) {
+        if (category == null) {
+            return false;
+        }
+        String root = category;
+        int split = root.indexOf(Configuration.CATEGORY_SPLITTER);
+        if (split >= 0) {
+            root = root.substring(0, split);
+        }
+        return CLIENT_CATEGORIES.contains(root.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /**
+     * Reads the client's options from {@code clientFile}, the server's
+     * from {@code serverFile}, the roles from {@code rolesFile} and the
+     * channels from {@code channelsFile}. A dedicated server passes no
+     * client file, and the client categories then hold their defaults in
+     * memory.
+     */
+    public static void load(File clientFile, File serverFile, File rolesFile,
+                            File channelsFile) {
+        loadedClientFile = clientFile;
+        loadedServerFile = serverFile;
+        loadedRolesFile = rolesFile == null ? serverFile : rolesFile;
+        loadedChannelsFile = channelsFile == null ? serverFile : channelsFile;
+        Configuration config = openSided();
         boolean retiredDropped = dropRetiredKeys(config);
         try {
             config.load();
@@ -910,22 +958,22 @@ public final class LostTalesConfig {
                     "Days of chat audit files kept; files older than this are deleted when the server starts and as the day rolls over."
             );
             chatRoles = config.getStringList(
-                    "roles",
-                    CATEGORY_CHAT,
-                    chatRoles,
-                    "Server only: the chat roles besides the built-in Operator and Lost Tales Team, one per line as <id>=name:<text>;tag:<[Text]>;color:<RRGGBB>;mention:<true|false>;rank:<number>;op:<level>;faction:<FACTION>@<rank>;grant:<capability>;desc:<text>. Every option is optional: a role is granted to the accounts listed under roleMembers, to anyone with the op level, and to anyone whose played identity holds the LOTR faction rank (a rank code name such as gondor.knight, or an alignment number). Lower rank comes first and colours the name; rank never grants anything. grant names what holders may do besides operators: chat.moderate (mute, unmute, remove any message), roles.manage (/losttales role), server.config (the server settings, which includes these roles), chat.console.read (the shared operator console). grant may repeat. An entry for operator only restyles the built-in operator role; the team mark is the code's alone and cannot be listed. Edit live from the Server Settings screen or /losttales role."
+                    "definitions",
+                    CATEGORY_ROLES,
+                    new String[] {ChatRoleConfig.DEFAULT_OPERATOR_ENTRY},
+                    "The chat roles, one per line as <id>=name:<text>;tag:<[Text]>;color:<RRGGBB>;mention:<true|false>;rank:<number>;op:<level>;faction:<FACTION>@<rank>;grant:<capability>;desc:<text>. Every option is optional: a role is held by the accounts and characters listed under members, by anyone with the op level, and by anyone whose played identity holds the LOTR faction rank (a rank code name such as gondor.knight, or an alignment number). Lower rank comes first and colours the name; rank never grants anything. grant names what account holders may do besides operators: chat.moderate (mute, unmute, remove any message), roles.manage (/losttales role), server.config (the server settings, which includes these roles), chat.console.read (the shared operator console). grant may repeat. The operator entry a fresh file starts with is a role like any other; the Lost Tales Team mark is the code's alone and cannot be listed. Edit live from the Server Settings screen or /losttales role."
             );
             chatRoleMembers = config.getStringList(
-                    "roleMembers",
-                    CATEGORY_CHAT,
+                    "members",
+                    CATEGORY_ROLES,
                     chatRoleMembers,
-                    "Server only: the accounts assigned each role, one role per line as <id>=<uuid>,<uuid>. /losttales role assign writes this."
+                    "Who holds each role, one role per line as <id>=<account uuid>,<account uuid>,character:<character uuid>. An account holds the role as every identity it plays and gains its grants; a character holds it as that character alone and gains no grant. /losttales role assign writes this."
             );
             chatChannelRoles = config.getStringList(
-                    "channelRoles",
-                    CATEGORY_CHAT,
-                    chatChannelRoles,
-                    "Server only: the roles a channel asks for, one channel per line as <channel>=read:<role,role|any>;send:<role,role|any>. A side left out is open to everyone the channel already admits. The Operator channel asks for operator on both sides unless listed here."
+                    "gates",
+                    CATEGORY_CHANNELS,
+                    new String[] {ChatRoleConfig.DEFAULT_ADMIN_GATE},
+                    "The roles a channel asks for, one channel per line as <channel>=read:<role,role|any|none>;send:<role,role|any|none>. A side left out or set to any is open to everyone the channel already admits; none closes it; a side naming a role that does not exist is closed until the entry is fixed. A fresh file starts with the Operator channel asking for the operator role on both sides."
             );
             installChatRoles();
             discordEnabled = config.getBoolean(
@@ -1451,8 +1499,40 @@ public final class LostTalesConfig {
         }
     }
 
-    public static File getLoadedConfigFile() {
-        return loadedConfigFile;
+    /** The server's options file, which the server settings screen and commands edit. */
+    public static File getServerConfigFile() {
+        return loadedServerFile;
+    }
+
+    /** The client's options file; null on a dedicated server. */
+    public static File getClientConfigFile() {
+        return loadedClientFile;
+    }
+
+    /** Every file as one configuration, over the files last loaded. */
+    private static LostTalesSidedConfiguration openSided() {
+        return LostTalesSidedConfiguration.open(loadedClientFile, loadedServerFile,
+                CLIENT_CATEGORIES, serverFilesByCategory());
+    }
+
+    /**
+     * The server's files as one configuration, the client categories in
+     * memory only: what the server settings screen and the commands read
+     * and write. Null before a file was loaded.
+     */
+    public static LostTalesSidedConfiguration openServerConfiguration() {
+        if (loadedServerFile == null) {
+            return null;
+        }
+        return LostTalesSidedConfiguration.open(null, loadedServerFile,
+                CLIENT_CATEGORIES, serverFilesByCategory());
+    }
+
+    private static Map<String, File> serverFilesByCategory() {
+        Map<String, File> files = new HashMap<String, File>();
+        files.put(CATEGORY_ROLES, loadedRolesFile);
+        files.put(CATEGORY_CHANNELS, loadedChannelsFile);
+        return files;
     }
 
     /** Puts the roles and gates the file describes in force on this side. */
@@ -1468,9 +1548,13 @@ public final class LostTalesConfig {
         ChatChannelGates.install(ChatRoleConfig.parseGates(chatChannelRoles, catalog, warnings));
     }
 
+    /**
+     * The client's options as the Forge screen edits them; null on a
+     * dedicated server, which has no client options and no screen.
+     */
     public static synchronized Configuration createConfiguration() {
-        pendingGuiConfiguration = loadedConfigFile == null
-                ? null : new Configuration(loadedConfigFile);
+        pendingGuiConfiguration = loadedClientFile == null
+                ? null : new Configuration(loadedClientFile);
         return pendingGuiConfiguration;
     }
 
@@ -1483,8 +1567,8 @@ public final class LostTalesConfig {
     }
 
     public static void reload() {
-        if (loadedConfigFile != null) {
-            load(loadedConfigFile);
+        if (loadedServerFile != null) {
+            load(loadedClientFile, loadedServerFile, loadedRolesFile, loadedChannelsFile);
         }
     }
 
@@ -1791,11 +1875,11 @@ public final class LostTalesConfig {
     }
 
     public static void save() {
-        if (loadedConfigFile == null) {
+        if (loadedServerFile == null) {
             return;
         }
 
-        Configuration config = new Configuration(loadedConfigFile);
+        Configuration config = openSided();
         try {
             config.load();
             writeCurrentValues(config);
@@ -1824,6 +1908,10 @@ public final class LostTalesConfig {
                 "losttales.config.category.waystones");
         config.getCategory(CATEGORY_DISCORD).setLanguageKey(
                 "losttales.config.category.discord");
+        config.getCategory(CATEGORY_ROLES).setLanguageKey(
+                "losttales.config.category.roles");
+        config.getCategory(CATEGORY_CHANNELS).setLanguageKey(
+                "losttales.config.category.channels");
     }
 
     /** A legacy key's string, or empty when the file no longer has it. */
@@ -1877,9 +1965,9 @@ public final class LostTalesConfig {
                 enableChargeTiers).set(enableChargeTiers);
         config.get(CATEGORY_CHAT, "proximityRadius",
                 chatProximityRadius).set(chatProximityRadius);
-        config.get(CATEGORY_CHAT, "roles", chatRoles).set(chatRoles);
-        config.get(CATEGORY_CHAT, "roleMembers", chatRoleMembers).set(chatRoleMembers);
-        config.get(CATEGORY_CHAT, "channelRoles", chatChannelRoles).set(chatChannelRoles);
+        config.get(CATEGORY_ROLES, "definitions", chatRoles).set(chatRoles);
+        config.get(CATEGORY_ROLES, "members", chatRoleMembers).set(chatRoleMembers);
+        config.get(CATEGORY_CHANNELS, "gates", chatChannelRoles).set(chatChannelRoles);
         config.get(CATEGORY_CLIENT, "showTimestamps",
                 showChatTimestamps).set(showChatTimestamps);
         config.get(CATEGORY_CLIENT, "enableChatEmojis",

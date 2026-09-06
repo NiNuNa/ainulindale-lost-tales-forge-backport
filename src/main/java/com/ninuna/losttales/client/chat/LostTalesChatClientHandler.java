@@ -143,7 +143,8 @@ public final class LostTalesChatClientHandler {
                 // The drawn lines are rebuilt from the adopted history,
                 // and the new head is remembered so the next tick does
                 // not rescan what was just adopted.
-                minecraft.ingameGUI.getChatGUI().refreshChat();
+                LostTalesChatHistoryHooks.refresh(
+                        minecraft.ingameGUI.getChatGUI());
                 this.watchedHead = messages.isEmpty()
                         ? null : messages.get(0);
             }

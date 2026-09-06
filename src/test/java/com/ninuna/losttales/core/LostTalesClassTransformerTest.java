@@ -38,6 +38,8 @@ public final class LostTalesClassTransformerTest {
             "com/ninuna/losttales/client/gui/tooltip/LostTalesTooltipHooks";
     private static final String CHAT_HIT_HOOK_OWNER =
             "com/ninuna/losttales/client/chat/LostTalesChatHitHooks";
+    private static final String ACHIEVEMENT_HOVER_HOOK_OWNER =
+            "com/ninuna/losttales/client/chat/LostTalesLotrAchievementHoverHook";
     private static final String CHAT_HISTORY_HOOK_OWNER =
             "com/ninuna/losttales/client/chat/LostTalesChatHistoryHooks";
     private static final String CHAT_WRAP_HOOK_OWNER =
@@ -388,6 +390,17 @@ public final class LostTalesClassTransformerTest {
         assertEquals(notices, decorated);
         assertEquals("true", System.getProperty(
                 LostTalesClassTransformer.LOTR_TRADER_NOTICE_ACTIVE_PROPERTY));
+    }
+
+    @Test
+    public void lotrAchievementHoverCardsAreDrawnInThePalette() throws Exception {
+        ClassNode hover = transform("lotr.client.gui.LOTRGuiAchievementHoverEvent");
+        assertTrue(containsStaticHook(hover, "func_146283_a",
+                ACHIEVEMENT_HOVER_HOOK_OWNER, "drawLines"));
+        assertTrue(containsStaticHook(hover, "drawCreativeTabHoveringText",
+                ACHIEVEMENT_HOVER_HOOK_OWNER, "drawLine"));
+        assertEquals("true", System.getProperty(
+                LostTalesClassTransformer.LOTR_ACHIEVEMENT_HOVER_ACTIVE_PROPERTY));
     }
 
     @Test

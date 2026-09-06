@@ -4,38 +4,48 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 
 /**
  * Where a sender's roles show, and what colours the name: one rule for
- * every line, decided by the channel the line goes to rather than by
- * the identity it wears.
+ * every line, decided by the channel's {@link ChatPresentationMode}
+ * rather than by the identity the line wears.
  *
- * <p>The account-identity channels — OOC, Operator, Console, whispers —
- * are out-of-character conversation, so a line there is tagged with the
- * sender's roles, highest display priority first, and the name takes
- * the primary role's colour; a sender with no role reads in the chat's
- * plain ivory, the colour of the unassigned. The character-identity
- * channels — Global, Proximity, Faction, Party — are in character, so
- * no role is tagged there whoever speaks, and the name takes the worn
- * character's faction colour; a line spoken as the account, which has
- * no faction, is unassigned and reads in ivory too. Roles still exist
- * behind an in-character line: they gate channels, answer mentions and
- * stand on the player's card. They only stop being worn on the line.</p>
+ * <p>On an out-of-character channel — OOC &amp; Discord, Operator, the
+ * Console — a line is tagged with the sender's primary role, the one of
+ * highest display priority, and the name takes that role's colour; a
+ * sender with no role reads in the chat's plain ivory, the colour of the
+ * unassigned. On an in-character channel — Global, Proximity, Faction,
+ * Party and whispers — no role is tagged whoever speaks, and the name
+ * takes the worn character's faction colour; a line spoken as the
+ * account, which has no faction, is unassigned and reads in ivory too.
+ * Roles still exist behind an in-character line: they gate channels,
+ * answer mentions and stand on the player's card. They only stop being
+ * worn on the line.</p>
  *
  * <p>The server signs every routed line by this, and a client signs the
  * lines it builds for itself by the same, so a line reads the same
- * whichever side composed it. Free of Minecraft imports.</p>
+ * whichever side composed it. Mentions, the completion list and the
+ * speech bubbles read the same rule. Free of Minecraft imports.</p>
  */
 public final class ChatRolePresentation {
 
     private ChatRolePresentation() {}
 
-    /** Whether lines of the channel are tagged with their sender's roles. */
-    public static boolean showsRoles(ChatChannel channel) {
+    /** Whether the channel's lines are in character; false for null. */
+    public static boolean isInCharacter(ChatChannel channel) {
         return channel != null
-                && channel.getIdentityType() == ChatIdentityType.ACCOUNT;
+                && channel.getPresentation() == ChatPresentationMode.IN_CHARACTER;
     }
 
-    /** The roles a line of the channel carries: all held, or none. */
+    /** Whether lines of the channel are tagged with their sender's primary role. */
+    public static boolean showsRoles(ChatChannel channel) {
+        return channel != null
+                && channel.getPresentation() == ChatPresentationMode.OUT_OF_CHARACTER;
+    }
+
+    /**
+     * The roles a line of the channel carries: the primary one alone
+     * where roles show, none in character. One tag, never a stack.
+     */
     public static int rolesShown(ChatChannel channel, int heldRoles) {
-        return showsRoles(channel) ? heldRoles : 0;
+        return showsRoles(channel) ? ChatAccountRole.primary(heldRoles).bit() : 0;
     }
 
     /**

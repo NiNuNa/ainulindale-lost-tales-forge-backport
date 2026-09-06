@@ -27,8 +27,7 @@ public final class ServerConfigSnapshot {
             new HashSet<String>(Arrays.asList(
                     LostTalesConfig.CATEGORY_DISCORD + ".botToken")));
     /** Categories that belong to the client and are not the server's to offer. */
-    public static final Set<String> CLIENT_CATEGORIES = Collections.unmodifiableSet(
-            new HashSet<String>(Arrays.asList(LostTalesConfig.CATEGORY_CLIENT)));
+    public static final Set<String> CLIENT_CATEGORIES = LostTalesConfig.CLIENT_CATEGORIES;
     public static final int MAX_ENTRIES = 512;
 
     private ServerConfigSnapshot() {}

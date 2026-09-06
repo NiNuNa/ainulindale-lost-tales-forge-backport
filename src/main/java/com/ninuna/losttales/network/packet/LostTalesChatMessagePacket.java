@@ -3,7 +3,7 @@ package com.ninuna.losttales.network.packet;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.chat.ChatIdentityType;
+import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
@@ -82,6 +82,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
             + ChatShowcase.MAX_TOTAL_BYTES
             + ChatReplyReference.MAX_AUTHOR_BYTES
             + ChatReplyReference.MAX_EXCERPT_BYTES;
+    /** The appended identity tail: a presence flag and a UUID, always whole. */
+    static final int IDENTITY_ID_TAIL_BYTES = 1 + 16;
     private static final int MAX_CHANNEL_BYTES = 16;
     private static final int MAX_IDENTITY_BYTES = 256;
     private static final int MAX_ACCOUNT_NAME_BYTES = 64;
@@ -132,6 +134,29 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * caching follow it.
      */
     private boolean accountLine;
+    /**
+     * The stable id of the character the line wears, or null for a line
+     * worn by the account or by a sender who has no characters (the
+     * Discord bridge). Names are presentation; this is what a client
+     * keys conversations, mentions and cards by. Appended to the layout,
+     * so an older sender leaves it null.
+     */
+    private UUID identityCharacterId;
+    /**
+     * For a whisper, the character of the receiving party this copy is
+     * held as — the sender's worn character on the sender's copy, the
+     * addressed character on the partner's — or null for the account.
+     * What the client files the conversation under, so one player's
+     * characters keep separate threads. Appended; null from an older
+     * server.
+     */
+    private UUID ownCharacterId;
+    /**
+     * For a whisper, the character of the other party the conversation
+     * is with, or null for their account. What a reply is addressed to
+     * by id rather than by name. Appended; null from an older server.
+     */
+    private UUID partnerCharacterId;
     /**
      * The server's name for this message, or {@link ChatMessageIds#NONE}
      * for a line nobody can name. Anything that refers to a message
@@ -205,8 +230,10 @@ public final class LostTalesChatMessagePacket implements IMessage {
         this(channel, senderId, identityName, accountName, title,
                 titleColor, nameColor, message, timestampMillis, skinId,
                 showcases, factionName, partner, roles,
-                channel != null && channel.getIdentityType()
-                        == ChatIdentityType.ACCOUNT);
+                // A caller that does not say takes the channel's word:
+                // out of character reads as the account, in character as
+                // a character. The server always says.
+                channel != null && ChatRolePresentation.showsRoles(channel));
     }
 
     public LostTalesChatMessagePacket(
@@ -273,6 +300,43 @@ public final class LostTalesChatMessagePacket implements IMessage {
             String partner, int roles, boolean accountLine,
             long messageId, ChatReplyReference reply,
             String partnerIdentity, long echoNonce) {
+        this(channel, senderId, identityName, accountName, title, titleColor,
+                nameColor, message, timestampMillis, skinId, showcases,
+                factionName, partner, roles, accountLine, messageId, reply,
+                partnerIdentity, echoNonce, null);
+    }
+
+    public LostTalesChatMessagePacket(
+            ChatChannel channel, UUID senderId, String identityName,
+            String accountName, String title,
+            int titleColor, int nameColor,
+            String message, long timestampMillis, String skinId,
+            List<ChatShowcase> showcases, String factionName,
+            String partner, int roles, boolean accountLine,
+            long messageId, ChatReplyReference reply,
+            String partnerIdentity, long echoNonce,
+            UUID identityCharacterId) {
+        this(channel, senderId, identityName, accountName, title, titleColor,
+                nameColor, message, timestampMillis, skinId, showcases,
+                factionName, partner, roles, accountLine, messageId, reply,
+                partnerIdentity, echoNonce, identityCharacterId, null, null);
+    }
+
+    public LostTalesChatMessagePacket(
+            ChatChannel channel, UUID senderId, String identityName,
+            String accountName, String title,
+            int titleColor, int nameColor,
+            String message, long timestampMillis, String skinId,
+            List<ChatShowcase> showcases, String factionName,
+            String partner, int roles, boolean accountLine,
+            long messageId, ChatReplyReference reply,
+            String partnerIdentity, long echoNonce,
+            UUID identityCharacterId, UUID ownCharacterId,
+            UUID partnerCharacterId) {
+        this.identityCharacterId = accountLine ? null : identityCharacterId;
+        boolean whisper = channel == ChatChannel.WHISPER;
+        this.ownCharacterId = whisper ? ownCharacterId : null;
+        this.partnerCharacterId = whisper ? partnerCharacterId : null;
         this.echoNonce = echoNonce;
         this.partnerIdentity = partnerIdentity == null ? ""
                 : partnerIdentity.trim();
@@ -378,6 +442,29 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 }
                 this.roles = wide;
             }
+            // Appended: the worn character's id, then a whisper's two
+            // conversation ids — each a fixed tail, so a payload cut
+            // short inside one stays malformed rather than reading as an
+            // older layout.
+            this.identityCharacterId = null;
+            this.ownCharacterId = null;
+            this.partnerCharacterId = null;
+            if (buffer.readableBytes() >= IDENTITY_ID_TAIL_BYTES) {
+                this.identityCharacterId = readOptionalUuid(buffer);
+                if (this.identityCharacterId != null && this.accountLine) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "an account line names a character");
+                }
+            }
+            if (buffer.readableBytes() >= 2 * IDENTITY_ID_TAIL_BYTES) {
+                this.ownCharacterId = readOptionalUuid(buffer);
+                this.partnerCharacterId = readOptionalUuid(buffer);
+                if ((this.ownCharacterId != null || this.partnerCharacterId != null)
+                        && ChatChannel.fromId(this.channelId) != ChatChannel.WHISPER) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "conversation ids on a line that is not a whisper");
+                }
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -387,6 +474,9 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.partner = "";
             this.roles = 0;
             this.accountLine = false;
+            this.identityCharacterId = null;
+            this.ownCharacterId = null;
+            this.partnerCharacterId = null;
             this.messageId = ChatMessageIds.NONE;
             this.reply = ChatReplyReference.NONE;
             this.partnerIdentity = "";
@@ -487,6 +577,23 @@ public final class LostTalesChatMessagePacket implements IMessage {
                     ChatReplyReference.MAX_EXCERPT_BYTES);
         }
         buffer.writeInt(this.roles);
+        writeOptionalUuid(buffer, this.identityCharacterId);
+        writeOptionalUuid(buffer, this.ownCharacterId);
+        writeOptionalUuid(buffer, this.partnerCharacterId);
+    }
+
+    /** A presence flag and a UUID, always {@link #IDENTITY_ID_TAIL_BYTES} long. */
+    private static void writeOptionalUuid(ByteBuf buffer, UUID value) {
+        buffer.writeBoolean(value != null);
+        buffer.writeLong(value == null ? 0L : value.getMostSignificantBits());
+        buffer.writeLong(value == null ? 0L : value.getLeastSignificantBits());
+    }
+
+    private static UUID readOptionalUuid(ByteBuf buffer) {
+        boolean present = buffer.readBoolean();
+        long most = buffer.readLong();
+        long least = buffer.readLong();
+        return present ? new UUID(most, least) : null;
     }
 
     private void validate() {
@@ -539,13 +646,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * the colours and the head, with only the words replaced.
      */
     public LostTalesChatMessagePacket withMessage(String message) {
-        return new LostTalesChatMessagePacket(getChannel(), this.senderId,
-                this.identityName, this.accountName, this.title,
-                this.titleColor, this.nameColor, message,
-                this.timestampMillis, this.skinId, this.showcases,
-                this.factionName, this.partner, this.roles,
-                this.accountLine, this.messageId, this.reply,
-                this.partnerIdentity, this.echoNonce);
+        return rebuild(message, this.partner, this.partnerIdentity, this.reply,
+                this.echoNonce);
     }
 
     /**
@@ -553,13 +655,53 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * with when the message it quotes has been edited under it.
      */
     public LostTalesChatMessagePacket withReply(ChatReplyReference reply) {
+        return rebuild(this.message, this.partner, this.partnerIdentity, reply,
+                this.echoNonce);
+    }
+
+    /**
+     * The same whisper as the other party is sent it: filed under the
+     * partner and identity that party sees the conversation as.
+     */
+    public LostTalesChatMessagePacket withPartner(String partner,
+                                                  String partnerIdentity) {
+        return rebuild(this.message, partner, partnerIdentity, this.reply,
+                this.echoNonce);
+    }
+
+    /**
+     * The same whisper held as, and addressed to, the given characters:
+     * the receiving party's own, and the other party's; null for an
+     * account on either side.
+     */
+    public LostTalesChatMessagePacket withConversation(UUID ownCharacterId,
+                                                       UUID partnerCharacterId) {
+        return rebuild(this.message, this.partner, this.partnerIdentity, this.reply,
+                this.echoNonce, ownCharacterId, partnerCharacterId);
+    }
+
+    private LostTalesChatMessagePacket rebuild(String message, String partner,
+                                               String partnerIdentity,
+                                               ChatReplyReference reply,
+                                               long echoNonce) {
+        return rebuild(message, partner, partnerIdentity, reply, echoNonce,
+                this.ownCharacterId, this.partnerCharacterId);
+    }
+
+    /** Every field as it is but for the ones named; the one place they are all listed. */
+    private LostTalesChatMessagePacket rebuild(String message, String partner,
+                                               String partnerIdentity,
+                                               ChatReplyReference reply,
+                                               long echoNonce, UUID ownCharacterId,
+                                               UUID partnerCharacterId) {
         return new LostTalesChatMessagePacket(getChannel(), this.senderId,
                 this.identityName, this.accountName, this.title,
-                this.titleColor, this.nameColor, this.message,
+                this.titleColor, this.nameColor, message,
                 this.timestampMillis, this.skinId, this.showcases,
-                this.factionName, this.partner, this.roles,
+                this.factionName, partner, this.roles,
                 this.accountLine, this.messageId, reply,
-                this.partnerIdentity, this.echoNonce);
+                partnerIdentity, echoNonce, this.identityCharacterId,
+                ownCharacterId, partnerCharacterId);
     }
 
     public ChatChannel getChannel() {
@@ -593,14 +735,24 @@ public final class LostTalesChatMessagePacket implements IMessage {
      */
     public LostTalesChatMessagePacket withoutEcho() {
         return this.echoNonce == 0L ? this
-                : new LostTalesChatMessagePacket(getChannel(), this.senderId,
-                        this.identityName, this.accountName, this.title,
-                        this.titleColor, this.nameColor, this.message,
-                        this.timestampMillis, this.skinId, this.showcases,
-                        this.factionName, this.partner, this.roles,
-                        this.accountLine, this.messageId, this.reply,
-                        this.partnerIdentity, 0L);
+                : rebuild(this.message, this.partner, this.partnerIdentity,
+                        this.reply, 0L);
     }
+    /**
+     * The stable id of the character the line wears; null for an account
+     * line, a bridge line, or a line from an older server.
+     */
+    public UUID getIdentityCharacterId() { return this.identityCharacterId; }
+    /**
+     * For a whisper, the receiving party's own character this copy is
+     * held as; null for the account, and from an older server.
+     */
+    public UUID getOwnCharacterId() { return this.ownCharacterId; }
+    /**
+     * For a whisper, the other party's character the conversation is
+     * with; null for their account, and from an older server.
+     */
+    public UUID getPartnerCharacterId() { return this.partnerCharacterId; }
     /** The sender's role mask, as the server states it; see {@link ChatAccountRole}. */
     public int getRoles() { return this.roles; }
     /** Whether the line wears the account identity rather than a

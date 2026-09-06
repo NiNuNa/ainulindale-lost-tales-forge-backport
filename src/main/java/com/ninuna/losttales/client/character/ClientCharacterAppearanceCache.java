@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.character;
 
 import com.ninuna.losttales.character.sync.CharacterAppearance;
+import com.ninuna.losttales.character.sync.CharacterAppearanceKind;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 
@@ -67,7 +68,9 @@ public final class ClientCharacterAppearanceCache {
             CharacterSummary active = snapshot.getActiveCharacter();
             if (active != null) {
                 return new CharacterAppearance(
+                        CharacterAppearanceKind.CHARACTER,
                         playerId,
+                        active.getCharacterId(),
                         "",
                         active.getName(),
                         active.getRaceId(),

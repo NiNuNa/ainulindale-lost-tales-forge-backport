@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatRoleFixtures;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import io.netty.buffer.ByteBuf;
@@ -24,7 +25,7 @@ public final class LostTalesChatRoleMaskTest {
 
     @Before
     public void setUp() {
-        ChatRoleCatalog.resetToBuiltIn();
+        ChatRoleCatalog.install(ChatRoleFixtures.catalogue());
     }
 
     @After
@@ -34,7 +35,7 @@ public final class LostTalesChatRoleMaskTest {
 
     @Test
     public void roleMaskRoundTripsAndDefaultsToNone() {
-        int roles = ChatAccountRole.maskOf(ChatAccountRole.OPERATOR,
+        int roles = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR,
                 ChatAccountRole.TEAM);
         LostTalesChatMessagePacket tagged = new LostTalesChatMessagePacket(
                 ChatChannel.OOC, UUID.randomUUID(), "Steve", "Steve", "",
@@ -76,8 +77,8 @@ public final class LostTalesChatRoleMaskTest {
         }
         ChatRoleCatalog.install(ChatRoleCatalog.of(custom, null, null));
         ChatAccountRole ninth = ChatAccountRole.byId("role7");
-        assertEquals(1 << 9, ninth.bit());
-        int roles = ChatAccountRole.maskOf(ninth, ChatAccountRole.OPERATOR);
+        assertEquals(1 << 8, ninth.bit());
+        int roles = ChatAccountRole.maskOf(ninth, ChatRoleFixtures.OPERATOR);
         ByteBuf buffer = Unpooled.buffer();
         new LostTalesChatMessagePacket(
                 ChatChannel.OOC, UUID.randomUUID(), "Steve", "Steve", "",
@@ -101,18 +102,18 @@ public final class LostTalesChatRoleMaskTest {
         LostTalesChatMessagePacket roled = new LostTalesChatMessagePacket(
                 ChatChannel.OOC, UUID.randomUUID(), "Steve", "Steve", "",
                 0xFFFFFF, 0xFFFFFF, "hello", 1L, "", null, "", "",
-                ChatAccountRole.maskOf(ChatAccountRole.OPERATOR));
+                ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR));
         ByteBuf buffer = Unpooled.buffer();
         roled.toBytes(buffer);
-        // The whole mask is the last int of the layout: a bit no role
+        // The whole mask is the int ahead of the three id tails: a bit no role
         // occupies, planted there, is refused.
-        buffer.setInt(buffer.writerIndex() - 4, 0x40000000 | ChatAccountRole.OPERATOR.bit());
+        buffer.setInt(buffer.writerIndex() - 4 - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES, 0x40000000 | ChatRoleFixtures.OPERATOR.bit());
         LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
         decoded.fromBytes(buffer.copy());
         assertTrue(decoded.isMalformed());
         assertEquals(0, decoded.getRoles());
         // And the two copies of the mask must agree.
-        buffer.setInt(buffer.writerIndex() - 4, ChatAccountRole.TEAM.bit());
+        buffer.setInt(buffer.writerIndex() - 4 - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES, ChatAccountRole.TEAM.bit());
         LostTalesChatMessagePacket disagreeing = new LostTalesChatMessagePacket();
         disagreeing.fromBytes(buffer);
         assertTrue(disagreeing.isMalformed());
@@ -123,14 +124,15 @@ public final class LostTalesChatRoleMaskTest {
         LostTalesChatMessagePacket roled = new LostTalesChatMessagePacket(
                 ChatChannel.OOC, UUID.randomUUID(), "Steve", "Steve", "",
                 0xFFFFFF, 0xFFFFFF, "hello", 1L, "", null, "", "",
-                ChatAccountRole.maskOf(ChatAccountRole.OPERATOR));
+                ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR));
         ByteBuf buffer = Unpooled.buffer();
         roled.toBytes(buffer);
         LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
-        decoded.fromBytes(buffer.slice(0, buffer.readableBytes() - 4));
+        decoded.fromBytes(buffer.slice(0, buffer.readableBytes() - 4
+                - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES));
         assertFalse(decoded.isMalformed());
-        assertEquals(ChatAccountRole.OPERATOR.bit(), decoded.getRoles());
-        assertEquals(Collections.singletonList(ChatAccountRole.OPERATOR),
+        assertEquals(ChatRoleFixtures.OPERATOR.bit(), decoded.getRoles());
+        assertEquals(Collections.singletonList(ChatRoleFixtures.OPERATOR),
                 ChatAccountRole.fromMask(decoded.getRoles()));
     }
 }

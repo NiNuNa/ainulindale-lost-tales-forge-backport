@@ -36,7 +36,7 @@ public final class ChatInputCompletionTest {
     @Test
     public void thePlayerComesFirstAndEveryoneElseAlphabetical() {
         List<ChatMentionCandidate> candidates =
-                ChatInputCompletion.mentionCandidatesFor(true, SELF, "Nils",
+                ChatInputCompletion.mentionCandidatesFor(SELF, "Nils",
                         "Aldric", Arrays.asList("zoe", "Beren", "  ", null,
                                 "NILS", "aragorn"),
                         Collections.<String, CharacterAppearance>emptyMap());
@@ -47,8 +47,8 @@ public final class ChatInputCompletionTest {
             }
         }
         // The player's own account is first and is never listed twice.
-        assertEquals(Arrays.asList("Nils", "aragorn", "Beren", "zoe"), names);
-        ChatMentionCandidate self = candidates.get(names.indexOf("Nils")
+        assertEquals(Arrays.asList("Aldric", "aragorn", "Beren", "zoe"), names);
+        ChatMentionCandidate self = candidates.get(names.indexOf("Aldric")
                 + candidates.size() - names.size());
         assertEquals(SELF.toString(), self.getKey());
         assertEquals("Nils", self.getAccountName());
@@ -68,7 +68,7 @@ public final class ChatInputCompletionTest {
         byAccount.put("beren", new CharacterAppearance(beren, "Beren",
                 "Beren Erchamion", "losttales:human", "male", "", true, 0));
         List<ChatMentionCandidate> candidates =
-                ChatInputCompletion.mentionCandidatesFor(false, SELF, "Nils",
+                ChatInputCompletion.mentionCandidatesFor(SELF, "Nils",
                         "Aldric", Arrays.asList("Beren", "zoe"), byAccount);
         List<ChatMentionCandidate> players = new ArrayList<ChatMentionCandidate>();
         for (ChatMentionCandidate candidate : candidates) {
@@ -81,27 +81,71 @@ public final class ChatInputCompletionTest {
         assertEquals(beren.toString(), players.get(1).getKey());
         assertEquals("zoe", players.get(2).getDisplayName());
         assertEquals("account:zoe", players.get(2).getKey());
+        assertEquals("", players.get(2).getCharacterId());
+        assertEquals("", players.get(2).getAccountId());
         // With no id at all the player still has a stable key.
         List<ChatMentionCandidate> anonymous =
-                ChatInputCompletion.mentionCandidatesFor(false, null, "Nils",
+                ChatInputCompletion.mentionCandidatesFor(null, "Nils",
                         "", Collections.<String>emptyList(), byAccount);
         assertEquals("self", anonymous.get(anonymous.size() - 1).getKey());
         assertEquals("Nils", anonymous.get(anonymous.size() - 1)
                 .getDisplayName());
     }
 
+    /**
+     * The character a row is displayed as is named by id, the sync's
+     * for another player and the roster's for the player themself, so
+     * the row is joined to the appearance rather than to a name.
+     */
+    @Test
+    public void candidatesCarryTheCharacterTheyAreDisplayedAs() {
+        UUID beren = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        UUID erchamion = UUID.fromString("00000000-0000-0000-0000-000000000022");
+        UUID aldric = UUID.fromString("00000000-0000-0000-0000-000000000011");
+        Map<String, CharacterAppearance> byAccount =
+                new HashMap<String, CharacterAppearance>();
+        byAccount.put("beren", new CharacterAppearance(beren, "Beren",
+                "Beren Erchamion", "losttales:human", "male", "", true, 0,
+                "lotr:gondor", 1, 30, "").withCharacterId(erchamion));
+        List<ChatMentionCandidate> candidates =
+                ChatInputCompletion.mentionCandidatesFor(SELF, "Nils",
+                        "Aldric", aldric, Arrays.asList("Beren"), byAccount);
+        List<ChatMentionCandidate> players = new ArrayList<ChatMentionCandidate>();
+        for (ChatMentionCandidate candidate : candidates) {
+            if (!candidate.isRole()) {
+                players.add(candidate);
+            }
+        }
+        assertEquals(aldric.toString(), players.get(0).getCharacterId());
+        assertEquals(SELF.toString(), players.get(0).getAccountId());
+        assertEquals(erchamion.toString(), players.get(1).getCharacterId());
+        assertEquals(beren.toString(), players.get(1).getAccountId());
+        // Without ids the same player is still listed, by name alone.
+        List<ChatMentionCandidate> nameless = ChatInputCompletion
+                .mentionCandidatesFor(SELF, "Nils", "Aldric",
+                        Arrays.asList("Beren"),
+                        Collections.<String, CharacterAppearance>emptyMap());
+        assertEquals("", nameless.get(nameless.size() - 1).getCharacterId());
+        assertEquals("", nameless.get(nameless.size() - 2).getCharacterId());
+        // A player displayed as another character is a different list.
+        List<ChatMentionCandidate> switched = ChatInputCompletion
+                .mentionCandidatesFor(SELF, "Nils", "Aldric", beren,
+                        Arrays.asList("Beren"), byAccount);
+        assertFalse(ChatInputCompletion.sameCandidates(candidates, switched));
+    }
+
     @Test
     public void candidateListsCompareByKeyNameAndAliases() {
         List<ChatMentionCandidate> first = ChatInputCompletion
-                .mentionCandidatesFor(true, SELF, "Nils", "Aldric",
+                .mentionCandidatesFor(SELF, "Nils", "Aldric",
                         Arrays.asList("Beren"),
                         Collections.<String, CharacterAppearance>emptyMap());
         List<ChatMentionCandidate> same = ChatInputCompletion
-                .mentionCandidatesFor(true, SELF, "Nils", "Aldric",
+                .mentionCandidatesFor(SELF, "Nils", "Aldric",
                         Arrays.asList("beren"),
                         Collections.<String, CharacterAppearance>emptyMap());
         List<ChatMentionCandidate> renamed = ChatInputCompletion
-                .mentionCandidatesFor(true, SELF, "Nils", "Aldric",
+                .mentionCandidatesFor(SELF, "Nils", "Aldric",
                         Arrays.asList("Beren", "Cirdan"),
                         Collections.<String, CharacterAppearance>emptyMap());
         assertFalse(ChatInputCompletion.sameCandidates(first, same));

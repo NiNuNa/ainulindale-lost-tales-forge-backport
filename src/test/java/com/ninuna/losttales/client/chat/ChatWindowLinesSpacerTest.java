@@ -81,6 +81,18 @@ public final class ChatWindowLinesSpacerTest {
         assertEquals(1, ChatWindowLines.spacersAfter(new int[] {1}, null).length);
     }
 
+    /**
+     * The feed lets a blank row go with the older run above it, which
+     * fades first; a window, which fades nothing, keeps the newer run's
+     * tick for the entry motion.
+     */
+    @Test
+    public void aBlankRowFadesWithTheOlderRunInTheFeed() {
+        assertEquals(40, ChatWindowLines.spacerClock(true, 90, 40));
+        assertEquals(40, ChatWindowLines.spacerClock(true, 40, 90));
+        assertEquals(90, ChatWindowLines.spacerClock(false, 90, 40));
+    }
+
     @Test
     public void aBlankRowIsKnownByIdentityAndNeverHeld() {
         ChatLine message = new ChatLine(1, new ChatComponentText("hello"), 40);

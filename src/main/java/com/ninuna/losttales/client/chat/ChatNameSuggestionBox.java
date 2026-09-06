@@ -162,9 +162,7 @@ final class ChatNameSuggestionBox {
             LostTalesChatVisualStyle.drawColored(font,
                     "@" + candidate.getDisplayName(),
                     inputX + 4 + ICON_SIZE + ICON_GAP, rowTop + 2,
-                    candidate.isRole() ? candidate.getRoleColor()
-                            : ChatMentionColors.colorOfKnown(
-                                    candidate.getDisplayName()), 255);
+                    rowColor(candidate), 255);
         }
     }
 
@@ -172,6 +170,19 @@ final class ChatNameSuggestionBox {
      * The player's head in the row's icon box, with the chat's shadow
      * under it. A role has none: its colour is what names it.
      */
+    /**
+     * The colour a row's name is drawn in: the same resolution a mention
+     * of that name gets in a line of the selected channel — a role its
+     * own, an account its primary role's, a character its faction's —
+     * so the list reads exactly as the sent line will; ivory only for a
+     * name nothing resolves.
+     */
+    private static int rowColor(ChatMentionCandidate candidate) {
+        int color = ChatMentionColors.colorOf(candidate,
+                ClientChatChannelState.getSelectedChannel());
+        return color >= 0 ? color : LostTalesChatVisualStyle.IVORY;
+    }
+
     private static void drawFace(Minecraft minecraft,
                                  ChatMentionCandidate candidate,
                                  int x, int y) {

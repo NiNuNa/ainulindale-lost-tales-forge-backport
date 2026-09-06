@@ -40,6 +40,17 @@ public final class ClientChatTypingState {
                 System.nanoTime());
     }
 
+    /**
+     * The key a tab's typing is filed under. The server says who is
+     * typing a whisper to this account, not into which of its
+     * conversations, so every conversation with one account shares the
+     * account's key; a plain tab is its own.
+     */
+    private static ChatTab keyOf(ChatTab tab) {
+        return tab != null && tab.isWhisper() && !tab.isNpc()
+                ? ChatTab.whisper(tab.getPartner()) : tab;
+    }
+
     static synchronized void apply(ChatTab tab, String name, boolean typing,
                                    long nowNanos) {
         if (tab == null || name == null || name.trim().length() == 0) {
@@ -75,7 +86,7 @@ public final class ClientChatTypingState {
     }
 
     static synchronized List<String> namesTyping(ChatTab tab, long nowNanos) {
-        LinkedHashMap<String, Long> names = tab == null ? null : TYPING.get(tab);
+        LinkedHashMap<String, Long> names = tab == null ? null : TYPING.get(keyOf(tab));
         if (names == null) {
             return Collections.emptyList();
         }

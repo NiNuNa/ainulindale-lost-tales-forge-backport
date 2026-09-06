@@ -2,7 +2,8 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.chat.ChatIdentityType;
+import com.ninuna.losttales.chat.ChatMentionCandidate;
+import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
@@ -12,6 +13,7 @@ import com.ninuna.losttales.compat.lotr.LotrFactionColors;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.Locale;
+import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiPlayerInfo;
 
@@ -70,17 +72,60 @@ final class ChatMentionColors {
         }
         int roleColor = roleColorFor(account);
         int accountColor = roleColor >= 0 ? roleColor : PLAYER_RGB;
-        // The mention names the character when it uses the character's
-        // name, and on the channels whose lines are signed in character
-        // even when it uses the account's: either way the identity on
-        // display is the character, so its faction colour is the
-        // mention's — with the account's colour standing in when this
-        // client knows no character for the name.
-        boolean characterIdentity = !name.equalsIgnoreCase(account)
-                || (channel != null && channel.getIdentityType()
-                        == ChatIdentityType.CHARACTER);
-        return characterIdentity
-                ? characterColorFor(account, accountColor) : accountColor;
+        // The same rule a sender's own name follows on the channel: out
+        // of character the primary role colours the name, in character
+        // the character's faction does — with the account's colour
+        // standing in when this client knows no character for the name.
+        return ChatRolePresentation.showsRoles(channel)
+                ? accountColor : characterColorFor(account, accountColor);
+    }
+
+    /**
+     * The colour a completion row is drawn in: a role its own; a player
+     * the same colour {@link #colorOf(String, ChatChannel)} gives their
+     * name on the channel, except that in character the faction is read
+     * from the synced appearance the candidate's ids name, so two
+     * characters of one name, or a name the appearance store has not
+     * indexed, still colour right. -1 when nothing resolves.
+     */
+    static int colorOf(ChatMentionCandidate candidate, ChatChannel channel) {
+        if (candidate == null) {
+            return -1;
+        }
+        if (candidate.isRole()) {
+            return candidate.getRoleColor();
+        }
+        if (!LostTalesConfig.enableChatPings
+                || ChatRolePresentation.showsRoles(channel)
+                || candidate.getCharacterId().length() == 0) {
+            return colorOf(candidate.getDisplayName(), channel);
+        }
+        CharacterAppearance appearance = appearanceOf(candidate);
+        if (appearance == null) {
+            return colorOf(candidate.getDisplayName(), channel);
+        }
+        int roleColor = roleColorFor(candidate.getAccountName());
+        return LotrFactionColors.forFactionId(appearance.getStartingFactionId(),
+                roleColor >= 0 ? roleColor : PLAYER_RGB);
+    }
+
+    /**
+     * The synced appearance the candidate's ids name — the account's,
+     * while it still wears the candidate's character — or null.
+     */
+    private static CharacterAppearance appearanceOf(ChatMentionCandidate candidate) {
+        UUID accountId;
+        try {
+            accountId = UUID.fromString(candidate.getAccountId());
+        } catch (IllegalArgumentException notAnId) {
+            return null;
+        }
+        CharacterAppearance appearance = ClientCharacterAppearanceCache.get(accountId);
+        return appearance != null && appearance.hasCharacter()
+                && appearance.getCharacterId() != null
+                && candidate.getCharacterId().equalsIgnoreCase(
+                        appearance.getCharacterId().toString())
+                ? appearance : null;
     }
 
     /**
@@ -159,16 +204,6 @@ final class ChatMentionColors {
             }
         }
         return null;
-    }
-
-    /**
-     * The colour a name already known to the chat is drawn in, without
-     * asking whether it is online: what the completion list and the
-     * input bar need for a name they are already showing.
-     */
-    static int colorOfKnown(String name) {
-        int role = ClientChatAccountRoles.colorOf(name);
-        return role >= 0 ? role : LostTalesChatVisualStyle.IVORY;
     }
 
     /**

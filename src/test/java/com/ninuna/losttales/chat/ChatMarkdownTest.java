@@ -126,6 +126,71 @@ public final class ChatMarkdownTest {
                         .replace("  ", " "));
     }
 
+    /**
+     * The layout is the parse with its places kept: every character not
+     * a mark wears the style its span has, the marks wear the style
+     * around them, and the unmarked characters read back as the spans.
+     */
+    @Test
+    public void theLayoutAgreesWithTheParse() {
+        String[] cases = {
+            "a **b** c", "**a** *b* ~~c~~ `d` ||e||", "***everything***",
+            "a**b*c*d**e", "*", "**", "```", "no markers at all",
+            "||a **b** c||", "2 * 3 * 4", "**bold *and italic***",
+            "`**not bold**`", "__under__score_names_", "",
+        };
+        for (String message : cases) {
+            int[] styles = ChatMarkdown.layout(message);
+            assertEquals(message, message.length(), styles.length);
+            StringBuilder unmarked = new StringBuilder();
+            for (int index = 0; index < styles.length; index++) {
+                if ((styles[index] & ChatMarkdown.Span.MARK) == 0) {
+                    unmarked.append(message.charAt(index));
+                }
+            }
+            assertEquals(message, plainOf(ChatMarkdown.parse(message)),
+                    unmarked.toString());
+            int cursor = 0;
+            for (ChatMarkdown.Span span : ChatMarkdown.parse(message)) {
+                for (int index = 0; index < span.getText().length(); index++) {
+                    while ((styles[cursor] & ChatMarkdown.Span.MARK) != 0) {
+                        cursor++;
+                    }
+                    assertEquals(message + " at " + cursor,
+                            styleOf(span), styles[cursor]);
+                    cursor++;
+                }
+            }
+        }
+        int[] bold = ChatMarkdown.layout("a **b** c");
+        assertEquals(ChatMarkdown.Span.PLAIN, bold[0]);
+        assertEquals(ChatMarkdown.Span.MARK, bold[2]);
+        assertEquals(ChatMarkdown.Span.MARK, bold[3]);
+        assertEquals(ChatMarkdown.Span.BOLD, bold[4]);
+        assertEquals(ChatMarkdown.Span.MARK, bold[5]);
+        assertEquals(ChatMarkdown.Span.PLAIN, bold[8]);
+        // An inner mark wears the style around it.
+        int[] nested = ChatMarkdown.layout("**a *b* c**");
+        assertEquals(ChatMarkdown.Span.BOLD | ChatMarkdown.Span.MARK, nested[4]);
+        assertEquals(ChatMarkdown.Span.BOLD | ChatMarkdown.Span.ITALIC, nested[5]);
+        // Inside code nothing is a mark.
+        int[] code = ChatMarkdown.layout("`**x**`");
+        assertEquals(ChatMarkdown.Span.MARK, code[0]);
+        assertEquals(ChatMarkdown.Span.CODE, code[1]);
+        assertEquals(ChatMarkdown.Span.CODE, code[3]);
+        assertEquals(ChatMarkdown.Span.MARK, code[6]);
+        assertEquals(0, ChatMarkdown.layout(null).length);
+    }
+
+    private static int styleOf(ChatMarkdown.Span span) {
+        return (span.isBold() ? ChatMarkdown.Span.BOLD : 0)
+                | (span.isItalic() ? ChatMarkdown.Span.ITALIC : 0)
+                | (span.isStrikethrough() ? ChatMarkdown.Span.STRIKETHROUGH : 0)
+                | (span.isUnderlined() ? ChatMarkdown.Span.UNDERLINE : 0)
+                | (span.isCode() ? ChatMarkdown.Span.CODE : 0)
+                | (span.isSpoiler() ? ChatMarkdown.Span.SPOILER : 0);
+    }
+
     /** The quick way out, for the many messages carrying no markup. */
     @Test
     public void plainTextIsRecognisedWithoutParsing() {

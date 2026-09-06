@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.config.LostTalesConfigFiles;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -30,7 +31,8 @@ import java.util.UUID;
  * names live only for the session; the file keeps accounts alone.</p>
  */
 public final class ClientChatIgnores {
-    static final String FILE_PATH = "losttales/chat_ignores.txt";
+    /** Under the client's config folder. */
+    static final String FILE_PATH = LostTalesConfigFiles.CHAT_IGNORES;
     /** Safety bound on stored ignores; adding past it is refused. */
     public static final int MAX_IGNORES = 256;
     private static final Charset UTF_8 = Charset.forName("UTF-8");

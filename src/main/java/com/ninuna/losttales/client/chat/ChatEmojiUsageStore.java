@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.config.LostTalesConfigFiles;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import java.io.File;
 import java.io.FileInputStream;
@@ -28,7 +29,8 @@ import java.util.Set;
  * corrupt the file or crash the client.
  */
 public final class ChatEmojiUsageStore {
-    static final String FILE_PATH = "losttales/chat_emojis.txt";
+    /** Under the client's config folder. */
+    static final String FILE_PATH = LostTalesConfigFiles.CHAT_EMOJIS;
     private static final Charset UTF_8 = Charset.forName("UTF-8");
     private static final int MAX_COUNT = 1000000;
 

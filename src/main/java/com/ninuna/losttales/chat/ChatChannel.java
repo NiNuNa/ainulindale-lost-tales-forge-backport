@@ -8,9 +8,9 @@ import java.util.Locale;
 
 /**
  * Small stable channel catalogue shared by packet validation and client UI.
- * Each constant is one built-in {@link ChatChannelDescriptor}: the id, the
- * identity its lines wear, the routing rule, the access a player needs,
- * the presentation, and whether the Discord bridge may carry it — the
+ * Each constant is one built-in {@link ChatChannelDescriptor}: the id, how
+ * its lines present their sender, the routing rule, the access a player
+ * needs, the colour, and whether the Discord bridge may carry it — the
  * Party channel, the console and whispers are private and never leave
  * the game. The string ids are the wire and storage surface —
  * packets and the layout file carry them, and client view state is keyed
@@ -19,50 +19,50 @@ import java.util.Locale;
  * {@link #presentationOrder()}.
  */
 public enum ChatChannel {
-    ALL("all", "Global", ChatIdentityType.CHARACTER,
+    ALL("all", "Global", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.FERN_GREEN), true),
-    PROXIMITY("proximity", "Proximity", ChatIdentityType.CHARACTER,
+    PROXIMITY("proximity", "Proximity", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.PROXIMITY, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN), true),
     // Presentation shows the member's own party colour; this seafoam is
     // only the fallback outside a party.
-    PARTY("party", "Party", ChatIdentityType.CHARACTER,
+    PARTY("party", "Party", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.PARTY, ChatChannelAccess.PARTY_MEMBERSHIP,
             LostTalesColors.rgb(LostTalesColors.SEAFOAM), false),
     // Presentation shows the sender's LOTR faction colour; this palette
     // honey is only the indicator/selector fallback.
-    FACTION("faction", "Faction", ChatIdentityType.CHARACTER,
+    FACTION("faction", "Faction", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.FACTION, ChatChannelAccess.CHARACTER_FACTION,
             LostTalesColors.rgb(LostTalesColors.HONEY), true),
     /**
      * Out-of-character conversation, and the channel the Discord bridge
-     * carries by default: account identity, everyone online reads it,
+     * carries by default: out of character, everyone online reads it,
      * and it is there whether or not the server bridges anything. An
      * older build kept a Discord channel of its own beside it; its id
      * still resolves here, see {@link #fromId}.
      */
-    OOC("ooc", "OOC & Discord", ChatIdentityType.ACCOUNT,
+    OOC("ooc", "OOC & Discord", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.STEEL_BLUE), true),
-    /** Staff channel: operators only, account identity; the wire id stays. */
-    ADMIN("admin", "Operator", ChatIdentityType.ACCOUNT,
-            ChatRecipientRule.OPERATORS, ChatChannelAccess.OPERATOR,
+    /** Staff channel: operators only, out of character; the wire id stays. */
+    ADMIN("admin", "Operator", ChatPresentationMode.OUT_OF_CHARACTER,
+            ChatRecipientRule.OPERATORS, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.CRIMSON), true),
     /**
      * The player's private console: what only they see anyway — command
      * output, fast-travel countdowns, other mods' notices — plus anything
      * they type there, which is echoed back to them alone.
      */
-    CONSOLE("console", "Console", ChatIdentityType.ACCOUNT,
+    CONSOLE("console", "Console", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.SELF, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.MAUVE), false),
     /**
-     * A private conversation between two accounts. Not a tab of its own:
+     * A private conversation between two players, in character. Not a tab of its own:
      * every whisper partner is one tab on this channel, and the client
      * keeps them apart by the partner's name.
      */
-    WHISPER("whisper", "Whisper", ChatIdentityType.ACCOUNT,
+    WHISPER("whisper", "Whisper", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.WHISPER, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.APRICOT), false);
 
@@ -85,19 +85,20 @@ public enum ChatChannel {
     private final ChatChannelDescriptor descriptor;
 
     ChatChannel(String id, String displayName,
-                ChatIdentityType identityType,
+                ChatPresentationMode presentation,
                 ChatRecipientRule recipientRule,
                 ChatChannelAccess access, int displayColor,
                 boolean bridgeable) {
         this.descriptor = new ChatChannelDescriptor(id, displayName,
-                identityType, recipientRule, access, displayColor,
+                presentation, recipientRule, access, displayColor,
                 bridgeable);
     }
 
     public String getId() { return this.descriptor.getId(); }
     public String getDisplayName() { return this.descriptor.getDisplayName(); }
-    public ChatIdentityType getIdentityType() {
-        return this.descriptor.getIdentityType();
+    /** How the channel's lines present their sender; see {@link ChatRolePresentation}. */
+    public ChatPresentationMode getPresentation() {
+        return this.descriptor.getPresentation();
     }
     public ChatRecipientRule getRecipientRule() {
         return this.descriptor.getRecipientRule();

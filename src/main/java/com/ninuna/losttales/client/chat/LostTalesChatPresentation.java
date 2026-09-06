@@ -4,7 +4,6 @@ import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatEpithet;
-import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatMarkdown;
 import com.ninuna.losttales.chat.ChatMentions;
 import com.ninuna.losttales.chat.ChatMessageIds;
@@ -131,10 +130,7 @@ public final class LostTalesChatPresentation {
         // its lines are still filed and counted unread, they still show
         // in the closed-chat feed, and the tab shows them all once it is
         // opened again.
-        ChatTab tab = channel == ChatChannel.WHISPER
-                ? ChatTab.whisper(packet.getPartner(),
-                        packet.getPartnerIdentity())
-                : ChatTab.of(channel);
+        ChatTab tab = tabOf(packet);
         if (tab != null && !ChatWindowLayout.isOpen(tab)
                 && !ChatWindowLayout.isHidden(tab)) {
             ChatWindowLayout.openTab(tab, windowIdOfSelection());
@@ -152,6 +148,12 @@ public final class LostTalesChatPresentation {
             ClientChatChannelState.rememberPartnerName(tab,
                     packet.getIdentityName(), packet.getAccountName());
         }
+        if (tab.isWhisper()) {
+            // Both copies say which character of the other party the
+            // conversation is with, so a reply is addressed by id.
+            ClientChatChannelState.rememberPartnerCharacterId(tab,
+                    packet.getPartnerCharacterId());
+        }
         // A message this client already showed is not printed again:
         // the line it is standing on becomes the real one, in place.
         int confirmed = replayed ? 0
@@ -165,8 +167,11 @@ public final class LostTalesChatPresentation {
             // The highlight stays for when the tab is read; the cue is
             // silenced by the tab's own preference alone — a closed tab
             // still receives — and a whisper is always a cue. A replayed
-            // line was said before this player arrived and sounds no cue.
-            if (!replayed && ChatWindowLayout.isPingAudible(tab)) {
+            // line was said before this player arrived and sounds no cue,
+            // and neither does a whisper to a character the player is not
+            // playing right now: it waits, counted, for that identity.
+            if (!replayed && ChatWindowLayout.isPingAudible(tab)
+                    && ClientChatChannelState.isAvailable(tab)) {
                 playPingSound(minecraft);
             }
         }
@@ -205,7 +210,7 @@ public final class LostTalesChatPresentation {
                     && ChatWindowLines.removeMessage(chat,
                             chatLineId.intValue())) {
                 ChatGroupRuns.forget(chatLineId.intValue());
-                chat.refreshChat();
+                LostTalesChatHistoryHooks.refresh(chat);
             }
             return;
         }
@@ -220,7 +225,7 @@ public final class LostTalesChatPresentation {
             // Nothing left of the message itself to correct: it has
             // fallen out of the history this client keeps.
             if (quotesChanged) {
-                chat.refreshChat();
+                LostTalesChatHistoryHooks.refresh(chat);
             }
             return;
         }
@@ -240,13 +245,13 @@ public final class LostTalesChatPresentation {
         if (!ChatWindowLines.replaceMessage(chat, chatLineId.intValue(),
                 full)) {
             if (quotesChanged) {
-                chat.refreshChat();
+                LostTalesChatHistoryHooks.refresh(chat);
             }
             return;
         }
         ChatGroupRuns.replaceGroupedLine(chatLineId.intValue(), groupedLine);
         ClientChatMessages.rewrite(packet.getMessageId(), edited);
-        chat.refreshChat();
+        LostTalesChatHistoryHooks.refresh(chat);
     }
 
     /**
@@ -501,7 +506,7 @@ public final class LostTalesChatPresentation {
             // message afresh, rather than leaving the two side by side.
             ChatWindowLines.removeMessage(chat, chatLineId);
             ChatGroupRuns.forget(chatLineId);
-            chat.refreshChat();
+            LostTalesChatHistoryHooks.refresh(chat);
             return 0;
         }
         ChatGroupRuns.remember(chatLineId, tab, packet.getSenderId(),
@@ -512,7 +517,7 @@ public final class LostTalesChatPresentation {
                         !packet.getReply().exists()));
         ClientChatMessageIds.remember(chatLineId, packet.getMessageId());
         ClientChatMessages.remember(packet, tab, showcaseIds);
-        chat.refreshChat();
+        LostTalesChatHistoryHooks.refresh(chat);
         return chatLineId;
     }
 
@@ -547,7 +552,7 @@ public final class LostTalesChatPresentation {
             }
         }
         if (changed) {
-            chat.refreshChat();
+            LostTalesChatHistoryHooks.refresh(chat);
         }
     }
 
@@ -776,11 +781,16 @@ public final class LostTalesChatPresentation {
         return build(packet, tabOf(packet), NO_SHOWCASES);
     }
 
-    /** The tab a packet would be filed under, read from the packet alone. */
+    /**
+     * The tab a packet would be filed under, read from the packet alone:
+     * a whisper's conversation with the partner's identity, held as the
+     * character this copy says it is held as.
+     */
     private static ChatTab tabOf(LostTalesChatMessagePacket packet) {
         return packet.getChannel() == ChatChannel.WHISPER
                 ? ChatTab.whisper(packet.getPartner(),
-                        packet.getPartnerIdentity())
+                        packet.getPartnerIdentity(),
+                        ChatTab.ownerKeyOf(packet.getOwnCharacterId()))
                 : ChatTab.of(packet.getChannel());
     }
 
@@ -885,9 +895,7 @@ public final class LostTalesChatPresentation {
         marker.setChatStyle(marker.getChatStyle().setChatClickEvent(
                 new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
                         ChatHeadMarker.encode(packet.getSenderId(),
-                                packet.isAccountLine()
-                                        ? ChatIdentityType.ACCOUNT
-                                        : ChatIdentityType.CHARACTER,
+                                packet.isAccountLine(),
                                 packet.getSkinId(), packet.getMessage(),
                                 packet.getTitleColor(),
                                 packet.getNameColor()))));
@@ -1417,15 +1425,14 @@ public final class LostTalesChatPresentation {
         if (!local && account == null) {
             return null;
         }
-        // The character channels sign every line with the sender's
-        // active role-playing character; a system line naming the
+        // Every channel signs a line with the sender's active
+        // role-playing character by default; a system line naming the
         // account shows the same identity when the client knows it —
         // the character's name, in the colour the mention resolution
         // below gives every mention of that identity, so an achievement
         // names its player exactly as their lines do.
         String shown = text;
-        if (account != null && channel != null
-                && channel.getIdentityType() == ChatIdentityType.CHARACTER) {
+        if (account != null) {
             String characterName =
                     ChatMentionColors.characterNameFor(account);
             if (characterName != null) {

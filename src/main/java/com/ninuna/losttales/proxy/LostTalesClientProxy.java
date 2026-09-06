@@ -1,5 +1,7 @@
 package com.ninuna.losttales.proxy;
 
+import com.ninuna.losttales.config.LostTalesConfigFiles;
+import java.io.File;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityPlushie;
@@ -119,16 +121,15 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
     @Override
     public void preInit(FMLPreInitializationEvent event) {
-        CameraPresetFileStore.initialize(
+        // The client's own stores live in the client folder; the common
+        // proxy has already moved an older build's files into it.
+        File clientFolder = LostTalesConfigFiles.clientDirectory(
                 event.getModConfigurationDirectory());
-        ChatEmojiUsageStore.initialize(
-                event.getModConfigurationDirectory());
-        ClientChatIgnores.initialize(
-                event.getModConfigurationDirectory());
-        ChatWindowLayoutStore.initialize(
-                event.getModConfigurationDirectory());
-        LostTalesClientMapMarkerUsageStore.initialize(
-                event.getModConfigurationDirectory());
+        CameraPresetFileStore.initialize(clientFolder);
+        ChatEmojiUsageStore.initialize(clientFolder);
+        ClientChatIgnores.initialize(clientFolder);
+        ChatWindowLayoutStore.initialize(clientFolder);
+        LostTalesClientMapMarkerUsageStore.initialize(clientFolder);
         LostTalesThirdPersonConfig.load(
                 event.getModConfigurationDirectory());
         ThirdPersonCameraRuntime.resetSession();

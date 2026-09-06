@@ -139,7 +139,10 @@ final class ChatOutbox {
                         ClientChatAppearances.wireCharacterId(tab),
                         reply.getMessageId(),
                         tab.isWhisper() ? tab.getPartnerIdentity() : "",
-                        echoNonce));
+                        echoNonce,
+                        tab.isWhisper()
+                                ? ClientChatChannelState.partnerCharacterIdOf(tab)
+                                : null));
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.config.LostTalesConfigFiles;
 import java.io.BufferedReader;
 import java.io.Closeable;
 import java.io.File;
@@ -25,7 +26,8 @@ import java.util.List;
  * when the player confirms a fast-travel destination on the map.
  */
 public final class LostTalesClientMapMarkerUsageStore {
-    static final String FILE_PATH = "losttales/map_markers.txt";
+    /** Under the client's config folder. */
+    static final String FILE_PATH = LostTalesConfigFiles.MAP_MARKERS;
     static final int MAX_FAVORITES = 64;
     static final int MAX_RECENT = 8;
     private static final Charset UTF_8 = Charset.forName("UTF-8");

@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatMarkdown;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
@@ -38,6 +39,17 @@ import net.minecraft.util.EnumChatFormatting;
  * so the bar reads as the line it is about to become. The rest of the
  * text stays ivory.</p>
  *
+ * <p>The chat's markup is previewed as it is typed: the text between a
+ * pair of marks wears the marks' style — bold, italic, underlined,
+ * struck — code and spoiler text a subdued colour, and the marker
+ * characters themselves stay on the bar, dimmed, at their own width, so
+ * nothing the caret can stand on is hidden from it. The same scan that
+ * lays out the sent line ({@link ChatMarkdown#layout}) decides which
+ * characters are marks, so the preview and the line agree. A bold
+ * glyph is a pixel wider than its plain self, and the display model
+ * below measures it so, which keeps the caret, the selection and the
+ * scroll on the glyphs actually drawn.</p>
+ *
  * <p>A share token whose item or marker the client can already resolve
  * — {@code [i:Stone Sword]}, {@code [m:Northgate]} — is shown as the
  * preview it will be in chat: the bracket, the icon, the real name, in
@@ -72,6 +84,10 @@ final class ChatInputField extends GuiTextField {
     /** The raw text the previews below were resolved for. */
     private String previewedText;
     private List<TokenPreview> previews = Collections.emptyList();
+    /** The raw text the styles below were laid out for. */
+    private String styledText;
+    /** Every character's markup style, or null for text without markup. */
+    private int[] styles;
 
     ChatInputField(FontRenderer font, int x, int y, int width, int height) {
         super(font, x, y, width, height);
@@ -112,11 +128,12 @@ final class ChatInputField extends GuiTextField {
             return;
         }
         List<TokenPreview> resolved = previewsFor(text);
-        if (!resolved.isEmpty()) {
+        if (!resolved.isEmpty() || stylesFor(text) != null) {
             // Vanilla scrolls by raw character widths, but a token is
             // drawn as one narrow element — ":creeper:" measures nine
-            // characters and draws ten pixels — so vanilla scrolls far
-            // too early and can rest inside a shortcode. The offset is
+            // characters and draws ten pixels — and a bold glyph a pixel
+            // wider than its plain self, so vanilla scrolls too early or
+            // too late and can rest inside a shortcode. The offset is
             // recomputed from the drawn widths every frame and written
             // back, so the field scrolls by what is actually on it and
             // vanilla continues from the corrected position.
@@ -352,7 +369,26 @@ final class ChatInputField extends GuiTextField {
                 && text.indexOf(':') >= 0) {
             result = mergeEmojiPreviews(text, result);
         }
-        return result;
+        return outsideCode(result, stylesFor(text));
+    }
+
+    /**
+     * The previews not inside a code span: quoted text is shown as
+     * typed in the sent line, so a token inside it is literal here too.
+     */
+    private static List<TokenPreview> outsideCode(List<TokenPreview> previews,
+                                                  int[] styles) {
+        if (styles == null || previews.isEmpty()) {
+            return previews;
+        }
+        List<TokenPreview> kept = new ArrayList<TokenPreview>(previews.size());
+        for (int index = 0; index < previews.size(); index++) {
+            TokenPreview preview = previews.get(index);
+            if (!ChatInputStyles.isCode(styles, preview.start)) {
+                kept.add(preview);
+            }
+        }
+        return kept;
     }
 
     private List<TokenPreview> buildSharePreviews(String text) {
@@ -553,24 +589,65 @@ final class ChatInputField extends GuiTextField {
         }
     }
 
-    /** Runs of one colour over the raw range, like the plain path's. */
+    /**
+     * Runs of one colour and one markup style over the raw range, like
+     * the plain path's: the style's decoration codes ahead of each run,
+     * marks and code and spoiler text in their subdued colours over
+     * whatever the mention pass chose.
+     */
     private int drawPlainRuns(String text, int[] colors, int colorsBase,
                               int from, int to, int x, int y) {
+        int[] styles = stylesFor(text);
         int cursor = x;
         int start = from;
         while (start < to) {
             int end = start + 1;
             while (end < to && colors[end - colorsBase]
-                    == colors[start - colorsBase]) {
+                    == colors[start - colorsBase]
+                    && ChatInputStyles.styleAt(styles, end)
+                            == ChatInputStyles.styleAt(styles, start)) {
                 end++;
             }
-            String run = text.substring(start, end);
+            int style = ChatInputStyles.styleAt(styles, start);
+            String run = ChatInputStyles.prefixOf(style)
+                    + text.substring(start, end);
             LostTalesChatVisualStyle.drawColored(this.font, run, cursor, y,
-                    colors[start - colorsBase], 255);
-            cursor += this.font.getStringWidth(run);
+                    ChatInputStyles.colorOf(style, colors[start - colorsBase]),
+                    255);
+            cursor += rawWidth(text, start, end);
             start = end;
         }
         return cursor;
+    }
+
+    /**
+     * The markup styles of the raw text, laid out only when it changes;
+     * null for text carrying no markup at all, the common case.
+     */
+    private int[] stylesFor(String text) {
+        if (text.equals(this.styledText)) {
+            return this.styles;
+        }
+        this.styledText = text;
+        this.styles = ChatMarkdown.hasMarkup(text)
+                ? ChatMarkdown.layout(text) : null;
+        return this.styles;
+    }
+
+    /** The drawn width of one raw character: its glyph, a pixel more in bold. */
+    private int charWidth(String text, int index) {
+        int width = this.font.getCharWidth(text.charAt(index));
+        return width > 0 && ChatInputStyles.isBold(stylesFor(text), index)
+                ? width + 1 : width;
+    }
+
+    /** The drawn width of the raw range {@code [from, to)}. */
+    private int rawWidth(String text, int from, int to) {
+        int width = 0;
+        for (int index = from; index < to; index++) {
+            width += charWidth(text, index);
+        }
+        return width;
     }
 
     /** The token as chat will show it: bracket, icon, name, bracket. */
@@ -621,7 +698,7 @@ final class ChatInputField extends GuiTextField {
                 continue;
             }
             while (cursor < preview.start) {
-                int width = this.font.getCharWidth(text.charAt(cursor));
+                int width = charWidth(text, cursor);
                 if (x + width > room) {
                     return cursor - from;
                 }
@@ -635,7 +712,7 @@ final class ChatInputField extends GuiTextField {
             cursor = preview.end;
         }
         while (cursor < text.length()) {
-            int width = this.font.getCharWidth(text.charAt(cursor));
+            int width = charWidth(text, cursor);
             if (x + width > room) {
                 return cursor - from;
             }
@@ -661,8 +738,7 @@ final class ChatInputField extends GuiTextField {
             if (preview.start >= index) {
                 break;
             }
-            x += this.font.getStringWidth(
-                    text.substring(cursor, preview.start));
+            x += rawWidth(text, cursor, preview.start);
             if (preview.end <= index) {
                 x += preview.width;
                 cursor = preview.end;
@@ -671,7 +747,7 @@ final class ChatInputField extends GuiTextField {
             return x + preview.width * (index - preview.start)
                     / (preview.end - preview.start);
         }
-        return x + this.font.getStringWidth(text.substring(cursor, index));
+        return x + rawWidth(text, cursor, index);
     }
 
     /**
@@ -688,7 +764,7 @@ final class ChatInputField extends GuiTextField {
                 continue;
             }
             while (cursor < preview.start) {
-                int width = this.font.getCharWidth(text.charAt(cursor));
+                int width = charWidth(text, cursor);
                 if (cx + width > x) {
                     return cursor;
                 }
@@ -703,7 +779,7 @@ final class ChatInputField extends GuiTextField {
             cursor = preview.end;
         }
         while (cursor < text.length()) {
-            int width = this.font.getCharWidth(text.charAt(cursor));
+            int width = charWidth(text, cursor);
             if (cx + width > x) {
                 return cursor;
             }

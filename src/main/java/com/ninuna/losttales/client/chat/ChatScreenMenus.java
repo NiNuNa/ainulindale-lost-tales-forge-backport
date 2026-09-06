@@ -389,7 +389,8 @@ final class ChatScreenMenus {
         List<ChatPopupMenu.Entry> players =
                 new ArrayList<ChatPopupMenu.Entry>();
         for (String name : whisperCandidates(this.mc)) {
-            ChatTab conversation = ChatTab.whisper(name);
+            ChatTab conversation = ChatTab.whisper(name, "",
+                    ClientChatAppearances.activeIdentityKey());
             if (conversation != null && !ChatWindowLayout.isOpen(conversation)
                     && matchesFilter(name, filter)) {
                 players.add(new ChatPopupMenu.Entry(conversation.id(),
@@ -520,7 +521,8 @@ final class ChatScreenMenus {
                     StatCollector.translateToLocal(
                             "gui.losttales.chat.open.players")));
             for (String name : players) {
-                ChatTab conversation = ChatTab.whisper(name);
+                ChatTab conversation = ChatTab.whisper(name, "",
+                    ClientChatAppearances.activeIdentityKey());
                 entries.add(new ChatPopupMenu.Entry(conversation.id(),
                         withCounter(name,
                                 ClientChatChannelViews.unreadCount(

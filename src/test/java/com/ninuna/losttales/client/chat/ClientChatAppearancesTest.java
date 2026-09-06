@@ -50,7 +50,7 @@ public final class ClientChatAppearancesTest {
         roster(ARAGORN, ARAGORN, LEGOLAS);
         assertEquals(ARAGORN, ClientChatAppearances.effectiveFor(global).characterId);
         assertEquals(ARAGORN, ClientChatAppearances.effectiveFor(proximity).characterId);
-        assertTrue(ClientChatAppearances.effectiveFor(ooc).account);
+        assertEquals(ARAGORN, ClientChatAppearances.effectiveFor(ooc).characterId);
         assertEquals(LostTalesChatSendPacket.APPEARANCE_DEFAULT,
                 ClientChatAppearances.wireKind(global));
         assertNull(ClientChatAppearances.wireCharacterId(global));
@@ -155,11 +155,43 @@ public final class ClientChatAppearancesTest {
         ClientChatAppearances.select(appearanceOf(LEGOLAS), ooc);
         ClientChatAppearances.clear();
         assertFalse(ClientChatAppearances.isLocked(global));
-        assertTrue(ClientChatAppearances.effectiveFor(ooc).account);
+        assertEquals(ARAGORN, ClientChatAppearances.effectiveFor(ooc).characterId);
         // Nothing to lock without a tab; nothing breaks either.
         ClientChatAppearances.toggleLocked(null);
         ClientChatAppearances.select(appearanceOf(LEGOLAS), null);
         assertFalse(ClientChatAppearances.isLocked(null));
+    }
+
+    /**
+     * A conversation is spoken in as the identity it is held as: the
+     * account's conversations as the account whatever is played, a
+     * character's as that character, until the roster loses it.
+     */
+    @Test
+    public void aConversationSpeaksAsTheIdentityItIsHeldAs() {
+        roster(ARAGORN, ARAGORN, LEGOLAS);
+        assertEquals(ChatTab.ownerKeyOf(ARAGORN),
+                ClientChatAppearances.activeIdentityKey());
+        ChatTab asAccount = ChatTab.whisper("Steve");
+        ChatTab asLegolas = ChatTab.whisper("Steve", "",
+                ChatTab.ownerKeyOf(LEGOLAS));
+        assertTrue(ClientChatAppearances.effectiveFor(asAccount).account);
+        assertEquals(LostTalesChatSendPacket.APPEARANCE_ACCOUNT,
+                ClientChatAppearances.wireKind(asAccount));
+        assertEquals(LEGOLAS, ClientChatAppearances.effectiveFor(asLegolas).characterId);
+        assertEquals(LEGOLAS, ClientChatAppearances.wireCharacterId(asLegolas));
+        // A lock on the tab does not move a conversation off its identity.
+        ClientChatAppearances.select(appearanceOf(ARAGORN), asLegolas);
+        ClientChatAppearances.toggleLocked(asLegolas);
+        assertEquals(LEGOLAS, ClientChatAppearances.effectiveFor(asLegolas).characterId);
+        // Gone from the roster, the conversation falls back to the default.
+        roster(ARAGORN, ARAGORN);
+        assertEquals(ARAGORN, ClientChatAppearances.effectiveFor(asLegolas).characterId);
+        // With no character active, the account is the active identity.
+        roster(null, ARAGORN);
+        assertEquals("", ClientChatAppearances.activeIdentityKey());
+        ClientCharacterRosterCache.clear();
+        assertEquals("", ClientChatAppearances.activeIdentityKey());
     }
 
     private static ClientChatAppearances.Appearance appearanceOf(UUID characterId) {

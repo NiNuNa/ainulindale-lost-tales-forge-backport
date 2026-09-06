@@ -9,6 +9,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public final class CharacterAppearanceSyncPacketTest {
@@ -42,6 +43,30 @@ public final class CharacterAppearanceSyncPacketTest {
         assertEquals("Heir of Isildur, for now a Ranger of the North.",
                 read.getDescription());
         assertTrue(read.isPresent());
+        // Named by name alone, the character has no id on either side.
+        assertNull(read.getCharacterId());
+    }
+
+    /** The character's stable id travels with its appearance and never with the account's. */
+    @Test
+    public void roundTripsTheCharacterId() {
+        UUID playerId = UUID.randomUUID();
+        UUID characterId = UUID.randomUUID();
+        CharacterAppearance appearance = new CharacterAppearance(
+                playerId, "Steve123", "Aragorn", "losttales:human",
+                "losttales:male", "losttales:human_ranger_male_2",
+                true, 0, "lotr:gondor", 7, 87, "").withCharacterId(characterId);
+        ByteBuf buffer = Unpooled.buffer();
+        new CharacterAppearanceSyncPacket(false, Collections.singletonList(appearance))
+                .toBytes(buffer);
+        CharacterAppearanceSyncPacket decoded = new CharacterAppearanceSyncPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(characterId, decoded.getAppearances().get(0).getCharacterId());
+
+        CharacterAppearance account = CharacterAppearance.forAccount(playerId, "Steve123",
+                "wide", true, 0).withCharacterId(characterId);
+        assertNull(account.getCharacterId());
     }
 
     @Test

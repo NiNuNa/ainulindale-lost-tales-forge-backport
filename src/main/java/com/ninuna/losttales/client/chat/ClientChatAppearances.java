@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
@@ -117,17 +116,15 @@ final class ClientChatAppearances {
     /**
      * The identity the tab speaks as right now: its lock, else the
      * passing choice made on it, else the default — the active
-     * character on the role-playing channels, the account everywhere
-     * else and whenever no character is active.
+     * character on every channel, and the account whenever no character
+     * is active.
      */
     static synchronized Appearance effectiveFor(ChatTab tab) {
         Appearance explicit = explicitFor(tab);
         if (explicit != null) {
             return explicit;
         }
-        if (tab != null && !tab.isNpc() && tab.getChannel() != null
-                && tab.getChannel().getIdentityType()
-                        == ChatIdentityType.CHARACTER) {
+        if (tab != null && !tab.isNpc() && tab.getChannel() != null) {
             CharacterSummary active = activeCharacter();
             if (active != null) {
                 return of(active);
@@ -175,6 +172,14 @@ final class ClientChatAppearances {
         if (tab == null) {
             return null;
         }
+        if (tab.isWhisper() && !tab.isNpc()) {
+            // A conversation is held as one identity and spoken in as
+            // that identity: the tab's own key decides, not a choice.
+            Appearance held = heldAs(tab.getOwnerKey());
+            if (held != null) {
+                return held;
+            }
+        }
         Appearance lock = validLock(tab);
         if (lock != null) {
             return lock;
@@ -187,6 +192,41 @@ final class ClientChatAppearances {
             pendingTab = null;
         }
         return null;
+    }
+
+    /**
+     * The identity a whisper tab's own key names: the account for an
+     * empty key, the roster's character for its id, or null when the
+     * roster no longer holds that character.
+     */
+    private static Appearance heldAs(String ownerKey) {
+        if (ownerKey == null || ownerKey.length() == 0) {
+            return accountAppearance();
+        }
+        CharacterRosterSnapshot roster =
+                ClientCharacterRosterCache.getSnapshot();
+        if (roster == null) {
+            return null;
+        }
+        UUID characterId;
+        try {
+            characterId = UUID.fromString(ownerKey);
+        } catch (IllegalArgumentException malformed) {
+            return null;
+        }
+        CharacterSummary summary = roster.getCharacter(characterId);
+        return summary == null ? null : of(summary);
+    }
+
+    /**
+     * The key a whisper opened now is held under: the active
+     * character's id, or empty for the account. Read from the roster
+     * cache alone, so any lock may be held while calling it.
+     */
+    public static String activeIdentityKey() {
+        CharacterSummary active = activeCharacter();
+        return ChatTab.ownerKeyOf(active == null ? null
+                : active.getCharacterId());
     }
 
     /** The tab's lock while the roster still holds its character; else none, and it is forgotten. */

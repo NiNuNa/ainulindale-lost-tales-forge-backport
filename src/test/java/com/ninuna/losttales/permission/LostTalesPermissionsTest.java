@@ -1,6 +1,7 @@
 package com.ninuna.losttales.permission;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatRoleFixtures;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatRoleConfig;
 import java.util.Collections;
@@ -83,14 +84,14 @@ public final class LostTalesPermissionsTest {
     }
 
     @Test
-    public void theBuiltInRolesGrantNothingByThemselves() {
-        ChatRoleCatalog catalog = ChatRoleCatalog.builtIn();
-        int both = ChatAccountRole.TEAM.bit() | ChatAccountRole.OPERATOR.bit();
+    public void theTeamMarkAndTheDefaultOperatorGrantNothing() {
+        ChatRoleCatalog catalog = ChatRoleFixtures.catalogue();
+        int both = ChatAccountRole.TEAM.bit() | ChatRoleFixtures.OPERATOR.bit();
         for (LostTalesCapability capability : LostTalesCapability.values()) {
             assertFalse(LostTalesPermissions.isGranted(both, capability, catalog));
         }
         assertTrue(ChatAccountRole.TEAM.getGrants().isEmpty());
-        assertTrue(ChatAccountRole.OPERATOR.getGrants().isEmpty());
+        assertTrue(ChatRoleFixtures.OPERATOR.getGrants().isEmpty());
     }
 
     /** What the wire carries about a role never includes its grants. */

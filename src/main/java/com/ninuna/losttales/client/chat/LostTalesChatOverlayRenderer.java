@@ -927,6 +927,16 @@ final class LostTalesChatOverlayRenderer {
                     if (line == null) {
                         continue;
                     }
+                    if (ChatWindowLines.isSpacer(line)
+                            && !olderNeighbourShown(minecraft, lines,
+                                    lineIndex, dividerIndex, scrollPosition,
+                                    visibleLineCount, open)) {
+                        // A blank row marks the gap between two runs; with
+                        // the run above it gone or cut off there is no gap,
+                        // and the row would read as an empty line over the
+                        // topmost message.
+                        continue;
+                    }
                     float headroom = open && lineIndex == topmostIndex
                             && (!fixedHeight
                                     || totalLineCount >= visibleLineCount)
@@ -1199,6 +1209,33 @@ final class LostTalesChatOverlayRenderer {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glEnable(GL11.GL_ALPHA_TEST);
         }
+    }
+
+    /**
+     * Whether the line above a blank row — the older neighbour, one
+     * further along the newest-first list — is on screen: still inside
+     * the window's rows, and in the closed feed not yet faded. A blank
+     * row stands for the gap between two runs, so with nothing above it
+     * there is nothing to mark.
+     */
+    static boolean olderNeighbourShown(Minecraft minecraft,
+                                       List<ChatLine> lines, int lineIndex,
+                                       int dividerIndex, int scrollPosition,
+                                       int visibleLineCount, boolean open) {
+        int older = lineIndex + 1;
+        if (older >= lines.size() || lines.get(older) == null) {
+            return false;
+        }
+        if (rowOfLine(older, dividerIndex) - scrollPosition
+                >= visibleLineCount) {
+            return false;
+        }
+        if (open) {
+            return true;
+        }
+        int age = minecraft.ingameGUI.getUpdateCounter()
+                - lines.get(older).getUpdatedCounter();
+        return age < FEED_FADE_TICKS;
     }
 
     /**

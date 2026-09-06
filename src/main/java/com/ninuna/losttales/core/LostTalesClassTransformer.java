@@ -105,6 +105,15 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.lotrHiredUnitTransformer.active";
     public static final String LOTR_TRADER_NOTICE_ACTIVE_PROPERTY =
             "losttales.lotrTraderNoticeTransformer.active";
+    public static final String LOTR_ACHIEVEMENT_HOVER_ACTIVE_PROPERTY =
+            "losttales.lotrAchievementHoverTransformer.active";
+    /**
+     * Set once the chat's line replacement is guarded against the
+     * history laying itself out again; the chat refreshes its drawn
+     * lines only while this holds.
+     */
+    public static final String CHAT_DELETE_ACTIVE_PROPERTY =
+            "losttales.chatDelete.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
@@ -301,8 +310,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "com/ninuna/losttales/client/chat/LostTalesChatHistoryHooks";
     private static final String CHAT_HISTORY_ACTIVE_PROPERTY =
             "losttales.chatHistory.active";
-    private static final String CHAT_DELETE_ACTIVE_PROPERTY =
-            "losttales.chatDelete.active";
+    private static final String LOTR_GUI_ACHIEVEMENT_HOVER =
+            "lotr.client.gui.LOTRGuiAchievementHoverEvent";
+    private static final String LOTR_ACHIEVEMENT_HOVER_HOOK_OWNER =
+            "com/ninuna/losttales/client/chat/LostTalesLotrAchievementHoverHook";
     /** Vanilla's history limit, as the literal its trimming loops test. */
     private static final int VANILLA_CHAT_HISTORY = 100;
     private static final String MENU_FRAMERATE_HOOK_OWNER =
@@ -409,6 +420,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
         if (LOTR_TRAVELLING_TRADER_INFO.equals(transformedName)) {
             return transformLotrTraderNotice(basicClass);
+        }
+        if (LOTR_GUI_ACHIEVEMENT_HOVER.equals(transformedName)) {
+            return transformLotrAchievementHover(basicClass);
         }
         if (LOTR_NPC_SPEECH_HANDLER.equals(transformedName)) {
             return transformLotrNpcSpeechHandler(basicClass);
@@ -3044,6 +3058,72 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return write(owner);
         } catch (Throwable throwable) {
             warn("Failed to patch LOTR travelling trader notices: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
+     * Draws LOTR's achievement hover card in the chat's palette.
+     *
+     * <p>LOTR draws the card for one of its achievements in the chat
+     * itself, after every chat screen, through
+     * {@code LOTRGuiAchievementHoverEvent}: a {@code GuiScreen} of its
+     * own whose two hovering-text methods hand the lines to vanilla's
+     * routine, in vanilla's colours. Each method opens with a call to
+     * {@code LostTalesLotrAchievementHoverHook}, which draws the same
+     * lines as the chat's own card and answers whether it did; when it
+     * did not, LOTR's drawing runs unchanged. Without the patch LOTR's
+     * card keeps its own colours.</p>
+     */
+    private static byte[] transformLotrAchievementHover(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            int patched = 0;
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                boolean lines = "func_146283_a".equals(method.name)
+                        && "(Ljava/util/List;II)V".equals(method.desc);
+                boolean line = ("drawCreativeTabHoveringText".equals(method.name)
+                        || "func_146279_a".equals(method.name))
+                        && "(Ljava/lang/String;II)V".equals(method.desc);
+                if (!lines && !line) {
+                    continue;
+                }
+                String hookName = lines ? "drawLines" : "drawLine";
+                if (containsHook(method, LOTR_ACHIEVEMENT_HOVER_HOOK_OWNER,
+                        hookName)) {
+                    patched++;
+                    continue;
+                }
+                // if (Hook.draw(this, arg, x, y)) return;
+                InsnList hook = new InsnList();
+                LabelNode drawByLotr = new LabelNode();
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                hook.add(new VarInsnNode(Opcodes.ILOAD, 2));
+                hook.add(new VarInsnNode(Opcodes.ILOAD, 3));
+                hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                        LOTR_ACHIEVEMENT_HOVER_HOOK_OWNER, hookName,
+                        lines ? "(Lnet/minecraft/client/gui/GuiScreen;"
+                                + "Ljava/util/List;II)Z"
+                                : "(Lnet/minecraft/client/gui/GuiScreen;"
+                                + "Ljava/lang/String;II)Z"));
+                hook.add(new JumpInsnNode(Opcodes.IFEQ, drawByLotr));
+                hook.add(new InsnNode(Opcodes.RETURN));
+                hook.add(drawByLotr);
+                method.instructions.insert(hook);
+                patched++;
+            }
+            if (patched == 0) {
+                warn("Could not locate LOTRGuiAchievementHoverEvent's hovering "
+                        + "text; LOTR achievement hover cards keep LOTR's colours");
+                return basicClass;
+            }
+            System.setProperty(LOTR_ACHIEVEMENT_HOVER_ACTIVE_PROPERTY, "true");
+            info("Patched LOTR achievement hover cards into the chat's palette");
+            return write(owner);
+        } catch (Throwable throwable) {
+            warn("Failed to patch LOTR achievement hover cards: " + throwable);
             return basicClass;
         }
     }

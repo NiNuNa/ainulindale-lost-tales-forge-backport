@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.nio.charset.Charset;
@@ -16,11 +15,12 @@ final class ChatHeadMarker {
 
     private ChatHeadMarker() {}
 
-    static String encode(UUID senderId, ChatIdentityType identityType,
+    /** {@code accountLine}: whether the head is the account's rather than a character's. */
+    static String encode(UUID senderId, boolean accountLine,
                          String skinId, String copyText,
                          int titleColor, int nameColor) {
         return PREFIX + senderId + ':'
-                + (identityType == ChatIdentityType.ACCOUNT ? 'A' : 'C')
+                + (accountLine ? 'A' : 'C')
                 + ':' + encodeText(skinId)
                 + ':' + encodeText(copyText)
                 + ':' + colorHex(titleColor)

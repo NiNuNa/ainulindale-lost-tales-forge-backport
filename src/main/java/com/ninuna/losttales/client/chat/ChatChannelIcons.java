@@ -108,7 +108,7 @@ final class ChatChannelIcons {
         int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
         if (tab.getChannel() == ChatChannel.FACTION) {
             ItemStack banner = LotrFactionBannerResolver.bannerFor(
-                    ClientChatChannelState.activeFactionId());
+                    ClientChatChannelState.wornFactionId(ChatChannel.FACTION));
             if (banner != null) {
                 // The banner fills the icon box exactly as a shared
                 // item's icon fills its inline content box.

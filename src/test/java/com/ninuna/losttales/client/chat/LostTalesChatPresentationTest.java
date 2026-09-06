@@ -1,7 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatRoleFixtures;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
@@ -11,6 +13,8 @@ import net.minecraft.event.ClickEvent;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.StatCollector;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -20,6 +24,16 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public final class LostTalesChatPresentationTest {
+
+    @Before
+    public void setUp() {
+        ChatRoleCatalog.install(ChatRoleFixtures.catalogue());
+    }
+
+    @After
+    public void tearDown() {
+        ChatRoleCatalog.resetToBuiltIn();
+    }
 
     /**
      * 1 when the component answers to a click as the sender's name does
@@ -460,11 +474,10 @@ public final class LostTalesChatPresentationTest {
                     ChatChannel.OOC, UUID.randomUUID(), "Steve", "Steve", "",
                     0xFCECD1, ChatAccountRole.TEAM.getColor(), "hello",
                     123456789L, "", null, "", "",
-                    ChatAccountRole.maskOf(ChatAccountRole.OPERATOR,
+                    ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR,
                             ChatAccountRole.TEAM));
             // Without a loaded language a tag reads as its key.
-            String operatorTag = StatCollector.translateToLocal(
-                    ChatAccountRole.OPERATOR.getTagKey()) + " ";
+            String operatorTag = ChatRoleFixtures.OPERATOR.getDisplayTag() + " ";
             String developerTag = StatCollector.translateToLocal(
                     ChatAccountRole.TEAM.getTagKey()) + " ";
             StringBuilder plain = new StringBuilder();
@@ -531,15 +544,14 @@ public final class LostTalesChatPresentationTest {
         boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
         LostTalesConfig.showChatTimestamps = false;
         try {
-            int roles = ChatAccountRole.maskOf(ChatAccountRole.OPERATOR);
+            int roles = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR);
             LostTalesChatMessagePacket whisper =
                     new LostTalesChatMessagePacket(
                             ChatChannel.WHISPER, UUID.randomUUID(), "Steve",
                             "Steve", "", 0xFCECD1,
                             ChatAccountRole.nameColor(roles), "hello",
                             123456789L, "", null, "", "Alex", roles, true);
-            String operatorTag = StatCollector.translateToLocal(
-                    ChatAccountRole.OPERATOR.getTagKey()) + " ";
+            String operatorTag = ChatRoleFixtures.OPERATOR.getDisplayTag() + " ";
             StringBuilder plain = new StringBuilder();
             Integer operatorRgb = null;
             for (Object value : LostTalesChatPresentation.build(whisper)) {
@@ -552,8 +564,8 @@ public final class LostTalesChatPresentationTest {
             assertTrue(plain.indexOf(operatorTag) >= 0);
             assertTrue(plain.indexOf(operatorTag) < plain.indexOf("<"));
             assertEquals(Integer.valueOf(
-                    ChatAccountRole.OPERATOR.getColor()), operatorRgb);
-            assertEquals(ChatAccountRole.OPERATOR.getColor(),
+                    ChatRoleFixtures.OPERATOR.getColor()), operatorRgb);
+            assertEquals(ChatRoleFixtures.OPERATOR.getColor(),
                     markerOf(LostTalesChatPresentation.build(whisper))
                             .nameColor);
 

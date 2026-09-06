@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.chat.ChatIdentityType;
+import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -13,12 +13,12 @@ import java.util.UUID;
 /**
  * What each speaker has just said, for the words drawn over their head.
  *
- * <p>Only lines spoken <em>in character</em> are kept: the mod already
- * marks which channels those are — {@link ChatIdentityType#CHARACTER},
- * which is Global, Proximity, Party and Faction — so a channel added
- * later needs nothing here, and the out-of-character ones (OOC, the
- * operator channel, whispers, the console, the Discord bridge) never
- * reach the world. Party, Faction and Global carry no distance of their
+ * <p>Only lines spoken <em>in character</em> are kept: the channel says
+ * which those are ({@link ChatRolePresentation#isInCharacter}) — Global,
+ * Proximity, Party, Faction and whispers — so a channel added later needs
+ * nothing here, and the out-of-character ones (OOC, the operator channel,
+ * the console, the Discord bridge) never reach the world. Party, Faction,
+ * whispers and Global carry no distance of their
  * own, but a speaker has to be rendered in front of you for the words to
  * be drawn at all, so what shows over a head is always someone present.</p>
  *
@@ -58,8 +58,7 @@ public final class ChatSpeechBubbles {
         }
         ChatChannel channel = packet.getChannel();
         UUID speaker = packet.getSenderId();
-        if (channel == null || speaker == null
-                || channel.getIdentityType() != ChatIdentityType.CHARACTER) {
+        if (speaker == null || !ChatRolePresentation.isInCharacter(channel)) {
             return;
         }
         // The name and its colour are the chat's own, so a hobbit is the

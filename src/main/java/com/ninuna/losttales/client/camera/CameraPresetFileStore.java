@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.camera;
 
+import com.ninuna.losttales.config.LostTalesConfigFiles;
 import com.ninuna.losttales.client.diagnostics.LostTalesClientDiagnostics;
 import java.io.File;
 import java.io.FileInputStream;
@@ -25,8 +26,9 @@ public final class CameraPresetFileStore {
     public static final int MAX_PRESET_FILES = 128;
     public static final long MAX_JSON_BYTES = 128L * 1024L;
 
+    /** Under the client's config folder. */
     private static final String PRESET_DIRECTORY =
-            "losttales/camera_presets";
+            LostTalesConfigFiles.CAMERA_PRESETS;
     private static final String BUNDLED_RESOURCE_ROOT =
             "/assets/losttales/camera_presets/";
     private static final String[] BUNDLED_FILE_NAMES = {

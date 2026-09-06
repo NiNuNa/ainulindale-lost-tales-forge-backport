@@ -1,9 +1,8 @@
 package com.ninuna.losttales.config;
 
+import cpw.mods.fml.relauncher.FMLInjectionData;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.charset.Charset;
+import java.lang.reflect.Field;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -12,16 +11,23 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-/** Every file lives in the mod's folder, and an older build's file is moved there once. */
+/**
+ * The client's files live in the client folder and the server's in the
+ * server folder, and a server asking for its own files never creates
+ * the client's folder.
+ */
 public final class LostTalesConfigFilesTest {
 
     private File configDirectory;
 
     @Before
-    public void setUp() throws IOException {
+    public void setUp() throws Exception {
         configDirectory = File.createTempFile("losttales-config", "");
         assertTrue(configDirectory.delete());
         assertTrue(configDirectory.mkdirs());
+        Field minecraftHome = FMLInjectionData.class.getDeclaredField("minecraftHome");
+        minecraftHome.setAccessible(true);
+        minecraftHome.set(null, configDirectory.getParentFile());
     }
 
     @After
@@ -30,56 +36,33 @@ public final class LostTalesConfigFilesTest {
     }
 
     @Test
-    public void filesLiveInTheModsFolder() {
-        File file = LostTalesConfigFiles.file(configDirectory, LostTalesConfigFiles.MAIN_OPTIONS);
-        assertEquals(new File(configDirectory, "losttales"), file.getParentFile());
-        assertEquals("losttales.cfg", file.getName());
-        assertTrue(file.getParentFile().isDirectory());
-        assertFalse(file.exists());
-        assertEquals("losttales-third-person.cfg", LostTalesConfigFiles.CAMERA_OPTIONS);
+    public void filesLiveInTheirSidesFolder() {
+        File client = LostTalesConfigFiles.clientOptions(configDirectory);
+        File server = LostTalesConfigFiles.serverOptions(configDirectory);
+        assertEquals(new File(configDirectory, "losttales/client"), client.getParentFile());
+        assertEquals(new File(configDirectory, "losttales/server"), server.getParentFile());
+        assertEquals("client.cfg", client.getName());
+        assertEquals("server.cfg", server.getName());
+        assertTrue(client.getParentFile().isDirectory());
+        assertTrue(server.getParentFile().isDirectory());
+        assertFalse(client.exists());
+        assertFalse(server.exists());
+        assertEquals(new File(configDirectory, "losttales/client/chat/layout.txt"),
+                LostTalesConfigFiles.clientFile(configDirectory, LostTalesConfigFiles.CHAT_LAYOUT));
+        assertEquals("third-person.cfg", LostTalesConfigFiles.CAMERA_OPTIONS);
     }
 
     @Test
-    public void anOlderBuildsFileIsMovedIntoTheFolderOnce() throws IOException {
-        File legacy = new File(configDirectory, LostTalesConfigFiles.MAIN_OPTIONS);
-        write(legacy, "old settings");
-        File file = LostTalesConfigFiles.file(configDirectory, LostTalesConfigFiles.MAIN_OPTIONS);
-        assertTrue(file.isFile());
-        assertFalse(legacy.exists());
-        assertEquals("old settings", read(file));
-        // A file already in the folder is never overwritten by an old one.
-        write(legacy, "stale copy");
-        File again = LostTalesConfigFiles.file(configDirectory, LostTalesConfigFiles.MAIN_OPTIONS);
-        assertEquals(file, again);
-        assertEquals("old settings", read(again));
-        assertTrue(legacy.isFile());
-    }
-
-    private static void write(File file, String text) throws IOException {
-        FileOutputStream output = new FileOutputStream(file);
-        try {
-            output.write(text.getBytes(Charset.forName("UTF-8")));
-        } finally {
-            output.close();
-        }
-    }
-
-    private static String read(File file) throws IOException {
-        byte[] bytes = new byte[(int)file.length()];
-        java.io.FileInputStream input = new java.io.FileInputStream(file);
-        try {
-            int offset = 0;
-            while (offset < bytes.length) {
-                int count = input.read(bytes, offset, bytes.length - offset);
-                if (count < 0) {
-                    break;
-                }
-                offset += count;
-            }
-        } finally {
-            input.close();
-        }
-        return new String(bytes, Charset.forName("UTF-8"));
+    public void aServerNeverCreatesTheClientFolder() {
+        assertTrue(LostTalesConfigFiles.serverOptions(configDirectory)
+                .getParentFile().isDirectory());
+        assertTrue(LostTalesConfigFiles.rolesOptions(configDirectory)
+                .getParentFile().isDirectory());
+        assertEquals(new File(configDirectory, "losttales/server/channels.cfg"),
+                LostTalesConfigFiles.channelsOptions(configDirectory));
+        assertFalse(new File(configDirectory, "losttales/client").exists());
+        assertEquals(new File(configDirectory, "losttales/lore_characters"),
+                LostTalesConfigFiles.file(configDirectory, "lore_characters"));
     }
 
     private static void delete(File file) {

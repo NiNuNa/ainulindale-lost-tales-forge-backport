@@ -91,6 +91,20 @@ final class ChatWindowLines {
     }
 
     /**
+     * The arrival tick a blank row between two runs is aged on. In a
+     * fading view the row must leave with whichever neighbour leaves
+     * first, which is the older run; a row kept on the newer run's clock
+     * outlives the run above it and stands as an empty line over the
+     * topmost message. A view that does not fade keeps the newer run's
+     * tick, which only decides the entry motion.
+     */
+    static int spacerClock(boolean fading, int newerRunCounter,
+                           int olderRunCounter) {
+        return fading ? Math.min(newerRunCounter, olderRunCounter)
+                : newerRunCounter;
+    }
+
+    /**
      * The row of a message nearest to {@code index}, looking at the
      * newer side first, or -1 when every row is a spacer: what a scroll
      * takes hold of instead of a blank row, which stands for nothing.
@@ -464,13 +478,12 @@ final class ChatWindowLines {
             boolean[] spacers = spacersAfter(lineIds, grouped);
             Map<ChatLine, Piece> kept = new IdentityHashMap<ChatLine, Piece>(
                     this.wrapped.size() + 1);
-            List<ChatLine> result =
-                    new ArrayList<ChatLine>(messages.size());
             // A fading view fades a run as one, so every line of a run
             // carries the arrival tick of the run's newest message —
             // the clock the renderer ages each line on. Walking newest
             // first, that is the newest message met since the last line
             // that opened a run.
+            List<Piece> pieces = new ArrayList<Piece>(visible.size());
             int runNewest = 0;
             for (int index = 0; index < visible.size(); index++) {
                 ChatLine message = visible.get(index);
@@ -487,16 +500,41 @@ final class ChatWindowLines {
                     piece = piece.on(counter);
                 }
                 kept.put(message, piece);
+                pieces.add(piece);
+            }
+            List<ChatLine> result =
+                    new ArrayList<ChatLine>(messages.size());
+            for (int index = 0; index < pieces.size(); index++) {
+                Piece piece = pieces.get(index);
                 result.addAll(piece.lines);
-                if (spacers[index]) {
-                    // The blank row between this run and the older one
-                    // below it, on this run's clock so the feed lets it
-                    // go with the run it belongs to.
-                    result.add(new ChatLine(counter, SPACER, 0));
+                // The blank row between this run and the older one
+                // above it stands only while both have something on
+                // screen: a neighbour that draws no glyph leaves no gap
+                // to mark, and in the feed the row goes on the older
+                // run's clock, since that run is the first to fade.
+                if (spacers[index] && index + 1 < pieces.size()
+                        && drawsSomething(piece)
+                        && drawsSomething(pieces.get(index + 1))) {
+                    result.add(new ChatLine(spacerClock(this.fading,
+                            piece.updatedCounter,
+                            pieces.get(index + 1).updatedCounter),
+                            SPACER, 0));
                 }
             }
             this.wrapped = kept;
             this.lines = Collections.unmodifiableList(result);
+        }
+
+        /** Whether the message has at least one row with text on it. */
+        private static boolean drawsSomething(Piece piece) {
+            for (ChatLine line : piece.lines) {
+                IChatComponent component = line.func_151461_a();
+                if (component != null
+                        && component.getUnformattedText().trim().length() > 0) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /**

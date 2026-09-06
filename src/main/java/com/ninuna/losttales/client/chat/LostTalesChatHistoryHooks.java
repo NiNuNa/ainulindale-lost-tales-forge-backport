@@ -1,6 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.core.LostTalesClassTransformer;
+import cpw.mods.fml.common.FMLLog;
 import net.minecraft.client.gui.GuiNewChat;
 
 /**
@@ -33,6 +36,39 @@ public final class LostTalesChatHistoryHooks {
     public static boolean isActive() {
         return Boolean.getBoolean(ACTIVE_PROPERTY);
     }
+
+    /** Whether {@link #deleteUnlessRefreshing} guards the history; see {@link #refresh}. */
+    public static boolean isDeleteGuardActive() {
+        return Boolean.getBoolean(
+                LostTalesClassTransformer.CHAT_DELETE_ACTIVE_PROPERTY);
+    }
+
+    /**
+     * Lays the drawn lines out again from the history — only while the
+     * history is guarded against that walk deleting it. Without the
+     * patch a refresh would empty the history (see
+     * {@link #deleteUnlessRefreshing}), so the drawn lines are left as
+     * they are and the reason is logged once; the Lost Tales windows lay
+     * their lines out from the history themselves and are unaffected.
+     */
+    public static void refresh(GuiNewChat chat) {
+        if (chat == null) {
+            return;
+        }
+        if (isDeleteGuardActive()) {
+            chat.refreshChat();
+            return;
+        }
+        if (!refreshSkipLogged) {
+            refreshSkipLogged = true;
+            FMLLog.warning("[%s] The chat line replacement patch is not active; "
+                    + "the drawn chat lines are not laid out again so the history "
+                    + "survives. Check the coremod warnings above.",
+                    LostTalesMetaData.MOD_ID);
+        }
+    }
+
+    private static boolean refreshSkipLogged;
 
     /**
      * Vanilla's own line replacement, skipped while the history is

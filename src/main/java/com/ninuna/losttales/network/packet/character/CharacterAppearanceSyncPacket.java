@@ -101,8 +101,14 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                     throw new CharacterPacketCodec.DecodeException(
                             "invalid appearance details");
                 }
+                UUID characterId = buffer.readBoolean()
+                        ? CharacterPacketCodec.readUuid(buffer) : null;
+                if (characterId != null && kind != CharacterAppearanceKind.CHARACTER) {
+                    throw new CharacterPacketCodec.DecodeException(
+                            "a character id on an appearance that is not a character");
+                }
                 decoded.add(new CharacterAppearance(kind,
-                        playerId, accountName, characterName, raceId,
+                        playerId, characterId, accountName, characterName, raceId,
                         genderId, skinId, showMinecraftCape, cosmeticCapeId,
                         startingFactionId, roleplayLevel, age, description,
                         bodyTypeId, chestTypeId));
@@ -165,6 +171,12 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
             // Appended again: which identity this is, so the account can
             // be drawn from its own entry rather than reconstructed.
             buffer.writeByte(appearance.getKind().getCode());
+            // Appended again: the character's stable id, so clients key
+            // conversations and mentions by it rather than by a name.
+            buffer.writeBoolean(appearance.getCharacterId() != null);
+            if (appearance.getCharacterId() != null) {
+                CharacterPacketCodec.writeUuid(buffer, appearance.getCharacterId());
+            }
         }
     }
 

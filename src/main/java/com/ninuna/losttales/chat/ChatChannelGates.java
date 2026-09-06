@@ -9,23 +9,39 @@ import java.util.Set;
 /**
  * Which roles a channel asks for, to read it and to send into it. A
  * side with no roles named is open to everyone the channel's own access
- * already admits. The Operator channel asks for the operator role on
- * both sides unless the config says otherwise. The server keeps the
- * gates in force and checks them on every send and delivery; a client
- * only receives the answer for itself, in the chat access packet.
+ * already admits. Every gate comes from the config — the server's file
+ * is seeded with the Operator channel asking for the operator role on
+ * both sides, and no channel is gated by anything but what the file
+ * says. A side that named a role the catalogue does not have is
+ * <em>closed</em>: a misspelt role must not open a staff channel to
+ * everyone. The server keeps the gates in force and checks them on
+ * every send and delivery; a client only receives the answer for
+ * itself, in the chat access packet.
  */
 public final class ChatChannelGates {
 
-    /** One channel's requirement: any of the read roles, any of the send roles. */
+    /**
+     * One channel's requirement: any of the read roles, any of the send
+     * roles; a side may instead be closed to everyone.
+     */
     public static final class Gate {
         private final Set<String> readRoles;
         private final Set<String> sendRoles;
+        private final boolean readClosed;
+        private final boolean sendClosed;
 
         public Gate(Set<String> readRoles, Set<String> sendRoles) {
+            this(readRoles, sendRoles, false, false);
+        }
+
+        public Gate(Set<String> readRoles, Set<String> sendRoles,
+                    boolean readClosed, boolean sendClosed) {
             this.readRoles = Collections.unmodifiableSet(new HashSet<String>(
                     readRoles == null ? Collections.<String>emptySet() : readRoles));
             this.sendRoles = Collections.unmodifiableSet(new HashSet<String>(
                     sendRoles == null ? Collections.<String>emptySet() : sendRoles));
+            this.readClosed = readClosed;
+            this.sendClosed = sendClosed;
         }
 
         public Set<String> getReadRoles() {
@@ -35,12 +51,24 @@ public final class ChatChannelGates {
         public Set<String> getSendRoles() {
             return this.sendRoles;
         }
+
+        /** Whether nobody may read: a side that named a role nothing knows. */
+        public boolean isReadClosed() {
+            return this.readClosed;
+        }
+
+        /** Whether nobody may send. */
+        public boolean isSendClosed() {
+            return this.sendClosed;
+        }
+
+        boolean asksAnything() {
+            return this.readClosed || this.sendClosed
+                    || !this.readRoles.isEmpty() || !this.sendRoles.isEmpty();
+        }
     }
 
     private static final Gate OPEN = new Gate(null, null);
-    private static final Gate OPERATORS_ONLY = new Gate(
-            Collections.singleton(ChatAccountRole.OPERATOR_ID),
-            Collections.singleton(ChatAccountRole.OPERATOR_ID));
     private static volatile ChatChannelGates current = defaults();
 
     private final Map<ChatChannel, Gate> gates;
@@ -61,15 +89,14 @@ public final class ChatChannelGates {
         current = defaults();
     }
 
-    /** The Operator channel for operators, everything else open. */
+    /** No gate at all: what stands before a config is read. */
     public static ChatChannelGates defaults() {
         return of(Collections.<ChatChannel, Gate>emptyMap());
     }
 
-    /** The given gates over the defaults. */
+    /** Exactly the given gates; every other channel is open. */
     public static ChatChannelGates of(Map<ChatChannel, Gate> configured) {
         Map<ChatChannel, Gate> gates = new HashMap<ChatChannel, Gate>();
-        gates.put(ChatChannel.ADMIN, OPERATORS_ONLY);
         if (configured != null) {
             gates.putAll(configured);
         }
@@ -83,18 +110,19 @@ public final class ChatChannelGates {
 
     /** Whether a holder of these roles may read the channel. */
     public boolean canRead(int roleMask, ChatChannel channel) {
-        return holdsAny(roleMask, gateOf(channel).readRoles);
+        Gate gate = gateOf(channel);
+        return !gate.readClosed && holdsAny(roleMask, gate.readRoles);
     }
 
     /** Whether a holder of these roles may send into the channel. */
     public boolean canSend(int roleMask, ChatChannel channel) {
-        return holdsAny(roleMask, gateOf(channel).sendRoles);
+        Gate gate = gateOf(channel);
+        return !gate.sendClosed && holdsAny(roleMask, gate.sendRoles);
     }
 
-    /** Whether the channel asks for a role on either side. */
+    /** Whether the channel asks for a role on either side, or is closed on one. */
     public boolean isGated(ChatChannel channel) {
-        Gate gate = gateOf(channel);
-        return !gate.readRoles.isEmpty() || !gate.sendRoles.isEmpty();
+        return gateOf(channel).asksAnything();
     }
 
     private static boolean holdsAny(int roleMask, Set<String> roleIds) {
@@ -112,13 +140,17 @@ public final class ChatChannelGates {
 
     /** The config entry a channel's gate is written as; null when open. */
     public static String format(ChatChannel channel, Gate gate) {
-        if (gate.readRoles.isEmpty() && gate.sendRoles.isEmpty()) {
+        if (!gate.asksAnything()) {
             return null;
         }
-        return channel.getId() + "=read:" + join(gate.readRoles) + ";send:" + join(gate.sendRoles);
+        return channel.getId() + "=read:" + join(gate.readRoles, gate.readClosed)
+                + ";send:" + join(gate.sendRoles, gate.sendClosed);
     }
 
-    private static String join(Set<String> ids) {
+    private static String join(Set<String> ids, boolean closed) {
+        if (closed) {
+            return "none";
+        }
         if (ids.isEmpty()) {
             return "any";
         }

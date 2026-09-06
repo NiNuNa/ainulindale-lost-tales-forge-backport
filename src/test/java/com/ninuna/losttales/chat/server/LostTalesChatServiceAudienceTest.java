@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatRoleFixtures;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatMessageIds;
@@ -78,7 +79,7 @@ public final class LostTalesChatServiceAudienceTest {
         Map<ChatChannel, ChatChannelGates.Gate> gates =
                 new HashMap<ChatChannel, ChatChannelGates.Gate>();
         gates.put(ChatChannel.ALL, new ChatChannelGates.Gate(
-                Collections.singleton(ChatAccountRole.OPERATOR_ID), null));
+                Collections.singleton(ChatRoleFixtures.OPERATOR_ID), null));
         ChatChannelGates.install(ChatChannelGates.of(gates));
         record(ChatChannel.ALL, null, "", Arrays.asList(ALICE, BOB));
         assertEquals(1, replay(BOB, "", 0L, null, EVERY_CHANNEL).size());
@@ -131,7 +132,7 @@ public final class LostTalesChatServiceAudienceTest {
                 channel == ChatChannel.WHISPER ? "bob" : "", 0, false, id,
                 ChatReplyReference.NONE, "");
         ChatHistory.record(id, ALICE, "Aldric", null, line, sentTo,
-                LostTalesChatService.audienceFor(channel, party, factionId, sentTo));
+                ChatChannelPolicy.audienceFor(channel, party, factionId, sentTo));
     }
 
     private static List<LostTalesChatMessagePacket> replay(

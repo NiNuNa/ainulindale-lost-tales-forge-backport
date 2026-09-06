@@ -27,8 +27,9 @@ public final class CameraPresetFileStoreTest {
 
         CameraPresetFileStore.initialize(configDirectory);
 
-        File presetDirectory = new File(
-                configDirectory, "losttales/camera_presets");
+        // The store is handed the client's folder and keeps its presets
+        // directly under it.
+        File presetDirectory = new File(configDirectory, "camera_presets");
         assertEquals(presetDirectory.getCanonicalFile(),
                 CameraPresetFileStore.getPresetDirectory()
                         .getCanonicalFile());

@@ -16,6 +16,8 @@ public final class CharacterClientTaskQueue {
     private static final int MAX_TASKS_PER_TICK = 128;
     private static final Queue<Runnable> TASKS = new ConcurrentLinkedQueue<Runnable>();
     private static final AtomicInteger QUEUED_TASK_COUNT = new AtomicInteger();
+    /** Whether the full queue has been reported this session. */
+    private static volatile boolean overflowLogged;
 
     public static boolean enqueue(Runnable task) {
         if (task == null) {
@@ -24,6 +26,15 @@ public final class CharacterClientTaskQueue {
         while (true) {
             int current = QUEUED_TASK_COUNT.get();
             if (current >= MAX_QUEUED_TASKS) {
+                if (!overflowLogged) {
+                    // Said once: a burst that overflows the queue loses
+                    // whatever it carried, and that must show in the log.
+                    overflowLogged = true;
+                    FMLLog.warning("[%s] The client task queue is full (%d tasks); "
+                            + "a queued sync was dropped and its state will be "
+                            + "missing until the server sends it again",
+                            LostTalesMetaData.MOD_ID, MAX_QUEUED_TASKS);
+                }
                 return false;
             }
             if (QUEUED_TASK_COUNT.compareAndSet(current, current + 1)) {
@@ -59,5 +70,6 @@ public final class CharacterClientTaskQueue {
     public static void clear() {
         TASKS.clear();
         QUEUED_TASK_COUNT.set(0);
+        overflowLogged = false;
     }
 }

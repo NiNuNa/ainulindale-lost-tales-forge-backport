@@ -6,7 +6,6 @@ import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatNameSuggester;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
@@ -636,25 +635,38 @@ final class ChatInputCompletion {
             }
         }
         return mentionCandidatesFor(
-                channel.getIdentityType() == ChatIdentityType.ACCOUNT,
                 this.mc.thePlayer.getUniqueID(),
                 this.mc.thePlayer.getCommandSenderName(),
-                active == null ? "" : active.getName(), online, byAccount);
+                active == null ? "" : active.getName(),
+                active == null ? null : active.getCharacterId(),
+                online, byAccount);
     }
 
     /**
-     * The candidates for one channel: the mentionable roles first, since
+     * The candidates for a channel: the mentionable roles first, since
      * addressing a whole group is never buried under a list of names;
      * then the player themself; then everyone else online, alphabetical.
-     * An account channel displays and inserts the account name, a
-     * role-play channel the active character name; both names remain
-     * searchable aliases. The stable key is the player's UUID from the
-     * appearance sync where one is known, so an account and its
-     * character never appear as two entries.
+     * A player is displayed and inserted by the active character's name
+     * wherever one is known — the identity every channel signs lines
+     * with by default — and by the account name otherwise; both names
+     * remain searchable aliases. The stable key is the player's UUID
+     * from the appearance sync where one is known, so an account and
+     * its character never appear as two entries; the character's own id
+     * rides along, so the row is coloured and faced by the synced
+     * appearance rather than by a name.
      */
     static List<ChatMentionCandidate> mentionCandidatesFor(
-            boolean accountIdentity, UUID selfId, String selfAccount,
+            UUID selfId, String selfAccount,
             String selfCharacter, List<String> onlineAccounts,
+            Map<String, CharacterAppearance> appearancesByAccount) {
+        return mentionCandidatesFor(selfId, selfAccount, selfCharacter, null,
+                onlineAccounts, appearancesByAccount);
+    }
+
+    static List<ChatMentionCandidate> mentionCandidatesFor(
+            UUID selfId, String selfAccount,
+            String selfCharacter, UUID selfCharacterId,
+            List<String> onlineAccounts,
             Map<String, CharacterAppearance> appearancesByAccount) {
         List<ChatMentionCandidate> result =
                 new ArrayList<ChatMentionCandidate>();
@@ -666,8 +678,9 @@ final class ChatInputCompletion {
             }
         }
         result.add(candidate(selfId == null ? "self" : selfId.toString(),
-                selfAccount, selfCharacter, accountIdentity,
-                selfId == null ? "" : selfId.toString()));
+                selfAccount, selfCharacter,
+                selfId == null ? "" : selfId.toString(),
+                selfCharacterId == null ? "" : selfCharacterId.toString()));
         List<ChatMentionCandidate> others =
                 new ArrayList<ChatMentionCandidate>();
         for (String account : onlineAccounts) {
@@ -682,8 +695,10 @@ final class ChatInputCompletion {
                     : appearance.getPlayerId().toString();
             others.add(candidate(key, account, appearance == null
                     ? "" : appearance.getCharacterName(),
-                    accountIdentity, appearance == null ? ""
-                            : appearance.getPlayerId().toString()));
+                    appearance == null ? ""
+                            : appearance.getPlayerId().toString(),
+                    appearance == null || appearance.getCharacterId() == null
+                            ? "" : appearance.getCharacterId().toString()));
         }
         Collections.sort(others, new Comparator<ChatMentionCandidate>() {
             @Override
@@ -699,11 +714,11 @@ final class ChatInputCompletion {
 
     private static ChatMentionCandidate candidate(
             String key, String account, String character,
-            boolean accountIdentity, String accountId) {
-        String display = accountIdentity || character == null
+            String accountId, String characterId) {
+        String display = character == null
                 || character.trim().length() == 0 ? account : character;
         return ChatMentionCandidate.player(key, display, account, character,
-                accountId, Arrays.asList(account, character));
+                accountId, characterId, Arrays.asList(account, character));
     }
 
     static boolean sameCandidates(List<ChatMentionCandidate> left,
@@ -716,6 +731,7 @@ final class ChatInputCompletion {
             ChatMentionCandidate b = right.get(index);
             if (!a.getKey().equals(b.getKey())
                     || !a.getDisplayName().equals(b.getDisplayName())
+                    || !a.getCharacterId().equals(b.getCharacterId())
                     || !a.getAliases().equals(b.getAliases())) {
                 return false;
             }

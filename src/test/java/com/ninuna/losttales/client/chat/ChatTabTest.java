@@ -157,4 +157,36 @@ public final class ChatTabTest {
         assertEquals(odd, ChatTab.fromId(odd.id()));
         assertEquals("A|B", ChatTab.fromId(odd.id()).getPartnerIdentity());
     }
+
+    /**
+     * What this player says as one character is that character's
+     * conversation: held as another identity, the same partner is
+     * another tab, and the key survives the id.
+     */
+    @Test
+    public void eachOwnIdentityHoldsItsOwnConversations() {
+        java.util.UUID mine = java.util.UUID.fromString(
+                "d0000000-0000-0000-0000-00000000000d");
+        ChatTab asAccount = ChatTab.whisper("Steve", "Aldric");
+        ChatTab asMine = ChatTab.whisper("Steve", "Aldric", ChatTab.ownerKeyOf(mine));
+        assertFalse(asAccount.equals(asMine));
+        assertEquals("", asAccount.getOwnerKey());
+        assertEquals(mine.toString(), asMine.getOwnerKey());
+        assertEquals(asMine, ChatTab.whisper("steve", "aldric",
+                mine.toString().toUpperCase(java.util.Locale.ROOT)));
+        assertEquals("whisper:Steve|Aldric|own:" + mine, asMine.id());
+        assertEquals(asMine, ChatTab.fromId(asMine.id()));
+        // Held as a character, a conversation with the account too.
+        ChatTab accountAsMine = ChatTab.whisper("Steve", "", ChatTab.ownerKeyOf(mine));
+        assertTrue(accountAsMine.isAccountConversation());
+        assertEquals("whisper:Steve|Steve|own:" + mine, accountAsMine.id());
+        assertEquals(accountAsMine, ChatTab.fromId(accountAsMine.id()));
+        assertEquals("", ChatTab.ownerKeyOf(null));
+        assertEquals("", ChatTab.whisper("Steve", "Aldric", null).getOwnerKey());
+        // An identity may hold the owner mark; only the last segment is one.
+        ChatTab odd = ChatTab.whisper("Steve", "own:x", ChatTab.ownerKeyOf(mine));
+        assertEquals(odd, ChatTab.fromId(odd.id()));
+        assertEquals("own:x", ChatTab.fromId(odd.id()).getPartnerIdentity());
+        assertEquals(mine.toString(), ChatTab.fromId(odd.id()).getOwnerKey());
+    }
 }

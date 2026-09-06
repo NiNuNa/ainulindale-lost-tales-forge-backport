@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatRoleFixtures;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import net.minecraft.util.StatCollector;
 import org.junit.After;
@@ -27,16 +28,15 @@ public final class LostTalesChatHoverCardTest {
         ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator",
                 "", "", 0xA94B54, true, 20, null);
         ChatRoleCatalog.install(ChatRoleCatalog.of(
-                java.util.Collections.singletonList(moderator), null, null));
+                java.util.Arrays.asList(ChatRoleFixtures.OPERATOR, moderator), null, null));
         int held = ChatRoleCatalog.current().byId("moderator").bit()
-                | ChatAccountRole.OPERATOR.bit() | ChatAccountRole.TEAM.bit();
+                | ChatRoleFixtures.OPERATOR.bit() | ChatAccountRole.TEAM.bit();
         String team = StatCollector.translateToLocal(ChatAccountRole.TEAM.getNameKey());
-        String operator = StatCollector.translateToLocal(
-                ChatAccountRole.OPERATOR.getNameKey());
+        String operator = ChatRoleFixtures.OPERATOR.getDisplayName();
         assertEquals(team + ", " + operator + ", Moderator",
                 LostTalesChatHoverCard.roleNames(held));
         assertEquals(operator, LostTalesChatHoverCard.roleNames(
-                ChatAccountRole.OPERATOR.bit()));
+                ChatRoleFixtures.OPERATOR.bit()));
         assertEquals("", LostTalesChatHoverCard.roleNames(0));
     }
     @Test

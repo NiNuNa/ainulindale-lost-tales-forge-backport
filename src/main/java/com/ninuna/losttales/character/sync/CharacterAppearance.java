@@ -27,6 +27,12 @@ public final class CharacterAppearance {
 
     private final CharacterAppearanceKind kind;
     private final UUID playerId;
+    /**
+     * The stable id of the character this is, or null for the account
+     * and for an appearance an older server sent without it. Names are
+     * for reading; this is what keys the character across renames.
+     */
+    private final UUID characterId;
     private final String accountName;
     private final String characterName;
     private final String raceId;
@@ -163,10 +169,26 @@ public final class CharacterAppearance {
                                String startingFactionId, int roleplayLevel,
                                int age, String description, String bodyTypeId,
                                String chestTypeId) {
+        this(kind, playerId, null, accountName, characterName, raceId, genderId,
+                skinId, showMinecraftCape, cosmeticCapeId, startingFactionId,
+                roleplayLevel, age, description, bodyTypeId, chestTypeId);
+    }
+
+    /** The canonical projection with the character's stable id; see {@link #getCharacterId}. */
+    public CharacterAppearance(CharacterAppearanceKind kind, UUID playerId,
+                               UUID characterId,
+                               String accountName, String characterName,
+                               String raceId, String genderId, String skinId,
+                               boolean showMinecraftCape, int cosmeticCapeId,
+                               String startingFactionId, int roleplayLevel,
+                               int age, String description, String bodyTypeId,
+                               String chestTypeId) {
         if (playerId == null) {
             throw new IllegalArgumentException("playerId must not be null");
         }
         this.playerId = playerId;
+        this.characterId = kind == CharacterAppearanceKind.CHARACTER
+                ? characterId : null;
         this.accountName = normalizeName(accountName);
         this.characterName = normalizeName(characterName);
         this.raceId = CharacterRaceRegistry.canonicalizeIdentifier(raceId);
@@ -232,7 +254,9 @@ public final class CharacterAppearance {
                         roster == null ? RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID
                                 : roster.getAccountCosmeticCapeId())
                 : new CharacterAppearance(
+                        CharacterAppearanceKind.CHARACTER,
                         playerId,
+                        active.getCharacterId(),
                         accountName,
                         active.getName(),
                         active.getRaceId(),
@@ -246,6 +270,15 @@ public final class CharacterAppearance {
                         active.getDescription(),
                         active.getBodyTypeId(),
                         active.getChestTypeId());
+    }
+
+    /** The same appearance naming the character by its stable id. */
+    public CharacterAppearance withCharacterId(UUID characterId) {
+        return new CharacterAppearance(this.kind, this.playerId, characterId,
+                this.accountName, this.characterName, this.raceId, this.genderId,
+                this.skinId, this.showMinecraftCape, this.cosmeticCapeId,
+                this.startingFactionId, this.roleplayLevel, this.age,
+                this.description, this.bodyTypeId, this.chestTypeId);
     }
 
     public static CharacterAppearance removed(UUID playerId) {
@@ -333,6 +366,14 @@ public final class CharacterAppearance {
     /** Whether the identity is a roleplay character rather than the account. */
     public boolean hasCharacter() {
         return this.kind == CharacterAppearanceKind.CHARACTER;
+    }
+
+    /**
+     * The character's stable id, or null for the account, a removal, and
+     * a character an older server described by name alone.
+     */
+    public UUID getCharacterId() {
+        return this.characterId;
     }
 
     /** Whether the identity is the Minecraft account played as itself. */

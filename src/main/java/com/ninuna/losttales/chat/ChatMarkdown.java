@@ -40,8 +40,25 @@ public final class ChatMarkdown {
         if (message == null || message.length() == 0) {
             return spans;
         }
-        scan(message, Span.PLAIN, 0, spans);
+        scan(message, 0, Span.PLAIN, 0, spans, null);
         return spans;
+    }
+
+    /**
+     * The style of every character of the message <em>as typed</em>: the
+     * marks each character is shown with, and {@link Span#MARK} on the
+     * marker characters themselves, which {@link #parse} drops. What the
+     * input field draws its live preview from, laid out by the same scan
+     * the chat line is, so the two can never disagree about which
+     * characters are markup. Every character keeps its place: the array
+     * is as long as the message.
+     */
+    public static int[] layout(String message) {
+        int[] styles = new int[message == null ? 0 : message.length()];
+        if (styles.length > 0) {
+            scan(message, 0, Span.PLAIN, 0, null, styles);
+        }
+        return styles;
     }
 
     /** Whether the text carries any markup at all; a quick way out. */
@@ -57,8 +74,14 @@ public final class ChatMarkdown {
         return false;
     }
 
-    private static void scan(String text, int style, int depth,
-                             List<Span> spans) {
+    /**
+     * One scan serves both readings: {@code spans} collects the runs
+     * without their markers, {@code styles} records every character's
+     * style at its place in the whole message, {@code base} away from
+     * this text's start. Either may be null.
+     */
+    private static void scan(String text, int base, int style, int depth,
+                             List<Span> spans, int[] styles) {
         int literalStart = 0;
         int cursor = 0;
         while (cursor < text.length()) {
@@ -72,22 +95,37 @@ public final class ChatMarkdown {
                 continue;
             }
             if (literalStart < cursor) {
-                add(spans, text.substring(literalStart, cursor), style);
+                add(spans, styles, text, literalStart, cursor, base, style);
             }
-            String inner = text.substring(cursor + delimiter.length(),
-                    close);
+            int innerStart = cursor + delimiter.length();
+            mark(styles, base + cursor, delimiter.length(), style);
+            mark(styles, base + close, delimiter.length(), style);
+            String inner = text.substring(innerStart, close);
             int nested = style | styleOf(delimiter);
             if ((nested & Span.CODE) != 0) {
                 // Quoted text is quoted: nothing inside it is markup.
-                add(spans, inner, nested);
+                add(spans, styles, text, innerStart, close, base, nested);
             } else {
-                scan(inner, nested, depth + 1, spans);
+                scan(inner, base + innerStart, nested, depth + 1, spans,
+                        styles);
             }
             cursor = close + delimiter.length();
             literalStart = cursor;
         }
         if (literalStart < text.length()) {
-            add(spans, text.substring(literalStart), style);
+            add(spans, styles, text, literalStart, text.length(), base,
+                    style);
+        }
+    }
+
+    /** A marker's characters: shown as typed, in the style around them. */
+    private static void mark(int[] styles, int at, int length, int style) {
+        if (styles == null) {
+            return;
+        }
+        for (int index = at; index < at + length && index < styles.length;
+                index++) {
+            styles[index] = style | Span.MARK;
         }
     }
 
@@ -160,9 +198,18 @@ public final class ChatMarkdown {
         return "`".equals(delimiter) ? Span.CODE : Span.ITALIC;
     }
 
-    private static void add(List<Span> spans, String text, int style) {
-        if (text.length() > 0) {
-            spans.add(new Span(text, style));
+    private static void add(List<Span> spans, int[] styles, String text,
+                            int from, int to, int base, int style) {
+        if (from >= to) {
+            return;
+        }
+        if (spans != null) {
+            spans.add(new Span(text.substring(from, to), style));
+        }
+        if (styles != null) {
+            for (int index = from; index < to; index++) {
+                styles[base + index] = style;
+            }
         }
     }
 
@@ -175,6 +222,12 @@ public final class ChatMarkdown {
         public static final int CODE = 8;
         public static final int SPOILER = 16;
         public static final int UNDERLINE = 32;
+        /**
+         * A marker character itself, in {@link ChatMarkdown#layout}
+         * only: shown as typed while the message is edited, gone once
+         * it is sent. Never set on a parsed span.
+         */
+        public static final int MARK = 64;
 
         private final String text;
         private final int style;

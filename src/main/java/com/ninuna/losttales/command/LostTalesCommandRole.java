@@ -2,6 +2,11 @@ package com.ninuna.losttales.command;
 
 import com.mojang.authlib.GameProfile;
 import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.character.storage.CharacterStorage;
+import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.model.CharacterRoster;
+import com.ninuna.losttales.chat.ChatChannelGates;
+import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatRoleConfig;
 import com.ninuna.losttales.chat.ChatRoleSource;
@@ -13,11 +18,9 @@ import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.relauncher.Side;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.command.ICommandSender;
@@ -26,17 +29,20 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.EnumChatFormatting;
 
 /**
- * The chat roles, live: list them, assign one to an account and take it
- * away, create, restyle and delete config roles, their grants included.
- * Every change is written to the config through the same service the
- * settings screen uses, so the file, the screen and the running server
- * agree, and the chat access of everyone online follows. The Lost Tales Team mark is shown
- * and refused by every verb: it belongs to the code.
+ * The chat roles, live: list them, assign one to an account or to a
+ * character — named alike, whichever it is — and take it away, create,
+ * restyle and delete roles,
+ * their grants included. Every change is written to the roles file
+ * through the same service the settings screen uses, so the file, the
+ * screen and the running server agree, and the chat access of everyone
+ * online follows. The Lost Tales Team mark is shown and refused by every
+ * verb: it belongs to the code. The operator role is a role like any
+ * other here; deleting it closes every gate that names it.
  */
 public final class LostTalesCommandRole extends LostTalesCommandBase {
 
-    private static final String ROLES_KEY = "roles";
-    private static final String MEMBERS_KEY = "roleMembers";
+    private static final String ROLES_KEY = "definitions";
+    private static final String MEMBERS_KEY = "members";
 
     public LostTalesCommandRole() {
         super("role");
@@ -105,17 +111,30 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
                 }
                 int members = catalog.membersOf(role.getId()).size();
                 if (members > 0) {
-                    line.append(" members:").append(members);
+                    line.append(" accounts:").append(members);
+                }
+                int characters = catalog.characterMembersOf(role.getId()).size();
+                if (characters > 0) {
+                    line.append(" characters:").append(characters);
                 }
             }
             LostTalesCommandConfig.send(sender, line.toString());
         }
     }
 
+    /**
+     * {@code assign|unassign <role> <player|character>}: the name is an
+     * account's (online, by id, or known to the server's profile cache)
+     * or a character's, on any roster, and is looked up as both. An
+     * account holds the role as every identity it plays and gains its
+     * grants; a character alone wears it and nothing is granted. A name
+     * both an account and a character answer to is refused until it is
+     * given as {@code account:<name>} or {@code character:<name>}.
+     */
     private void assign(ICommandSender sender, String[] args, boolean grant) {
         if (args.length < 3) {
             LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + "/losttales role "
-                    + (grant ? "assign" : "unassign") + " <role> <player>");
+                    + (grant ? "assign" : "unassign") + " <role> <player|character>");
             return;
         }
         ChatAccountRole role = ChatRoleCatalog.server().byId(args[1]);
@@ -129,24 +148,153 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
                     + "The Lost Tales Team mark is never assigned; it belongs to the code.");
             return;
         }
-        UUID account = resolveAccount(args[2]);
-        if (account == null) {
-            LostTalesCommandConfig.send(sender, EnumChatFormatting.RED
-                    + "No account known as " + args[2] + ".");
+        Subject subject = resolveSubject(sender, joinFrom(args, 2));
+        if (subject.problem != null) {
+            LostTalesCommandConfig.send(sender, EnumChatFormatting.RED + subject.problem);
             return;
         }
-        Set<UUID> members = new HashSet<UUID>(ChatRoleCatalog.server().membersOf(role.getId()));
-        boolean changed = grant ? members.add(account) : members.remove(account);
+        Set<UUID> accounts = new HashSet<UUID>(
+                ChatRoleCatalog.server().membersOf(role.getId()));
+        Set<UUID> characters = new HashSet<UUID>(
+                ChatRoleCatalog.server().characterMembersOf(role.getId()));
+        boolean changed = subject.character != null
+                ? (grant ? characters.add(subject.character)
+                        : characters.remove(subject.character))
+                : (grant ? accounts.add(subject.account)
+                        : accounts.remove(subject.account));
         if (!changed) {
-            LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + args[2]
+            LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + subject.label
                     + (grant ? " already holds " : " does not hold ") + role.getId() + ".");
             return;
         }
         List<String> entries = ChatRoleConfig.withMembers(
-                LostTalesConfig.chatRoleMembers, role.getId(), members);
+                LostTalesConfig.chatRoleMembers, role.getId(), accounts, characters);
         LostTalesCommandConfig.report(sender, LostTalesServerConfigService.apply(
                 java.util.Collections.singletonList(new ServerConfigChange(
-                        LostTalesConfig.CATEGORY_CHAT, MEMBERS_KEY, true, entries))));
+                        LostTalesConfig.CATEGORY_ROLES, MEMBERS_KEY, true, entries))));
+    }
+
+    /** Whom a name names: one account, or one character, or a problem to report. */
+    private static final class Subject {
+        final UUID account;
+        final UUID character;
+        final String label;
+        final String problem;
+
+        Subject(UUID account, UUID character, String label, String problem) {
+            this.account = account;
+            this.character = character;
+            this.label = label;
+            this.problem = problem;
+        }
+    }
+
+    private static final String ACCOUNT_PREFIX = "account:";
+    private static final String CHARACTER_PREFIX = "character:";
+
+    /**
+     * The account or character the name stands for, read from the
+     * server's own records — the player list, the profile cache and the
+     * character rosters — never from the command's words alone.
+     */
+    private static Subject resolveSubject(ICommandSender sender, String typed) {
+        String name = typed == null ? "" : typed.trim();
+        boolean accountOnly = false;
+        boolean characterOnly = false;
+        if (name.toLowerCase(Locale.ROOT).startsWith(ACCOUNT_PREFIX)) {
+            accountOnly = true;
+            name = name.substring(ACCOUNT_PREFIX.length()).trim();
+        } else if (name.toLowerCase(Locale.ROOT).startsWith(CHARACTER_PREFIX)) {
+            characterOnly = true;
+            name = name.substring(CHARACTER_PREFIX.length()).trim();
+        }
+        if (name.length() == 0) {
+            return new Subject(null, null, "", "Name an account or a character.");
+        }
+        UUID account = characterOnly ? null : resolveAccount(name);
+        RoleplayCharacter character = accountOnly ? null
+                : resolveCharacter(sender, name);
+        if (account != null && character != null) {
+            return new Subject(null, null, name, "Both an account and a character are named "
+                    + name + "; say " + ACCOUNT_PREFIX + name + " or " + CHARACTER_PREFIX
+                    + name + ".");
+        }
+        if (character != null) {
+            return new Subject(null, character.getCharacterId(),
+                    character.getName() + " (character)", null);
+        }
+        if (account != null) {
+            return new Subject(account, null, name + " (account)", null);
+        }
+        return new Subject(null, null, name, "No account or character known as " + name + ".");
+    }
+
+    /**
+     * The character of that name on any roster, or null; two rosters
+     * holding the name make it nobody's, since a role cannot be given
+     * to half a name. Read from the server's store; a store that cannot
+     * be read names nobody.
+     */
+    private static RoleplayCharacter resolveCharacter(ICommandSender sender, String name) {
+        if (sender == null || sender.getEntityWorld() == null) {
+            return null;
+        }
+        RoleplayCharacter found = null;
+        try {
+            for (CharacterRoster roster
+                    : CharacterStorage.get(sender.getEntityWorld()).getRosters()) {
+                if (roster == null) {
+                    continue;
+                }
+                for (RoleplayCharacter character : roster.getCharacters()) {
+                    if (character == null || !name.equalsIgnoreCase(character.getName())) {
+                        continue;
+                    }
+                    if (found != null) {
+                        return null;
+                    }
+                    found = character;
+                }
+            }
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
+        return found;
+    }
+
+    /** Every character name on every roster, for completion. */
+    private static List<String> characterNames(ICommandSender sender) {
+        List<String> names = new ArrayList<String>();
+        if (sender == null || sender.getEntityWorld() == null) {
+            return names;
+        }
+        try {
+            for (CharacterRoster roster
+                    : CharacterStorage.get(sender.getEntityWorld()).getRosters()) {
+                if (roster == null) {
+                    continue;
+                }
+                for (RoleplayCharacter character : roster.getCharacters()) {
+                    if (character != null && character.getName().trim().length() > 0) {
+                        names.add(character.getName());
+                    }
+                }
+            }
+        } catch (RuntimeException unreadable) {
+            // Nothing to complete from a store that cannot be read.
+        }
+        return names;
+    }
+
+    private static String joinFrom(String[] args, int start) {
+        StringBuilder joined = new StringBuilder();
+        for (int index = start; index < args.length; index++) {
+            if (joined.length() > 0) {
+                joined.append(' ');
+            }
+            joined.append(args[index]);
+        }
+        return joined.toString();
     }
 
     /**
@@ -201,7 +349,7 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
             LostTalesCommandConfig.send(sender, EnumChatFormatting.YELLOW + warning);
         }
         ChatAccountRole role = parsed.byId(id);
-        if (role == null || (ChatAccountRole.OPERATOR_ID.equals(id) && role.isLocked())) {
+        if (role == null) {
             LostTalesCommandConfig.send(sender, EnumChatFormatting.RED
                     + "The entry could not be read; nothing was changed.");
             return;
@@ -209,7 +357,7 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         List<String> entries = ChatRoleConfig.upsertRole(LostTalesConfig.chatRoles, role);
         LostTalesCommandConfig.report(sender, LostTalesServerConfigService.apply(
                 java.util.Collections.singletonList(new ServerConfigChange(
-                        LostTalesConfig.CATEGORY_CHAT, ROLES_KEY, true, entries))));
+                        LostTalesConfig.CATEGORY_ROLES, ROLES_KEY, true, entries))));
     }
 
     private void delete(ICommandSender sender, String[] args) {
@@ -224,15 +372,24 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
             LostTalesCommandConfig.send(sender, EnumChatFormatting.RED + "No chat role " + id + ".");
             return;
         }
-        if (role.isLocked() || ChatAccountRole.OPERATOR_ID.equals(id)) {
+        if (role.isLocked()) {
             LostTalesCommandConfig.send(sender, EnumChatFormatting.RED
-                    + "The built-in roles cannot be deleted; an edit restyles the operator role.");
+                    + "The Lost Tales Team mark belongs to the code and cannot be deleted.");
             return;
         }
+        for (ChatChannel channel : ChatChannel.values()) {
+            ChatChannelGates.Gate gate = ChatChannelGates.current().gateOf(channel);
+            if (gate.getReadRoles().contains(id) || gate.getSendRoles().contains(id)) {
+                LostTalesCommandConfig.send(sender, EnumChatFormatting.YELLOW
+                        + "The " + channel.getDisplayName() + " channel's gate names " + id
+                        + "; that side of the gate is closed to everyone until the gate is "
+                        + "changed in channels.cfg.");
+            }
+        }
         List<ServerConfigChange> changes = new ArrayList<ServerConfigChange>();
-        changes.add(new ServerConfigChange(LostTalesConfig.CATEGORY_CHAT, ROLES_KEY, true,
+        changes.add(new ServerConfigChange(LostTalesConfig.CATEGORY_ROLES, ROLES_KEY, true,
                 ChatRoleConfig.removeKey(LostTalesConfig.chatRoles, id)));
-        changes.add(new ServerConfigChange(LostTalesConfig.CATEGORY_CHAT, MEMBERS_KEY, true,
+        changes.add(new ServerConfigChange(LostTalesConfig.CATEGORY_ROLES, MEMBERS_KEY, true,
                 ChatRoleConfig.removeKey(LostTalesConfig.chatRoleMembers, id)));
         LostTalesCommandConfig.report(sender, LostTalesServerConfigService.apply(changes));
     }
@@ -323,9 +480,9 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + getCommandUsage(sender));
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + "/losttales role list");
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
-                + "/losttales role assign <role> <player>");
+                + "/losttales role assign <role> <player|character>");
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
-                + "/losttales role unassign <role> <player>");
+                + "/losttales role unassign <role> <player|character>");
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
                 + "/losttales role create <id> [name:<text>] [tag:<[Text]>] [color:<RRGGBB>] "
                 + "[mention:<true|false>] [rank:<n>] [op:<level>] [faction:<FACTION>@<rank>] "
@@ -358,20 +515,14 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         }
         if (args.length == 3 && ("assign".equalsIgnoreCase(args[0])
                 || "unassign".equalsIgnoreCase(args[0]))) {
+            List<String> names = characterNames(sender);
             MinecraftServer server = MinecraftServer.getServer();
             if (server != null) {
-                return getListOfStringsMatchingLastWord(args, server.getAllUsernames());
+                names.addAll(java.util.Arrays.asList(server.getAllUsernames()));
             }
+            return getListOfStringsMatchingLastWord(args,
+                    names.toArray(new String[names.size()]));
         }
         return null;
-    }
-
-    /** Every member id of the catalogue, for tests and listings. */
-    static Map<String, Set<UUID>> membersOf(ChatRoleCatalog catalog) {
-        return catalog.members();
-    }
-
-    static List<String> asList(String[] values) {
-        return Arrays.asList(values);
     }
 }

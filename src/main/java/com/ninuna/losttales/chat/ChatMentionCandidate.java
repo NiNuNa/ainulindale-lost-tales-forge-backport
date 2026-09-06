@@ -17,9 +17,12 @@ import java.util.Locale;
  * player the same way a chat line's name does.
  *
  * <p>A candidate is either a player or a role. A player carries the
- * account id its face is drawn from; a role carries the colour it is
- * named in and reaches everyone holding it. Roles are listed first, so
- * addressing a whole group is never buried under a list of names.</p>
+ * account id its face is drawn from and the id of the character it is
+ * displayed as, so what the list shows is joined to the synced
+ * appearance by id rather than by a name two characters may share; a
+ * role carries the colour it is named in and reaches everyone holding
+ * it. Roles are listed first, so addressing a whole group is never
+ * buried under a list of names.</p>
  */
 public final class ChatMentionCandidate {
     private final String key;
@@ -27,6 +30,7 @@ public final class ChatMentionCandidate {
     private final String accountName;
     private final String characterName;
     private final String accountId;
+    private final String characterId;
     private final int roleColor;
     private final List<String> aliases;
 
@@ -38,7 +42,8 @@ public final class ChatMentionCandidate {
     public ChatMentionCandidate(String key, String displayName,
                                 String accountName, String characterName,
                                 List<String> aliases) {
-        this(key, displayName, accountName, characterName, aliases, "", -1);
+        this(key, displayName, accountName, characterName, aliases, "", "",
+                -1);
     }
 
     /**
@@ -47,7 +52,7 @@ public final class ChatMentionCandidate {
      */
     public static ChatMentionCandidate role(String key, String name,
                                             int color) {
-        return new ChatMentionCandidate(key, name, "", "", null, "",
+        return new ChatMentionCandidate(key, name, "", "", null, "", "",
                 color & 0xFFFFFF);
     }
 
@@ -57,14 +62,28 @@ public final class ChatMentionCandidate {
                                               String characterName,
                                               String accountId,
                                               List<String> aliases) {
+        return player(key, displayName, accountName, characterName,
+                accountId, "", aliases);
+    }
+
+    /**
+     * A player, with the account id their face is drawn from and the
+     * id of the character they are displayed as; empty for none.
+     */
+    public static ChatMentionCandidate player(String key, String displayName,
+                                              String accountName,
+                                              String characterName,
+                                              String accountId,
+                                              String characterId,
+                                              List<String> aliases) {
         return new ChatMentionCandidate(key, displayName, accountName,
-                characterName, aliases, accountId, -1);
+                characterName, aliases, accountId, characterId, -1);
     }
 
     private ChatMentionCandidate(String key, String displayName,
                                  String accountName, String characterName,
                                  List<String> aliases, String accountId,
-                                 int roleColor) {
+                                 String characterId, int roleColor) {
         String trimmedDisplay = displayName == null ? "" : displayName.trim();
         this.key = key == null || key.trim().length() == 0
                 ? trimmedDisplay.toLowerCase(Locale.ROOT) : key.trim();
@@ -81,7 +100,16 @@ public final class ChatMentionCandidate {
         }
         this.aliases = Collections.unmodifiableList(normalized);
         this.accountId = accountId == null ? "" : accountId.trim();
+        this.characterId = characterId == null ? "" : characterId.trim();
         this.roleColor = roleColor;
+    }
+
+    /**
+     * The id of the character this candidate is displayed as, or empty
+     * when it is displayed as the account — or is a role.
+     */
+    public String getCharacterId() {
+        return this.characterId;
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.proxy;
 
+import java.io.File;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.achievement.ELostTalesAchievement;
@@ -89,6 +90,7 @@ import com.ninuna.losttales.world.map.waypoint.LostTalesMapMarkerWaypointRegistr
 import com.ninuna.losttales.world.spawning.ELostTalesSpawnList;
 import com.ninuna.losttales.world.structure.ELostTalesStructure;
 import cpw.mods.fml.common.FMLCommonHandler;
+import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
@@ -117,9 +119,22 @@ import software.bernie.geckolib3.GeckoLib;
 
 public class LostTalesCommonProxy {
 
+    /**
+     * Reads the options: the client's file and the server's on a client,
+     * the server's alone on a dedicated server, which never creates the
+     * client folder.
+     */
+    private static void loadConfig(File modConfigDirectory) {
+        boolean clientSide = FMLCommonHandler.instance().getSide() == Side.CLIENT;
+        LostTalesConfig.load(
+                clientSide ? LostTalesConfigFiles.clientOptions(modConfigDirectory) : null,
+                LostTalesConfigFiles.serverOptions(modConfigDirectory),
+                LostTalesConfigFiles.rolesOptions(modConfigDirectory),
+                LostTalesConfigFiles.channelsOptions(modConfigDirectory));
+    }
+
     public void preInit(FMLPreInitializationEvent event) {
-        LostTalesConfig.load(LostTalesConfigFiles.file(
-                event.getModConfigurationDirectory(), LostTalesConfigFiles.MAIN_OPTIONS));
+        loadConfig(event.getModConfigurationDirectory());
         LoreCharacterRegistry.load(event.getModConfigurationDirectory());
         GeckoLib.initialize();
         LostTalesNetworkHandler.registerCommonPackets();

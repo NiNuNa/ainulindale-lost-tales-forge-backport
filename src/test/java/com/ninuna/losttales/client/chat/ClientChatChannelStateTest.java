@@ -111,6 +111,8 @@ public final class ClientChatChannelStateTest {
         assertEquals(ChatChannel.CONSOLE, ClientChatChannelState.cycle().getChannel());
         assertFalse(ClientChatChannelState.canSend(ChatChannel.ADMIN));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.CONSOLE));
+        // The server's word arrives as gate masks: every channel open here.
+        ClientChatChannelState.setChannelGates(-1, -1);
         ClientChatChannelState.setAdminAccess(true);
         assertEquals(java.util.Arrays.asList(ChatChannel.ALL,
                 ChatChannel.PROXIMITY, ChatChannel.OOC, ChatChannel.ADMIN,
@@ -118,6 +120,8 @@ public final class ClientChatChannelStateTest {
                 ClientChatChannelState.getAvailableChannels());
         ClientChatChannelState.select(ChatChannel.ADMIN);
         ClientChatChannelState.setAdminAccess(false);
+        ClientChatChannelState.setChannelGates(-1 & ~(1 << ChatChannel.ADMIN.ordinal()),
+                -1 & ~(1 << ChatChannel.ADMIN.ordinal()));
         // Losing op status drops the selection back to a channel the
         // player can talk in: Global, sendable with the account now.
         assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
@@ -255,7 +259,43 @@ public final class ClientChatChannelStateTest {
                 ClientChatChannelState.cycleAll(true).getChannel());
     }
 
-    private static void acceptRoster(String factionId) {
+    /**
+     * A conversation held as one character is on screen only while that
+     * character is played; the account's while none is. Its partner's
+     * character is remembered for the reply, and forgotten with the
+     * world.
+     */
+    @Test
+    public void conversationsShowForTheIdentityTheyAreHeldAs() {
+        UUID played = acceptRoster("GONDOR");
+        ChatTab asPlayed = ChatTab.whisper("Steve", "Aldric", ChatTab.ownerKeyOf(played));
+        ChatTab asOther = ChatTab.whisper("Steve", "Aldric",
+                ChatTab.ownerKeyOf(UUID.randomUUID()));
+        ChatTab asAccount = ChatTab.whisper("Steve", "Aldric");
+        assertTrue(ClientChatChannelState.isAvailable(asPlayed));
+        assertFalse(ClientChatChannelState.isAvailable(asOther));
+        assertFalse(ClientChatChannelState.isAvailable(asAccount));
+        assertTrue(ClientChatChannelState.isAvailable(ChatTab.npc("Steve")));
+        ClientCharacterRosterCache.clear();
+        assertTrue(ClientChatChannelState.isAvailable(asAccount));
+        assertFalse(ClientChatChannelState.isAvailable(asPlayed));
+
+        UUID aldric = UUID.randomUUID();
+        assertEquals(null, ClientChatChannelState.partnerCharacterIdOf(asAccount));
+        ClientChatChannelState.rememberPartnerCharacterId(asAccount, aldric);
+        assertEquals(aldric, ClientChatChannelState.partnerCharacterIdOf(asAccount));
+        assertEquals(null, ClientChatChannelState.partnerCharacterIdOf(asPlayed));
+        ClientChatChannelState.rememberPartnerCharacterId(asAccount, null);
+        assertEquals(null, ClientChatChannelState.partnerCharacterIdOf(asAccount));
+        ClientChatChannelState.rememberPartnerCharacterId(asAccount, aldric);
+        ClientChatChannelState.rememberPartnerCharacterId(ChatTab.of(ChatChannel.ALL), aldric);
+        assertEquals(null, ClientChatChannelState.partnerCharacterIdOf(
+                ChatTab.of(ChatChannel.ALL)));
+        ClientChatChannelState.clear();
+        assertEquals(null, ClientChatChannelState.partnerCharacterIdOf(asAccount));
+    }
+
+    private static UUID acceptRoster(String factionId) {
         UUID ownerId = UUID.randomUUID();
         UUID characterId = UUID.randomUUID();
         CharacterSummary character = new CharacterSummary(
@@ -267,5 +307,6 @@ public final class ClientChatChannelStateTest {
                 RoleplayCharacter.CURRENT_DATA_VERSION,
                 Collections.singletonList(character));
         ClientCharacterRosterCache.acceptRoster(0, snapshot);
+        return characterId;
     }
 }

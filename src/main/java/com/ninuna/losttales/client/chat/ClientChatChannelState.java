@@ -3,6 +3,9 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelAccess;
+import com.ninuna.losttales.chat.ChatRoleConfig;
+import com.ninuna.losttales.chat.ChatRoleCatalog;
+import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
@@ -52,6 +55,13 @@ public final class ClientChatChannelState {
      */
     private static final LinkedHashMap<ChatTab, String> PARTNER_NAMES =
             new LinkedHashMap<ChatTab, String>();
+    /**
+     * The id of the character a conversation is with, when the server
+     * has said; a reply is then addressed by it. Remembered like the
+     * names, from the conversation's lines alone.
+     */
+    private static final LinkedHashMap<ChatTab, UUID> PARTNER_CHARACTER_IDS =
+            new LinkedHashMap<ChatTab, UUID>();
     private static String cachedFactionId = "";
     private static String cachedFactionName = "";
     private static long cachedFactionNanos;
@@ -63,9 +73,17 @@ public final class ClientChatChannelState {
     private static boolean canEditServerConfig;
     /** Server-stated roles of this player; what {@code @Operator} reaches. */
     private static int roleMask;
+    /**
+     * The gates before the server's first word: what a fresh server file
+     * states, read for a player with no role — the Operator channel
+     * closed, everything else open. Once the access packet arrives the
+     * server's own masks replace them.
+     */
+    private static final int DEFAULT_READABLE = seededGateMask(true);
+    private static final int DEFAULT_SENDABLE = seededGateMask(false);
     /** Server-stated channel gates for this player, one bit per channel. */
-    private static int readableChannels = -1;
-    private static int sendableChannels = -1;
+    private static int readableChannels = DEFAULT_READABLE;
+    private static int sendableChannels = DEFAULT_SENDABLE;
     /** Server-stated muted senders; filled for operators only. */
     private static final java.util.Set<UUID> MUTED_SENDERS =
             new java.util.HashSet<UUID>();
@@ -265,9 +283,20 @@ public final class ClientChatChannelState {
         return null;
     }
 
-    /** Whether the tab's history is readable and its tab shown. */
+    /**
+     * Whether the tab's history is readable and its tab shown. A
+     * conversation is shown only while the identity it is held as is
+     * the active one: what the player said as one character is not on
+     * screen while they play another. Its lines are still filed and
+     * counted, and it shows again when that identity is played again.
+     */
     public static synchronized boolean isAvailable(ChatTab tab) {
-        return tab != null && isAvailable(tab.getChannel());
+        if (tab == null || !isAvailable(tab.getChannel())) {
+            return false;
+        }
+        return !tab.isWhisper() || tab.isNpc()
+                || tab.getOwnerKey().equals(
+                        ClientChatAppearances.activeIdentityKey());
     }
 
     /**
@@ -325,6 +354,23 @@ public final class ClientChatChannelState {
         return bit >= 32 || (gates & (1 << bit)) != 0;
     }
 
+    /** One bit per channel the seeded gates leave open to a player with no role. */
+    private static int seededGateMask(boolean read) {
+        ChatChannelGates seeded = ChatRoleConfig.parseGates(
+                new String[] {ChatRoleConfig.DEFAULT_ADMIN_GATE},
+                ChatRoleCatalog.builtIn(), ChatRoleConfig.SILENT);
+        int mask = 0;
+        ChatChannel[] channels = ChatChannel.values();
+        for (int index = 0; index < channels.length && index < 32; index++) {
+            boolean open = read ? seeded.canRead(0, channels[index])
+                    : seeded.canSend(0, channels[index]);
+            if (open) {
+                mask |= 1 << index;
+            }
+        }
+        return mask;
+    }
+
     /** The server's word on the channels this player may read and send into. */
     public static synchronized void setChannelGates(int readable, int sendable) {
         readableChannels = readable;
@@ -350,14 +396,11 @@ public final class ClientChatChannelState {
         if (!isGateOpen(sendableChannels, channel)) {
             return false;
         }
+        // Role gates, the Operator channel's included, are answered by the
+        // sendable mask the server sent above; membership is what remains.
         ChatChannelAccess access = channel.getAccess();
-        if (access == ChatChannelAccess.OPERATOR) {
-            return adminAccess;
-        }
         if (access == ChatChannelAccess.CHARACTER_FACTION) {
-            CharacterSummary active = activeCharacter();
-            return active != null && LotrCharacterAdapter.normalizeFactionId(
-                    active.getStartingFactionId()).length() > 0;
+            return wornFactionId(channel).length() > 0;
         }
         if (access != ChatChannelAccess.PARTY_MEMBERSHIP) {
             return true;
@@ -439,15 +482,40 @@ public final class ClientChatChannelState {
         }
     }
 
+    /**
+     * Remembers which character of the other party a conversation is
+     * with; null forgets, for a conversation with their account.
+     */
+    public static synchronized void rememberPartnerCharacterId(ChatTab tab,
+                                                               UUID characterId) {
+        if (tab == null || !tab.isWhisper() || tab.isNpc()) {
+            return;
+        }
+        if (characterId == null) {
+            PARTNER_CHARACTER_IDS.remove(tab);
+            return;
+        }
+        PARTNER_CHARACTER_IDS.put(tab, characterId);
+        while (PARTNER_CHARACTER_IDS.size() > MAX_PARTNER_COLORS) {
+            Iterator<ChatTab> oldest = PARTNER_CHARACTER_IDS.keySet().iterator();
+            oldest.next();
+            oldest.remove();
+        }
+    }
+
+    /** The id of the character a conversation is with; null for their account, or unknown. */
+    public static synchronized UUID partnerCharacterIdOf(ChatTab tab) {
+        return tab == null ? null : PARTNER_CHARACTER_IDS.get(tab);
+    }
+
     public static synchronized int displayColor(ChatChannel channel) {
         if (channel == null) {
             return 0xFFFFFF;
         }
         if (channel == ChatChannel.FACTION) {
-            CharacterSummary active = activeCharacter();
-            return active == null ? channel.getDisplayColor()
-                    : LotrFactionColors.forFactionId(
-                            active.getStartingFactionId(),
+            String factionId = wornFactionId(channel);
+            return factionId.length() == 0 ? channel.getDisplayColor()
+                    : LotrFactionColors.forFactionId(factionId,
                             channel.getDisplayColor());
         }
         if (channel == ChatChannel.PARTY) {
@@ -497,9 +565,10 @@ public final class ClientChatChannelState {
     }
 
     /**
-     * Visible label for a channel. Faction shows the active character's
-     * LOTR faction name ("Gondor") so the tab, indicator, and message prefix
-     * all agree; the logical channel id is untouched. The LOTR lookup is
+     * Visible label for a channel. Faction shows the LOTR faction name
+     * ("Gondor") of the identity its tab speaks as, so the tab, indicator
+     * and message prefix all agree and follow a character chosen for the
+     * tab; the logical channel id is untouched. The LOTR lookup is
      * cached per faction id, and an unavailable lookup is retried on an
      * interval rather than every frame, falling back to the catalogue name.
      */
@@ -510,10 +579,7 @@ public final class ClientChatChannelState {
         if (channel != ChatChannel.FACTION) {
             return channel.getDisplayName();
         }
-        CharacterSummary active = activeCharacter();
-        String factionId = active == null ? ""
-                : LotrCharacterAdapter.normalizeFactionId(
-                        active.getStartingFactionId());
+        String factionId = wornFactionId(channel);
         if (factionId.length() == 0) {
             return channel.getDisplayName();
         }
@@ -721,6 +787,7 @@ public final class ClientChatChannelState {
         selected = ChatTab.of(ChatChannel.ALL);
         PARTNER_COLORS.clear();
         PARTNER_NAMES.clear();
+        PARTNER_CHARACTER_IDS.clear();
         cachedFactionId = "";
         cachedFactionName = "";
         cachedFactionNanos = 0L;
@@ -728,8 +795,8 @@ public final class ClientChatChannelState {
         canModerate = false;
         canEditServerConfig = false;
         roleMask = 0;
-        readableChannels = -1;
-        sendableChannels = -1;
+        readableChannels = DEFAULT_READABLE;
+        sendableChannels = DEFAULT_SENDABLE;
         ROLE_HOLDERS.clear();
         MUTED_SENDERS.clear();
         DRAFTS.clear();
@@ -740,6 +807,27 @@ public final class ClientChatChannelState {
         CharacterRosterSnapshot roster =
                 ClientCharacterRosterCache.getSnapshot();
         return roster == null ? null : roster.getActiveCharacter();
+    }
+
+    /**
+     * The normalized faction id of the identity the channel's tab speaks
+     * as — the character chosen or locked for the tab, else the active
+     * character — or empty for the account and for a character without
+     * a faction. The Faction channel's label, colour and availability
+     * all read this, so they follow the worn identity as the server's
+     * routing does.
+     */
+    public static synchronized String wornFactionId(ChatChannel channel) {
+        ClientChatAppearances.Appearance worn =
+                ClientChatAppearances.effectiveFor(ChatTab.of(channel));
+        if (worn == null || worn.account || worn.characterId == null) {
+            return "";
+        }
+        CharacterRosterSnapshot roster = ClientCharacterRosterCache.getSnapshot();
+        CharacterSummary character = roster == null ? null
+                : roster.getCharacter(worn.characterId);
+        return character == null ? ""
+                : LotrCharacterAdapter.normalizeFactionId(character.getStartingFactionId());
     }
 
     /**

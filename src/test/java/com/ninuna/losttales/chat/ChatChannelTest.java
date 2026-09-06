@@ -59,8 +59,8 @@ public final class ChatChannelTest {
                 ChatChannel.CONSOLE.getRecipientRule());
         assertEquals(ChatRecipientRule.OPERATORS,
                 ChatChannel.ADMIN.getRecipientRule());
-        assertEquals(ChatIdentityType.ACCOUNT,
-                ChatChannel.ADMIN.getIdentityType());
+        assertEquals(ChatPresentationMode.OUT_OF_CHARACTER,
+                ChatChannel.ADMIN.getPresentation());
     }
 
     @Test
@@ -77,14 +77,14 @@ public final class ChatChannelTest {
                 ChatChannel.FACTION.getAccess());
         assertEquals(ChatChannelAccess.PARTY_MEMBERSHIP,
                 ChatChannel.PARTY.getAccess());
-        assertEquals(ChatChannelAccess.OPERATOR,
+        assertEquals(ChatChannelAccess.NONE,
                 ChatChannel.ADMIN.getAccess());
         // OOC & Discord is a room everyone is in, bridged or not; the
         // bridge is the server's configuration and never a gate.
         assertEquals(ChatRecipientRule.GLOBAL,
                 ChatChannel.OOC.getRecipientRule());
-        assertEquals(ChatIdentityType.ACCOUNT,
-                ChatChannel.OOC.getIdentityType());
+        assertEquals(ChatPresentationMode.OUT_OF_CHARACTER,
+                ChatChannel.OOC.getPresentation());
     }
 
     /** Private conversations never leave the game, whatever the bridge is told. */
@@ -108,8 +108,8 @@ public final class ChatChannelTest {
             assertEquals(channel.getId(), descriptor.getId());
             assertEquals(channel.getDisplayName(),
                     descriptor.getDisplayName());
-            assertEquals(channel.getIdentityType(),
-                    descriptor.getIdentityType());
+            assertEquals(channel.getPresentation(),
+                    descriptor.getPresentation());
             assertEquals(channel.getRecipientRule(),
                     descriptor.getRecipientRule());
             assertEquals(channel.getAccess(), descriptor.getAccess());

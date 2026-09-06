@@ -1,7 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.chat.ChatIdentityType;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -488,7 +487,7 @@ public final class ChatLineWrapperTest {
         head.setChatStyle(head.getChatStyle().setChatClickEvent(
                 new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
                         ChatHeadMarker.encode(UUID.randomUUID(),
-                                ChatIdentityType.ACCOUNT, "", "hello",
+                                true, "", "hello",
                                 0x123456, 0xA94B54))));
         root.appendSibling(head);
         root.appendSibling(ChatLayoutMarker.anchor());

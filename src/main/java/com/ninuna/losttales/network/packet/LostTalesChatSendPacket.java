@@ -43,6 +43,8 @@ public final class LostTalesChatSendPacket implements IMessage {
     private static final int MAX_TARGET_BYTES = 64;
     /** An identity name is bounded like the one a line is signed with. */
     private static final int MAX_IDENTITY_BYTES = 256;
+    /** A presence flag and a UUID: the appended target-character tail. */
+    static final int TARGET_ID_TAIL_BYTES = 1 + 2 * 8;
 
     private String channelId = "";
     private String message = "";
@@ -56,6 +58,13 @@ public final class LostTalesChatSendPacket implements IMessage {
      * player's own roster before the line is filed under it.
      */
     private String targetIdentity = "";
+    /**
+     * For a whisper, the id of the character it is addressed to, when the
+     * client knows it; null addresses the target by name, or their account.
+     * The server resolves it against the target's own roster before the
+     * line is filed under it. Appended; null from an older client.
+     */
+    private UUID targetCharacterId;
     /**
      * The sender's own name for this message, so the copy that comes
      * back can be recognised as the line already on their screen.
@@ -133,6 +142,19 @@ public final class LostTalesChatSendPacket implements IMessage {
                                    UUID appearanceCharacterId,
                                    long replyToMessageId,
                                    String targetIdentity, long echoNonce) {
+        this(channel, message, references, target, appearanceKind,
+                appearanceCharacterId, replyToMessageId, targetIdentity, echoNonce,
+                null);
+    }
+
+    public LostTalesChatSendPacket(ChatChannel channel, String message,
+                                   List<ChatShareReference> references,
+                                   String target, int appearanceKind,
+                                   UUID appearanceCharacterId,
+                                   long replyToMessageId,
+                                   String targetIdentity, long echoNonce,
+                                   UUID targetCharacterId) {
+        this.targetCharacterId = targetCharacterId;
         this.echoNonce = echoNonce;
         this.targetIdentity = targetIdentity == null ? ""
                 : targetIdentity.trim();
@@ -195,10 +217,21 @@ public final class LostTalesChatSendPacket implements IMessage {
             this.targetIdentity = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_IDENTITY_BYTES).trim();
             this.echoNonce = buffer.readLong();
+            // Appended: the character the whisper is addressed to, by id,
+            // a fixed tail so a payload cut short inside it stays
+            // malformed rather than reading as an older layout.
+            this.targetCharacterId = null;
+            if (buffer.readableBytes() >= TARGET_ID_TAIL_BYTES) {
+                boolean present = buffer.readBoolean();
+                long most = buffer.readLong();
+                long least = buffer.readLong();
+                this.targetCharacterId = present ? new UUID(most, least) : null;
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
             this.malformed = true;
+            this.targetCharacterId = null;
             this.target = "";
             this.references = Collections.emptyList();
             this.appearanceKind = APPEARANCE_DEFAULT;
@@ -241,6 +274,11 @@ public final class LostTalesChatSendPacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(buffer, this.targetIdentity,
                 MAX_IDENTITY_BYTES);
         buffer.writeLong(this.echoNonce);
+        buffer.writeBoolean(this.targetCharacterId != null);
+        buffer.writeLong(this.targetCharacterId == null ? 0L
+                : this.targetCharacterId.getMostSignificantBits());
+        buffer.writeLong(this.targetCharacterId == null ? 0L
+                : this.targetCharacterId.getLeastSignificantBits());
     }
 
     private void validate() {
@@ -285,6 +323,8 @@ public final class LostTalesChatSendPacket implements IMessage {
     public String getTarget() { return this.target; }
     /** The identity of that account addressed; empty for its own. */
     public String getTargetIdentity() { return this.targetIdentity; }
+    /** The character a whisper is addressed to by id; null for by name or account. */
+    public UUID getTargetCharacterId() { return this.targetCharacterId; }
     /** The sender's own name for this message; zero for none. */
     public long getEchoNonce() { return this.echoNonce; }
     /** One of the {@code APPEARANCE_*} constants. */

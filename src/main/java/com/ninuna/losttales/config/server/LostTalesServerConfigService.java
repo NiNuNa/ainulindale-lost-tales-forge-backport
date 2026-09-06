@@ -12,7 +12,6 @@ import net.minecraftforge.common.config.ConfigCategory;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -119,7 +118,7 @@ public final class LostTalesServerConfigService {
         all.add(LostTalesConfig.CATEGORY_CHAT);
         List<String> restarted = restartOwners(all);
         FMLLog.info("[%s] Server config reloaded from %s", LostTalesMetaData.MOD_ID,
-                LostTalesConfig.getLoadedConfigFile());
+                LostTalesConfig.getServerConfigFile());
         return restarted;
     }
 
@@ -130,20 +129,25 @@ public final class LostTalesServerConfigService {
             LostTalesDiscordBridge.getInstance().start();
             restarted.add("Discord bridge");
         }
-        if (categories.contains(LostTalesConfig.CATEGORY_CHAT)) {
+        if (categories.contains(LostTalesConfig.CATEGORY_CHAT)
+                || categories.contains(LostTalesConfig.CATEGORY_ROLES)
+                || categories.contains(LostTalesConfig.CATEGORY_CHANNELS)) {
             LostTalesChatService.sendAccessToAll(null);
             restarted.add("chat access");
         }
         return restarted;
     }
 
-    /** The file as it is on disk, with the category metadata the screen shows. */
+    /**
+     * The server's files as they are on disk — the options, the roles
+     * and the channels as one configuration — with the category metadata
+     * the screen shows.
+     */
     private static Configuration openFile() {
-        File file = LostTalesConfig.getLoadedConfigFile();
-        if (file == null) {
+        Configuration config = LostTalesConfig.openServerConfiguration();
+        if (config == null) {
             return null;
         }
-        Configuration config = new Configuration(file);
         config.load();
         LostTalesConfig.applyGuiMetadata(config);
         return config;

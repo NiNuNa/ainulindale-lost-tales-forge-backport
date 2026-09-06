@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.config.LostTalesConfigFiles;
 import com.ninuna.losttales.chat.ChatChannel;
 import java.io.BufferedReader;
 import java.io.File;
@@ -37,7 +38,8 @@ import java.util.Locale;
  * </pre>
  */
 public final class ChatWindowLayoutStore {
-    static final String FILE_PATH = "losttales/chat_layout.txt";
+    /** Under the client's config folder. */
+    static final String FILE_PATH = LostTalesConfigFiles.CHAT_LAYOUT;
     private static final Charset UTF_8 = Charset.forName("UTF-8");
 
     private static File storeFile;

@@ -83,9 +83,9 @@ public final class LostTalesThirdPersonConfig {
 
     private LostTalesThirdPersonConfig() {}
 
-    /** Reads the camera options from the mod's folder under Forge's config directory. */
+    /** Reads the camera options from the client's folder under Forge's config directory. */
     public static void load(File configDirectory) {
-        loadedConfigFile = LostTalesConfigFiles.file(configDirectory,
+        loadedConfigFile = LostTalesConfigFiles.clientFile(configDirectory,
                 LostTalesConfigFiles.CAMERA_OPTIONS);
         loadConfiguration(new Configuration(loadedConfigFile));
     }

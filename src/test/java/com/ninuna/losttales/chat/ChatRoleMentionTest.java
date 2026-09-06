@@ -3,6 +3,8 @@ package com.ninuna.losttales.chat;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -18,6 +20,16 @@ import static org.junit.Assert.assertTrue;
  */
 public final class ChatRoleMentionTest {
 
+    @Before
+    public void setUp() {
+        ChatRoleCatalog.install(ChatRoleFixtures.catalogue());
+    }
+
+    @After
+    public void tearDown() {
+        ChatRoleCatalog.resetToBuiltIn();
+    }
+
     @Test
     public void onlyRolesWorthAnsweringCanBeAddressed() {
         List<ChatAccountRole> roles = ChatAccountRole.mentionable();
@@ -29,7 +41,7 @@ public final class ChatRoleMentionTest {
             // The plain name is its own, never the bracketed tag.
             assertFalse(role.getDisplayName().equals(role.getDisplayTag()));
         }
-        assertTrue(roles.contains(ChatAccountRole.OPERATOR));
+        assertTrue(roles.contains(ChatRoleFixtures.OPERATOR));
         // A vanity mark is worn and never called.
         assertFalse(ChatAccountRole.TEAM.isMentionable());
         assertFalse(roles.contains(ChatAccountRole.TEAM));
@@ -45,9 +57,9 @@ public final class ChatRoleMentionTest {
     public void aRoleCandidateIsNamedInItsColourAndFoundByPrefix() {
         ChatMentionCandidate operator = ChatMentionCandidate.role(
                 "role:operator", "Operator",
-                ChatAccountRole.OPERATOR.getColor());
+                ChatRoleFixtures.OPERATOR.getColor());
         assertTrue(operator.isRole());
-        assertEquals(ChatAccountRole.OPERATOR.getColor(),
+        assertEquals(ChatRoleFixtures.OPERATOR.getColor(),
                 operator.getRoleColor());
         assertEquals("", operator.getAccountId());
         assertTrue(operator.matches("op"));
@@ -93,8 +105,8 @@ public final class ChatRoleMentionTest {
         assertFalse(ChatMentions.mentionsAny(message,
                 Arrays.asList("Steve", "Developer")));
         // The mask the server sends is what names those roles.
-        int mask = ChatAccountRole.maskOf(ChatAccountRole.OPERATOR);
-        assertEquals(Collections.singletonList(ChatAccountRole.OPERATOR),
+        int mask = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR);
+        assertEquals(Collections.singletonList(ChatRoleFixtures.OPERATOR),
                 ChatAccountRole.fromMask(mask));
         assertTrue(ChatAccountRole.isValidMask(mask));
     }

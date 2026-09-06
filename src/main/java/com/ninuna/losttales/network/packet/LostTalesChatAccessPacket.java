@@ -110,7 +110,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders) {
         this(adminAccess, discordAccess, roleMask, roleHolders, mutedSenders,
-                ChatRoleCatalog.builtIn().roles(), ALL_CHANNELS, ALL_CHANNELS);
+                ChatRoleCatalog.current().roles(), ALL_CHANNELS, ALL_CHANNELS);
     }
 
     public LostTalesChatAccessPacket(boolean adminAccess,

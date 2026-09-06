@@ -1,7 +1,7 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.chat.ChatIdentityType;
+import com.ninuna.losttales.chat.ChatPresentationMode;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatMessageIds;
@@ -30,16 +30,16 @@ public final class LostTalesChatPacketTest {
 
     @Test
     public void channelCatalogueHasStableSemantics() {
-        assertEquals(ChatIdentityType.CHARACTER,
-                ChatChannel.ALL.getIdentityType());
+        assertEquals(ChatPresentationMode.IN_CHARACTER,
+                ChatChannel.ALL.getPresentation());
         assertEquals(ChatRecipientRule.PROXIMITY,
                 ChatChannel.PROXIMITY.getRecipientRule());
         assertEquals(ChatRecipientRule.PARTY,
                 ChatChannel.PARTY.getRecipientRule());
         assertEquals(ChatRecipientRule.FACTION,
                 ChatChannel.FACTION.getRecipientRule());
-        assertEquals(ChatIdentityType.ACCOUNT,
-                ChatChannel.OOC.getIdentityType());
+        assertEquals(ChatPresentationMode.OUT_OF_CHARACTER,
+                ChatChannel.OOC.getPresentation());
         assertEquals(ChatChannel.PROXIMITY,
                 ChatChannel.fromId("Proximity"));
         assertNull(ChatChannel.fromId("trade"));
@@ -661,5 +661,133 @@ public final class LostTalesChatPacketTest {
         assertFalse(plainDecoded.isMalformed());
         assertEquals(ChatMessageIds.NONE,
                 plainDecoded.getReplyToMessageId());
+    }
+
+    /** The worn character's id rides the line; an account line never names one. */
+    @Test
+    public void theWornCharactersIdRoundTrips() {
+        UUID character = UUID.randomUUID();
+        LostTalesChatMessagePacket worn = new LostTalesChatMessagePacket(
+                ChatChannel.ALL, UUID.randomUUID(), "Aragorn", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "hello", 1L, "skin", null, "", "", 0,
+                false, ChatMessageIds.NONE, null, "", 0L, character);
+        ByteBuf buffer = Unpooled.buffer();
+        worn.toBytes(buffer);
+        LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(character, decoded.getIdentityCharacterId());
+        assertEquals(character, decoded.withMessage("edited").getIdentityCharacterId());
+        assertEquals(character,
+                decoded.withPartner("Beren", "Beren").getIdentityCharacterId());
+
+        LostTalesChatMessagePacket account = new LostTalesChatMessagePacket(
+                ChatChannel.OOC, UUID.randomUUID(), "Steve", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "hello", 1L, "", null, "", "", 0,
+                true, ChatMessageIds.NONE, null, "", 0L, character);
+        assertNull(account.getIdentityCharacterId());
+        buffer = Unpooled.buffer();
+        account.toBytes(buffer);
+        // A tail claiming a character on an account line is refused.
+        buffer.setBoolean(buffer.writerIndex()
+                - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES, true);
+        LostTalesChatMessagePacket forged = new LostTalesChatMessagePacket();
+        forged.fromBytes(buffer);
+        assertTrue(forged.isMalformed());
+    }
+
+    /**
+     * A whisper says which character of each party it is held as and
+     * with, on the wire and through every rebuild; a plain line carries
+     * neither, and one claiming them is refused.
+     */
+    @Test
+    public void whispersCarryTheirConversationIds() {
+        UUID own = UUID.randomUUID();
+        UUID partner = UUID.randomUUID();
+        LostTalesChatMessagePacket whisper = new LostTalesChatMessagePacket(
+                ChatChannel.WHISPER, UUID.randomUUID(), "Aragorn", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "psst", 1L, "skin", null, "", "Alex", 0,
+                false, ChatMessageIds.NONE, null, "Beren", 7L, own)
+                .withConversation(own, partner);
+        assertEquals(own, whisper.getOwnCharacterId());
+        assertEquals(partner, whisper.getPartnerCharacterId());
+        ByteBuf buffer = Unpooled.buffer();
+        whisper.toBytes(buffer);
+        LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(own, decoded.getOwnCharacterId());
+        assertEquals(partner, decoded.getPartnerCharacterId());
+        assertEquals(own, decoded.getIdentityCharacterId());
+        assertEquals(partner, decoded.withMessage("edited").getPartnerCharacterId());
+        assertEquals(own, decoded.withoutEcho().getOwnCharacterId());
+        // The partner's copy is held the other way round.
+        LostTalesChatMessagePacket theirs = decoded.withPartner("Steve", "Aragorn")
+                .withConversation(partner, own);
+        assertEquals(partner, theirs.getOwnCharacterId());
+        assertEquals(own, theirs.getPartnerCharacterId());
+        assertEquals("Aragorn", theirs.getPartnerIdentity());
+        // A payload cut short inside a conversation tail is malformed;
+        // one from an older server, without the tails, reads as accounts.
+        buffer = Unpooled.buffer();
+        whisper.toBytes(buffer);
+        LostTalesChatMessagePacket cut = new LostTalesChatMessagePacket();
+        cut.fromBytes(buffer.slice(0, buffer.readableBytes() - 5));
+        assertTrue(cut.isMalformed());
+        LostTalesChatMessagePacket older = new LostTalesChatMessagePacket();
+        older.fromBytes(buffer.slice(0, buffer.readableBytes()
+                - 2 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES));
+        assertFalse(older.isMalformed());
+        assertNull(older.getOwnCharacterId());
+        assertNull(older.getPartnerCharacterId());
+        // A plain line never carries them, whatever it is built with.
+        LostTalesChatMessagePacket plain = new LostTalesChatMessagePacket(
+                ChatChannel.ALL, UUID.randomUUID(), "Aragorn", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "hello", 1L, "skin", null, "", "", 0,
+                false, ChatMessageIds.NONE, null, "", 0L, own, own, partner);
+        assertNull(plain.getOwnCharacterId());
+        assertNull(plain.getPartnerCharacterId());
+        buffer = Unpooled.buffer();
+        plain.toBytes(buffer);
+        buffer.setBoolean(buffer.writerIndex()
+                - LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES, true);
+        LostTalesChatMessagePacket forged = new LostTalesChatMessagePacket();
+        forged.fromBytes(buffer);
+        assertTrue(forged.isMalformed());
+    }
+
+    /** A whisper addresses the partner's character by id when the client knows it. */
+    @Test
+    public void whisperRequestsAddressTheCharacterById() {
+        UUID target = UUID.randomUUID();
+        LostTalesChatSendPacket send = new LostTalesChatSendPacket(
+                ChatChannel.WHISPER, "psst", null, "Steve",
+                LostTalesChatSendPacket.APPEARANCE_DEFAULT, null,
+                ChatMessageIds.NONE, "Aldric", 3L, target);
+        assertEquals(target, send.getTargetCharacterId());
+        ByteBuf buffer = Unpooled.buffer();
+        send.toBytes(buffer);
+        LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(target, decoded.getTargetCharacterId());
+        assertEquals("Aldric", decoded.getTargetIdentity());
+        assertEquals(3L, decoded.getEchoNonce());
+        // Cut short inside the tail it is malformed; without the tail,
+        // as an older client sends it, the target is named alone.
+        buffer = Unpooled.buffer();
+        send.toBytes(buffer);
+        LostTalesChatSendPacket cut = new LostTalesChatSendPacket();
+        cut.fromBytes(buffer.slice(0, buffer.readableBytes() - 3));
+        assertTrue(cut.isMalformed());
+        LostTalesChatSendPacket older = new LostTalesChatSendPacket();
+        older.fromBytes(buffer.slice(0, buffer.readableBytes()
+                - LostTalesChatSendPacket.TARGET_ID_TAIL_BYTES));
+        assertFalse(older.isMalformed());
+        assertNull(older.getTargetCharacterId());
+        assertEquals("Aldric", older.getTargetIdentity());
+        assertNull(new LostTalesChatSendPacket(ChatChannel.OOC, "hi")
+                .getTargetCharacterId());
     }
 }

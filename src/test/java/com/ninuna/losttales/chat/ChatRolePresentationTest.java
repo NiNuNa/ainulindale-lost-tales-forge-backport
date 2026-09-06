@@ -18,7 +18,7 @@ public final class ChatRolePresentationTest {
 
     @Before
     public void setUp() {
-        ChatRoleCatalog.resetToBuiltIn();
+        ChatRoleCatalog.install(ChatRoleFixtures.catalogue());
     }
 
     @After
@@ -27,26 +27,42 @@ public final class ChatRolePresentationTest {
     }
 
     @Test
-    public void rolesShowOnTheAccountChannelsOnly() {
+    public void rolesShowOutOfCharacterOnly() {
         for (ChatChannel channel : ChatChannel.values()) {
-            assertEquals(channel.getIdentityType() == ChatIdentityType.ACCOUNT,
-                    ChatRolePresentation.showsRoles(channel));
+            boolean outOfCharacter = channel.getPresentation()
+                    == ChatPresentationMode.OUT_OF_CHARACTER;
+            assertEquals(outOfCharacter, ChatRolePresentation.showsRoles(channel));
+            assertEquals(!outOfCharacter, ChatRolePresentation.isInCharacter(channel));
         }
         assertFalse(ChatRolePresentation.showsRoles(null));
-        int held = ChatAccountRole.maskOf(ChatAccountRole.OPERATOR);
+        assertFalse(ChatRolePresentation.isInCharacter(null));
+        // Whispers are roleplay: no role is worn there.
+        assertTrue(ChatRolePresentation.isInCharacter(ChatChannel.WHISPER));
+        int held = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR);
         assertEquals(held, ChatRolePresentation.rolesShown(ChatChannel.OOC, held));
-        assertEquals(held, ChatRolePresentation.rolesShown(ChatChannel.WHISPER, held));
+        assertEquals(0, ChatRolePresentation.rolesShown(ChatChannel.WHISPER, held));
         assertEquals(0, ChatRolePresentation.rolesShown(ChatChannel.ALL, held));
         assertEquals(0, ChatRolePresentation.rolesShown(ChatChannel.FACTION, held));
+    }
+
+    /** One tag, never a stack: only the highest-ranked role is worn. */
+    @Test
+    public void onlyThePrimaryRoleIsWorn() {
+        int both = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR, ChatAccountRole.TEAM);
+        assertEquals(ChatAccountRole.TEAM.bit(),
+                ChatRolePresentation.rolesShown(ChatChannel.OOC, both));
+        assertEquals(ChatAccountRole.TEAM.bit(),
+                ChatRolePresentation.rolesShown(ChatChannel.ADMIN, both));
+        assertEquals(0, ChatRolePresentation.rolesShown(ChatChannel.OOC, 0));
     }
 
     /** Out of character the primary role colours the name, whoever is worn. */
     @Test
     public void outOfCharacterTheRoleColoursTheName() {
-        int held = ChatAccountRole.maskOf(ChatAccountRole.OPERATOR);
-        assertEquals(ChatAccountRole.OPERATOR.getColor(),
+        int held = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR);
+        assertEquals(ChatRoleFixtures.OPERATOR.getColor(),
                 ChatRolePresentation.nameColor(ChatChannel.OOC, held, true, GONDOR));
-        assertEquals(ChatAccountRole.OPERATOR.getColor(),
+        assertEquals(ChatRoleFixtures.OPERATOR.getColor(),
                 ChatRolePresentation.nameColor(ChatChannel.OOC, held, false, GONDOR));
         assertEquals(ChatRolePresentation.unassignedColor(),
                 ChatRolePresentation.nameColor(ChatChannel.ADMIN, 0, true, GONDOR));
@@ -57,7 +73,7 @@ public final class ChatRolePresentationTest {
     /** In character the faction colours the name; the account is unassigned. */
     @Test
     public void inCharacterTheFactionColoursTheNameAndRolesAreNotWorn() {
-        int held = ChatAccountRole.maskOf(ChatAccountRole.OPERATOR, ChatAccountRole.TEAM);
+        int held = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR, ChatAccountRole.TEAM);
         assertEquals(GONDOR,
                 ChatRolePresentation.nameColor(ChatChannel.ALL, held, false, GONDOR));
         assertEquals(GONDOR,

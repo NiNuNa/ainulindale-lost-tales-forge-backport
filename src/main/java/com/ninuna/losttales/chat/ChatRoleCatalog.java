@@ -14,18 +14,21 @@ import java.util.UUID;
 
 /**
  * The roles in force, with their bits and precedence, and — on the
- * server — the accounts assigned to each. The two built-ins keep their
- * bits whatever the config says (the team mark bit 0, the operator
- * bit 1, the wire layout every older client reads); config roles take
- * the bits after them in the order the config lists them. Precedence is
- * by rank, the built-ins' ranks fixed. One catalogue is current per
- * side: the server's from its config, a client's from the last chat
- * access packet.
+ * server — who is assigned each: accounts, and characters. The Lost
+ * Tales Team mark keeps bit 0 whatever the config says; every other
+ * role, the operator role included, comes from the config and takes the
+ * next bit in the order the config lists them. Precedence is by rank.
+ * One catalogue is current per side: the server's from its config, a
+ * client's from the last chat access packet.
+ *
+ * <p>Bits are the wire form of a set of roles for one session and are
+ * never stored: assignments are kept by role id, so the config may be
+ * reordered without disturbing anything saved.</p>
  */
 public final class ChatRoleCatalog {
 
     public static final int MAX_ROLES = 32;
-    private static final int FIRST_CUSTOM_BIT = 2;
+    private static final int FIRST_CONFIG_BIT = 1;
 
     private static volatile ChatRoleCatalog current = builtIn();
     /**
@@ -38,9 +41,11 @@ public final class ChatRoleCatalog {
     private final List<ChatAccountRole> roles;
     private final Map<String, ChatAccountRole> byId;
     private final Map<String, Set<UUID>> members;
+    private final Map<String, Set<UUID>> characterMembers;
     private final int knownMask;
 
-    private ChatRoleCatalog(List<ChatAccountRole> ordered, Map<String, Set<UUID>> members) {
+    private ChatRoleCatalog(List<ChatAccountRole> ordered, Map<String, Set<UUID>> members,
+                            Map<String, Set<UUID>> characterMembers) {
         this.roles = Collections.unmodifiableList(new ArrayList<ChatAccountRole>(ordered));
         Map<String, ChatAccountRole> ids = new HashMap<String, ChatAccountRole>();
         int mask = 0;
@@ -49,15 +54,20 @@ public final class ChatRoleCatalog {
             mask |= role.bit();
         }
         this.byId = Collections.unmodifiableMap(ids);
+        this.members = copyOf(members);
+        this.characterMembers = copyOf(characterMembers);
+        this.knownMask = mask;
+    }
+
+    private static Map<String, Set<UUID>> copyOf(Map<String, Set<UUID>> assignments) {
         Map<String, Set<UUID>> copied = new HashMap<String, Set<UUID>>();
-        if (members != null) {
-            for (Map.Entry<String, Set<UUID>> entry : members.entrySet()) {
+        if (assignments != null) {
+            for (Map.Entry<String, Set<UUID>> entry : assignments.entrySet()) {
                 copied.put(entry.getKey(), Collections.unmodifiableSet(
                         new HashSet<UUID>(entry.getValue())));
             }
         }
-        this.members = Collections.unmodifiableMap(copied);
-        this.knownMask = mask;
+        return Collections.unmodifiableMap(copied);
     }
 
     /** The catalogue in force on this side. */
@@ -94,38 +104,39 @@ public final class ChatRoleCatalog {
         return signature.toString();
     }
 
-    /** The two built-ins and nothing else. */
+    /**
+     * The team mark alone: what stands before a config is read, and
+     * what a client falls back to before its access packet arrives.
+     * Every other role, the operator role included, is the file's.
+     */
     public static ChatRoleCatalog builtIn() {
-        return of(Collections.<ChatAccountRole>emptyList(), null, null);
+        return of(null, null, null);
     }
 
     /**
-     * The built-ins followed by the config roles, each given the next bit
-     * in the order given, then ordered by rank. A config role whose id is
-     * a built-in's is dropped here — the parser refuses it first — and
-     * roles past the bit budget are dropped. {@code operatorLook}, when
-     * given, restyles the operator role.
+     * The team mark followed by the config roles, each given the next
+     * bit in the order given, then ordered by rank. A role whose id is
+     * the team mark's, or repeats another's, is dropped here — the
+     * parser refuses it first — and roles past the bit budget are
+     * dropped.
      */
-    public static ChatRoleCatalog of(List<ChatAccountRole> customRoles,
-                                     ChatAccountRole operatorLook,
-                                     Map<String, Set<UUID>> members) {
+    public static ChatRoleCatalog of(List<ChatAccountRole> configRoles,
+                                     Map<String, Set<UUID>> members,
+                                     Map<String, Set<UUID>> characterMembers) {
         List<ChatAccountRole> ordered = new ArrayList<ChatAccountRole>();
         ordered.add(ChatAccountRole.TEAM);
-        ordered.add(operatorLook == null ? ChatAccountRole.OPERATOR
-                : operatorLook.withBit(ChatAccountRole.OPERATOR.getBitIndex()));
         Set<String> ids = new HashSet<String>();
         ids.add(ChatAccountRole.TEAM_ID);
-        ids.add(ChatAccountRole.OPERATOR_ID);
-        int bit = FIRST_CUSTOM_BIT;
-        for (ChatAccountRole role : customRoles == null
-                ? Collections.<ChatAccountRole>emptyList() : customRoles) {
+        int bit = FIRST_CONFIG_BIT;
+        for (ChatAccountRole role : configRoles == null
+                ? Collections.<ChatAccountRole>emptyList() : configRoles) {
             if (role == null || role.getId().length() == 0 || !ids.add(role.getId())
                     || bit >= MAX_ROLES) {
                 continue;
             }
             ordered.add(role.withBit(bit++));
         }
-        return new ChatRoleCatalog(sortedByRank(ordered), members);
+        return new ChatRoleCatalog(sortedByRank(ordered), members, characterMembers);
     }
 
     /** A catalogue as the wire describes it, bits already given. */
@@ -141,7 +152,7 @@ public final class ChatRoleCatalog {
             bits |= role.bit();
             accepted.add(role);
         }
-        return new ChatRoleCatalog(sortedByRank(accepted), null);
+        return new ChatRoleCatalog(sortedByRank(accepted), null, null);
     }
 
     private static List<ChatAccountRole> sortedByRank(List<ChatAccountRole> roles) {
@@ -180,16 +191,32 @@ public final class ChatRoleCatalog {
         return assigned == null ? Collections.<UUID>emptySet() : assigned;
     }
 
-    /** Every assignment, role id to accounts. */
+    /**
+     * The characters assigned the role by the config, by character id;
+     * empty for none. A character-scoped role is worn by that character
+     * alone, never by the account's other identities, and grants nothing.
+     */
+    public Set<UUID> characterMembersOf(String roleId) {
+        Set<UUID> assigned = roleId == null ? null
+                : this.characterMembers.get(roleId.trim().toLowerCase(Locale.ROOT));
+        return assigned == null ? Collections.<UUID>emptySet() : assigned;
+    }
+
+    /** Every account assignment, role id to accounts. */
     public Map<String, Set<UUID>> members() {
         return this.members;
     }
 
+    /** Every character assignment, role id to character ids. */
+    public Map<String, Set<UUID>> characterMembers() {
+        return this.characterMembers;
+    }
+
     /** The config roles only, in config (bit) order, for writing back. */
-    public List<ChatAccountRole> customRoles() {
+    public List<ChatAccountRole> configRoles() {
         List<ChatAccountRole> custom = new ArrayList<ChatAccountRole>();
         for (ChatAccountRole role : this.roles) {
-            if (role.getBitIndex() >= FIRST_CUSTOM_BIT) {
+            if (role.getBitIndex() >= FIRST_CONFIG_BIT) {
                 custom.add(role);
             }
         }
@@ -202,13 +229,7 @@ public final class ChatRoleCatalog {
         return custom;
     }
 
-    /** The operator role as it stands, restyled or not. */
-    public ChatAccountRole operator() {
-        ChatAccountRole role = this.byId.get(ChatAccountRole.OPERATOR_ID);
-        return role == null ? ChatAccountRole.OPERATOR : role;
-    }
-
-    /** A copy of the assignments, for editing. */
+    /** A copy of the account assignments, for editing. */
     public Map<String, Set<UUID>> membersCopy() {
         Map<String, Set<UUID>> copy = new LinkedHashMap<String, Set<UUID>>();
         for (Map.Entry<String, Set<UUID>> entry : this.members.entrySet()) {

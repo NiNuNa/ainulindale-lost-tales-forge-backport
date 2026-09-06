@@ -18,11 +18,11 @@ import java.util.Set;
  * the server states when it builds the line: which roles, and what
  * colour they and the name take, live here and nowhere else.
  *
- * <p>Two roles are built in: the Lost Tales Team mark, a vanity role
- * held by the accounts the code recognises and by nobody else, and the
- * operator role, decided by the server's own permission check. Every
- * other role comes from the server's config ({@link ChatRoleConfig})
- * and reaches clients through the chat access packet. The roles in
+ * <p>One role is built in: the Lost Tales Team mark, a vanity role held
+ * by the accounts the code recognises and by nobody else. Every other
+ * role comes from the server's config ({@link ChatRoleConfig}) — the
+ * operator role included, which is only the entry a fresh file starts
+ * with — and reaches clients through the chat access packet. The roles in
  * force are the {@link ChatRoleCatalog}; the wire form of a set of them
  * is a bit set, one bit per role in the catalogue's order, so a role can
  * be added without disturbing the layout. Precedence — which role
@@ -35,7 +35,6 @@ import java.util.Set;
 public final class ChatAccountRole {
 
     public static final String TEAM_ID = "team";
-    public static final String OPERATOR_ID = "operator";
     public static final int MAX_ID_LENGTH = 32;
     public static final int MAX_TEXT_LENGTH = 64;
     public static final int MAX_DESCRIPTION_LENGTH = 256;
@@ -54,16 +53,6 @@ public final class ChatAccountRole {
             "chat.losttales.role.team", "chat.losttales.tag.team", "", "", "",
             LostTalesColors.rgb(LostTalesColors.MULBERRY), false, true, 0,
             Collections.<ChatRoleSource>emptyList(), null);
-    /**
-     * A server operator, as the server's permission check states it. It
-     * carries no grants of its own: every capability names the operator
-     * level that holds it, so the check passes before roles are asked.
-     */
-    public static final ChatAccountRole OPERATOR = new ChatAccountRole(OPERATOR_ID, 1,
-            "chat.losttales.role.operator", "chat.losttales.tag.operator", "", "", "",
-            LostTalesColors.rgb(LostTalesColors.CRIMSON), true, false, 10,
-            Collections.singletonList(ChatRoleSource.opLevel(2)), null);
-
     private final String id;
     private final int bitIndex;
     private final String nameKey;

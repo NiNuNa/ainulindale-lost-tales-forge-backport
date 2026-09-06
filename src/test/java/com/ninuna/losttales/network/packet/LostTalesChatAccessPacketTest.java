@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatRoleFixtures;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatRoleSource;
@@ -30,7 +31,7 @@ public final class LostTalesChatAccessPacketTest {
 
     @Before
     public void setUp() {
-        ChatRoleCatalog.resetToBuiltIn();
+        ChatRoleCatalog.install(ChatRoleFixtures.catalogue());
     }
 
     @After
@@ -40,7 +41,7 @@ public final class LostTalesChatAccessPacketTest {
 
     @Test
     public void accessAndRolesRoundTrip() {
-        int roles = ChatAccountRole.maskOf(ChatAccountRole.OPERATOR);
+        int roles = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR);
         LostTalesChatAccessPacket packet =
                 new LostTalesChatAccessPacket(true, false, roles);
         ByteBuf buffer = Unpooled.buffer();
@@ -102,10 +103,10 @@ public final class LostTalesChatAccessPacketTest {
         ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator", "[Mod]",
                 "Keeps the peace.", 0xA94B54, true, 15,
                 Collections.singletonList(ChatRoleSource.opLevel(1)));
-        ChatRoleCatalog catalog = ChatRoleCatalog.of(Collections.singletonList(moderator),
-                ChatAccountRole.OPERATOR.withLook("Staff", "[Staff]", "", 0x00FF00, true, 10),
-                null);
-        int held = catalog.byId("moderator").bit() | ChatAccountRole.OPERATOR.bit();
+        ChatRoleCatalog catalog = ChatRoleCatalog.of(Arrays.asList(
+                ChatRoleFixtures.OPERATOR.withLook("Staff", "[Staff]", "", 0x00FF00, true, 10),
+                moderator), null, null);
+        int held = catalog.byId("moderator").bit() | ChatRoleFixtures.OPERATOR.bit();
         int readable = 1 << ChatChannel.ALL.ordinal() | 1 << ChatChannel.ADMIN.ordinal();
         int sendable = 1 << ChatChannel.ALL.ordinal();
         LostTalesChatAccessPacket packet = new LostTalesChatAccessPacket(false, true, held,
@@ -127,8 +128,8 @@ public final class LostTalesChatAccessPacketTest {
         assertEquals("[Mod]", read.byId("moderator").getDisplayTag());
         assertEquals("Keeps the peace.", read.byId("moderator").getDisplayDescription());
         assertEquals(4, read.byId("moderator").bit());
-        assertEquals("Staff", read.operator().getDisplayName());
-        assertEquals(0x00FF00, read.operator().getColor());
+        assertEquals("Staff", read.byId("operator").getDisplayName());
+        assertEquals(0x00FF00, read.byId("operator").getColor());
         assertTrue(read.byId("team").isLocked());
         assertEquals("Lost Tales Team", read.byId("team").getName().length() == 0
                 ? "Lost Tales Team" : read.byId("team").getName());
