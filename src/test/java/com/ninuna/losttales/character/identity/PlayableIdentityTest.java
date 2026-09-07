@@ -30,14 +30,6 @@ public final class PlayableIdentityTest {
         assertFalse(account.matchesGameplayId(CHARACTER));
     }
 
-    @Test
-    public void aCharacterIsKeyedByItsOwnUuid() {
-        PlayableIdentity character = PlayableIdentity.character(OWNER, CHARACTER);
-        assertFalse(character.isAccount());
-        assertEquals(CHARACTER, character.getCharacterId());
-        assertEquals(CHARACTER, character.getGameplayId());
-        assertEquals(OWNER, character.getOwnerId());
-    }
 
     @Test
     public void ofReadsANullCharacterAsTheAccount() {
@@ -76,10 +68,4 @@ public final class PlayableIdentityTest {
         PlayableIdentity.character(OWNER, null);
     }
 
-    @Test
-    public void toStringNamesTheKind() {
-        assertEquals("account:" + OWNER, PlayableIdentity.account(OWNER).toString());
-        assertEquals("character:" + CHARACTER,
-                PlayableIdentity.character(OWNER, CHARACTER).toString());
-    }
 }

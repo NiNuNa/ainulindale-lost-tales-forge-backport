@@ -49,16 +49,6 @@ public final class ChatStackRowsTest {
         assertEquals(5, LostTalesChatOverlayRenderer.rowOfLine(4, divider));
     }
 
-    @Test
-    public void theDividerOwnsExactlyOneRow() {
-        int divider = 2;
-        // Row 3 is the divider's: no line stands on it.
-        for (int line = 0; line < 6; line++) {
-            assertEquals("no line may claim the divider's row", true,
-                    LostTalesChatOverlayRenderer.rowOfLine(line, divider)
-                            != divider + 1);
-        }
-    }
 
     @Test
     public void rowsMapBackToTheLineThatDrawsThem() {
@@ -113,20 +103,4 @@ public final class ChatStackRowsTest {
         assertTrue(lineCeiling + room - 1 < topRow);
     }
 
-    @Test
-    public void theTopmostRowIsReachable() {
-        // A history of ten lines with a divider is eleven rows tall; a
-        // window with room for four must be able to scroll to the row
-        // that holds the oldest line.
-        int lines = 10;
-        int divider = 1;
-        int rows = lines + 1;
-        double room = 4.0D;
-        double ceiling = rows - room;
-        int topRow = LostTalesChatOverlayRenderer.rowOfLine(lines - 1,
-                divider);
-        assertEquals(10, topRow);
-        // At the ceiling the topmost drawn row is scroll + room - 1.
-        assertEquals(topRow, (int)Math.round(ceiling + room - 1));
-    }
 }

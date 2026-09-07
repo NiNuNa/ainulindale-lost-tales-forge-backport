@@ -1,6 +1,10 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatRecipientRule;
+import com.ninuna.losttales.chat.ChatPresentationMode;
+import com.ninuna.losttales.chat.ChatChannelDescriptor;
+import com.ninuna.losttales.chat.ChatChannelAccess;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -23,6 +27,79 @@ public final class ChatWindowLayoutStoreTest {
     @After
     public void cleanUp() {
         ChatWindowLayout.reset();
+        ChatWindowLayout.setChangeListener(null);
+        ChatChannel.resetToBuiltIn();
+    }
+
+    /**
+     * A window arranged around a channel the server defines is read at
+     * start-up, when only the built-in channels exist, so its tab cannot
+     * be resolved and is skipped. Once the server's channels are in
+     * force the file is worth reading again — otherwise the next thing
+     * the player moves writes the layout back without that tab, and the
+     * arrangement is gone for good.
+     */
+    @Test
+    public void aTabOnAServerDefinedChannelComesBackWhenItsChannelDoes() {
+        // Trade has a window of its own, so where it went is the point
+        // and not merely that it is somewhere.
+        List<String> lines = Arrays.asList(
+                "window w1 x=0.00 y=0.00 active=all tabs=all",
+                "window w2 x=50.00 y=50.00 active=trade tabs=trade");
+        ChatWindowLayoutStore.load(lines);
+
+        ChatChannel.installDefined(Collections.singletonList(
+                new ChatChannelDescriptor("trade", "Trade",
+                        ChatPresentationMode.IN_CHARACTER,
+                        ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
+                        0xC9A227, false)), null);
+        ChatChannel trade = ChatChannel.fromId("trade");
+        assertNotNull(trade);
+        assertFalse("the window was dropped when the file was read,"
+                        + " because its only tab was on no channel yet",
+                holdsTrade(trade));
+
+        ChatWindowLayoutStore.reloadForNewChannels();
+
+        assertTrue("the window it was arranged into is back",
+                holdsTrade(trade));
+    }
+
+    /** Whether some window holds the trade channel and nothing else. */
+    private static boolean holdsTrade(ChatChannel trade) {
+        for (ChatWindow window : ChatWindowLayout.windows()) {
+            if (Collections.singletonList(trade).equals(window.getChannels())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * What the player has moved is newer than the file and is never
+     * replaced by it.
+     */
+    @Test
+    public void aLayoutThePlayerHasMovedIsNotReplacedByTheFile() {
+        ChatWindowLayoutStore.load(Collections.singletonList(
+                "window w1 x=0.00 y=0.00 active=all tabs=all,trade"));
+        // The store marks the layout moved through this listener; a save
+        // with no file behind it writes nothing.
+        ChatWindowLayout.setChangeListener(null);
+        ChatWindowLayoutStore.initialize(null);
+        ChatWindowLayoutStore.load(Collections.singletonList(
+                "window w1 x=0.00 y=0.00 active=all tabs=all,trade"));
+        ChatWindowLayout.close(ChatChannel.ALL);
+
+        ChatChannel.installDefined(Collections.singletonList(
+                new ChatChannelDescriptor("trade", "Trade",
+                        ChatPresentationMode.IN_CHARACTER,
+                        ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
+                        0xC9A227, false)), null);
+        ChatWindowLayoutStore.reloadForNewChannels();
+
+        assertFalse("the closed channel stays closed",
+                ChatWindowLayout.isOpen(ChatChannel.ALL));
     }
 
     /**

@@ -57,17 +57,8 @@ public final class ChatTab {
      * than a position: the set of channels is open, so there is no fixed
      * length to index into.
      */
-    private static final java.util.Map<ChatChannel, ChatTab> PLAIN =
-            new java.util.HashMap<ChatChannel, ChatTab>();
-
-    static {
-        for (ChatChannel channel : ChatChannel.values()) {
-            // A whisper is always with someone: it has no plain tab.
-            if (channel != ChatChannel.WHISPER) {
-                PLAIN.put(channel, new ChatTab(channel, "", "", "", false));
-            }
-        }
-    }
+    private static final java.util.Map<String, ChatTab> PLAIN =
+            new java.util.concurrent.ConcurrentHashMap<String, ChatTab>();
 
     private final ChatChannel channel;
     private final String partner;
@@ -100,7 +91,22 @@ public final class ChatTab {
      * being read is {@link #viewed}.
      */
     public static ChatTab of(ChatChannel channel) {
-        return channel == null ? null : PLAIN.get(channel);
+        // A whisper is always with someone: it has no plain tab.
+        if (channel == null || channel == ChatChannel.WHISPER) {
+            return null;
+        }
+        // Made when first asked for rather than all at once, because the
+        // set of channels is open: a server names its own, and they are
+        // registered long after this class is first read. Kept by id and
+        // rebuilt when the registry hands out a new object for that id,
+        // so the tab always names the channel in force.
+        String key = channel.getId();
+        ChatTab cached = PLAIN.get(key);
+        if (cached == null || cached.channel != channel) {
+            cached = new ChatTab(channel, "", "", "", false);
+            PLAIN.put(key, cached);
+        }
+        return cached;
     }
 
     /**
@@ -289,7 +295,12 @@ public final class ChatTab {
             return false;
         }
         ChatTab tab = (ChatTab)other;
-        return tab.channel == this.channel && tab.npc == this.npc
+        // By the channel's id, never the object: a channel a server
+        // defines is registered again with every access broadcast, and
+        // two tabs naming the same channel must stay the same tab across
+        // that. It is also what keeps this in step with hashCode.
+        return tab.channel.getId().equals(this.channel.getId())
+                && tab.npc == this.npc
                 && tab.partnerKey.equals(this.partnerKey)
                 && tab.identityKey.equals(this.identityKey)
                 && tab.ownerKey.equals(this.ownerKey);

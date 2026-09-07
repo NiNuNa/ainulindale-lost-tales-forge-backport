@@ -31,10 +31,18 @@ public final class ClientCharacterDisplayNames {
 
     private ClientCharacterDisplayNames() {}
 
+    /**
+     * The races the creation form offers. A race that is no longer
+     * anyone's to choose is left out; a character who already is one is
+     * unaffected, and the form never opens on one because the server
+     * would refuse it.
+     */
     public static List<String> getRaceIds() {
         ArrayList<String> ids = new ArrayList<String>();
         for (CharacterRaceDefinition definition : CharacterRaceRegistry.getAll()) {
-            ids.add(definition.getId());
+            if (definition.isSelectable()) {
+                ids.add(definition.getId());
+            }
         }
         return Collections.unmodifiableList(ids);
     }

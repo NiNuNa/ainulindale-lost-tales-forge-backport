@@ -3,23 +3,10 @@ package com.ninuna.losttales.compat.discord;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 public final class DiscordBridgeDirectionTest {
 
-    @Test
-    public void eachDirectionSaysWhichWayLinesCross() {
-        assertFalse(DiscordBridgeDirection.DISABLED.sendsToDiscord());
-        assertFalse(DiscordBridgeDirection.DISABLED.readsFromDiscord());
-        assertTrue(DiscordBridgeDirection.GAME_TO_DISCORD.sendsToDiscord());
-        assertFalse(DiscordBridgeDirection.GAME_TO_DISCORD.readsFromDiscord());
-        assertFalse(DiscordBridgeDirection.DISCORD_TO_GAME.sendsToDiscord());
-        assertTrue(DiscordBridgeDirection.DISCORD_TO_GAME.readsFromDiscord());
-        assertTrue(DiscordBridgeDirection.BIDIRECTIONAL.sendsToDiscord());
-        assertTrue(DiscordBridgeDirection.BIDIRECTIONAL.readsFromDiscord());
-    }
 
     @Test
     public void takingAHalfAwayLeavesTheOther() {

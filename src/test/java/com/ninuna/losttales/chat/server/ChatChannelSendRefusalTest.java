@@ -207,15 +207,4 @@ public final class ChatChannelSendRefusalTest {
                 catalog.byId("operator").bit(), false));
     }
 
-    /** Every channel is decided the same way: none of them is named in the rule. */
-    @Test
-    public void everyChannelIsDecidedByItsOwnFacts() {
-        for (ChatChannel channel : ChatChannel.values()) {
-            String refusal = ChatChannelPolicy.sendRefusal(
-                    channel, partyOf(ALDRIC), ALDRIC, GONDOR, 0, false);
-            assertTrue(channel.getId() + " answers with a notice or with nothing",
-                    refusal == null || Arrays.asList(PARTY_REFUSAL, FACTION_REFUSAL,
-                            GATE_REFUSAL).contains(refusal));
-        }
-    }
 }

@@ -404,12 +404,25 @@ public final class ChatRoleConfig {
                         + "can describe (global, proximity or operators); skipped");
                 continue;
             }
+            if (defined.size() >= ChatChannel.MAX_DEFINED_CHANNELS) {
+                warnings.warn("Channel '" + id + "' is past the "
+                        + ChatChannel.MAX_DEFINED_CHANNELS + " a server may "
+                        + "define; it and any after it were skipped");
+                break;
+            }
             String name = first(options, "name");
             if (name == null || name.trim().length() == 0) {
                 name = id;
             }
+            String shown = ChatChannelDescriptor.clipDisplayName(name);
+            if (!shown.equals(name.trim())) {
+                warnings.warn("Channel '" + id + "' is named longer than the "
+                        + ChatChannelDescriptor.MAX_DISPLAY_NAME_LENGTH
+                        + " characters a name may be shown as; it reads '"
+                        + shown + "'");
+            }
             boolean outOfCharacter = Boolean.parseBoolean(first(options, "ooc"));
-            defined.add(new ChatChannelDescriptor(id, name.trim(),
+            defined.add(new ChatChannelDescriptor(id, shown,
                     outOfCharacter ? ChatPresentationMode.OUT_OF_CHARACTER
                             : ChatPresentationMode.IN_CHARACTER,
                     rule, ChatChannelAccess.NONE,

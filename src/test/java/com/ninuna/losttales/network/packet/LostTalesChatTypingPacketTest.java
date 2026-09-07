@@ -7,6 +7,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -42,6 +43,45 @@ public final class LostTalesChatTypingPacketTest {
         LostTalesChatTypingPacket rejected = new LostTalesChatTypingPacket();
         rejected.fromBytes(trailing);
         assertTrue(rejected.isMalformed());
+    }
+
+    @Test
+    public void theStatedIdentityRoundTripsAndAnOlderPayloadStatesNone() {
+        java.util.UUID character =
+                java.util.UUID.fromString("00000000-0000-0000-0000-0000000000c1");
+        LostTalesChatTypingPacket original = new LostTalesChatTypingPacket(
+                ChatChannel.ALL, "", true,
+                LostTalesChatSendPacket.APPEARANCE_CHARACTER, character);
+        ByteBuf buffer = Unpooled.buffer();
+        try {
+            original.toBytes(buffer);
+            LostTalesChatTypingPacket decoded = new LostTalesChatTypingPacket();
+            decoded.fromBytes(buffer);
+            assertFalse(decoded.isMalformed());
+            assertEquals(LostTalesChatSendPacket.APPEARANCE_CHARACTER,
+                    decoded.getAppearanceKind());
+            assertEquals(character, decoded.getAppearanceCharacterId());
+        } finally {
+            buffer.release();
+        }
+
+        // The layout this was appended to: a payload that stops after the
+        // typing flag states no identity, and the server signs presence
+        // with the character being played, as it did before.
+        ByteBuf older = Unpooled.buffer();
+        try {
+            LostTalesPacketCodec.writeUtf8String(older, "all", 16);
+            LostTalesPacketCodec.writeUtf8String(older, "", 64);
+            older.writeBoolean(true);
+            LostTalesChatTypingPacket decoded = new LostTalesChatTypingPacket();
+            decoded.fromBytes(older);
+            assertFalse(decoded.isMalformed());
+            assertEquals(LostTalesChatSendPacket.APPEARANCE_DEFAULT,
+                    decoded.getAppearanceKind());
+            assertNull(decoded.getAppearanceCharacterId());
+        } finally {
+            older.release();
+        }
     }
 
     @Test

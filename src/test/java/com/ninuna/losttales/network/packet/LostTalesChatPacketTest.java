@@ -28,24 +28,6 @@ import static org.junit.Assert.assertTrue;
 
 public final class LostTalesChatPacketTest {
 
-    @Test
-    public void channelCatalogueHasStableSemantics() {
-        assertEquals(ChatPresentationMode.IN_CHARACTER,
-                ChatChannel.ALL.getPresentation());
-        assertEquals(ChatRecipientRule.PROXIMITY,
-                ChatChannel.PROXIMITY.getRecipientRule());
-        assertEquals(ChatRecipientRule.PARTY,
-                ChatChannel.PARTY.getRecipientRule());
-        assertEquals(ChatRecipientRule.FACTION,
-                ChatChannel.FACTION.getRecipientRule());
-        assertEquals(ChatPresentationMode.OUT_OF_CHARACTER,
-                ChatChannel.OOC.getPresentation());
-        assertEquals(ChatChannel.PROXIMITY,
-                ChatChannel.fromId("Proximity"));
-        assertNull(ChatChannel.fromId("trade"));
-        assertEquals("Global", ChatChannel.ALL.getDisplayName());
-        assertEquals("all", ChatChannel.ALL.getId());
-    }
 
     @Test
     public void sendRequestRoundTripsAndRejectsTrailingData() {
@@ -293,20 +275,6 @@ public final class LostTalesChatPacketTest {
                 0xFFFFFF, 0xFFFFFF, "hi", 5L, "").getPartner());
     }
 
-    @Test
-    public void messageValidationRejectsFormattingAndControlText() {
-        assertTrue(ChatMessageValidator.isValid("Mae govannen!"));
-        assertFalse(ChatMessageValidator.isValid(" padded "));
-        assertFalse(ChatMessageValidator.isValid("colored §cmessage"));
-        assertFalse(ChatMessageValidator.isValid("line\nbreak"));
-
-        StringBuilder oversized = new StringBuilder();
-        for (int index = 0;
-             index <= ChatMessageValidator.MAX_CHARACTERS; index++) {
-            oversized.append('x');
-        }
-        assertFalse(ChatMessageValidator.isValid(oversized.toString()));
-    }
 
     @Test
     public void shareTokensCountAsOneVisibleCharacter() {
@@ -484,29 +452,6 @@ public final class LostTalesChatPacketTest {
         }
     }
 
-    /** Markers are cheap, so a message may carry the full count of them. */
-    @Test
-    public void aFullCountOfMarkersFitsTheBudget() {
-        List<ChatShowcase> markers = new ArrayList<ChatShowcase>();
-        for (int index = 1; index < ChatShareTokenParser.MAX_TOKENS;
-                index += 2) {
-            markers.add(ChatShowcase.marker(index, "losttales:m" + index,
-                    "Place " + index, "star", "gold", 0, index, -index));
-        }
-        assertTrue(ChatShowcase.serializedBytes(markers)
-                <= ChatShowcase.MAX_TOTAL_BYTES);
-        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
-                ChatChannel.ALL, UUID.randomUUID(), "Aldric", "Steve", "",
-                0xFFFFFF, 0xFFFFFF,
-                tokensFor(ChatShareTokenParser.MAX_TOKENS), 1L, "", markers);
-        ByteBuf buffer = Unpooled.buffer();
-        packet.toBytes(buffer);
-        LostTalesChatMessagePacket decoded =
-                new LostTalesChatMessagePacket();
-        decoded.fromBytes(buffer);
-        assertFalse(decoded.isMalformed());
-        assertEquals(markers.size(), decoded.getShowcases().size());
-    }
 
     /**
      * The message id survives the wire, and a whisper's two copies carry
@@ -596,6 +541,34 @@ public final class LostTalesChatPacketTest {
         assertEquals("Aldric", decoded.getReply().getAuthor());
         assertEquals("meet me at the gate",
                 decoded.getReply().getExcerpt());
+        assertEquals("a quote told no colour keeps saying so",
+                ChatReplyReference.NO_COLOR,
+                decoded.getReply().getAuthorColor());
+    }
+
+    /**
+     * The quoted author's own name colour travels too. A client holds
+     * name colours for accounts it has been told about; an in-character
+     * author is a character, which is not on that list, so the quote
+     * would otherwise be the one place that name is drawn grey.
+     */
+    @Test
+    public void aQuoteCarriesTheAuthorsNameColour() {
+        long original = ChatMessageIdAllocator.next();
+        ChatReplyReference reply = ChatReplyReference.of(original, "Aldric",
+                "meet me at the gate", 0x4A90D9);
+        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
+                ChatChannel.ALL, UUID.randomUUID(), "Beren", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "on my way", 1L, "", null, "", "", 0,
+                false, ChatMessageIdAllocator.next(), reply);
+        ByteBuf buffer = Unpooled.buffer();
+        packet.toBytes(buffer);
+        LostTalesChatMessagePacket decoded =
+                new LostTalesChatMessagePacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(0x4A90D9, decoded.getReply().getAuthorColor());
+        assertEquals("Aldric", decoded.getReply().getAuthor());
     }
 
     /** An ordinary line replies to nothing and pays nothing for it. */

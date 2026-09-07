@@ -34,6 +34,9 @@ public final class LostTalesClassTransformerTest {
             "com/ninuna/losttales/client/camera/ThirdPersonEntityActionHooks";
     private static final String THIRD_PERSON_BLOCK_ACTION_HOOK_OWNER =
             "com/ninuna/losttales/client/camera/ThirdPersonBlockActionHooks";
+    private static final String TOOLTIP_SMOOTHING_OWNER =
+            "com/ninuna/losttales/client/gui/tooltip/"
+                    + "LostTalesTooltipSmoothing";
     private static final String TOOLTIP_HOOK_OWNER =
             "com/ninuna/losttales/client/gui/tooltip/LostTalesTooltipHooks";
     private static final String CHAT_HIT_HOOK_OWNER =
@@ -432,10 +435,35 @@ public final class LostTalesClassTransformerTest {
                 screen, "drawHoveringText",
                 TOOLTIP_HOOK_OWNER, "drawHoveringText"));
         // The offer has to come before vanilla draws anything, or the tooltip
-        // would be drawn twice, once in each layout.
+        // would be drawn twice, once in each layout. The pointer shift is
+        // ahead of it and draws nothing itself.
         MethodNode method = findMethod(screen, "drawHoveringText");
         assertTrue(firstCallIsHook(
-                method, TOOLTIP_HOOK_OWNER, "drawHoveringText"));
+                method, TOOLTIP_SMOOTHING_OWNER, "begin"));
+        assertTrue(callFollows(method,
+                TOOLTIP_SMOOTHING_OWNER, "begin",
+                TOOLTIP_HOOK_OWNER, "drawHoveringText"));
+    }
+
+    /**
+     * The shift onto the pointer's true position brackets the whole
+     * method: pushed once at the head, and taken back off at every way
+     * out — the icon renderer's early return included, or the matrix
+     * would be left shifted for everything drawn after it.
+     */
+    @Test
+    public void everyTooltipIsPlacedOnThePointerAndPutBack()
+            throws Exception {
+        ClassNode screen = transform("net.minecraft.client.gui.GuiScreen");
+        MethodNode method = findMethod(screen, "drawHoveringText");
+        assertEquals("one shift, at the head",
+                1, countCalls(method, TOOLTIP_SMOOTHING_OWNER, "begin"));
+        assertEquals("one way out is one way back",
+                countReturns(method),
+                countCalls(method, TOOLTIP_SMOOTHING_OWNER, "end"));
+        assertTrue("every return puts it back first",
+                everyReturnIsPrecededBy(
+                        method, TOOLTIP_SMOOTHING_OWNER, "end"));
     }
 
     @Test
@@ -895,6 +923,75 @@ public final class LostTalesClassTransformerTest {
     }
 
     /** True when the first call the method makes is that hook. */
+    /** Whether {@code second} is called somewhere after {@code first}. */
+    private static boolean callFollows(MethodNode method,
+                                       String firstOwner, String firstName,
+                                       String secondOwner, String secondName) {
+        boolean seenFirst = false;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof MethodInsnNode)) {
+                continue;
+            }
+            MethodInsnNode call = (MethodInsnNode)instruction;
+            if (!seenFirst) {
+                seenFirst = firstOwner.equals(call.owner)
+                        && firstName.equals(call.name);
+            } else if (secondOwner.equals(call.owner)
+                    && secondName.equals(call.name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static int countCalls(MethodNode method,
+                                  String hookOwner, String hookName) {
+        int found = 0;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (instruction instanceof MethodInsnNode) {
+                MethodInsnNode call = (MethodInsnNode)instruction;
+                if (hookOwner.equals(call.owner) && hookName.equals(call.name)) {
+                    found++;
+                }
+            }
+        }
+        return found;
+    }
+
+    private static int countReturns(MethodNode method) {
+        int found = 0;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (instruction.getOpcode() == Opcodes.RETURN) {
+                found++;
+            }
+        }
+        return found;
+    }
+
+    private static boolean everyReturnIsPrecededBy(
+            MethodNode method, String hookOwner, String hookName) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (instruction.getOpcode() != Opcodes.RETURN) {
+                continue;
+            }
+            AbstractInsnNode previous = instruction.getPrevious();
+            while (previous != null && !(previous instanceof MethodInsnNode)) {
+                previous = previous.getPrevious();
+            }
+            MethodInsnNode call = previous instanceof MethodInsnNode
+                    ? (MethodInsnNode)previous : null;
+            if (call == null || !hookOwner.equals(call.owner)
+                    || !hookName.equals(call.name)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static boolean firstCallIsHook(
             MethodNode method, String hookOwner, String hookName) {
         for (AbstractInsnNode instruction = method.instructions.getFirst();

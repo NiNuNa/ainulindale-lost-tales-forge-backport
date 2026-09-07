@@ -81,7 +81,9 @@ public final class LostTalesChatMessagePacket implements IMessage {
             + ChatMessageValidator.MAX_UTF8_BYTES
             + ChatShowcase.MAX_TOTAL_BYTES
             + ChatReplyReference.MAX_AUTHOR_BYTES
-            + ChatReplyReference.MAX_EXCERPT_BYTES;
+            + ChatReplyReference.MAX_EXCERPT_BYTES
+            // The quoted author's name colour, at the payload's tail.
+            + 4;
     /** The appended identity tail: a presence flag and a UUID, always whole. */
     static final int IDENTITY_ID_TAIL_BYTES = 1 + 16;
     private static final int MAX_CHANNEL_BYTES = 16;
@@ -508,6 +510,14 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 }
                 this.scopeValue = scope;
             }
+            // Appended after that: the colour the quoted author's name
+            // was drawn in. A payload written before it says nothing, and
+            // the quote is drawn quietly, which is what it did then.
+            if (this.reply.exists() && buffer.readableBytes() >= 4) {
+                this.reply = ChatReplyReference.of(
+                        this.reply.getMessageId(), this.reply.getAuthor(),
+                        this.reply.getExcerpt(), buffer.readInt());
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -626,6 +636,9 @@ public final class LostTalesChatMessagePacket implements IMessage {
         writeOptionalUuid(buffer, this.partnerCharacterId);
         LostTalesPacketCodec.writeUtf8String(buffer, this.scopeValue,
                 MAX_SCOPE_VALUE_BYTES);
+        if (this.reply.exists()) {
+            buffer.writeInt(this.reply.getAuthorColor());
+        }
     }
 
     /** A presence flag and a UUID, always {@link #IDENTITY_ID_TAIL_BYTES} long. */

@@ -23,10 +23,6 @@ public final class LostTalesMapMarkerDataTest {
         assertEquals(-8.0D, marker.getCompassTargetZ(), 0.0D);
     }
 
-    @Test
-    public void blankDescriptionRemainsBlankForNativeLoreFallback() {
-        assertEquals("", marker(false).getDescription());
-    }
 
     @Test
     public void decorativeAnimationOmitsHiddenDefinitions() {

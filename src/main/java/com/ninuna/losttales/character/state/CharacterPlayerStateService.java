@@ -590,8 +590,15 @@ public final class CharacterPlayerStateService {
         for (CharacterStateComponent component : this.components) {
             NBTTagCompound state;
             if (character != null && component == this.lotrProgressionComponent) {
-                state = this.lotrProgressionComponent.createDefault(
-                        character.getStartingFactionId());
+                // A character made in the roster names the faction it starts
+                // with, and starts with alignment for it. The account's own
+                // default character names none: it is the identity that was
+                // already being played, so its progression is whatever that
+                // player had, and clean progression is the right blank for it.
+                String startingFactionId = character.getStartingFactionId();
+                state = startingFactionId == null || startingFactionId.length() == 0
+                        ? this.lotrProgressionComponent.createDefault()
+                        : this.lotrProgressionComponent.createDefault(startingFactionId);
             } else if (component == this.locationComponent) {
                 state = createInitialLocation(character);
             } else {

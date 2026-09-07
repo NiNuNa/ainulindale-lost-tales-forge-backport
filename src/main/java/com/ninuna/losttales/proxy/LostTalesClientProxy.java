@@ -11,6 +11,7 @@ import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.character.CharacterClientTaskQueue;
+import com.ninuna.losttales.client.character.CharacterTemplateOffer;
 import com.ninuna.losttales.client.character.CharacterTemplateStore;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache;
@@ -351,6 +352,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             return;
         }
         ClientCharacterRosterCache.acceptRoster(packet.getRequestId(), packet.getSnapshot());
+        CharacterTemplateOffer.onRoster(packet.getSnapshot());
     }
 
     @Override
@@ -509,20 +511,26 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             }
             ChatRoleCatalog.install(catalog);
             // The channels this server has of its own, put in force
-            // before the gates below name them. Starting from the
-            // built-ins each time means a server that has dropped one
+            // before the gates below name them, and as one step: a client
+            // hosting a world shares this registry with its own logical
+            // server, which must never see it half-applied. Starting from
+            // the built-ins each time means a server that has dropped one
             // stops this client showing it.
-            ChatChannel.resetToBuiltIn();
-            for (ChatChannelDescriptor defined : packet.getDefinedChannels()) {
-                try {
-                    ChatChannel.register(defined);
-                } catch (RuntimeException refused) {
-                    FMLLog.warning("[%s] The server named a channel this client "
-                                    + "cannot put in force (%s): %s",
-                            LostTalesMetaData.MOD_ID, defined.getId(),
-                            refused.toString());
-                }
-            }
+            ChatChannel.installDefined(packet.getDefinedChannels(),
+                    new ChatChannel.Warnings() {
+                        @Override
+                        public void warn(String message) {
+                            FMLLog.warning("[%s] The server named a channel "
+                                            + "this client cannot put in "
+                                            + "force: %s",
+                                    LostTalesMetaData.MOD_ID, message);
+                        }
+                    });
+            // The stored layout was read at start-up, when only the
+            // built-in channels existed, so any window arranged around
+            // one of this server's own dropped its tab. Now that they are
+            // in force it is worth reading again.
+            ChatWindowLayoutStore.reloadForNewChannels();
             ClientChatChannelState.setChannelGates(
                     packet.getReadableChannels(), packet.getSendableChannels());
             ClientChatChannelState.setAdminAccess(packet.hasAdminAccess());

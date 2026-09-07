@@ -40,6 +40,28 @@ enum PlayerBodyShape {
     HALF_TROLL(0, false, false, false, false, true,
             -8.0F, -8.0F, 0.0F, -6.0F, 8.5F, -4.0F);
 
+    /**
+     * How much wider than a biped a dwarf's torso, arms and legs are
+     * drawn. Owned here rather than by either drawing: the body model
+     * scales its parts by it and the cape has to be scaled to match, and
+     * a proportion changed in one of those places and not the other
+     * detaches the cape from the back it hangs on.
+     */
+    static final float DWARF_WIDTH_SCALE = 1.25F;
+    /** How much shorter a hobbit's limbs are: ten rows where twelve fit. */
+    static final float HOBBIT_VERTICAL_SCALE = 10.0F / 12.0F;
+    /**
+     * The half-troll's torso against a biped's, in both directions: its
+     * box is twelve wide and sixteen long where a biped's is eight and
+     * twelve, and a cape hangs on the box rather than on the biped.
+     */
+    static final float HALF_TROLL_WIDTH_SCALE = 12.0F / 8.0F;
+    static final float HALF_TROLL_LENGTH_SCALE = 16.0F / 12.0F;
+    /** How far out of the torso a dwarf's arms are pushed. */
+    static final float DWARF_ARM_SHIFT = 1.0F;
+    /** And its legs, which are widened rather than only moved. */
+    static final float DWARF_LEG_SHIFT = 0.25F;
+
     private final int lotrHeadwearHeight;
     private final boolean elfEars;
     private final boolean dwarfProportions;
@@ -124,6 +146,20 @@ enum PlayerBodyShape {
 
     float getLegDrop() {
         return this.legDrop;
+    }
+
+    /**
+     * The shape behind a body model identifier, and the plain player body
+     * for anything that names none.
+     *
+     * <p>What a renderer asks. A blank race, a model a later build knew
+     * and this one does not, a template nobody has filled in yet — none
+     * of those is a reason to stop drawing, and a biped is what every
+     * shape here is a change to.</p>
+     */
+    static PlayerBodyShape forModelIdOrDefault(String modelId) {
+        PlayerBodyShape shape = forModelId(modelId);
+        return shape == null ? PLAYER : shape;
     }
 
     /** The shape behind a body model identifier, or null for an unknown one. */

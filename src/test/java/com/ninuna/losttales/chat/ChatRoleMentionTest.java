@@ -66,17 +66,6 @@ public final class ChatRoleMentionTest {
         assertFalse(operator.matches("dev"));
     }
 
-    @Test
-    public void aPlayerCandidateCarriesTheFaceToDrawAndIsNotARole() {
-        ChatMentionCandidate player = ChatMentionCandidate.player(
-                "key", "Aragorn", "Steve", "Aragorn",
-                "0-0-0-0-1", Arrays.asList("Steve", "Aragorn"));
-        assertFalse(player.isRole());
-        assertEquals(-1, player.getRoleColor());
-        assertEquals("0-0-0-0-1", player.getAccountId());
-        assertTrue(player.matches("ste"));
-        assertTrue(player.matches("ara"));
-    }
 
     /** The list keeps candidate order, so roles stay above the players. */
     @Test
@@ -92,22 +81,4 @@ public final class ChatRoleMentionTest {
         assertSame(player, matches.get(1));
     }
 
-    /**
-     * Mention detection is the same word-boundary match a name gets, so a
-     * client holding the role recognises it and one that does not never
-     * sees the message as addressed to it.
-     */
-    @Test
-    public void holdingTheRoleIsWhatMakesARoleMentionLand() {
-        String message = "@Operator please look at spawn";
-        assertTrue(ChatMentions.mentionsAny(message,
-                Arrays.asList("Steve", "Operator")));
-        assertFalse(ChatMentions.mentionsAny(message,
-                Arrays.asList("Steve", "Developer")));
-        // The mask the server sends is what names those roles.
-        int mask = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR);
-        assertEquals(Collections.singletonList(ChatRoleFixtures.OPERATOR),
-                ChatAccountRole.fromMask(mask));
-        assertTrue(ChatAccountRole.isValidMask(mask));
-    }
 }

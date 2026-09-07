@@ -2,6 +2,7 @@ package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelGates;
+import com.ninuna.losttales.chat.server.ChatChannelPolicy;
 import com.ninuna.losttales.chat.ChatMessageOrigin;
 
 /**
@@ -38,7 +39,16 @@ public final class DiscordBridgePolicy {
         if (channel == null || !channel.isBridgeable()) {
             return false;
         }
-        ChatChannelGates.Gate gate = ChatChannelGates.current().gateOf(channel);
+        ChatChannelGates gates = ChatChannelGates.current();
+        // A channel routed to operators with no gate written for it is
+        // operator-only in game, and an empty gate is exactly what the
+        // role test below reads as "everyone may". Asking the same
+        // question the game asks keeps a staff channel off Discord when
+        // its seeded gate line is missing.
+        if (ChatChannelPolicy.staffOnly(channel, gates)) {
+            return false;
+        }
+        ChatChannelGates.Gate gate = gates.gateOf(channel);
         return !gate.isReadClosed() && gate.getReadRoles().isEmpty();
     }
 }

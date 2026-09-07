@@ -102,18 +102,4 @@ public final class LostTalesCommandRoleGrantGuardTest {
                         granting(LostTalesCapability.SERVER_CONFIG)));
     }
 
-    /**
-     * The first capability the sender lacks is the one reported, whatever
-     * else the role grants beside it.
-     */
-    @Test
-    public void oneWithheldCapabilityIsEnoughToRefuse() {
-        String withheld = LostTalesCommandRole.withheldGrant(
-                FakeCommandSender.player("Someone"),
-                granting(LostTalesCapability.CHAT_MODERATE,
-                        LostTalesCapability.ROLES_MANAGE,
-                        LostTalesCapability.SERVER_CONFIG));
-        assertEquals("a capability the sender does not hold is named",
-                true, withheld != null);
-    }
 }

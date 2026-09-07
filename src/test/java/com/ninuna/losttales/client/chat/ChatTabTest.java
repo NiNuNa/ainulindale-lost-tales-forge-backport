@@ -19,6 +19,56 @@ public final class ChatTabTest {
     public void cleanUp() {
         ChatWindowLayout.reset();
         ClientChatChannelState.clear();
+        ChatChannel.resetToBuiltIn();
+    }
+
+    /**
+     * A channel a server defines has a tab like any other. The set of
+     * channels is open and they are registered long after this class is
+     * first read, so a tab made once for each channel up front would
+     * leave every server-defined one with none at all.
+     */
+    @Test
+    public void aChannelTheServerDefinesHasATab() {
+        ChatChannel.installDefined(java.util.Collections.singletonList(
+                tradeDescriptor()), null);
+        ChatChannel trade = ChatChannel.fromId("trade");
+        assertNotNull(trade);
+
+        ChatTab tab = ChatTab.of(trade);
+        assertNotNull("a server's own channel is a tab like any other", tab);
+        assertEquals("trade", tab.id());
+        assertSame(tab, ChatTab.of(trade));
+        assertEquals(tab, ChatTab.fromId("trade"));
+    }
+
+    /**
+     * The registry hands out a new object for a channel every time it is
+     * filled, and an access broadcast fills it on every login, logout,
+     * mute and role change. A tab has to survive that, or a window's
+     * tabs, its mutes and its hidden set all quietly stop matching.
+     */
+    @Test
+    public void aTabSurvivesItsChannelBeingRegisteredAgain() {
+        ChatChannel.installDefined(java.util.Collections.singletonList(
+                tradeDescriptor()), null);
+        ChatTab before = ChatTab.of(ChatChannel.fromId("trade"));
+
+        ChatChannel.installDefined(java.util.Collections.singletonList(
+                tradeDescriptor()), null);
+        ChatTab after = ChatTab.of(ChatChannel.fromId("trade"));
+
+        assertEquals("the same tab, whichever object names the channel",
+                before, after);
+        assertEquals(before.hashCode(), after.hashCode());
+    }
+
+    private static com.ninuna.losttales.chat.ChatChannelDescriptor tradeDescriptor() {
+        return new com.ninuna.losttales.chat.ChatChannelDescriptor("trade",
+                "Trade", com.ninuna.losttales.chat.ChatPresentationMode.IN_CHARACTER,
+                com.ninuna.losttales.chat.ChatRecipientRule.GLOBAL,
+                com.ninuna.losttales.chat.ChatChannelAccess.NONE,
+                0xC9A227, false);
     }
 
     @Test

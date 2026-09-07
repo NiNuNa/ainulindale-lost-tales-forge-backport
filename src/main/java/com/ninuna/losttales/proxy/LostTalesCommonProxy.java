@@ -333,10 +333,15 @@ public class LostTalesCommonProxy {
             LostTalesFastTravelArrivalPacket packet) {}
 
     public void onServerStarting(FMLServerStartingEvent event) {
-        // First, so the roles, gates and settings everything below reads
-        // are the ones on disk now: the files may have been edited since
-        // pre-init, and a client hosting a world installs its catalogue
-        // here rather than at pre-init.
+        // Before the reload, not after: the reload registers the channels
+        // this server's config defines, and resetting afterwards would
+        // take them straight back out again. Every other static store
+        // below holds nothing the reload puts there.
+        ChatChannel.resetToBuiltIn();
+        // Then the config, so the roles, gates, channels and settings
+        // everything below reads are the ones on disk now: the files may
+        // have been edited since pre-init, and a client hosting a world
+        // installs its catalogue here rather than at pre-init.
         LostTalesConfig.reload();
         CharacterLifecycleStateTracker.markServerStarting();
         initializeLoreCharacterOwnership(event);
@@ -348,12 +353,10 @@ public class LostTalesCommonProxy {
         LostTalesRequestRateLimiter.clear();
         LostTalesThirdPersonAimService.clear();
         LostTalesChargeService.clear();
-        CharacterServerPacketDispatcher.clearSecurityState();
         PartySyncManager.clear();
         PartyMemberStatusSyncManager.clear();
         PartyTrackingSyncManager.clear();
         LostTalesChatRoleRosterWatcher.clear();
-        ChatChannel.resetToBuiltIn();
         ChatMessageIdAllocator.reset();
         ChatHistory.clear();
         ChatConsoleStream.clear();
@@ -422,7 +425,6 @@ public class LostTalesCommonProxy {
         LostTalesRequestRateLimiter.clear();
         LostTalesThirdPersonAimService.clear();
         LostTalesChargeService.clear();
-        CharacterServerPacketDispatcher.clearSecurityState();
         PartySyncManager.clear();
         PartyMemberStatusSyncManager.clear();
         PartyTrackingSyncManager.clear();

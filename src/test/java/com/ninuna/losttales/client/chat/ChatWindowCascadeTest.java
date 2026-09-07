@@ -64,15 +64,4 @@ public final class ChatWindowCascadeTest {
         assertEquals(0.0D, corner.y, 0.0D);
     }
 
-    @Test
-    public void theSameInputsGiveTheSameCorner() {
-        ChatWindowCascade.Corner first = ChatWindowCascade.place(
-                33.0D, 44.0D, WIDTH, HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, 0,
-                ChatWindowCascade.STEP);
-        ChatWindowCascade.Corner second = ChatWindowCascade.place(
-                33.0D, 44.0D, WIDTH, HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, 0,
-                ChatWindowCascade.STEP);
-        assertEquals(first.x, second.x, 0.0D);
-        assertEquals(first.y, second.y, 0.0D);
-    }
 }

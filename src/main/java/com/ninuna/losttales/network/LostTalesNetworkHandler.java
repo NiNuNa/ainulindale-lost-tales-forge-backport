@@ -43,6 +43,7 @@ import com.ninuna.losttales.network.packet.character.CharacterDeleteRequestPacke
 import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
+import com.ninuna.losttales.network.packet.character.CharacterTemplateAdoptRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterSelectRequestPacket;
 import com.ninuna.losttales.network.packet.character.LoreCharacterClaimRequestPacket;
 import com.ninuna.losttales.network.packet.character.LoreCharacterReleaseRequestPacket;
@@ -124,5 +125,6 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesServerConfigRequestPacket.Handler.class, LostTalesServerConfigRequestPacket.class, 44, Side.SERVER);
         CHANNEL.registerMessage(LostTalesServerConfigApplyPacket.Handler.class, LostTalesServerConfigApplyPacket.class, 46, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChatContextHistoryPacket.Handler.class, LostTalesChatContextHistoryPacket.class, 50, Side.SERVER);
+        CHANNEL.registerMessage(CharacterTemplateAdoptRequestPacket.Handler.class, CharacterTemplateAdoptRequestPacket.class, 51, Side.SERVER);
     }
 }

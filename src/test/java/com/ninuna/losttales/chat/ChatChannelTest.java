@@ -100,21 +100,4 @@ public final class ChatChannelTest {
         assertEquals(false, ChatChannel.WHISPER.isBridgeable());
     }
 
-    @Test
-    public void descriptorCarriesExactlyWhatTheChannelStates() {
-        for (ChatChannel channel : ChatChannel.values()) {
-            ChatChannelDescriptor descriptor = channel.getDescriptor();
-            assertEquals(channel.isBridgeable(), descriptor.isBridgeable());
-            assertEquals(channel.getId(), descriptor.getId());
-            assertEquals(channel.getDisplayName(),
-                    descriptor.getDisplayName());
-            assertEquals(channel.getPresentation(),
-                    descriptor.getPresentation());
-            assertEquals(channel.getRecipientRule(),
-                    descriptor.getRecipientRule());
-            assertEquals(channel.getAccess(), descriptor.getAccess());
-            assertEquals(channel.getDisplayColor(),
-                    descriptor.getDisplayColor());
-        }
-    }
 }

@@ -27,6 +27,7 @@ public final class CharacterRosterSnapshot {
     private final Map<Integer, CharacterSummary> charactersBySlot;
     private final boolean accountShowMinecraftCape;
     private final int accountCosmeticCapeId;
+    private final boolean templateTaken;
 
     public CharacterRosterSnapshot(UUID ownerId, int unlockedSlotCount,
                                    UUID activeCharacterId, long revision,
@@ -34,7 +35,7 @@ public final class CharacterRosterSnapshot {
                                    List<CharacterSummary> characters) {
         this(ownerId, unlockedSlotCount, activeCharacterId, revision, dataVersion,
                 characters, RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID);
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true);
     }
 
     public CharacterRosterSnapshot(UUID ownerId, int unlockedSlotCount,
@@ -43,6 +44,17 @@ public final class CharacterRosterSnapshot {
                                    List<CharacterSummary> characters,
                                    boolean accountShowMinecraftCape,
                                    int accountCosmeticCapeId) {
+        this(ownerId, unlockedSlotCount, activeCharacterId, revision, dataVersion,
+                characters, accountShowMinecraftCape, accountCosmeticCapeId, true);
+    }
+
+    public CharacterRosterSnapshot(UUID ownerId, int unlockedSlotCount,
+                                   UUID activeCharacterId, long revision,
+                                   int dataVersion,
+                                   List<CharacterSummary> characters,
+                                   boolean accountShowMinecraftCape,
+                                   int accountCosmeticCapeId,
+                                   boolean templateTaken) {
         if (ownerId == null) {
             throw new IllegalArgumentException("ownerId must not be null");
         }
@@ -81,6 +93,7 @@ public final class CharacterRosterSnapshot {
                 ? activeCharacterId : null;
         this.accountShowMinecraftCape = accountShowMinecraftCape;
         this.accountCosmeticCapeId = CharacterCapeCatalog.normalizeSelection(accountCosmeticCapeId);
+        this.templateTaken = templateTaken;
     }
 
     public static CharacterRosterSnapshot fromRoster(CharacterRoster roster) {
@@ -99,8 +112,18 @@ public final class CharacterRosterSnapshot {
                 roster.getDataVersion(),
                 summaries,
                 roster.isAccountMinecraftCapeVisible(),
-                roster.getAccountCosmeticCapeId()
+                roster.getAccountCosmeticCapeId(),
+                roster.isTemplateTaken()
         );
+    }
+
+    /**
+     * Whether this world has already taken the account's template. A
+     * snapshot built without an answer says it has, so nothing older
+     * than the flag asks a client to send one.
+     */
+    public boolean isTemplateTaken() {
+        return this.templateTaken;
     }
 
     /** The cape the account wears when played as itself. */

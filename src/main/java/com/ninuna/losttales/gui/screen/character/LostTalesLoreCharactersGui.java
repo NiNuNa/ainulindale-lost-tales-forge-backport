@@ -101,7 +101,7 @@ public final class LostTalesLoreCharactersGui extends GuiScreen {
                 && ClientCharacterRosterCache.isRequestPending(
                 this.pendingRequestId);
         boolean slotAvailable = roster != null
-                && CharacterRoster.isValidSlotIndex(this.targetSlot)
+                && CharacterRoster.isCreatableSlotIndex(this.targetSlot)
                 && roster.getSlotState(this.targetSlot)
                 == CharacterSlotState.UNLOCKED;
         boolean active = selected != null && roster != null
@@ -262,7 +262,7 @@ public final class LostTalesLoreCharactersGui extends GuiScreen {
                 x, line, width, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
         CharacterRosterSnapshot roster = ClientCharacterRosterCache.getSnapshot();
         if (!character.isOwnedByViewer() && roster != null) {
-            String slot = CharacterRoster.isValidSlotIndex(this.targetSlot)
+            String slot = CharacterRoster.isCreatableSlotIndex(this.targetSlot)
                     ? I18n.format("gui.losttales.character.slot",
                     Integer.valueOf(this.targetSlot + 1))
                     : I18n.format("gui.losttales.lore.no_slot");
@@ -374,7 +374,7 @@ public final class LostTalesLoreCharactersGui extends GuiScreen {
     private int findEmptySlot(int direction) {
         CharacterRosterSnapshot roster = ClientCharacterRosterCache.getSnapshot();
         if (roster == null || direction == 0) return -1;
-        int start = CharacterRoster.isValidSlotIndex(this.targetSlot)
+        int start = CharacterRoster.isCreatableSlotIndex(this.targetSlot)
                 ? this.targetSlot : direction > 0 ? -1 : CharacterRoster.MAX_SLOTS;
         for (int slot = start + direction;
              slot >= 0 && slot < CharacterRoster.MAX_SLOTS;

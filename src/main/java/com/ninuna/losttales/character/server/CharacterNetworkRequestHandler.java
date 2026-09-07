@@ -38,6 +38,22 @@ public final class CharacterNetworkRequestHandler {
     }
 
     /**
+     * Takes the account's template onto this world's default character.
+     * The world decides whether it still has a reading to spend, and
+     * every field is checked against this server's own content.
+     */
+    public static void handleTemplateAdoptRequest(
+            final EntityPlayerMP player, final int requestId,
+            final CharacterTemplateAdoption adoption) {
+        execute(player, requestId, CharacterOperationType.CREATE, new Operation() {
+            @Override
+            public CharacterOperationResult run() {
+                return CharacterService.getInstance().adoptTemplate(player, adoption);
+            }
+        });
+    }
+
+    /**
      * Plays as the named character, or as the account when {@code selectAccount}
      * is set. The target is built from the live player, never from the wire.
      */

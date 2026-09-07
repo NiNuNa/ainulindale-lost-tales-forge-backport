@@ -16,10 +16,12 @@ import com.ninuna.losttales.character.registry.CharacterFactionResolver;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
+import com.ninuna.losttales.character.validation.CharacterAppearanceValidationResult;
 import com.ninuna.losttales.character.validation.CharacterCreationValidationResult;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.character.validation.CharacterValidationResult;
 import com.ninuna.losttales.character.validation.CharacterValidator;
+import com.ninuna.losttales.character.validation.ValidatedCharacterAppearance;
 import com.ninuna.losttales.character.validation.ValidatedCharacterCreation;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import cpw.mods.fml.common.FMLLog;
@@ -181,6 +183,12 @@ public final class CharacterService {
                 .race(raceId)
                 .gender(genderId)
                 .skin(skinId)
+                // The account's own arm width, so the identity a player
+                // already had keeps the model their skin is painted for.
+                // Without it the record takes the gender's default, which
+                // for the male gender chosen above is always the wide arm,
+                // and a slim skin would be sampled a texel too far.
+                .bodyType(CharacterAppearanceSyncManager.accountBodyType(player))
                 .age(CharacterValidator.MIN_AGE)
                 .startingFaction("")
                 .createdAt(System.currentTimeMillis())
@@ -281,6 +289,94 @@ public final class CharacterService {
             // account identity it already had still stands.
             return target;
         }
+    }
+
+    /**
+     * Takes the account's template onto this world's default character,
+     * once.
+     *
+     * <p>A world reads a template on the login where its default
+     * character exists and has not been read for yet, and never again:
+     * from then on the character is this world's. The reading is spent
+     * even when the account offered nothing, so a template written later
+     * is for the next world rather than this one.</p>
+     *
+     * <p>Everything in the request is checked against this server's own
+     * content exactly as a character somebody is making is checked. The
+     * character's id, slot, faction, level, progression and creation time
+     * are not the template's to say and are left as they were — which is
+     * what keeps the account's items, statistics, alignment and party
+     * membership where they are, all of them filed under the id this
+     * record already has.</p>
+     */
+    public synchronized CharacterOperationResult adoptTemplate(
+            EntityPlayerMP player, CharacterTemplateAdoption adoption) {
+        CharacterValidationResult playerValidation = validateServerPlayer(player);
+        if (!playerValidation.isValid()) {
+            return CharacterOperationResult.failure(playerValidation.getErrorId(), null);
+        }
+        if (adoption == null) {
+            return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, null);
+        }
+        CharacterWorldData data = getData(player);
+        if (data == null) {
+            return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, null);
+        }
+        if (data.isReadOnlyForNewerVersion()) {
+            return CharacterOperationResult.failure(CharacterErrorId.STORAGE_READ_ONLY, null);
+        }
+        CharacterRoster roster = data.getRoster(player.getUniqueID());
+        if (roster == null) {
+            return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, null);
+        }
+        CharacterValidationResult revision = CharacterValidator.validateExpectedRevision(
+                roster, adoption.getExpectedRosterRevision());
+        if (!revision.isValid()) {
+            return CharacterOperationResult.failure(revision.getErrorId(), roster);
+        }
+        RoleplayCharacter current = roster.getDefaultCharacter();
+        if (current == null || roster.isTemplateTaken()) {
+            // Either there is nothing to take it onto yet, or this world
+            // has had its one reading. Neither is the player's mistake.
+            return CharacterOperationResult.success(false, roster, current);
+        }
+        if (!adoption.isOffered()) {
+            roster.markTemplateTaken();
+            roster.incrementRevision();
+            data.saveRoster(roster);
+            return CharacterOperationResult.success(true, roster, current);
+        }
+        CharacterAppearanceValidationResult appearance =
+                CharacterValidator.validateAppearance(roster,
+                        current.getCharacterId(), current.getRaceId(),
+                        adoption.getName(),
+                        adoption.getRaceId(), adoption.getGenderId(),
+                        adoption.getSkinId(), adoption.getBodyTypeId(),
+                        adoption.getChestTypeId(), adoption.getDescription(),
+                        adoption.getAge());
+        if (!appearance.isValid()) {
+            return CharacterOperationResult.failure(appearance.getErrorId(), roster);
+        }
+        ValidatedCharacterAppearance wanted = appearance.getAppearance();
+        RoleplayCharacter adopted = RoleplayCharacter.builder(current)
+                .name(wanted.getName())
+                .race(wanted.getRaceId())
+                .gender(wanted.getGenderId())
+                .skin(wanted.getSkinId())
+                .bodyType(wanted.getBodyTypeId())
+                .chestType(wanted.getChestTypeId())
+                .description(wanted.getDescription())
+                .age(wanted.getAge())
+                .build();
+        if (!roster.replaceCharacter(adopted)) {
+            return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, roster);
+        }
+        roster.markTemplateTaken();
+        roster.incrementRevision();
+        data.saveRoster(roster);
+        FMLLog.info("[%s] The default character for %s took the account template",
+                LostTalesMetaData.MOD_ID, player.getUniqueID());
+        return CharacterOperationResult.success(true, roster, adopted);
     }
 
     public synchronized CharacterOperationResult updateCapeSettings(

@@ -91,6 +91,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.guiAnimationBackgroundTransformer.active";
     public static final String TOOLTIP_ICON_ACTIVE_PROPERTY =
             "losttales.tooltipIconTransformer.active";
+    public static final String TOOLTIP_SMOOTHING_ACTIVE_PROPERTY =
+            "losttales.tooltipSmoothingTransformer.active";
     public static final String CHAT_HIT_TEST_ACTIVE_PROPERTY =
             "losttales.chatHitTestTransformer.active";
     public static final String CHAT_WRAP_ACTIVE_PROPERTY =
@@ -299,6 +301,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     private static final String SMOOTH_INVENTORY_HOOK_OWNER =
             "com/ninuna/losttales/client/gui/inventory/"
                     + "LostTalesSmoothInventoryHooks";
+    private static final String TOOLTIP_SMOOTHING_OWNER =
+            "com/ninuna/losttales/client/gui/tooltip/"
+                    + "LostTalesTooltipSmoothing";
     private static final String TOOLTIP_HOOK_OWNER =
             "com/ninuna/losttales/client/gui/tooltip/"
                     + "LostTalesTooltipHooks";
@@ -3249,10 +3254,22 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         "drawHoveringText")) {
                     System.setProperty(
                             TOOLTIP_ICON_ACTIVE_PROPERTY, "true");
+                    System.setProperty(
+                            TOOLTIP_SMOOTHING_ACTIVE_PROPERTY, "true");
                     return basicClass;
                 }
                 LabelNode vanilla = new LabelNode();
                 InsnList head = new InsnList();
+                // First, and drawing nothing: every tooltip below is put
+                // on the pointer's true position rather than on the whole
+                // interface unit the screen was handed.
+                head.add(new VarInsnNode(Opcodes.ILOAD, 2));
+                head.add(new VarInsnNode(Opcodes.ILOAD, 3));
+                head.add(new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        TOOLTIP_SMOOTHING_OWNER,
+                        "begin",
+                        "(II)V"));
                 head.add(new VarInsnNode(Opcodes.ALOAD, 0));
                 head.add(new VarInsnNode(Opcodes.ALOAD, 1));
                 head.add(new VarInsnNode(Opcodes.ILOAD, 2));
@@ -3269,16 +3286,36 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 head.add(new InsnNode(Opcodes.RETURN));
                 head.add(vanilla);
                 method.instructions.insert(head);
+                // Every way out of the method takes the shift back off,
+                // the icon renderer's own early return included.
+                injectTooltipSmoothingEnd(method);
                 System.setProperty(TOOLTIP_ICON_ACTIVE_PROPERTY, "true");
-                info("Patched GuiScreen tooltips for inline key icons");
+                System.setProperty(TOOLTIP_SMOOTHING_ACTIVE_PROPERTY, "true");
+                info("Patched GuiScreen tooltips for inline key icons and "
+                        + "pointer-accurate placement");
                 return write(owner);
             }
             warn("Could not locate GuiScreen#drawHoveringText; tooltips will "
-                    + "name their keys in text instead of icons");
+                    + "name their keys in text instead of icons, and will "
+                    + "step with the interface grid rather than the pointer");
             return basicClass;
         } catch (Throwable throwable) {
             warn("Failed to patch tooltip key icons: " + throwable);
             return basicClass;
+        }
+    }
+
+    /** Takes the pointer shift back off at every exit from the method. */
+    private static void injectTooltipSmoothingEnd(MethodNode method) {
+        AbstractInsnNode node = method.instructions.getFirst();
+        while (node != null) {
+            AbstractInsnNode next = node.getNext();
+            if (node.getOpcode() == Opcodes.RETURN) {
+                method.instructions.insertBefore(node, new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        TOOLTIP_SMOOTHING_OWNER, "end", "()V"));
+            }
+            node = next;
         }
     }
 

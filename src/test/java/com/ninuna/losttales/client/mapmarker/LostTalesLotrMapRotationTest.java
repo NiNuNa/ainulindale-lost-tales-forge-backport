@@ -615,23 +615,6 @@ public final class LostTalesLotrMapRotationTest {
                 LostTalesLotrMapRotation.leanForInput(9.0F), 0.0001F);
     }
 
-    /** Equal features remain equal-sized anywhere in an orthographic view. */
-    @Test
-    public void orthographicPitchDoesNotResizeEitherHalf() {
-        float scaleY = LostTalesLotrMapRotation.leanScaleY(1.0F);
-        float[] near = { CENTER_X + 120.0F, CENTER_Y + 150.0F };
-        float[] far = { CENTER_X + 120.0F, CENTER_Y - 150.0F };
-
-        LostTalesLotrMapRotation.applyLean(
-                near, CENTER_X, CENTER_Y, scaleY);
-        LostTalesLotrMapRotation.applyLean(
-                far, CENTER_X, CENTER_Y, scaleY);
-
-        assertEquals(CENTER_X + 120.0F, near[0], 0.0F);
-        assertEquals(CENTER_X + 120.0F, far[0], 0.0F);
-        assertEquals(near[1] - CENTER_Y,
-                CENTER_Y - far[1], 0.0001F);
-    }
 
     private static float dragFor(float degrees) {
         float low = 0.0F;

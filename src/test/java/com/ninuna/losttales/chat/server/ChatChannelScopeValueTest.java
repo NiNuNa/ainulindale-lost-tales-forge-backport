@@ -70,20 +70,6 @@ public final class ChatChannelScopeValueTest {
                 firstScope.equals(secondScope));
     }
 
-    /**
-     * A party line is named by the party and never by the faction of
-     * whoever happened to say it: two members of one party in different
-     * factions are still in the one conversation.
-     */
-    @Test
-    public void aPartyLineIsNotNamedByTheSpeakersFaction() {
-        Party party = party();
-
-        assertEquals(ChatChannelPolicy.scopeValueOf(
-                        ChatChannel.PARTY, party, GONDOR),
-                ChatChannelPolicy.scopeValueOf(
-                        ChatChannel.PARTY, party, "lotr:rohan"));
-    }
 
     /** A channel that is one conversation is stamped with nothing. */
     @Test

@@ -42,6 +42,7 @@ public class CharacterRoster {
     /** The cape the account wears when played as itself. */
     private boolean accountShowMinecraftCape = RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE;
     private int accountCosmeticCapeId = RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID;
+    private boolean templateTaken;
 
     public CharacterRoster(UUID ownerId) {
         this(ownerId, INITIAL_UNLOCKED_SLOTS, null, 0L, CURRENT_DATA_VERSION);
@@ -124,6 +125,33 @@ public class CharacterRoster {
         return this.dataVersion;
     }
 
+    /**
+     * Whether this world has taken the account's template.
+     *
+     * <p>An account keeps a template on its own installation: who it
+     * wants its default character to start as. A world reads it once, on
+     * the login where it makes that character, and never again — from
+     * then on the character is this world's, and what the player does to
+     * the template elsewhere is about the next world, not this one.</p>
+     *
+     * <p>False for every roster written before the template existed, so
+     * a world that made a default character before then still takes it
+     * the next time the player joins. That is the same one reading, one
+     * login later.</p>
+     */
+    public boolean isTemplateTaken() {
+        return this.templateTaken;
+    }
+
+    /** Marks the template read. Answers whether this changed anything. */
+    public boolean markTemplateTaken() {
+        if (this.templateTaken) {
+            return false;
+        }
+        this.templateTaken = true;
+        return true;
+    }
+
     public boolean isAccountMinecraftCapeVisible() {
         return this.accountShowMinecraftCape;
     }
@@ -195,6 +223,30 @@ public class CharacterRoster {
         return CharacterSlotState.UNLOCKED;
     }
 
+    /**
+     * Puts a changed copy of a character the roster already holds in its
+     * place. The copy keeps the id and the slot — those are what the rest
+     * of the world files everything under — and only the record itself
+     * changes. Answers false when no such character is here, or when the
+     * copy is not the same one.
+     */
+    public boolean replaceCharacter(RoleplayCharacter character) {
+        if (character == null) {
+            throw new IllegalArgumentException("character must not be null");
+        }
+        RoleplayCharacter existing = this.charactersById.get(character.getCharacterId());
+        if (existing == null
+                || existing.getSlotIndex() != character.getSlotIndex()
+                || !existing.getOwnerId().equals(character.getOwnerId())
+                || existing.getKind() != character.getKind()) {
+            return false;
+        }
+        this.charactersById.put(character.getCharacterId(), character);
+        this.charactersBySlot.put(
+                Integer.valueOf(character.getSlotIndex()), character);
+        return true;
+    }
+
     public boolean addCharacter(RoleplayCharacter character) {
         if (character == null) {
             throw new IllegalArgumentException("character must not be null");
@@ -236,9 +288,24 @@ public class CharacterRoster {
         return removed;
     }
 
+    /**
+     * Whether a slot index names a place a character can be stored. The
+     * default character's slot is one of them, which is why this is not
+     * the test for a slot something may be created in.
+     */
     public static boolean isValidSlotIndex(int slotIndex) {
         return slotIndex == DEFAULT_SLOT_INDEX
                 || (slotIndex >= 0 && slotIndex < MAX_SLOTS);
+    }
+
+    /**
+     * Whether a slot index names a place a player may put a character
+     * they are making or claiming. The default character's slot is not
+     * one: only the server mints that record, and a request naming it
+     * would otherwise be answered by whether it happened to be empty.
+     */
+    public static boolean isCreatableSlotIndex(int slotIndex) {
+        return slotIndex >= 0 && slotIndex < MAX_SLOTS;
     }
 
     private static void validateSlotIndex(int slotIndex) {

@@ -105,18 +105,36 @@ public final class ChatHistory {
     }
 
     /**
-     * The quote {@code replier} may show for the message they named, or
-     * {@link ChatReplyReference#NONE} when there is none they may: the
-     * message has fallen out of reach, or was never sent to them.
+     * The quote {@code replier} may show for the message they named, in
+     * the channel they are replying in, or {@link ChatReplyReference#NONE}
+     * when there is none they may.
+     *
+     * <p>Having seen a line is not enough. A quote carries the words of
+     * the message it names to everyone the reply reaches, so it may only
+     * be shown back into the conversation it was said in: the same
+     * channel, and for a channel that has conversations of its own — a
+     * party, a faction, a whisper — the same one. Otherwise naming an id
+     * would quote a private line into a channel of the replier's
+     * choosing, which is the one thing this check exists to stop.</p>
      */
-    public static synchronized ChatReplyReference quoteFor(long messageId,
-                                                           UUID replier) {
+    public static synchronized ChatReplyReference quoteFor(
+            long messageId, UUID replier,
+            ChatChannel replyChannel, String replyScopeValue) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
-        if (entry == null || replier == null
+        if (entry == null || replier == null || replyChannel == null
                 || !entry.seenBy.contains(replier)) {
             return ChatReplyReference.NONE;
         }
-        return ChatReplyReference.of(messageId, entry.author, entry.excerpt);
+        if (!entry.channelId.equals(replyChannel.getId())) {
+            return ChatReplyReference.NONE;
+        }
+        String quotedScope = entry.forOthers.getScopeValue();
+        String replyScope = replyScopeValue == null ? "" : replyScopeValue;
+        if (!(quotedScope == null ? "" : quotedScope).equals(replyScope)) {
+            return ChatReplyReference.NONE;
+        }
+        return ChatReplyReference.of(messageId, entry.author, entry.excerpt,
+                entry.forOthers.getNameColor());
     }
 
     /**
@@ -135,7 +153,7 @@ public final class ChatHistory {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
         return entry == null ? ChatReplyReference.NONE
                 : ChatReplyReference.of(messageId, entry.author,
-                        entry.excerpt);
+                        entry.excerpt, entry.forOthers.getNameColor());
     }
 
     /**

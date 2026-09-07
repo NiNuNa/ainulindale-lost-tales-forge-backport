@@ -58,6 +58,7 @@ public final class CharacterNbtCodec {
     private static final String TAG_REVISION = "Revision";
     private static final String TAG_ACCOUNT_SHOW_MINECRAFT_CAPE = "AccountShowMinecraftCape";
     private static final String TAG_ACCOUNT_COSMETIC_CAPE_ID = "AccountCosmeticCapeId";
+    private static final String TAG_TEMPLATE_TAKEN = "TemplateTaken";
     private static final String TAG_NAME = "Name";
     private static final String TAG_RACE_ID = "RaceId";
     private static final String TAG_GENDER_ID = "GenderId";
@@ -281,6 +282,7 @@ public final class CharacterNbtCodec {
         }
         tag.setBoolean(TAG_ACCOUNT_SHOW_MINECRAFT_CAPE, roster.isAccountMinecraftCapeVisible());
         tag.setInteger(TAG_ACCOUNT_COSMETIC_CAPE_ID, roster.getAccountCosmeticCapeId());
+        tag.setBoolean(TAG_TEMPLATE_TAKEN, roster.isTemplateTaken());
 
         NBTTagList characterList = new NBTTagList();
         for (RoleplayCharacter character : roster.getCharacters()) {
@@ -401,6 +403,12 @@ public final class CharacterNbtCodec {
             repaired = true;
         }
         roster.setAccountCapeSettings(showAccountCape, accountCapeId);
+        // Absent on every roster written before templates existed,
+        // which reads as not yet taken: such a world takes it on the
+        // player's next login instead of never.
+        if (tag.getBoolean(TAG_TEMPLATE_TAKEN)) {
+            roster.markTemplateTaken();
+        }
 
         ArrayList<NBTTagCompound> quarantinedEntries = new ArrayList<NBTTagCompound>();
         NBTTagList characterList = tag.getTagList(TAG_CHARACTERS, Constants.NBT.TAG_COMPOUND);
@@ -519,6 +527,18 @@ public final class CharacterNbtCodec {
         // account did before it was a character, so a blank faction is a
         // fact about it rather than a missing field.
         boolean factionRequired = kind != CharacterKind.DEFAULT;
+        if ((slotIndex == CharacterRoster.DEFAULT_SLOT_INDEX)
+                != (kind == CharacterKind.DEFAULT)) {
+            // The slot and the kind are two spellings of the same fact,
+            // and everything that reads the roster picks one of them.
+            // A record where they disagree would be the account's own
+            // identity to one reader and a deletable character to
+            // another, so it is quarantined rather than guessed at.
+            warn("Skipping character %s for owner %s because slot %d and kind %s disagree",
+                    characterId, rosterOwnerId, Integer.valueOf(slotIndex),
+                    kind.getId());
+            return CharacterReadResult.failed(true, "slot_kind_mismatch");
+        }
         if (isBlank(name) || isBlank(raceId) || isBlank(genderId)
                 || (factionRequired && isBlank(startingFactionId))) {
             warn("Skipping character %s for owner %s because a required text field is empty or unsupported",

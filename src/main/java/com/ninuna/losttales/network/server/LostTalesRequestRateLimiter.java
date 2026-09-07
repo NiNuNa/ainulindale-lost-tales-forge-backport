@@ -46,7 +46,12 @@ public final class LostTalesRequestRateLimiter {
         CHAT_HISTORY(6, 5000L),
         // An operator opens the settings screen and saves it; a few of each
         // in five seconds is already impatient.
-        SERVER_CONFIG(6, 5000L);
+        SERVER_CONFIG(6, 5000L),
+        // Every character request shares one budget: opening the roster,
+        // making somebody, switching, deleting, claiming a lore character.
+        // They are all deliberate, and a screen full of them is a handful
+        // of clicks rather than a stream.
+        CHARACTER_REQUEST(40, 5000L);
 
         private final int maximumRequests;
         private final long windowMillis;
@@ -99,6 +104,32 @@ public final class LostTalesRequestRateLimiter {
 
     public static void clear() {
         WINDOWS.clear();
+    }
+
+    /**
+     * Whether the player may be told something about this request type
+     * again yet, given the last time they were told.
+     *
+     * <p>A refusal a client is answered with is itself worth bounding:
+     * a flood of requests would otherwise be a flood of replies. The
+     * answer is remembered per player and request type, beside the
+     * window that counts the requests themselves.</p>
+     */
+    public static boolean allowReply(EntityPlayerMP player,
+                                     RequestType requestType,
+                                     long intervalMillis) {
+        if (player == null || player.getUniqueID() == null) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        RequestWindow window = getWindow(player.getUniqueID(), requestType, now);
+        synchronized (window) {
+            if (now - window.lastReplyAt < intervalMillis) {
+                return false;
+            }
+            window.lastReplyAt = now;
+            return true;
+        }
     }
 
     private static void logThrottled(EntityPlayerMP player, RequestType requestType, String message) {
@@ -163,6 +194,8 @@ public final class LostTalesRequestRateLimiter {
         private long startedAt;
         private int requestCount;
         private long lastLogAt;
+        /** When the player was last answered about this request type. */
+        private long lastReplyAt;
 
         private RequestWindow(long startedAt) {
             this.startedAt = startedAt;

@@ -58,6 +58,140 @@ public final class CharacterValidator {
         return CharacterValidationResult.success();
     }
 
+
+    /**
+     * Everything a character looks like and says about itself, asked once
+     * for the making of one and the changing of one alike.
+     *
+     * <p>{@code exceptCharacterId} names the character whose own name is
+     * not a clash with itself — the one being changed. Null when a name
+     * is being taken for the first time and every name already in the
+     * roster belongs to somebody else.</p>
+     *
+     * <p>{@code keptRaceId} is the race that character already is, which
+     * it may go on being even when nobody may newly choose it. Null when
+     * a race is being taken rather than kept.</p>
+     */
+    public static CharacterAppearanceValidationResult validateAppearance(
+            CharacterRoster roster, UUID exceptCharacterId,
+            String requestedName, String requestedRaceId,
+            String requestedGenderId, String requestedSkinId,
+            String requestedBodyTypeId, String requestedChestTypeId,
+            String requestedDescription, int requestedAge) {
+        return validateAppearance(roster, exceptCharacterId, null,
+                requestedName, requestedRaceId, requestedGenderId,
+                requestedSkinId, requestedBodyTypeId, requestedChestTypeId,
+                requestedDescription, requestedAge);
+    }
+
+    public static CharacterAppearanceValidationResult validateAppearance(
+            CharacterRoster roster, UUID exceptCharacterId, String keptRaceId,
+            String requestedName, String requestedRaceId,
+            String requestedGenderId, String requestedSkinId,
+            String requestedBodyTypeId, String requestedChestTypeId,
+            String requestedDescription, int requestedAge) {
+        if (roster == null) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INTERNAL_ERROR);
+        }
+
+        String normalizedName = normalizeName(requestedName);
+        if (normalizedName.length() == 0) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INVALID_NAME_EMPTY);
+        }
+        int nameLength = normalizedName.codePointCount(0, normalizedName.length());
+        if (nameLength < MIN_NAME_LENGTH || nameLength > MAX_NAME_LENGTH) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INVALID_NAME_LENGTH);
+        }
+        if (!containsOnlyAllowedNameCharacters(normalizedName)) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INVALID_NAME_CHARACTERS);
+        }
+        String normalizedNameKey = normalizeNameKey(normalizedName);
+        for (RoleplayCharacter existing : roster.getCharacters()) {
+            if (exceptCharacterId != null
+                    && exceptCharacterId.equals(existing.getCharacterId())) {
+                continue;
+            }
+            if (normalizedNameKey.equals(normalizeNameKey(existing.getName()))) {
+                return CharacterAppearanceValidationResult.failure(
+                        CharacterErrorId.DUPLICATE_NAME);
+            }
+        }
+
+        String raceId = CharacterRaceRegistry.canonicalizeIdentifier(requestedRaceId);
+        if (!isValidIdentifierLength(raceId)) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INVALID_RACE);
+        }
+        CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);
+        if (race == null) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INVALID_RACE);
+        }
+        // A race nobody may newly choose may still be kept by a character
+        // who already is one; what is refused is taking it.
+        if (!race.isSelectable() && !raceId.equals(
+                CharacterRaceRegistry.canonicalizeIdentifier(keptRaceId))) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INVALID_RACE);
+        }
+
+        String genderId = CharacterGenderRegistry.normalizeIdentifier(requestedGenderId);
+        if (!isValidIdentifierLength(genderId)
+                || !CharacterGenderRegistry.contains(genderId)
+                || !race.isGenderAllowed(genderId)) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INVALID_GENDER);
+        }
+
+        String skinId = CharacterSkinRegistry.normalizeIdentifier(requestedSkinId);
+        if (!isValidIdentifierLength(skinId)
+                || !CharacterSkinRegistry.isCompatible(skinId, race.getId(), genderId)) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INVALID_SKIN);
+        }
+
+        // Body type is a choice of its own; an empty request takes the
+        // default for the sex, anything unknown is refused.
+        String bodyTypeId = CharacterBodyTypeRegistry.normalizeIdentifier(
+                requestedBodyTypeId);
+        if (bodyTypeId.length() == 0) {
+            bodyTypeId = CharacterBodyTypeRegistry.defaultFor(genderId);
+        } else if (!isValidIdentifierLength(bodyTypeId)
+                || !CharacterBodyTypeRegistry.contains(bodyTypeId)) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INVALID_BODY_TYPE);
+        }
+        String chestTypeId = CharacterChestTypeRegistry.normalizeIdentifier(
+                requestedChestTypeId);
+        if (chestTypeId.length() == 0) {
+            chestTypeId = CharacterChestTypeRegistry.defaultFor(genderId);
+        } else if (!isValidIdentifierLength(chestTypeId)
+                || !CharacterChestTypeRegistry.contains(chestTypeId)) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INVALID_CHEST_TYPE);
+        }
+
+        String description = normalizeDescription(requestedDescription);
+        if (!isValidDescription(description)) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INVALID_DESCRIPTION);
+        }
+
+        if (requestedAge < MIN_AGE || requestedAge > MAX_AGE) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INVALID_AGE);
+        }
+
+        return CharacterAppearanceValidationResult.success(
+                new ValidatedCharacterAppearance(normalizedName, normalizedNameKey,
+                        race.getId(), genderId, skinId, bodyTypeId, chestTypeId,
+                        description, requestedAge));
+    }
+
     public static CharacterCreationValidationResult validateCreation(
             CharacterRoster roster, CharacterCreationRequest request,
             CharacterFactionResolver factionResolver) {
@@ -72,7 +206,7 @@ public final class CharacterValidator {
         }
 
         int slotIndex = request.getSlotIndex();
-        if (!CharacterRoster.isValidSlotIndex(slotIndex)) {
+        if (!CharacterRoster.isCreatableSlotIndex(slotIndex)) {
             return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_SLOT);
         }
         if (slotIndex >= roster.getUnlockedSlotCount()) {
@@ -85,77 +219,24 @@ public final class CharacterValidator {
             return CharacterCreationValidationResult.failure(CharacterErrorId.MAX_CHARACTERS);
         }
 
-        String normalizedName = normalizeName(request.getName());
-        if (normalizedName.length() == 0) {
-            return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_NAME_EMPTY);
+        CharacterAppearanceValidationResult appearance = validateAppearance(
+                roster, null, request.getName(), request.getRaceId(),
+                request.getGenderId(), request.getSkinId(),
+                request.getBodyTypeId(), request.getChestTypeId(),
+                request.getDescription(), request.getAge());
+        if (!appearance.isValid()) {
+            return CharacterCreationValidationResult.failure(appearance.getErrorId());
         }
-        int nameLength = normalizedName.codePointCount(0, normalizedName.length());
-        if (nameLength < MIN_NAME_LENGTH || nameLength > MAX_NAME_LENGTH) {
-            return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_NAME_LENGTH);
-        }
-        if (!containsOnlyAllowedNameCharacters(normalizedName)) {
-            return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_NAME_CHARACTERS);
-        }
-        String normalizedNameKey = normalizeNameKey(normalizedName);
-        for (RoleplayCharacter existing : roster.getCharacters()) {
-            if (normalizedNameKey.equals(normalizeNameKey(existing.getName()))) {
-                return CharacterCreationValidationResult.failure(CharacterErrorId.DUPLICATE_NAME);
-            }
-        }
-
-        String raceId = CharacterRaceRegistry.canonicalizeIdentifier(request.getRaceId());
-        if (!isValidIdentifierLength(raceId)) {
-            return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_RACE);
-        }
-        CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);
-        if (race == null) {
-            return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_RACE);
-        }
-
-        String genderId = CharacterGenderRegistry.normalizeIdentifier(request.getGenderId());
-        if (!isValidIdentifierLength(genderId)
-                || !CharacterGenderRegistry.contains(genderId)
-                || !race.isGenderAllowed(genderId)) {
-            return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_GENDER);
-        }
-
-        String skinId = CharacterSkinRegistry.normalizeIdentifier(request.getSkinId());
-        if (!isValidIdentifierLength(skinId)
-                || !CharacterSkinRegistry.isCompatible(skinId, race.getId(), genderId)) {
-            return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_SKIN);
-        }
-
-        // Body type is a choice of its own; an empty request takes the
-        // default for the sex, anything unknown is refused.
-        String bodyTypeId = CharacterBodyTypeRegistry.normalizeIdentifier(
-                request.getBodyTypeId());
-        if (bodyTypeId.length() == 0) {
-            bodyTypeId = CharacterBodyTypeRegistry.defaultFor(genderId);
-        } else if (!isValidIdentifierLength(bodyTypeId)
-                || !CharacterBodyTypeRegistry.contains(bodyTypeId)) {
-            return CharacterCreationValidationResult.failure(
-                    CharacterErrorId.INVALID_BODY_TYPE);
-        }
-        String chestTypeId = CharacterChestTypeRegistry.normalizeIdentifier(
-                request.getChestTypeId());
-        if (chestTypeId.length() == 0) {
-            chestTypeId = CharacterChestTypeRegistry.defaultFor(genderId);
-        } else if (!isValidIdentifierLength(chestTypeId)
-                || !CharacterChestTypeRegistry.contains(chestTypeId)) {
-            return CharacterCreationValidationResult.failure(
-                    CharacterErrorId.INVALID_CHEST_TYPE);
-        }
-
-        String description = normalizeDescription(request.getDescription());
-        if (!isValidDescription(description)) {
-            return CharacterCreationValidationResult.failure(
-                    CharacterErrorId.INVALID_DESCRIPTION);
-        }
-
-        int age = request.getAge();
-        if (age < MIN_AGE || age > MAX_AGE) {
-            return CharacterCreationValidationResult.failure(CharacterErrorId.INVALID_AGE);
-        }
+        String normalizedName = appearance.getAppearance().getName();
+        String normalizedNameKey = appearance.getAppearance().getNormalizedNameKey();
+        String genderId = appearance.getAppearance().getGenderId();
+        String skinId = appearance.getAppearance().getSkinId();
+        String bodyTypeId = appearance.getAppearance().getBodyTypeId();
+        String chestTypeId = appearance.getAppearance().getChestTypeId();
+        String description = appearance.getAppearance().getDescription();
+        int age = appearance.getAppearance().getAge();
+        CharacterRaceDefinition race = CharacterRaceRegistry.get(
+                appearance.getAppearance().getRaceId());
 
         String requestedFactionId = normalizeStableIdentifier(request.getStartingFactionId());
         if (!isValidIdentifierLength(requestedFactionId)) {

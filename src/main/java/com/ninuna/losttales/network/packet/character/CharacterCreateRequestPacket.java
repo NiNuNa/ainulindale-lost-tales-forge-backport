@@ -1,5 +1,6 @@
 package com.ninuna.losttales.network.packet.character;
 
+import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.server.CharacterCreationRequest;
 import com.ninuna.losttales.character.server.CharacterNetworkRequestHandler;
 import com.ninuna.losttales.character.server.CharacterServerPacketDispatcher;
@@ -78,6 +79,11 @@ public final class CharacterCreateRequestPacket implements IMessage {
             CharacterPacketCodec.requireFinished(buffer);
             if (this.expectedRosterRevision < 0L) {
                 throw new CharacterPacketCodec.DecodeException("missing roster revision");
+            }
+            if (!CharacterRoster.isCreatableSlotIndex(this.slotIndex)) {
+                // The default character's slot is not one a request may
+                // name, and a byte can carry any of 256 values.
+                throw new CharacterPacketCodec.DecodeException("slot out of range");
             }
         } catch (RuntimeException exception) {
             this.malformed = true;

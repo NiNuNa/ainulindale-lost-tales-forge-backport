@@ -150,6 +150,11 @@ final class ChatLayoutMarker {
         }
     }
 
+    /** Whether the component is one of this class's own, of any kind. */
+    static boolean isMarker(IChatComponent component) {
+        return payloadOf(component) != null;
+    }
+
     static boolean isAnchor(IChatComponent component) {
         Data data = decode(component);
         return data != null && data.anchor;

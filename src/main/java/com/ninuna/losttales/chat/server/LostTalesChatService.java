@@ -260,10 +260,15 @@ public final class LostTalesChatService {
         // character's lines and on nobody else's.
         int roles = ChatRolePresentation.rolesShown(channel, wornRoles);
         int ivory = ChatRolePresentation.unassignedColor();
+        // The quote is only allowed back into the conversation it came
+        // from: a whisper quoted into Global would carry its words to
+        // everyone online.
+        String replyScope = ChatChannelPolicy.scopeValueOf(
+                channel, party, factionId);
         ChatReplyReference reply = ChatMessageIds.NONE == replyToMessageId
                 ? ChatReplyReference.NONE
                 : ChatHistory.quoteFor(replyToMessageId,
-                        sender.getUniqueID());
+                        sender.getUniqueID(), channel, replyScope);
         if (replyToMessageId != ChatMessageIds.NONE && !reply.exists()) {
             sender.addChatMessage(new ChatComponentTranslation(
                     "chat.losttales.reply.unavailable"));
@@ -303,8 +308,7 @@ public final class LostTalesChatService {
                 // faction it was spoken to, or the party it was spoken
                 // in. The client files it under that conversation's tab
                 // and shows it under no other.
-                .withScope(ChatChannelPolicy.scopeValueOf(
-                        channel, party, factionId));
+                .withScope(replyScope);
 
         FMLLog.info("[losttales/chat/%s] <%s (%s)> %s%s%s",
                 channel.getId(), identityName, accountName, message,
@@ -596,6 +600,14 @@ public final class LostTalesChatService {
      */
     public static void typing(EntityPlayerMP sender, ChatChannel channel,
                               String target, boolean typing) {
+        typing(sender, channel, target, typing,
+                LostTalesChatSendPacket.APPEARANCE_DEFAULT, null);
+    }
+
+    public static void typing(EntityPlayerMP sender, ChatChannel channel,
+                              String target, boolean typing,
+                              int appearanceKind,
+                              UUID appearanceCharacterId) {
         if (!LostTalesConfig.chatTypingIndicators || sender == null
                 || sender.worldObj == null || sender.worldObj.isRemote
                 || channel == null
@@ -607,17 +619,38 @@ public final class LostTalesChatService {
         if (activeMute(sender) != null) {
             return;
         }
-        RoleplayCharacter character = CharacterActiveResolver.get(sender);
+        // The identity the message will wear, resolved exactly as a send
+        // resolves it: presence is routed, signed and gated by it, so the
+        // indicator reaches the readers the message will reach and no
+        // others. A stated character the sender does not own says
+        // nothing at all — presence earns no notices, refusals included.
+        RoleplayCharacter appearance;
+        if (appearanceKind == LostTalesChatSendPacket.APPEARANCE_ACCOUNT) {
+            appearance = null;
+        } else if (appearanceKind
+                == LostTalesChatSendPacket.APPEARANCE_CHARACTER) {
+            appearance = ownedCharacter(sender, appearanceCharacterId);
+            if (appearance == null) {
+                return;
+            }
+        } else {
+            PlayableIdentityResolver.Resolution identity =
+                    PlayableIdentityResolver.resolve(sender);
+            if (!identity.isAvailable()
+                    && ChatRolePresentation.isInCharacter(channel)) {
+                // The line would wear the active character and the roster
+                // cannot say which; the send would be refused too.
+                return;
+            }
+            appearance = identity.isAvailable()
+                    ? identity.getCharacter() : null;
+        }
         String accountName = sender.getGameProfile() == null
                 ? sender.getCommandSenderName()
                 : sender.getGameProfile().getName();
-        // Presence carries the default identity, the character being
-        // played: the typing packet does not say which appearance the
-        // message will wear, and a name shown a moment early is
-        // presentation, not fact.
-        String identityName = character == null
+        String identityName = appearance == null
                 ? accountName
-                : characterNameOrFallback(character, accountName);
+                : characterNameOrFallback(appearance, accountName);
         if (channel.getRecipientRule() == ChatRecipientRule.WHISPER) {
             EntityPlayerMP whisperTarget = LostTalesServerPlayers.findOnline(target);
             if (whisperTarget != null && whisperTarget != sender) {
@@ -629,17 +662,17 @@ public final class LostTalesChatService {
             return;
         }
         Party party = null;
-        String factionId = ChatChannelPolicy.playedFactionId(character);
+        String factionId = ChatChannelPolicy.playedFactionId(appearance);
         if (channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP) {
             party = PartyService.getInstance()
                     .getPartyForActiveCharacter(sender);
         }
-        // The same question a send asks, so presence never promises a
-        // message the channel would refuse.
+        // The same question a send asks, with the same roles, so presence
+        // never promises a message the channel would refuse.
         if (ChatChannelPolicy.sendRefusal(channel, party,
                 RoleplayCharacterIdentityHook.resolveGameplayId(sender), factionId,
                 ChatAccountRoleResolver.resolve(sender,
-                        character == null ? null : character.getCharacterId()),
+                        appearance == null ? null : appearance.getCharacterId()),
                 LostTalesPermissions.isOperator(sender)) != null) {
             return;
         }

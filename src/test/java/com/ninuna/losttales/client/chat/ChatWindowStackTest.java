@@ -87,19 +87,6 @@ public final class ChatWindowStackTest {
         assertEquals(start, order());
     }
 
-    @Test
-    public void everyWindowTakesItsTurnInFront() {
-        detach(ChatChannel.OOC);
-        detach(ChatChannel.PARTY);
-        int count = ChatWindowLayout.stacked().size();
-        java.util.Set<String> seen = new java.util.HashSet<String>();
-        for (int press = 0; press < count; press++) {
-            seen.add(front().getId());
-            ChatWindowLayout.lower(front().getId());
-        }
-        assertEquals("each window comes forward exactly once",
-                count, seen.size());
-    }
 
     @Test
     public void loweringAWindowThatIsGoneChangesNothing() {

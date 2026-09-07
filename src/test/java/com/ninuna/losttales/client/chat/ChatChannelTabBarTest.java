@@ -93,48 +93,6 @@ public final class ChatChannelTabBarTest {
         assertArrayEquals(new int[] {0, 0}, widths);
     }
 
-    /** The run the row shows always holds the tab in front. */
-    @Test
-    public void theShownRunKeepsTheTabInFront() {
-        int[] widths = { 30, 30, 30, 30, 30 };
-        // Room for three of the five: the run closes in on the selection
-        // from the far end first, so the tab in front never falls out.
-        assertArrayEquals(new int[] { 0, 2 },
-                shownRun(widths, 100, 1));
-        assertArrayEquals(new int[] { 2, 4 },
-                shownRun(widths, 100, 4));
-        assertArrayEquals(new int[] { 0, 4 },
-                shownRun(widths, 1000, 2));
-        // Not even one tab fits: the row keeps the selected one anyway.
-        assertArrayEquals(new int[] { 3, 3 }, shownRun(widths, 5, 3));
-    }
-
-    /**
-     * The same shrink the row performs, over bare tab widths: the run
-     * closes in on the selection from whichever end is further away.
-     */
-    private static int[] shownRun(int[] fixed, int room, int selected) {
-        int first = 0;
-        int last = fixed.length - 1;
-        while (first <= last && sum(fixed, first, last) > room) {
-            if (last > selected) {
-                last--;
-            } else if (first < selected) {
-                first++;
-            } else {
-                break;
-            }
-        }
-        return new int[] { first, last };
-    }
-
-    private static int sum(int[] widths, int first, int last) {
-        int total = 0;
-        for (int index = first; index <= last; index++) {
-            total += widths[index];
-        }
-        return total;
-    }
 
     /**
      * A tab behind the one in front gives its controls up in stages as

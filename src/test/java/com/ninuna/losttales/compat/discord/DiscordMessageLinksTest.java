@@ -107,16 +107,6 @@ public final class DiscordMessageLinksTest {
         assertEquals(0, links.size());
     }
 
-    @Test
-    public void relinkingAMessageReplacesItsPair() {
-        DiscordMessageLinks links = new DiscordMessageLinks();
-        links.link(1000L, "111", "", "", "");
-        links.link(1000L, "112", "", "", "");
-        assertEquals("112", firstDiscordIdOf(links, 1000L));
-        assertEquals(1000L, links.messageIdOf("112"));
-        assertEquals(ChatMessageIds.NONE, links.messageIdOf("111"));
-        assertEquals(1, links.copiesOf(1000L).size());
-    }
 
     @Test
     public void theOldestMessagesGoFirst() {

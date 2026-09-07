@@ -4,15 +4,24 @@ import cpw.mods.fml.common.network.ByteBufUtils;
 import io.netty.buffer.ByteBuf;
 
 import java.nio.charset.Charset;
+import java.util.UUID;
 
 /**
  * Bounded packet primitives for the legacy Lost Tales packet formats.
  *
- * Strings retain Forge 1.7.10's ByteBufUtils UTF-8 wire format: a two-byte
- * maximum varint byte length followed by the UTF-8 payload. The bounded read
- * checks the declared length before allocating a byte array.
+ * Two string framings are carried, and both are wire surface: the
+ * {@code utf8} pair keeps Forge 1.7.10's ByteBufUtils format — a two-byte
+ * maximum varint byte length followed by the UTF-8 payload — while the
+ * {@code shortFramed} pair writes an unsigned short length, which is what
+ * the character and party families were written against. Neither may be
+ * swapped for the other: the bytes on the wire are what they are.
+ *
+ * <p>Internal to the mod's packets. The character and party families sit
+ * in packages of their own and reach these through their own small
+ * classes, which hold the size limits those families bound their fields
+ * by and nothing else.</p>
  */
-final class LostTalesPacketCodec {
+public final class LostTalesPacketCodec {
 
     static final int MAX_ACTION_BYTES = 32;
     static final int MAX_IDENTIFIER_BYTES = 128;
@@ -52,7 +61,58 @@ final class LostTalesPacketCodec {
         buffer.writeBytes(bytes);
     }
 
-    static void requireFinished(ByteBuf buffer) {
+    /**
+     * A string behind an unsigned-short byte length. The bounded read
+     * checks the declared length before allocating.
+     */
+    public static String readShortFramedString(ByteBuf buffer, int maximumBytes) {
+        requireReadable(buffer, 2);
+        int length = buffer.readUnsignedShort();
+        if (length > maximumBytes) {
+            throw new DecodeException("string length exceeds limit");
+        }
+        requireReadable(buffer, length);
+        byte[] bytes = new byte[length];
+        buffer.readBytes(bytes);
+        return new String(bytes, UTF_8);
+    }
+
+    public static void writeShortFramedString(ByteBuf buffer, String value,
+                                              int maximumBytes) {
+        byte[] bytes = (value == null ? "" : value).getBytes(UTF_8);
+        if (bytes.length > maximumBytes) {
+            throw new IllegalArgumentException("encoded string exceeds packet limit");
+        }
+        buffer.writeShort(bytes.length);
+        buffer.writeBytes(bytes);
+    }
+
+    public static UUID readUuid(ByteBuf buffer) {
+        requireReadable(buffer, 16);
+        return new UUID(buffer.readLong(), buffer.readLong());
+    }
+
+    public static UUID readNullableUuid(ByteBuf buffer) {
+        requireReadable(buffer, 1);
+        return buffer.readBoolean() ? readUuid(buffer) : null;
+    }
+
+    public static void writeUuid(ByteBuf buffer, UUID value) {
+        if (value == null) {
+            throw new IllegalArgumentException("UUID must not be null");
+        }
+        buffer.writeLong(value.getMostSignificantBits());
+        buffer.writeLong(value.getLeastSignificantBits());
+    }
+
+    public static void writeNullableUuid(ByteBuf buffer, UUID value) {
+        buffer.writeBoolean(value != null);
+        if (value != null) {
+            writeUuid(buffer, value);
+        }
+    }
+
+    public static void requireFinished(ByteBuf buffer) {
         if (buffer == null || buffer.isReadable()) {
             throw new DecodeException("unexpected trailing packet data");
         }
@@ -128,10 +188,10 @@ final class LostTalesPacketCodec {
         }
     }
 
-    static final class DecodeException extends RuntimeException {
+    public static class DecodeException extends RuntimeException {
         private static final long serialVersionUID = 1L;
 
-        DecodeException(String message) {
+        public DecodeException(String message) {
             super(message);
         }
     }

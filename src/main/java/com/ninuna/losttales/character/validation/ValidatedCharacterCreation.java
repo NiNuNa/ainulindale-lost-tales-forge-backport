@@ -1,8 +1,5 @@
 package com.ninuna.losttales.character.validation;
 
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
-import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
-
 /** Canonical values produced by successful creation validation. */
 public final class ValidatedCharacterCreation {
 
@@ -19,52 +16,6 @@ public final class ValidatedCharacterCreation {
     private final String startingFactionId;
     private final String startingWaypointId;
     private final boolean unconventionalSettings;
-
-    public ValidatedCharacterCreation(int slotIndex, String name,
-                                      String normalizedNameKey, String raceId,
-                                      String genderId, String skinId, int age,
-                                      String startingFactionId) {
-        this(slotIndex, name, normalizedNameKey, raceId, genderId, skinId,
-                age, startingFactionId, "", false,
-                "");
-    }
-
-    public ValidatedCharacterCreation(int slotIndex, String name,
-                                      String normalizedNameKey, String raceId,
-                                      String genderId, String skinId, int age,
-                                      String startingFactionId,
-                                      String startingWaypointId,
-                                      boolean unconventionalSettings) {
-        this(slotIndex, name, normalizedNameKey, raceId, genderId, skinId,
-                age, startingFactionId, startingWaypointId,
-                unconventionalSettings, "");
-    }
-
-    public ValidatedCharacterCreation(int slotIndex, String name,
-                                      String normalizedNameKey, String raceId,
-                                      String genderId, String skinId, int age,
-                                      String startingFactionId,
-                                      String startingWaypointId,
-                                      boolean unconventionalSettings,
-                                      String description) {
-        this(slotIndex, name, normalizedNameKey, raceId, genderId, skinId,
-                age, startingFactionId, startingWaypointId,
-                unconventionalSettings, description,
-                CharacterBodyTypeRegistry.defaultFor(genderId));
-    }
-
-    public ValidatedCharacterCreation(int slotIndex, String name,
-                                      String normalizedNameKey, String raceId,
-                                      String genderId, String skinId, int age,
-                                      String startingFactionId,
-                                      String startingWaypointId,
-                                      boolean unconventionalSettings,
-                                      String description, String bodyTypeId) {
-        this(slotIndex, name, normalizedNameKey, raceId, genderId, skinId,
-                age, startingFactionId, startingWaypointId,
-                unconventionalSettings, description, bodyTypeId,
-                CharacterChestTypeRegistry.defaultFor(genderId));
-    }
 
     public ValidatedCharacterCreation(int slotIndex, String name,
                                       String normalizedNameKey, String raceId,

@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.render.player;
 
-import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.camera.ThirdPersonDirectionalMovementController;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
@@ -36,10 +35,7 @@ final class LostTalesPlayerCapeRenderer {
      */
     private static final ModelBiped CAPE_MODEL = new LOTRModelBiped();
     private static final float VANILLA_BACK_OFFSET = 2.0F * MODEL_UNIT;
-    private static final float HOBBIT_VERTICAL_SCALE = 0.8333333F;
-    private static final float DWARF_WIDTH_SCALE = 1.25F;
-    private static final float HALF_TROLL_WIDTH_SCALE = 1.5F;
-    private static final float HALF_TROLL_LENGTH_SCALE = 1.3333334F;
+    /** The half-troll's torso is four pixels deeper than a biped's. */
     private static final float HALF_TROLL_BACK_OFFSET = 4.0F * MODEL_UNIT;
     private static final float MAXIMUM_FORWARD_LIFT = 80.0F;
     private static final float MAXIMUM_SIDE_SWING = 65.0F;
@@ -51,8 +47,14 @@ final class LostTalesPlayerCapeRenderer {
 
     private LostTalesPlayerCapeRenderer() {}
 
+    /**
+     * @param modelId which body is being drawn. The cape hangs on that
+     *                body, so it is scaled by the body's own shape and
+     *                not by the race — a race may be drawn on more than
+     *                one model, and two models are two backs.
+     */
     static void render(LostTalesConfiguredPlayerRenderer renderer,
-                       String raceId,
+                       String modelId,
                        AbstractClientPlayer player,
                        float partialTicks) {
         if (renderer == null || player == null || player.isInvisible()) {
@@ -82,7 +84,8 @@ final class LostTalesPlayerCapeRenderer {
             return;
         }
 
-        CapeTransform transform = CapeTransform.forRace(raceId);
+        CapeTransform transform = CapeTransform.forShape(
+                PlayerBodyShape.forModelIdOrDefault(modelId));
         ModelRenderer body = model.bipedBody;
         ModelRenderer cloak = CAPE_MODEL.bipedCloak;
 
@@ -309,24 +312,29 @@ final class LostTalesPlayerCapeRenderer {
             this.backOffset = backOffset;
         }
 
-        private static CapeTransform forRace(String raceId) {
-            if (CharacterRaceRegistry.HOBBIT.equals(raceId)) {
+        /**
+         * The cape as the body it hangs on is drawn. Every proportion
+         * comes from {@link PlayerBodyShape}, which is also where the
+         * body model takes it from, so the two cannot disagree.
+         */
+        private static CapeTransform forShape(PlayerBodyShape shape) {
+            if (shape.hasHobbitProportions()) {
                 return new CapeTransform(
-                        1.0F, HOBBIT_VERTICAL_SCALE, 1.0F,
-                        1.0F, HOBBIT_VERTICAL_SCALE, 1.0F,
+                        1.0F, PlayerBodyShape.HOBBIT_VERTICAL_SCALE, 1.0F,
+                        1.0F, PlayerBodyShape.HOBBIT_VERTICAL_SCALE, 1.0F,
                         VANILLA_BACK_OFFSET);
             }
-            if (CharacterRaceRegistry.DWARF.equals(raceId)) {
+            if (shape.hasDwarfProportions()) {
                 return new CapeTransform(
-                        DWARF_WIDTH_SCALE, 1.0F, 1.0F,
-                        DWARF_WIDTH_SCALE, 1.0F, 1.0F,
+                        PlayerBodyShape.DWARF_WIDTH_SCALE, 1.0F, 1.0F,
+                        PlayerBodyShape.DWARF_WIDTH_SCALE, 1.0F, 1.0F,
                         VANILLA_BACK_OFFSET);
             }
-            if (CharacterRaceRegistry.HALF_TROLL.equals(raceId)) {
+            if (shape.isHalfTroll()) {
                 return new CapeTransform(
                         1.0F, 1.0F, 1.0F,
-                        HALF_TROLL_WIDTH_SCALE,
-                        HALF_TROLL_LENGTH_SCALE,
+                        PlayerBodyShape.HALF_TROLL_WIDTH_SCALE,
+                        PlayerBodyShape.HALF_TROLL_LENGTH_SCALE,
                         1.0F,
                         HALF_TROLL_BACK_OFFSET);
             }

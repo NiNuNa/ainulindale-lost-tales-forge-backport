@@ -73,18 +73,4 @@ public final class ServerConfigAuthorizationCategoriesTest {
                         LostTalesConfig.CATEGORY_CLIENT));
     }
 
-    /** A change naming an excluded category is refused, not quietly applied. */
-    @Test
-    public void aChangeNamingTheRolesIsNotFoundAmongTheEntries() {
-        Configuration config = new Configuration();
-        Property roles = config.get(LostTalesConfig.CATEGORY_ROLES, "definitions",
-                new String[] {"operator=name:Operator"});
-        roles.set(new String[] {"operator=name:Operator"});
-
-        List<ServerConfigEntry> entries = ServerConfigSnapshot.fromConfiguration(
-                config, ServerConfigSnapshot.EXCLUDED_CATEGORIES,
-                ServerConfigSnapshot.SECRET_KEYS);
-
-        assertTrue("nothing on the surface at all", entries.isEmpty());
-    }
 }

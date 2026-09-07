@@ -54,6 +54,32 @@ tasks.matching { task ->
     task.name == 'runClient' || task.name == 'runServer'
 }.all { task ->
     task.jvmArgs "-Dfml.coreMods.load=${lostTalesCorePlugin}"
+    // Launch arguments for runtime testing, so a run can pick its account or
+    // join a server without going through the menus. GradleStart forwards
+    // what it does not recognise to Minecraft. For example:
+    //   gradlew runClient -PrunArgs="--username Player390 --server localhost"
+    // An option given here replaces the one ForgeGradle supplies, which
+    // otherwise names the account at random on every launch.
+    if (project.hasProperty('runArgs')) {
+        task.doFirst {
+            List<String> extra =
+                    project.property('runArgs').toString().trim().split('\\s+') as List
+            List<String> merged = task.args as List
+            extra.findAll { it.startsWith('--') }.each { String option ->
+                int at = merged.indexOf(option)
+                while (at >= 0) {
+                    boolean valued = at + 1 < merged.size() &&
+                            !merged.get(at + 1).startsWith('--')
+                    merged.remove(at)
+                    if (valued) {
+                        merged.remove(at)
+                    }
+                    at = merged.indexOf(option)
+                }
+            }
+            task.args = merged + extra
+        }
+    }
 }
 
 

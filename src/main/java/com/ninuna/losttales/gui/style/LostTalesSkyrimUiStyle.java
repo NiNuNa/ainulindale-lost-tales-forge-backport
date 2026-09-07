@@ -4,6 +4,9 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import java.util.Locale;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.renderer.OpenGlHelper;
+import net.minecraft.client.renderer.Tessellator;
+import org.lwjgl.opengl.GL11;
 /**
  * Small primitive-drawn UI style used by the quest journal/HUD.
  *
@@ -14,6 +17,64 @@ import net.minecraft.client.gui.Gui;
 public final class LostTalesSkyrimUiStyle extends LostTalesColors {
 
     private LostTalesSkyrimUiStyle() {}
+
+    /**
+     * Puts blending back the way content needs it.
+     *
+     * <p>{@link Gui#drawRect} disables {@code GL_BLEND} when it finishes,
+     * and every panel, rule and row here is built from it. Text or a
+     * sprite drawn afterwards would land fully opaque, which turns a
+     * half-opacity shadow into a solid black one. Anything drawn after a
+     * panel calls this first.</p>
+     */
+    public static void beginContent() {
+        GL11.glEnable(GL11.GL_BLEND);
+        OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
+                GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+    }
+
+    /**
+     * Begins a run of untextured quads and answers the tessellator they
+     * are added to.
+     *
+     * <p>Rules, panels, fades and backdrops are all built from these, and
+     * each one set the same pieces of state up and put most of them back
+     * on its own. Most: some restored the draw colour afterwards and some
+     * did not, which is how a coloured quad tints the next thing drawn —
+     * the same class of fault as the blend state {@link #beginContent}
+     * exists for. One bracket, and every run puts back everything it
+     * changed.</p>
+     *
+     * @param smooth whether the run shades between its vertices. A single
+     *               flat quad does not, and asking for it would be two
+     *               state changes for nothing.
+     */
+    public static Tessellator beginQuads(boolean smooth) {
+        GL11.glDisable(GL11.GL_TEXTURE_2D);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glDisable(GL11.GL_ALPHA_TEST);
+        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
+        if (smooth) {
+            GL11.glShadeModel(GL11.GL_SMOOTH);
+        }
+        Tessellator tessellator = Tessellator.instance;
+        tessellator.startDrawingQuads();
+        return tessellator;
+    }
+
+    /** Draws a run begun by {@link #beginQuads} and puts the state back. */
+    public static void endQuads(Tessellator tessellator, boolean smooth) {
+        if (tessellator != null) {
+            tessellator.draw();
+        }
+        if (smooth) {
+            GL11.glShadeModel(GL11.GL_FLAT);
+        }
+        GL11.glDisable(GL11.GL_BLEND);
+        GL11.glEnable(GL11.GL_ALPHA_TEST);
+        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+    }
 
     public static void drawScreenShade(int width, int height) {
         if (LostTalesGuiAnimations.isManagingBackdrop()) {

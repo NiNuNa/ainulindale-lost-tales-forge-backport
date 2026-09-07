@@ -41,10 +41,15 @@ public final class LostTalesPlayerModel extends ModelBiped {
      */
     private static final float ARM_PIVOT_Y = 2.0F;
     private static final float VANILLA_ARM_REACH = 5.0F;
-    private static final float HOBBIT_LIMB_SCALE = 10.0F / 12.0F;
-    private static final float DWARF_WIDTH_SCALE = 1.25F;
-    private static final float DWARF_ARM_SHIFT = 1.0F;
-    private static final float DWARF_LEG_SHIFT = 0.25F;
+    // The proportions belong to the shape, which the cape renderer reads
+    // them from too: a body scaled here and a cape scaled there have to
+    // agree, so there is one of each number.
+    private static final float HOBBIT_LIMB_SCALE =
+            PlayerBodyShape.HOBBIT_VERTICAL_SCALE;
+    private static final float DWARF_WIDTH_SCALE =
+            PlayerBodyShape.DWARF_WIDTH_SCALE;
+    private static final float DWARF_ARM_SHIFT = PlayerBodyShape.DWARF_ARM_SHIFT;
+    private static final float DWARF_LEG_SHIFT = PlayerBodyShape.DWARF_LEG_SHIFT;
     /** Rounded chest: hung 0.9 px below the neck at the torso front, tilted forward. */
     private static final float ROUNDED_HANG = 0.9F;
     private static final float ROUNDED_TILT = -35.0F;

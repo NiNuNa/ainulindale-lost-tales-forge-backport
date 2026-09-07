@@ -9,6 +9,7 @@ import com.ninuna.losttales.client.character.CharacterGuiPreviewLayout;
 import com.ninuna.losttales.client.character.CharacterTemplate;
 import com.ninuna.losttales.client.character.CharacterTemplateStore;
 import com.ninuna.losttales.client.character.LostTalesClientAccount;
+import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
@@ -58,6 +59,24 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
 
     /** The slot a template stands for: none, until a server names one. */
     private static final int TEMPLATE_SLOT = -1;
+
+    private static final int PANEL_TOP = 46;
+    /** Where the panel starts when the header has to share the room. */
+    private static final int PANEL_TOP_TIGHT = 20;
+    private static final int PANEL_HEIGHT_MAX = 420;
+    private static final int PANEL_HEIGHT_MIN = 120;
+    /** The button row's band at the foot of the screen. */
+    private static final int BUTTON_ROW_BAND = 44;
+    /** Below this the appearance step drops the race attributes. */
+    private static final int RACE_ATTRIBUTES_MIN_PANEL = 314;
+    /** Below this the identity step drops its hint lines. */
+    private static final int HINTS_MIN_PANEL = 235;
+    /** Below this the identity step drops its appearance summary. */
+    private static final int SUMMARY_MIN_PANEL = 290;
+    /** The face drawn where there is no body to dress, in pixels. */
+    private static final int FACE_PREVIEW_SIZE = 48;
+    /** How far above the body's baseline the face sits. */
+    private static final int FACE_PREVIEW_LIFT = 30;
 
     private final GuiScreen parent;
     private final int slotIndex;
@@ -133,23 +152,31 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
         this.draftDescription = template.getDescription();
         this.unconventionalSettings = template.hasUnconventionalSettings();
 
+        // Each choice narrows the ones under it, so they are seeded top
+        // down and the lists below are rebuilt in between — the same
+        // order the cyclers use. Seeding a skin against the list the
+        // previous sex offered would silently drop it.
         List<String> unavailable = new java.util.ArrayList<String>();
         int race = this.raceIds.indexOf(template.getRaceId());
         if (race >= 0) {
             this.raceIndex = race;
-            rebuildGenderOptions();
-            rebuildAppearanceOptions();
         } else if (template.getRaceId().length() > 0) {
             unavailable.add(ClientCharacterDisplayNames.race(template.getRaceId()));
         }
+        rebuildGenderOptions();
         this.genderIndex = seedIndex(this.genderIds, template.getGenderId(),
-                this.genderIndex);
+                this.genderIndex, template.getGenderId().length() > 0
+                        ? ClientCharacterDisplayNames.gender(template.getGenderId())
+                        : null, unavailable);
+        rebuildAppearanceOptions();
         this.skinIndex = seedIndex(this.skinIds, template.getSkinId(),
-                this.skinIndex);
+                this.skinIndex, template.getSkinId().length() > 0
+                        ? ClientCharacterDisplayNames.skin(template.getSkinId())
+                        : null, unavailable);
         this.bodyTypeIndex = seedIndex(this.bodyTypeIds,
-                template.getBodyTypeId(), this.bodyTypeIndex);
+                template.getBodyTypeId(), this.bodyTypeIndex, null, unavailable);
         this.chestTypeIndex = seedIndex(this.chestTypeIds,
-                template.getChestTypeId(), this.chestTypeIndex);
+                template.getChestTypeId(), this.chestTypeIndex, null, unavailable);
         int faction = this.factionIds.indexOf(template.getStartingFactionId());
         if (faction >= 0) {
             this.factionIndex = faction;
@@ -157,17 +184,33 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
             unavailable.add(ClientCharacterDisplayNames.faction(
                     template.getStartingFactionId()));
         }
-        if (!unavailable.isEmpty() && !this.templateMode) {
-            this.statusMessage = I18n.format(
-                    "gui.losttales.character.template.unavailable",
+        if (!unavailable.isEmpty()) {
+            // Away from a world there is no server to name; the template
+            // editor is answering out of this installation's own content.
+            this.statusMessage = I18n.format(this.templateMode
+                            ? "gui.losttales.character.template.unknown"
+                            : "gui.losttales.character.template.unavailable",
                     join(unavailable));
             this.statusError = false;
         }
     }
 
-    private static int seedIndex(List<String> options, String id, int fallback) {
+    /**
+     * The template's choice where the options offer it, and the form's own
+     * otherwise. A choice that is dropped is named, so a template made
+     * against one server never quietly becomes a different character on
+     * another; {@code label} is null for a choice not worth naming.
+     */
+    private static int seedIndex(List<String> options, String id, int fallback,
+                                 String label, List<String> unavailable) {
         int index = id == null ? -1 : options.indexOf(id);
-        return index >= 0 ? index : fallback;
+        if (index >= 0) {
+            return index;
+        }
+        if (label != null) {
+            unavailable.add(label);
+        }
+        return fallback;
     }
 
     private static String join(List<String> values) {
@@ -249,8 +292,12 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
             this.descriptionField.setText(this.draftDescription);
             addCyclerButtons(BUTTON_FACTION_PREVIOUS, BUTTON_FACTION_NEXT,
                     fieldX, top + 90, fieldWidth);
-            addCyclerButtons(BUTTON_WAYPOINT_PREVIOUS, BUTTON_WAYPOINT_NEXT,
-                    fieldX, top + 120, fieldWidth);
+            if (!this.templateMode) {
+                // A template names no starting waypoint, so the form that
+                // edits one does not ask for it.
+                addCyclerButtons(BUTTON_WAYPOINT_PREVIOUS, BUTTON_WAYPOINT_NEXT,
+                        fieldX, top + 120, fieldWidth);
+            }
             this.unconventionalButton = new GuiButton(
                     BUTTON_UNCONVENTIONAL, fieldX, top + 150,
                     fieldWidth, 20, "");
@@ -262,7 +309,9 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
                     I18n.format("gui.losttales.character.back")));
             this.createButton = new GuiButton(BUTTON_CREATE,
                     this.width / 2 - 49, bottom, 98, 20,
-                    I18n.format("gui.losttales.character.create"));
+                    I18n.format(this.templateMode
+                            ? "gui.losttales.character.template.save"
+                            : "gui.losttales.character.create"));
             this.buttonList.add(this.createButton);
             this.buttonList.add(new GuiButton(BUTTON_CANCEL,
                     this.width / 2 + 57, bottom, 98, 20,
@@ -357,9 +406,13 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
             this.continueButton.enabled = !pending && appearanceReady;
         }
         if (this.createButton != null) {
+            // A template carries no starting waypoint — every server
+            // resolves that against its own map — so it is not something
+            // saving one can wait for.
             this.createButton.enabled = !pending && appearanceReady
-                && this.factionIds.size() > 0
-                && this.waypointIds.size() > 0;
+                && (this.templateMode
+                    || (this.factionIds.size() > 0
+                        && this.waypointIds.size() > 0));
         }
     }
 
@@ -670,8 +723,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
                 ? "gui.losttales.character.creation.step.appearance"
                 : "gui.losttales.character.creation.step.identity");
         LostTalesSkyrimUiStyle.drawCenteredHeader(this.fontRendererObj,
-                I18n.format("gui.losttales.character.creation"),
-                stepLabel + " - " + I18n.format(
+                I18n.format(this.templateMode
+                        ? "gui.losttales.character.template.title"
+                        : "gui.losttales.character.creation"),
+                this.templateMode ? stepLabel : stepLabel + " - " + I18n.format(
                         "gui.losttales.character.slot",
                         Integer.valueOf(this.slotIndex + 1)),
                 this.width, 12);
@@ -721,7 +776,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
                                     selected(this.skinIds, this.skinIndex)),
                     valueX + 22, rowY + 60, valueWidth - 44);
 
-            if (panelHeight >= 314) {
+            if (panelHeight >= RACE_ATTRIBUTES_MIN_PANEL && !this.templateMode) {
                 drawRaceAttributes(left + 18, rowY + 142,
                         panelWidth - previewWidth - 36);
             }
@@ -739,8 +794,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
                     labelX, rowY + 66);
             drawLabel(I18n.format("gui.losttales.character.starting_faction"),
                     labelX, rowY + 96);
-            drawLabel(I18n.format("gui.losttales.character.starting_waypoint"),
-                    labelX, rowY + 126);
+            if (!this.templateMode) {
+                drawLabel(I18n.format("gui.losttales.character.starting_waypoint"),
+                        labelX, rowY + 126);
+            }
 
             if (this.nameField != null) {
                 this.nameField.drawTextBox();
@@ -755,41 +812,47 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
                             : ClientCharacterDisplayNames.faction(
                                     selected(this.factionIds, this.factionIndex)),
                     valueX + 22, rowY + 90, valueWidth - 44);
-            drawCenteredValue(this.waypointIds.isEmpty()
-                            ? I18n.format("gui.losttales.character.no_options")
-                            : ClientCharacterDisplayNames.waypoint(
-                                    selected(this.waypointIds,
-                                            this.waypointIndex)),
-                    valueX + 22, rowY + 120, valueWidth - 44);
-
-            this.fontRendererObj.drawStringWithShadow(
-                    LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj,
-                            I18n.format("gui.losttales.character.description.hint"),
-                            panelWidth - 36),
-                    left + 18, rowY + 177,
-                    LostTalesSkyrimUiStyle.TEXT_MUTED);
-            if (this.unconventionalSettings) {
-                this.fontRendererObj.drawStringWithShadow(
-                        LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj,
-                                I18n.format(
-                                        "gui.losttales.character.unconventional.hint"),
-                                panelWidth - 36),
-                        left + 18, rowY + 191,
-                        LostTalesSkyrimUiStyle.TEXT_MUTED);
+            if (!this.templateMode) {
+                drawCenteredValue(this.waypointIds.isEmpty()
+                                ? I18n.format("gui.losttales.character.no_options")
+                                : ClientCharacterDisplayNames.waypoint(
+                                        selected(this.waypointIds,
+                                                this.waypointIndex)),
+                        valueX + 22, rowY + 120, valueWidth - 44);
             }
 
-            LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj,
-                    I18n.format("gui.losttales.character.appearance_summary"),
-                    left + 18, rowY + 218, panelWidth - 36);
-            drawCompactAttribute(I18n.format("gui.losttales.character.race"),
-                    ClientCharacterDisplayNames.race(
-                            selected(this.raceIds, this.raceIndex)),
-                    left + 18, rowY + 235, (panelWidth - 48) / 2);
-            drawCompactAttribute(I18n.format("gui.losttales.character.skin"),
-                    ClientCharacterDisplayNames.skin(
-                            selected(this.skinIds, this.skinIndex)),
-                    left + panelWidth / 2, rowY + 235,
-                    panelWidth / 2 - 18);
+            if (panelHeight >= HINTS_MIN_PANEL) {
+                this.fontRendererObj.drawStringWithShadow(
+                        LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj,
+                                I18n.format("gui.losttales.character.description.hint"),
+                                panelWidth - 36),
+                        left + 18, rowY + 177,
+                        LostTalesSkyrimUiStyle.TEXT_MUTED);
+                if (this.unconventionalSettings) {
+                    this.fontRendererObj.drawStringWithShadow(
+                            LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj,
+                                    I18n.format(
+                                            "gui.losttales.character.unconventional.hint"),
+                                    panelWidth - 36),
+                            left + 18, rowY + 191,
+                            LostTalesSkyrimUiStyle.TEXT_MUTED);
+                }
+            }
+
+            if (panelHeight >= SUMMARY_MIN_PANEL) {
+                LostTalesSkyrimUiStyle.drawSectionHeader(this.fontRendererObj,
+                        I18n.format("gui.losttales.character.appearance_summary"),
+                        left + 18, rowY + 218, panelWidth - 36);
+                drawCompactAttribute(I18n.format("gui.losttales.character.race"),
+                        ClientCharacterDisplayNames.race(
+                                selected(this.raceIds, this.raceIndex)),
+                        left + 18, rowY + 235, (panelWidth - 48) / 2);
+                drawCompactAttribute(I18n.format("gui.losttales.character.skin"),
+                        ClientCharacterDisplayNames.skin(
+                                selected(this.skinIds, this.skinIndex)),
+                        left + panelWidth / 2, rowY + 235,
+                        panelWidth / 2 - 18);
+            }
         }
 
         if (this.statusMessage.length() > 0) {
@@ -851,23 +914,44 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
         return Math.min(560, this.width - 30);
     }
 
-    private int getPanelHeight() {
-        return Math.min(420, Math.max(314, this.height - 74));
-    }
-
     private int getPanelTop() {
-        return Math.max(20, Math.min(46, this.height - getPanelHeight() - 28));
+        return this.height >= 340 ? PANEL_TOP : PANEL_TOP_TIGHT;
     }
 
+    /**
+     * What is left between the panel's top and the band the button row
+     * needs at the foot of the screen.
+     *
+     * <p>The row is placed from the panel's bottom edge, so a panel with
+     * a fixed floor takes the row off screen with it on any short one —
+     * and short is common: 1.7.10 only keeps the scaled height at or
+     * above 240, and 1920x1080 at the default GUI Scale Auto is 270.
+     * Sections that do not fit what is left are dropped by the draw
+     * pass rather than drawn past the panel.</p>
+     */
+    private int getPanelHeight() {
+        return Math.max(PANEL_HEIGHT_MIN, Math.min(PANEL_HEIGHT_MAX,
+                this.height - getPanelTop() - BUTTON_ROW_BAND));
+    }
+
+    /**
+     * The character being chosen, drawn beside the choices.
+     *
+     * <p>In a world that is the player's own body wearing the appearance,
+     * which is what it will actually look like. At the main menu there is
+     * no body to dress, so the face is drawn on its own from the same
+     * skin the body would have worn.</p>
+     */
     private void drawAppearancePreview(int x, int y, int mouseX, int mouseY) {
         EntityPlayer player = this.mc == null ? null : this.mc.thePlayer;
-        if (player == null || player.getUniqueID() == null) {
-            return;
-        }
         String raceId = selected(this.raceIds, this.raceIndex);
         String genderId = selected(this.genderIds, this.genderIndex);
         String skinId = selected(this.skinIds, this.skinIndex);
         if (raceId.length() == 0 || genderId.length() == 0 || skinId.length() == 0) {
+            return;
+        }
+        if (player == null || player.getUniqueID() == null) {
+            drawFacePreview(skinId, x, y);
             return;
         }
 
@@ -888,6 +972,19 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
             RenderManager.debugBoundingBox = previousDebugBoundingBox;
             ClientCharacterAppearanceCache.clearPreview(player.getUniqueID());
         }
+    }
+
+    /** The face alone, centred on the column the body would have filled. */
+    private void drawFacePreview(String skinId, int centerX, int baselineY) {
+        java.util.UUID account = LostTalesClientAccount.id();
+        if (account == null) {
+            return;
+        }
+        LostTalesSkyrimUiStyle.beginContent();
+        LostTalesCharacterHeadIconRenderer.drawSnapshotHead(this.mc, account,
+                skinId, centerX - FACE_PREVIEW_SIZE / 2,
+                baselineY - FACE_PREVIEW_SIZE - FACE_PREVIEW_LIFT,
+                FACE_PREVIEW_SIZE, 1.0F, 1.0F);
     }
 
     private void drawLabel(String label, int x, int y) {

@@ -45,6 +45,20 @@ public final class ChatWindowLayoutStore {
 
     private static File storeFile;
 
+    /**
+     * The file as it was read, kept so it can be read again.
+     *
+     * <p>The layout is loaded at client start-up, which is long before
+     * any server has said which channels it defines: a tab on one of
+     * those cannot be resolved yet, and a tab that cannot be resolved is
+     * skipped. Keeping the lines lets the layout be built again from the
+     * same file once the server's channels are in force.</p>
+     */
+    private static List<String> loadedLines;
+
+    /** Whether the player has moved anything since the layout was built. */
+    private static boolean layoutTouched;
+
     private ChatWindowLayoutStore() {}
 
     public static synchronized void initialize(File configDirectory) {
@@ -54,18 +68,41 @@ public final class ChatWindowLayoutStore {
         if (lines != null) {
             load(lines);
         } else {
+            loadedLines = null;
+            layoutTouched = false;
             ChatWindowLayout.reset();
         }
         ChatWindowLayout.setChangeListener(new Runnable() {
             @Override
             public void run() {
+                layoutTouched = true;
                 save();
             }
         });
     }
 
+    /**
+     * Builds the layout again from the file, now that the server's own
+     * channels are in force, so a window arranged around one of them is
+     * restored rather than quietly dropped and then written away.
+     *
+     * <p>Only while the player has not moved anything: once they have,
+     * what is on screen is newer than the file and is what gets saved.
+     * Reading a file that was never written leaves the layout alone.</p>
+     */
+    public static synchronized void reloadForNewChannels() {
+        if (loadedLines != null && !layoutTouched) {
+            load(loadedLines);
+        }
+    }
+
     /** Applies parsed lines to the layout; visible for tests. */
     static void load(List<String> lines) {
+        // The file this layout was built from, and a layout nobody has
+        // moved yet: both are what lets it be built again once the
+        // server's own channels are in force.
+        loadedLines = lines;
+        layoutTouched = false;
         List<ChatWindowLayout.WindowSpec> specs =
                 new ArrayList<ChatWindowLayout.WindowSpec>();
         Set<ChatChannel> closed = new LinkedHashSet<ChatChannel>();

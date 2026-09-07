@@ -125,7 +125,20 @@ public final class LostTalesAccountSkins {
             return override;
         }
 
-        GameProfile gameProfile = player.getGameProfile();
+        return resolveProfile(player.getGameProfile());
+    }
+
+    /**
+     * The skin an account's own profile names, brought into the 64x64
+     * layout, without a player to ask.
+     *
+     * <p>The main menu has a signed-in session and no player at all, and
+     * the profile is all this ever needed: the hash names the texture,
+     * the URL fetches it, and the model says which arm width it was
+     * painted for.</p>
+     */
+    public static AccountSkin resolveProfile(GameProfile gameProfile) {
+        Minecraft minecraft = Minecraft.getMinecraft();
         AccountSkinProfile profile = ProfileTexturesDecoder.decode(gameProfile);
         BufferedImage placeholder = defaultImage(minecraft);
         if (profile == null || placeholder == null) {

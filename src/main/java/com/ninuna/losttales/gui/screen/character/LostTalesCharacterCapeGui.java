@@ -40,6 +40,11 @@ public final class LostTalesCharacterCapeGui extends GuiScreen {
     private static final int BUTTON_SAVE = 4;
     private static final int BUTTON_CANCEL = 5;
 
+    private static final int PANEL_HEIGHT_MAX = 286;
+    private static final int PANEL_HEIGHT_MIN = 120;
+    /** The button row's band at the foot of the screen, top and bottom. */
+    private static final int BUTTON_ROW_BAND = 44;
+
     private final GuiScreen parent;
     private List<Integer> cosmeticCapeIds = Collections.emptyList();
     private boolean initializedFromSnapshot;
@@ -55,6 +60,21 @@ public final class LostTalesCharacterCapeGui extends GuiScreen {
         this.parent = parent;
     }
 
+    /**
+     * The panel's height, always short enough that the button row it is
+     * measured from stays on screen. 1.7.10 keeps the scaled height at or
+     * above 240 and no higher, so a fixed floor would put the row off a
+     * window that is merely ordinary.
+     */
+    private int getPanelHeight() {
+        return Math.max(PANEL_HEIGHT_MIN,
+                Math.min(PANEL_HEIGHT_MAX, this.height - BUTTON_ROW_BAND * 2));
+    }
+
+    private int getPanelTop(int panelHeight) {
+        return Math.max(4, (this.height - panelHeight) / 2);
+    }
+
     @Override
     public void initGui() {
         this.buttonList.clear();
@@ -62,9 +82,9 @@ public final class LostTalesCharacterCapeGui extends GuiScreen {
         initializeFromSnapshot();
 
         int panelWidth = Math.min(470, this.width - 32);
-        int panelHeight = Math.min(286, Math.max(230, this.height - 76));
+        int panelHeight = getPanelHeight();
         int left = (this.width - panelWidth) / 2;
-        int top = Math.max(36, (this.height - panelHeight) / 2);
+        int top = getPanelTop(panelHeight);
         int controlsX = left + 32;
         int controlsWidth = Math.max(180, panelWidth - 190);
 
@@ -260,9 +280,9 @@ public final class LostTalesCharacterCapeGui extends GuiScreen {
                 12);
 
         int panelWidth = Math.min(470, this.width - 32);
-        int panelHeight = Math.min(286, Math.max(230, this.height - 76));
+        int panelHeight = getPanelHeight();
         int left = (this.width - panelWidth) / 2;
-        int top = Math.max(36, (this.height - panelHeight) / 2);
+        int top = getPanelTop(panelHeight);
         int controlsX = left + 32;
         int controlsWidth = Math.max(180, panelWidth - 190);
         LostTalesSkyrimUiStyle.drawPanel(left, top, panelWidth, panelHeight);

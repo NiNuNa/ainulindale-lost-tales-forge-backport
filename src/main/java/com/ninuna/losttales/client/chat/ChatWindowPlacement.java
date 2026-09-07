@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import net.minecraft.util.MathHelper;
 import java.util.List;
+import com.ninuna.losttales.client.gui.LostTalesGuiPointer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiNewChat;
 import org.lwjgl.input.Mouse;
@@ -670,14 +671,11 @@ public final class ChatWindowPlacement {
     }
 
     public static double preciseMouseX(Minecraft minecraft, int screenWidth) {
-        return minecraft == null || minecraft.displayWidth <= 0 ? 0.0D
-                : Mouse.getX() * (double)screenWidth / minecraft.displayWidth;
+        return LostTalesGuiPointer.x(minecraft, screenWidth);
     }
 
     public static double preciseMouseY(Minecraft minecraft, int screenHeight) {
-        return minecraft == null || minecraft.displayHeight <= 0 ? 0.0D
-                : screenHeight - Mouse.getY() * (double)screenHeight
-                        / minecraft.displayHeight - 1.0D;
+        return LostTalesGuiPointer.y(minecraft, screenHeight);
     }
 
     /** Position of an element's leading edge for a percent of its travel. */

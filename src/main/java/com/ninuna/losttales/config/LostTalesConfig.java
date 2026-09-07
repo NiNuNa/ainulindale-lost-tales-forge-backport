@@ -384,9 +384,15 @@ public final class LostTalesConfig {
         loadedRolesFile = rolesFile == null ? serverFile : rolesFile;
         loadedChannelsFile = channelsFile == null ? serverFile : channelsFile;
         Configuration config = openSided();
-        boolean retiredDropped = dropRetiredKeys(config);
+        boolean retiredDropped;
         try {
             config.load();
+            // After the load, not before it: Forge's Configuration reads
+            // the file in its constructor and reads it again here, into
+            // the same category objects, so a key dropped beforehand is
+            // simply put back — and the flag it sets would rewrite the
+            // file with the retired keys still in it, on every start.
+            retiredDropped = dropRetiredKeys(config);
             applyGuiMetadata(config);
 
             enableChargeTiers = config.getBoolean(
@@ -1589,17 +1595,15 @@ public final class LostTalesConfig {
         // gates are read, so a gate may name one of them. Every reload
         // starts from the built-ins: an id is registered once, and the
         // file is the only thing that says which others are in force.
-        ChatChannel.resetToBuiltIn();
-        for (ChatChannelDescriptor descriptor
-                : ChatRoleConfig.parseChannelDefinitions(
-                        chatChannelDefinitions, warnings)) {
-            try {
-                ChatChannel.register(descriptor);
-            } catch (RuntimeException refused) {
-                warnings.warn("Channel '" + descriptor.getId()
-                        + "' could not be put in force: " + refused.getMessage());
-            }
-        }
+        ChatChannel.installDefined(
+                ChatRoleConfig.parseChannelDefinitions(
+                        chatChannelDefinitions, warnings),
+                new ChatChannel.Warnings() {
+                    @Override
+                    public void warn(String message) {
+                        warnings.warn(message);
+                    }
+                });
         ChatChannelGates.install(ChatRoleConfig.parseGates(chatChannelRoles, catalog, warnings));
     }
 

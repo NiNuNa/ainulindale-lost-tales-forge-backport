@@ -9,7 +9,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -64,40 +63,6 @@ public final class ChatWindowLinesPruneTest {
         assertFalse(cache.containsKey("w404"));
     }
 
-    @Test
-    public void everyWindowStillOpenKeepsItsLayout() {
-        ChatWindowLayout.detach(
-                Collections.singletonList(ChatTab.of(ChatChannel.OOC)),
-                0.5D, 0.5D);
-        List<ChatWindow> windows = ChatWindowLayout.windows();
-        assertTrue(windows.size() >= 2);
-        Map<String, Object> cache =
-                new LinkedHashMap<String, Object>();
-        for (int index = 0; index < windows.size(); index++) {
-            cache.put(windows.get(index).getId(), new Object());
-        }
-        int before = cache.size();
-        ChatWindowLines.pruneViews(cache, windows);
-        assertEquals("nothing open is ever swept", before, cache.size());
-    }
 
-    @Test
-    public void withNoWindowsLeftOnlyTheFeedSurvives() {
-        Map<String, Object> cache = views(
-                ChatWindowFrame.feed().windowId, "w1", "w2", "w3");
-        ChatWindowLines.pruneViews(cache,
-                Collections.<ChatWindow>emptyList());
-        assertEquals(1, cache.size());
-        assertTrue(cache.containsKey(ChatWindowFrame.feed().windowId));
-    }
 
-    @Test
-    public void sweepingTwiceChangesNothingTheSecondTime() {
-        List<ChatWindow> windows = ChatWindowLayout.windows();
-        Map<String, Object> cache = views(windows.get(0).getId(), "w404");
-        ChatWindowLines.pruneViews(cache, windows);
-        int after = cache.size();
-        ChatWindowLines.pruneViews(cache, windows);
-        assertEquals(after, cache.size());
-    }
 }

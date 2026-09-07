@@ -330,14 +330,14 @@ public final class LostTalesCharacterHeadIconRenderer {
                         configured.getRaceId()));
     }
 
-    private static ResolvedHead resolveSnapshotHead(
+    static ResolvedHead resolveSnapshotHead(
             Minecraft minecraft, UUID ownerId, String skinId) {
         ResolvedHead configured = resolveConfiguredHead(skinId);
         return configured == null
                 ? resolveAccountHead(minecraft, ownerId) : configured;
     }
 
-    private static ResolvedHead resolveAccountHead(
+    static ResolvedHead resolveAccountHead(
             Minecraft minecraft, UUID ownerId) {
         if (minecraft != null && minecraft.theWorld != null
                 && minecraft.theWorld.playerEntities != null
@@ -421,16 +421,16 @@ public final class LostTalesCharacterHeadIconRenderer {
                 red, green, blue, alpha, true);
     }
 
-    private static boolean drawResolvedHead(Minecraft minecraft,
-                                            ResolvedHead head,
-                                            float x,
-                                            float y,
-                                            float size,
-                                            float red,
-                                            float green,
-                                            float blue,
-                                            float alpha,
-                                            boolean drawFeatures) {
+    static boolean drawResolvedHead(Minecraft minecraft,
+                                    ResolvedHead head,
+                                    float x,
+                                    float y,
+                                    float size,
+                                    float red,
+                                    float green,
+                                    float blue,
+                                    float alpha,
+                                    boolean drawFeatures) {
         if (minecraft == null || head == null || size <= 0.0F
                 || alpha <= 0.0F
                 || (red <= 0.0F && green <= 0.0F && blue <= 0.0F)) {
@@ -550,18 +550,46 @@ public final class LostTalesCharacterHeadIconRenderer {
      * twenty-four pixels becomes seven and a half, and the columns come
      * out three, then four, then two pixels wide.
      */
-    private static void drawTexturedQuad(float x,
-                                         float y,
-                                         float width,
-                                         float height,
-                                         float textureX,
-                                         float textureY,
-                                         float textureWidth,
-                                         float textureHeight,
-                                         float imageWidth,
-                                         float imageHeight) {
+    static void drawTexturedQuad(float x,
+                                 float y,
+                                 float width,
+                                 float height,
+                                 float textureX,
+                                 float textureY,
+                                 float textureWidth,
+                                 float textureHeight,
+                                 float imageWidth,
+                                 float imageHeight) {
+        drawTexturedQuad(x, y, width, height, textureX, textureY,
+                textureWidth, textureHeight, imageWidth, imageHeight, false);
+    }
+
+    /**
+     * As above, optionally left-to-right.
+     *
+     * <p>A skin with no limbs of its own on the left paints one side and
+     * the model mirrors it, so a figure drawn from such a skin mirrors it
+     * too. The cell is still sampled whole — only which edge is which
+     * changes — so every texel keeps its pixels.</p>
+     */
+    static void drawTexturedQuad(float x,
+                                 float y,
+                                 float width,
+                                 float height,
+                                 float textureX,
+                                 float textureY,
+                                 float textureWidth,
+                                 float textureHeight,
+                                 float imageWidth,
+                                 float imageHeight,
+                                 boolean mirrored) {
         double u0 = textureX / imageWidth;
         double u1 = (textureX + textureWidth) / imageWidth;
+        if (mirrored) {
+            double swap = u0;
+            u0 = u1;
+            u1 = swap;
+        }
         double v0 = textureY / imageHeight;
         double v1 = (textureY + textureHeight) / imageHeight;
         Tessellator tessellator = Tessellator.instance;
@@ -574,9 +602,9 @@ public final class LostTalesCharacterHeadIconRenderer {
         tessellator.draw();
     }
 
-    private static final class ResolvedHead {
-        private final ResourceLocation location;
-        private final CharacterHeadIconLayout layout;
+    static final class ResolvedHead {
+        final ResourceLocation location;
+        final CharacterHeadIconLayout layout;
 
         private ResolvedHead(ResourceLocation location,
                              CharacterHeadIconLayout layout) {

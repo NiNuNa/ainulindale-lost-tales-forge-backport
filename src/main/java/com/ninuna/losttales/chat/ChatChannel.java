@@ -159,6 +159,60 @@ public final class ChatChannel {
         BY_ID.keySet().retainAll(BUILT_IN_IDS);
     }
 
+    /**
+     * Puts exactly these channels in force beside the built-in ones, as
+     * one step.
+     *
+     * <p>Resetting and then registering would leave the registry holding
+     * only the built-ins for as long as the loop takes, and on an
+     * integrated server the logical server reads the same registry: a
+     * line sent in that window would find its channel missing. Swapping
+     * the set under the lock means nobody ever sees a half-applied
+     * catalogue. A descriptor that cannot be put in force is reported
+     * and skipped; the rest still go in.</p>
+     */
+    public static synchronized void installDefined(
+            Iterable<ChatChannelDescriptor> descriptors, Warnings out) {
+        Map<String, ChatChannel> replacement =
+                new LinkedHashMap<String, ChatChannel>();
+        for (Map.Entry<String, ChatChannel> entry : BY_ID.entrySet()) {
+            if (BUILT_IN_IDS.contains(entry.getKey())) {
+                replacement.put(entry.getKey(), entry.getValue());
+            }
+        }
+        if (descriptors != null) {
+            for (ChatChannelDescriptor descriptor : descriptors) {
+                if (descriptor == null) {
+                    continue;
+                }
+                String key = descriptor.getId().toLowerCase(Locale.ROOT);
+                if (replacement.containsKey(key)) {
+                    if (out != null) {
+                        out.warn("Channel '" + key + "' is named twice; the "
+                                + "second was skipped");
+                    }
+                    continue;
+                }
+                replacement.put(key, new ChatChannel(descriptor));
+            }
+        }
+        BY_ID.clear();
+        BY_ID.putAll(replacement);
+    }
+
+    /** Told about a channel that could not be put in force. */
+    public interface Warnings {
+        void warn(String message);
+    }
+
+    /**
+     * How many channels a server's config may define beside the built-in
+     * ones. The access packet carries the whole catalogue in one payload
+     * and is bounded, so this is that bound stated where a config can be
+     * warned about it rather than where a list is quietly cut short.
+     */
+    public static final int MAX_DEFINED_CHANNELS = 48;
+
     /** Whether the channel is one of the code's own rather than a config's. */
     public static synchronized boolean isBuiltIn(ChatChannel channel) {
         return channel != null && BUILT_IN_IDS.contains(

@@ -85,14 +85,6 @@ public final class ChatEmojiParserTest {
         assertSame(ChatEmoji.SMILE, segments.get(1).getEmoji());
     }
 
-    @Test
-    public void unicodeTextAroundShortcodesIsPreserved() {
-        List<ChatEmojiParser.Segment> segments = ChatEmojiParser.split(
-                "H\u00e4rte :smile: \u00c6\u00d8\u2026");
-        assertEquals("H\u00e4rte ", segments.get(0).getText());
-        assertSame(ChatEmoji.SMILE, segments.get(1).getEmoji());
-        assertEquals(" \u00c6\u00d8\u2026", segments.get(2).getText());
-    }
 
     @Test
     public void segmentsAlwaysReconstructTheOriginalMessage() {

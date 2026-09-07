@@ -17,9 +17,11 @@ package com.ninuna.losttales.chat;
  * matched against. {@link #NONE} is a line that replies to nothing.</p>
  */
 public final class ChatReplyReference {
+    /** An author whose colour the quote was not told. */
+    public static final int NO_COLOR = -1;
     /** A line that is not a reply. */
     public static final ChatReplyReference NONE =
-            new ChatReplyReference(ChatMessageIds.NONE, "", "");
+            new ChatReplyReference(ChatMessageIds.NONE, "", "", NO_COLOR);
     /** The quoted sender's name, bounded like any other identity name. */
     public static final int MAX_AUTHOR_BYTES = 256;
     /** The quoted text: one glanceable line, not the message again. */
@@ -33,12 +35,14 @@ public final class ChatReplyReference {
     private final long messageId;
     private final String author;
     private final String excerpt;
+    private final int authorColor;
 
     private ChatReplyReference(long messageId, String author,
-                               String excerpt) {
+                               String excerpt, int authorColor) {
         this.messageId = messageId;
         this.author = author == null ? "" : author;
         this.excerpt = excerpt == null ? "" : excerpt;
+        this.authorColor = authorColor;
     }
 
     /**
@@ -54,11 +58,28 @@ public final class ChatReplyReference {
      */
     public static ChatReplyReference of(long messageId, String author,
                                         String message) {
+        return of(messageId, author, message, NO_COLOR);
+    }
+
+    /**
+     * As above, carrying the colour the quoted author's name was drawn
+     * in.
+     *
+     * <p>A quote names whoever wrote the line it quotes, and that name
+     * has a colour of its own — a faction's, a role's. Only the server
+     * knows it: an in-character name belongs to a character, and a
+     * client holds name colours for the accounts it has been told about,
+     * which is not the same list. So it travels with the quote, and a
+     * quote that was not told one is drawn quietly.</p>
+     */
+    public static ChatReplyReference of(long messageId, String author,
+                                        String message, int authorColor) {
         String name = author == null ? "" : author.trim();
         if (messageId == ChatMessageIds.NONE || name.length() == 0) {
             return NONE;
         }
-        return new ChatReplyReference(messageId, name, excerptOf(message));
+        return new ChatReplyReference(messageId, name, excerptOf(message),
+                authorColor);
     }
 
     /** The message as one glanceable line, cut with a trailing mark. */
@@ -68,6 +89,14 @@ public final class ChatReplyReference {
             return text;
         }
         return text.substring(0, MAX_EXCERPT_CHARACTERS) + ELLIPSIS;
+    }
+
+    /**
+     * The colour the quoted author's name was drawn in, or
+     * {@link #NO_COLOR} when the quote was not told one.
+     */
+    public int getAuthorColor() {
+        return this.authorColor;
     }
 
     /** Whether the line replies to anything at all. */

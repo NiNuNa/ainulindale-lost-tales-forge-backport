@@ -308,8 +308,12 @@ final class ChatOutbox {
     }
 
     private static void sendTyping(ChatTab tab, boolean typing) {
+        // The identity the message will be sent as, stated the same way
+        // the send states it, so presence goes where the message will.
         LostTalesNetworkHandler.CHANNEL.sendToServer(
                 new LostTalesChatTypingPacket(tab.getChannel(),
-                        tab.isWhisper() ? tab.getPartner() : "", typing));
+                        tab.isWhisper() ? tab.getPartner() : "", typing,
+                        ClientChatAppearances.wireKind(tab),
+                        ClientChatAppearances.wireCharacterId(tab)));
     }
 }

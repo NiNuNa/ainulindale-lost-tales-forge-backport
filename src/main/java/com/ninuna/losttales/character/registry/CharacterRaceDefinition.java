@@ -30,6 +30,7 @@ public final class CharacterRaceDefinition {
     private final float rendererScale;
     private final float guiPreviewScale;
     private final int guiPreviewVerticalOffset;
+    private final boolean selectable;
 
     public CharacterRaceDefinition(
             String id,
@@ -48,6 +49,32 @@ public final class CharacterRaceDefinition {
             float rendererScale,
             float guiPreviewScale,
             int guiPreviewVerticalOffset) {
+        this(id, lotrRaceAssociation, allowedFactionCategories,
+                allowedFactionIds, deniedFactionIds, allowedGenderIds,
+                width, height, standingEyeHeight, sneakingEyeHeight,
+                maxHealth, movementSpeedMultiplier, attackDamage,
+                rendererScale, guiPreviewScale, guiPreviewVerticalOffset,
+                true);
+    }
+
+    public CharacterRaceDefinition(
+            String id,
+            String lotrRaceAssociation,
+            Set<CharacterFactionCategory> allowedFactionCategories,
+            Set<String> allowedFactionIds,
+            Set<String> deniedFactionIds,
+            Set<String> allowedGenderIds,
+            float width,
+            float height,
+            float standingEyeHeight,
+            float sneakingEyeHeight,
+            double maxHealth,
+            double movementSpeedMultiplier,
+            double attackDamage,
+            float rendererScale,
+            float guiPreviewScale,
+            int guiPreviewVerticalOffset,
+            boolean selectable) {
         if (id == null || id.length() == 0) {
             throw new IllegalArgumentException("id must not be blank");
         }
@@ -67,6 +94,7 @@ public final class CharacterRaceDefinition {
             throw new IllegalArgumentException("invalid eye heights for " + id);
         }
 
+        this.selectable = selectable;
         this.id = id;
         this.lotrRaceAssociation = lotrRaceAssociation == null
                 ? "" : lotrRaceAssociation;
@@ -84,6 +112,19 @@ public final class CharacterRaceDefinition {
         this.rendererScale = rendererScale;
         this.guiPreviewScale = guiPreviewScale;
         this.guiPreviewVerticalOffset = guiPreviewVerticalOffset;
+    }
+
+    /**
+     * Whether anyone may choose this race for a character they are
+     * making.
+     *
+     * <p>A race that is not selectable is still a race: a character that
+     * already is one keeps being one, is loaded, rendered and played as
+     * it always was. It is only kept out of the form that makes new
+     * ones.</p>
+     */
+    public boolean isSelectable() {
+        return this.selectable;
     }
 
     public String getId() {

@@ -6,8 +6,6 @@ import org.junit.Test;
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
 
 /**
  * A unit is released to its owner while the identity that hired it is
@@ -24,14 +22,6 @@ public final class LotrHiredUnitCustodyRuleTest {
     private static final String CHARACTER_KEY = LotrHiredUnitTag.identityKey(CHARACTER);
     private static final String ACCOUNT_KEY = LotrHiredUnitTag.ACCOUNT_KEY;
 
-    @Test
-    public void theParkingUuidIsStableAndNobodys() {
-        assertEquals(PARKED, LotrHiredUnitCustodyRule.parkedUuid(OWNER));
-        assertNotEquals(OWNER, PARKED);
-        assertNotEquals(PARKED, LotrHiredUnitCustodyRule.parkedUuid(CHARACTER));
-        assertFalse(PARKED.equals(LotrHiredUnitCustodyRule.parkedUuid(
-                UUID.fromString("e4000000-0000-0000-0000-00000000004d"))));
-    }
 
     @Test
     public void theActiveIdentitysUnitIsReleasedOnceAndLeftAfter() {

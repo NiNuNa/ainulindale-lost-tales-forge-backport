@@ -5,14 +5,11 @@ import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.renderer.OpenGlHelper;
-import net.minecraft.event.ClickEvent;
 import net.minecraft.item.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
-import org.lwjgl.opengl.GL11;
 
 /**
  * Lost Tales' ivory text and plum-black shadow treatment for chat. Every
@@ -148,9 +145,7 @@ final class LostTalesChatVisualStyle {
     }
 
     static void beginContent() {
-        GL11.glEnable(GL11.GL_BLEND);
-        OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
-                GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+        LostTalesSkyrimUiStyle.beginContent();
     }
 
     static void drawFormatted(FontRenderer font, IChatComponent line,
@@ -501,7 +496,7 @@ final class LostTalesChatVisualStyle {
             if (explicitColor == null) {
                 explicitColor = ChatReplyMarker.colorOf(part);
             }
-            boolean replyIdentity = isReplyIdentity(part);
+            boolean replyIdentity = ChatSenderSpan.isSenderName(part);
             boolean identityBracket = "<".equals(text)
                     || (identitySeen && text.startsWith(">"));
             if (!colours) {
@@ -584,15 +579,6 @@ final class LostTalesChatVisualStyle {
                     ChatInlineIcons.markerRgb(marker.colorName),
                     boxX, boxY, size, alpha, shadowPass);
         }
-    }
-
-    private static boolean isReplyIdentity(IChatComponent part) {
-        ClickEvent click = part == null || part.getChatStyle() == null
-                ? null : part.getChatStyle().getChatClickEvent();
-        return click != null
-                && click.getAction() == ClickEvent.Action.SUGGEST_COMMAND
-                && click.getValue() != null
-                && click.getValue().startsWith("/msg ");
     }
 
     /** Removes colour/reset codes but keeps bold/italic decorations and width. */

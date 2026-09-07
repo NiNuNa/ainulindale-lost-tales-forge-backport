@@ -42,7 +42,7 @@ public final class LoreCharacterTransferRecord {
                 || characterId == null || expectedOwnershipRevision < 0L
                 || step < 0 || step > 3
                 || type == Type.CLAIM && (targetOwnerId == null
-                || !CharacterRoster.isValidSlotIndex(targetSlot))
+                || !CharacterRoster.isCreatableSlotIndex(targetSlot))
                 || type == Type.RELEASE && sourceOwnerId == null) {
             throw new IllegalArgumentException(
                     "Lore-character transfer record is incomplete");

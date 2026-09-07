@@ -69,7 +69,6 @@ final class ChatScreenMenus {
     private static final String ENTRY_WINDOW_RESET = "window_reset";
     /** How often the open {@code +} menu re-reads its rows. */
     private static final long RESTORE_REFRESH_NANOS = 500L * 1000000L;
-    private static final String WHISPER_PREFIX = "/msg ";
 
     /** What a click on an open menu came to. */
     static final class Click {
@@ -1245,10 +1244,7 @@ final class ChatScreenMenus {
             if (!afterHead) {
                 continue;
             }
-            ClickEvent click = part.getChatStyle() == null ? null
-                    : part.getChatStyle().getChatClickEvent();
-            if (click != null && click.getValue() != null
-                    && click.getValue().startsWith(WHISPER_PREFIX)) {
+            if (ChatSenderSpan.isSenderName(part)) {
                 return part.getUnformattedTextForChat().trim();
             }
         }
@@ -1275,29 +1271,11 @@ final class ChatScreenMenus {
 
     /** The account named by a {@code /msg Account } suggestion. */
     static String replyAccount(String suggestion) {
-        return suggestion == null || !suggestion.startsWith(WHISPER_PREFIX)
-                ? "" : suggestion.substring(WHISPER_PREFIX.length()).trim();
+        return ChatSenderSpan.accountOf(suggestion);
     }
 
     /** The line's {@code /msg} suggestion, shared by name and head. */
     static ClickEvent findReplySuggestion(IChatComponent line) {
-        if (line == null) {
-            return null;
-        }
-        for (Object value : line) {
-            if (!(value instanceof IChatComponent)) {
-                continue;
-            }
-            IChatComponent part = (IChatComponent)value;
-            ClickEvent event = part.getChatStyle() == null
-                    ? null : part.getChatStyle().getChatClickEvent();
-            if (event != null
-                    && event.getAction() == ClickEvent.Action.SUGGEST_COMMAND
-                    && event.getValue() != null
-                    && event.getValue().startsWith(WHISPER_PREFIX)) {
-                return event;
-            }
-        }
-        return null;
+        return ChatSenderSpan.findSuggestion(line);
     }
 }

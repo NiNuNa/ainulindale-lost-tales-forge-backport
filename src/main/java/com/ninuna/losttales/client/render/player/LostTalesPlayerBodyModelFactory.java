@@ -20,6 +20,26 @@ final class LostTalesPlayerBodyModelFactory {
     private LostTalesPlayerBodyModelFactory() {}
 
     /**
+     * The body itself, without the two armour layers: what a figure drawn
+     * in a menu needs, and the first of the three a whole renderer is
+     * built from. Null for an identifier this client cannot build.
+     */
+    static ModelBiped createMainModel(
+            CharacterBodyModelDefinition definition, CharacterSkinLayout layout,
+            String bodyTypeId, String chestTypeId) {
+        if (definition == null || layout == null) {
+            return null;
+        }
+        PlayerBodyShape shape = PlayerBodyShape.forModelId(definition.getId());
+        if (shape == null) {
+            return null;
+        }
+        return new LostTalesPlayerModel(0.0F,
+                CharacterBodyTypeRegistry.SLIM.equals(bodyTypeId), shape, layout,
+                CharacterChestTypeRegistry.get(chestTypeId), false);
+    }
+
+    /**
      * Returns null for an identifier this client cannot build. A body model
      * is built with its main model at inflation 0, the outer armor layer at
      * 1.0, and the leggings layer at 0.5, matching vanilla's RenderPlayer.
@@ -37,9 +57,8 @@ final class LostTalesPlayerBodyModelFactory {
             return null;
         }
         boolean slim = CharacterBodyTypeRegistry.SLIM.equals(bodyTypeId);
-        CharacterChestTypeDefinition chest = CharacterChestTypeRegistry.get(chestTypeId);
-        ModelBiped mainModel = new LostTalesPlayerModel(
-                0.0F, slim, shape, layout, chest, false);
+        ModelBiped mainModel = createMainModel(
+                definition, layout, bodyTypeId, chestTypeId);
         ModelBiped chestArmorModel = new LostTalesPlayerModel(
                 OUTER_ARMOR_INFLATION, false, shape, layout, null, true);
         ModelBiped armorModel = new LostTalesPlayerModel(

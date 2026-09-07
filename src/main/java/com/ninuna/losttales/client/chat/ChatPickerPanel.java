@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
+import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSmoothing;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.gui.ScaledResolution;
@@ -383,10 +384,17 @@ abstract class ChatPickerPanel {
         int x = Math.max(2, Math.min(anchorRight - width,
                 mouseX - width / 2));
         int y = mouseY - 14;
-        Gui.drawRect(x, y, x + width, y + 11,
-                LostTalesChatVisualStyle.argb(
-                        LostTalesChatVisualStyle.SURFACE_RGB, 0xE6));
-        LostTalesChatVisualStyle.drawPlain(font, label, x + 3, y + 2, 255);
+        // Beside the pointer, so it keeps pace with the cursor rather
+        // than with the interface grid, as every other tooltip does.
+        LostTalesTooltipSmoothing.begin(mouseX, mouseY);
+        try {
+            Gui.drawRect(x, y, x + width, y + 11,
+                    LostTalesChatVisualStyle.argb(
+                            LostTalesChatVisualStyle.SURFACE_RGB, 0xE6));
+            LostTalesChatVisualStyle.drawPlain(font, label, x + 3, y + 2, 255);
+        } finally {
+            LostTalesTooltipSmoothing.end();
+        }
     }
 
     /** Scissors the body rectangle in window pixels; false if unavailable. */

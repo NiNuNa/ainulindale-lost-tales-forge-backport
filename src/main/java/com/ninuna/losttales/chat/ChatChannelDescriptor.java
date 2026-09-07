@@ -44,13 +44,33 @@ public final class ChatChannelDescriptor {
                     "channel " + id + " is incompletely described");
         }
         this.id = id.trim();
-        this.displayName = displayName;
+        this.displayName = clipDisplayName(displayName);
         this.presentation = presentation;
         this.recipientRule = recipientRule;
         this.access = access;
         this.displayColor = displayColor;
         this.bridgeable = bridgeable;
         this.scope = scope == null ? ChatChannelScope.NONE : scope;
+    }
+
+    /**
+     * The longest a channel's name may be shown as.
+     *
+     * <p>Every other channel name in the mod is a code constant, but a
+     * config may name one, and that name is written into the access
+     * packet. A bound here is what keeps a long line in a config file
+     * from being a payload no server can encode — and the access packet
+     * carries every gate, role and capability a player has, so failing to
+     * write it costs that player all of them.</p>
+     */
+    public static final int MAX_DISPLAY_NAME_LENGTH = 16;
+
+    /** The name as it will be shown, cut to what can be carried. */
+    public static String clipDisplayName(String displayName) {
+        String trimmed = displayName == null ? "" : displayName.trim();
+        return trimmed.length() <= MAX_DISPLAY_NAME_LENGTH
+                ? trimmed
+                : trimmed.substring(0, MAX_DISPLAY_NAME_LENGTH).trim();
     }
 
     public String getId() { return this.id; }

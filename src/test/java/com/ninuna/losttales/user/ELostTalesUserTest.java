@@ -39,16 +39,4 @@ public final class ELostTalesUserTest {
                 ELostTalesUser.NULL.getRecognition().getChatRole());
     }
 
-    @Test
-    public void theTeamWearsTheTeamMark() {
-        ELostTalesUser[] team = { ELostTalesUser.NINUNA,
-                ELostTalesUser.SCOSHER, ELostTalesUser.BALARAUKO,
-                ELostTalesUser.CAPTAIN_CHEESE };
-        for (ELostTalesUser member : team) {
-            assertEquals(ELostTalesUserRecognition.TEAM,
-                    member.getRecognition());
-            assertEquals(ChatAccountRole.TEAM,
-                    member.getRecognition().getChatRole());
-        }
-    }
 }

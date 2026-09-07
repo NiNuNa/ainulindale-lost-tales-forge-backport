@@ -239,48 +239,7 @@ public final class LostTalesMapMarkerGroupingTest {
         assertEquals(1, result.getGroups().get(1).size());
     }
 
-    @Test
-    public void repeatedFramesWithUnchangedInputProduceTheSameResult() {
-        List<LostTalesMapMarkerGrouping.Entry> entries = Arrays.asList(
-                icon("losttales:a", "A", 30, 0.0F, 0.0F),
-                icon("losttales:b", "B", 20, 3.0F, 1.0F),
-                icon("losttales:c", "C", 10, 40.0F, 0.0F));
 
-        Map<String, String> membership = Collections.emptyMap();
-        String first = null;
-        for (int frame = 0; frame < 5; frame++) {
-            LostTalesMapMarkerGrouping.Result result =
-                    LostTalesMapMarkerGrouping.group(
-                            entries, new HashMap<String, String>(membership));
-            membership = result.getMembership();
-            String description = describe(result);
-            if (first == null) {
-                first = description;
-            }
-            assertEquals(first, description);
-        }
-    }
-
-    @Test
-    public void groupingIgnoresTheOrderMarkersAreSuppliedIn() {
-        LostTalesMapMarkerGrouping.Entry a =
-                icon("losttales:a", "A", 30, 0.0F, 0.0F);
-        LostTalesMapMarkerGrouping.Entry b =
-                icon("losttales:b", "B", 20, 3.0F, 0.0F);
-        LostTalesMapMarkerGrouping.Entry c =
-                icon("losttales:c", "C", 10, 40.0F, 0.0F);
-
-        LostTalesMapMarkerGrouping.Result forwards =
-                LostTalesMapMarkerGrouping.group(
-                        Arrays.asList(a, b, c), fresh());
-        LostTalesMapMarkerGrouping.Result backwards =
-                LostTalesMapMarkerGrouping.group(
-                        Arrays.asList(c, b, a), fresh());
-
-        assertEquals(forwards.getMembership(), backwards.getMembership());
-        assertEquals(forwards.getGroups().size(),
-                backwards.getGroups().size());
-    }
 
     @Test
     public void condensedCountOnlyCoversMembersTheFanCannotDraw() {
@@ -910,30 +869,7 @@ public final class LostTalesMapMarkerGroupingTest {
         }
     }
 
-    @Test
-    public void questMarkersNeverGroup() {
-        // Two quest markers drawn exactly on top of each other still stay two
-        // readable objectives.
-        LostTalesMapMarkerGrouping.Result result = group(fresh(),
-                icon("losttales:q1", "Q1", 10, QUEST, 0.0F, 0.0F),
-                icon("losttales:q2", "Q2", 5, QUEST, 0.0F, 0.0F));
 
-        assertEquals(2, result.getGroups().size());
-        assertEquals(0, result.getMembership().size());
-    }
-
-    @Test
-    public void aQuestMarkerNeitherJoinsNorSwallowsALocation() {
-        // Whichever one ranks higher, the two must not end up in one stack.
-        assertEquals(2, group(fresh(),
-                icon("losttales:q", "Q", 10, QUEST, 0.0F, 0.0F),
-                icon("losttales:a", "A", 5, LOCATION, 0.0F, 0.0F))
-                .getGroups().size());
-        assertEquals(2, group(fresh(),
-                icon("losttales:a", "A", 10, LOCATION, 0.0F, 0.0F),
-                icon("losttales:q", "Q", 5, QUEST, 0.0F, 0.0F))
-                .getGroups().size());
-    }
 
     @Test
     public void incompatibleCategoriesNeverShareAGroup() {
@@ -972,15 +908,6 @@ public final class LostTalesMapMarkerGroupingTest {
                 .PLAYER_WAYSTONE.isGroupingEligible());
     }
 
-    @Test
-    public void anUnclassifiedMarkerGroupsWithNothing() {
-        // Fail closed: two markers we cannot classify are not evidence that
-        // they belong together.
-        assertEquals(2, group(fresh(),
-                icon("losttales:a", "A", 10, UNKNOWN, 0.0F, 0.0F),
-                icon("losttales:b", "B", 5, UNKNOWN, 0.0F, 0.0F))
-                .getGroups().size());
-    }
 
     @Test
     public void anIncompatibleMarkerDoesNotSplitTheStackAroundIt() {

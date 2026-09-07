@@ -9,7 +9,8 @@ import net.minecraftforge.client.event.RenderPlayerEvent;
 /** Forge-event bridge that replaces only the configured renderer's cape pass. */
 public final class LostTalesPlayerCapeRenderHook {
 
-    private static final Set<String> DISABLED_RACES = new HashSet<String>();
+    /** Bodies whose cape drawing threw once and is not tried again. */
+    private static final Set<String> DISABLED_MODELS = new HashSet<String>();
 
     private LostTalesPlayerCapeRenderHook() {}
 
@@ -27,25 +28,27 @@ public final class LostTalesPlayerCapeRenderHook {
         }
         LostTalesConfiguredPlayerRenderer renderer =
                 (LostTalesConfiguredPlayerRenderer)event.renderer;
-        String raceId = appearance.getRaceId();
-        if (DISABLED_RACES.contains(raceId)) {
+        // The cape hangs on the body, so what it follows is the model,
+        // not the race: one race may be drawn on more than one.
+        String modelId = appearance.getModelId();
+        if (DISABLED_MODELS.contains(modelId)) {
             return;
         }
 
         try {
             LostTalesPlayerCapeRenderer.render(
                     renderer,
-                    raceId,
+                    modelId,
                     (AbstractClientPlayer)event.entityPlayer,
                     event.partialRenderTick);
             // The normal cape has now either been rendered or intentionally
             // skipped for the same visibility/texture conditions as vanilla.
             event.renderCape = false;
         } catch (Throwable throwable) {
-            DISABLED_RACES.add(raceId);
+            DISABLED_MODELS.add(modelId);
             FMLLog.warning(
-                    "[losttales] Race-adjusted cape rendering was disabled for %s: %s",
-                    raceId,
+                    "[losttales] Body-adjusted cape rendering was disabled for %s: %s",
+                    modelId,
                     throwable.toString());
             // Leave renderCape true so RenderPlayer falls back to vanilla.
         }

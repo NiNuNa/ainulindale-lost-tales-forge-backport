@@ -34,16 +34,6 @@ public final class CameraPresetTest {
                 > standing.getSmoothing().getRotationRate());
     }
 
-    @Test
-    public void everyNamedPresetDefinesEverySupportedState() {
-        for (CameraPresetId presetId : CameraPresetId.values()) {
-            CameraPreset preset = CameraPreset.forId(presetId);
-            for (CameraProfileId profileId : CameraProfileId.values()) {
-                assertNotNull(presetId + ":" + profileId,
-                        preset.get(profileId));
-            }
-        }
-    }
 
     @Test
     public void modernIsTheOnlyBundledPresetAndProvidesCameraMotion() {

@@ -78,7 +78,9 @@ public final class LostTalesChatAccessPacket implements IMessage {
     /** More channel ids than this is a broken payload, not an access answer. */
     private static final int MAX_CHANNEL_IDS = 64;
     /** A channel's shown name is bounded like a role's text. */
-    private static final int MAX_CHANNEL_NAME_BYTES = 64;
+    /** Four bytes per character is the most UTF-8 spends on one. */
+    private static final int MAX_CHANNEL_NAME_BYTES =
+            ChatChannelDescriptor.MAX_DISPLAY_NAME_LENGTH * 4;
     /** An enum constant's name, for the facts a channel is described by. */
     private static final int MAX_ENUM_NAME_BYTES = 32;
 

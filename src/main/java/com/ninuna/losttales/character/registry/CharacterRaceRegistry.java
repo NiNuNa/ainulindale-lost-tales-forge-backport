@@ -1,11 +1,13 @@
 package com.ninuna.losttales.character.registry;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -88,13 +90,22 @@ public final class CharacterRaceRegistry {
                 0.60F, 1.80F, standingEyeHeight(1.80F), sneakingEyeHeight(1.80F),
                 24.0D, 1.05D, 4.0D,
                 1.0F, 1.05F, -2));
+        // Not a race anyone may choose. Its body is half again as broad
+        // as a biped and eight pixels taller, built from boxes of its own
+        // rather than a scaled biped's, and no armour in the game is cut
+        // for it — which is why it alone needs a rule refusing armour, a
+        // notice explaining the refusal, and equipment moved out of its
+        // slots on every switch. Somebody who wants to stand with the
+        // half-trolls plays an orc or an uruk in their faction. The race
+        // stays registered so a character who already is one still loads,
+        // renders and plays.
         register(definitions, definition(
                 HALF_TROLL, "lotr:half_troll",
                 EnumSet.of(CharacterFactionCategory.TROLL),
                 NO_FACTIONS, NO_FACTIONS, NON_BINARY_ONLY,
                 1.00F, 2.40F, standingEyeHeight(2.40F), sneakingEyeHeight(2.40F),
                 40.0D, 0.9D, 6.0D,
-                1.0F, 0.72F, 5));
+                1.0F, 0.72F, 5, false));
 
         DEFINITIONS = Collections.unmodifiableMap(definitions);
     }
@@ -158,6 +169,31 @@ public final class CharacterRaceRegistry {
             float rendererScale,
             float previewScale,
             int previewVerticalOffset) {
+        return definition(id, lotrRaceAssociation, categories,
+                allowedFactions, deniedFactions, genders, width, height,
+                standingEyeHeight, sneakingEyeHeight, maxHealth,
+                movementSpeedMultiplier, attackDamage, rendererScale,
+                previewScale, previewVerticalOffset, true);
+    }
+
+    private static CharacterRaceDefinition definition(
+            String id,
+            String lotrRaceAssociation,
+            Set<CharacterFactionCategory> categories,
+            Set<String> allowedFactions,
+            Set<String> deniedFactions,
+            Set<String> genders,
+            float width,
+            float height,
+            float standingEyeHeight,
+            float sneakingEyeHeight,
+            double maxHealth,
+            double movementSpeedMultiplier,
+            double attackDamage,
+            float rendererScale,
+            float previewScale,
+            int previewVerticalOffset,
+            boolean selectable) {
         return new CharacterRaceDefinition(
                 id,
                 lotrRaceAssociation,
@@ -174,7 +210,8 @@ public final class CharacterRaceRegistry {
                 attackDamage,
                 rendererScale,
                 previewScale,
-                previewVerticalOffset);
+                previewVerticalOffset,
+                selectable);
     }
 
     private static Set<String> identifiers(String... values) {
@@ -188,6 +225,17 @@ public final class CharacterRaceRegistry {
 
     private static float sneakingEyeHeight(float bodyHeight) {
         return standingEyeHeight(bodyHeight) - SNEAKING_EYE_HEIGHT_DROP;
+    }
+
+    /** Every race a character may be made as, in the order they are shown. */
+    public static List<String> getSelectableIds() {
+        List<String> ids = new ArrayList<String>();
+        for (CharacterRaceDefinition race : DEFINITIONS.values()) {
+            if (race.isSelectable()) {
+                ids.add(race.getId());
+            }
+        }
+        return Collections.unmodifiableList(ids);
     }
 
     private static void register(Map<String, CharacterRaceDefinition> definitions,

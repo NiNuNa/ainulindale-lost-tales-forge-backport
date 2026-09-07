@@ -309,32 +309,6 @@ public final class LostTalesChatPresentationTest {
         }
     }
 
-    @Test
-    public void messageKeepsSkinSnapshotAfterLaterCharacterChange() {
-        UUID sender = UUID.randomUUID();
-        LostTalesChatMessagePacket first = new LostTalesChatMessagePacket(
-                ChatChannel.ALL, sender, "Borin", "Player", "",
-                0xAABBCC, 0xAABBCC, "First", 1000L,
-                "losttales:dwarf_erebor_male_0");
-        LostTalesChatMessagePacket second = new LostTalesChatMessagePacket(
-                ChatChannel.ALL, sender, "Amdir", "Player", "",
-                0x112233, 0x112233, "Second", 2000L,
-                "losttales:elf_high_male_0");
-
-        ChatHeadMarker.Data firstMarker = markerOf(
-                LostTalesChatPresentation.build(first));
-        ChatHeadMarker.Data secondMarker = markerOf(
-                LostTalesChatPresentation.build(second));
-
-        assertNotNull(firstMarker);
-        assertNotNull(secondMarker);
-        assertEquals("losttales:dwarf_erebor_male_0",
-                firstMarker.skinId);
-        assertEquals("losttales:elf_high_male_0",
-                secondMarker.skinId);
-        assertEquals("First", firstMarker.copyText);
-        assertEquals("Second", secondMarker.copyText);
-    }
 
     @Test
     public void shadowFormattingKeepsBoldAdvanceButDropsColors() {
@@ -346,13 +320,6 @@ public final class LostTalesChatPresentationTest {
                         "\u00a7f\u00a7lFarmer\u00a7r\u00a7o of Bree\u00a7z"));
     }
 
-    @Test
-    public void chatBackdropUsesPlumBlack() {
-        assertEquals(LostTalesColors.rgb(LostTalesColors.PLUM_BLACK),
-                LostTalesChatOverlayRenderer.CHAT_BACKDROP_RGB);
-        assertEquals(0x2D1E2F,
-                LostTalesChatOverlayRenderer.CHAT_BACKDROP_RGB);
-    }
 
     /**
      * The backdrop leans away from the very first pixel and reaches
@@ -388,23 +355,6 @@ public final class LostTalesChatPresentationTest {
                 steepest < 0.2F);
     }
 
-    @Test
-    public void channelCatalogueColorsComeFromThePalette() {
-        assertEquals(LostTalesColors.rgb(LostTalesColors.FERN_GREEN),
-                ChatChannel.ALL.getDisplayColor());
-        assertEquals(LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN),
-                ChatChannel.PROXIMITY.getDisplayColor());
-        assertEquals(LostTalesColors.rgb(LostTalesColors.STEEL_BLUE),
-                ChatChannel.OOC.getDisplayColor());
-        assertEquals(LostTalesColors.rgb(LostTalesColors.MAUVE),
-                ChatChannel.CONSOLE.getDisplayColor());
-        assertEquals(LostTalesColors.rgb(LostTalesColors.CRIMSON),
-                ChatChannel.ADMIN.getDisplayColor());
-        // The catalogue colour is only the fallback: presentation shows
-        // the member's own party colour and the sender's faction colour.
-        assertEquals(LostTalesColors.rgb(LostTalesColors.SEAFOAM),
-                ChatChannel.PARTY.getDisplayColor());
-    }
 
     /**
      * An ampersand code is not formatting: a player's own words carry

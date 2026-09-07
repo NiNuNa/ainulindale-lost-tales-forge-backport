@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.character;
 
 import com.ninuna.losttales.character.server.CharacterCreationRequest;
+import com.ninuna.losttales.character.server.CharacterTemplateAdoption;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.character.CharacterCapeUpdateRequestPacket;
@@ -8,6 +9,7 @@ import com.ninuna.losttales.network.packet.character.CharacterCreateRequestPacke
 import com.ninuna.losttales.network.packet.character.CharacterDeleteRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterSelectRequestPacket;
+import com.ninuna.losttales.network.packet.character.CharacterTemplateAdoptRequestPacket;
 import com.ninuna.losttales.network.packet.character.LoreCharacterClaimRequestPacket;
 import com.ninuna.losttales.network.packet.character.LoreCharacterReleaseRequestPacket;
 
@@ -46,6 +48,21 @@ public final class ClientCharacterNetwork {
         });
     }
 
+    /** Offers the account's template for this world's default character. */
+    public static int adoptTemplate(final CharacterTemplateAdoption adoption) {
+        if (adoption == null || adoption.getExpectedRosterRevision() < 0L) {
+            throw new IllegalArgumentException("adoption and revision must be valid");
+        }
+        final int requestId = nextRequestId();
+        return send(requestId, CharacterOperationType.CREATE, new Runnable() {
+            @Override
+            public void run() {
+                LostTalesNetworkHandler.CHANNEL.sendToServer(
+                        new CharacterTemplateAdoptRequestPacket(requestId, adoption));
+            }
+        });
+    }
+
     public static int selectCharacter(final long expectedRosterRevision,
                                       final UUID characterId) {
         if (expectedRosterRevision < 0L || characterId == null) {
@@ -62,22 +79,6 @@ public final class ClientCharacterNetwork {
         });
     }
 
-    /** Asks to play as the account itself; {@code ownerId} is the roster's owner. */
-    public static int selectAccount(final long expectedRosterRevision,
-                                    final UUID ownerId) {
-        if (expectedRosterRevision < 0L || ownerId == null) {
-            throw new IllegalArgumentException("revision and ownerId must be valid");
-        }
-        final int requestId = nextRequestId();
-        return send(requestId, CharacterOperationType.SELECT, new Runnable() {
-            @Override
-            public void run() {
-                LostTalesNetworkHandler.CHANNEL.sendToServer(
-                        CharacterSelectRequestPacket.forAccount(
-                                requestId, expectedRosterRevision, ownerId));
-            }
-        });
-    }
 
     public static int deleteCharacter(final long expectedRosterRevision,
                                       final UUID characterId) {

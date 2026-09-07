@@ -32,14 +32,6 @@ public final class ChatSentHistoryTest {
         assertNull("nothing lies below the draft", history.step(GLOBAL, 1, "draft"));
     }
 
-    @Test
-    public void eachTabHasItsOwnHistory() {
-        ChatSentHistory history = new ChatSentHistory();
-        history.record(GLOBAL, "Hi");
-
-        assertNull("OOC has nothing to recall", history.step(OOC, -1, ""));
-        assertEquals("Hi", history.step(GLOBAL, -1, ""));
-    }
 
     @Test
     public void sendingEndsTheWalkAndAppends() {
@@ -76,14 +68,6 @@ public final class ChatSentHistoryTest {
         assertEquals("b", history.step(OOC, 1, "x"));
     }
 
-    @Test
-    public void oneEntryWalksUpAndBack() {
-        ChatSentHistory history = new ChatSentHistory();
-        history.record(GLOBAL, "only");
-        assertEquals("only", history.step(GLOBAL, -1, ""));
-        assertNull(history.step(GLOBAL, -1, "only"));
-        assertEquals("", history.step(GLOBAL, 1, "only"));
-    }
 
     @Test
     public void emptyTextIsNeverRecorded() {

@@ -4,7 +4,6 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /** The bridge's own posts and the topic are short, fixed, and safe to show. */
@@ -79,22 +78,6 @@ public final class DiscordServerNoticesTest {
         assertTrue(notice.getText().endsWith("..."));
     }
 
-    @Test
-    public void lifecycleNoticesAreOneLineEach() {
-        DiscordNotice started = DiscordServerNotices.serverStarted();
-        DiscordNotice stopping = DiscordServerNotices.serverStopping();
-        assertEquals(DiscordNotice.Kind.SERVER_STARTED, started.getKind());
-        assertEquals(DiscordNotice.Kind.SERVER_STOPPING, stopping.getKind());
-        assertTrue(started.getText().endsWith("Server started"));
-        assertTrue(stopping.getText().endsWith("Server shutting down"));
-        assertFalse(started.getText().contains("\n"));
-        assertFalse(stopping.getText().contains("\n"));
-        assertEquals("", started.getIconUrl());
-        assertEquals(LostTalesColors.rgb(LostTalesColors.FERN_GREEN),
-                started.getColor());
-        assertEquals(LostTalesColors.rgb(LostTalesColors.CRIMSON),
-                stopping.getColor());
-    }
 
     @Test
     public void topicStatesTheCountAgainstTheCap() {

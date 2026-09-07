@@ -71,10 +71,20 @@ public final class ChatChannelGates {
     private static final Gate OPEN = new Gate(null, null);
     private static volatile ChatChannelGates current = defaults();
 
-    private final Map<ChatChannel, Gate> gates;
+    /**
+     * Keyed by channel id, never by the channel itself.
+     *
+     * <p>A {@link ChatChannel} is a registry entry with no value
+     * equality, and a config-defined one is a fresh instance every time
+     * the registry is filled. An integrated server shares that registry
+     * with its own client, so a gate keyed by instance stops matching the
+     * moment either side registers the channels again — and a gate that
+     * stops matching reads as no gate at all.</p>
+     */
+    private final Map<String, Gate> gates;
 
-    private ChatChannelGates(Map<ChatChannel, Gate> gates) {
-        this.gates = Collections.unmodifiableMap(new HashMap<ChatChannel, Gate>(gates));
+    private ChatChannelGates(Map<String, Gate> gates) {
+        this.gates = Collections.unmodifiableMap(new HashMap<String, Gate>(gates));
     }
 
     public static ChatChannelGates current() {
@@ -96,15 +106,19 @@ public final class ChatChannelGates {
 
     /** Exactly the given gates; every other channel is open. */
     public static ChatChannelGates of(Map<ChatChannel, Gate> configured) {
-        Map<ChatChannel, Gate> gates = new HashMap<ChatChannel, Gate>();
+        Map<String, Gate> gates = new HashMap<String, Gate>();
         if (configured != null) {
-            gates.putAll(configured);
+            for (Map.Entry<ChatChannel, Gate> entry : configured.entrySet()) {
+                if (entry.getKey() != null && entry.getValue() != null) {
+                    gates.put(entry.getKey().getId(), entry.getValue());
+                }
+            }
         }
         return new ChatChannelGates(gates);
     }
 
     public Gate gateOf(ChatChannel channel) {
-        Gate gate = channel == null ? null : this.gates.get(channel);
+        Gate gate = channel == null ? null : this.gates.get(channel.getId());
         return gate == null ? OPEN : gate;
     }
 
@@ -132,7 +146,7 @@ public final class ChatChannelGates {
      * saying nothing about it.
      */
     public boolean hasEntry(ChatChannel channel) {
-        return channel != null && this.gates.containsKey(channel);
+        return channel != null && this.gates.containsKey(channel.getId());
     }
 
     private static boolean holdsAny(int roleMask, Set<String> roleIds) {

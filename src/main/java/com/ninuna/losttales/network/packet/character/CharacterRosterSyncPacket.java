@@ -122,6 +122,11 @@ public final class CharacterRosterSyncPacket implements IMessage {
                     throw new CharacterPacketCodec.DecodeException("invalid account cape");
                 }
             }
+            // Appended after the account cape: whether this world has
+            // taken the account's template. A shorter payload says it
+            // has, so an older sender never asks for one.
+            boolean templateTaken = buffer.readableBytes() < 1
+                    || buffer.readBoolean();
             CharacterPacketCodec.requireFinished(buffer);
             this.snapshot = new CharacterRosterSnapshot(
                     ownerId,
@@ -131,7 +136,8 @@ public final class CharacterRosterSyncPacket implements IMessage {
                     dataVersion,
                     characters,
                     accountShowMinecraftCape,
-                    accountCosmeticCapeId
+                    accountCosmeticCapeId,
+                    templateTaken
             );
             if (activeCharacterId != null && this.snapshot.getActiveCharacterId() == null) {
                 throw new CharacterPacketCodec.DecodeException("invalid active character reference");
@@ -185,6 +191,7 @@ public final class CharacterRosterSyncPacket implements IMessage {
         }
         buffer.writeBoolean(this.snapshot.isAccountMinecraftCapeVisible());
         buffer.writeShort(this.snapshot.getAccountCosmeticCapeId());
+        buffer.writeBoolean(this.snapshot.isTemplateTaken());
     }
 
     public int getRequestId() {

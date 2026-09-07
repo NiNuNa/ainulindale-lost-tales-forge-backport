@@ -43,7 +43,6 @@ public final class CharacterPlayerEventHandler {
         CharacterAppearanceSyncManager.broadcastRemoval(player.getUniqueID());
         // The remaining players' role rosters follow the leave.
         LostTalesChatService.sendAccessToAll(player);
-        CharacterNetworkSecurity.clearPlayer(player.getUniqueID());
         CharacterSwitchCoordinator.getInstance().clearRuntimeState(player.getUniqueID());
     }
 

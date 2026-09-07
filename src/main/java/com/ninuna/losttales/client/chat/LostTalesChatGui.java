@@ -2224,7 +2224,14 @@ public final class LostTalesChatGui extends GuiChat {
                 || ChatReplyMarker.isMarker(hit.component)
                 // The chevron a body opens with is the chat's own
                 // punctuation: it is drawn, but it answers to nothing.
-                || ChatBodyMarker.isMarker(hit.component)) {
+                || ChatBodyMarker.isMarker(hit.component)
+                // The indent a wrapped line hangs under, and the gap an
+                // icon reserves: both are drawn, both are wide enough to
+                // be hit, and neither is anything to act on. Without
+                // them the click below would read their payload as a
+                // suggestion and paste it over whatever was being typed.
+                || ChatLayoutMarker.isMarker(hit.component)
+                || ChatSpacerMarker.isMarker(hit.component)) {
             return true;
         }
         ClickEvent event =
@@ -2238,7 +2245,7 @@ public final class LostTalesChatGui extends GuiChat {
             return true;
         }
         if (event.getAction() == ClickEvent.Action.SUGGEST_COMMAND
-                && event.getValue().startsWith("/msg ")) {
+                && event.getValue().startsWith(ChatSenderSpan.WHISPER_PREFIX)) {
             // The sender's own name and brackets: a person, not a link.
             return true;
         } else if (event.getAction() == ClickEvent.Action.SUGGEST_COMMAND) {

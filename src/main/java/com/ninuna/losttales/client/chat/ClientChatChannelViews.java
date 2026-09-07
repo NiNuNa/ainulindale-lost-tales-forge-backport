@@ -108,6 +108,22 @@ public final class ClientChatChannelViews {
 
     private ClientChatChannelViews() {}
 
+    /**
+     * The key a view's state is kept under.
+     *
+     * <p>Everything here — where a view is scrolled to, what it is
+     * holding on to, what arrived while it was scrolled back, what it has
+     * not read — belongs to a conversation, not to a row. A scoped
+     * channel has a row entry and a conversation tab for every
+     * conversation in it, and the two are never the same value: a line
+     * arrives under its own conversation while the window and the
+     * renderer both ask about the row. Every access goes through here so
+     * that one side cannot write what the other never reads.</p>
+     */
+    private static ChatTab key(ChatTab tab) {
+        return ChatTab.viewed(tab);
+    }
+
     /** Remembers a new Lost Tales line's tab and counts it unread elsewhere. */
     public static synchronized void record(int chatLineId, ChatTab tab,
                                            ChatTab selected,
@@ -115,6 +131,7 @@ public final class ClientChatChannelViews {
         if (tab == null) {
             return;
         }
+        ChatTab view = key(tab);
         TAB_BY_LINE_ID.put(Integer.valueOf(chatLineId), tab);
         while (TAB_BY_LINE_ID.size() > maxTrackedLines()) {
             Iterator<Integer> iterator = TAB_BY_LINE_ID.keySet().iterator();
@@ -125,19 +142,19 @@ public final class ClientChatChannelViews {
         // Both sides through the same normalisation: the line carries its
         // own conversation while the selection is the channel's row entry,
         // and for a scoped channel those are never the same value.
-        if (ChatTab.viewed(tab).equals(ChatTab.viewed(selected))) {
+        if (view.equals(key(selected))) {
             // The tab is open in front of the player — but if they have
             // scrolled back to read, a message arriving is one they have
             // not seen. It is counted on the jump-to-present button, and
             // the first of a run opens the same crimson divider an unread
             // run in another tab opens, so where they were reading is
             // marked as plainly there as anywhere else.
-            if (target(tab) > 0.0D) {
-                int waiting = count(WAITING_BELOW, tab);
-                WAITING_BELOW.put(tab, Integer.valueOf(
+            if (target(view) > 0.0D) {
+                int waiting = count(WAITING_BELOW, view);
+                WAITING_BELOW.put(view, Integer.valueOf(
                         Math.min(MAX_UNREAD + 1, waiting + 1)));
                 if (waiting == 0) {
-                    UNREAD_DIVIDERS.put(tab, new UnreadDivider(chatLineId));
+                    UNREAD_DIVIDERS.put(view, new UnreadDivider(chatLineId));
                 }
             }
             return;
@@ -145,11 +162,11 @@ public final class ClientChatChannelViews {
         {
             Map<ChatTab, Integer> counter = mentionsLocalPlayer
                     ? UNREAD_PINGS : UNREAD_OTHER;
-            counter.put(tab, Integer.valueOf(
-                    Math.min(MAX_UNREAD + 1, count(counter, tab) + 1)));
-            UnreadDivider divider = UNREAD_DIVIDERS.get(tab);
+            counter.put(view, Integer.valueOf(
+                    Math.min(MAX_UNREAD + 1, count(counter, view) + 1)));
+            UnreadDivider divider = UNREAD_DIVIDERS.get(view);
             if (divider == null || divider.seen) {
-                UNREAD_DIVIDERS.put(tab, new UnreadDivider(chatLineId));
+                UNREAD_DIVIDERS.put(view, new UnreadDivider(chatLineId));
             }
         }
     }
@@ -179,8 +196,9 @@ public final class ClientChatChannelViews {
      * the foot of the stack, and there the arriving messages should push
      * it, which is what jumping to the present goes back to.</p>
      */
-    static synchronized void holdPosition(ChatTab view,
+    static synchronized void holdPosition(ChatTab tab,
                                           ChatWindowFrame frame) {
+        ChatTab view = key(tab);
         if (view == null || frame == null) {
             return;
         }
@@ -282,7 +300,7 @@ public final class ClientChatChannelViews {
 
     /** Called while a view is on screen; clears its unread counters. */
     public static synchronized void markViewed(ChatTab tab) {
-        tab = ChatTab.viewed(tab);
+        tab = key(tab);
         if (tab != null) {
             UNREAD_PINGS.remove(tab);
             UNREAD_OTHER.remove(tab);
@@ -301,14 +319,14 @@ public final class ClientChatChannelViews {
      */
     public static synchronized Integer unreadDividerLine(ChatTab tab) {
         UnreadDivider divider = tab == null ? null
-                : UNREAD_DIVIDERS.get(tab);
+                : UNREAD_DIVIDERS.get(key(tab));
         return divider == null ? null : Integer.valueOf(divider.lineId);
     }
 
     /** The divider's date label: the day its unread run began. */
     public static synchronized String unreadDividerLabel(ChatTab tab) {
         UnreadDivider divider = tab == null ? null
-                : UNREAD_DIVIDERS.get(tab);
+                : UNREAD_DIVIDERS.get(key(tab));
         return divider == null ? "" : divider.label;
     }
 
@@ -319,10 +337,11 @@ public final class ClientChatChannelViews {
      * is gone the next time the tab opens, the way Discord's is.
      */
     public static synchronized void dismissSeenDivider(ChatTab tab) {
-        UnreadDivider divider = tab == null ? null
-                : UNREAD_DIVIDERS.get(tab);
+        ChatTab view = key(tab);
+        UnreadDivider divider = view == null ? null
+                : UNREAD_DIVIDERS.get(view);
         if (divider != null && divider.seen) {
-            UNREAD_DIVIDERS.remove(tab);
+            UNREAD_DIVIDERS.remove(view);
         }
     }
 
@@ -333,7 +352,7 @@ public final class ClientChatChannelViews {
      */
     public static synchronized void dismissDivider(ChatTab tab) {
         if (tab != null) {
-            UNREAD_DIVIDERS.remove(tab);
+            UNREAD_DIVIDERS.remove(key(tab));
         }
     }
 
@@ -349,7 +368,8 @@ public final class ClientChatChannelViews {
     }
 
     /** Sends the view back to the newest line; it glides there. */
-    public static synchronized void scrollHome(ChatTab view) {
+    public static synchronized void scrollHome(ChatTab tab) {
+        ChatTab view = key(tab);
         if (view != null) {
             SCROLL.remove(view);
             ANCHORS.remove(view);
@@ -363,7 +383,7 @@ public final class ClientChatChannelViews {
      * what the jump-to-present button counts. Zero once the view is home.
      */
     public static synchronized int waitingBelow(ChatTab view) {
-        return count(WAITING_BELOW, view);
+        return count(WAITING_BELOW, key(view));
     }
 
     /** One tab's divider: where the latest unread run starts. */
@@ -527,8 +547,9 @@ public final class ClientChatChannelViews {
      * fractions of a line included, so a window dragged to an odd height
      * still comes to rest on a whole message at both ends.
      */
-    public static synchronized double getScroll(ChatTab view, int totalLines,
+    public static synchronized double getScroll(ChatTab tab, int totalLines,
                                                 double roomLines) {
+        ChatTab view = key(tab);
         if (view == null) {
             return 0.0D;
         }
@@ -567,8 +588,9 @@ public final class ClientChatChannelViews {
      * once per window draw; with chat animation switched off, or while
      * a resize holds the clamp in motion, it is the target itself.
      */
-    public static synchronized double renderedScroll(ChatTab view,
+    public static synchronized double renderedScroll(ChatTab tab,
                                                      double target) {
+        ChatTab view = key(tab);
         if (view == null) {
             return 0.0D;
         }
@@ -606,9 +628,10 @@ public final class ClientChatChannelViews {
      * what a jump to a quoted message asks for. The offset is a target
      * like any other, so the view glides to it rather than snapping.
      */
-    public static synchronized void scrollTo(ChatTab view, double lines,
+    public static synchronized void scrollTo(ChatTab tab, double lines,
                                              int totalLines,
                                              double roomLines) {
+        ChatTab view = key(tab);
         if (view != null) {
             SCROLL.put(view, Double.valueOf(Math.max(0.0D, lines)));
             noteScrolled(view);
@@ -616,9 +639,10 @@ public final class ClientChatChannelViews {
         }
     }
 
-    public static synchronized void scroll(ChatTab view, int delta,
+    public static synchronized void scroll(ChatTab tab, int delta,
                                            int totalLines,
                                            double roomLines) {
+        ChatTab view = key(tab);
         if (view == null) {
             return;
         }

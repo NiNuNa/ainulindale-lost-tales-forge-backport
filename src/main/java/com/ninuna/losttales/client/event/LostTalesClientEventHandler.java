@@ -17,6 +17,8 @@ import com.ninuna.losttales.client.camera.ThirdPersonHeadRenderHook;
 import com.ninuna.losttales.client.camera.ThirdPersonProjectileTrajectoryRenderer;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
+import com.ninuna.losttales.client.character.CharacterTemplateOffer;
+import com.ninuna.losttales.client.render.player.LostTalesCharacterFigureRenderer;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
@@ -152,6 +154,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientMobAggroCache.clear();
         LostTalesClientQuickLootCache.clear();
         ClientCharacterRosterCache.clear();
+        CharacterTemplateOffer.clear();
+        LostTalesCharacterFigureRenderer.clear();
         ClientCharacterAppearanceCache.clear();
         PlayerAppearanceResolver.clear();
         LostTalesAccountSkins.clear();

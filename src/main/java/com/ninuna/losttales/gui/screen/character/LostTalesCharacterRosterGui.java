@@ -2,7 +2,6 @@ package com.ninuna.losttales.gui.screen.character;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.CharacterSlotState;
-import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.sync.CharacterOperationFeedback;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
@@ -12,9 +11,9 @@ import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
-import com.ninuna.losttales.client.skin.LostTalesAccountSkins;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
-import net.minecraft.client.entity.AbstractClientPlayer;
+
+import java.util.UUID;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
@@ -22,10 +21,17 @@ import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Keyboard;
 
 /**
- * Client-only roster and character-management view: the Minecraft account
- * as the first playable identity in a row of its own, then the nine
- * character slots. Whichever is being played is marked active, and any
- * other can be selected.
+ * Client-only roster and character-management view: the account's default
+ * character in a row of its own at the top, then the nine character slots.
+ * Whichever is being played is marked active, and any other can be
+ * selected.
+ *
+ * <p>The first row is the account's own identity as a character record,
+ * not a second thing beside it. It reads from the same summary every
+ * other row does, is selected and played the same way, and differs only
+ * in that it is always there and the delete button stays off for it.
+ * Until a world has minted the record the row falls back to the account's
+ * own name and face, which is what it stands for.</p>
  */
 public final class LostTalesCharacterRosterGui extends GuiScreen {
 
@@ -36,21 +42,32 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
     private static final int BUTTON_LORE_CHARACTERS = 5;
     private static final int BUTTON_CAPE = 6;
 
-    /** The account's row stands in for a slot index it does not have. */
-    private static final int ACCOUNT_SLOT = -1;
-    private static final int ACCOUNT_ROW_HEIGHT = 26;
-    /** The account head drawn at the left of its row. */
-    private static final int ACCOUNT_HEAD_SIZE = 16;
+    /** The default character's own slot, outside the nine. */
+    private static final int DEFAULT_ROW_SLOT = CharacterRoster.DEFAULT_SLOT_INDEX;
+    private static final int DEFAULT_ROW_HEIGHT = 26;
+    /** The head drawn at the left of the default character's row. */
+    private static final int DEFAULT_HEAD_SIZE = 16;
+
+    private static final int PANEL_TOP = 44;
+    /** Where the panel starts when the header has to share the room. */
+    private static final int PANEL_TOP_TIGHT = 30;
+    private static final int PANEL_HEIGHT_MIN = 120;
+    /** The button row's band at the foot of the screen. */
+    private static final int BUTTON_ROW_BAND = 44;
+    /** Below this the detail line under the grid is dropped. */
+    private static final int DETAILS_MIN_PANEL = 200;
+    /** A tile still has to hold a name and a line under it. */
+    private static final int CELL_HEIGHT_MIN = 30;
 
     private final GuiScreen parent;
-    private int selectedSlot = ACCOUNT_SLOT;
+    private int selectedSlot = DEFAULT_ROW_SLOT;
     private int pendingRequestId;
     private String statusMessage = "";
     private boolean statusError;
 
-    private int accountX;
-    private int accountY;
-    private int accountWidth;
+    private int defaultRowX;
+    private int defaultRowY;
+    private int defaultRowWidth;
     private int gridX;
     private int gridY;
     private int cellWidth;
@@ -128,23 +145,39 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
 
     private void ensureSelection() {
         CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
-        if (snapshot == null || this.selectedSlot == ACCOUNT_SLOT) {
+        if (snapshot == null || this.selectedSlot == DEFAULT_ROW_SLOT) {
             return;
         }
         if (!CharacterRoster.isValidSlotIndex(this.selectedSlot)
                 || snapshot.getSlotState(this.selectedSlot) == CharacterSlotState.HIDDEN) {
             CharacterSummary active = snapshot.getActiveCharacter();
-            this.selectedSlot = active == null ? ACCOUNT_SLOT : active.getSlotIndex();
+            this.selectedSlot = active == null ? DEFAULT_ROW_SLOT : active.getSlotIndex();
         }
     }
 
-    private boolean isAccountSelected() {
-        return this.selectedSlot == ACCOUNT_SLOT;
+    private boolean isDefaultRowSelected() {
+        return this.selectedSlot == DEFAULT_ROW_SLOT;
     }
 
     private CharacterSummary selectedCharacter(CharacterRosterSnapshot snapshot) {
-        return snapshot == null || isAccountSelected()
+        return snapshot == null
                 ? null : snapshot.getCharacterAtSlot(this.selectedSlot);
+    }
+
+    /**
+     * Whether a summary is the identity being played. A world that has
+     * not minted the default character yet names no active character at
+     * all, and the account is what is being played then, so the default
+     * row answers for it.
+     */
+    private static boolean isPlayed(CharacterRosterSnapshot snapshot,
+                                    CharacterSummary summary) {
+        if (snapshot == null || summary == null) {
+            return false;
+        }
+        return snapshot.getActiveCharacterId() == null
+                ? summary.isDefault()
+                : summary.getCharacterId().equals(snapshot.getActiveCharacterId());
     }
 
     private CharacterSlotState selectedSlotState(CharacterRosterSnapshot snapshot) {
@@ -162,35 +195,34 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
         CharacterSummary selected = selectedCharacter(snapshot);
         CharacterSlotState state = selectedSlotState(snapshot);
 
-        if (isAccountSelected() && snapshot != null) {
-            boolean onAccount = snapshot.getActiveCharacterId() == null;
-            this.primaryButton.displayString = I18n.format(onAccount
-                    ? "gui.losttales.character.active"
-                    : "gui.losttales.character.select_account");
-            this.primaryButton.enabled = !onAccount && !pending;
-        } else if (state == CharacterSlotState.UNLOCKED) {
-            this.primaryButton.displayString = I18n.format("gui.losttales.character.create");
-            this.primaryButton.enabled = !pending;
-        } else if (selected != null && selected.getCharacterId().equals(snapshot.getActiveCharacterId())) {
+        boolean played = isPlayed(snapshot, selected);
+        if (played) {
             this.primaryButton.displayString = I18n.format("gui.losttales.character.active");
             this.primaryButton.enabled = false;
         } else if (selected != null) {
             this.primaryButton.displayString = I18n.format("gui.losttales.character.select");
             this.primaryButton.enabled = !pending;
+        } else if (isDefaultRowSelected()) {
+            // The world has not minted the record yet; there is nothing
+            // to switch to, and the account is already what is played.
+            this.primaryButton.displayString = I18n.format("gui.losttales.character.active");
+            this.primaryButton.enabled = false;
+        } else if (state == CharacterSlotState.UNLOCKED) {
+            this.primaryButton.displayString = I18n.format("gui.losttales.character.create");
+            this.primaryButton.enabled = !pending;
         } else {
             this.primaryButton.displayString = I18n.format("gui.losttales.character.unavailable");
             this.primaryButton.enabled = false;
         }
-        this.deleteButton.enabled = selected != null && !pending
+        // The account's own identity is always there; the server refuses
+        // to delete it, so the button never offers it.
+        this.deleteButton.enabled = selected != null && !selected.isDefault()
+                && !pending
                 && ClientLoreCharacterCache.findOwnedCharacter(
                 selected.getCharacterId()) == null;
         this.refreshButton.enabled = !pending;
         if (this.capeButton != null) {
-            boolean selectedIsPlayed = snapshot != null && (isAccountSelected()
-                    ? snapshot.getActiveCharacterId() == null
-                    : selected != null && selected.getCharacterId().equals(
-                            snapshot.getActiveCharacterId()));
-            this.capeButton.enabled = selectedIsPlayed && !pending;
+            this.capeButton.enabled = played && !pending;
         }
     }
 
@@ -220,26 +252,20 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
         CharacterSummary selected = selectedCharacter(snapshot);
         CharacterSlotState state = selectedSlotState(snapshot);
         if (button.id == BUTTON_PRIMARY) {
-            if (isAccountSelected()) {
-                if (snapshot.getActiveCharacterId() != null) {
-                    this.statusMessage = I18n.format("gui.losttales.character.selecting_account");
-                    this.statusError = false;
-                    this.pendingRequestId = ClientCharacterNetwork.selectAccount(
-                            snapshot.getRevision(), snapshot.getOwnerId());
-                }
-            } else if (state == CharacterSlotState.UNLOCKED) {
-                this.mc.displayGuiScreen(new LostTalesCharacterCreationGui(
-                        this, this.selectedSlot));
-            } else if (selected != null
-                    && !selected.getCharacterId().equals(snapshot.getActiveCharacterId())) {
+            if (selected != null && !isPlayed(snapshot, selected)) {
                 this.statusMessage = I18n.format("gui.losttales.character.selecting");
                 this.statusError = false;
                 this.pendingRequestId = ClientCharacterNetwork.selectCharacter(
                         snapshot.getRevision(), selected.getCharacterId());
+            } else if (selected == null && !isDefaultRowSelected()
+                    && state == CharacterSlotState.UNLOCKED) {
+                this.mc.displayGuiScreen(new LostTalesCharacterCreationGui(
+                        this, this.selectedSlot));
             }
             return;
         }
-        if (button.id == BUTTON_DELETE && selected != null) {
+        if (button.id == BUTTON_DELETE && selected != null
+                && !selected.isDefault()) {
             this.mc.displayGuiScreen(new LostTalesCharacterDeleteConfirmationGui(this, selected));
         }
     }
@@ -253,24 +279,30 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
                 this.width, 12);
 
         int panelWidth = Math.min(560, this.width - 28);
-        int panelHeight = Math.max(178 + ACCOUNT_ROW_HEIGHT, this.height - 92);
         int panelX = (this.width - panelWidth) / 2;
-        int panelY = 44;
+        int panelY = this.height >= 300 ? PANEL_TOP : PANEL_TOP_TIGHT;
+        // Never past the band the button row sits in: 1.7.10 keeps the
+        // scaled height at or above 240 and no higher, and a panel with a
+        // fixed floor runs under the row on every window that short.
+        int panelHeight = Math.max(PANEL_HEIGHT_MIN,
+                this.height - panelY - BUTTON_ROW_BAND);
         LostTalesSkyrimUiStyle.drawPanel(panelX, panelY, panelWidth, panelHeight);
 
         this.gap = 8;
-        this.accountX = panelX + 12;
-        this.accountY = panelY + 14;
-        this.accountWidth = panelWidth - 24;
+        this.defaultRowX = panelX + 12;
+        this.defaultRowY = panelY + 14;
+        this.defaultRowWidth = panelWidth - 24;
         this.gridX = panelX + 12;
-        this.gridY = this.accountY + ACCOUNT_ROW_HEIGHT + this.gap;
+        this.gridY = this.defaultRowY + DEFAULT_ROW_HEIGHT + this.gap;
         this.cellWidth = (panelWidth - 24 - this.gap * 2) / 3;
-        this.cellHeight = Math.max(38,
-                (panelHeight - 70 - ACCOUNT_ROW_HEIGHT - this.gap * 3) / 3);
+        boolean roomForDetails = panelHeight >= DETAILS_MIN_PANEL;
+        int gridSpace = panelHeight - DEFAULT_ROW_HEIGHT - this.gap * 3
+                - (roomForDetails ? 70 : 30);
+        this.cellHeight = Math.max(CELL_HEIGHT_MIN, gridSpace / 3);
 
         CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
-        drawAccountRow(snapshot, this.accountX, this.accountY, this.accountWidth,
-                mouseX, mouseY);
+        drawDefaultRow(snapshot, this.defaultRowX, this.defaultRowY,
+                this.defaultRowWidth, mouseX, mouseY);
         for (int slot = 0; slot < CharacterRoster.MAX_SLOTS; slot++) {
             int column = slot % 3;
             int row = slot / 3;
@@ -278,8 +310,10 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
             int y = this.gridY + row * (this.cellHeight + this.gap);
             drawSlot(snapshot, slot, x, y, mouseX, mouseY);
         }
-        drawSelectedDetails(snapshot, panelX + 12, panelY + panelHeight - 39,
-                panelWidth - 24);
+        if (roomForDetails) {
+            drawSelectedDetails(snapshot, panelX + 12, panelY + panelHeight - 39,
+                    panelWidth - 24);
+        }
 
         if (this.statusMessage.length() > 0) {
             drawCenteredString(this.fontRendererObj, this.statusMessage, this.width / 2,
@@ -297,24 +331,12 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
                     x, y + 2, LostTalesSkyrimUiStyle.TEXT_MUTED);
             return;
         }
-        if (isAccountSelected()) {
-            String lineOne = getAccountName() + "  •  "
-                    + ClientCharacterDisplayNames.race(CharacterRaceRegistry.HUMAN) + "  •  "
-                    + ClientCharacterDisplayNames.bodyType(accountBodyType()) + "  •  "
-                    + ClientCharacterDisplayNames.cape(snapshot.getAccountCosmeticCapeId());
-            this.fontRendererObj.drawStringWithShadow(
-                    LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, lineOne, width),
-                    x, y, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
-            this.fontRendererObj.drawStringWithShadow(
-                    LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj,
-                            I18n.format("gui.losttales.character.account_detail"), width),
-                    x, y + 11, LostTalesSkyrimUiStyle.TEXT_MUTED);
-            return;
-        }
         CharacterSummary character = snapshot.getCharacterAtSlot(this.selectedSlot);
         CharacterSlotState state = snapshot.getSlotState(this.selectedSlot);
         if (character == null) {
-            String message = state == CharacterSlotState.UNLOCKED
+            String message = isDefaultRowSelected()
+                    ? I18n.format("gui.losttales.character.account_detail")
+                    : state == CharacterSlotState.UNLOCKED
                     ? I18n.format("gui.losttales.character.empty_detail")
                     : I18n.format("gui.losttales.character.unavailable_detail");
             this.fontRendererObj.drawStringWithShadow(
@@ -327,8 +349,13 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
                 + ClientCharacterDisplayNames.gender(character.getGenderId()) + "  •  "
                 + I18n.format("gui.losttales.character.age_value",
                 Integer.valueOf(character.getAge()));
-        String lineTwo = ClientCharacterDisplayNames.faction(character.getStartingFactionId())
-                + "  •  " + I18n.format("gui.losttales.character.level_short",
+        // The account's own identity starts in no faction, which is a
+        // fact about it rather than a field nobody filled in.
+        String faction = character.getStartingFactionId().length() == 0
+                ? I18n.format("gui.losttales.character.account_faction_none")
+                : ClientCharacterDisplayNames.faction(character.getStartingFactionId());
+        String lineTwo = faction + "  •  "
+                + I18n.format("gui.losttales.character.level_short",
                 Integer.valueOf(character.getRoleplayLevel()));
         this.fontRendererObj.drawStringWithShadow(
                 LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, lineOne, width),
@@ -338,20 +365,23 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
                 x, y + 11, LostTalesSkyrimUiStyle.TEXT_MUTED);
     }
 
-    /** The account's row: the identity the player has before any character. */
-    private void drawAccountRow(CharacterRosterSnapshot snapshot, int x, int y, int width,
-                                int mouseX, int mouseY) {
+    /**
+     * The default character's row: the account's own identity, drawn from
+     * its record. Until a world has minted that record the row shows the
+     * account's name and face, which is what the record will carry.
+     */
+    private void drawDefaultRow(CharacterRosterSnapshot snapshot, int x, int y,
+                                int width, int mouseX, int mouseY) {
         boolean hovered = mouseX >= x && mouseX < x + width
-                && mouseY >= y && mouseY < y + ACCOUNT_ROW_HEIGHT;
-        drawTileFrame(x, y, width, ACCOUNT_ROW_HEIGHT, isAccountSelected(), hovered);
-        // The account's own face, from its Minecraft skin, at the left.
+                && mouseY >= y && mouseY < y + DEFAULT_ROW_HEIGHT;
+        drawTileFrame(x, y, width, DEFAULT_ROW_HEIGHT, isDefaultRowSelected(), hovered);
+        CharacterSummary character = snapshot == null
+                ? null : snapshot.getCharacterAtSlot(DEFAULT_ROW_SLOT);
+        int headY = y + (DEFAULT_ROW_HEIGHT - DEFAULT_HEAD_SIZE) / 2;
         int textX = x + 6;
         if (this.mc != null && this.mc.thePlayer != null
-                && LostTalesCharacterHeadIconRenderer.drawAccountHead(this.mc,
-                        this.mc.thePlayer.getUniqueID(), x + 5,
-                        y + (ACCOUNT_ROW_HEIGHT - ACCOUNT_HEAD_SIZE) / 2,
-                        ACCOUNT_HEAD_SIZE, 1.0F, 1.0F)) {
-            textX += ACCOUNT_HEAD_SIZE + 4;
+                && drawDefaultHead(character, x + 5, headY)) {
+            textX += DEFAULT_HEAD_SIZE + 4;
         }
         this.fontRendererObj.drawStringWithShadow(
                 I18n.format("gui.losttales.character.account_tile"), textX, y + 4,
@@ -361,15 +391,21 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
                     textX, y + 14, LostTalesSkyrimUiStyle.TEXT_DIM);
             return;
         }
-        boolean active = snapshot.getActiveCharacterId() == null;
+        boolean active = character == null
+                ? snapshot.getActiveCharacterId() == null
+                : isPlayed(snapshot, character);
         int nameWidth = width / 2 - 12;
+        String name = character == null ? getAccountName() : character.getName();
         this.fontRendererObj.drawStringWithShadow(
-                LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, getAccountName(),
+                LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, name,
                         nameWidth - (textX - x - 6)),
                 textX, y + 14,
                 active ? LostTalesSkyrimUiStyle.GOLD : LostTalesSkyrimUiStyle.TEXT_BRIGHT);
-        String details = ClientCharacterDisplayNames.race(CharacterRaceRegistry.HUMAN)
-                + "  •  " + ClientCharacterDisplayNames.bodyType(accountBodyType());
+        String details = character == null
+                ? ClientCharacterDisplayNames.race(CharacterRaceRegistry.HUMAN)
+                : ClientCharacterDisplayNames.race(character.getRaceId()) + "  •  "
+                        + I18n.format("gui.losttales.character.level_short",
+                        Integer.valueOf(character.getRoleplayLevel()));
         this.fontRendererObj.drawStringWithShadow(
                 LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, details, nameWidth - 42),
                 x + width / 2, y + 14, LostTalesSkyrimUiStyle.TEXT_MUTED);
@@ -377,6 +413,17 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
             this.fontRendererObj.drawStringWithShadow(I18n.format("gui.losttales.character.active_marker"),
                     x + width - 42, y + 4, LostTalesSkyrimUiStyle.GREEN);
         }
+    }
+
+    /** The record's face where there is one, the account's own until then. */
+    private boolean drawDefaultHead(CharacterSummary character, int x, int y) {
+        UUID ownerId = this.mc.thePlayer.getUniqueID();
+        return character == null
+                ? LostTalesCharacterHeadIconRenderer.drawAccountHead(
+                        this.mc, ownerId, x, y, DEFAULT_HEAD_SIZE, 1.0F, 1.0F)
+                : LostTalesCharacterHeadIconRenderer.drawSnapshotHead(
+                        this.mc, ownerId, character.getSkinId(), x, y,
+                        DEFAULT_HEAD_SIZE, 1.0F, 1.0F);
     }
 
     private void drawSlot(CharacterRosterSnapshot snapshot, int slot, int x, int y,
@@ -449,20 +496,14 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
                 : this.mc.thePlayer.getCommandSenderName();
     }
 
-    /** The arm width the local player's own skin declares. */
-    private String accountBodyType() {
-        return this.mc != null && this.mc.thePlayer instanceof AbstractClientPlayer
-                ? LostTalesAccountSkins.resolve(
-                        (AbstractClientPlayer)this.mc.thePlayer).getBodyTypeId()
-                : CharacterBodyTypeRegistry.WIDE;
-    }
-
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
         if (button == 0) {
-            if (mouseX >= this.accountX && mouseX < this.accountX + this.accountWidth
-                    && mouseY >= this.accountY && mouseY < this.accountY + ACCOUNT_ROW_HEIGHT) {
-                this.selectedSlot = ACCOUNT_SLOT;
+            if (mouseX >= this.defaultRowX
+                    && mouseX < this.defaultRowX + this.defaultRowWidth
+                    && mouseY >= this.defaultRowY
+                    && mouseY < this.defaultRowY + DEFAULT_ROW_HEIGHT) {
+                this.selectedSlot = DEFAULT_ROW_SLOT;
                 this.statusMessage = "";
                 updateButtonState();
                 return;

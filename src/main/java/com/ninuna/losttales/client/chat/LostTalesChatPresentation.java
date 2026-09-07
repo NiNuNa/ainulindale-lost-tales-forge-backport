@@ -898,7 +898,7 @@ public final class LostTalesChatPresentation {
         // and a click exactly as it does, so the card comes up wherever
         // the pointer is over the sender. Their colour comes from the
         // head marker, which is where every part of the name takes it.
-        String whisper = "/msg " + packet.getAccountName() + " ";
+        String whisper = ChatSenderSpan.suggestionFor(packet.getAccountName());
         root.appendSibling(reply(text("<", nearestFormatting(
                 packet.getNameColor()), false), whisper));
         // Two bold spaces stand in for the head; what the line actually
@@ -1011,7 +1011,16 @@ public final class LostTalesChatPresentation {
     private static void appendReplyQuote(ChatComponentText root,
                                          ChatReplyReference reply) {
         int quiet = LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE);
-        int name = ClientChatAccountRoles.colorOf(reply.getAuthor());
+        // The colour the server drew that name in, which is the only
+        // answer for an in-character author: a character's name belongs
+        // to a character, and the account-role colours this client holds
+        // are keyed by account name and have never seen it. The account
+        // colours still answer for a line from before the quote carried
+        // one, and a quote with neither is drawn quietly.
+        int name = reply.getAuthorColor();
+        if (name < 0) {
+            name = ClientChatAccountRoles.colorOf(reply.getAuthor());
+        }
         long id = reply.getMessageId();
         root.appendSibling(ChatReplyMarker.apply(
                 text(REPLY_MARK, nearestFormatting(quiet), false),

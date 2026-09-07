@@ -1,5 +1,6 @@
 package com.ninuna.losttales.network.packet.character;
 
+import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.server.CharacterNetworkRequestHandler;
 import com.ninuna.losttales.character.server.CharacterServerPacketDispatcher;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
@@ -44,7 +45,8 @@ public final class LoreCharacterClaimRequestPacket implements IMessage {
             CharacterPacketCodec.requireFinished(buffer);
             if (this.expectedRosterRevision < 0L
                     || this.expectedOwnershipRevision < 0L
-                    || this.loreCharacterId.length() == 0) {
+                    || this.loreCharacterId.length() == 0
+                    || !CharacterRoster.isCreatableSlotIndex(this.slotIndex)) {
                 throw new CharacterPacketCodec.DecodeException("invalid claim");
             }
         } catch (RuntimeException exception) { this.malformed = true; }

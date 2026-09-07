@@ -43,18 +43,6 @@ public final class CharacterSummary {
                 creationTimestamp, dataVersion, "");
     }
 
-    public CharacterSummary(UUID characterId, int slotIndex, String name,
-                            String raceId, String genderId, String skinId,
-                            boolean showMinecraftCape, int cosmeticCapeId,
-                            int age, String startingFactionId, int roleplayLevel,
-                            long experiencePoints, long creationTimestamp,
-                            int dataVersion) {
-        this(characterId, slotIndex, name, raceId, genderId, skinId,
-                showMinecraftCape, cosmeticCapeId, age, startingFactionId,
-                roleplayLevel, experiencePoints, creationTimestamp,
-                dataVersion, "");
-    }
-
     /** Body and chest types default from the sex. */
     public CharacterSummary(UUID characterId, int slotIndex, String name,
                             String raceId, String genderId, String skinId,
@@ -144,7 +132,12 @@ public final class CharacterSummary {
     /**
      * Whether this is the account's own identity. The slot says so: the
      * default character is the one outside the nine, which is also what
-     * puts it first when the roster is ordered.
+     * puts it first when the roster is ordered. Nothing else can be
+     * stored there — creation and lore claims both refuse the slot, and
+     * the codec quarantines a record whose slot and kind disagree — so
+     * the slot answers the question the stored kind answers on the
+     * server, without a second field on the wire to fall out of step
+     * with it.
      */
     public boolean isDefault() {
         return this.slotIndex == CharacterRoster.DEFAULT_SLOT_INDEX;

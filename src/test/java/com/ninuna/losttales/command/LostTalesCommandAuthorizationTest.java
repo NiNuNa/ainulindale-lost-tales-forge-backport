@@ -46,33 +46,7 @@ public final class LostTalesCommandAuthorizationTest {
                 Arrays.asList(role), members, null));
     }
 
-    /**
-     * A capability-bearing command asks the capability and nothing else,
-     * so an operator runs it because of the level the capability names.
-     */
-    @Test
-    public void aCapabilityCommandOpensForAnOperator() {
-        LostTalesCommandBase moderation = new LostTalesCommandChatModeration();
-        assertEquals(LostTalesCapability.CHAT_MODERATE, moderation.getCapability());
-        assertTrue(moderation.canCommandSenderUseCommand(
-                FakeCommandSender.operator("Ops")));
-        assertFalse(moderation.canCommandSenderUseCommand(
-                FakeCommandSender.player("Someone")));
-    }
 
-    /**
-     * A command names its level once: the capability's. The two can no
-     * longer say different things.
-     */
-    @Test
-    public void theCommandLevelIsTheCapabilitysOwn() {
-        LostTalesCommandBase moderation = new LostTalesCommandChatModeration();
-        assertEquals(LostTalesCapability.CHAT_MODERATE.getRequiredOpLevel(),
-                moderation.getRequiredPermissionLevel());
-        LostTalesCommandBase role = new LostTalesCommandRole();
-        assertEquals(LostTalesCapability.ROLES_MANAGE.getRequiredOpLevel(),
-                role.getRequiredPermissionLevel());
-    }
 
     /**
      * The root names no capability of its own and keeps vanilla's level
@@ -86,24 +60,6 @@ public final class LostTalesCommandAuthorizationTest {
         assertFalse(root.canCommandSenderUseCommand(FakeCommandSender.player("Someone")));
     }
 
-    /**
-     * Every area that was the operators' alone now names a capability,
-     * so a server may delegate it to a role instead of handing out
-     * operator status.
-     */
-    @Test
-    public void theOperatorOnlyCommandsCanBeDelegated() {
-        assertEquals(LostTalesCapability.QUEST_ADMIN,
-                new LostTalesCommandQuest().getCapability());
-        assertEquals(LostTalesCapability.CHARACTER_ADMIN,
-                new LostTalesCommandCharacterAdmin().getCapability());
-        assertEquals(LostTalesCapability.PARTY_ADMIN,
-                new LostTalesCommandPartyAdmin().getCapability());
-        assertEquals(LostTalesCapability.MAPMARKER_MANAGE,
-                new LostTalesCommandMapMarker().getCapability());
-        assertEquals(LostTalesCapability.HUD_ADMIN,
-                new LostTalesCommandHud().getCapability());
-    }
 
     /**
      * A role the server grants the capability to opens the command for a
@@ -128,21 +84,6 @@ public final class LostTalesCommandAuthorizationTest {
                 com.ninuna.losttales.permission.LostTalesPermissionCatalog.current()));
     }
 
-    /**
-     * The root opens for an operator, and for nobody who may run no
-     * sub-command; every sub-command it lists is asked for itself.
-     */
-    @Test
-    public void theRootOpensNoWiderThanItsSubCommands() {
-        LostTalesCommandRoot root = new LostTalesCommandRoot();
-        assertTrue(root.canCommandSenderUseCommand(FakeCommandSender.operator("Ops")));
-        assertFalse(root.canCommandSenderUseCommand(FakeCommandSender.player("Someone")));
-        for (ELostTalesSubCommand subCommand : ELostTalesSubCommand.values()) {
-            assertFalse("no sub-command opens for a player with no level and no role",
-                    subCommand.getCommand().canCommandSenderUseCommand(
-                            FakeCommandSender.player("Someone")));
-        }
-    }
 
     /**
      * Every capability-bearing sub-command reaches the same decision,

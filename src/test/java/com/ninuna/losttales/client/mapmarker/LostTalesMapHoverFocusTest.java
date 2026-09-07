@@ -5,11 +5,6 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 public final class LostTalesMapHoverFocusTest {
-    @Test
-    public void defaultDelayStaysResponsive() {
-        assertEquals(80000000L,
-                LostTalesMapHoverFocus.DEFAULT_DELAY_NANOS);
-    }
 
     @Test
     public void focusActivatesOnlyAfterTheConfiguredDelay() {

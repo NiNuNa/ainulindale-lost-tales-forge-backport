@@ -15,7 +15,7 @@ import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiNewChat;
 import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.client.renderer.OpenGlHelper;
+import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.IChatComponent;
@@ -1312,13 +1312,7 @@ final class LostTalesChatOverlayRenderer {
             columnX[column] = left + (right - left) * t;
             columnWeight[column] = 1.0F - t;
         }
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glDisable(GL11.GL_ALPHA_TEST);
-        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
-        GL11.glShadeModel(GL11.GL_SMOOTH);
-        Tessellator tessellator = Tessellator.instance;
-        tessellator.startDrawingQuads();
+        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
         for (int rowIndex = 0; rowIndex < EDGE_FADE_ROWS; rowIndex++) {
             // Each band runs from nearer the edge to farther from it;
             // its top and bottom are then taken in screen order so the
@@ -1359,11 +1353,7 @@ final class LostTalesChatOverlayRenderer {
                 tessellator.addVertex(x0, y1, 0.0D);
             }
         }
-        tessellator.draw();
-        GL11.glShadeModel(GL11.GL_FLAT);
-        GL11.glDisable(GL11.GL_BLEND);
-        GL11.glEnable(GL11.GL_ALPHA_TEST);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
     }
 
     /**
@@ -1441,13 +1431,7 @@ final class LostTalesChatOverlayRenderer {
                 < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glDisable(GL11.GL_ALPHA_TEST);
-        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
-        GL11.glShadeModel(GL11.GL_SMOOTH);
-        Tessellator tessellator = Tessellator.instance;
-        tessellator.startDrawingQuads();
+        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
         // Same winding as the backdrop: the GUI pass culls back faces.
         tessellator.setColorRGBA_I(rgb, rightAlpha);
         tessellator.addVertex(right, top + 1.0F, 0.0D);
@@ -1455,11 +1439,7 @@ final class LostTalesChatOverlayRenderer {
         tessellator.setColorRGBA_I(rgb, leftAlpha);
         tessellator.addVertex(left, top, 0.0D);
         tessellator.addVertex(left, top + 1.0F, 0.0D);
-        tessellator.draw();
-        GL11.glShadeModel(GL11.GL_FLAT);
-        GL11.glDisable(GL11.GL_BLEND);
-        GL11.glEnable(GL11.GL_ALPHA_TEST);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
     }
 
     /** Width of the scrollbar's track and thumb. */
@@ -1763,13 +1743,7 @@ final class LostTalesChatOverlayRenderer {
             return;
         }
         float centre = (left + right) / 2.0F;
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glDisable(GL11.GL_ALPHA_TEST);
-        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
-        GL11.glShadeModel(GL11.GL_SMOOTH);
-        Tessellator tessellator = Tessellator.instance;
-        tessellator.startDrawingQuads();
+        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
         // Same winding as the backdrop: the GUI pass culls back faces.
         // Left half: transparent edge to opaque centre.
         tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, safeAlpha);
@@ -1785,12 +1759,7 @@ final class LostTalesChatOverlayRenderer {
         tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, safeAlpha);
         tessellator.addVertex(centre, top, 0.0D);
         tessellator.addVertex(centre, bottom, 0.0D);
-        tessellator.draw();
-        GL11.glShadeModel(GL11.GL_FLAT);
-        GL11.glDisable(GL11.GL_BLEND);
-        GL11.glEnable(GL11.GL_ALPHA_TEST);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
     }
 
     /**
@@ -1807,13 +1776,7 @@ final class LostTalesChatOverlayRenderer {
             return;
         }
         float centre = (top + bottom) / 2.0F;
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glDisable(GL11.GL_ALPHA_TEST);
-        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
-        GL11.glShadeModel(GL11.GL_SMOOTH);
-        Tessellator tessellator = Tessellator.instance;
-        tessellator.startDrawingQuads();
+        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
         // Same winding as the backdrop: the GUI pass culls back faces.
         // Top half: transparent end to opaque centre.
         tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, safeAlpha);
@@ -1829,12 +1792,7 @@ final class LostTalesChatOverlayRenderer {
         tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, safeAlpha);
         tessellator.addVertex(right, centre, 0.0D);
         tessellator.addVertex(left, centre, 0.0D);
-        tessellator.draw();
-        GL11.glShadeModel(GL11.GL_FLAT);
-        GL11.glDisable(GL11.GL_BLEND);
-        GL11.glEnable(GL11.GL_ALPHA_TEST);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
     }
 
     /**
@@ -1976,13 +1934,7 @@ final class LostTalesChatOverlayRenderer {
                 < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glDisable(GL11.GL_ALPHA_TEST);
-        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
-        GL11.glShadeModel(GL11.GL_SMOOTH);
-        Tessellator tessellator = Tessellator.instance;
-        tessellator.startDrawingQuads();
+        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
         // Same winding as the backdrop: the GUI pass culls back faces.
         tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY,
                 bottomAlpha);
@@ -1991,12 +1943,7 @@ final class LostTalesChatOverlayRenderer {
         tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, topAlpha);
         tessellator.addVertex(x + 1.0F, top, 0.0D);
         tessellator.addVertex(x, top, 0.0D);
-        tessellator.draw();
-        GL11.glShadeModel(GL11.GL_FLAT);
-        GL11.glDisable(GL11.GL_BLEND);
-        GL11.glEnable(GL11.GL_ALPHA_TEST);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
     }
 
     /** The ramp's opacity at {@code y}; clamped, linear. */
@@ -2020,13 +1967,7 @@ final class LostTalesChatOverlayRenderer {
                 || right <= left) {
             return;
         }
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glDisable(GL11.GL_ALPHA_TEST);
-        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
-        GL11.glShadeModel(GL11.GL_SMOOTH);
-        Tessellator tessellator = Tessellator.instance;
-        tessellator.startDrawingQuads();
+        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
         // Same winding as the backdrop: the GUI pass culls back faces.
         tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, safeAlpha);
         tessellator.addVertex(left, top + 1.0F, 0.0D);
@@ -2035,12 +1976,7 @@ final class LostTalesChatOverlayRenderer {
         tessellator.addVertex(right, top, 0.0D);
         tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, safeAlpha);
         tessellator.addVertex(left, top, 0.0D);
-        tessellator.draw();
-        GL11.glShadeModel(GL11.GL_FLAT);
-        GL11.glDisable(GL11.GL_BLEND);
-        GL11.glEnable(GL11.GL_ALPHA_TEST);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
     }
 
     /** A flat quad at fractional edges; {@code Gui.drawRect} is whole. */
@@ -2050,21 +1986,13 @@ final class LostTalesChatOverlayRenderer {
         if (alpha <= 0 || right <= left || bottom <= top) {
             return;
         }
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glDisable(GL11.GL_ALPHA_TEST);
-        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
-        Tessellator tessellator = Tessellator.instance;
-        tessellator.startDrawingQuads();
+        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(false);
         tessellator.setColorRGBA_I(argb & 0xFFFFFF, alpha);
         tessellator.addVertex(left, bottom, 0.0D);
         tessellator.addVertex(right, bottom, 0.0D);
         tessellator.addVertex(right, top, 0.0D);
         tessellator.addVertex(left, top, 0.0D);
-        tessellator.draw();
-        GL11.glDisable(GL11.GL_BLEND);
-        GL11.glEnable(GL11.GL_ALPHA_TEST);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        LostTalesSkyrimUiStyle.endQuads(tessellator, false);
     }
 
     /**
@@ -2091,13 +2019,7 @@ final class LostTalesChatOverlayRenderer {
         if (right <= left || bottom <= top || safeAlpha <= 0) {
             return;
         }
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glDisable(GL11.GL_ALPHA_TEST);
-        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
-        GL11.glShadeModel(GL11.GL_SMOOTH);
-        Tessellator tessellator = Tessellator.instance;
-        tessellator.startDrawingQuads();
+        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
         float width = right - left;
         for (int step = 0; step < BACKDROP_FADE_STEPS; step++) {
             float x0 = left + width * step / (float)BACKDROP_FADE_STEPS;
@@ -2113,11 +2035,7 @@ final class LostTalesChatOverlayRenderer {
             tessellator.addVertex(x0, top, 0.0D);
             tessellator.addVertex(x0, bottom, 0.0D);
         }
-        tessellator.draw();
-        GL11.glShadeModel(GL11.GL_FLAT);
-        GL11.glDisable(GL11.GL_BLEND);
-        GL11.glEnable(GL11.GL_ALPHA_TEST);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
     }
 
     private static void drawHead(Minecraft minecraft, FontRenderer font,

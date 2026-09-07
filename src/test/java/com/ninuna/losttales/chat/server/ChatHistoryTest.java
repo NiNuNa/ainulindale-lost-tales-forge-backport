@@ -51,10 +51,41 @@ public final class ChatHistoryTest {
     /* ---- quoting, editing, removing ---- */
 
     @Test
+    public void aQuoteIsOnlyAllowedBackIntoItsOwnConversation() {
+        // Having seen a line is not enough: a quote carries its words to
+        // everyone the reply reaches, so a whisper may not be answered
+        // into Global.
+        long whisper = record(ChatChannel.WHISPER, ALICE,
+                "the vault code is 4417", Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
+
+        assertTrue(ChatHistory.quoteFor(
+                whisper, BOB, ChatChannel.WHISPER, "").exists());
+        assertFalse("a whisper quoted into Global would reach everyone",
+                ChatHistory.quoteFor(whisper, BOB, ChatChannel.ALL, "").exists());
+        assertFalse(ChatHistory.quoteFor(
+                whisper, BOB, ChatChannel.OOC, "").exists());
+    }
+
+    @Test
+    public void aQuoteIsOnlyAllowedBackIntoItsOwnScope() {
+        // Two factions share the Faction channel; a line said to one is
+        // not a line the other may be shown.
+        long gondor = record(ChatChannel.FACTION, ALICE, "the gate holds",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone(),
+                "gondor");
+
+        assertTrue(ChatHistory.quoteFor(
+                gondor, BOB, ChatChannel.FACTION, "gondor").exists());
+        assertFalse(ChatHistory.quoteFor(
+                gondor, BOB, ChatChannel.FACTION, "rohan").exists());
+    }
+
+    @Test
     public void aRecipientIsQuotedTheMessageTheyWereSent() {
         long id = record(ChatChannel.ALL, ALICE, "meet me at the gate",
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
-        ChatReplyReference quote = ChatHistory.quoteFor(id, BOB);
+        ChatReplyReference quote = ChatHistory.quoteFor(id, BOB, ChatChannel.ALL, "");
         assertTrue(quote.exists());
         assertEquals(id, quote.getMessageId());
         assertEquals("Aldric", quote.getAuthor());
@@ -78,10 +109,11 @@ public final class ChatHistoryTest {
         long id = record(ChatChannel.WHISPER, ALICE, "the key is under the barrel",
                 Arrays.asList(ALICE, BOB),
                 ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
-        assertFalse(ChatHistory.quoteFor(id, CAROL).exists());
-        assertFalse(ChatHistory.quoteFor(id, null).exists());
-        assertFalse(ChatHistory.quoteFor(1234L, ALICE).exists());
-        assertFalse(ChatHistory.quoteFor(ChatMessageIds.NONE, ALICE).exists());
+        assertFalse(ChatHistory.quoteFor(id, CAROL, ChatChannel.WHISPER, "").exists());
+        assertFalse(ChatHistory.quoteFor(id, null, ChatChannel.WHISPER, "").exists());
+        assertFalse(ChatHistory.quoteFor(1234L, ALICE, ChatChannel.WHISPER, "").exists());
+        assertFalse(ChatHistory.quoteFor(
+                ChatMessageIds.NONE, ALICE, ChatChannel.WHISPER, "").exists());
     }
 
     @Test
@@ -105,7 +137,8 @@ public final class ChatHistoryTest {
         }
         long id = record(ChatChannel.ALL, ALICE, long_.toString(),
                 Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
-        String excerpt = ChatHistory.quoteFor(id, ALICE).getExcerpt();
+        String excerpt = ChatHistory.quoteFor(
+                id, ALICE, ChatChannel.ALL, "").getExcerpt();
         assertTrue(excerpt.length() < ChatReplyReference.MAX_EXCERPT_CHARACTERS + 5);
         assertTrue(excerpt.endsWith("..."));
     }
@@ -117,7 +150,8 @@ public final class ChatHistoryTest {
         assertNull(ChatHistory.applyEdit(id, BOB, "meet me at the tower"));
         assertNull(ChatHistory.remove(id, BOB));
         assertNull(ChatHistory.applyEdit(id, null, "nobody at all"));
-        assertEquals("meet me at the gate", ChatHistory.quoteFor(id, BOB).getExcerpt());
+        assertEquals("meet me at the gate", ChatHistory.quoteFor(
+                id, BOB, ChatChannel.ALL, "").getExcerpt());
     }
 
     /** An edit reaches exactly who was sent the original, and the replay says the new words. */
@@ -130,7 +164,8 @@ public final class ChatHistoryTest {
         assertTrue(told.contains(ALICE));
         assertTrue(told.contains(BOB));
         assertFalse(told.contains(CAROL));
-        assertEquals("meet me at the tower", ChatHistory.quoteFor(id, BOB).getExcerpt());
+        assertEquals("meet me at the tower", ChatHistory.quoteFor(
+                id, BOB, ChatChannel.ALL, "").getExcerpt());
         List<LostTalesChatMessagePacket> replay = ChatHistory.replayFor(
                 requester(CAROL), ChatMessageIds.NONE);
         assertEquals(1, replay.size());
@@ -144,7 +179,7 @@ public final class ChatHistoryTest {
         Set<UUID> told = ChatHistory.remove(id, ALICE);
         assertNotNull(told);
         assertTrue(told.contains(BOB));
-        assertFalse(ChatHistory.quoteFor(id, BOB).exists());
+        assertFalse(ChatHistory.quoteFor(id, BOB, ChatChannel.ALL, "").exists());
         assertNull(ChatHistory.applyEdit(id, ALICE, "or that"));
         assertTrue(ChatHistory.replayFor(requester(CAROL), ChatMessageIds.NONE).isEmpty());
         // A moderator's removal likewise, and it says whose the message was.
@@ -170,10 +205,12 @@ public final class ChatHistoryTest {
             record(ChatChannel.ALL, ALICE, "and another",
                     Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
         }
-        assertFalse(ChatHistory.quoteFor(oldestGlobal, ALICE).exists());
+        assertFalse(ChatHistory.quoteFor(
+                oldestGlobal, ALICE, ChatChannel.ALL, "").exists());
         assertNull(ChatHistory.applyEdit(oldestGlobal, ALICE, "on reflection"));
         // The other channel's line was not the one to go.
-        assertTrue(ChatHistory.quoteFor(oldestOoc, ALICE).exists());
+        assertTrue(ChatHistory.quoteFor(
+                oldestOoc, ALICE, ChatChannel.OOC, "").exists());
         assertEquals(ChatHistory.MAX_PER_CHANNEL + 1, ChatHistory.size());
         ChatHistory.clear();
         assertEquals(0, ChatHistory.size());

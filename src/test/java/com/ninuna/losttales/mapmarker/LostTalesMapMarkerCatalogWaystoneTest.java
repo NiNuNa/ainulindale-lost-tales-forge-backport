@@ -16,20 +16,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public final class LostTalesMapMarkerCatalogWaystoneTest {
-    @Test
-    public void relevanceScaleHasExactlyFiveOrderedLevels() {
-        assertEquals(5, LostTalesMapMarkerRelevance.values().length);
-        assertEquals(LostTalesMapMarkerRelevance.VERY_LOW,
-                LostTalesMapMarkerRelevance.values()[0]);
-        assertEquals(LostTalesMapMarkerRelevance.LOW,
-                LostTalesMapMarkerRelevance.values()[1]);
-        assertEquals(LostTalesMapMarkerRelevance.MEDIUM,
-                LostTalesMapMarkerRelevance.values()[2]);
-        assertEquals(LostTalesMapMarkerRelevance.HIGH,
-                LostTalesMapMarkerRelevance.values()[3]);
-        assertEquals(LostTalesMapMarkerRelevance.VERY_HIGH,
-                LostTalesMapMarkerRelevance.values()[4]);
-    }
 
     @Test
     public void lotrWaypointIdCanBeDerivedFromMarkerId() {

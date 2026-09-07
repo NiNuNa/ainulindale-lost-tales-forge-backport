@@ -17,7 +17,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiNewChat;
-import net.minecraft.event.ClickEvent;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
@@ -470,7 +469,7 @@ final class LostTalesChatHoverCard {
                         : LostTalesChatVisualStyle.removeColorCodes(
                                 part.getUnformattedTextForChat()).trim();
                 boolean inSpan = identitySpan;
-                if (isReplyIdentity(part) && !identitySpan) {
+                if (ChatSenderSpan.isSenderName(part) && !identitySpan) {
                     // A player's opening bracket carries the reply
                     // identity and starts the span.
                     identitySpan = true;
@@ -600,7 +599,7 @@ final class LostTalesChatHoverCard {
                     }
                     continue;
                 }
-                if (isReplyIdentity(part)) {
+                if (ChatSenderSpan.isSenderName(part)) {
                     // The brackets answer to the pointer as the name
                     // does, but they are not it. The name is the one
                     // that follows the head: the opening bracket comes
@@ -610,7 +609,7 @@ final class LostTalesChatHoverCard {
                     if (afterHead && identity.length() == 0) {
                         identity = LostTalesChatVisualStyle.removeColorCodes(
                                 part.getUnformattedTextForChat()).trim();
-                        account = replyAccount(part);
+                        account = ChatSenderSpan.accountOf(part);
                     }
                     continue;
                 }
@@ -633,22 +632,6 @@ final class LostTalesChatHoverCard {
                 : new Target(marker.senderId, marker.accountIdentity,
                         marker.skinId, identity, title, account,
                         marker.nameColor);
-    }
-
-    private static boolean isReplyIdentity(IChatComponent part) {
-        ClickEvent click = part == null || part.getChatStyle() == null
-                ? null : part.getChatStyle().getChatClickEvent();
-        return click != null
-                && click.getAction() == ClickEvent.Action.SUGGEST_COMMAND
-                && click.getValue() != null
-                && click.getValue().startsWith("/msg ");
-    }
-
-    private static String replyAccount(IChatComponent part) {
-        String value = part.getChatStyle().getChatClickEvent().getValue();
-        String account = value.substring("/msg ".length()).trim();
-        int space = account.indexOf(' ');
-        return space < 0 ? account : account.substring(0, space);
     }
 
     /**

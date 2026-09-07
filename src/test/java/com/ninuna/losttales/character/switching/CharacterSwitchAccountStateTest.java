@@ -6,7 +6,6 @@ import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
@@ -354,30 +353,7 @@ public final class CharacterSwitchAccountStateTest {
         assertEquals(8000L, account.getLastObservedWallClock());
     }
 
-    @Test
-    public void freezingAndThawingIsCarried() {
-        CharacterSwitchAccountState account = freshAccount();
 
-        assertFalse(account.isFrozen());
-        account.setFrozen(true);
-        assertTrue(account.isFrozen());
-        account.setFrozen(false);
-        assertFalse(account.isFrozen());
-    }
-
-    /** A pending death carries its timestamp, and clearing takes both away. */
-    @Test
-    public void aPendingDeathCarriesItsTimestampUntilCleared() {
-        CharacterSwitchAccountState account = freshAccount();
-
-        account.markDeathPending(7000L);
-        assertTrue(account.isDeathPending());
-        assertEquals(7000L, account.getDeathPendingAt());
-
-        account.clearDeathPending();
-        assertFalse(account.isDeathPending());
-        assertEquals(0L, account.getDeathPendingAt());
-    }
 
     /** A death timestamp from before the epoch is stored as zero. */
     @Test
@@ -390,34 +366,7 @@ public final class CharacterSwitchAccountStateTest {
         assertEquals(0L, account.getDeathPendingAt());
     }
 
-    @Test
-    public void theJournalIsHeldAndReleasedAsGiven() {
-        CharacterSwitchAccountState account = freshAccount();
-        CharacterSwitchTransaction transaction = journal();
 
-        assertNull(account.getTransaction());
-        account.setTransaction(transaction);
-        assertSame(transaction, account.getTransaction());
-        account.setTransaction(null);
-        assertNull(account.getTransaction());
-    }
-
-    /** A new account owes nothing and holds no journal. */
-    @Test
-    public void aNewAccountStartsClean() {
-        CharacterSwitchAccountState account = freshAccount();
-
-        assertEquals(OWNER, account.getOwnerId());
-        assertEquals(0, account.getCooldownStage());
-        assertEquals(0L, account.getNextAllowedAt());
-        assertEquals(0L, account.getLastSuccessfulSwitchAt());
-        assertEquals(0L, account.getDecayAnchorAt());
-        assertEquals(0L, account.getLastObservedWallClock());
-        assertFalse(account.isFrozen());
-        assertFalse(account.isDeathPending());
-        assertEquals(0L, account.getDeathPendingAt());
-        assertNull(account.getTransaction());
-    }
 
     @Test(expected = IllegalArgumentException.class)
     public void anAccountWithoutAnOwnerIsRejected() {

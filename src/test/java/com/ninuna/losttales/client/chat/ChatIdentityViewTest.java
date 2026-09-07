@@ -36,6 +36,7 @@ public final class ChatIdentityViewTest {
     public void tearDown() {
         ClientChatAppearances.clear();
         ClientCharacterRosterCache.clear();
+        ClientChatChannelViews.clear();
     }
 
     private static final UUID CIRION =
@@ -127,6 +128,75 @@ public final class ChatIdentityViewTest {
         assertTrue(ChatLineFilter.of(row).accepts(rohan));
         assertFalse("Gondor's lines are no longer shown under it",
                 ChatLineFilter.of(row).accepts(gondor));
+    }
+
+    /**
+     * A conversation's unread state is found by the row that stands for
+     * it. The line arrives under its own conversation tab while the
+     * window, the tab bar and the renderer all ask about the row, so the
+     * two have to be one key or the divider is written where nothing
+     * reads it.
+     */
+    @Test
+    public void aScopedChannelsUnreadStateIsFoundByItsRow() {
+        roster();
+        ChatTab row = ChatTab.of(ChatChannel.FACTION);
+        ChatTab gondor = ChatTab.of(ChatChannel.FACTION, GONDOR);
+        assertNotEquals("the line's tab is not the row's", gondor, row);
+
+        // A faction line arrives while another tab is in front.
+        ClientChatChannelViews.record(41, gondor,
+                ChatTab.of(ChatChannel.ALL), false);
+
+        assertEquals(Integer.valueOf(41),
+                ClientChatChannelViews.unreadDividerLine(row));
+        assertEquals(1, ClientChatChannelViews.unreadCount(row));
+        assertTrue(ClientChatChannelViews.hasUnread(row));
+    }
+
+    /**
+     * The same for a line that arrives while the conversation is open but
+     * scrolled back: it is counted on the jump-to-present button, which
+     * asks by the row.
+     */
+    @Test
+    public void aScopedChannelCountsWhatArrivedWhileItWasScrolledBack() {
+        roster();
+        ChatTab row = ChatTab.of(ChatChannel.FACTION);
+        ChatTab gondor = ChatTab.of(ChatChannel.FACTION, GONDOR);
+        ClientChatChannelViews.scroll(row, 5, 100, 10.0D);
+        assertTrue("the view is scrolled back",
+                ClientChatChannelViews.getScroll(row, 100, 10.0D) > 0.0D);
+
+        ClientChatChannelViews.record(42, gondor, row, false);
+
+        assertEquals(1, ClientChatChannelViews.waitingBelow(row));
+        assertEquals(Integer.valueOf(42),
+                ClientChatChannelViews.unreadDividerLine(row));
+        assertEquals("it is not unread; it is waiting below",
+                0, ClientChatChannelViews.unreadCount(row));
+    }
+
+    /**
+     * Reading as the other identity is reading another conversation, and
+     * its unread state is that conversation's own.
+     */
+    @Test
+    public void eachConversationKeepsItsOwnUnreadState() {
+        roster();
+        ChatTab row = ChatTab.of(ChatChannel.FACTION);
+        ClientChatChannelViews.record(43,
+                ChatTab.of(ChatChannel.FACTION, GONDOR),
+                ChatTab.of(ChatChannel.ALL), false);
+        assertEquals(1, ClientChatChannelViews.unreadCount(row));
+
+        ClientChatAppearances.select(appearanceOf(BEREN), row);
+        assertEquals("Rohan's conversation has heard nothing",
+                0, ClientChatChannelViews.unreadCount(row));
+
+        ClientChatAppearances.select(appearanceOf(ALDRIC), row);
+        assertEquals("Gondor's is still waiting to be read",
+                1, ClientChatChannelViews.unreadCount(row));
     }
 
     /** A channel that is one conversation is unmoved by any of it. */

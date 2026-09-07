@@ -1,5 +1,6 @@
 package com.ninuna.losttales.network.server;
 
+import com.ninuna.losttales.DedicatedServerIsolation;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
@@ -22,73 +23,44 @@ import com.ninuna.losttales.network.packet.LostTalesChatHistorySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPacket;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.Charset;
 import org.junit.Test;
-
-import static org.junit.Assert.assertFalse;
 
 /** Common chat routing and packet classes must remain loadable without client code. */
 public final class ChatDedicatedServerIsolationTest {
-    private static final Charset CLASS_FILE_TEXT =
-            Charset.forName("ISO-8859-1");
 
     @Test
     public void commonChatClassesDoNotReferenceMinecraftClient() throws Exception {
-        assertNoClientReference(ChatChannel.class);
-        assertNoClientReference(LostTalesChatService.class);
-        assertNoClientReference(LostTalesChatSendPacket.class);
-        assertNoClientReference(LostTalesChatSendPacket.Handler.class);
-        assertNoClientReference(LostTalesChatMessagePacket.class);
-        assertNoClientReference(LostTalesChatMessagePacket.Handler.class);
-        assertNoClientReference(LostTalesChatHistorySyncPacket.class);
-        assertNoClientReference(LostTalesChatHistorySyncPacket.Handler.class);
-        assertNoClientReference(ChatHistory.class);
-        assertNoClientReference(ChatHistory.Audience.class);
-        assertNoClientReference(ChatHistory.Requester.class);
-        assertNoClientReference(ChatConsoleEvent.class);
-        assertNoClientReference(ChatConsoleStream.class);
-        assertNoClientReference(ChatConsoleCommandHandler.class);
-        assertNoClientReference(LostTalesChatConsoleSyncPacket.class);
-        assertNoClientReference(LostTalesChatConsoleSyncPacket.Handler.class);
-        assertNoClientReference(ChatEmoji.class);
-        assertNoClientReference(ChatEmojiParser.class);
-        assertNoClientReference(ChatEmojiParser.Segment.class);
-        assertNoClientReference(ChatFormattingCodes.class);
-        assertNoClientReference(ChatMentions.class);
-        assertNoClientReference(ChatMentionCandidate.class);
-        assertNoClientReference(ChatNameSuggester.class);
-        assertNoClientReference(ChatShareTokenParser.class);
-        assertNoClientReference(ChatShareKind.class);
-        assertNoClientReference(ChatShareReference.class);
-        assertNoClientReference(ChatShareTokenParser.Token.class);
-        assertNoClientReference(ChatShareSuggester.class);
-        assertNoClientReference(ChatShowcase.class);
-        assertNoClientReference(CharacterAppearanceSyncPacket.class);
-    }
-
-    private static void assertNoClientReference(Class<?> type)
-            throws IOException {
-        String path = '/' + type.getName().replace('.', '/') + ".class";
-        InputStream input = type.getResourceAsStream(path);
-        if (input == null) {
-            throw new IOException("Missing class resource " + path);
-        }
-        try {
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            byte[] buffer = new byte[4096];
-            int read;
-            while ((read = input.read(buffer)) >= 0) {
-                output.write(buffer, 0, read);
-            }
-            String constants = new String(
-                    output.toByteArray(), CLASS_FILE_TEXT);
-            assertFalse(type.getName() + " references client classes",
-                    constants.contains("net/minecraft/client"));
-        } finally {
-            input.close();
-        }
+        DedicatedServerIsolation.assertServerSafe(
+                ChatChannel.class,
+                LostTalesChatService.class,
+                LostTalesChatSendPacket.class,
+                LostTalesChatSendPacket.Handler.class,
+                LostTalesChatMessagePacket.class,
+                LostTalesChatMessagePacket.Handler.class,
+                LostTalesChatHistorySyncPacket.class,
+                LostTalesChatHistorySyncPacket.Handler.class,
+                ChatHistory.class,
+                ChatHistory.Audience.class,
+                ChatHistory.Requester.class,
+                ChatConsoleEvent.class,
+                ChatConsoleStream.class,
+                ChatConsoleCommandHandler.class,
+                LostTalesChatConsoleSyncPacket.class,
+                LostTalesChatConsoleSyncPacket.Handler.class,
+                ChatEmoji.class,
+                ChatEmojiParser.class,
+                ChatEmojiParser.Segment.class,
+                ChatFormattingCodes.class,
+                ChatMentions.class,
+                ChatMentionCandidate.class,
+                ChatNameSuggester.class,
+                ChatShareTokenParser.class,
+                ChatShareKind.class,
+                ChatShareReference.class,
+                ChatShareTokenParser.Token.class,
+                ChatShareSuggester.class,
+                ChatShowcase.class,
+                CharacterAppearanceSyncPacket.class);
     }
 }
