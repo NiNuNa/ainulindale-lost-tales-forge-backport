@@ -122,6 +122,12 @@ public final class CharacterDataMigrator {
                     // stored apart from the sex, derived from it when missing.
                     return 8;
                 }
+                if (version == 8) {
+                    // Character v9 adds Kind. A record written before it
+                    // is a roleplay character, which is what every record
+                    // that existed then was.
+                    return 9;
+                }
                 break;
             case PROGRESSION:
                 if (version == 0) {

@@ -111,8 +111,8 @@ public final class ClientChatChannelStateTest {
         assertEquals(ChatChannel.CONSOLE, ClientChatChannelState.cycle().getChannel());
         assertFalse(ClientChatChannelState.canSend(ChatChannel.ADMIN));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.CONSOLE));
-        // The server's word arrives as gate masks: every channel open here.
-        ClientChatChannelState.setChannelGates(-1, -1);
+        // The server's word arrives as channel ids: every channel open here.
+        ClientChatChannelState.setChannelGates(allChannelIds(), allChannelIds());
         ClientChatChannelState.setAdminAccess(true);
         assertEquals(java.util.Arrays.asList(ChatChannel.ALL,
                 ChatChannel.PROXIMITY, ChatChannel.OOC, ChatChannel.ADMIN,
@@ -120,8 +120,9 @@ public final class ClientChatChannelStateTest {
                 ClientChatChannelState.getAvailableChannels());
         ClientChatChannelState.select(ChatChannel.ADMIN);
         ClientChatChannelState.setAdminAccess(false);
-        ClientChatChannelState.setChannelGates(-1 & ~(1 << ChatChannel.ADMIN.ordinal()),
-                -1 & ~(1 << ChatChannel.ADMIN.ordinal()));
+        ClientChatChannelState.setChannelGates(
+                everyChannelExcept(ChatChannel.ADMIN),
+                everyChannelExcept(ChatChannel.ADMIN));
         // Losing op status drops the selection back to a channel the
         // player can talk in: Global, sendable with the account now.
         assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
@@ -308,5 +309,21 @@ public final class ClientChatChannelStateTest {
                 Collections.singletonList(character));
         ClientCharacterRosterCache.acceptRoster(0, snapshot);
         return characterId;
+    }
+
+    /** Every channel this build knows, as the access packet states them. */
+    private static java.util.List<String> allChannelIds() {
+        java.util.List<String> ids = new java.util.ArrayList<String>();
+        for (ChatChannel channel : ChatChannel.values()) {
+            ids.add(channel.getId());
+        }
+        return ids;
+    }
+
+    /** Every channel but the one named, for a gate that closes just it. */
+    private static java.util.List<String> everyChannelExcept(ChatChannel closed) {
+        java.util.List<String> ids = allChannelIds();
+        ids.remove(closed.getId());
+        return ids;
     }
 }

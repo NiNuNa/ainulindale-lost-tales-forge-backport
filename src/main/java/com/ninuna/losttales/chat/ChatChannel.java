@@ -1,10 +1,13 @@
 package com.ninuna.losttales.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Small stable channel catalogue shared by packet validation and client UI.
@@ -18,24 +21,35 @@ import java.util.Locale;
  * no meaning of its own; the order channels are presented in is
  * {@link #presentationOrder()}.
  */
-public enum ChatChannel {
-    ALL("all", "Global", ChatPresentationMode.IN_CHARACTER,
+public final class ChatChannel {
+
+    /**
+     * Every channel in force, by id, in the order they were registered.
+     * The built-ins register as this class is first read; a server may
+     * register its own beside them, and everything that walks the
+     * channels walks this rather than a fixed set.
+     */
+    private static final Map<String, ChatChannel> BY_ID =
+            new LinkedHashMap<String, ChatChannel>();
+
+    public static final ChatChannel ALL = register("all", "Global", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.FERN_GREEN), true),
-    PROXIMITY("proximity", "Proximity", ChatPresentationMode.IN_CHARACTER,
+            LostTalesColors.rgb(LostTalesColors.FERN_GREEN), true);
+    public static final ChatChannel PROXIMITY = register("proximity", "Proximity", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.PROXIMITY, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN), true),
+            LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN), true);
     // Presentation shows the member's own party colour; this seafoam is
     // only the fallback outside a party.
-    PARTY("party", "Party", ChatPresentationMode.IN_CHARACTER,
+    public static final ChatChannel PARTY = register("party", "Party", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.PARTY, ChatChannelAccess.PARTY_MEMBERSHIP,
-            LostTalesColors.rgb(LostTalesColors.SEAFOAM), false),
+            LostTalesColors.rgb(LostTalesColors.SEAFOAM), false,
+            ChatChannelScope.PARTY);
     // Presentation shows the sender's LOTR faction colour; this palette
     // honey is only the indicator/selector fallback.
-    FACTION("faction", "Faction", ChatPresentationMode.IN_CHARACTER,
+    public static final ChatChannel FACTION = register("faction", "Faction", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.FACTION, ChatChannelAccess.CHARACTER_FACTION,
             LostTalesColors.rgb(LostTalesColors.HONEY), true,
-            ChatChannelScope.FACTION),
+            ChatChannelScope.FACTION);
     /**
      * Out-of-character conversation, and the channel the Discord bridge
      * carries by default: out of character, everyone online reads it,
@@ -43,34 +57,36 @@ public enum ChatChannel {
      * older build kept a Discord channel of its own beside it; its id
      * still resolves here, see {@link #fromId}.
      */
-    OOC("ooc", "OOC & Discord", ChatPresentationMode.OUT_OF_CHARACTER,
+    public static final ChatChannel OOC = register("ooc", "OOC & Discord", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.STEEL_BLUE), true),
+            LostTalesColors.rgb(LostTalesColors.STEEL_BLUE), true);
     /** Staff channel: operators only, out of character; the wire id stays. */
-    ADMIN("admin", "Operator", ChatPresentationMode.OUT_OF_CHARACTER,
+    public static final ChatChannel ADMIN = register("admin", "Operator", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.OPERATORS, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.CRIMSON), true),
+            LostTalesColors.rgb(LostTalesColors.CRIMSON), true);
     /**
      * The player's private console: what only they see anyway — command
      * output, fast-travel countdowns, other mods' notices — plus anything
      * they type there, which is echoed back to them alone.
      */
-    CONSOLE("console", "Console", ChatPresentationMode.OUT_OF_CHARACTER,
+    public static final ChatChannel CONSOLE = register("console", "Console", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.SELF, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.MAUVE), false),
+            LostTalesColors.rgb(LostTalesColors.MAUVE), false);
     /**
      * A private conversation between two players, in character. Not a tab of its own:
      * every whisper partner is one tab on this channel, and the client
      * keeps them apart by the partner's name.
      */
-    WHISPER("whisper", "Whisper", ChatPresentationMode.IN_CHARACTER,
+    public static final ChatChannel WHISPER = register("whisper", "Whisper", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.WHISPER, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.APRICOT), false);
 
-    /** Tab, indicator, and cycle order: the two global channels bracket
-     *  the scoped role-play ones, then Party, staff, and the console.
-     *  Whispers are not listed: their tabs exist per conversation. */
-    private static final List<ChatChannel> PRESENTATION_ORDER =
+    /** Tab, indicator, and cycle order for the built-in channels: the two
+     *  global ones bracket the scoped role-play ones, then Party, staff,
+     *  and the console. Whispers are not listed: their tabs exist per
+     *  conversation. Anything registered besides these follows them, in
+     *  the order it was registered. */
+    private static final List<ChatChannel> BUILT_IN_ORDER =
             Collections.unmodifiableList(Arrays.asList(
                     ALL, PROXIMITY, FACTION, OOC, PARTY, ADMIN, CONSOLE));
 
@@ -83,25 +99,94 @@ public enum ChatChannel {
      */
     private static final String LEGACY_DISCORD_ID = "discord";
 
+    /** The ids that are the code's own and are never taken out of force. */
+    private static final java.util.Set<String> BUILT_IN_IDS =
+            Collections.unmodifiableSet(
+                    new java.util.LinkedHashSet<String>(BY_ID.keySet()));
+
     private final ChatChannelDescriptor descriptor;
 
-    ChatChannel(String id, String displayName,
-                ChatPresentationMode presentation,
-                ChatRecipientRule recipientRule,
-                ChatChannelAccess access, int displayColor,
-                boolean bridgeable) {
-        this(id, displayName, presentation, recipientRule, access, displayColor,
-                bridgeable, ChatChannelScope.NONE);
+    private ChatChannel(ChatChannelDescriptor descriptor) {
+        this.descriptor = descriptor;
     }
 
-    ChatChannel(String id, String displayName,
-                ChatPresentationMode presentation,
-                ChatRecipientRule recipientRule,
-                ChatChannelAccess access, int displayColor,
-                boolean bridgeable, ChatChannelScope scope) {
-        this.descriptor = new ChatChannelDescriptor(id, displayName,
-                presentation, recipientRule, access, displayColor,
-                bridgeable, scope);
+    private static ChatChannel register(String id, String displayName,
+                                        ChatPresentationMode presentation,
+                                        ChatRecipientRule recipientRule,
+                                        ChatChannelAccess access,
+                                        int displayColor, boolean bridgeable) {
+        return register(id, displayName, presentation, recipientRule, access,
+                displayColor, bridgeable, ChatChannelScope.NONE);
+    }
+
+    private static ChatChannel register(String id, String displayName,
+                                        ChatPresentationMode presentation,
+                                        ChatRecipientRule recipientRule,
+                                        ChatChannelAccess access,
+                                        int displayColor, boolean bridgeable,
+                                        ChatChannelScope scope) {
+        return register(new ChatChannelDescriptor(id, displayName, presentation,
+                recipientRule, access, displayColor, bridgeable, scope));
+    }
+
+    /**
+     * Puts a channel in force. The id is what everything names it by —
+     * packets, the layout file, the config — so registering one twice is
+     * a mistake in whatever described it, not a channel to be replaced.
+     */
+    public static synchronized ChatChannel register(
+            ChatChannelDescriptor descriptor) {
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+        String key = descriptor.getId().toLowerCase(Locale.ROOT);
+        if (BY_ID.containsKey(key)) {
+            throw new IllegalStateException(
+                    "chat channel " + key + " is already registered");
+        }
+        ChatChannel channel = new ChatChannel(descriptor);
+        BY_ID.put(key, channel);
+        return channel;
+    }
+
+    /**
+     * The built-in channels and nothing else. Every reload of the config
+     * starts here: a channel a server defined is in force only while its
+     * file says so, and registering the same id twice is refused, so the
+     * set has to be put back before it is read again.
+     */
+    public static synchronized void resetToBuiltIn() {
+        BY_ID.keySet().retainAll(BUILT_IN_IDS);
+    }
+
+    /** Whether the channel is one of the code's own rather than a config's. */
+    public static synchronized boolean isBuiltIn(ChatChannel channel) {
+        return channel != null && BUILT_IN_IDS.contains(
+                channel.getId().toLowerCase(Locale.ROOT));
+    }
+
+    /** Every channel in force, in the order they were registered. */
+    public static synchronized ChatChannel[] values() {
+        return BY_ID.values().toArray(new ChatChannel[BY_ID.size()]);
+    }
+
+    /**
+     * The constant's own name, for a log line or a test that needs to say
+     * which channel it means. A channel a server defined has none of its
+     * own and answers with its id.
+     */
+    public String name() {
+        for (java.lang.reflect.Field field : ChatChannel.class.getFields()) {
+            try {
+                if (field.getType() == ChatChannel.class
+                        && field.get(null) == this) {
+                    return field.getName();
+                }
+            } catch (IllegalAccessException unreadable) {
+                break;
+            }
+        }
+        return getId();
     }
 
     public String getId() { return this.descriptor.getId(); }
@@ -122,13 +207,24 @@ public enum ChatChannel {
     /** What tells one conversation on the channel from another. */
     public ChatChannelScope getScope() { return this.descriptor.getScope(); }
     /** Whether a tab here carries the identity it is read as. */
-    public boolean isIdentityScoped() { return this.descriptor.getScope().isIdentityScoped(); }
+    public boolean isScoped() { return this.descriptor.getScope().isScoped(); }
     /** The channel as the facts that describe it. */
     public ChatChannelDescriptor getDescriptor() { return this.descriptor; }
 
-    /** Every channel in the order the client presents them. */
-    public static List<ChatChannel> presentationOrder() {
-        return PRESENTATION_ORDER;
+    /**
+     * Every channel in the order the client presents them: the built-ins
+     * in the order chosen for them, then anything a server registered, in
+     * the order it did. Whispers are left out, as their tabs are one per
+     * conversation rather than one for the channel.
+     */
+    public static synchronized List<ChatChannel> presentationOrder() {
+        List<ChatChannel> order = new ArrayList<ChatChannel>(BUILT_IN_ORDER);
+        for (ChatChannel channel : BY_ID.values()) {
+            if (channel != WHISPER && !order.contains(channel)) {
+                order.add(channel);
+            }
+        }
+        return Collections.unmodifiableList(order);
     }
 
     /**

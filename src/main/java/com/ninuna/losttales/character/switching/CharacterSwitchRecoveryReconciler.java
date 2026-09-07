@@ -72,6 +72,31 @@ public final class CharacterSwitchRecoveryReconciler {
         return second.getErrorId() == CharacterErrorId.NONE ? second : first;
     }
 
+    /**
+     * Whether the journal still describes work the live player has to be
+     * reconciled against, from its status alone.
+     *
+     * <p>An {@code ABORTED} journal describes a switch whose rollback
+     * already put the player back on the source, and a
+     * {@code RECOVERY_REQUIRED} one describes an attempt that failed
+     * part-way and is held for an operator. Applying either journal's
+     * generation again would replace the state the player is on with the
+     * state they were on when the attempt was made — for a
+     * {@code RECOVERY_REQUIRED} journal by repeating the failure that
+     * marked it, on every login. Both are answered here rather than by
+     * {@link #decide}, because they are true whichever identity the
+     * roster ended up on.</p>
+     */
+    public static boolean requiresLiveReconciliation(
+            CharacterSwitchTransaction transaction) {
+        if (transaction == null) {
+            return false;
+        }
+        CharacterSwitchTransactionStatus status = transaction.getStatus();
+        return status != CharacterSwitchTransactionStatus.ABORTED
+                && status != CharacterSwitchTransactionStatus.RECOVERY_REQUIRED;
+    }
+
     public static Action decide(UUID activeCharacterId,
                                 CharacterSwitchTransaction transaction) {
         if (transaction == null) {

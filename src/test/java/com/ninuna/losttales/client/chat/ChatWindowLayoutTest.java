@@ -4,7 +4,6 @@ import com.ninuna.losttales.chat.ChatChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.List;
 import org.junit.After;
 import org.junit.Before;
@@ -664,8 +663,8 @@ public final class ChatWindowLayoutTest {
                 Collections.<ChatChannel>emptyList(), null, false, 0.0D, 0.0D));
         specs.add(new ChatWindowLayout.WindowSpec("w3",
                 Arrays.asList(ChatChannel.FACTION), null, false, 0.0D, 0.0D));
-        ChatWindowLayout.load(specs, EnumSet.of(ChatChannel.ADMIN),
-                EnumSet.of(ChatChannel.OOC, ChatChannel.ADMIN), 120.0D,
+        ChatWindowLayout.load(specs, channels(ChatChannel.ADMIN),
+                channels(ChatChannel.OOC, ChatChannel.ADMIN), 120.0D,
                 33.0D);
         assertEquals(100.0D, ChatWindowLayout.feedOffsetX(), 0.0D);
         assertEquals(33.0D, ChatWindowLayout.feedOffsetY(), 0.0D);
@@ -702,14 +701,14 @@ public final class ChatWindowLayoutTest {
     @Test
     public void loadWithNothingUsableFallsBackSensibly() {
         ChatWindowLayout.load(Collections.<ChatWindowLayout.WindowSpec>emptyList(),
-                EnumSet.allOf(ChatChannel.class), null, 0.0D, 100.0D);
+                channels(ChatChannel.values()), null, 0.0D, 100.0D);
         // Everything closed is a layout of its own: the file described
         // no window, so none is opened.
         assertTrue(ChatWindowLayout.isEmpty());
         assertNull(ChatWindowLayout.firstWindow());
         assertEquals(0.0D, ChatWindowLayout.feedOffsetX(), 0.0D);
         ChatWindowLayout.load(Collections.<ChatWindowLayout.WindowSpec>emptyList(),
-                EnumSet.of(ChatChannel.ADMIN), null, 0.0D, 100.0D);
+                channels(ChatChannel.ADMIN), null, 0.0D, 100.0D);
         // No windows at all: one window with everything still open.
         assertEquals(1, ChatWindowLayout.windows().size());
         ChatWindow only = ChatWindowLayout.firstWindow();
@@ -719,5 +718,10 @@ public final class ChatWindowLayoutTest {
                 ChatChannel.CONSOLE), only.getChannels());
         assertEquals(ChatChannel.ALL, only.getActiveChannel());
         assertEquals(100.0D, only.getOffsetY(), 0.0D);
+    }
+
+    /** A set of channels, now that they are not an enum. */
+    private static java.util.Set<ChatChannel> channels(ChatChannel... members) {
+        return new java.util.LinkedHashSet<ChatChannel>(Arrays.asList(members));
     }
 }

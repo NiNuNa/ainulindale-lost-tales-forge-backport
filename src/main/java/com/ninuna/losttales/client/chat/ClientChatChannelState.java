@@ -6,6 +6,7 @@ import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatRoleConfig;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatChannelGates;
+import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
@@ -17,6 +18,7 @@ import com.ninuna.losttales.compat.lotr.LotrFactionColors;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.party.model.PartyColor;
 import com.ninuna.losttales.party.sync.PartyMemberSnapshot;
+import com.ninuna.losttales.party.sync.PartySnapshot;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -86,13 +88,20 @@ public final class ClientChatChannelState {
      * The gates before the server's first word: what a fresh server file
      * states, read for a player with no role — the Operator channel
      * closed, everything else open. Once the access packet arrives the
-     * server's own masks replace them.
+     * server's own answer replaces them.
      */
-    private static final int DEFAULT_READABLE = seededGateMask(true);
-    private static final int DEFAULT_SENDABLE = seededGateMask(false);
-    /** Server-stated channel gates for this player, one bit per channel. */
-    private static int readableChannels = DEFAULT_READABLE;
-    private static int sendableChannels = DEFAULT_SENDABLE;
+    private static final java.util.Set<String> DEFAULT_READABLE =
+            seededGates(true);
+    private static final java.util.Set<String> DEFAULT_SENDABLE =
+            seededGates(false);
+    /**
+     * The channels the server last said this player may read and send
+     * into, by channel id. Ids rather than positions: a channel's id is
+     * its wire surface, while the order the constants are declared in
+     * carries no meaning and is not sent.
+     */
+    private static java.util.Set<String> readableChannels = DEFAULT_READABLE;
+    private static java.util.Set<String> sendableChannels = DEFAULT_SENDABLE;
     /** Server-stated muted senders; filled for operators only. */
     private static final java.util.Set<UUID> MUTED_SENDERS =
             new java.util.HashSet<UUID>();
@@ -363,33 +372,52 @@ public final class ClientChatChannelState {
     }
 
     /** Whether the server's gate for this player lets the channel be used. */
-    private static boolean isGateOpen(int gates, ChatChannel channel) {
-        int bit = channel.ordinal();
-        return bit >= 32 || (gates & (1 << bit)) != 0;
+    private static boolean isGateOpen(java.util.Set<String> gates,
+                                      ChatChannel channel) {
+        return gates.contains(channel.getId());
     }
 
-    /** One bit per channel the seeded gates leave open to a player with no role. */
-    private static int seededGateMask(boolean read) {
+    /** The channels the seeded gates leave open to a player with no role. */
+    private static java.util.Set<String> seededGates(boolean read) {
         ChatChannelGates seeded = ChatRoleConfig.parseGates(
                 new String[] {ChatRoleConfig.DEFAULT_ADMIN_GATE},
                 ChatRoleCatalog.builtIn(), ChatRoleConfig.SILENT);
-        int mask = 0;
-        ChatChannel[] channels = ChatChannel.values();
-        for (int index = 0; index < channels.length && index < 32; index++) {
-            boolean open = read ? seeded.canRead(0, channels[index])
-                    : seeded.canSend(0, channels[index]);
-            if (open) {
-                mask |= 1 << index;
+        java.util.Set<String> open = new java.util.HashSet<String>();
+        for (ChatChannel channel : ChatChannel.values()) {
+            boolean allowed = read ? seeded.canRead(0, channel)
+                    : seeded.canSend(0, channel);
+            if (allowed) {
+                open.add(channel.getId());
             }
         }
-        return mask;
+        return java.util.Collections.unmodifiableSet(open);
     }
 
-    /** The server's word on the channels this player may read and send into. */
-    public static synchronized void setChannelGates(int readable, int sendable) {
-        readableChannels = readable;
-        sendableChannels = sendable;
+    /**
+     * The server's word on the channels this player may read and send
+     * into, by id. A channel the server did not name is closed: a client
+     * never decides a gate for itself, and a channel this build does not
+     * know is not one it can show anyway.
+     */
+    public static synchronized void setChannelGates(
+            java.util.Collection<String> readable,
+            java.util.Collection<String> sendable) {
+        readableChannels = idSet(readable);
+        sendableChannels = idSet(sendable);
         ensureAvailable();
+    }
+
+    private static java.util.Set<String> idSet(
+            java.util.Collection<String> ids) {
+        java.util.Set<String> copy = new java.util.HashSet<String>();
+        if (ids != null) {
+            for (String id : ids) {
+                if (id != null && id.length() > 0) {
+                    copy.add(id.trim().toLowerCase(java.util.Locale.ROOT));
+                }
+            }
+        }
+        return java.util.Collections.unmodifiableSet(copy);
     }
 
     public static synchronized boolean canSend(ChatTab tab) {
@@ -548,18 +576,9 @@ public final class ClientChatChannelState {
         return channel.getDisplayColor();
     }
 
-    /** The chat's RGB for a party colour, as the party screens map it. */
+    /** The RGB a party colour is drawn in, which the colour itself says. */
     private static int partyColorRgb(PartyColor color) {
-        if (color == PartyColor.GREEN) {
-            return LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN);
-        }
-        if (color == PartyColor.YELLOW) {
-            return LostTalesColors.rgb(LostTalesColors.HONEY);
-        }
-        if (color == PartyColor.PURPLE) {
-            return LostTalesColors.rgb(LostTalesColors.ORCHID);
-        }
-        return LostTalesColors.rgb(LostTalesColors.SEAFOAM);
+        return color == null ? PartyColor.GREEN.getRgb() : color.getRgb();
     }
 
     /** Visible label for a tab: the partner's name for a whisper —
@@ -857,31 +876,35 @@ public final class ClientChatChannelState {
      * routing does.
      */
     /**
-     * Which of this player's identities reads a line said in one
-     * conversation of a scoped channel: the character in that faction,
-     * by its id, or the account's empty key when the channel is only
-     * ever one conversation. A conversation nothing of this player's is
-     * in — which the server does not send — files under the plain tab,
-     * where it is counted and not shown.
+     * The conversation of a scoped channel this player is reading.
+     *
+     * <p>Which identity decides it is the scope's own rule. A faction's
+     * talk follows the identity the chat is <em>read</em> as: an account
+     * may read the talk of any faction it has a character in, whichever
+     * character it is playing. A party's follows the identity being
+     * <em>played</em>: membership is that identity's, and the server
+     * sends a party's lines to nobody else, so there is no conversation
+     * to read as anyone else.</p>
+     *
+     * <p>Empty when the identity is in none, which leaves the row's tab
+     * showing nothing until one that is comes along.</p>
      */
-    public static synchronized String ownerKeyReading(ChatChannel channel,
-                                                      String scopeValue) {
-        if (channel == null || !channel.isIdentityScoped()
-                || scopeValue == null || scopeValue.length() == 0) {
+    public static synchronized String scopeKeyRead(ChatChannel channel) {
+        if (channel == null || !channel.isScoped()) {
             return "";
         }
-        CharacterRosterSnapshot roster = ClientCharacterRosterCache.getSnapshot();
-        if (roster == null) {
-            return "";
+        if (channel.getScope() == ChatChannelScope.PARTY) {
+            return playedPartyKey();
         }
-        for (CharacterSummary character : roster.getCharacters()) {
-            if (character != null && scopeValue.equals(
-                    LotrCharacterAdapter.normalizeFactionId(
-                            character.getStartingFactionId()))) {
-                return ChatTab.ownerKeyOf(character.getCharacterId());
-            }
-        }
-        return "";
+        return scopeOfIdentity(channel, ClientChatAppearances.viewIdentityKey());
+    }
+
+    /** The party the identity being played is in, by id; empty for none. */
+    private static String playedPartyKey() {
+        PartyStateSnapshot state = ClientPartyStateCache.getSnapshot();
+        PartySnapshot party = state == null ? null : state.getParty();
+        return party == null || party.getPartyId() == null
+                ? "" : party.getPartyId().toString();
     }
 
     /**
@@ -916,7 +939,7 @@ public final class ClientChatChannelState {
      */
     public static synchronized String scopeOfIdentity(ChatChannel channel,
                                                       String ownerKey) {
-        if (channel == null || !channel.isIdentityScoped()
+        if (channel == null || !channel.isScoped()
                 || ownerKey == null || ownerKey.length() == 0) {
             return "";
         }
@@ -940,9 +963,9 @@ public final class ClientChatChannelState {
      * selection and the composer point at.
      */
     public static synchronized ChatTab tabRead(ChatChannel channel) {
-        return channel == null || !channel.isIdentityScoped()
+        return channel == null || !channel.isScoped()
                 ? ChatTab.of(channel)
-                : ChatTab.of(channel, ClientChatAppearances.viewIdentityKey());
+                : ChatTab.of(channel, scopeKeyRead(channel));
     }
 
     public static synchronized String wornFactionId(ChatChannel channel) {

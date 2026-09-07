@@ -67,7 +67,10 @@ public final class LostTalesCharacterProfileRouterGui extends GuiScreen {
             return;
         }
         this.routed = true;
-        if (snapshot.getCharacterCount() == 0) {
+        // A player who has made nobody yet is shown the roster, where
+        // they can. The account's own identity is always on it and is not
+        // somebody they made, so it is not what decides this.
+        if (snapshot.getRoleplayCharacterCount() == 0) {
             this.mc.displayGuiScreen(new LostTalesCharacterRosterGui(this.parent));
         } else {
             this.mc.displayGuiScreen(new LostTalesCharacterInfoGui(this.parent));

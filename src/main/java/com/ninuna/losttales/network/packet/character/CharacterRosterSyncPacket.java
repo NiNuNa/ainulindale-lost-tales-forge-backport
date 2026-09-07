@@ -57,7 +57,9 @@ public final class CharacterRosterSyncPacket implements IMessage {
             Set<Integer> slots = new HashSet<Integer>();
             for (int index = 0; index < characterCount; index++) {
                 UUID characterId = CharacterPacketCodec.readUuid(buffer);
-                int slotIndex = buffer.readUnsignedByte();
+                // Signed: the default character sits in slot -1, and the
+                // nine a player fills encode the same either way.
+                int slotIndex = buffer.readByte();
                 String name = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_NAME_BYTES);
                 String raceId = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String genderId = CharacterPacketCodec.readString(

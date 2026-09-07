@@ -48,13 +48,27 @@ public final class LostTalesServerConfigService {
             return new ArrayList<ServerConfigEntry>();
         }
         return ServerConfigSnapshot.fromConfiguration(config,
-                ServerConfigSnapshot.CLIENT_CATEGORIES, ServerConfigSnapshot.SECRET_KEYS);
+                ServerConfigSnapshot.EXCLUDED_CATEGORIES,
+                ServerConfigSnapshot.SECRET_KEYS);
+    }
+
+    /** Why a category is not on the settings surface, for a refused change. */
+    private static String refusalReason(String category) {
+        String name = category == null ? "" : category.toLowerCase(Locale.ROOT);
+        if (ServerConfigSnapshot.CLIENT_CATEGORIES.contains(name)) {
+            return "a client setting, not the server's";
+        }
+        if (ServerConfigSnapshot.AUTHORIZATION_CATEGORIES.contains(name)) {
+            return "decides what players may do; edit it with /losttales role";
+        }
+        return "no such key";
     }
 
     /**
      * Validates and writes the changes, then reloads. A secret left empty
      * is kept as it is. A change naming a client key is refused: the
-     * server's file is not the place for it.
+     * server's file is not the place for it. So is one naming the roles or
+     * the channel gates, which are the role command's to edit.
      */
     public static ServerConfigApplyResult apply(List<ServerConfigChange> changes) {
         Configuration config = openFile();
@@ -63,7 +77,8 @@ public final class LostTalesServerConfigService {
                     "The server has no config file loaded.");
         }
         List<ServerConfigEntry> entries = ServerConfigSnapshot.fromConfiguration(config,
-                ServerConfigSnapshot.CLIENT_CATEGORIES, ServerConfigSnapshot.SECRET_KEYS);
+                ServerConfigSnapshot.EXCLUDED_CATEGORIES,
+                ServerConfigSnapshot.SECRET_KEYS);
         List<String> applied = new ArrayList<String>();
         List<ServerConfigApplyResult.Refusal> refused =
                 new ArrayList<ServerConfigApplyResult.Refusal>();
@@ -73,9 +88,7 @@ public final class LostTalesServerConfigService {
                     change.getCategory(), change.getKey());
             if (entry == null) {
                 refused.add(new ServerConfigApplyResult.Refusal(change.qualifiedName(),
-                        ServerConfigSnapshot.CLIENT_CATEGORIES.contains(
-                                change.getCategory().toLowerCase(Locale.ROOT))
-                                ? "a client setting, not the server's" : "no such key"));
+                        refusalReason(change.getCategory())));
                 continue;
             }
             if (entry.isSecret() && !change.isList() && change.getValue().length() == 0) {

@@ -11,6 +11,7 @@ import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.character.CharacterClientTaskQueue;
+import com.ninuna.losttales.client.character.CharacterTemplateStore;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
@@ -29,6 +30,7 @@ import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
 import com.ninuna.losttales.client.camera.ThirdPersonChargeFeedbackController;
 import com.ninuna.losttales.client.camera.CameraPresetFileStore;
 import com.ninuna.losttales.client.event.LostTalesClientEventHandler;
+import com.ninuna.losttales.client.gui.LostTalesMainMenuHandler;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationHandler;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
@@ -48,6 +50,9 @@ import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntit
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererStatue;
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererWaystone;
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererUrn;
+import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelDescriptor;
+import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.compat.minecraft.ModDisableabilityAccess;
 import com.ninuna.losttales.config.client.ClientServerConfigCache;
@@ -130,6 +135,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         ClientChatIgnores.initialize(clientFolder);
         ChatWindowLayoutStore.initialize(clientFolder);
         LostTalesClientMapMarkerUsageStore.initialize(clientFolder);
+        CharacterTemplateStore.initialize(clientFolder);
         LostTalesThirdPersonConfig.load(
                 event.getModConfigurationDirectory());
         ThirdPersonCameraRuntime.resetSession();
@@ -149,6 +155,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(characterClientTaskQueue);
         FMLCommonHandler.instance().bus().register(guiAnimationHandler);
         FMLCommonHandler.instance().bus().register(new LostTalesConfigGuiEventHandler());
+        MinecraftForge.EVENT_BUS.register(new LostTalesMainMenuHandler());
         ELostTalesMapLabels.initAndRegisterMapLabels();
 
         GeoArmorRenderer.registerArmorRenderer(LostTalesItemArmor3D.class, new LostTalesItemRendererArmor3D());
@@ -501,6 +508,21 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                 ClientChatAccountRoles.clear();
             }
             ChatRoleCatalog.install(catalog);
+            // The channels this server has of its own, put in force
+            // before the gates below name them. Starting from the
+            // built-ins each time means a server that has dropped one
+            // stops this client showing it.
+            ChatChannel.resetToBuiltIn();
+            for (ChatChannelDescriptor defined : packet.getDefinedChannels()) {
+                try {
+                    ChatChannel.register(defined);
+                } catch (RuntimeException refused) {
+                    FMLLog.warning("[%s] The server named a channel this client "
+                                    + "cannot put in force (%s): %s",
+                            LostTalesMetaData.MOD_ID, defined.getId(),
+                            refused.toString());
+                }
+            }
             ClientChatChannelState.setChannelGates(
                     packet.getReadableChannels(), packet.getSendableChannels());
             ClientChatChannelState.setAdminAccess(packet.hasAdminAccess());

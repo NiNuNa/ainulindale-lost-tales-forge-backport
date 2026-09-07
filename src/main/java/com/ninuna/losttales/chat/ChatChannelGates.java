@@ -125,6 +125,16 @@ public final class ChatChannelGates {
         return gateOf(channel).asksAnything();
     }
 
+    /**
+     * Whether the config named this channel at all, which is not the same
+     * as gating it: an entry saying {@code any} on both sides is a
+     * decision that the channel is open, while no entry is the file
+     * saying nothing about it.
+     */
+    public boolean hasEntry(ChatChannel channel) {
+        return channel != null && this.gates.containsKey(channel);
+    }
+
     private static boolean holdsAny(int roleMask, Set<String> roleIds) {
         if (roleIds.isEmpty()) {
             return true;

@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatContextHistoryPacket;
@@ -65,7 +64,7 @@ final class ClientChatContextHistory {
     /** Whether the tab names one conversation of a channel that has several. */
     private static boolean isScoped(ChatTab tab) {
         return tab != null && !tab.isWhisper() && tab.getChannel() != null
-                && tab.getChannel().isIdentityScoped()
+                && tab.getChannel().isScoped()
                 && tab.getOwnerKey().length() > 0;
     }
 
@@ -81,15 +80,11 @@ final class ClientChatContextHistory {
     }
 
     /**
-     * The conversation the tab stands for, if the roster still names the
-     * identity it is read as; empty when it does not, which is what a
-     * request must not be made for.
+     * The conversation the tab stands for; empty when it stands for
+     * none, which is what a request must not be made for. A scoped
+     * tab is named by its conversation, so the tab is the answer.
      */
     static String scopeOf(ChatTab tab) {
-        if (!isScoped(tab)) {
-            return "";
-        }
-        ChatChannel channel = tab.getChannel();
-        return ClientChatChannelState.scopeOfIdentity(channel, tab.getOwnerKey());
+        return isScoped(tab) ? tab.getOwnerKey() : "";
     }
 }

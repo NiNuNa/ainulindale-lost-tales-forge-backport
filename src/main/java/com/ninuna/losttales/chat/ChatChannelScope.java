@@ -12,15 +12,27 @@ package com.ninuna.losttales.chat;
 public enum ChatChannelScope {
     /** One conversation, whoever is being played. */
     NONE,
-    /** One conversation per LOTR faction; the identity names which. */
-    FACTION;
+    /**
+     * One conversation per LOTR faction. Which one a player is in
+     * follows the identity they are <em>reading</em> as: an account may
+     * read the talk of any faction it has a character in, whichever
+     * character it happens to be playing.
+     */
+    FACTION,
+    /**
+     * One conversation per party. Which one a player is in follows the
+     * identity they are <em>playing</em>: membership is that identity's,
+     * so a party is not something another of the account's characters
+     * can read while it is not in it.
+     */
+    PARTY;
 
     /**
-     * Whether a tab on this channel carries the identity it is read as.
-     * Two identities of one account then have tabs of their own, and
-     * the lines of one are never shown under the other.
+     * Whether a channel of this scope is more than one conversation. The
+     * row holds one tab for it either way; which conversation that tab
+     * stands for follows the scope's own rule.
      */
-    public boolean isIdentityScoped() {
+    public boolean isScoped() {
         return this != NONE;
     }
 }

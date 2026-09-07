@@ -31,20 +31,9 @@ public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy
                 || accountState == null) {
             return CharacterSwitchPolicyResult.denied(CharacterErrorId.INVALID_PLAYER);
         }
-        if (accountState.isFrozen()) {
-            return CharacterSwitchPolicyResult.denied(
-                    CharacterErrorId.SWITCH_ACCOUNT_FROZEN);
-        }
-        if (accountState.isDeathPending()) {
-            return CharacterSwitchPolicyResult.denied(
-                    CharacterErrorId.SWITCH_DEATH_PENDING);
-        }
-        CharacterSwitchTransaction transaction = accountState.getTransaction();
-        if (transaction != null
-                && transaction.getStatus()
-                == CharacterSwitchTransactionStatus.RECOVERY_REQUIRED) {
-            return CharacterSwitchPolicyResult.denied(
-                    CharacterErrorId.SWITCH_RECOVERY_REQUIRED);
+        CharacterSwitchPolicyResult accountRefusal = accountRefusal(accountState);
+        if (accountRefusal != null) {
+            return accountRefusal;
         }
 
         CharacterLifecycleStateTracker.Snapshot lifecycle =
@@ -128,13 +117,63 @@ public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy
             return CharacterSwitchPolicyResult.denied(
                     CharacterErrorId.SWITCH_UNSAFE_MOVEMENT);
         }
-        if (!isCooldownExempt(player)
-                && safeNow < accountState.getNextAllowedAt()) {
+        CharacterSwitchPolicyResult cooldownRefusal = cooldownRefusal(
+                accountState, safeNow, isCooldownExempt(player));
+        if (cooldownRefusal != null) {
+            return cooldownRefusal;
+        }
+        return CharacterSwitchPolicyResult.allowed();
+    }
+
+    /**
+     * Why the account itself refuses a switch before the player is
+     * looked at, or null when it does not: an account an operator froze,
+     * one whose death has not been settled, and one holding a journal
+     * awaiting recovery. The three are the account's own facts, so they
+     * are decided here without a player and in the order the evaluation
+     * asks them.
+     */
+    static CharacterSwitchPolicyResult accountRefusal(
+            CharacterSwitchAccountState accountState) {
+        if (accountState == null) {
+            return CharacterSwitchPolicyResult.denied(CharacterErrorId.INVALID_PLAYER);
+        }
+        if (accountState.isFrozen()) {
+            return CharacterSwitchPolicyResult.denied(
+                    CharacterErrorId.SWITCH_ACCOUNT_FROZEN);
+        }
+        if (accountState.isDeathPending()) {
+            return CharacterSwitchPolicyResult.denied(
+                    CharacterErrorId.SWITCH_DEATH_PENDING);
+        }
+        CharacterSwitchTransaction transaction = accountState.getTransaction();
+        if (transaction != null
+                && transaction.getStatus()
+                == CharacterSwitchTransactionStatus.RECOVERY_REQUIRED) {
+            return CharacterSwitchPolicyResult.denied(
+                    CharacterErrorId.SWITCH_RECOVERY_REQUIRED);
+        }
+        return null;
+    }
+
+    /**
+     * Why the cooldown refuses a switch, with the moment it may be tried
+     * again, or null when it does not. Asked last, after everything about
+     * the player, so a refusal names the cooldown only when nothing else
+     * was in the way.
+     */
+    static CharacterSwitchPolicyResult cooldownRefusal(
+            CharacterSwitchAccountState accountState, long safeNow,
+            boolean cooldownExempt) {
+        if (accountState == null) {
+            return CharacterSwitchPolicyResult.denied(CharacterErrorId.INVALID_PLAYER);
+        }
+        if (!cooldownExempt && safeNow < accountState.getNextAllowedAt()) {
             return CharacterSwitchPolicyResult.denied(
                     CharacterErrorId.SWITCH_COOLDOWN,
                     accountState.getNextAllowedAt());
         }
-        return CharacterSwitchPolicyResult.allowed();
+        return null;
     }
 
     private static long safeAdd(long left, long right) {

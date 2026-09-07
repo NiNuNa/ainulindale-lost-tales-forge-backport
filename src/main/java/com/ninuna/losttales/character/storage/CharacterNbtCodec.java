@@ -3,6 +3,7 @@ package com.ninuna.losttales.character.storage;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterProgression;
+import com.ninuna.losttales.character.model.CharacterKind;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
@@ -49,6 +50,7 @@ public final class CharacterNbtCodec {
 
     private static final String TAG_OWNER_UUID = "OwnerUUID";
     private static final String TAG_CHARACTER_UUID = "CharacterUUID";
+    private static final String TAG_KIND = "Kind";
     private static final String TAG_ACTIVE_CHARACTER_UUID = "ActiveCharacterUUID";
 
     private static final String TAG_SLOT_INDEX = "SlotIndex";
@@ -293,6 +295,7 @@ public final class CharacterNbtCodec {
         tag.setInteger(TAG_DATA_VERSION, RoleplayCharacter.CURRENT_DATA_VERSION);
         writeUuid(tag, TAG_CHARACTER_UUID, character.getCharacterId());
         writeUuid(tag, TAG_OWNER_UUID, character.getOwnerId());
+        tag.setString(TAG_KIND, character.getKind().getId());
         tag.setInteger(TAG_SLOT_INDEX, character.getSlotIndex());
         tag.setString(TAG_NAME, character.getName());
         tag.setString(TAG_RACE_ID, character.getRaceId());
@@ -509,7 +512,15 @@ public final class CharacterNbtCodec {
         String genderId = CharacterRaceRegistry.normalizeGenderForRace(
                 raceId, storedGenderId);
         String startingFactionId = tag.getString(TAG_STARTING_FACTION_ID);
-        if (isBlank(name) || isBlank(raceId) || isBlank(genderId) || isBlank(startingFactionId)) {
+        // A record written before kinds existed is a roleplay character:
+        // that is what every record that existed then was.
+        CharacterKind kind = CharacterKind.fromId(tag.getString(TAG_KIND));
+        // The account's own identity belongs to no faction, exactly as the
+        // account did before it was a character, so a blank faction is a
+        // fact about it rather than a missing field.
+        boolean factionRequired = kind != CharacterKind.DEFAULT;
+        if (isBlank(name) || isBlank(raceId) || isBlank(genderId)
+                || (factionRequired && isBlank(startingFactionId))) {
             warn("Skipping character %s for owner %s because a required text field is empty or unsupported",
                     characterId, rosterOwnerId);
             return CharacterReadResult.failed(true, "missing_required_text_field");
@@ -716,6 +727,7 @@ public final class CharacterNbtCodec {
                 .description(description)
                 .bodyType(bodyTypeId)
                 .chestType(chestTypeId)
+                .kind(kind)
                 .build();
         return CharacterReadResult.success(character, repaired, quarantinedEntries);
     }

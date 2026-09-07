@@ -18,7 +18,16 @@ import net.minecraftforge.common.util.Constants;
 import java.util.ArrayList;
 import java.util.List;
 
-/** The character-owned ring slot plus any loss-prevention quarantine entry. */
+/**
+ * The character-owned ring slot plus any loss-prevention quarantine entry.
+ *
+ * <p>The snapshot this writes is its own, built from the parsed
+ * {@link AccessoryPlayerData} rather than from that data's stored tag: the
+ * two share key names and share nothing else, and each carries a version
+ * of its own that the other never reads. A legacy singleton in the
+ * account's own file is normalised into a list before it is ever
+ * captured, so nothing here has to know that shape.</p>
+ */
 public final class AccessoryStateComponent implements CharacterStateComponent {
 
     public static final String ID = "losttales_accessory";

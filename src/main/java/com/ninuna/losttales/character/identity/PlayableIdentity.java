@@ -1,6 +1,7 @@
 package com.ninuna.losttales.character.identity;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
+import com.ninuna.losttales.character.model.RoleplayCharacter;
 
 import java.util.UUID;
 
@@ -60,6 +61,25 @@ public final class PlayableIdentity {
      */
     public static UUID gameplayId(UUID characterIdOrNull, UUID ownerIdOrNull) {
         return characterIdOrNull != null ? characterIdOrNull : ownerIdOrNull;
+    }
+
+    /**
+     * How an identity is named: the character's own name when it has one
+     * worth showing, else the account's. The one statement of the rule,
+     * so the chat, the nameplates, the party and the LOTR records that
+     * ask it all answer the same.
+     *
+     * <p>An account name that is itself empty comes back empty: a caller
+     * that has somewhere better to fall back to says so itself, rather
+     * than every caller inventing the same last resort.</p>
+     */
+    public static String displayName(RoleplayCharacter character,
+                                     String accountName) {
+        if (character != null && character.getName() != null
+                && character.getName().trim().length() > 0) {
+            return character.getName().trim();
+        }
+        return accountName == null ? "" : accountName.trim();
     }
 
     public UUID getOwnerId() {

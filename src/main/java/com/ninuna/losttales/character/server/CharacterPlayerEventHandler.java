@@ -20,6 +20,7 @@ import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedOutEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerRespawnEvent;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.util.ChatComponentTranslation;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 
@@ -134,10 +135,31 @@ public final class CharacterPlayerEventHandler {
                     lifecycleResult.getId());
         }
 
+        // Made after the journal has been settled, so an interrupted
+        // switch is reconciled against the roster as it was rather than
+        // against one that has just gained an identity. On a world that
+        // already knows this account it does nothing.
+        if (action == LifecycleAction.LOGIN) {
+            CharacterOperationResult defaultCharacter = CharacterService
+                    .getInstance().ensureDefaultCharacter(serverPlayer);
+            if (!defaultCharacter.isSuccessful()) {
+                FMLLog.warning("[%s] Could not make the default character for %s: %s",
+                        LostTalesMetaData.MOD_ID, player.getUniqueID(),
+                        defaultCharacter.getErrorId().getId());
+            }
+        }
+
         boolean switchingReady = lifecycleResult == CharacterErrorId.NONE
                 || lifecycleResult == CharacterErrorId.SWITCH_DEATH_PENDING;
         if (switchingReady) {
             CharacterLifecycleStateTracker.markReady(serverPlayer);
+        } else if (action == LifecycleAction.LOGIN) {
+            // Joining with switching unavailable is a state only an operator
+            // can clear, so the player is told once, on the join itself. A
+            // respawn or a dimension change says nothing: those are the
+            // transitions the tracker is expected to be busy during.
+            serverPlayer.addChatMessage(new ChatComponentTranslation(
+                    "chat.losttales.character.switching_unavailable"));
         }
         CharacterSyncManager.sendRoster(
                 serverPlayer,

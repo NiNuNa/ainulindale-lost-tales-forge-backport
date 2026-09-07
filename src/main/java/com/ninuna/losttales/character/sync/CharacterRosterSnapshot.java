@@ -149,6 +149,31 @@ public final class CharacterRosterSnapshot {
         return this.characters.size();
     }
 
+    /**
+     * How many characters the player made. The account's own identity is
+     * always there and is not one of them, so this is what answers
+     * "has this player made anyone yet".
+     */
+    public int getRoleplayCharacterCount() {
+        int count = 0;
+        for (CharacterSummary character : this.characters) {
+            if (character != null && !character.isDefault()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /** The account's own identity, or null on a roster that has none. */
+    public CharacterSummary getDefaultCharacter() {
+        for (CharacterSummary character : this.characters) {
+            if (character != null && character.isDefault()) {
+                return character;
+            }
+        }
+        return null;
+    }
+
     public CharacterSummary getCharacter(UUID characterId) {
         return characterId == null ? null : this.charactersById.get(characterId);
     }

@@ -6,6 +6,9 @@ import com.ninuna.losttales.character.sync.CharacterOperationFeedback;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.client.character.CharacterGuiPreviewLayout;
+import com.ninuna.losttales.client.character.CharacterTemplate;
+import com.ninuna.losttales.client.character.CharacterTemplateStore;
+import com.ninuna.losttales.client.character.LostTalesClientAccount;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
@@ -53,8 +56,14 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
     private static final int STEP_APPEARANCE = 0;
     private static final int STEP_IDENTITY = 1;
 
+    /** The slot a template stands for: none, until a server names one. */
+    private static final int TEMPLATE_SLOT = -1;
+
     private final GuiScreen parent;
     private final int slotIndex;
+    /** Whether the form edits the account's template rather than a world's roster. */
+    private final boolean templateMode;
+    private boolean seededFromTemplate;
 
     private GuiTextField nameField;
     private GuiTextField ageField;
@@ -86,8 +95,90 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
     private GuiButton unconventionalButton;
 
     public LostTalesCharacterCreationGui(GuiScreen parent, int slotIndex) {
+        this(parent, slotIndex, false);
+    }
+
+    /**
+     * The same form as the account's own template editor: no server is
+     * asked anything, and confirming writes the template this client
+     * opens every later creation form from.
+     */
+    public static LostTalesCharacterCreationGui forTemplate(GuiScreen parent) {
+        return new LostTalesCharacterCreationGui(parent, TEMPLATE_SLOT, true);
+    }
+
+    private LostTalesCharacterCreationGui(GuiScreen parent, int slotIndex,
+                                          boolean templateMode) {
         this.parent = parent;
         this.slotIndex = slotIndex;
+        this.templateMode = templateMode;
+    }
+
+    /**
+     * Fills the form in from the account's template, once, after the
+     * options are known. A value the options do not offer is left at the
+     * form's own choice and named in the status line, so a template made
+     * against one server never quietly becomes a different character on
+     * another.
+     */
+    private void seedFromTemplate() {
+        CharacterTemplate template = CharacterTemplateStore.load(
+                LostTalesClientAccount.id());
+        if (template.isEmpty()) {
+            return;
+        }
+        this.draftName = template.getName();
+        this.draftAge = template.getAge() > 0
+                ? String.valueOf(template.getAge()) : this.draftAge;
+        this.draftDescription = template.getDescription();
+        this.unconventionalSettings = template.hasUnconventionalSettings();
+
+        List<String> unavailable = new java.util.ArrayList<String>();
+        int race = this.raceIds.indexOf(template.getRaceId());
+        if (race >= 0) {
+            this.raceIndex = race;
+            rebuildGenderOptions();
+            rebuildAppearanceOptions();
+        } else if (template.getRaceId().length() > 0) {
+            unavailable.add(ClientCharacterDisplayNames.race(template.getRaceId()));
+        }
+        this.genderIndex = seedIndex(this.genderIds, template.getGenderId(),
+                this.genderIndex);
+        this.skinIndex = seedIndex(this.skinIds, template.getSkinId(),
+                this.skinIndex);
+        this.bodyTypeIndex = seedIndex(this.bodyTypeIds,
+                template.getBodyTypeId(), this.bodyTypeIndex);
+        this.chestTypeIndex = seedIndex(this.chestTypeIds,
+                template.getChestTypeId(), this.chestTypeIndex);
+        int faction = this.factionIds.indexOf(template.getStartingFactionId());
+        if (faction >= 0) {
+            this.factionIndex = faction;
+        } else if (template.getStartingFactionId().length() > 0) {
+            unavailable.add(ClientCharacterDisplayNames.faction(
+                    template.getStartingFactionId()));
+        }
+        if (!unavailable.isEmpty() && !this.templateMode) {
+            this.statusMessage = I18n.format(
+                    "gui.losttales.character.template.unavailable",
+                    join(unavailable));
+            this.statusError = false;
+        }
+    }
+
+    private static int seedIndex(List<String> options, String id, int fallback) {
+        int index = id == null ? -1 : options.indexOf(id);
+        return index >= 0 ? index : fallback;
+    }
+
+    private static String join(List<String> values) {
+        StringBuilder joined = new StringBuilder();
+        for (String value : values) {
+            if (joined.length() > 0) {
+                joined.append(", ");
+            }
+            joined.append(value);
+        }
+        return joined.toString();
     }
 
     @Override
@@ -99,6 +190,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
         this.raceIndex = clampIndex(this.raceIndex, this.raceIds.size());
         rebuildGenderOptions();
         rebuildAppearanceOptions();
+        if (!this.seededFromTemplate) {
+            this.seededFromTemplate = true;
+            seedFromTemplate();
+        }
 
         int panelWidth = getPanelWidth();
         int panelHeight = getPanelHeight();
@@ -457,6 +552,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
     }
 
     private void submitCreation() {
+        if (this.templateMode) {
+            saveTemplate();
+            return;
+        }
         CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
         if (snapshot == null) {
             this.statusMessage = I18n.format("gui.losttales.character.loading_detail");
@@ -503,6 +602,65 @@ public final class LostTalesCharacterCreationGui extends GuiScreen {
         this.statusMessage = I18n.format("gui.losttales.character.creating");
         this.statusError = false;
         this.pendingRequestId = ClientCharacterNetwork.createCharacter(request);
+        // What this account starts as on the next world it joins. The
+        // creation itself is the server's answer; this only remembers the
+        // choices that led to it.
+        rememberTemplate(request);
+    }
+
+    /**
+     * Writes the form as the account's template. Nothing is sent and
+     * nothing is validated beyond a name worth keeping: which of these
+     * choices a particular server offers is that server's to say, and is
+     * asked when the form is opened against it.
+     */
+    private void saveTemplate() {
+        String normalizedName = CharacterValidator.normalizeName(
+                this.nameField == null ? this.draftName : this.nameField.getText());
+        if (normalizedName.length() == 0) {
+            this.statusMessage = ClientCharacterDisplayNames.error(
+                    com.ninuna.losttales.character.validation.CharacterErrorId.INVALID_NAME_EMPTY);
+            this.statusError = true;
+            return;
+        }
+        int age;
+        try {
+            age = Integer.parseInt(this.ageField == null
+                    ? this.draftAge.trim() : this.ageField.getText().trim());
+        } catch (NumberFormatException notANumber) {
+            this.statusMessage = ClientCharacterDisplayNames.error(
+                    com.ninuna.losttales.character.validation.CharacterErrorId.INVALID_AGE);
+            this.statusError = true;
+            return;
+        }
+        CharacterTemplate template = new CharacterTemplate(
+                normalizedName,
+                selected(this.raceIds, this.raceIndex),
+                selected(this.genderIds, this.genderIndex),
+                selected(this.skinIds, this.skinIndex),
+                selected(this.bodyTypeIds, this.bodyTypeIndex),
+                selected(this.chestTypeIds, this.chestTypeIndex),
+                selected(this.factionIds, this.factionIndex),
+                CharacterValidator.normalizeDescription(
+                        this.descriptionField == null
+                                ? this.draftDescription
+                                : this.descriptionField.getText()),
+                age, this.unconventionalSettings);
+        boolean saved = CharacterTemplateStore.save(
+                LostTalesClientAccount.id(), template);
+        this.statusMessage = I18n.format(saved
+                ? "gui.losttales.character.template.saved"
+                : "gui.losttales.character.template.unsaved");
+        this.statusError = !saved;
+        if (saved && this.mc != null) {
+            this.mc.displayGuiScreen(this.parent);
+        }
+    }
+
+    /** Remembers a creation as this account's template; failure costs nothing. */
+    private void rememberTemplate(CharacterCreationRequest request) {
+        CharacterTemplateStore.save(LostTalesClientAccount.id(),
+                CharacterTemplate.of(request));
     }
 
     @Override

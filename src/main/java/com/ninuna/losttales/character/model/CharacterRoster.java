@@ -23,6 +23,13 @@ public class CharacterRoster {
     public static final int CURRENT_DATA_VERSION = 1;
     public static final int MAX_SLOTS = 9;
     public static final int INITIAL_UNLOCKED_SLOTS = 1;
+    /**
+     * The slot the account's own identity sits in. It is not one of the
+     * nine a player fills: the default character is always there, is
+     * shown before them, and does not spend a slot they could otherwise
+     * make someone in. Sorting by slot puts it first for that reason.
+     */
+    public static final int DEFAULT_SLOT_INDEX = -1;
 
     private final UUID ownerId;
     private final Map<Integer, RoleplayCharacter> charactersBySlot = new HashMap<Integer, RoleplayCharacter>();
@@ -146,6 +153,22 @@ public class CharacterRoster {
         return characterId == null ? null : this.charactersById.get(characterId);
     }
 
+    /** The account's own identity, or null before the world has made it. */
+    public RoleplayCharacter getDefaultCharacter() {
+        return this.charactersBySlot.get(Integer.valueOf(DEFAULT_SLOT_INDEX));
+    }
+
+    /** How many of the nine slots are filled; the default is not one. */
+    public int roleplayCharacterCount() {
+        int count = 0;
+        for (RoleplayCharacter character : this.charactersById.values()) {
+            if (!character.isDefault()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public RoleplayCharacter getCharacterAtSlot(int slotIndex) {
         return this.charactersBySlot.get(Integer.valueOf(slotIndex));
     }
@@ -186,13 +209,16 @@ public class CharacterRoster {
         if (this.charactersBySlot.containsKey(Integer.valueOf(character.getSlotIndex()))) {
             return false;
         }
-        if (this.charactersById.size() >= MAX_SLOTS) {
+        // The default character is not one of the nine: it is counted
+        // neither against them nor by the slot it unlocks below.
+        if (!character.isDefault() && roleplayCharacterCount() >= MAX_SLOTS) {
             return false;
         }
 
         this.charactersById.put(character.getCharacterId(), character);
         this.charactersBySlot.put(Integer.valueOf(character.getSlotIndex()), character);
-        if (character.getSlotIndex() >= this.unlockedSlotCount) {
+        if (!character.isDefault()
+                && character.getSlotIndex() >= this.unlockedSlotCount) {
             this.unlockedSlotCount = character.getSlotIndex() + 1;
         }
         return true;
@@ -211,7 +237,8 @@ public class CharacterRoster {
     }
 
     public static boolean isValidSlotIndex(int slotIndex) {
-        return slotIndex >= 0 && slotIndex < MAX_SLOTS;
+        return slotIndex == DEFAULT_SLOT_INDEX
+                || (slotIndex >= 0 && slotIndex < MAX_SLOTS);
     }
 
     private static void validateSlotIndex(int slotIndex) {

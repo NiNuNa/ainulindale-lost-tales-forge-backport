@@ -379,17 +379,10 @@ public final class LostTalesPartyHudRenderer {
         tessellator.draw();
     }
 
+    /** The member's own colour, opaque; the colour itself is the party's. */
     private static int color(PartyColor color) {
-        if (color == PartyColor.YELLOW) {
-            return 0xFFE3CF58;
-        }
-        if (color == PartyColor.PURPLE) {
-            return 0xFFAA72CF;
-        }
-        if (color == PartyColor.BLUE) {
-            return 0xFF6098D8;
-        }
-        return 0xFF62B56B;
+        PartyColor drawn = color == null ? PartyColor.GREEN : color;
+        return 0xFF000000 | drawn.getRgb();
     }
 
 }

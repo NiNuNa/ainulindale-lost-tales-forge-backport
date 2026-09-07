@@ -46,13 +46,9 @@ public final class PlayableIdentityResolver {
 
     /** The name the identity goes by: the character's, else the account's. */
     public static String displayName(Resolution resolution, EntityPlayerMP player) {
-        RoleplayCharacter character = resolution == null ? null
-                : resolution.getCharacter();
-        if (character != null && character.getName() != null
-                && character.getName().trim().length() > 0) {
-            return character.getName();
-        }
-        return player == null ? "" : player.getCommandSenderName();
+        return PlayableIdentity.displayName(
+                resolution == null ? null : resolution.getCharacter(),
+                player == null ? "" : player.getCommandSenderName());
     }
 
     /** What the store said about one player. */

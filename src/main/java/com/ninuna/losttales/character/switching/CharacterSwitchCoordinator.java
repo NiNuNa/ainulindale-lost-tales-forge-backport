@@ -111,7 +111,15 @@ public final class CharacterSwitchCoordinator {
                 Stores stores = loadStores(player.worldObj, player.getUniqueID());
                 CharacterErrorId availability = stores.check(player.getUniqueID());
                 if (availability != CharacterErrorId.NONE) {
-                    disconnectForRecovery(player);
+                    // A store that cannot be written is a reason not to
+                    // switch, not a reason not to play. Nothing has touched
+                    // the live entity, so the player keeps their own files
+                    // and is let in; the caller leaves the session unready,
+                    // so every switch is refused until the store is repaired.
+                    FMLLog.warning("[%s] Character switching is unavailable for "
+                                    + "owner %s: %s",
+                            LostTalesMetaData.MOD_ID, player.getUniqueID(),
+                            availability.getId());
                     return availability;
                 }
                 CharacterRoster roster = stores.rosters.getOrCreateRoster(
@@ -390,6 +398,63 @@ public final class CharacterSwitchCoordinator {
                 return true;
             } catch (RuntimeException exception) {
                 return false;
+            }
+        }
+    }
+
+    /** What discarding an account's switch journal did. */
+    public enum JournalDiscard {
+        /** The store is read-only, or this owner's entry is quarantined. */
+        UNAVAILABLE,
+        /** The account holds no journal. */
+        NONE,
+        /** The journal was discarded and the account thawed. */
+        DISCARDED
+    }
+
+    /**
+     * Discards an account's switch journal and thaws the account, by owner
+     * id and without a live player, so an account that is refused at login
+     * can be repaired while it is offline.
+     *
+     * <p>The account's own player files are left exactly as they are and
+     * become authoritative by default: a journal held for recovery is what
+     * said they might not be. Whatever the interrupted switch had written
+     * to the state store stays there as an unreferenced generation.</p>
+     */
+    public JournalDiscard discardJournal(World world, UUID ownerId) {
+        if (world == null || world.isRemote || ownerId == null) {
+            return JournalDiscard.UNAVAILABLE;
+        }
+        synchronized (getAccountLock(ownerId)) {
+            try {
+                CharacterSwitchWorldData data = CharacterSwitchStorage.get(world);
+                if (data.isReadOnlyForNewerVersion() || data.isOwnerBlocked(ownerId)) {
+                    return JournalDiscard.UNAVAILABLE;
+                }
+                CharacterSwitchAccountState state = data.getAccount(ownerId);
+                CharacterSwitchTransaction discarded =
+                        state == null ? null : state.getTransaction();
+                if (discarded == null) {
+                    return JournalDiscard.NONE;
+                }
+                state.setTransaction(null);
+                state.setFrozen(false);
+                data.saveAccount(state);
+                CharacterSwitchStorage.flush(world);
+                FMLLog.warning("[%s] Character switch journal %s discarded for "
+                                + "owner %s: status=%s source=%s target=%s "
+                                + "sourceState=%d targetState=%d",
+                        LostTalesMetaData.MOD_ID,
+                        discarded.getTransactionId(), ownerId,
+                        discarded.getStatus().getId(),
+                        discarded.getSourceCharacterId(),
+                        discarded.getTargetCharacterId(),
+                        Long.valueOf(discarded.getSourceStateGeneration()),
+                        Long.valueOf(discarded.getTargetStateGeneration()));
+                return JournalDiscard.DISCARDED;
+            } catch (RuntimeException exception) {
+                return JournalDiscard.UNAVAILABLE;
             }
         }
     }
@@ -824,6 +889,23 @@ public final class CharacterSwitchCoordinator {
             return CharacterErrorId.NONE;
         }
 
+        // A journal held for an operator is never acted on again. The
+        // attempt that marked it failed part-way, and repeating it fails
+        // the same way and disconnects the player again, on every login.
+        // Nothing below this point has touched the live entity, so the
+        // player keeps whatever their own files hold and is let in;
+        // switching stays unavailable, because the caller only marks the
+        // session ready for CharacterErrorId.NONE.
+        if (transaction.getStatus()
+                == CharacterSwitchTransactionStatus.RECOVERY_REQUIRED) {
+            FMLLog.warning("[%s] Owner %s holds character switch journal %s "
+                            + "awaiting recovery; switching stays unavailable "
+                            + "until an operator discards it",
+                    LostTalesMetaData.MOD_ID, player.getUniqueID(),
+                    transaction.getTransactionId());
+            return CharacterErrorId.SWITCH_RECOVERY_REQUIRED;
+        }
+
         CharacterPlayerStateAccount playerStateAccount = null;
         if (transaction.hasPlayerStateGenerations()) {
             // Migrate older snapshot schemas before resolving a generation that
@@ -833,7 +915,13 @@ public final class CharacterSwitchCoordinator {
                     player, roster, stores.playerStates);
         }
 
+        // Only a journal whose own status says the switch was still in
+        // flight names a generation to put back on. One that was already
+        // rolled back names the state the player is on, and re-applying
+        // it would rewind them to the moment the attempt failed.
         if (transaction.hasPlayerStateGenerations()
+                && CharacterSwitchRecoveryReconciler
+                        .requiresLiveReconciliation(transaction)
                 && player.isEntityAlive() && !player.isDead
                 && player.getHealth() > 0.0F) {
             UUID activeId = roster.getActiveCharacterId();
@@ -885,8 +973,10 @@ public final class CharacterSwitchCoordinator {
                 CharacterLiveStatePersistence.save(player);
             } catch (Throwable failure) {
                 // Never allow play to continue after a partial interrupted-switch
-                // restore. Preserve the journal, freeze the account, and require
-                // an operator to repair or retry the authoritative generation.
+                // restore: the live entity holds a mixture of two identities.
+                // Preserve the journal, freeze the account, and require an
+                // operator to repair or discard it. The status written here is
+                // what stops the next login attempting the same restore.
                 transaction.markRecoveryRequired(System.currentTimeMillis());
                 account.setFrozen(true);
                 stores.switches.saveAccount(account);
@@ -900,8 +990,10 @@ public final class CharacterSwitchCoordinator {
             }
         } else if (player.isEntityAlive() && !player.isDead
                 && player.getHealth() > 0.0F) {
-            // Version-1 journals predate component generations. Preserve the
-            // already-loaded live account state before removing that journal.
+            // Nothing to put back: a version-1 journal names no generation,
+            // and a rolled-back one names the state the player is already
+            // on. Either way the live state is made durable so the journal
+            // can be cleared below.
             CharacterLiveStatePersistence.save(player);
         }
 

@@ -109,6 +109,7 @@ import com.ninuna.losttales.chat.moderation.ChatAuditLog;
 import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.server.ChatConsoleCommandHandler;
+import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.server.ChatConsoleStream;
 import com.ninuna.losttales.chat.server.ChatHistory;
 import com.ninuna.losttales.chat.server.LostTalesChatRoleRosterWatcher;
@@ -352,6 +353,7 @@ public class LostTalesCommonProxy {
         PartyMemberStatusSyncManager.clear();
         PartyTrackingSyncManager.clear();
         LostTalesChatRoleRosterWatcher.clear();
+        ChatChannel.resetToBuiltIn();
         ChatMessageIdAllocator.reset();
         ChatHistory.clear();
         ChatConsoleStream.clear();
@@ -425,6 +427,7 @@ public class LostTalesCommonProxy {
         PartyMemberStatusSyncManager.clear();
         PartyTrackingSyncManager.clear();
         LostTalesChatRoleRosterWatcher.clear();
+        ChatChannel.resetToBuiltIn();
         ChatMessageIdAllocator.reset();
         ChatHistory.clear();
         ChatConsoleStream.clear();

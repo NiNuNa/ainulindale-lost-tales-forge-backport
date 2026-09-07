@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.party.server.PartySyncManager;
 import com.ninuna.losttales.character.lore.sync.LoreCharacterSyncManager;
 import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferCoordinator;
@@ -179,6 +180,15 @@ public final class CharacterNetworkRequestHandler {
                             player, PartySyncManager.UNSOLICITED_REQUEST_ID);
                     PartySyncManager.sendStateToAudience(
                             affectedAudience, player.getUniqueID());
+                }
+                if (operationType == CharacterOperationType.SELECT) {
+                    // The roles a line is signed with and the channels the
+                    // tabs offer are resolved for the account together with
+                    // the character being played: a character-scoped role,
+                    // and a role a LOTR faction rank earns, both change with
+                    // the identity. The client is told again so its tabs and
+                    // badges follow the character it has just switched to.
+                    LostTalesChatService.sendAccess(player);
                 }
             } catch (Throwable synchronizationFailure) {
                 FMLLog.warning("[%s] Character %s committed for player %s but post-commit synchronization failed: %s",

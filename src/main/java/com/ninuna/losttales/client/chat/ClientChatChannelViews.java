@@ -122,7 +122,10 @@ public final class ClientChatChannelViews {
             iterator.remove();
         }
         invalidateCache();
-        if (tab.equals(selected)) {
+        // Both sides through the same normalisation: the line carries its
+        // own conversation while the selection is the channel's row entry,
+        // and for a scoped channel those are never the same value.
+        if (ChatTab.viewed(tab).equals(ChatTab.viewed(selected))) {
             // The tab is open in front of the player — but if they have
             // scrolled back to read, a message arriving is one they have
             // not seen. It is counted on the jump-to-present button, and

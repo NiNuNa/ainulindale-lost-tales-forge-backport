@@ -1,18 +1,31 @@
 package com.ninuna.losttales.party.model;
 
-/** Server-validated party indicator colors in deterministic assignment order. */
+import com.ninuna.losttales.gui.style.LostTalesColors;
+
+/**
+ * Server-validated party indicator colors in deterministic assignment
+ * order. Each carries the palette entry it is drawn in, so the HUD, the
+ * chat and the party screens show one member in one colour.
+ */
 public enum PartyColor {
-    GREEN(0, "green"),
-    YELLOW(1, "yellow"),
-    PURPLE(2, "purple"),
-    BLUE(3, "blue");
+    GREEN(0, "green", LostTalesColors.MEADOW_GREEN),
+    YELLOW(1, "yellow", LostTalesColors.HONEY),
+    PURPLE(2, "purple", LostTalesColors.ORCHID),
+    BLUE(3, "blue", LostTalesColors.SEAFOAM);
 
     private final int networkId;
     private final String id;
+    private final int rgb;
 
-    PartyColor(int networkId, String id) {
+    PartyColor(int networkId, String id, int paletteEntry) {
         this.networkId = networkId;
         this.id = id;
+        this.rgb = LostTalesColors.rgb(paletteEntry);
+    }
+
+    /** What this colour is drawn in, without an alpha of its own. */
+    public int getRgb() {
+        return this.rgb;
     }
 
     public int getNetworkId() {

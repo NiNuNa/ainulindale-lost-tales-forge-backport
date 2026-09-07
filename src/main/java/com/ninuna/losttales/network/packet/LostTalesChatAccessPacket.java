@@ -2,6 +2,12 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatRecipientRule;
+import com.ninuna.losttales.chat.ChatPresentationMode;
+import com.ninuna.losttales.chat.ChatChannelScope;
+import com.ninuna.losttales.chat.ChatChannelDescriptor;
+import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -67,13 +73,34 @@ public final class LostTalesChatAccessPacket implements IMessage {
             ChatAccountRole.MAX_DESCRIPTION_LENGTH * 4;
     private static final int MAX_ROLE_BYTES = MAX_ROLE_ID_BYTES + 4 * MAX_ROLE_TEXT_BYTES
             + MAX_ROLE_DESCRIPTION_BYTES + 32;
+    /** A channel id is bounded as the send packet bounds the same field. */
+    private static final int MAX_CHANNEL_ID_BYTES = 16;
+    /** More channel ids than this is a broken payload, not an access answer. */
+    private static final int MAX_CHANNEL_IDS = 64;
+    /** A channel's shown name is bounded like a role's text. */
+    private static final int MAX_CHANNEL_NAME_BYTES = 64;
+    /** An enum constant's name, for the facts a channel is described by. */
+    private static final int MAX_ENUM_NAME_BYTES = 32;
+
     private static final int MAX_PACKET_BYTES = 16
             + MAX_HOLDERS * (MAX_HOLDER_NAME_BYTES + 8)
             + 2 + MAX_MUTED_SENDERS * 16
             + 1 + ChatRoleCatalog.MAX_ROLES * MAX_ROLE_BYTES + 8 + 2
-            + 2 + MAX_CAPABILITIES * MAX_CAPABILITY_ID_BYTES;
-    /** Every channel open: what a payload without gates means. */
-    public static final int ALL_CHANNELS = -1;
+            + 2 + MAX_CAPABILITIES * MAX_CAPABILITY_ID_BYTES
+            + 2 + 2 * MAX_CHANNEL_IDS * (MAX_CHANNEL_ID_BYTES + 2)
+            + 1 + MAX_CHANNEL_IDS * (MAX_CHANNEL_ID_BYTES
+                    + MAX_CHANNEL_NAME_BYTES + 4 * MAX_ENUM_NAME_BYTES + 16);
+    /**
+     * Every channel this build knows, by id: what a payload written
+     * without a channel answer reads as, and what a client falls back to.
+     */
+    public static List<String> allChannelIds() {
+        List<String> ids = new ArrayList<String>();
+        for (ChatChannel channel : ChatChannel.values()) {
+            ids.add(channel.getId());
+        }
+        return Collections.unmodifiableList(ids);
+    }
 
     private boolean adminAccess;
     private boolean discordAccess;
@@ -88,8 +115,15 @@ public final class LostTalesChatAccessPacket implements IMessage {
     private List<UUID> mutedSenders = Collections.emptyList();
     /** The roles in force, in precedence order; empty means the built-ins. */
     private List<ChatAccountRole> catalog = Collections.emptyList();
-    private int readableChannels = ALL_CHANNELS;
-    private int sendableChannels = ALL_CHANNELS;
+    /**
+     * The channels this player may read and send into, by id. Ids and not
+     * a bit set over the declaration order: a channel's id is its wire
+     * surface and is permanent, while the order the constants happen to be
+     * declared in is not, and a set of bits also could not carry a channel
+     * a server defines for itself.
+     */
+    private List<String> readableChannels = allChannelIds();
+    private List<String> sendableChannels = allChannelIds();
     private boolean canModerate;
     private boolean canEditServerConfig;
     /**
@@ -99,6 +133,13 @@ public final class LostTalesChatAccessPacket implements IMessage {
      * request.
      */
     private List<String> capabilities = Collections.emptyList();
+    /**
+     * The channels this server has of its own. The built-in ones are in
+     * both builds' code and are never sent; these are the ones a client
+     * would otherwise never have heard of, and cannot show until it is
+     * told. Empty from a server that defines none.
+     */
+    private List<ChatChannelDescriptor> definedChannels = Collections.emptyList();
     private boolean malformed;
 
     public LostTalesChatAccessPacket() {}
@@ -126,7 +167,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders) {
         this(adminAccess, discordAccess, roleMask, roleHolders, mutedSenders,
-                ChatRoleCatalog.current().roles(), ALL_CHANNELS, ALL_CHANNELS);
+                ChatRoleCatalog.current().roles(), allChannelIds(), allChannelIds());
     }
 
     public LostTalesChatAccessPacket(boolean adminAccess,
@@ -134,7 +175,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
-                                     int readableChannels, int sendableChannels) {
+                                     List<String> readableChannels,
+                                     List<String> sendableChannels) {
         this(adminAccess, discordAccess, roleMask, roleHolders, mutedSenders, catalog,
                 readableChannels, sendableChannels, false, false);
     }
@@ -144,7 +186,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
-                                     int readableChannels, int sendableChannels,
+                                     List<String> readableChannels,
+                                     List<String> sendableChannels,
                                      boolean canModerate, boolean canEditServerConfig) {
         this(adminAccess, discordAccess, roleMask, roleHolders, mutedSenders, catalog,
                 readableChannels, sendableChannels, canModerate, canEditServerConfig,
@@ -156,7 +199,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
-                                     int readableChannels, int sendableChannels,
+                                     List<String> readableChannels,
+                                     List<String> sendableChannels,
                                      boolean canModerate, boolean canEditServerConfig,
                                      List<String> capabilities) {
         List<String> held = new ArrayList<String>();
@@ -201,8 +245,37 @@ public final class LostTalesChatAccessPacket implements IMessage {
             }
         }
         this.catalog = Collections.unmodifiableList(roles);
-        this.readableChannels = readableChannels;
-        this.sendableChannels = sendableChannels;
+        this.readableChannels = channelIds(readableChannels);
+        this.sendableChannels = channelIds(sendableChannels);
+        this.definedChannels = definedChannels();
+    }
+
+    /** The channels in force that this build does not have of its own. */
+    private static List<ChatChannelDescriptor> definedChannels() {
+        List<ChatChannelDescriptor> defined =
+                new ArrayList<ChatChannelDescriptor>();
+        for (ChatChannel channel : ChatChannel.values()) {
+            if (!ChatChannel.isBuiltIn(channel)
+                    && defined.size() < MAX_CHANNEL_IDS) {
+                defined.add(channel.getDescriptor());
+            }
+        }
+        return Collections.unmodifiableList(defined);
+    }
+
+    /** The given ids, trimmed, deduplicated and bounded. */
+    private static List<String> channelIds(List<String> ids) {
+        List<String> kept = new ArrayList<String>();
+        if (ids != null) {
+            for (String id : ids) {
+                String trimmed = id == null ? "" : id.trim();
+                if (trimmed.length() > 0 && !kept.contains(trimmed)
+                        && kept.size() < MAX_CHANNEL_IDS) {
+                    kept.add(trimmed);
+                }
+            }
+        }
+        return Collections.unmodifiableList(kept);
     }
 
     @Override
@@ -266,12 +339,12 @@ public final class LostTalesChatAccessPacket implements IMessage {
             }
             ChatRoleCatalog known = roles.isEmpty() ? ChatRoleCatalog.builtIn()
                     : ChatRoleCatalog.fromWire(roles);
-            // Appended last: the channel gates for this player.
-            int readable = ALL_CHANNELS;
-            int sendable = ALL_CHANNELS;
-            if (buffer.readableBytes() >= 8) {
-                readable = buffer.readInt();
-                sendable = buffer.readInt();
+            // The channel gates for this player, each side a list of ids.
+            List<String> readable = allChannelIds();
+            List<String> sendable = allChannelIds();
+            if (buffer.readableBytes() >= 1) {
+                readable = readChannelIds(buffer);
+                sendable = readChannelIds(buffer);
             }
             // Appended last of all: the two capability flags.
             boolean moderate = buffer.readableBytes() >= 1 && buffer.readBoolean();
@@ -296,6 +369,18 @@ public final class LostTalesChatAccessPacket implements IMessage {
                     held.add(id.trim());
                 }
             }
+            List<ChatChannelDescriptor> defined =
+                    new ArrayList<ChatChannelDescriptor>();
+            if (buffer.readableBytes() >= 1) {
+                int channelCount = buffer.readUnsignedByte();
+                if (channelCount > MAX_CHANNEL_IDS) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "too many defined channels");
+                }
+                for (int index = 0; index < channelCount; index++) {
+                    defined.add(readChannel(buffer));
+                }
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             for (RoleHolder holder : holders) {
                 if ((holder.getMask() & ~known.knownMask()) != 0) {
@@ -306,11 +391,12 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.roleHolders = Collections.unmodifiableList(holders);
             this.mutedSenders = Collections.unmodifiableList(muted);
             this.catalog = Collections.unmodifiableList(known.roles());
-            this.readableChannels = readable;
-            this.sendableChannels = sendable;
+            this.readableChannels = Collections.unmodifiableList(readable);
+            this.sendableChannels = Collections.unmodifiableList(sendable);
             this.canModerate = moderate;
             this.canEditServerConfig = editConfig;
             this.capabilities = Collections.unmodifiableList(held);
+            this.definedChannels = Collections.unmodifiableList(defined);
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.adminAccess = false;
@@ -319,12 +405,73 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.roleHolders = Collections.emptyList();
             this.mutedSenders = Collections.emptyList();
             this.catalog = Collections.emptyList();
-            this.readableChannels = ALL_CHANNELS;
-            this.sendableChannels = ALL_CHANNELS;
+            this.readableChannels = allChannelIds();
+            this.sendableChannels = allChannelIds();
             this.canModerate = false;
             this.canEditServerConfig = false;
             this.capabilities = Collections.emptyList();
+            this.definedChannels = Collections.emptyList();
             LostTalesPacketCodec.discardRemaining(buffer);
+        }
+    }
+
+    /** One channel a server described, refused rather than guessed at. */
+    private static ChatChannelDescriptor readChannel(ByteBuf buffer) {
+        String id = LostTalesPacketCodec.readUtf8String(
+                buffer, MAX_CHANNEL_ID_BYTES).trim();
+        String name = LostTalesPacketCodec.readUtf8String(
+                buffer, MAX_CHANNEL_NAME_BYTES);
+        ChatPresentationMode presentation = named(ChatPresentationMode.class,
+                LostTalesPacketCodec.readUtf8String(buffer, MAX_ENUM_NAME_BYTES));
+        ChatRecipientRule rule = named(ChatRecipientRule.class,
+                LostTalesPacketCodec.readUtf8String(buffer, MAX_ENUM_NAME_BYTES));
+        ChatChannelAccess access = named(ChatChannelAccess.class,
+                LostTalesPacketCodec.readUtf8String(buffer, MAX_ENUM_NAME_BYTES));
+        ChatChannelScope scope = named(ChatChannelScope.class,
+                LostTalesPacketCodec.readUtf8String(buffer, MAX_ENUM_NAME_BYTES));
+        int colour = buffer.readInt();
+        boolean bridgeable = buffer.readBoolean();
+        if (id.length() == 0 || presentation == null || rule == null
+                || access == null || scope == null) {
+            throw new LostTalesPacketCodec.DecodeException(
+                    "invalid channel description");
+        }
+        return new ChatChannelDescriptor(id, name, presentation, rule, access,
+                colour & 0xFFFFFF, bridgeable, scope);
+    }
+
+    /** The constant a name names; null for one this build does not have. */
+    private static <T extends Enum<T>> T named(Class<T> type, String name) {
+        for (T constant : type.getEnumConstants()) {
+            if (constant.name().equals(name)) {
+                return constant;
+            }
+        }
+        return null;
+    }
+
+    private static List<String> readChannelIds(ByteBuf buffer) {
+        int count = buffer.readUnsignedByte();
+        if (count > MAX_CHANNEL_IDS) {
+            throw new LostTalesPacketCodec.DecodeException("too many channel ids");
+        }
+        List<String> ids = new ArrayList<String>(count);
+        for (int index = 0; index < count; index++) {
+            String id = LostTalesPacketCodec.readUtf8String(
+                    buffer, MAX_CHANNEL_ID_BYTES).trim();
+            if (id.length() == 0 || ids.contains(id)) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "invalid channel id");
+            }
+            ids.add(id);
+        }
+        return ids;
+    }
+
+    private static void writeChannelIds(ByteBuf buffer, List<String> ids) {
+        buffer.writeByte(ids.size());
+        for (String id : ids) {
+            LostTalesPacketCodec.writeUtf8String(buffer, id, MAX_CHANNEL_ID_BYTES);
         }
     }
 
@@ -379,14 +526,34 @@ public final class LostTalesChatAccessPacket implements IMessage {
             buffer.writeBoolean(role.isLocked());
             buffer.writeInt(role.getRank());
         }
-        buffer.writeInt(this.readableChannels);
-        buffer.writeInt(this.sendableChannels);
+        writeChannelIds(buffer, this.readableChannels);
+        writeChannelIds(buffer, this.sendableChannels);
         buffer.writeBoolean(this.canModerate);
         buffer.writeBoolean(this.canEditServerConfig);
         buffer.writeShort(this.capabilities.size());
         for (String capability : this.capabilities) {
             LostTalesPacketCodec.writeUtf8String(buffer, capability,
                     MAX_CAPABILITY_ID_BYTES);
+        }
+        // Appended last of all: the channels this server has of its own.
+        buffer.writeByte(this.definedChannels.size());
+        for (ChatChannelDescriptor channel : this.definedChannels) {
+            LostTalesPacketCodec.writeUtf8String(buffer, channel.getId(),
+                    MAX_CHANNEL_ID_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer,
+                    channel.getDisplayName(), MAX_CHANNEL_NAME_BYTES);
+            // By name and not by position: an enum's declaration order is
+            // not something either side promises the other.
+            LostTalesPacketCodec.writeUtf8String(buffer,
+                    channel.getPresentation().name(), MAX_ENUM_NAME_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer,
+                    channel.getRecipientRule().name(), MAX_ENUM_NAME_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer,
+                    channel.getAccess().name(), MAX_ENUM_NAME_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer,
+                    channel.getScope().name(), MAX_ENUM_NAME_BYTES);
+            buffer.writeInt(channel.getDisplayColor());
+            buffer.writeBoolean(channel.isBridgeable());
         }
     }
 
@@ -402,10 +569,14 @@ public final class LostTalesChatAccessPacket implements IMessage {
     public List<UUID> getMutedSenders() { return this.mutedSenders; }
     /** The roles in force, in precedence order. */
     public List<ChatAccountRole> getCatalog() { return this.catalog; }
-    /** One bit per channel ordinal: whether this player may read it. */
-    public int getReadableChannels() { return this.readableChannels; }
-    /** One bit per channel ordinal: whether this player may send into it. */
-    public int getSendableChannels() { return this.sendableChannels; }
+    /** The ids of the channels this player may read. */
+    public List<String> getReadableChannels() { return this.readableChannels; }
+    /** The ids of the channels this player may send into. */
+    public List<String> getSendableChannels() { return this.sendableChannels; }
+    /** The channels this server has of its own, for the client to put in force. */
+    public List<ChatChannelDescriptor> getDefinedChannels() {
+        return this.definedChannels;
+    }
     /** Whether the server says this player may moderate the chat. */
     public boolean canModerate() { return this.canModerate; }
     /** Whether the server says this player may edit its settings. */

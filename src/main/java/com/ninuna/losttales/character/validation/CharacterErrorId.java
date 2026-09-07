@@ -62,6 +62,7 @@ public enum CharacterErrorId {
     SWITCH_RECOVERY_REQUIRED("switch_recovery_required"),
     DELETE_NOT_ALLOWED("delete_not_allowed"),
     DELETE_ACTIVE_CHARACTER("delete_active_character"),
+    DELETE_DEFAULT_CHARACTER("delete_default_character"),
     DELETE_RECOVERY_STORAGE_READ_ONLY("delete_recovery_storage_read_only"),
     DELETE_PLAYER_STATE_STORAGE_READ_ONLY("delete_player_state_storage_read_only"),
     DELETE_PLAYER_STATE_INVALID("delete_player_state_invalid"),

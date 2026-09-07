@@ -13,6 +13,7 @@ import java.nio.charset.Charset;
 import java.security.SecureRandom;
 import java.util.Locale;
 import java.util.Random;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
@@ -52,6 +53,15 @@ public final class DiscordWebSocket {
         int port = uri.getPort() < 0 ? 443 : uri.getPort();
         SSLSocket socket = (SSLSocket)SSLSocketFactory.getDefault().createSocket();
         try {
+            // The default socket checks that the certificate chain is trusted
+            // and nothing else. Asking for the HTTPS identification algorithm
+            // is what makes the handshake also check the certificate was
+            // issued for the host being connected to; without it any
+            // certificate the JVM trusts is accepted for any name, and the
+            // bot token travels in the IDENTIFY frame on this socket.
+            SSLParameters parameters = socket.getSSLParameters();
+            parameters.setEndpointIdentificationAlgorithm("HTTPS");
+            socket.setSSLParameters(parameters);
             socket.connect(new InetSocketAddress(uri.getHost(), port), CONNECT_TIMEOUT_MILLIS);
             socket.setSoTimeout(READ_TIMEOUT_MILLIS);
             socket.setTcpNoDelay(true);

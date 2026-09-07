@@ -1,5 +1,6 @@
 package com.ninuna.losttales.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import java.util.ArrayList;
@@ -350,6 +351,124 @@ public final class ChatRoleConfig {
             entry.append(first ? "" : ";").append("desc:").append(description.trim());
         }
         return entry.toString();
+    }
+
+    /**
+     * The channels the entries define, registered beside the built-in
+     * ones:
+     * <pre>
+     * trade=name:Trade;rule:global;colour:C9A227;bridge:true
+     * </pre>
+     * The key is the channel's id and is permanent: packets, the layout
+     * file and the gates all name a channel by it. {@code rule} is how
+     * the server routes it — {@code global}, {@code proximity} or
+     * {@code operators}; the rules that need something the config cannot
+     * describe (a party, a faction, a whisper, a private console) are
+     * refused. {@code ooc} makes it an out-of-character channel, which
+     * is what decides whether roles are tagged on its lines.
+     *
+     * <p>An entry naming a built-in channel's id is refused rather than
+     * replacing it: the code's own channels are not a config's to
+     * redefine. Every problem is reported and that entry alone skipped.</p>
+     */
+    public static List<ChatChannelDescriptor> parseChannelDefinitions(
+            String[] entries, Warnings out) {
+        Warnings warnings = out == null ? SILENT : out;
+        List<ChatChannelDescriptor> defined =
+                new ArrayList<ChatChannelDescriptor>();
+        Set<String> seen = new LinkedHashSet<String>();
+        for (String entry : entries == null ? new String[0] : entries) {
+            if (isBlankOrComment(entry)) {
+                continue;
+            }
+            String id = keyOf(entry).toLowerCase(Locale.ROOT);
+            if (id.length() == 0 || !isChannelId(id)) {
+                warnings.warn("Channel entry '" + entry + "' names no usable "
+                        + "channel id; skipped");
+                continue;
+            }
+            if (ChatChannel.fromId(id) != null) {
+                warnings.warn("Channel '" + id + "' is one this build "
+                        + "already has and is not a config's to define; skipped");
+                continue;
+            }
+            if (!seen.add(id)) {
+                warnings.warn("Channel '" + id + "' is defined twice; the "
+                        + "second was skipped");
+                continue;
+            }
+            Map<String, List<String>> options = optionsOf(entry);
+            ChatRecipientRule rule = definedRule(first(options, "rule"));
+            if (rule == null) {
+                warnings.warn("Channel '" + id + "' names no routing a config "
+                        + "can describe (global, proximity or operators); skipped");
+                continue;
+            }
+            String name = first(options, "name");
+            if (name == null || name.trim().length() == 0) {
+                name = id;
+            }
+            boolean outOfCharacter = Boolean.parseBoolean(first(options, "ooc"));
+            defined.add(new ChatChannelDescriptor(id, name.trim(),
+                    outOfCharacter ? ChatPresentationMode.OUT_OF_CHARACTER
+                            : ChatPresentationMode.IN_CHARACTER,
+                    rule, ChatChannelAccess.NONE,
+                    definedColour(first(options, "colour"), id, warnings),
+                    Boolean.parseBoolean(first(options, "bridge")),
+                    ChatChannelScope.NONE));
+        }
+        return defined;
+    }
+
+    /**
+     * The routing a config may ask for. The rules left out each need
+     * something only the game can supply — a party, a faction, the two
+     * parties of a whisper, one player's own console — so a channel
+     * defined by data cannot name them.
+     */
+    private static ChatRecipientRule definedRule(String rule) {
+        String named = rule == null ? "" : rule.trim().toLowerCase(Locale.ROOT);
+        if ("global".equals(named) || named.length() == 0) {
+            return ChatRecipientRule.GLOBAL;
+        }
+        if ("proximity".equals(named)) {
+            return ChatRecipientRule.PROXIMITY;
+        }
+        if ("operators".equals(named)) {
+            return ChatRecipientRule.OPERATORS;
+        }
+        return null;
+    }
+
+    /** A channel id is a short word the wire and the layout file can carry. */
+    private static boolean isChannelId(String id) {
+        if (id.length() == 0 || id.length() > 16) {
+            return false;
+        }
+        for (int index = 0; index < id.length(); index++) {
+            char character = id.charAt(index);
+            if ((character < 'a' || character > 'z')
+                    && (character < '0' || character > '9')
+                    && character != '_') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** The colour the entry names, or the palette's own for one it does not. */
+    private static int definedColour(String colour, String id, Warnings out) {
+        String named = colour == null ? "" : colour.trim();
+        if (named.length() == 0) {
+            return LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
+        }
+        try {
+            return Integer.parseInt(named, 16) & 0xFFFFFF;
+        } catch (NumberFormatException notAColour) {
+            out.warn("Channel '" + id + "' names '" + named + "', which is no "
+                    + "colour; the default is used");
+            return LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
+        }
     }
 
     /** The gates the entries describe, over the roles of {@code catalog}. */

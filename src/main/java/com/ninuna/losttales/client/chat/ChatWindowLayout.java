@@ -95,7 +95,16 @@ public final class ChatWindowLayout {
     private static final List<ChatWindow> WINDOWS = new ArrayList<ChatWindow>();
     private static final List<ChatWindow> WINDOWS_VIEW =
             Collections.unmodifiableList(WINDOWS);
-    /** Muted tabs: their lines stay out of the closed-chat feed. */
+    /**
+     * Muted tabs: their lines stay out of the closed-chat feed.
+     *
+     * <p>This and the two preference sets below hold row entries. A
+     * scoped channel's conversations share the one entry the row holds,
+     * so muting the Faction tab mutes the channel rather than whichever
+     * faction happened to be on screen. Every accessor normalises
+     * through {@link ChatTab#row}, so a caller holding a line's own tab
+     * asks the same question.</p>
+     */
     private static final Set<ChatTab> MUTED = new HashSet<ChatTab>();
     /** Tabs whose mention cue is silent; they still show in the feed. */
     private static final Set<ChatTab> PINGS_MUTED = new HashSet<ChatTab>();
@@ -316,7 +325,7 @@ public final class ChatWindowLayout {
     }
 
     public static synchronized boolean isOpen(ChatTab tab) {
-        return windowOf(tab) != null;
+        return windowOf(ChatTab.row(tab)) != null;
     }
 
     public static synchronized boolean isOpen(ChatChannel channel) {
@@ -353,7 +362,7 @@ public final class ChatWindowLayout {
     }
 
     public static synchronized boolean isMuted(ChatTab tab) {
-        return tab != null && MUTED.contains(tab);
+        return tab != null && MUTED.contains(ChatTab.row(tab));
     }
 
     public static synchronized boolean isMuted(ChatChannel channel) {
@@ -396,7 +405,7 @@ public final class ChatWindowLayout {
 
     /** Whether the tab's mention cue sounds: its mentions are not muted. */
     public static synchronized boolean isPingAudible(ChatTab tab) {
-        return tab != null && !PINGS_MUTED.contains(tab);
+        return tab != null && !PINGS_MUTED.contains(ChatTab.row(tab));
     }
 
     /** Mention-muted plain tabs in a stable order, for the store. */
@@ -416,7 +425,7 @@ public final class ChatWindowLayout {
 
     /** Whether a message may not reopen the tab while it is closed. */
     public static synchronized boolean isHidden(ChatTab tab) {
-        return tab != null && HIDDEN.contains(tab);
+        return tab != null && HIDDEN.contains(ChatTab.row(tab));
     }
 
     public static synchronized boolean isHidden(ChatChannel channel) {
@@ -1192,9 +1201,13 @@ public final class ChatWindowLayout {
                 }
                 ChatWindow window = new ChatWindow(id);
                 for (ChatTab tab : spec.tabs) {
-                    // Conversations are not layout: a whisper tab from an
-                    // older file is dropped.
-                    if (tab != null && !tab.isWhisper() && placed.add(tab)) {
+                    // Conversations are not layout: a whisper tab, and a
+                    // scoped channel's conversation, are both dropped. The
+                    // row holds the channel; which conversation it shows
+                    // follows the identity being read.
+                    if (tab != null && !tab.isWhisper()
+                            && tab.getOwnerKey().length() == 0
+                            && placed.add(tab)) {
                         window.tabs().add(tab);
                     }
                 }
@@ -1270,15 +1283,16 @@ public final class ChatWindowLayout {
 
     /**
      * A serialisable description of the current layout. Whisper and NPC
-     * tabs are left out: conversations end with the session, and a
-     * window holding nothing else is not described at all.
+     * tabs are left out, and so is a scoped channel's conversation:
+     * conversations end with the session, and a window holding nothing
+     * else is not described at all.
      */
     static synchronized List<WindowSpec> describe() {
         List<WindowSpec> result = new ArrayList<WindowSpec>(WINDOWS.size());
         for (ChatWindow window : WINDOWS) {
             List<ChatTab> tabs = new ArrayList<ChatTab>();
             for (ChatTab tab : window.tabs()) {
-                if (!tab.isWhisper()) {
+                if (!tab.isWhisper() && tab.getOwnerKey().length() == 0) {
                     tabs.add(tab);
                 }
             }

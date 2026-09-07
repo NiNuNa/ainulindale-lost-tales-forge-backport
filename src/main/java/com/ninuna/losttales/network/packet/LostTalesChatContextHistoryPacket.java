@@ -93,7 +93,7 @@ public final class LostTalesChatContextHistoryPacket implements IMessage {
      */
     private void validate() {
         ChatChannel channel = ChatChannel.fromId(this.channelId);
-        if (channel == null || !channel.isIdentityScoped()
+        if (channel == null || !channel.isScoped()
                 || this.scopeValue.length() == 0
                 || this.sinceMessageId < ChatMessageIds.NONE) {
             throw new IllegalArgumentException("invalid chat context history request");

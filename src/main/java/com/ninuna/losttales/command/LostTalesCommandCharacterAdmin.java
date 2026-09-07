@@ -50,6 +50,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
     public String getCommandUsage(ICommandSender sender) {
         return "/losttales character <status|recover|cooldown|freeze|unfreeze|deleted> [player]"
                 + " or <restore|rollback|purge> <player> <character-uuid> [confirm]"
+                + " or discard-journal <player|account-uuid>"
                 + " or lore <status|recover|inspect> [lore-character-id]";
     }
 
@@ -66,6 +67,12 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         }
         if ("lore".equalsIgnoreCase(args[0])) {
             processLoreCommand(sender, args);
+            return;
+        }
+        // Answered before a player is resolved: the account this repairs is
+        // usually the one that cannot stay connected.
+        if ("discard-journal".equalsIgnoreCase(args[0])) {
+            processDiscardJournal(sender, args);
             return;
         }
         EntityPlayerMP target = resolveTarget(sender, args.length > 1 ? args[1] : null);
@@ -151,6 +158,67 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             setFrozen(sender, target, false);
         } else {
             sendUsage(sender);
+        }
+    }
+
+    /**
+     * Discards one account's switch journal and thaws the account, naming
+     * the account by an online player's name or by its UUID — the id the
+     * server log prints beside every switch failure — so an account that
+     * is disconnected or refused at login can be repaired while offline.
+     */
+    private void processDiscardJournal(ICommandSender sender, String[] args) {
+        MinecraftServer server = MinecraftServer.getServer();
+        World world = server == null ? null : server.worldServerForDimension(0);
+        if (world == null) {
+            send(sender, EnumChatFormatting.RED
+                    + "The server overworld is not available.");
+            return;
+        }
+        if (args.length < 2) {
+            send(sender, EnumChatFormatting.RED
+                    + "Specify an online player name or an account UUID.");
+            return;
+        }
+        EntityPlayerMP online = resolveTarget(sender, args[1]);
+        UUID ownerId;
+        if (online != null) {
+            ownerId = online.getUniqueID();
+        } else {
+            try {
+                ownerId = UUID.fromString(args[1]);
+            } catch (IllegalArgumentException exception) {
+                send(sender, EnumChatFormatting.RED
+                        + "No online player is named " + args[1]
+                        + ", and it is not an account UUID either.");
+                return;
+            }
+        }
+
+        CharacterSwitchCoordinator.JournalDiscard outcome =
+                CharacterSwitchCoordinator.getInstance().discardJournal(world, ownerId);
+        if (outcome == CharacterSwitchCoordinator.JournalDiscard.NONE) {
+            send(sender, EnumChatFormatting.YELLOW
+                    + "That account holds no switch journal; nothing to discard.");
+            return;
+        }
+        if (outcome == CharacterSwitchCoordinator.JournalDiscard.UNAVAILABLE) {
+            send(sender, EnumChatFormatting.RED
+                    + "The switch store refused: it is read-only, or that "
+                    + "account's entry is quarantined. See the server log.");
+            return;
+        }
+        send(sender, EnumChatFormatting.GREEN
+                + "Switch journal discarded for " + ownerId
+                + ". The account's own player files are now authoritative.");
+        if (online != null) {
+            // Already connected: switching becomes available again without
+            // making them reconnect.
+            CharacterLifecycleStateTracker.markReady(online);
+            reportStatus(sender, online);
+        } else {
+            send(sender, EnumChatFormatting.GRAY
+                    + "It takes effect the next time that account joins.");
         }
     }
 
@@ -526,7 +594,8 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
         if (args != null && args.length == 1) {
             return getListOfStringsMatchingLastWord(
                     args, "status", "recover", "cooldown", "freeze", "unfreeze",
-                    "deleted", "restore", "rollback", "purge", "lore");
+                    "deleted", "restore", "rollback", "purge", "discard-journal",
+                    "lore");
         }
         if (args != null && args.length == 2
                 && "lore".equalsIgnoreCase(args[0])) {

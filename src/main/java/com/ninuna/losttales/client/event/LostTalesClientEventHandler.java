@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.event;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.accessory.inventory.LostTalesContainerPlayer;
 import com.ninuna.losttales.accessory.player.AccessoryInventory;
+import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.client.LostTalesClientThread;
 import com.ninuna.losttales.config.client.ClientServerConfigCache;
@@ -210,6 +211,9 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientChatChannelState.clear();
         ClientChatChannelViews.clear();
         ChatRoleCatalog.resetToBuiltIn();
+        // A channel a server defined is that server's; arriving
+        // somewhere else leaves the code's own channels alone.
+        ChatChannel.resetToBuiltIn();
         ClientChatShowcaseStore.clear();
         LostTalesChatPresentation.clear();
         LostTalesCharacterHeadIconRenderer.clearAccountSkinCache();

@@ -8,6 +8,7 @@ import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatChannelGates;
+import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -63,10 +64,13 @@ public final class ChatChannelPolicy {
      * needs a party, a faction line a faction — then the role gate,
      * which a channel may ask besides.
      *
-     * @param roles the sender's roles as the identity being played
+     * @param roles    the sender's roles as the identity being played
+     * @param operator whether the sender holds the server's operator level,
+     *                 which is what reaches a staff channel the config
+     *                 names no gate for; see {@link #staffOnly}
      */
     public static String sendRefusal(ChatChannel channel, Party party, UUID gameplayId,
-                                     String factionId, int roles) {
+                                     String factionId, int roles, boolean operator) {
         if (channel == null) {
             return "chat.losttales.channel.role_unavailable";
         }
@@ -78,10 +82,48 @@ public final class ChatChannelPolicy {
                 && (factionId == null || factionId.length() == 0)) {
             return "chat.losttales.channel.faction_unavailable";
         }
+        if (staffOnly(channel, ChatChannelGates.current())) {
+            return operator ? null : "chat.losttales.channel.role_unavailable";
+        }
         if (!ChatChannelGates.current().canSend(roles, channel)) {
             return "chat.losttales.channel.role_unavailable";
         }
         return null;
+    }
+
+    /**
+     * Whether the channel is staff talk the config says nothing about. A
+     * channel whose routing rule is {@link ChatRecipientRule#OPERATORS}
+     * reaches everyone the gate admits, so with no entry at all it would
+     * reach everyone online — a staff channel opened by a line missing
+     * from a file rather than by a decision. Missing is not the same as
+     * open: an entry naming {@code any} on both sides is a server saying
+     * it wants the channel open, and is honoured.
+     */
+    public static boolean staffOnly(ChatChannel channel, ChatChannelGates gates) {
+        return channel != null
+                && channel.getRecipientRule() == ChatRecipientRule.OPERATORS
+                && !gates.hasEntry(channel);
+    }
+
+    /** Whether the player may read the channel, the staff floor included. */
+    public static boolean canRead(EntityPlayerMP player, ChatChannel channel,
+                                  int roles) {
+        ChatChannelGates gates = ChatChannelGates.current();
+        if (staffOnly(channel, gates)) {
+            return LostTalesPermissions.isOperator(player);
+        }
+        return gates.canRead(roles, channel);
+    }
+
+    /** Whether the player may send into the channel, the staff floor included. */
+    public static boolean canSend(EntityPlayerMP player, ChatChannel channel,
+                                  int roles) {
+        ChatChannelGates gates = ChatChannelGates.current();
+        if (staffOnly(channel, gates)) {
+            return LostTalesPermissions.isOperator(player);
+        }
+        return gates.canSend(roles, channel);
     }
 
     /** Whether the refusal is the role gate's, so the client's tabs should be told again. */
@@ -105,6 +147,7 @@ public final class ChatChannelPolicy {
         List<EntityPlayerMP> online = onlinePlayers();
         ChatChannelGates gates = ChatChannelGates.current();
         boolean gated = gates.isGated(channel);
+        boolean staffOnly = staffOnly(channel, gates);
         ChatRecipientRule rule = channel.getRecipientRule();
         // A line typed in a private channel by someone who may read the
         // shared console is staff talk and reaches every reader of it;
@@ -116,7 +159,11 @@ public final class ChatChannelPolicy {
             if (candidate == null || candidate.getUniqueID() == null) {
                 continue;
             }
-            if (gated && !gates.canRead(playedRoles(candidate), channel)) {
+            if (staffOnly) {
+                if (!LostTalesPermissions.isOperator(candidate)) {
+                    continue;
+                }
+            } else if (gated && !gates.canRead(playedRoles(candidate), channel)) {
                 continue;
             }
             boolean reached;
@@ -211,6 +258,28 @@ public final class ChatChannelPolicy {
     /** Whether the player may read the shared operator console. */
     public static boolean readsConsole(EntityPlayerMP player) {
         return LostTalesPermissions.has(player, LostTalesCapability.CHAT_CONSOLE_READ);
+    }
+
+    /**
+     * Which conversation of the channel a line belongs to: the faction it
+     * is spoken to, the party it is spoken in, or nothing at all for a
+     * channel that is only ever one conversation. The one place the scope
+     * of a line is decided, so the sender's copy, the recipients' and the
+     * history all name the same conversation.
+     */
+    public static String scopeValueOf(ChatChannel channel, Party party,
+                                      String factionId) {
+        if (channel == null) {
+            return "";
+        }
+        if (channel.getScope() == ChatChannelScope.FACTION) {
+            return factionId == null ? "" : factionId;
+        }
+        if (channel.getScope() == ChatChannelScope.PARTY) {
+            return party == null || party.getPartyId() == null
+                    ? "" : party.getPartyId().toString();
+        }
+        return "";
     }
 
     /** The played character's normalized faction id, or empty for none. */

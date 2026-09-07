@@ -6,8 +6,12 @@ import com.ninuna.losttales.character.deletion.CharacterDeletionService;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorldData;
+import com.ninuna.losttales.character.model.CharacterKind;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
+import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.character.registry.CharacterFactionResolver;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
@@ -83,6 +87,108 @@ public final class CharacterService {
         return CharacterOperationResult.success(true, created, null);
     }
 
+    /**
+     * Makes the account's own identity if this world has not made it yet,
+     * and plays as it when nothing else is being played.
+     *
+     * <p>The record carries the account's own UUID as its character id.
+     * That is what keeps a world that already existed working: party
+     * membership, LOTR bounty records, personal map markers and the
+     * account's saved player state are all filed under the gameplay id,
+     * which for the account was its own UUID and for this character is
+     * the same value. Nothing is re-keyed, and nothing has to be.</p>
+     *
+     * <p>It belongs to no faction, exactly as the account did before it
+     * was a character, and wears the account's own skin and the cape the
+     * account was already wearing.</p>
+     */
+    public synchronized CharacterOperationResult ensureDefaultCharacter(
+            EntityPlayerMP player) {
+        CharacterValidationResult playerValidation = validateServerPlayer(player);
+        if (!playerValidation.isValid()) {
+            return CharacterOperationResult.failure(playerValidation.getErrorId(), null);
+        }
+        CharacterWorldData data = getData(player);
+        if (data == null) {
+            return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, null);
+        }
+        if (data.isReadOnlyForNewerVersion()) {
+            return CharacterOperationResult.failure(CharacterErrorId.STORAGE_READ_ONLY, null);
+        }
+        CharacterRoster roster = data.getOrCreateRoster(player.getUniqueID());
+        if (roster.getDefaultCharacter() != null) {
+            return CharacterOperationResult.success(false, roster,
+                    roster.getActiveCharacter());
+        }
+        UUID ownerId = player.getUniqueID();
+        if (data.containsCharacter(ownerId)) {
+            // Some other roster already holds a character under this id.
+            // Minting a second would make the id ambiguous and cost both
+            // of them their party membership and their markers.
+            FMLLog.warning("[%s] Not making a default character for %s: "
+                            + "a character already exists under that id",
+                    LostTalesMetaData.MOD_ID, ownerId);
+            return CharacterOperationResult.failure(
+                    CharacterErrorId.INTERNAL_ERROR, roster);
+        }
+        RoleplayCharacter defaultCharacter = buildDefaultCharacter(player, roster);
+        if (defaultCharacter == null || !roster.addCharacter(defaultCharacter)) {
+            return CharacterOperationResult.failure(
+                    CharacterErrorId.INTERNAL_ERROR, roster);
+        }
+        if (roster.getActiveCharacterId() == null) {
+            // The account was the identity being played, and this record
+            // is that identity: the same gameplay id, the same saved
+            // state, now with a name and a face of its own.
+            roster.setActiveCharacterId(defaultCharacter.getCharacterId());
+        }
+        roster.incrementRevision();
+        data.saveRoster(roster);
+        FMLLog.info("[%s] Made the default character for %s in slot %d",
+                LostTalesMetaData.MOD_ID, ownerId,
+                Integer.valueOf(CharacterRoster.DEFAULT_SLOT_INDEX));
+        return CharacterOperationResult.success(true, roster, defaultCharacter);
+    }
+
+    /** The account's identity as a character record, from server-side facts. */
+    private RoleplayCharacter buildDefaultCharacter(EntityPlayerMP player,
+                                                     CharacterRoster roster) {
+        UUID ownerId = player.getUniqueID();
+        String accountName = player.getGameProfile() == null
+                || player.getGameProfile().getName() == null
+                || player.getGameProfile().getName().trim().length() == 0
+                ? player.getCommandSenderName()
+                : player.getGameProfile().getName().trim();
+        String name = CharacterValidator.normalizeName(accountName);
+        if (name == null || name.length() == 0) {
+            // A record with no name is one the codec would skip, so the
+            // identity would vanish on the next load.
+            FMLLog.warning("[%s] Cannot name the default character for %s",
+                    LostTalesMetaData.MOD_ID, ownerId);
+            return null;
+        }
+        String raceId = CharacterRaceRegistry.HUMAN;
+        String genderId = CharacterRaceRegistry.normalizeGenderForRace(
+                raceId, CharacterGenderRegistry.MALE);
+        String skinId = CharacterSkinRegistry.isCompatible(
+                CharacterSkinRegistry.ACCOUNT_SKIN_ID, raceId, genderId)
+                ? CharacterSkinRegistry.ACCOUNT_SKIN_ID
+                : CharacterSkinRegistry.getDefaultSkinId(raceId, genderId, ownerId);
+        return RoleplayCharacter.builder(ownerId, ownerId)
+                .kind(CharacterKind.DEFAULT)
+                .slot(CharacterRoster.DEFAULT_SLOT_INDEX)
+                .name(name)
+                .race(raceId)
+                .gender(genderId)
+                .skin(skinId)
+                .age(CharacterValidator.MIN_AGE)
+                .startingFaction("")
+                .createdAt(System.currentTimeMillis())
+                .minecraftCapeVisible(roster.isAccountMinecraftCapeVisible())
+                .cosmeticCape(roster.getAccountCosmeticCapeId())
+                .build();
+    }
+
     public synchronized CharacterOperationResult createCharacter(
             EntityPlayerMP player, CharacterCreationRequest request) {
         CharacterValidationResult playerValidation = validateServerPlayer(player);
@@ -141,7 +247,40 @@ public final class CharacterService {
             EntityPlayerMP player, int requestId,
             long expectedRosterRevision, PlayableIdentity target) {
         return CharacterSwitchCoordinator.getInstance().selectIdentity(
-                player, requestId, expectedRosterRevision, target);
+                player, requestId, expectedRosterRevision,
+                asDefaultCharacter(player, target));
+    }
+
+    /**
+     * The account asked for as the character that is the account. Once a
+     * world has made the default character, the bare account identity and
+     * that character are the same person — the same gameplay id, the same
+     * saved state — so a request for one is answered with the other and
+     * the roster never shows a player two rows for one identity.
+     *
+     * <p>Anything else is passed through untouched, including the account
+     * on a world that has not made the character yet.</p>
+     */
+    private PlayableIdentity asDefaultCharacter(EntityPlayerMP player,
+                                                 PlayableIdentity target) {
+        if (target == null || !target.isAccount() || player == null
+                || player.worldObj == null || player.worldObj.isRemote) {
+            return target;
+        }
+        try {
+            CharacterWorldData data = getData(player);
+            CharacterRoster roster = data == null
+                    ? null : data.getRoster(target.getOwnerId());
+            RoleplayCharacter account = roster == null
+                    ? null : roster.getDefaultCharacter();
+            return account == null ? target
+                    : PlayableIdentity.character(target.getOwnerId(),
+                            account.getCharacterId());
+        } catch (RuntimeException unreadable) {
+            // A store that cannot be read names no character, and the
+            // account identity it already had still stands.
+            return target;
+        }
     }
 
     public synchronized CharacterOperationResult updateCapeSettings(
@@ -241,6 +380,14 @@ public final class CharacterService {
         }
 
         RoleplayCharacter character = roster.getCharacter(characterId);
+        // The account's own identity is always there. Deleting it would
+        // leave the account with nothing to fall back to, and the state
+        // filed under its id — its party membership, its markers, its
+        // saved player state — with nothing to belong to.
+        if (character != null && character.isDefault()) {
+            return CharacterOperationResult.failure(
+                    CharacterErrorId.DELETE_DEFAULT_CHARACTER, roster);
+        }
         try {
             LoreCharacterOwnershipWorldData loreOwnership =
                     LoreCharacterOwnershipStorage.get(player.worldObj);

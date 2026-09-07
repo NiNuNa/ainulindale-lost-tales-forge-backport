@@ -1,5 +1,7 @@
 package com.ninuna.losttales.character.sync;
 
+import com.ninuna.losttales.character.model.CharacterRoster;
+
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
@@ -137,6 +139,15 @@ public final class CharacterSummary {
                 character.getBodyTypeId(),
                 character.getChestTypeId()
         );
+    }
+
+    /**
+     * Whether this is the account's own identity. The slot says so: the
+     * default character is the one outside the nine, which is also what
+     * puts it first when the roster is ordered.
+     */
+    public boolean isDefault() {
+        return this.slotIndex == CharacterRoster.DEFAULT_SLOT_INDEX;
     }
 
     public UUID getCharacterId() {

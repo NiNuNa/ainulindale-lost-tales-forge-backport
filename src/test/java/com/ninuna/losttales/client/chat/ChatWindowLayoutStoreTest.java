@@ -159,6 +159,36 @@ public final class ChatWindowLayoutStoreTest {
     }
 
     /**
+     * A file naming one conversation of a scoped channel is repaired:
+     * the row holds one Faction tab, and which conversation it shows
+     * follows the identity being read, so a stored conversation would
+     * only ever be a second Faction tab beside the first.
+     */
+    @Test
+    public void aStoredConversationOfAScopedChannelIsDropped() {
+        ChatWindowLayoutStore.load(Arrays.asList(
+                "window w1 x=0.00 y=100.00 active=all "
+                        + "tabs=all,faction,faction|own:"
+                        + "00000000-0000-0000-0000-0000000000c1,"
+                        + "faction|in:lotr:gondor"));
+        ChatWindow window = ChatWindowLayout.window("w1");
+        assertNotNull(window);
+        int factionTabs = 0;
+        for (ChatTab tab : window.tabs()) {
+            if (tab.getChannel() == ChatChannel.FACTION) {
+                factionTabs++;
+                assertTrue("the row entry, not a conversation",
+                        tab.getOwnerKey().isEmpty());
+            }
+        }
+        assertEquals("one Faction tab in the row", 1, factionTabs);
+        // And nothing writes one back out.
+        for (String line : ChatWindowLayoutStore.describe()) {
+            assertFalse(line, line.contains("faction|"));
+        }
+    }
+
+    /**
      * An older build wrote a Discord tab of its own; OOC &amp; Discord took
      * it in, so every line naming it — a tab, the front tab, a mute, a
      * hidden mark — reads as that channel, and a layout naming both

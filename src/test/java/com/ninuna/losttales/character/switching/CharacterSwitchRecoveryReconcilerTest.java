@@ -194,6 +194,60 @@ public final class CharacterSwitchRecoveryReconcilerTest {
                 transaction);
     }
 
+    /**
+     * The status alone decides whether the live player still has to be
+     * reconciled against the journal. A rolled-back switch put the player
+     * back on the source already, and a journal held for an operator
+     * records an attempt that failed part-way: re-applying either would
+     * replace the state the player is on.
+     */
+    @Test
+    public void anAbortedJournalNamesNoStateToPutBack() {
+        assertFalse(CharacterSwitchRecoveryReconciler.requiresLiveReconciliation(
+                transaction(SOURCE, CharacterSwitchTransactionStatus.ABORTED)));
+    }
+
+    @Test
+    public void aJournalHeldForAnOperatorIsNeverActedOnAgain() {
+        assertFalse(CharacterSwitchRecoveryReconciler.requiresLiveReconciliation(
+                transaction(SOURCE,
+                        CharacterSwitchTransactionStatus.RECOVERY_REQUIRED)));
+    }
+
+    @Test
+    public void anInterruptedJournalStillNamesStateToPutBack() {
+        assertTrue(CharacterSwitchRecoveryReconciler.requiresLiveReconciliation(
+                transaction(SOURCE, CharacterSwitchTransactionStatus.PREPARED)));
+        assertTrue(CharacterSwitchRecoveryReconciler.requiresLiveReconciliation(
+                transaction(SOURCE, CharacterSwitchTransactionStatus.COMMITTED)));
+    }
+
+    @Test
+    public void noJournalNamesNothing() {
+        assertFalse(
+                CharacterSwitchRecoveryReconciler.requiresLiveReconciliation(null));
+    }
+
+    /**
+     * An aborted switch whose rollback left the source active is finished:
+     * the journal goes, and nothing about the cooldown or the freeze is
+     * touched a second time.
+     */
+    @Test
+    public void anAbortedJournalOnTheSourceIsSimplyCleared() {
+        CharacterSwitchAccountState account = account(transaction(
+                SOURCE, CharacterSwitchTransactionStatus.ABORTED));
+
+        CharacterSwitchRecoveryReconciler.Result result =
+                CharacterSwitchRecoveryReconciler.reconcile(SOURCE, account, 5000L);
+
+        assertEquals(CharacterSwitchRecoveryReconciler.Action.CLEAR_JOURNAL,
+                result.getAction());
+        assertEquals(CharacterErrorId.NONE, result.getErrorId());
+        assertNull(account.getTransaction());
+        assertFalse(account.isFrozen());
+    }
+
     private static CharacterSwitchTransaction transaction(
             UUID source,
             CharacterSwitchTransactionStatus status) {

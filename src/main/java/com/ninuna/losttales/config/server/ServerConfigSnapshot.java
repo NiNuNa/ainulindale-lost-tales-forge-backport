@@ -28,7 +28,32 @@ public final class ServerConfigSnapshot {
                     LostTalesConfig.CATEGORY_DISCORD + ".botToken")));
     /** Categories that belong to the client and are not the server's to offer. */
     public static final Set<String> CLIENT_CATEGORIES = LostTalesConfig.CLIENT_CATEGORIES;
+    /**
+     * Categories that decide what a player is allowed to do: the roles and
+     * the permissions they reach, and the gates the channels ask for. They
+     * are edited by {@code /losttales role}, which asks for
+     * {@link com.ninuna.losttales.permission.LostTalesCapability#ROLES_MANAGE},
+     * and are kept out of the general settings surface so that
+     * {@code server.config} cannot be used to grant itself anything else.
+     */
+    public static final Set<String> AUTHORIZATION_CATEGORIES =
+            Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
+                    LostTalesConfig.CATEGORY_ROLES,
+                    LostTalesConfig.CATEGORY_CHANNELS)));
+    /** Every category the general settings surface leaves alone. */
+    public static final Set<String> EXCLUDED_CATEGORIES = excluded();
     public static final int MAX_ENTRIES = 512;
+
+    private static Set<String> excluded() {
+        Set<String> names = new HashSet<String>();
+        for (String name : CLIENT_CATEGORIES) {
+            names.add(name.toLowerCase(Locale.ROOT));
+        }
+        for (String name : AUTHORIZATION_CATEGORIES) {
+            names.add(name.toLowerCase(Locale.ROOT));
+        }
+        return Collections.unmodifiableSet(names);
+    }
 
     private ServerConfigSnapshot() {}
 

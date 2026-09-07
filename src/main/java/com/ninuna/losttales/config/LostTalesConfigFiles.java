@@ -10,7 +10,8 @@ import java.io.File;
  *
  * <pre>
  * config/losttales/
- *   client/   client.cfg, third-person.cfg, camera_presets/, chat/, map_markers.txt
+ *   client/   client.cfg, third-person.cfg, camera_presets/, chat/, map_markers.txt,
+ *             templates/&lt;account uuid&gt;.txt
  *   server/   server.cfg, roles.cfg, channels.cfg
  *   lore_characters/   content both sides read; not configuration
  * </pre>
@@ -49,6 +50,14 @@ public final class LostTalesConfigFiles {
     public static final String CHAT_IGNORES = "chat/ignores.txt";
     /** Map marker favourites and recent destinations, under the client folder. */
     public static final String MAP_MARKERS = "map_markers.txt";
+    /**
+     * The default-character templates, a folder under the client folder
+     * holding one file per Minecraft account. A template is what a new
+     * world's default character is filled in from, so it is the account's
+     * and not the installation's: two people sharing a machine keep their
+     * own, and one person with two accounts keeps one for each.
+     */
+    public static final String CHARACTER_TEMPLATES = "templates";
 
     private LostTalesConfigFiles() {}
 

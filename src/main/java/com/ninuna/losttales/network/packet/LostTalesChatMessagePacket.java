@@ -771,7 +771,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
 
     /** Whether the channel is as many conversations as it has scope values. */
     private static boolean scopedChannel(ChatChannel channel) {
-        return channel != null && channel.isIdentityScoped();
+        return channel != null && channel.isScoped();
     }
 
     public ChatChannel getChannel() {

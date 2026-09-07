@@ -12,6 +12,8 @@ import java.util.Set;
 import cpw.mods.fml.common.FMLLog;
 import com.ninuna.losttales.chat.ChatRoleConfig;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
+import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelDescriptor;
 import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.LostTalesMetaData;
@@ -193,6 +195,7 @@ public final class LostTalesConfig {
     /** The accounts assigned each role, by UUID. */
     public static String[] chatRoleMembers = new String[0];
     /** The roles a channel asks for, to read and to send. */
+    public static String[] chatChannelDefinitions = new String[0];
     public static String[] chatChannelRoles = new String[0];
     /**
      * The server's Discord bridge; read on the server only. The token
@@ -984,6 +987,12 @@ public final class LostTalesConfig {
                     chatRoleMembers,
                     "Who holds each role, one role per line as <id>=<account uuid>,<account uuid>,character:<character uuid>. An account holds the role as every identity it plays and gains its grants; a character holds it as that character alone and gains no grant. /losttales role assign writes this."
             );
+            chatChannelDefinitions = config.getStringList(
+                    "definitions",
+                    CATEGORY_CHANNELS,
+                    new String[0],
+                    "Channels this server has of its own, one per line as <id>=name:<shown name>;rule:<global|proximity|operators>;colour:<RRGGBB>;ooc:<true|false>;bridge:<true|false>. The id is permanent: packets, the layout file and the gates all name a channel by it. The routing rules a config cannot describe - a party, a faction, a whisper, a private console - are refused, and an entry naming a channel this build already has is refused rather than replacing it."
+            );
             chatChannelRoles = config.getStringList(
                     "gates",
                     CATEGORY_CHANNELS,
@@ -1576,6 +1585,21 @@ public final class LostTalesConfig {
         ChatRoleCatalog catalog = ChatRoleConfig.parse(chatRoles, chatRoleMembers,
                 permissions, warnings);
         ChatRoleCatalog.installServer(catalog);
+        // The channels this server defines are put in force before the
+        // gates are read, so a gate may name one of them. Every reload
+        // starts from the built-ins: an id is registered once, and the
+        // file is the only thing that says which others are in force.
+        ChatChannel.resetToBuiltIn();
+        for (ChatChannelDescriptor descriptor
+                : ChatRoleConfig.parseChannelDefinitions(
+                        chatChannelDefinitions, warnings)) {
+            try {
+                ChatChannel.register(descriptor);
+            } catch (RuntimeException refused) {
+                warnings.warn("Channel '" + descriptor.getId()
+                        + "' could not be put in force: " + refused.getMessage());
+            }
+        }
         ChatChannelGates.install(ChatRoleConfig.parseGates(chatChannelRoles, catalog, warnings));
     }
 
@@ -2011,6 +2035,8 @@ public final class LostTalesConfig {
         config.get(CATEGORY_ROLES, "permissions", chatPermissions).set(chatPermissions);
         config.get(CATEGORY_ROLES, "definitions", chatRoles).set(chatRoles);
         config.get(CATEGORY_ROLES, "members", chatRoleMembers).set(chatRoleMembers);
+        config.get(CATEGORY_CHANNELS, "definitions", chatChannelDefinitions)
+                .set(chatChannelDefinitions);
         config.get(CATEGORY_CHANNELS, "gates", chatChannelRoles).set(chatChannelRoles);
         config.get(CATEGORY_CLIENT, "showTimestamps",
                 showChatTimestamps).set(showChatTimestamps);

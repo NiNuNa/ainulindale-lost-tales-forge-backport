@@ -81,7 +81,7 @@ public final class CharacterValidator {
         if (roster.getCharacterAtSlot(slotIndex) != null) {
             return CharacterCreationValidationResult.failure(CharacterErrorId.SLOT_OCCUPIED);
         }
-        if (roster.getCharacterCount() >= CharacterRoster.MAX_SLOTS) {
+        if (roster.roleplayCharacterCount() >= CharacterRoster.MAX_SLOTS) {
             return CharacterCreationValidationResult.failure(CharacterErrorId.MAX_CHARACTERS);
         }
 

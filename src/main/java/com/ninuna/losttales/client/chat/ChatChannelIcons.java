@@ -215,25 +215,32 @@ final class ChatChannelIcons {
         if (channel == null) {
             return null;
         }
-        switch (channel) {
-            case ALL:
-                return ChatEmoji.SLIGHT_SMILE;
-            case PROXIMITY:
-                return ChatEmoji.SMILEY;
-            case FACTION:
-                return ChatEmoji.SMIRK;
-            case OOC:
-                return ChatEmoji.DISCORD;
-            case PARTY:
-                return ChatEmoji.JOY;
-            case ADMIN:
-                return ChatEmoji.EXPRESSIONLESS;
-            case CONSOLE:
-                return ChatEmoji.CONSOLE;
-            case WHISPER:
-                return ChatEmoji.BLUSH;
-            default:
-                return ChatEmoji.SLIGHT_SMILE;
+        // By the channel itself rather than a name, so a channel a server
+        // defines falls through to the same face every unknown one wears.
+        if (channel == ChatChannel.ALL) {
+            return ChatEmoji.SLIGHT_SMILE;
         }
+        if (channel == ChatChannel.PROXIMITY) {
+            return ChatEmoji.SMILEY;
+        }
+        if (channel == ChatChannel.FACTION) {
+            return ChatEmoji.SMIRK;
+        }
+        if (channel == ChatChannel.OOC) {
+            return ChatEmoji.DISCORD;
+        }
+        if (channel == ChatChannel.PARTY) {
+            return ChatEmoji.JOY;
+        }
+        if (channel == ChatChannel.ADMIN) {
+            return ChatEmoji.EXPRESSIONLESS;
+        }
+        if (channel == ChatChannel.CONSOLE) {
+            return ChatEmoji.CONSOLE;
+        }
+        if (channel == ChatChannel.WHISPER) {
+            return ChatEmoji.BLUSH;
+        }
+        return ChatEmoji.SLIGHT_SMILE;
     }
 }

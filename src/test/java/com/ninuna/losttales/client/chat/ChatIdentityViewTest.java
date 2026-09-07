@@ -14,6 +14,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -37,6 +38,9 @@ public final class ChatIdentityViewTest {
         ClientCharacterRosterCache.clear();
     }
 
+    private static final UUID CIRION =
+            UUID.fromString("00000000-0000-0000-0000-0000000000c3");
+
     /** Aldric is in Gondor and is being played; Beren is in Rohan. */
     private static void roster() {
         ClientCharacterRosterCache.acceptRoster(0, new CharacterRosterSnapshot(
@@ -44,6 +48,16 @@ public final class ChatIdentityViewTest {
                 ALDRIC, 1L, RoleplayCharacter.CURRENT_DATA_VERSION,
                 Arrays.asList(summary(ALDRIC, "Aldric", GONDOR, 0),
                         summary(BEREN, "Beren", ROHAN, 1))));
+    }
+
+    /** As above, with a second character of the same faction as Aldric. */
+    private static void rosterWithTwoInGondor() {
+        ClientCharacterRosterCache.acceptRoster(0, new CharacterRosterSnapshot(
+                UUID.fromString("00000000-0000-0000-0000-0000000000a1"), 3,
+                ALDRIC, 1L, RoleplayCharacter.CURRENT_DATA_VERSION,
+                Arrays.asList(summary(ALDRIC, "Aldric", GONDOR, 0),
+                        summary(BEREN, "Beren", ROHAN, 1),
+                        summary(CIRION, "Cirion", GONDOR, 2))));
     }
 
     private static CharacterSummary summary(UUID id, String name, String faction,
@@ -97,8 +111,8 @@ public final class ChatIdentityViewTest {
     public void theFactionTabShowsTheFactionOfTheIdentityBeingRead() {
         roster();
         ChatTab row = ChatTab.of(ChatChannel.FACTION);
-        ChatTab gondor = ChatTab.of(ChatChannel.FACTION, keyOf(ALDRIC));
-        ChatTab rohan = ChatTab.of(ChatChannel.FACTION, keyOf(BEREN));
+        ChatTab gondor = ChatTab.of(ChatChannel.FACTION, GONDOR);
+        ChatTab rohan = ChatTab.of(ChatChannel.FACTION, ROHAN);
         assertNotEquals("the two conversations are two tabs", gondor, rohan);
 
         // Read as Aldric: the row stands for Gondor's talk.
@@ -152,17 +166,99 @@ public final class ChatIdentityViewTest {
     }
 
     /**
-     * A tab a scoped channel's line is filed under round-trips through
-     * the id the layout writes, so a stored tab still names the same
-     * conversation after a restart.
+     * Every character of this player in a faction reads the same
+     * conversation. The tab is named by the faction, so a second Gondor
+     * character sees Gondor's talk rather than an empty tab that keeps
+     * counting unread.
      */
     @Test
-    public void aScopedTabRoundTripsThroughItsId() {
-        ChatTab rohan = ChatTab.of(ChatChannel.FACTION, keyOf(BEREN));
-        assertEquals("faction|own:" + keyOf(BEREN), rohan.id());
+    public void twoCharactersInOneFactionReadTheSameConversation() {
+        rosterWithTwoInGondor();
+        ChatTab row = ChatTab.of(ChatChannel.FACTION);
+        ChatTab gondor = ChatTab.of(ChatChannel.FACTION, GONDOR);
+
+        assertEquals("read as Aldric, the row is Gondor's talk",
+                gondor, ChatTab.viewed(row));
+        assertTrue(ChatLineFilter.of(row).accepts(gondor));
+
+        ClientChatAppearances.select(appearanceOf(CIRION), row);
+        assertEquals("read as Cirion, the same conversation",
+                gondor, ChatTab.viewed(row));
+        assertTrue("Gondor's lines are still shown",
+                ChatLineFilter.of(row).accepts(gondor));
+    }
+
+    /** The account is in no faction, so it is in no conversation. */
+    @Test
+    public void theAccountReadsNoFactionConversation() {
+        roster();
+        ChatTab row = ChatTab.of(ChatChannel.FACTION);
+        ClientChatAppearances.select(ClientChatAppearances.accountAppearance(), row);
+        assertEquals("the row stands for nothing to show",
+                row, ChatTab.viewed(row));
+        assertFalse(ChatLineFilter.of(row).accepts(
+                ChatTab.of(ChatChannel.FACTION, GONDOR)));
+    }
+
+    /**
+     * A line arriving in the conversation on screen is one the player is
+     * looking at, so it opens no unread count. The line carries its own
+     * conversation while the selection is the row entry, and the two are
+     * compared as the same conversation rather than as different values.
+     */
+    @Test
+    public void aLineInTheConversationOnScreenIsNotCountedUnread() {
+        roster();
+        ChatTab row = ChatTab.of(ChatChannel.FACTION);
+        ChatTab gondor = ChatTab.of(ChatChannel.FACTION, GONDOR);
+        ChatTab rohan = ChatTab.of(ChatChannel.FACTION, ROHAN);
+        try {
+            ClientChatChannelViews.record(-501, gondor, row, false);
+            assertEquals("read as Aldric, Gondor's talk is on screen",
+                    0, ClientChatChannelViews.unreadCount(row));
+
+            // The other faction's talk is not on screen and is counted.
+            ClientChatChannelViews.record(-502, rohan, row, false);
+            assertEquals(0, ClientChatChannelViews.unreadCount(row));
+            ClientChatAppearances.select(appearanceOf(BEREN), row);
+            assertEquals("and is waiting when it is read as",
+                    1, ClientChatChannelViews.unreadCount(row));
+        } finally {
+            ClientChatChannelViews.clear();
+        }
+    }
+
+    /**
+     * A conversation is not a tab a window holds: the row entry is, and
+     * that is what the layout is asked about.
+     */
+    @Test
+    public void aConversationBelongsToItsChannelsRowEntry() {
+        ChatTab row = ChatTab.of(ChatChannel.FACTION);
+        assertEquals(row, ChatTab.row(ChatTab.of(ChatChannel.FACTION, GONDOR)));
+        assertEquals("an unscoped tab is its own row",
+                ChatTab.of(ChatChannel.ALL),
+                ChatTab.row(ChatTab.of(ChatChannel.ALL)));
+        ChatTab whisper = ChatTab.whisper("Steve", "Faramir", keyOf(ALDRIC));
+        assertEquals("a whisper tab is its own row", whisper,
+                ChatTab.row(whisper));
+    }
+
+    /**
+     * A conversation round-trips through its id, and an id written when
+     * a conversation was named by a character names none now, so a
+     * layout file holding one drops it rather than restoring a second
+     * Faction tab beside the row entry.
+     */
+    @Test
+    public void aScopedTabRoundTripsThroughItsIdAndACharacterKeyedOneDoesNot() {
+        ChatTab rohan = ChatTab.of(ChatChannel.FACTION, ROHAN);
+        assertEquals("faction|in:" + ROHAN, rohan.id());
         assertEquals(rohan, ChatTab.fromId(rohan.id()));
         ChatTab plain = ChatTab.of(ChatChannel.ALL);
         assertEquals("all", plain.id());
         assertEquals(plain, ChatTab.fromId(plain.id()));
+        assertNull("a conversation named by a character names none now",
+                ChatTab.fromId("faction|own:" + keyOf(BEREN)));
     }
 }

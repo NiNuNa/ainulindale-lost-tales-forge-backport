@@ -9,13 +9,14 @@ import java.util.UUID;
 /** Persistent server-authoritative record for one roleplaying character. */
 public class RoleplayCharacter {
 
-    public static final int CURRENT_DATA_VERSION = 8;
+    public static final int CURRENT_DATA_VERSION = 9;
     public static final int INITIAL_ROLEPLAY_LEVEL = 1;
     public static final boolean DEFAULT_SHOW_MINECRAFT_CAPE = true;
     public static final int DEFAULT_COSMETIC_CAPE_ID = CharacterCapeCatalog.NONE_ID;
 
     private final UUID characterId;
     private final UUID ownerId;
+    private final CharacterKind kind;
     private final int slotIndex;
     private final String name;
     private final String raceId;
@@ -60,6 +61,7 @@ public class RoleplayCharacter {
             throw new IllegalArgumentException("source must not be null");
         }
         return new Builder(source.characterId, source.ownerId)
+                .kind(source.kind)
                 .slot(source.slotIndex).name(source.name).race(source.raceId)
                 .gender(source.genderId).skin(source.skinId).age(source.age)
                 .startingFaction(source.startingFactionId)
@@ -79,6 +81,7 @@ public class RoleplayCharacter {
     private RoleplayCharacter(Builder builder) {
         this.characterId = builder.characterId;
         this.ownerId = builder.ownerId;
+        this.kind = builder.kind == null ? CharacterKind.ROLEPLAY : builder.kind;
         this.slotIndex = builder.slotIndex;
         this.name = builder.name;
         this.raceId = builder.raceId;
@@ -133,6 +136,7 @@ public class RoleplayCharacter {
         private String description = "";
         private String bodyTypeId;
         private String chestTypeId;
+        private CharacterKind kind = CharacterKind.ROLEPLAY;
 
         private Builder(UUID characterId, UUID ownerId) {
             if (characterId == null) {
@@ -143,6 +147,12 @@ public class RoleplayCharacter {
             }
             this.characterId = characterId;
             this.ownerId = ownerId;
+        }
+
+        /** Which kind of identity this is; a roleplay character by default. */
+        public Builder kind(CharacterKind kind) {
+            this.kind = kind == null ? CharacterKind.ROLEPLAY : kind;
+            return this;
         }
 
         /** The account the character belongs to, when it changes hands. */
@@ -255,6 +265,16 @@ public class RoleplayCharacter {
 
     public UUID getCharacterId() {
         return this.characterId;
+    }
+
+    /** Which kind of playable identity this record is. */
+    public CharacterKind getKind() {
+        return this.kind;
+    }
+
+    /** Whether this is the account's own identity, which is never deleted. */
+    public boolean isDefault() {
+        return this.kind == CharacterKind.DEFAULT;
     }
 
     public UUID getOwnerId() {

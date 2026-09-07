@@ -40,11 +40,8 @@ public final class RoleplayCharacterIdentityHook {
 
     /** Returns the active character name for roleplay dialogue only. */
     public static String resolveRoleplayName(EntityPlayer player) {
-        RoleplayCharacter character = resolveActive(player);
-        if (character != null && !isBlank(character.getName())) {
-            return character.getName();
-        }
-        return player == null ? "" : player.getCommandSenderName();
+        return PlayableIdentity.displayName(resolveActive(player),
+                player == null ? "" : player.getCommandSenderName());
     }
 
     /**

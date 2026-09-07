@@ -53,42 +53,42 @@ public final class ChatChannelSendRefusalTest {
     /** An open channel refuses nobody, whatever they are or are not in. */
     @Test
     public void anOpenChannelRefusesNobody() {
-        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.ALL, null, ALDRIC, "", 0));
-        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.PROXIMITY, null, ALDRIC, "", 0));
-        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.OOC, null, null, "", 0));
+        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.ALL, null, ALDRIC, "", 0, false));
+        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.PROXIMITY, null, ALDRIC, "", 0, false));
+        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.OOC, null, null, "", 0, false));
     }
 
     /** A channel that is not a channel at all refuses, rather than passing. */
     @Test
     public void noChannelIsRefused() {
         assertEquals(GATE_REFUSAL,
-                ChatChannelPolicy.sendRefusal(null, null, ALDRIC, GONDOR, 0));
+                ChatChannelPolicy.sendRefusal(null, null, ALDRIC, GONDOR, 0, false));
     }
 
     /** A party line needs a party, and the sender's own place in it. */
     @Test
     public void aPartyLineNeedsThatPartysMembership() {
         assertEquals(PARTY_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.PARTY, null, ALDRIC, "", 0));
+                ChatChannelPolicy.sendRefusal(ChatChannel.PARTY, null, ALDRIC, "", 0, false));
         Party party = partyOf(ALDRIC);
-        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.PARTY, party, ALDRIC, "", 0));
+        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.PARTY, party, ALDRIC, "", 0, false));
         assertEquals("someone else's party is not the sender's",
                 PARTY_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.PARTY, party, BEREN, "", 0));
+                ChatChannelPolicy.sendRefusal(ChatChannel.PARTY, party, BEREN, "", 0, false));
         assertEquals("an identity with no gameplay id is in no party",
                 PARTY_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.PARTY, party, null, "", 0));
+                ChatChannelPolicy.sendRefusal(ChatChannel.PARTY, party, null, "", 0, false));
     }
 
     /** A faction line needs a faction: the account, which has none, is refused. */
     @Test
     public void aFactionLineNeedsAFaction() {
         assertEquals(FACTION_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.FACTION, null, ALDRIC, "", 0));
+                ChatChannelPolicy.sendRefusal(ChatChannel.FACTION, null, ALDRIC, "", 0, false));
         assertEquals(FACTION_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.FACTION, null, ALDRIC, null, 0));
+                ChatChannelPolicy.sendRefusal(ChatChannel.FACTION, null, ALDRIC, null, 0, false));
         assertNull(ChatChannelPolicy.sendRefusal(
-                ChatChannel.FACTION, null, ALDRIC, GONDOR, 0));
+                ChatChannel.FACTION, null, ALDRIC, GONDOR, 0, false));
     }
 
     /** Membership is asked before the gate, so the notice names the nearer reason. */
@@ -97,7 +97,7 @@ public final class ChatChannelSendRefusalTest {
         installOperatorGateOn(ChatChannel.FACTION);
         assertEquals("no faction is the reason, not the gate",
                 FACTION_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.FACTION, null, ALDRIC, "", 0));
+                ChatChannelPolicy.sendRefusal(ChatChannel.FACTION, null, ALDRIC, "", 0, false));
     }
 
     /** The gate the config put on a channel refuses whoever does not hold its role. */
@@ -105,13 +105,78 @@ public final class ChatChannelSendRefusalTest {
     public void theGateRefusesWhoeverDoesNotHoldItsRole() {
         installOperatorGateOn(ChatChannel.ADMIN);
         assertEquals(GATE_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.ADMIN, null, ALDRIC, "", 0));
+                ChatChannelPolicy.sendRefusal(ChatChannel.ADMIN, null, ALDRIC, "", 0, false));
         int operator = ChatRoleCatalog.server().byId("operator").bit();
         assertNull(ChatChannelPolicy.sendRefusal(
-                ChatChannel.ADMIN, null, ALDRIC, "", operator));
+                ChatChannel.ADMIN, null, ALDRIC, "", operator, false));
         assertTrue("the client is told to ask again for its tabs",
                 ChatChannelPolicy.isGateRefusal(GATE_REFUSAL));
         assertTrue(!ChatChannelPolicy.isGateRefusal(FACTION_REFUSAL));
+    }
+
+    /**
+     * A staff channel with no gate on it is the server's operators and
+     * nobody else. The config chooses which roles reach such a channel;
+     * a line missing from a file does not choose that everyone does.
+     */
+    @Test
+    public void anUngatedStaffChannelIsOperatorsOnly() {
+        ChatRoleCatalog catalog = ChatRoleConfig.parse(
+                new String[] {ChatRoleConfig.DEFAULT_OPERATOR_ENTRY}, null,
+                ChatRoleConfig.SILENT);
+        ChatRoleCatalog.installServer(catalog);
+        // A channels file that names no gate at all.
+        ChatChannelGates.install(ChatChannelGates.defaults());
+
+        assertTrue("the staff channel is restricted by its own rule",
+                ChatChannelPolicy.staffOnly(ChatChannel.ADMIN,
+                        ChatChannelGates.current()));
+        assertEquals("a player who is not an operator is refused",
+                GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
+                        ChatChannel.ADMIN, null, ALDRIC, "", 0, false));
+        assertNull("an operator still reaches it",
+                ChatChannelPolicy.sendRefusal(
+                        ChatChannel.ADMIN, null, ALDRIC, "", 0, true));
+        assertTrue("no other channel is restricted by its rule",
+                !ChatChannelPolicy.staffOnly(ChatChannel.ALL,
+                        ChatChannelGates.current())
+                        && !ChatChannelPolicy.staffOnly(ChatChannel.OOC,
+                                ChatChannelGates.current()));
+    }
+
+    /**
+     * A file that names the staff channel and leaves both sides open has
+     * decided; the floor is for a file that says nothing, not for one
+     * that says "any".
+     */
+    @Test
+    public void aStaffChannelTheConfigDeliberatelyOpensStaysOpen() {
+        ChatRoleCatalog catalog = ChatRoleConfig.parse(
+                new String[] {ChatRoleConfig.DEFAULT_OPERATOR_ENTRY}, null,
+                ChatRoleConfig.SILENT);
+        ChatRoleCatalog.installServer(catalog);
+        ChatChannelGates.install(ChatRoleConfig.parseGates(
+                new String[] {"admin=read:any;send:any"}, catalog,
+                ChatRoleConfig.SILENT));
+
+        assertTrue("the file named it, so the floor stands down",
+                !ChatChannelPolicy.staffOnly(ChatChannel.ADMIN,
+                        ChatChannelGates.current()));
+        assertNull("anyone may send into it",
+                ChatChannelPolicy.sendRefusal(
+                        ChatChannel.ADMIN, null, ALDRIC, "", 0, false));
+    }
+
+    /** With a gate in place the config decides again, operator or not. */
+    @Test
+    public void aGatedStaffChannelFollowsTheConfigNotTheOperatorFloor() {
+        installOperatorGateOn(ChatChannel.ADMIN);
+        assertTrue("a gate is what the config put there",
+                !ChatChannelPolicy.staffOnly(ChatChannel.ADMIN,
+                        ChatChannelGates.current()));
+        assertEquals("the gate refuses whoever does not hold its role",
+                GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
+                        ChatChannel.ADMIN, null, ALDRIC, "", 0, true));
     }
 
     /** Installs the seeded operator role and puts its gate on one channel. */
@@ -139,7 +204,7 @@ public final class ChatChannelSendRefusalTest {
                 ChatRoleConfig.SILENT));
         assertEquals(GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
                 ChatChannel.ADMIN, null, ALDRIC,  "",
-                catalog.byId("operator").bit()));
+                catalog.byId("operator").bit(), false));
     }
 
     /** Every channel is decided the same way: none of them is named in the rule. */
@@ -147,7 +212,7 @@ public final class ChatChannelSendRefusalTest {
     public void everyChannelIsDecidedByItsOwnFacts() {
         for (ChatChannel channel : ChatChannel.values()) {
             String refusal = ChatChannelPolicy.sendRefusal(
-                    channel, partyOf(ALDRIC), ALDRIC, GONDOR, 0);
+                    channel, partyOf(ALDRIC), ALDRIC, GONDOR, 0, false);
             assertTrue(channel.getId() + " answers with a notice or with nothing",
                     refusal == null || Arrays.asList(PARTY_REFUSAL, FACTION_REFUSAL,
                             GATE_REFUSAL).contains(refusal));

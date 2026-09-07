@@ -131,9 +131,14 @@ public final class LostTalesChatPresentation {
         // in the closed-chat feed, and the tab shows them all once it is
         // opened again.
         ChatTab tab = tabOf(packet);
-        if (tab != null && !ChatWindowLayout.isOpen(tab)
-                && !ChatWindowLayout.isHidden(tab)) {
-            ChatWindowLayout.openTab(tab, windowIdOfSelection());
+        // The layout holds one entry per channel, so a conversation of a
+        // scoped channel is asked about as the row entry it belongs to.
+        // Asking with the conversation's own tab would find no window
+        // holding it and open a second Faction tab beside the first.
+        ChatTab row = ChatTab.row(tab);
+        if (row != null && !ChatWindowLayout.isOpen(row)
+                && !ChatWindowLayout.isHidden(row)) {
+            ChatWindowLayout.openTab(row, windowIdOfSelection());
         }
         if (tab == null) {
             return;
@@ -800,12 +805,10 @@ public final class LostTalesChatPresentation {
                     ChatTab.ownerKeyOf(packet.getOwnCharacterId()));
         }
         // A line of a scoped channel belongs to the conversation it was
-        // said in, and so to the identity of this player's that reads
-        // that conversation: a Gondor line is Gondor's character's, and
-        // is never shown under the Rohan one's tab.
-        return ChatTab.of(packet.getChannel(),
-                ClientChatChannelState.ownerKeyReading(packet.getChannel(),
-                        packet.getScopeValue()));
+        // said in, named by that conversation: a Gondor line is Gondor's,
+        // whichever character of this player's reads it, and is never
+        // shown under the Rohan one.
+        return ChatTab.of(packet.getChannel(), packet.getScopeValue());
     }
 
     /**

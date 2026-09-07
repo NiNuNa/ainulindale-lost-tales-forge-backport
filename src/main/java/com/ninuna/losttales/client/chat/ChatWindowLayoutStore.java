@@ -12,7 +12,8 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.EnumSet;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 
@@ -67,7 +68,7 @@ public final class ChatWindowLayoutStore {
     static void load(List<String> lines) {
         List<ChatWindowLayout.WindowSpec> specs =
                 new ArrayList<ChatWindowLayout.WindowSpec>();
-        EnumSet<ChatChannel> closed = EnumSet.noneOf(ChatChannel.class);
+        Set<ChatChannel> closed = new LinkedHashSet<ChatChannel>();
         List<ChatTab> muted = new ArrayList<ChatTab>();
         List<ChatTab> pingsMuted = new ArrayList<ChatTab>();
         List<ChatTab> hidden = new ArrayList<ChatTab>();

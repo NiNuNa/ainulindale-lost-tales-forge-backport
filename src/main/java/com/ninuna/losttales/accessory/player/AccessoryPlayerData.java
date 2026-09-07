@@ -16,6 +16,12 @@ import java.util.List;
 public final class AccessoryPlayerData implements IExtendedEntityProperties {
 
     public static final String PROPERTY_ID = "LostTalesAccessory";
+    /**
+     * The version of this file's own layout. The character snapshot in
+     * {@code AccessoryStateComponent} counts separately: it writes a
+     * compound of its own from the parsed state below, so the two never
+     * read each other's bytes and neither version follows the other.
+     */
     private static final int DATA_VERSION = 2;
     public static final int MAX_REJECTED_ENTRIES = 16;
     private static final String TAG_VERSION = "Version";
