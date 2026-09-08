@@ -34,6 +34,8 @@ public final class CharacterTemplateAdoption {
     private final String chestTypeId;
     private final String description;
     private final int age;
+    private final boolean showMinecraftCape;
+    private final int cosmeticCapeId;
 
     /** An account with no template: the reading is spent, nothing changes. */
     public static CharacterTemplateAdoption none(long expectedRosterRevision) {
@@ -41,12 +43,25 @@ public final class CharacterTemplateAdoption {
                 "", "", "", "", "", "", "", 0);
     }
 
+    /** The Minecraft cape shown and no cosmetic cape, as a character starts unless asked otherwise. */
     public CharacterTemplateAdoption(long expectedRosterRevision, boolean offered,
                                      String name, String raceId, String genderId,
                                      String skinId, String bodyTypeId,
                                      String chestTypeId, String description,
                                      int age) {
+        this(expectedRosterRevision, offered, name, raceId, genderId, skinId,
+                bodyTypeId, chestTypeId, description, age, true, 0);
+    }
+
+    public CharacterTemplateAdoption(long expectedRosterRevision, boolean offered,
+                                     String name, String raceId, String genderId,
+                                     String skinId, String bodyTypeId,
+                                     String chestTypeId, String description,
+                                     int age, boolean showMinecraftCape,
+                                     int cosmeticCapeId) {
         this.expectedRosterRevision = expectedRosterRevision;
+        this.showMinecraftCape = showMinecraftCape;
+        this.cosmeticCapeId = cosmeticCapeId;
         this.offered = offered;
         this.name = text(name);
         this.raceId = text(raceId);
@@ -68,6 +83,10 @@ public final class CharacterTemplateAdoption {
     public String getChestTypeId() { return this.chestTypeId; }
     public String getDescription() { return this.description; }
     public int getAge() { return this.age; }
+    /** Whether the account's own Minecraft cape is worn when no cosmetic cape is. */
+    public boolean isMinecraftCapeVisible() { return this.showMinecraftCape; }
+    /** The cosmetic cape's catalogue id; zero for none. The server checks it. */
+    public int getCosmeticCapeId() { return this.cosmeticCapeId; }
 
     private static String text(String value) {
         return value == null ? "" : value;

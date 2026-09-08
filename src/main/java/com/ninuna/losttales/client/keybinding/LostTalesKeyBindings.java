@@ -33,8 +33,12 @@ public class LostTalesKeyBindings {
     private static final KeyBinding TARGET_LOCK = new KeyBinding("key.losttales.targetLock", MIDDLE_MOUSE_KEY_CODE, CATEGORY);
     private static final KeyBinding CYCLE_TARGET_LEFT = new KeyBinding("key.losttales.cycleTargetLeft", Keyboard.KEY_NONE, CATEGORY);
     private static final KeyBinding CYCLE_TARGET_RIGHT = new KeyBinding("key.losttales.cycleTargetRight", Keyboard.KEY_NONE, CATEGORY);
+    /** Lights the character in the creator; read by the creator screen, never during play. */
+    private static final KeyBinding CREATOR_LIGHT = new KeyBinding(
+            "key.losttales.creatorLight", Keyboard.KEY_L, CATEGORY);
 
     public void register() {
+        ClientRegistry.registerKeyBinding(CREATOR_LIGHT);
         ClientRegistry.registerKeyBinding(CHARACTER_MENU);
         ClientRegistry.registerKeyBinding(QUEST_JOURNAL);
         ClientRegistry.registerKeyBinding(MAP);
@@ -177,6 +181,14 @@ public class LostTalesKeyBindings {
 
     public static boolean isMapKey(int keyCode) {
         return isKeyboardKey(MAP, keyCode);
+    }
+
+    public static boolean isCreatorLightKey(int keyCode) {
+        return isKeyboardKey(CREATOR_LIGHT, keyCode);
+    }
+
+    public static KeyBinding getCreatorLightKeyBinding() {
+        return CREATOR_LIGHT;
     }
 
     public static boolean isMapMouseButton(int mouseButton) {

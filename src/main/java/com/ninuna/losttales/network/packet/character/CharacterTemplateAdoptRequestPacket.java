@@ -1,5 +1,6 @@
 package com.ninuna.losttales.network.packet.character;
 
+import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.server.CharacterNetworkRequestHandler;
 import com.ninuna.losttales.character.server.CharacterServerPacketDispatcher;
 import com.ninuna.losttales.character.server.CharacterTemplateAdoption;
@@ -40,6 +41,8 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
     private String chestTypeId = "";
     private String description = "";
     private int age;
+    private boolean showMinecraftCape = true;
+    private int cosmeticCapeId;
     private boolean malformed;
 
     public CharacterTemplateAdoptRequestPacket() {}
@@ -60,6 +63,8 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
         this.chestTypeId = adoption.getChestTypeId();
         this.description = adoption.getDescription();
         this.age = adoption.getAge();
+        this.showMinecraftCape = adoption.isMinecraftCapeVisible();
+        this.cosmeticCapeId = adoption.getCosmeticCapeId();
     }
 
     @Override
@@ -83,10 +88,17 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
             this.description = CharacterPacketCodec.readString(
                     buffer, CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
             this.age = buffer.readInt();
+            this.showMinecraftCape = buffer.readBoolean();
+            this.cosmeticCapeId = buffer.readInt();
             CharacterPacketCodec.requireFinished(buffer);
             if (this.expectedRosterRevision < 0L) {
                 throw new CharacterPacketCodec.DecodeException(
                         "missing roster revision");
+            }
+            if (this.cosmeticCapeId < CharacterCapeCatalog.NONE_ID
+                    || this.cosmeticCapeId > CharacterCapeCatalog.MAX_NETWORK_ID) {
+                throw new CharacterPacketCodec.DecodeException(
+                        "cape id out of range");
             }
         } catch (RuntimeException exception) {
             this.malformed = true;
@@ -113,6 +125,9 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
         CharacterPacketCodec.writeString(
                 buffer, this.description, CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
         buffer.writeInt(this.age);
+        // Appended after the original layout: the cape the template chose.
+        buffer.writeBoolean(this.showMinecraftCape);
+        buffer.writeInt(this.cosmeticCapeId);
     }
 
     /** Whether the payload could not be read and must be discarded. */
@@ -125,7 +140,8 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
         return new CharacterTemplateAdoption(this.expectedRosterRevision,
                 this.offered, this.name, this.raceId, this.genderId,
                 this.skinId, this.bodyTypeId, this.chestTypeId,
-                this.description, this.age);
+                this.description, this.age, this.showMinecraftCape,
+                this.cosmeticCapeId);
     }
 
     public static final class Handler implements

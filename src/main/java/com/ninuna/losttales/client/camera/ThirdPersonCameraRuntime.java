@@ -117,6 +117,7 @@ public final class ThirdPersonCameraRuntime {
         ThirdPersonTargetingHooks.resetDiagnostics();
         ThirdPersonTargetLockController.reset();
         ThirdPersonChargeFeedbackController.reset();
+        ThirdPersonCameraInspection.reset();
     }
 
     public static boolean isOverhaulOperational() {

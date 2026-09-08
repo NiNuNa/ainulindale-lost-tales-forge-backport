@@ -22,9 +22,17 @@ public final class ThirdPersonCameraHooks {
             EntityLivingBase viewEntity, double vanillaDistance,
             float partialTicks) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (!isTransformerActive()
-                || !ThirdPersonCameraRuntime.shouldUseCamera(
-                minecraft, viewEntity)) {
+        if (!isTransformerActive()) {
+            ThirdPersonCameraController.deactivate();
+            return vanillaDistance;
+        }
+        if (ThirdPersonCameraInspection.isActive(minecraft, viewEntity)) {
+            // A screen has borrowed the camera; the overhaul's own state is
+            // left as it is for when the screen gives it back.
+            return ThirdPersonCameraInspection.resolveDistance(
+                    viewEntity, partialTicks);
+        }
+        if (!ThirdPersonCameraRuntime.shouldUseCamera(minecraft, viewEntity)) {
             ThirdPersonCameraController.deactivate();
             return vanillaDistance;
         }
@@ -122,9 +130,15 @@ public final class ThirdPersonCameraHooks {
             EntityLivingBase viewEntity, float partialTicks,
             double actualDistance) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (!isTransformerActive()
-                || !ThirdPersonCameraRuntime.shouldUseCamera(
-                minecraft, viewEntity)) {
+        if (!isTransformerActive()) {
+            return;
+        }
+        if (ThirdPersonCameraInspection.isActive(minecraft, viewEntity)) {
+            ThirdPersonCameraInspection.applyCameraOffset(
+                    viewEntity, partialTicks, actualDistance);
+            return;
+        }
+        if (!ThirdPersonCameraRuntime.shouldUseCamera(minecraft, viewEntity)) {
             return;
         }
         CameraPose pose = ThirdPersonCameraController.getCurrentPose();
@@ -159,8 +173,14 @@ public final class ThirdPersonCameraHooks {
 
     public static float resolveFov(float vanillaFov, boolean useFovSetting) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (!useFovSetting || !isTransformerActive()
-                || !ThirdPersonCameraRuntime.shouldUseCamera(
+        if (!useFovSetting || !isTransformerActive()) {
+            return vanillaFov;
+        }
+        if (ThirdPersonCameraInspection.isActive(minecraft,
+                minecraft == null ? null : minecraft.renderViewEntity)) {
+            return ThirdPersonCameraInspection.recordFov(vanillaFov);
+        }
+        if (!ThirdPersonCameraRuntime.shouldUseCamera(
                 minecraft, minecraft == null
                 ? null : minecraft.renderViewEntity)) {
             return vanillaFov;
@@ -176,7 +196,7 @@ public final class ThirdPersonCameraHooks {
         return resolvedFov;
     }
 
-    private static CameraCollisionResolver.Raycaster createWorldRaycaster(
+    static CameraCollisionResolver.Raycaster createWorldRaycaster(
             final EntityLivingBase viewEntity) {
         return new CameraCollisionResolver.Raycaster() {
             @Override

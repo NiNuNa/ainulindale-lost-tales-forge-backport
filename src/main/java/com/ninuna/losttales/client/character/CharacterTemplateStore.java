@@ -52,6 +52,8 @@ public final class CharacterTemplateStore {
     private static final String KEY_DESCRIPTION = "description";
     private static final String KEY_AGE = "age";
     private static final String KEY_UNCONVENTIONAL = "unconventional";
+    private static final String KEY_MINECRAFT_CAPE = "minecraft_cape";
+    private static final String KEY_COSMETIC_CAPE = "cosmetic_cape";
 
     /** The folder under the client's own, one file per account. */
     static final String FOLDER = LostTalesConfigFiles.CHARACTER_TEMPLATES;
@@ -87,7 +89,12 @@ public final class CharacterTemplateStore {
                 values.get(KEY_BODY), values.get(KEY_CHEST),
                 values.get(KEY_FACTION), values.get(KEY_DESCRIPTION),
                 parseAge(values.get(KEY_AGE)),
-                Boolean.parseBoolean(values.get(KEY_UNCONVENTIONAL)));
+                Boolean.parseBoolean(values.get(KEY_UNCONVENTIONAL)),
+                // A file from before the cape was kept shows the cape, as
+                // every character did then.
+                values.get(KEY_MINECRAFT_CAPE) == null
+                        || Boolean.parseBoolean(values.get(KEY_MINECRAFT_CAPE)),
+                parseAge(values.get(KEY_COSMETIC_CAPE)));
     }
 
     /**
@@ -113,6 +120,9 @@ public final class CharacterTemplateStore {
         values.put(KEY_AGE, String.valueOf(template.getAge()));
         values.put(KEY_UNCONVENTIONAL,
                 String.valueOf(template.hasUnconventionalSettings()));
+        values.put(KEY_MINECRAFT_CAPE,
+                String.valueOf(template.isMinecraftCapeVisible()));
+        values.put(KEY_COSMETIC_CAPE, String.valueOf(template.getCosmeticCapeId()));
         // Anything a later build wrote and this one does not know is put
         // back as it was, so saving here does not thin out that file.
         if (file.isFile()) {

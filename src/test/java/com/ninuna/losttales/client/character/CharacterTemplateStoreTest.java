@@ -97,6 +97,24 @@ public final class CharacterTemplateStoreTest {
         assertFalse(CharacterTemplateStore.save(ACCOUNT, template("Aldric", "")));
     }
 
+    /** The cape rides along, and a file from before it was kept shows the cape. */
+    @Test
+    public void theCapeIsKeptAndAnOlderFileShowsIt() throws IOException {
+        CharacterTemplate caped = new CharacterTemplate("Aldric", "lotr:human",
+                "male", "human_male_1", "wide", "none", "lotr:gondor", "", 30,
+                false, false, 5);
+        assertTrue(CharacterTemplateStore.save(ACCOUNT, caped));
+        CharacterTemplate loaded = CharacterTemplateStore.load(ACCOUNT);
+        assertFalse(loaded.isMinecraftCapeVisible());
+        assertEquals(5, loaded.getCosmeticCapeId());
+        assertEquals(caped, loaded);
+
+        writeRaw(ACCOUNT, "name=Aldric\nage=41\n");
+        CharacterTemplate older = CharacterTemplateStore.load(ACCOUNT);
+        assertTrue(older.isMinecraftCapeVisible());
+        assertEquals(0, older.getCosmeticCapeId());
+    }
+
     /** A file of nonsense is a template nobody has, not a failure. */
     @Test
     public void anUnreadableFileReadsAsNoTemplate() throws IOException {

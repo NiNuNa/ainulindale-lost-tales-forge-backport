@@ -10,6 +10,7 @@ import com.ninuna.losttales.client.character.LostTalesClientAccount;
 import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSmoothing;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterCreationGui;
+import com.ninuna.losttales.gui.style.LostTalesButtonStyle;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import net.minecraft.client.Minecraft;
@@ -25,8 +26,8 @@ import java.lang.ref.WeakReference;
 import java.util.UUID;
 
 /**
- * The way into the account's default-character template from the main
- * menu, before any world is open.
+ * Styles the main menu's standard controls and adds the account's
+ * default-character template button before any world is open.
  *
  * <p>The menu is not gated: Singleplayer and Multiplayer stay where they
  * are and do what they always did. A world makes the account's default
@@ -80,6 +81,11 @@ public final class LostTalesMainMenuHandler {
             // same path; that one is scenery and owns no buttons of ours.
             return;
         }
+        styleMenuButtons(event);
+        MainMenuButtonLayout.arrange(event.buttonList);
+        // The character frame spans the final, uniformly spaced rows.
+        GuiButton singleplayer = findButton(event, SINGLEPLAYER_ID);
+        GuiButton multiplayer = findButton(event, MULTIPLAYER_ID);
         UUID account = LostTalesClientAccount.id();
         if (account == null) {
             // Nothing to keep a template under, so nothing to offer.
@@ -89,8 +95,6 @@ public final class LostTalesMainMenuHandler {
         if (existing != null && event.buttonList.contains(existing)) {
             return;
         }
-        GuiButton singleplayer = findButton(event, SINGLEPLAYER_ID);
-        GuiButton multiplayer = findButton(event, MULTIPLAYER_ID);
         if (singleplayer == null || multiplayer == null
                 || !singleplayer.visible || !multiplayer.visible) {
             // A demo world's menu, or one a mod has rebuilt: there is no
@@ -119,6 +123,46 @@ public final class LostTalesMainMenuHandler {
         this.labelledScreen = new WeakReference<GuiScreen>(event.gui);
         this.labelledButton =
                 new WeakReference<LostTalesCharacterMenuButton>(button);
+    }
+
+    /** Standard menu actions are dispatched by id in GuiMainMenu. */
+    private static void styleMenuButtons(GuiScreenEvent.InitGuiEvent.Post event) {
+        for (int index = 0; index < event.buttonList.size(); index++) {
+            Object value = event.buttonList.get(index);
+            if (!(value instanceof GuiButton) || value instanceof LostTalesButton) {
+                continue;
+            }
+            GuiButton original = (GuiButton) value;
+            if (original.width < LostTalesButtonStyle.MIN_SIZE
+                    || original.height < LostTalesButtonStyle.MIN_SIZE) {
+                continue;
+            }
+            switch (original.id) {
+                case 0: // Options
+                case 1: // Singleplayer
+                case 2: // Multiplayer
+                case 4: // Quit
+                case 5: // Language
+                case 6: // Forge mod list
+                case 11: // Play demo
+                case 12: // Reset demo
+                case 14: // Realms
+                    break;
+                default:
+                    continue;
+            }
+            LostTalesButton replacement = original.id == 5
+                    ? new LostTalesLanguageButton(original.id, original.xPosition,
+                            original.yPosition, original.width, MainMenuButtonLayout.HEIGHT,
+                            original.displayString)
+                    : new LostTalesButton(original.id, original.xPosition,
+                            original.yPosition, original.width, MainMenuButtonLayout.HEIGHT,
+                            original.displayString);
+            replacement.enabled = original.enabled;
+            replacement.visible = original.visible;
+            replacement.packedFGColour = original.packedFGColour;
+            event.buttonList.set(index, replacement);
+        }
     }
 
     /**

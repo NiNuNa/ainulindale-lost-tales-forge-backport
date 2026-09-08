@@ -24,7 +24,7 @@ public final class LostTalesSkyrimUiStyle extends LostTalesColors {
      * <p>{@link Gui#drawRect} disables {@code GL_BLEND} when it finishes,
      * and every panel, rule and row here is built from it. Text or a
      * sprite drawn afterwards would land fully opaque, which turns a
-     * half-opacity shadow into a solid black one. Anything drawn after a
+     * translucent shadow into a solid black one. Anything drawn after a
      * panel calls this first.</p>
      */
     public static void beginContent() {

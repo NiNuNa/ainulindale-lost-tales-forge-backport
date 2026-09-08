@@ -21,6 +21,8 @@ public final class CharacterCreationRequest {
     private final String startingFactionId;
     private final String startingWaypointId;
     private final boolean unconventionalSettings;
+    private final boolean showMinecraftCape;
+    private final int cosmeticCapeId;
 
     public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
                                     String name, String raceId, String genderId,
@@ -68,6 +70,7 @@ public final class CharacterCreationRequest {
                 unconventionalSettings, description, bodyTypeId, "");
     }
 
+    /** The Minecraft cape shown and no cosmetic cape, which is what a new character wears unless asked otherwise. */
     public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
                                     String name, String raceId, String genderId,
                                     String skinId, int age,
@@ -76,7 +79,24 @@ public final class CharacterCreationRequest {
                                     boolean unconventionalSettings,
                                     String description, String bodyTypeId,
                                     String chestTypeId) {
+        this(expectedRosterRevision, slotIndex, name, raceId, genderId,
+                skinId, age, startingFactionId, startingWaypointId,
+                unconventionalSettings, description, bodyTypeId, chestTypeId,
+                true, 0);
+    }
+
+    public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
+                                    String name, String raceId, String genderId,
+                                    String skinId, int age,
+                                    String startingFactionId,
+                                    String startingWaypointId,
+                                    boolean unconventionalSettings,
+                                    String description, String bodyTypeId,
+                                    String chestTypeId, boolean showMinecraftCape,
+                                    int cosmeticCapeId) {
         this.expectedRosterRevision = expectedRosterRevision;
+        this.showMinecraftCape = showMinecraftCape;
+        this.cosmeticCapeId = cosmeticCapeId;
         this.slotIndex = slotIndex;
         this.name = name;
         this.raceId = raceId;
@@ -143,5 +163,15 @@ public final class CharacterCreationRequest {
 
     public boolean hasUnconventionalSettings() {
         return this.unconventionalSettings;
+    }
+
+    /** Whether the account's own Minecraft cape is worn when no cosmetic cape is. */
+    public boolean isMinecraftCapeVisible() {
+        return this.showMinecraftCape;
+    }
+
+    /** The cosmetic cape's catalogue id; zero for none. The server checks it. */
+    public int getCosmeticCapeId() {
+        return this.cosmeticCapeId;
     }
 }

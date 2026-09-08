@@ -68,6 +68,10 @@ public class LostTalesColors {
     public static final int HUD_LABEL = IVORY;
     /** Shared plum-black shadow for HUD icons, labels, and chat portraits. */
     public static final int HUD_SHADOW = PLUM_BLACK;
+    /** Shared drop-shadow opacity, relative to the content's own opacity. */
+    public static final float SHADOW_OPACITY = 2.0F / 3.0F;
+    /** Two-thirds of the 8-bit alpha range is exactly 170. */
+    public static final int SHADOW_ALPHA = Math.round(255.0F * SHADOW_OPACITY);
 
     // ---- Translucent surfaces (palette entries with a chosen alpha) ----
     public static final int PANEL_FILL = withAlpha(PLUM_BLACK, 0xBC);
@@ -76,7 +80,7 @@ public class LostTalesColors {
     public static final int PANEL_SELECTED = withAlpha(PLUM_DARK, 0x64);
     public static final int BORDER = withAlpha(SAND, 0x82);
     public static final int BORDER_DIM = withAlpha(MAUVE, 0x44);
-    public static final int BLACK_SHADOW = withAlpha(PLUM_BLACK, 0xC0);
+    public static final int BLACK_SHADOW = withAlpha(PLUM_BLACK, SHADOW_ALPHA);
 
     protected LostTalesColors() {}
 

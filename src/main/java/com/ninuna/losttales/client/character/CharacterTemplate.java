@@ -35,12 +35,28 @@ public final class CharacterTemplate {
     private final String description;
     private final int age;
     private final boolean unconventionalSettings;
+    private final boolean showMinecraftCape;
+    private final int cosmeticCapeId;
 
+    /** The Minecraft cape shown and no cosmetic cape, as a character starts unless asked otherwise. */
     public CharacterTemplate(String name, String raceId, String genderId,
                              String skinId, String bodyTypeId,
                              String chestTypeId, String startingFactionId,
                              String description, int age,
                              boolean unconventionalSettings) {
+        this(name, raceId, genderId, skinId, bodyTypeId, chestTypeId,
+                startingFactionId, description, age, unconventionalSettings,
+                true, 0);
+    }
+
+    public CharacterTemplate(String name, String raceId, String genderId,
+                             String skinId, String bodyTypeId,
+                             String chestTypeId, String startingFactionId,
+                             String description, int age,
+                             boolean unconventionalSettings,
+                             boolean showMinecraftCape, int cosmeticCapeId) {
+        this.showMinecraftCape = showMinecraftCape;
+        this.cosmeticCapeId = Math.max(0, cosmeticCapeId);
         this.name = trimmed(name);
         this.raceId = trimmed(raceId);
         this.genderId = trimmed(genderId);
@@ -67,7 +83,8 @@ public final class CharacterTemplate {
                 request.getGenderId(), request.getSkinId(),
                 request.getBodyTypeId(), request.getChestTypeId(),
                 request.getStartingFactionId(), request.getDescription(),
-                request.getAge(), request.hasUnconventionalSettings());
+                request.getAge(), request.hasUnconventionalSettings(),
+                request.isMinecraftCapeVisible(), request.getCosmeticCapeId());
     }
 
     public String getName() { return this.name; }
@@ -83,6 +100,12 @@ public final class CharacterTemplate {
         return this.unconventionalSettings;
     }
 
+    /** Whether the account's own Minecraft cape is worn when no cosmetic cape is. */
+    public boolean isMinecraftCapeVisible() { return this.showMinecraftCape; }
+
+    /** The cosmetic cape's catalogue id; zero for none. */
+    public int getCosmeticCapeId() { return this.cosmeticCapeId; }
+
     /** Whether anything at all has been chosen. */
     public boolean isEmpty() {
         return this.name.length() == 0 && this.raceId.length() == 0
@@ -90,7 +113,8 @@ public final class CharacterTemplate {
                 && this.bodyTypeId.length() == 0
                 && this.chestTypeId.length() == 0
                 && this.startingFactionId.length() == 0
-                && this.description.length() == 0 && this.age == 0;
+                && this.description.length() == 0 && this.age == 0
+                && this.cosmeticCapeId == 0;
     }
 
     /**
@@ -117,6 +141,8 @@ public final class CharacterTemplate {
         CharacterTemplate that = (CharacterTemplate) other;
         return this.age == that.age
                 && this.unconventionalSettings == that.unconventionalSettings
+                && this.showMinecraftCape == that.showMinecraftCape
+                && this.cosmeticCapeId == that.cosmeticCapeId
                 && this.name.equals(that.name)
                 && this.raceId.equals(that.raceId)
                 && this.genderId.equals(that.genderId)
@@ -138,6 +164,8 @@ public final class CharacterTemplate {
         result = 31 * result + this.startingFactionId.hashCode();
         result = 31 * result + this.description.hashCode();
         result = 31 * result + this.age;
+        result = 31 * result + this.cosmeticCapeId;
+        result = 31 * result + (this.showMinecraftCape ? 1 : 0);
         return 31 * result + (this.unconventionalSettings ? 1 : 0);
     }
 

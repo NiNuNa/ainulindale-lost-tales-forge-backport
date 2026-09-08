@@ -19,8 +19,10 @@ public final class CharacterTemplateAdoptRequestPacketTest {
     public void anOfferedTemplateRoundTrips() {
         CharacterTemplateAdoption sent = new CharacterTemplateAdoption(
                 7L, true, "Beren", "lotr:human", "male", "human_male_1",
-                "slim", "flat", "A ranger of the north.", 34);
+                "slim", "flat", "A ranger of the north.", 34, false, 3);
         CharacterTemplateAdoption decoded = roundTrip(sent).toAdoption();
+        assertFalse(decoded.isMinecraftCapeVisible());
+        assertEquals(3, decoded.getCosmeticCapeId());
         assertTrue(decoded.isOffered());
         assertEquals(7L, decoded.getExpectedRosterRevision());
         assertEquals("Beren", decoded.getName());
@@ -31,6 +33,23 @@ public final class CharacterTemplateAdoptRequestPacketTest {
         assertEquals("flat", decoded.getChestTypeId());
         assertEquals("A ranger of the north.", decoded.getDescription());
         assertEquals(34, decoded.getAge());
+    }
+
+    @Test
+    public void aCapeIdOutOfTheCatalogueRangeIsMalformed() {
+        CharacterTemplateAdoption sent = new CharacterTemplateAdoption(
+                7L, true, "Beren", "lotr:human", "male", "human_male_1",
+                "slim", "flat", "", 34, true, 70000);
+        ByteBuf buffer = Unpooled.buffer();
+        try {
+            new CharacterTemplateAdoptRequestPacket(9, sent).toBytes(buffer);
+            CharacterTemplateAdoptRequestPacket decoded =
+                    new CharacterTemplateAdoptRequestPacket();
+            decoded.fromBytes(buffer);
+            assertTrue(decoded.isMalformed());
+        } finally {
+            buffer.release();
+        }
     }
 
     @Test

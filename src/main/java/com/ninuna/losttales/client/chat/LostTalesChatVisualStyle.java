@@ -15,7 +15,7 @@ import net.minecraft.util.IChatComponent;
  * Lost Tales' ivory text and plum-black shadow treatment for chat. Every
  * chat element — text, emojis, head icons, item and marker icons — draws
  * its shadow as a flat {@link #SHADOW} silhouette offset by one pixel at
- * half opacity, so the relationship between content and shadow is
+ * two-thirds opacity, so the relationship between content and shadow is
  * identical at every GUI scale; inline glyphs share the box and baseline
  * rules of {@link ChatInlineIcons}.
  *
@@ -24,7 +24,7 @@ import net.minecraft.util.IChatComponent;
  * panel, strip and bar in the chat is built from — <em>disables</em>
  * blending when it is done, and text or a sprite drawn after one would
  * otherwise land opaque, shadow and all. Asking each call site to
- * remember that is how a half-opacity shadow keeps coming back as a
+ * remember that is how a translucent shadow keeps coming back as a
  * solid one, so nothing here relies on the state it is handed.</p> Channel prefix components are skipped
  * entirely while the chat screen is open (the tabs already say which
  * channel a line belongs to), and layout markers advance the cursor
@@ -52,8 +52,8 @@ final class LostTalesChatVisualStyle {
             LostTalesSkyrimUiStyle.PLUM_GRAY);
     /** Shadow offset shared by text, sprites, and icons. */
     static final int SHADOW_OFFSET = 1;
-    /** Shadows sit at half the opacity of the content they belong to. */
-    static final float SHADOW_OPACITY = 0.5F;
+    /** Shared palette opacity for every chat text, icon and portrait shadow. */
+    static final float SHADOW_OPACITY = LostTalesSkyrimUiStyle.SHADOW_OPACITY;
     /**
      * Lowest alpha FontRenderer honours: a colour whose alpha is below four
      * is treated as opaque, so a near-invisible shadow would flash at full
@@ -75,7 +75,7 @@ final class LostTalesChatVisualStyle {
 
     /**
      * Puts the pipeline into the state every chat element is drawn in:
-     * blended, so a shadow's half opacity and a fading line's alpha both
+     * blended, so a shadow's two-thirds opacity and a fading line's alpha both
      * mean what they say. Called by every draw in this class, and by the
      * chat's sprite drawing, so no call site has to know what the last
      * rectangle left behind.

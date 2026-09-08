@@ -1,5 +1,6 @@
 package com.ninuna.losttales.network.packet.character;
 
+import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.server.CharacterCreationRequest;
 import com.ninuna.losttales.character.server.CharacterNetworkRequestHandler;
@@ -29,6 +30,8 @@ public final class CharacterCreateRequestPacket implements IMessage {
     private boolean unconventionalSettings;
     private String bodyTypeId = "";
     private String chestTypeId = "";
+    private boolean showMinecraftCape = true;
+    private int cosmeticCapeId;
     private boolean malformed;
 
     public CharacterCreateRequestPacket() {}
@@ -51,6 +54,8 @@ public final class CharacterCreateRequestPacket implements IMessage {
         this.unconventionalSettings = request.hasUnconventionalSettings();
         this.bodyTypeId = request.getBodyTypeId();
         this.chestTypeId = request.getChestTypeId();
+        this.showMinecraftCape = request.isMinecraftCapeVisible();
+        this.cosmeticCapeId = request.getCosmeticCapeId();
     }
 
     @Override
@@ -76,9 +81,15 @@ public final class CharacterCreateRequestPacket implements IMessage {
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             this.chestTypeId = CharacterPacketCodec.readString(
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            this.showMinecraftCape = buffer.readBoolean();
+            this.cosmeticCapeId = buffer.readInt();
             CharacterPacketCodec.requireFinished(buffer);
             if (this.expectedRosterRevision < 0L) {
                 throw new CharacterPacketCodec.DecodeException("missing roster revision");
+            }
+            if (this.cosmeticCapeId < CharacterCapeCatalog.NONE_ID
+                    || this.cosmeticCapeId > CharacterCapeCatalog.MAX_NETWORK_ID) {
+                throw new CharacterPacketCodec.DecodeException("cape id out of range");
             }
             if (!CharacterRoster.isCreatableSlotIndex(this.slotIndex)) {
                 // The default character's slot is not one a request may
@@ -114,6 +125,9 @@ public final class CharacterCreateRequestPacket implements IMessage {
         // Appended again: the requested chest type.
         CharacterPacketCodec.writeString(
                 buffer, this.chestTypeId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+        // Appended again: the cape, as the creator's cape page chose it.
+        buffer.writeBoolean(this.showMinecraftCape);
+        buffer.writeInt(this.cosmeticCapeId);
     }
 
     private CharacterCreationRequest toRequest() {
@@ -130,7 +144,9 @@ public final class CharacterCreateRequestPacket implements IMessage {
                 this.unconventionalSettings,
                 this.description,
                 this.bodyTypeId,
-                this.chestTypeId
+                this.chestTypeId,
+                this.showMinecraftCape,
+                this.cosmeticCapeId
         );
     }
 

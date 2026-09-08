@@ -226,7 +226,18 @@ public final class CharacterService {
         ValidatedCharacterCreation creation = validation.getCreation();
         RoleplayCharacter character = createUniqueCharacter(
                 data, player.getUniqueID(), creation);
-        if (character == null || !roster.addCharacter(character)) {
+        if (character == null) {
+            return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, roster);
+        }
+        // The cape goes through the same gate a later cape change does.
+        CharacterValidationResult cape = this.capeEligibilityPolicy.validate(
+                player, character, request.getCosmeticCapeId());
+        if (!cape.isValid()) {
+            return CharacterOperationResult.failure(cape.getErrorId(), roster);
+        }
+        character.setCapeSettings(request.isMinecraftCapeVisible(),
+                request.getCosmeticCapeId());
+        if (!roster.addCharacter(character)) {
             return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, roster);
         }
 
@@ -357,6 +368,11 @@ public final class CharacterService {
         if (!appearance.isValid()) {
             return CharacterOperationResult.failure(appearance.getErrorId(), roster);
         }
+        CharacterValidationResult cape = this.capeEligibilityPolicy.validate(
+                player, current, adoption.getCosmeticCapeId());
+        if (!cape.isValid()) {
+            return CharacterOperationResult.failure(cape.getErrorId(), roster);
+        }
         ValidatedCharacterAppearance wanted = appearance.getAppearance();
         RoleplayCharacter adopted = RoleplayCharacter.builder(current)
                 .name(wanted.getName())
@@ -367,6 +383,8 @@ public final class CharacterService {
                 .chestType(wanted.getChestTypeId())
                 .description(wanted.getDescription())
                 .age(wanted.getAge())
+                .minecraftCapeVisible(adoption.isMinecraftCapeVisible())
+                .cosmeticCape(adoption.getCosmeticCapeId())
                 .build();
         if (!roster.replaceCharacter(adopted)) {
             return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, roster);

@@ -2,10 +2,7 @@ package com.ninuna.losttales.client.gui;
 
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterFigureRenderer;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiButton;
-import org.lwjgl.opengl.GL11;
 
 import java.util.UUID;
 
@@ -14,13 +11,8 @@ import java.util.UUID;
  * upright button beside Singleplayer and Multiplayer, wearing that
  * character's face.
  *
- * <p>It is drawn in the mod's own panel style rather than the menu's.
- * LOTR replaces every vanilla menu button with one of its own that blits
- * a fixed twenty-pixel-tall strip of the red book, so there is no button
- * art on that menu this one could be cut from, and a vanilla widget
- * beside those would read as a different mod again. The panel is drawn
- * from primitives at whatever size it is given, which is what lets the
- * button span two buttons' worth of height on any menu.</p>
+ * <p>The shared button frame joins sprite corners at the menu's measured
+ * height. Its content is the character model instead of a text label.</p>
  *
  * <p>The figure is the account's own until a template names one, and then
  * it is the template's: the body model itself, stood facing out of the
@@ -28,7 +20,7 @@ import java.util.UUID;
  * the race's own drawn height centred down it, so a hobbit sits in the
  * middle rather than hanging from where a human's head would be.</p>
  */
-public final class LostTalesCharacterMenuButton extends GuiButton {
+public final class LostTalesCharacterMenuButton extends LostTalesButton {
 
     /** Clear of the panel's own border, top and bottom. */
     private static final int FIGURE_MARGIN = 3;
@@ -49,28 +41,9 @@ public final class LostTalesCharacterMenuButton extends GuiButton {
         this.appearance = appearance;
     }
 
-    /** Whether the pointer was on the button the last time it was drawn. */
-    public boolean isHovered() {
-        return this.field_146123_n;
-    }
-
     @Override
-    public void drawButton(Minecraft minecraft, int mouseX, int mouseY) {
-        if (!this.visible) {
-            return;
-        }
-        this.field_146123_n = mouseX >= this.xPosition
-                && mouseY >= this.yPosition
-                && mouseX < this.xPosition + this.width
-                && mouseY < this.yPosition + this.height;
-        LostTalesSkyrimUiStyle.drawPanel(this.xPosition, this.yPosition,
-                this.width, this.height,
-                this.field_146123_n
-                        ? LostTalesSkyrimUiStyle.PANEL_SELECTED
-                        : LostTalesSkyrimUiStyle.PANEL_FILL);
-        // The panel is built from drawRect, which leaves blending off.
-        LostTalesSkyrimUiStyle.beginContent();
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+    protected void drawContents(Minecraft minecraft, int mouseX, int mouseY,
+                                boolean highlighted) {
         // As large as the button can hold, at whole pixels per texel.
         int scale = LostTalesCharacterFigureRenderer.scaleFor(
                 this.height - FIGURE_MARGIN * 2);

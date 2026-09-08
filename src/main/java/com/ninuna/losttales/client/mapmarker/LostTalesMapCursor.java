@@ -70,7 +70,6 @@ public final class LostTalesMapCursor {
     /** The interface's own drop shadow, shared with the chat's glyphs. */
     private static final int SHADOW_RGB =
             LostTalesColors.rgb(LostTalesColors.HUD_SHADOW);
-    private static final float SHADOW_OPACITY = 0.5F;
     private static final int SHADOW_OFFSET = 1;
 
     /**
@@ -281,7 +280,7 @@ public final class LostTalesMapCursor {
             // opacity, so it sits over a GUI like every glyph in it.
             LostTalesSilhouetteRenderState.begin(SHADOW_RGB);
             try {
-                GL11.glColor4f(1.0F, 1.0F, 1.0F, SHADOW_OPACITY);
+                GL11.glColor4f(1.0F, 1.0F, 1.0F, LostTalesColors.SHADOW_OPACITY);
                 drawSprite(pose, x + SHADOW_OFFSET, y + SHADOW_OFFSET,
                         minU, maxU);
             } finally {

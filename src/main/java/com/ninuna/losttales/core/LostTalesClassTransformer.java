@@ -26,6 +26,20 @@ import org.objectweb.asm.tree.VarInsnNode;
  * do not expose the required camera, debug-box, identity, and LOTR behavior.
  */
 public final class LostTalesClassTransformer implements IClassTransformer {
+    public static final String MAIN_MENU_TEXT_ACTIVE_PROPERTY =
+            "losttales.mainMenuTextTransformer.active";
+    public static final String LOTR_MAIN_MENU_TEXT_ACTIVE_PROPERTY =
+            "losttales.lotrMainMenuTextTransformer.active";
+    private static final String GUI_MAIN_MENU = "net.minecraft.client.gui.GuiMainMenu";
+    private static final String LOTR_GUI_MAIN_MENU = "lotr.client.gui.LOTRGuiMainMenu";
+    private static final String MAIN_MENU_TEXT_HOOK_OWNER =
+            "com/ninuna/losttales/client/gui/LostTalesMainMenuTextStyle";
+    public static final String MAIN_MENU_TITLE_ACTIVE_PROPERTY =
+            "losttales.mainMenuTitleTransformer.active";
+    public static final String LOTR_MAIN_MENU_TITLE_ACTIVE_PROPERTY =
+            "losttales.lotrMainMenuTitleTransformer.active";
+    private static final String MAIN_MENU_TITLE_HOOK_OWNER =
+            "com/ninuna/losttales/client/gui/LostTalesMainMenuTitle";
 
     public static final String CAMERA_ACTIVE_PROPERTY =
             "losttales.cameraTransformer.active";
@@ -369,6 +383,14 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     transformGuiScreenBackground(
                             transformGuiScreenInput(basicClass)));
         }
+        if (GUI_MAIN_MENU.equals(transformedName)
+                || LOTR_GUI_MAIN_MENU.equals(transformedName)) {
+            return transformMainMenuTitle(transformMainMenuText(basicClass,
+                    LOTR_GUI_MAIN_MENU.equals(transformedName)
+                            ? LOTR_MAIN_MENU_TEXT_ACTIVE_PROPERTY
+                            : MAIN_MENU_TEXT_ACTIVE_PROPERTY),
+                    LOTR_GUI_MAIN_MENU.equals(transformedName));
+        }
         if (GUI_NEW_CHAT.equals(transformedName)) {
             return transformGuiNewChatDelete(transformGuiNewChatHistory(
                     transformGuiNewChatWrap(
@@ -446,6 +468,151 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
         if (LOTR_LEVEL_DATA.equals(transformedName)) {
             return transformLotrPlayerLocations(basicClass);
+        }
+        return basicClass;
+    }
+
+    /** Replaces only the title blits, keeping each menu's background renderer. */
+    private static byte[] transformMainMenuTitle(byte[] basicClass, boolean lotr) {
+        String property = lotr ? LOTR_MAIN_MENU_TITLE_ACTIVE_PROPERTY : MAIN_MENU_TITLE_ACTIVE_PROPERTY;
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode) value;
+                if (!("drawScreen".equals(method.name) || "func_73863_a".equals(method.name))
+                        || !"(IIF)V".equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, MAIN_MENU_TITLE_HOOK_OWNER, "drawPiece")) {
+                    System.setProperty(property, "true");
+                    return basicClass;
+                }
+                FieldInsnNode buttons = null;
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (instruction instanceof FieldInsnNode) {
+                        FieldInsnNode field = (FieldInsnNode) instruction;
+                        if (field.getOpcode() == Opcodes.GETFIELD
+                                && ("buttonList".equals(field.name) || "field_146292_n".equals(field.name))
+                                && "Ljava/util/List;".equals(field.desc)) {
+                            buttons = field;
+                            break;
+                        }
+                    }
+                }
+                if (buttons == null) {
+                    break;
+                }
+                int pieces = 0;
+                int subtitles = 0;
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (!(instruction instanceof MethodInsnNode)) {
+                        continue;
+                    }
+                    MethodInsnNode call = (MethodInsnNode) instruction;
+                    if (call.getOpcode() == Opcodes.INVOKEVIRTUAL
+                            && ("drawTexturedModalRect".equals(call.name) || "func_73729_b".equals(call.name))
+                            && "(IIIIII)V".equals(call.desc)
+                            && (owner.name.equals(call.owner) || "net/minecraft/client/gui/Gui".equals(call.owner)
+                            || "net/minecraft/client/gui/GuiMainMenu".equals(call.owner))) {
+                        InsnList arguments = new InsnList();
+                        arguments.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                        arguments.add(new FieldInsnNode(Opcodes.GETFIELD, buttons.owner, buttons.name, buttons.desc));
+                        arguments.add(new InsnNode(lotr ? Opcodes.ICONST_1 : Opcodes.ICONST_0));
+                        method.instructions.insertBefore(call, arguments);
+                        call.setOpcode(Opcodes.INVOKESTATIC);
+                        call.owner = MAIN_MENU_TITLE_HOOK_OWNER;
+                        call.name = "drawPiece";
+                        call.desc = "(Lnet/minecraft/client/gui/GuiScreen;IIIIIILjava/util/List;Z)V";
+                        call.itf = false;
+                        pieces++;
+                    } else if (lotr && MAIN_MENU_TEXT_HOOK_OWNER.equals(call.owner)
+                            && "drawString".equals(call.name)) {
+                        AbstractInsnNode y = previousCode(previousCode(call));
+                        if (y instanceof IntInsnNode && ((IntInsnNode) y).operand == 80) {
+                            InsnList arguments = new InsnList();
+                            arguments.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                            arguments.add(new FieldInsnNode(Opcodes.GETFIELD, buttons.owner, buttons.name, buttons.desc));
+                            arguments.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                            arguments.add(new MethodInsnNode(Opcodes.INVOKESTATIC, MAIN_MENU_TITLE_HOOK_OWNER,
+                                    "subtitleY", "(ILjava/util/List;Lnet/minecraft/client/gui/GuiScreen;)I"));
+                            method.instructions.insert(y, arguments);
+                            subtitles++;
+                        }
+                    }
+                }
+                // All original pieces must be replaced together, including
+                // vanilla's rare alternate logo; otherwise keep the old title.
+                if (pieces == (lotr ? 2 : 7) && subtitles == (lotr ? 1 : 0)) {
+                    byte[] result = write(owner);
+                    System.setProperty(property, "true");
+                    info("Patched custom main-menu title: " + owner.name);
+                    return result;
+                }
+            }
+            warn("Could not patch main-menu title: " + property);
+        } catch (Throwable throwable) {
+            warn("Failed to patch main-menu title: " + property + ": " + throwable);
+        }
+        return basicClass;
+    }
+
+    /** Main menus have no per-label Forge event; redirect their text calls. */
+    private static byte[] transformMainMenuText(byte[] basicClass, String activeProperty) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode) value;
+                if (!("drawScreen".equals(method.name)
+                        || "func_73863_a".equals(method.name))
+                        || !"(IIF)V".equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, MAIN_MENU_TEXT_HOOK_OWNER, "drawString")) {
+                    System.setProperty(activeProperty, "true");
+                    return basicClass;
+                }
+                boolean patched = false;
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (!(instruction instanceof MethodInsnNode)) {
+                        continue;
+                    }
+                    MethodInsnNode call = (MethodInsnNode) instruction;
+                    if (call.getOpcode() != Opcodes.INVOKEVIRTUAL
+                            || !"(Lnet/minecraft/client/gui/FontRenderer;Ljava/lang/String;III)V"
+                            .equals(call.desc)
+                            || !(owner.name.equals(call.owner)
+                            || "net/minecraft/client/gui/Gui".equals(call.owner)
+                            || "net/minecraft/client/gui/GuiScreen".equals(call.owner)
+                            || "net/minecraft/client/gui/GuiMainMenu".equals(call.owner))) {
+                        continue;
+                    }
+                    boolean centered = "drawCenteredString".equals(call.name)
+                            || "func_73732_a".equals(call.name);
+                    if (!centered && !"drawString".equals(call.name)
+                            && !"func_73731_b".equals(call.name)) {
+                        continue;
+                    }
+                    call.setOpcode(Opcodes.INVOKESTATIC);
+                    call.owner = MAIN_MENU_TEXT_HOOK_OWNER;
+                    call.name = centered ? "drawCenteredString" : "drawString";
+                    call.desc = "(Lnet/minecraft/client/gui/Gui;"
+                            + "Lnet/minecraft/client/gui/FontRenderer;Ljava/lang/String;III)V";
+                    call.itf = false;
+                    patched = true;
+                }
+                if (patched) {
+                    byte[] result = write(owner);
+                    System.setProperty(activeProperty, "true");
+                    info("Patched main-menu text onto the Lost Tales palette: " + owner.name);
+                    return result;
+                }
+            }
+            warn("Could not patch main-menu text: " + activeProperty);
+        } catch (Throwable throwable) {
+            warn("Failed to patch main-menu text: " + activeProperty + ": " + throwable);
         }
         return basicClass;
     }

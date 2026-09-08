@@ -34,8 +34,10 @@ import com.ninuna.losttales.client.chat.ClientChatTypingState;
 import com.ninuna.losttales.client.chat.ClientChatShowcaseStore;
 import com.ninuna.losttales.client.chat.LostTalesChatPresentation;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
+import com.ninuna.losttales.client.character.CreatorCharacterLight;
 import com.ninuna.losttales.client.gui.LostTalesGuiInventory;
 import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
+import com.ninuna.losttales.client.gui.LostTalesHudHidingScreen;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneStateStore;
@@ -374,6 +376,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void applyThirdPersonHeadPitch(RenderPlayerEvent.Pre event) {
         ThirdPersonHeadRenderHook.onPre(event);
+        CreatorCharacterLight.onRenderPlayerPre(event);
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -387,7 +390,31 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void restoreThirdPersonHeadPitch(RenderPlayerEvent.Post event) {
+        CreatorCharacterLight.onRenderPlayerPost(event);
         ThirdPersonHeadRenderHook.onPost(event);
+    }
+
+    /**
+     * A screen that asks for the bare world gets it: every element of the
+     * game's overlay is cancelled one by one, and this mod's own panels
+     * below step aside too.
+     *
+     * <p>Not the overlay as a whole. Forge answers a cancelled whole by
+     * returning before it sets up the orthographic projection the screen
+     * is then drawn in, so cancelling it leaves the screen itself drawn
+     * under the world's perspective, which is to say invisible.</p>
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void hideHudBehindScreen(RenderGameOverlayEvent.Pre event) {
+        if (event != null && event.type != RenderGameOverlayEvent.ElementType.ALL
+                && isHudHidden()) {
+            event.setCanceled(true);
+        }
+    }
+
+    private static boolean isHudHidden() {
+        return Minecraft.getMinecraft().currentScreen
+                instanceof LostTalesHudHidingScreen;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -449,7 +476,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void renderHud(RenderGameOverlayEvent.Post event) {
-        if (event.type == RenderGameOverlayEvent.ElementType.ALL) {
+        if (event.type == RenderGameOverlayEvent.ElementType.ALL
+                && !isHudHidden()) {
             LostTalesQuickLootHudRenderer.render(Minecraft.getMinecraft());
             LostTalesCompassHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
             LostTalesMapMarkerHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);

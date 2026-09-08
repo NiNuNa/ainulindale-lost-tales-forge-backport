@@ -2,6 +2,7 @@ package com.ninuna.losttales.core;
 
 import org.junit.Test;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
@@ -15,11 +16,101 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /** Verifies the supported LOTR v36.15 integration points against the local jar. */
 public final class LostTalesClassTransformerTest {
+    @Test
+    public void vanillaMainMenuTextUsesPaletteHooks() throws Exception {
+        assertMainMenuTextHooks("net.minecraft.client.gui.GuiMainMenu",
+                LostTalesClassTransformer.MAIN_MENU_TEXT_ACTIVE_PROPERTY);
+    }
+
+    @Test
+    public void lotrMainMenuTextUsesPaletteHooks() throws Exception {
+        assertMainMenuTextHooks("lotr.client.gui.LOTRGuiMainMenu",
+                LostTalesClassTransformer.LOTR_MAIN_MENU_TEXT_ACTIVE_PROPERTY);
+    }
+
+    private static void assertMainMenuTextHooks(String binaryName, String property)
+            throws Exception {
+        String hookOwner = "com/ninuna/losttales/client/gui/LostTalesMainMenuTextStyle";
+        String titleOwner = "com/ninuna/losttales/client/gui/LostTalesMainMenuTitle";
+        boolean lotr = binaryName.startsWith("lotr.");
+        byte[] original = readResource(binaryName.replace('.', '/') + ".class");
+        // Exercise both development and production names on the real method bodies.
+        for (boolean srg : new boolean[] {false, true}) {
+            ClassNode source = new ClassNode();
+            new ClassReader(original).accept(source, 0);
+            MethodNode drawing = findMethod(source, "drawScreen");
+            drawing.name = srg ? "func_73863_a" : "drawScreen";
+            int expectedCalls = 0;
+            for (AbstractInsnNode instruction = drawing.instructions.getFirst();
+                 instruction != null; instruction = instruction.getNext()) {
+                if (!(instruction instanceof MethodInsnNode)) {
+                    continue;
+                }
+                MethodInsnNode call = (MethodInsnNode) instruction;
+                if ("drawTexturedModalRect".equals(call.name) || "func_73729_b".equals(call.name)) {
+                    call.name = srg ? "func_73729_b" : "drawTexturedModalRect";
+                }
+                if ("drawString".equals(call.name) || "func_73731_b".equals(call.name)) {
+                    call.name = srg ? "func_73731_b" : "drawString";
+                    expectedCalls++;
+                } else if ("drawCenteredString".equals(call.name)
+                        || "func_73732_a".equals(call.name)) {
+                    call.name = srg ? "func_73732_a" : "drawCenteredString";
+                    expectedCalls++;
+                }
+            }
+            assertEquals("Branding, footer, splash and warning call sites", 5, expectedCalls);
+            ClassWriter writer = new ClassWriter(0);
+            source.accept(writer);
+            LostTalesClassTransformer transformer = new LostTalesClassTransformer();
+            System.clearProperty(property);
+            byte[] transformed = transformer.transform(binaryName, binaryName,
+                    writer.toByteArray());
+            ClassNode result = new ClassNode();
+            new ClassReader(transformed).accept(result, 0);
+            assertTrue(containsStaticHook(result, drawing.name, hookOwner, "drawString"));
+            MethodNode patched = findMethod(result, drawing.name);
+            assertEquals(expectedCalls, countCalls(patched, hookOwner, "drawString")
+                    + countCalls(patched, hookOwner, "drawCenteredString"));
+            assertTrue(containsStaticHook(result, drawing.name, titleOwner, "drawPiece"));
+            assertEquals(lotr ? 2 : 7, countCalls(patched, titleOwner, "drawPiece"));
+            assertEquals(lotr ? 1 : 0, countCalls(patched, titleOwner, "subtitleY"));
+            assertTrue(Boolean.getBoolean(lotr
+                    ? LostTalesClassTransformer.LOTR_MAIN_MENU_TITLE_ACTIVE_PROPERTY
+                    : LostTalesClassTransformer.MAIN_MENU_TITLE_ACTIVE_PROPERTY));
+            for (AbstractInsnNode instruction = patched.instructions.getFirst();
+                 instruction != null; instruction = instruction.getNext()) {
+                if (instruction instanceof MethodInsnNode) {
+                    MethodInsnNode call = (MethodInsnNode) instruction;
+                    assertFalse("drawTexturedModalRect".equals(call.name));
+                    assertFalse("func_73729_b".equals(call.name));
+                    if (titleOwner.equals(call.owner)) {
+                        assertEquals(Opcodes.INVOKESTATIC, call.getOpcode());
+                        assertFalse(call.itf);
+                        assertEquals("drawPiece".equals(call.name)
+                                ? "(Lnet/minecraft/client/gui/GuiScreen;IIIIIILjava/util/List;Z)V"
+                                : "(ILjava/util/List;Lnet/minecraft/client/gui/GuiScreen;)I", call.desc);
+                    }
+                    if (hookOwner.equals(call.owner)) {
+                        assertEquals(Opcodes.INVOKESTATIC, call.getOpcode());
+                        assertFalse(call.itf);
+                        assertEquals("(Lnet/minecraft/client/gui/Gui;"
+                                + "Lnet/minecraft/client/gui/FontRenderer;Ljava/lang/String;III)V",
+                                call.desc);
+                    }
+                }
+            }
+            assertTrue(Boolean.getBoolean(property));
+            assertArrayEquals("Applying the hook twice must leave the bytes unchanged",
+                    transformed, transformer.transform(binaryName, binaryName, transformed));
+        }
+    }
 
     private static final String HOOK_OWNER =
             "com/ninuna/losttales/character/identity/"

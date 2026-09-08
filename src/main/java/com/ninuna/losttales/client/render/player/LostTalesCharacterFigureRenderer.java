@@ -110,7 +110,37 @@ public final class LostTalesCharacterFigureRenderer {
                                      CharacterAppearance appearance,
                                      float centerX, float feetY, int scale,
                                      float brightness, float alpha) {
-        if (minecraft == null || appearance == null || scale <= 0
+        return drawPosedFigure(minecraft, ownerId, appearance, centerX, feetY,
+                scale, 0.0F, 0.0F, 0.0F, 0.0F, brightness, alpha);
+    }
+
+    /**
+     * Draws the character turned, tilted and looking where it is told.
+     *
+     * <p>The creator's stage: the player turns the figure about its feet
+     * and tilts it about its middle, and its head follows the pointer.
+     * The scale may be fractional here — a figure this large is zoomed,
+     * not pixel art — which is the one thing the menu button's overload
+     * does not allow.</p>
+     *
+     * @param yaw       degrees the figure is turned; zero faces the viewer
+     *                  and positive turns its front toward the viewer's
+     *                  right
+     * @param pitch     degrees the whole figure leans about its middle;
+     *                  positive brings the head toward the viewer
+     * @param headYaw   degrees the head is turned from the body, in the
+     *                  model's own sense: what a living entity hands it as
+     *                  its net head yaw, where negative looks toward the
+     *                  viewer's right while the figure faces out
+     * @param headPitch degrees the head looks down
+     */
+    public static boolean drawPosedFigure(Minecraft minecraft, UUID ownerId,
+                                          CharacterAppearance appearance,
+                                          float centerX, float feetY,
+                                          float scale, float yaw, float pitch,
+                                          float headYaw, float headPitch,
+                                          float brightness, float alpha) {
+        if (minecraft == null || appearance == null || scale <= 0.0F
                 || alpha <= 0.0F) {
             return false;
         }
@@ -138,8 +168,8 @@ public final class LostTalesCharacterFigureRenderer {
             if (model == null) {
                 return false;
             }
-            draw(minecraft, model, texture, centerX, feetY, scale,
-                    brightness, alpha);
+            draw(minecraft, model, texture, centerX, feetY, scale, yaw,
+                    pitch, headYaw, headPitch, brightness, alpha);
             return true;
         } catch (RuntimeException unavailable) {
             // A menu is never worth a crash; the button keeps its panel.
@@ -149,7 +179,8 @@ public final class LostTalesCharacterFigureRenderer {
 
     private static void draw(Minecraft minecraft, ModelBiped model,
                              ResourceLocation texture, float centerX,
-                             float feetY, int scale, float brightness,
+                             float feetY, float scale, float yaw, float pitch,
+                             float headYaw, float headPitch, float brightness,
                              float alpha) {
         // The world's light map is still bound on its own texture unit,
         // and away from a world it is dark: left on, it multiplies the
@@ -177,9 +208,23 @@ public final class LostTalesCharacterFigureRenderer {
             GL11.glScalef(-scale, scale, scale);
             GL11.glRotatef(180.0F, 0.0F, 0.0F, 1.0F);
 
+            // In this frame the figure stands from its feet at zero up two
+            // blocks along +y, and +z is toward the viewer. A lean turns it
+            // about its middle so it neither sinks into the floor nor
+            // lifts off it; the turn is about its own feet, and comes
+            // after the lean in the matrix so the lean stays the screen's
+            // horizontal whichever way the figure faces.
+            if (pitch != 0.0F) {
+                GL11.glTranslatef(0.0F, MODEL_HEIGHT_UNITS * MODEL_UNIT / 2.0F, 0.0F);
+                GL11.glRotatef(pitch, 1.0F, 0.0F, 0.0F);
+                GL11.glTranslatef(0.0F, -MODEL_HEIGHT_UNITS * MODEL_UNIT / 2.0F, 0.0F);
+            }
             // And what RendererLivingEntity does around the model itself,
-            // with the yaw of somebody looking straight at you.
-            GL11.glRotatef(FACING_VIEWER_YAW, 0.0F, 1.0F, 0.0F);
+            // with the yaw of somebody looking straight at you, plus the
+            // turn the player gave it. A positive turn about +y here moves
+            // the front toward +x, and +x is the viewer's right: the
+            // mirrored scale and the half-turn above flip x once each.
+            GL11.glRotatef(FACING_VIEWER_YAW + yaw, 0.0F, 1.0F, 0.0F);
             GL11.glEnable(GL12.GL_RESCALE_NORMAL);
             GL11.glScalef(-1.0F, -1.0F, 1.0F);
             GL11.glTranslatef(0.0F, FEET_LIFT, 0.0F);
@@ -204,7 +249,9 @@ public final class LostTalesCharacterFigureRenderer {
             float shade = Math.min(1.0F, brightness);
             GL11.glColor4f(shade, shade, shade, Math.min(1.0F, alpha));
             minecraft.getTextureManager().bindTexture(texture);
-            model.render(null, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, MODEL_UNIT);
+            // The head's turn and tilt are the model's own business: the
+            // same two angles a living entity hands it every frame.
+            model.render(null, 0.0F, 0.0F, 0.0F, headYaw, headPitch, MODEL_UNIT);
         } finally {
             GL11.glPopMatrix();
             // A screen is painted in the order it is drawn, and everything

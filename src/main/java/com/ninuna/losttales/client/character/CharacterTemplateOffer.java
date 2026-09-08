@@ -71,7 +71,8 @@ public final class CharacterTemplateOffer {
                 // A template that never named an age keeps the one the
                 // record was made with, which is the lowest a character
                 // may have; zero is not an age any server accepts.
-                Math.max(CharacterValidator.MIN_AGE, template.getAge()));
+                Math.max(CharacterValidator.MIN_AGE, template.getAge()),
+                template.isMinecraftCapeVisible(), template.getCosmeticCapeId());
     }
 
     /** Whether that race is one a character may still be made as. */
