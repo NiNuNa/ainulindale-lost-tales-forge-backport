@@ -83,7 +83,7 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
 
     private void setOffset(ICommandSender sender, String[] args) {
         if (args.length < 4) {
-            send(sender, EnumChatFormatting.RED + "Usage: " + commandPrefix() + " set <compass|party|quickloot|quest|questnotifications|mapdiscovery|areanotice> <xPercent> <yPercent>");
+            send(sender, EnumChatFormatting.RED + "Usage: " + commandPrefix() + " set <compass|party|quickloot|quest|notifications> <xPercent> <yPercent>");
             return;
         }
         String element = LostTalesConfig.normalizeHudElement(args[1]);
@@ -102,7 +102,7 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
 
     private void moveOffset(ICommandSender sender, String[] args) {
         if (args.length < 4) {
-            send(sender, EnumChatFormatting.RED + "Usage: " + commandPrefix() + " move <compass|party|quickloot|quest|questnotifications|mapdiscovery|areanotice> <dxPercent> <dyPercent>");
+            send(sender, EnumChatFormatting.RED + "Usage: " + commandPrefix() + " move <compass|party|quickloot|quest|notifications> <dxPercent> <dyPercent>");
             return;
         }
         String element = LostTalesConfig.normalizeHudElement(args[1]);
@@ -170,9 +170,7 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
                 + ", quick loot " + formatOffset("quickloot")
                 + ", quest " + formatOffset("quest"));
         send(sender, EnumChatFormatting.GRAY
-                + "Quest notifications " + formatOffset("questnotifications")
-                + ", discovery " + formatOffset("mapdiscovery")
-                + ", area name " + formatOffset("areanotice"));
+                + "Notifications " + formatOffset("notifications"));
         send(sender, EnumChatFormatting.DARK_GRAY + "Tip: hold the Lost Tales Modifier Key and press H client-side to open the HUD placement editor.");
     }
 
@@ -193,17 +191,9 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
             return formatOffset(LostTalesConfig.questHudOffsetX,
                     LostTalesConfig.questHudOffsetY);
         }
-        if ("questnotifications".equals(element)) {
-            return formatOffset(LostTalesConfig.questNotificationHudOffsetX,
-                    LostTalesConfig.questNotificationHudOffsetY);
-        }
-        if ("mapdiscovery".equals(element)) {
-            return formatOffset(LostTalesConfig.mapDiscoveryHudOffsetX,
-                    LostTalesConfig.mapDiscoveryHudOffsetY);
-        }
-        if ("areanotice".equals(element)) {
-            return formatOffset(LostTalesConfig.areaNoticeHudOffsetX,
-                    LostTalesConfig.areaNoticeHudOffsetY);
+        if ("notifications".equals(element)) {
+            return formatOffset(LostTalesConfig.notificationHudOffsetX,
+                    LostTalesConfig.notificationHudOffsetY);
         }
         return "unknown";
     }
@@ -250,8 +240,7 @@ public class LostTalesCommandHud extends LostTalesCommandBase {
         }
         if (args.length == 2 && ("set".equalsIgnoreCase(args[0]) || "move".equalsIgnoreCase(args[0]))) {
             return getListOfStringsMatchingLastWord(args,
-                    "compass", "party", "quickloot", "quest",
-                    "questnotifications", "mapdiscovery", "areanotice");
+                    "compass", "party", "quickloot", "quest", "notifications");
         }
         if (args.length == 2 && "toggle".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args, "hud", "compass", "quickloot", "quest", "worldmarkers");

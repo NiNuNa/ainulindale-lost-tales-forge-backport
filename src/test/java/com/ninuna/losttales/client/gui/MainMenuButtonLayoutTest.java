@@ -50,7 +50,10 @@ public class MainMenuButtonLayoutTest {
         hidden.visible = false;
         MainMenuButtonLayout.position(Arrays.asList(options, quit, hidden), 854, 480);
         assertEquals(327, options.xPosition);
-        assertEquals(168, options.yPosition);
+        // One row deep, centred where the standard column's middle falls.
+        assertEquals(168 + MainMenuButtonLayout.baselineShift(20), options.yPosition);
+        assertEquals(168 + (MainMenuButtonLayout.BASELINE_COLUMN_HEIGHT - 20) / 2,
+                options.yPosition);
         assertEquals(4, quit.xPosition - options.xPosition - options.width);
         assertEquals(-1000, hidden.xPosition);
         assertEquals(-1000, hidden.yPosition);
@@ -120,6 +123,80 @@ public class MainMenuButtonLayoutTest {
         assertEquals(16, options.yPosition - reset.yPosition - reset.height);
         assertEquals(140, options.yPosition);
         assertEquals(false, reset.enabled);
+    }
+
+    @Test
+    public void menuWithoutACharacterReplacesThePlayColumnAndWidensMods() {
+        GuiButton single = button(1, 100, 80, 200);
+        GuiButton multi = button(2, 100, 104, 200);
+        GuiButton realms = button(14, 202, 128, 98);
+        GuiButton mods = button(6, 100, 128, 98);
+        GuiButton options = button(0, 100, 164, 98);
+        GuiButton quit = button(4, 202, 164, 98);
+        List<GuiButton> buttons = Arrays.asList(single, multi, realms, mods, options, quit);
+        MainMenuButtonLayout.withholdPlayButtons(buttons);
+        MainMenuButtonLayout.arrange(buttons);
+        MainMenuButtonLayout.position(buttons, 854, 480);
+        int[] frame = MainMenuButtonLayout.replacePlayButtons(buttons);
+        assertNotNull(frame);
+        assertEquals(false, realms.visible);
+        assertEquals(false, single.visible);
+        assertEquals(false, multi.visible);
+        // The frame is Singleplayer's own row; the rows below close up.
+        assertEquals(single.xPosition, frame[0]);
+        assertEquals(single.yPosition, frame[1]);
+        assertEquals(200, frame[2]);
+        assertEquals(20, frame[3]);
+        // Mods, alone in its row, takes the column's width under it.
+        assertEquals(single.xPosition, mods.xPosition);
+        assertEquals(200, mods.width);
+        assertEquals(4, mods.yPosition - frame[1] - frame[3]);
+        assertEquals(16, options.yPosition - mods.yPosition - mods.height);
+        assertTrue(Math.abs(frame[0] * 2 + frame[2] - 854) <= 1);
+    }
+
+    @Test
+    public void shorterColumnIsCentredWhereTheStandardColumnsMiddleFalls() {
+        for (int screenHeight : new int[] {349, 480, 1080}) {
+            GuiButton single = button(1, 100, 80, 200);
+            GuiButton multi = button(2, 100, 104, 200);
+            GuiButton realms = button(14, 202, 128, 98);
+            GuiButton mods = button(6, 100, 128, 98);
+            GuiButton options = button(0, 100, 164, 98);
+            GuiButton quit = button(4, 202, 164, 98);
+            List<GuiButton> standard = Arrays.asList(single, multi, realms, mods, options, quit);
+            MainMenuButtonLayout.arrange(standard);
+            MainMenuButtonLayout.position(standard, 854, screenHeight);
+            int standardMiddle = (single.yPosition + quit.yPosition + quit.height) / 2;
+            assertEquals(MainMenuButtonLayout.BASELINE_COLUMN_HEIGHT,
+                    quit.yPosition + quit.height - single.yPosition);
+
+            GuiButton gatedSingle = button(1, 100, 80, 200);
+            GuiButton gatedMulti = button(2, 100, 104, 200);
+            GuiButton gatedRealms = button(14, 202, 128, 98);
+            GuiButton gatedMods = button(6, 100, 128, 98);
+            GuiButton gatedOptions = button(0, 100, 164, 98);
+            GuiButton gatedQuit = button(4, 202, 164, 98);
+            List<GuiButton> gated = Arrays.asList(gatedSingle, gatedMulti, gatedRealms,
+                    gatedMods, gatedOptions, gatedQuit);
+            MainMenuButtonLayout.withholdPlayButtons(gated);
+            MainMenuButtonLayout.arrange(gated);
+            MainMenuButtonLayout.position(gated, 854, screenHeight);
+            int gatedMiddle = (gatedSingle.yPosition
+                    + gatedQuit.yPosition + gatedQuit.height) / 2;
+            assertEquals(standardMiddle, gatedMiddle);
+            assertTrue(gatedSingle.yPosition > single.yPosition);
+        }
+    }
+
+    @Test
+    public void menuWithoutPlayButtonsIsLeftAsItIs() {
+        GuiButton play = button(11, 100, 80, 200);
+        GuiButton options = button(0, 100, 164, 98);
+        List<GuiButton> buttons = Arrays.asList(play, options);
+        MainMenuButtonLayout.withholdPlayButtons(buttons);
+        assertEquals(null, MainMenuButtonLayout.replacePlayButtons(buttons));
+        assertEquals(true, play.visible);
     }
 
     private static GuiButton button(int id, int x, int y, int width) {

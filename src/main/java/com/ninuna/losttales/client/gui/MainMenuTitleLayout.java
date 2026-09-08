@@ -2,10 +2,10 @@ package com.ninuna.losttales.client.gui;
 
 /** Fits the complete title above the menu without changing its aspect ratio. */
 final class MainMenuTitleLayout {
-    static final int TEXTURE_WIDTH = 4032;
-    static final int TEXTURE_HEIGHT = 814;
+    static final int TEXTURE_WIDTH = 4014;
+    static final int TEXTURE_HEIGHT = 796;
     // Exclude the transparent export border when matching vanilla's visible width.
-    static final int TEXTURE_PADDING = 10;
+    static final int TEXTURE_PADDING = 1;
     static final int ARTWORK_WIDTH = TEXTURE_WIDTH - TEXTURE_PADDING * 2;
     static final int ARTWORK_HEIGHT = TEXTURE_HEIGHT - TEXTURE_PADDING * 2;
     static final int TOP = 30;

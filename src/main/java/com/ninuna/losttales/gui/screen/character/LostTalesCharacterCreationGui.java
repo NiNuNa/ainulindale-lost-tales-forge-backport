@@ -15,10 +15,10 @@ import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.cape.CharacterCapeDefinition;
 import com.ninuna.losttales.client.character.CharacterTemplate;
 import com.ninuna.losttales.client.character.CharacterTemplateStore;
+import com.ninuna.losttales.client.character.room.CharacterRoomSession;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.CreatorCharacterLight;
 import com.ninuna.losttales.client.gui.LostTalesHudHidingScreen;
-import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterRaceAttributes;
@@ -74,18 +74,20 @@ import java.util.UUID;
  * finished before the next. In a world the stage is the world itself: the
  * screen borrows the third-person camera, stands it in front of the
  * player wearing the choices as they stand, and the player orbits it by
- * dragging and brings it nearer with the wheel. At the main menu there is
- * no world to stand in, so the stage draws the figure from the same body
- * model instead, turned and tilted by the same drag, its head following
- * the pointer.</p>
+ * dragging and brings it nearer with the wheel. The main menu opens it
+ * in the character room, a world of one room made for the visit, so the
+ * stage is the world there too. Only with no world to stand in does the
+ * stage draw the figure from the same body model instead, turned and
+ * tilted by the same drag, its head following the pointer.</p>
  *
  * <p>Two things open it. The roster opens it against a world, and
  * confirming sends a creation request the server validates and answers.
- * The main menu opens it as the account's own template, before any world
- * is open: nothing is sent, and confirming writes the template this
- * account starts every later world from. The screen is the same either
- * way; only what confirming does differs, and the pages that only a world
- * can answer — the starting waypoint — are left out of the template.</p>
+ * The character room opens it as the account's own template: nothing is
+ * sent, and confirming writes the template this account starts every
+ * later world from, then returns to the room. The screen is the same
+ * either way; only what confirming does differs, and the pages that only
+ * a world can answer — the starting waypoint — are left out of the
+ * template.</p>
  *
  * <p>The server remains authoritative for every validation. What this
  * screen refuses on its own is only what it can see is empty.</p>
@@ -111,6 +113,8 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private static final float FIGURE_HEIGHT_BLOCKS = 2.0F;
     /** The face drawn when there is no account to build a body for. */
     private static final int FACE_FALLBACK_SIZE = 64;
+    /** Lights the character in a world; a key of this screen's, not a control of the game's. */
+    private static final int LIGHT_KEY = Keyboard.KEY_L;
 
     private final GuiScreen parent;
     private final int slotIndex;
@@ -1365,8 +1369,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 I18n.format("gui.losttales.character.creator.hint.reset_view")));
         int leftHints = 4;
         if (this.worldCamera) {
-            hints.add(Hint.binding(this.mc, this.fontRendererObj,
-                    LostTalesKeyBindings.getCreatorLightKeyBinding(),
+            hints.add(Hint.key(this.mc, this.fontRendererObj, LIGHT_KEY,
                     I18n.format("gui.losttales.character.creator.hint.light")));
             leftHints = 5;
         }
@@ -1599,7 +1602,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 this.pose.reset();
                 return;
             default:
-                if (this.worldCamera && LostTalesKeyBindings.isCreatorLightKey(keyCode)) {
+                if (this.worldCamera && keyCode == LIGHT_KEY) {
                     CreatorCharacterLight.toggle(this);
                     return;
                 }
@@ -1701,6 +1704,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         setStatus(I18n.format(saved
                 ? "gui.losttales.character.template.saved"
                 : "gui.losttales.character.template.unsaved"), !saved);
+        if (saved) {
+            // In the character room the body keeps wearing what was saved.
+            CharacterRoomSession.onTemplateSaved(template);
+        }
         if (saved && this.mc != null) {
             this.mc.displayGuiScreen(this.parent);
         }

@@ -98,9 +98,7 @@ public class LostTalesConfigGui extends GuiConfig {
                 "showPartyHud", "linkShowPartyHud", "partyHudOffsetX", "partyHudOffsetY",
                 "showQuickLootHud", "linkShowQuickLootHud", "quickLootHudOffsetX", "quickLootHudOffsetY",
                 "showQuestHud", "linkShowQuestHud", "questHudOffsetX", "questHudOffsetY",
-                "questNotificationHudOffsetX", "questNotificationHudOffsetY",
-                "mapDiscoveryHudOffsetX", "mapDiscoveryHudOffsetY",
-                "areaNoticeHudOffsetX", "areaNoticeHudOffsetY")));
+                "notificationHudOffsetX", "notificationHudOffsetY")));
         elements.add(group("compass", "losttales.config.category.client.compass", pick(client,
                 "compassHudDisplayRadius", "showStaticCompassMarkers", "showLotrWaypointCompassMarkers",
                 "onlyShowUnlockedLotrWaypoints", "showHostileCompassMarkers",

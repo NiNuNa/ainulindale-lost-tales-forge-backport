@@ -9,7 +9,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
-import com.ninuna.losttales.gui.hud.mapmarker.LostTalesMapMarkerHudRenderer;
+import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
 import com.ninuna.losttales.gui.hud.party.PartyHudLayout;
 import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
 import java.util.ArrayList;
@@ -613,9 +613,8 @@ public class LostTalesHudPlacementGui extends GuiScreen {
         PARTY("Party", "party"),
         QUICK_LOOT("Quick Loot", "quickloot"),
         QUEST_TRACKER("Quest Tracker", "quest"),
-        QUEST_NOTIFICATIONS("Quest Notifications", "questnotifications"),
-        LOCATION_DISCOVERY("Location Discovery", "mapdiscovery"),
-        AREA_NAME("Area Name", "areanotice");
+        /** Quest banners, location discoveries and area names, one slot. */
+        NOTIFICATIONS("Notifications", "notifications");
 
         private final String label;
         private final String configKey;
@@ -644,15 +643,7 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             if (this == QUEST_TRACKER) {
                 return LostTalesQuestHudRenderer.getTrackerPlacementWidth();
             }
-            if (this == QUEST_NOTIFICATIONS) {
-                return LostTalesQuestHudRenderer
-                        .getNotificationPlacementWidth();
-            }
-            if (this == LOCATION_DISCOVERY) {
-                return LostTalesMapMarkerHudRenderer
-                        .getDiscoveryPlacementWidth();
-            }
-            return LostTalesMapMarkerHudRenderer.getAreaPlacementWidth();
+            return LostTalesNotificationHud.getPlacementWidth();
         }
 
         @Override
@@ -670,15 +661,7 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             if (this == QUEST_TRACKER) {
                 return LostTalesQuestHudRenderer.getTrackerPlacementHeight();
             }
-            if (this == QUEST_NOTIFICATIONS) {
-                return LostTalesQuestHudRenderer
-                        .getNotificationPlacementHeight();
-            }
-            if (this == LOCATION_DISCOVERY) {
-                return LostTalesMapMarkerHudRenderer
-                        .getDiscoveryPlacementHeight();
-            }
-            return LostTalesMapMarkerHudRenderer.getAreaPlacementHeight();
+            return LostTalesNotificationHud.getPlacementHeight();
         }
 
         @Override
@@ -695,13 +678,7 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             if (this == QUEST_TRACKER) {
                 return LostTalesConfig.questHudOffsetX;
             }
-            if (this == QUEST_NOTIFICATIONS) {
-                return LostTalesConfig.questNotificationHudOffsetX;
-            }
-            if (this == LOCATION_DISCOVERY) {
-                return LostTalesConfig.mapDiscoveryHudOffsetX;
-            }
-            return LostTalesConfig.areaNoticeHudOffsetX;
+            return LostTalesConfig.notificationHudOffsetX;
         }
 
         @Override
@@ -718,13 +695,7 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             if (this == QUEST_TRACKER) {
                 return LostTalesConfig.questHudOffsetY;
             }
-            if (this == QUEST_NOTIFICATIONS) {
-                return LostTalesConfig.questNotificationHudOffsetY;
-            }
-            if (this == LOCATION_DISCOVERY) {
-                return LostTalesConfig.mapDiscoveryHudOffsetY;
-            }
-            return LostTalesConfig.areaNoticeHudOffsetY;
+            return LostTalesConfig.notificationHudOffsetY;
         }
 
         @Override

@@ -115,6 +115,8 @@ import com.ninuna.losttales.chat.server.ChatHistory;
 import com.ninuna.losttales.chat.server.LostTalesChatRoleRosterWatcher;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
+import com.ninuna.losttales.world.room.CharacterRoomWorldHandler;
+import com.ninuna.losttales.world.room.CharacterRoomWorldType;
 import com.ninuna.losttales.world.waystone.LostTalesWaystoneGenerationHandler;
 import software.bernie.geckolib3.GeckoLib;
 
@@ -139,6 +141,8 @@ public class LostTalesCommonProxy {
         LoreCharacterRegistry.load(event.getModConfigurationDirectory());
         GeckoLib.initialize();
         LostTalesNetworkHandler.registerCommonPackets();
+        // Before any world can load: a world names its type by name.
+        CharacterRoomWorldType.register();
         LostTalesQuestRegistry.loadFromClasspath();
         LostTalesQuestPlayerEventHandler questPlayerEventHandler = new LostTalesQuestPlayerEventHandler();
         AccessoryPlayerEventHandler accessoryPlayerEventHandler =
@@ -178,6 +182,7 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(projectileAimHandler);
         MinecraftForge.EVENT_BUS.register(chargeService);
         MinecraftForge.EVENT_BUS.register(waystoneGenerationHandler);
+        MinecraftForge.EVENT_BUS.register(new CharacterRoomWorldHandler());
         MinecraftForge.EVENT_BUS.register(new ChatConsoleCommandHandler());
         MinecraftForge.TERRAIN_GEN_BUS.register(waystoneGenerationHandler);
         GameRegistry.registerWorldGenerator(
@@ -367,7 +372,10 @@ public class LostTalesCommonProxy {
         LostTalesMobAggroEventHandler.clearAll();
         LotrRaceProfileAdapter.getInstance().clear();
         ELostTalesCommand.initAndRegisterCommands(event);
-        LostTalesDiscordBridge.getInstance().start();
+        // A character room is a private visit; Discord is not told of it.
+        if (!CharacterRoomWorldType.isRoomServer(event.getServer())) {
+            LostTalesDiscordBridge.getInstance().start();
+        }
     }
 
     private static void initializeLoreCharacterOwnership(
@@ -404,6 +412,9 @@ public class LostTalesCommonProxy {
 
     /** The server accepts players from here on; the bridge may say so. */
     public void onServerStarted(FMLServerStartedEvent event) {
+        if (CharacterRoomWorldType.isRoomServer(MinecraftServer.getServer())) {
+            return;
+        }
         LostTalesDiscordBridge.getInstance().onServerStarted();
     }
 

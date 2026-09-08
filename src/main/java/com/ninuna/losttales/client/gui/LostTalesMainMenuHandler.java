@@ -1,12 +1,10 @@
 package com.ninuna.losttales.client.gui;
 
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
-import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
-import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.character.CharacterTemplate;
 import com.ninuna.losttales.client.character.CharacterTemplateStore;
 import com.ninuna.losttales.client.character.LostTalesClientAccount;
+import com.ninuna.losttales.client.character.room.CharacterRoomLauncher;
 import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSmoothing;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterCreationGui;
@@ -26,14 +24,23 @@ import java.lang.ref.WeakReference;
 import java.util.UUID;
 
 /**
- * Styles the main menu's standard controls and adds the account's
- * default-character template button before any world is open.
+ * Styles the main menu's standard controls and decides what the menu
+ * offers before any world is open, from whether the account has a base
+ * character: the template kept on this installation for the signed-in
+ * account, the character every world it has not joined yet starts it as.
  *
- * <p>The menu is not gated: Singleplayer and Multiplayer keep their usual
- * actions. A world makes the account's default
- * character whether or not a template was ever written, so a player who
- * ignores this button loses nothing but the chance to say who they start
- * as.</p>
+ * <p>Without one there is nothing to play as yet, so Singleplayer,
+ * Multiplayer and Realms are withheld and one control stands in their
+ * place, leading to the character room. With one the menu is the usual
+ * menu, and the thin button beside Singleplayer and Multiplayer, wearing
+ * the character's face, leads to the same room to change it. Both open
+ * the room: a world of one lit room, made fresh for the visit, where the
+ * creator edits the template as the world draws the character, and the
+ * play controls are offered again from within.</p>
+ *
+ * <p>An installation that cannot say which account it is signed in as
+ * keeps no template and is never gated: the menu stays as vanilla built
+ * it, since there is nothing to keep a character under.</p>
  *
  * <p>Keyed on {@link GuiMainMenu} rather than an exact class: LOTR
  * replaces the menu with a subclass of it, and that subclass is the one
@@ -41,11 +48,11 @@ import java.util.UUID;
  * the same initialisation, so only the screen Minecraft is actually
  * showing is touched.</p>
  *
- * <p>The button is placed from the menu's own Singleplayer and
- * Multiplayer buttons, read after the menu has finished building them.
- * LOTR moves the whole column down and swaps every button for one of its
- * own in {@code initGui}, and this runs afterwards, so what is measured
- * is where the buttons ended up.</p>
+ * <p>Every control of this handler's is placed from the menu's own
+ * Singleplayer and Multiplayer buttons, read after the menu has finished
+ * building them. LOTR moves the whole column down and swaps every button
+ * for one of its own in {@code initGui}, and this runs afterwards, so
+ * what is measured is where the buttons ended up.</p>
  */
 public final class LostTalesMainMenuHandler {
 
@@ -82,21 +89,48 @@ public final class LostTalesMainMenuHandler {
             return;
         }
         styleMenuButtons(event);
+        UUID account = LostTalesClientAccount.id();
+        CharacterTemplate template = account == null
+                ? CharacterTemplate.EMPTY : CharacterTemplateStore.load(account);
+        boolean characterRequired = account != null && !template.isSetUp();
+        if (characterRequired) {
+            // Before the rows are laid out, so the withheld rows close up.
+            MainMenuButtonLayout.withholdPlayButtons(event.buttonList);
+        }
         MainMenuButtonLayout.arrange(event.buttonList);
         MainMenuButtonLayout.position(event.buttonList, event.gui.width, event.gui.height);
-        addCharacterButton(event, minecraft);
-    }
-
-    private void addCharacterButton(GuiScreenEvent.InitGuiEvent.Post event,
-                                    Minecraft minecraft) {
-        // The character frame spans the final, uniformly spaced rows.
-        GuiButton singleplayer = findButton(event, SINGLEPLAYER_ID);
-        GuiButton multiplayer = findButton(event, MULTIPLAYER_ID);
-        UUID account = LostTalesClientAccount.id();
         if (account == null) {
             // Nothing to keep a template under, so nothing to offer.
             return;
         }
+        if (characterRequired) {
+            addCreateButton(event);
+        } else {
+            addCharacterButton(event, minecraft, account, template);
+        }
+    }
+
+    /**
+     * The one control a menu without a character offers in place of the
+     * play buttons, in Singleplayer's own frame. A menu without that
+     * button is left as it is.
+     */
+    private static void addCreateButton(GuiScreenEvent.InitGuiEvent.Post event) {
+        int[] frame = MainMenuButtonLayout.replacePlayButtons(event.buttonList);
+        if (frame == null) {
+            return;
+        }
+        event.buttonList.add(new LostTalesButton(BUTTON_ID, frame[0], frame[1],
+                frame[2], frame[3],
+                I18n.format("gui.losttales.character.room.create")));
+    }
+
+    private void addCharacterButton(GuiScreenEvent.InitGuiEvent.Post event,
+                                    Minecraft minecraft, UUID account,
+                                    CharacterTemplate template) {
+        // The character frame spans the final, uniformly spaced rows.
+        GuiButton singleplayer = findButton(event, SINGLEPLAYER_ID);
+        GuiButton multiplayer = findButton(event, MULTIPLAYER_ID);
         LostTalesCharacterMenuButton existing = labelledButtonFor(event.gui);
         if (existing != null && event.buttonList.contains(existing)) {
             return;
@@ -118,12 +152,11 @@ public final class LostTalesMainMenuHandler {
         if (placement == null) {
             return;
         }
-        CharacterTemplate template = CharacterTemplateStore.load(account);
         LostTalesCharacterHeadIconRenderer.rememberAccountSkin(minecraft,
                 account, LostTalesClientAccount.name());
         LostTalesCharacterMenuButton button = new LostTalesCharacterMenuButton(
                 BUTTON_ID, placement.getX(), placement.getY(),
-                placement.getHeight(), account, appearanceOf(account, template),
+                placement.getHeight(), account, template.toAppearance(account),
                 I18n.format("gui.losttales.character.template.button"));
         event.buttonList.add(button);
         this.labelledScreen = new WeakReference<GuiScreen>(event.gui);
@@ -229,28 +262,12 @@ public final class LostTalesMainMenuHandler {
             return;
         }
         event.setCanceled(true);
-        minecraft.displayGuiScreen(
-                LostTalesCharacterCreationGui.forTemplate(event.gui));
-    }
-
-    /**
-     * The template as an appearance the body model can be built from. A
-     * template with nothing chosen resolves to the account's own look,
-     * which is what a world would make its default character as.
-     */
-    private static CharacterAppearance appearanceOf(UUID account,
-                                                    CharacterTemplate template) {
-        String raceId = template.getRaceId().length() > 0
-                ? template.getRaceId() : CharacterRaceRegistry.HUMAN;
-        String genderId = template.getGenderId().length() > 0
-                ? template.getGenderId()
-                : CharacterRaceRegistry.normalizeGenderForRace(
-                        raceId, CharacterGenderRegistry.MALE);
-        String skinId = template.getSkinId().length() > 0
-                ? template.getSkinId()
-                : CharacterSkinRegistry.getDefaultSkinId(raceId, genderId, account);
-        return new CharacterAppearance(account, raceId, genderId, skinId,
-                template.getBodyTypeId(), template.getChestTypeId());
+        // The room shows the character as a world draws it. When no
+        // world can be opened, the creator draws the figure itself.
+        if (!CharacterRoomLauncher.enter(minecraft)) {
+            minecraft.displayGuiScreen(
+                    LostTalesCharacterCreationGui.forTemplate(event.gui));
+        }
     }
 
     /** The button this handler added to that screen, while it is still open. */

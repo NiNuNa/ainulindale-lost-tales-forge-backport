@@ -44,11 +44,15 @@ public final class LostTalesHudPlacementConfigTest {
                 LostTalesConfig.normalizeHudElement("quick-loot"));
         assertEquals("quest",
                 LostTalesConfig.normalizeHudElement("tracker"));
-        assertEquals("questnotifications",
+        assertEquals("notifications",
+                LostTalesConfig.normalizeHudElement("notifications"));
+        // The three notices used to be three slots; their old names still
+        // reach the one they share.
+        assertEquals("notifications",
                 LostTalesConfig.normalizeHudElement("quest notifications"));
-        assertEquals("mapdiscovery",
+        assertEquals("notifications",
                 LostTalesConfig.normalizeHudElement("location discovery"));
-        assertEquals("areanotice",
+        assertEquals("notifications",
                 LostTalesConfig.normalizeHudElement("area name"));
     }
 }

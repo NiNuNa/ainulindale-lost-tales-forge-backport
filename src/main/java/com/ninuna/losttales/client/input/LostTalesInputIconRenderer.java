@@ -37,8 +37,15 @@ public final class LostTalesInputIconRenderer {
 
     /** Reads the binding's current code on every call so changed controls appear immediately. */
     public static int drawKeyBinding(Minecraft minecraft, KeyBinding keyBinding, float x, float y, float scale) {
+        return drawKeyBinding(minecraft, keyBinding, x, y, scale, 1.0F);
+    }
+
+    /** The same icon faded to that opacity, for a hint that comes and goes with its line. */
+    public static int drawKeyBinding(Minecraft minecraft, KeyBinding keyBinding,
+                                     float x, float y, float scale, float alpha) {
         int keyCode = keyBinding == null ? Integer.MIN_VALUE : keyBinding.getKeyCode();
-        return drawInput(minecraft, LostTalesInputBinding.getType(keyBinding), keyCode, x, y, scale);
+        return drawInput(minecraft, LostTalesInputBinding.getType(keyBinding), keyCode,
+                x, y, scale, alpha);
     }
 
     public static int drawMouseWheel(Minecraft minecraft, float x, float y, float scale) {
@@ -75,19 +82,26 @@ public final class LostTalesInputIconRenderer {
     }
 
     public static int drawInput(Minecraft minecraft, Type type, int keyCode, float x, float y, float scale) {
-        if (minecraft == null || scale <= 0.0F) {
-            return 0;
+        return drawInput(minecraft, type, keyCode, x, y, scale, 1.0F);
+    }
+
+    /** Draws the icon at that opacity; the pose's own shadow and highlight fade with it. */
+    public static int drawInput(Minecraft minecraft, Type type, int keyCode,
+                                float x, float y, float scale, float alpha) {
+        if (minecraft == null || scale <= 0.0F || alpha <= 0.0F) {
+            return measureInput(minecraft, type, keyCode, scale);
         }
+        float opacity = Math.min(1.0F, alpha);
 
         Sprite sprite = LostTalesInputIconAtlas.findSprite(type, keyCode);
         Pose pose = animationPose(type, keyCode);
         if (sprite != null && isTextureAvailable(minecraft)) {
-            drawSprite(minecraft, sprite, pose, x, y, scale);
+            drawSprite(minecraft, sprite, pose, x, y, scale, opacity);
             return (int) Math.ceil(sprite.getWidth() * scale);
         }
 
         String label = LostTalesInputBinding.getFallbackLabel(type, keyCode);
-        return drawFallback(minecraft.fontRenderer, label, pose, x, y, scale);
+        return drawFallback(minecraft.fontRenderer, label, pose, x, y, scale, opacity);
     }
 
     /** Rechecks the texture after resource-pack reloads without parsing the image. */
@@ -152,7 +166,7 @@ public final class LostTalesInputIconRenderer {
 
     private static void drawSprite(
             Minecraft minecraft, Sprite sprite, Pose pose,
-            float x, float y, float scale) {
+            float x, float y, float scale, float alpha) {
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT | GL11.GL_CURRENT_BIT | GL11.GL_TEXTURE_BIT);
         GL11.glPushMatrix();
         try {
@@ -169,7 +183,7 @@ public final class LostTalesInputIconRenderer {
                     applyPoseTransform(pose, sprite.getWidth(),
                             sprite.getHeight(), true);
                     GL11.glColor4f(0.14F, 0.11F, 0.09F,
-                            pose.getShadowAlpha());
+                            pose.getShadowAlpha() * alpha);
                     drawSpriteLayers(sprite, pose.getFrame());
                 } finally {
                     GL11.glPopMatrix();
@@ -184,7 +198,7 @@ public final class LostTalesInputIconRenderer {
                 float warmth = pose.getPressure();
                 GL11.glColor4f(brightness,
                         brightness * (1.0F - 0.018F * warmth),
-                        brightness * (1.0F - 0.045F * warmth), 1.0F);
+                        brightness * (1.0F - 0.045F * warmth), alpha);
                 drawSpriteLayers(sprite, pose.getFrame());
 
                 // Fixed-function colour multiplication cannot brighten past
@@ -195,7 +209,7 @@ public final class LostTalesInputIconRenderer {
                 if (highlightAlpha > 0.003F) {
                     OpenGlHelper.glBlendFunc(
                             GL11.GL_SRC_ALPHA, GL11.GL_ONE, 1, 0);
-                    GL11.glColor4f(1.0F, 0.78F, 0.55F, highlightAlpha);
+                    GL11.glColor4f(1.0F, 0.78F, 0.55F, highlightAlpha * alpha);
                     drawSpriteLayers(sprite, pose.getFrame());
                     OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
                             GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
@@ -265,7 +279,7 @@ public final class LostTalesInputIconRenderer {
 
     private static int drawFallback(
             FontRenderer font, String label, Pose pose,
-            float x, float y, float scale) {
+            float x, float y, float scale, float alpha) {
         if (font == null) {
             return 0;
         }
@@ -284,7 +298,7 @@ public final class LostTalesInputIconRenderer {
                 try {
                     applyPoseTransform(pose, width, BASE_ICON_HEIGHT, true);
                     int shadowAlpha = Math.max(0, Math.min(255,
-                            Math.round(pose.getShadowAlpha() * 255.0F)));
+                            Math.round(pose.getShadowAlpha() * alpha * 255.0F)));
                     drawRect(0, 0, width, BASE_ICON_HEIGHT,
                             shadowAlpha << 24);
                 } finally {
@@ -294,17 +308,18 @@ public final class LostTalesInputIconRenderer {
             GL11.glPushMatrix();
             try {
                 applyPoseTransform(pose, width, BASE_ICON_HEIGHT, false);
-                drawRect(0, 0, width, BASE_ICON_HEIGHT, 0xCC080808);
-                drawRect(0, 0, width, 1, 0xDDB8B8B8);
+                drawRect(0, 0, width, BASE_ICON_HEIGHT, faded(0xCC080808, alpha));
+                drawRect(0, 0, width, 1, faded(0xDDB8B8B8, alpha));
                 drawRect(0, BASE_ICON_HEIGHT - 1, width,
-                        BASE_ICON_HEIGHT, 0xDD303030);
-                drawRect(0, 0, 1, BASE_ICON_HEIGHT, 0xDD909090);
+                        BASE_ICON_HEIGHT, faded(0xDD303030, alpha));
+                drawRect(0, 0, 1, BASE_ICON_HEIGHT, faded(0xDD909090, alpha));
                 drawRect(width - 1, 0, width,
-                        BASE_ICON_HEIGHT, 0xDD303030);
+                        BASE_ICON_HEIGHT, faded(0xDD303030, alpha));
                 GL11.glEnable(GL11.GL_TEXTURE_2D);
                 GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
                 font.drawStringWithShadow(label, FALLBACK_HORIZONTAL_PADDING,
-                        (BASE_ICON_HEIGHT - font.FONT_HEIGHT) / 2, 0xFFFFFF);
+                        (BASE_ICON_HEIGHT - font.FONT_HEIGHT) / 2,
+                        faded(0xFFFFFFFF, alpha));
             } finally {
                 GL11.glPopMatrix();
             }
@@ -313,6 +328,15 @@ public final class LostTalesInputIconRenderer {
             GL11.glPopAttrib();
         }
         return (int) Math.ceil(width * scale);
+    }
+
+    /**
+     * The colour with its alpha scaled down. Never below the font's
+     * threshold, under which it would draw the colour fully opaque.
+     */
+    private static int faded(int color, float alpha) {
+        int scaled = Math.round((color >>> 24) * Math.max(0.0F, Math.min(1.0F, alpha)));
+        return (Math.max(4, scaled) << 24) | (color & 0xFFFFFF);
     }
 
     private static void drawRect(int left, int top, int right, int bottom, int color) {

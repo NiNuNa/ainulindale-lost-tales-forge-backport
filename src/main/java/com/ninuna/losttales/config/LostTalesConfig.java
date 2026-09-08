@@ -128,12 +128,9 @@ public final class LostTalesConfig {
     public static int questHudMaxTrackedQuests = 4;
     public static int questHudObjectiveLineCount = 2;
     public static boolean showQuestHudNotifications = true;
-    public static double questNotificationHudOffsetX = 50.0D;
-    public static double questNotificationHudOffsetY = 75.0D;
-    public static double mapDiscoveryHudOffsetX = 50.0D;
-    public static double mapDiscoveryHudOffsetY = 35.0D;
-    public static double areaNoticeHudOffsetX = 50.0D;
-    public static double areaNoticeHudOffsetY = 15.0D;
+    /** The one slot every passing notice shares: quest banners, discoveries, area names. */
+    public static double notificationHudOffsetX = 50.0D;
+    public static double notificationHudOffsetY = 35.0D;
     public static boolean showWorldQuestMarkers = true;
     public static boolean showDiscoveredWorldMapMarkers = true;
     public static int worldQuestMarkerMaxDistance = 128;
@@ -891,35 +888,15 @@ public final class LostTalesConfig {
                     showQuestHudNotifications,
                     "Render centered quest notification banners for quest starts, objective progress, and completions."
             );
-            questNotificationHudOffsetX = getHudPercent(
-                    config, "questNotificationHudOffsetX",
-                    questNotificationHudOffsetX, 0.0D, 100.0D,
-                    "Horizontal quest-notification position within the available scaled screen width."
+            notificationHudOffsetX = getHudPercent(
+                    config, "notificationHudOffsetX",
+                    notificationHudOffsetX, 0.0D, 100.0D,
+                    "Horizontal position of the notification slot (quest banners, location discoveries, area names) within the available scaled screen width."
             );
-            questNotificationHudOffsetY = getHudPercent(
-                    config, "questNotificationHudOffsetY",
-                    questNotificationHudOffsetY, 0.0D, 100.0D,
-                    "Vertical quest-notification position within the available scaled screen height."
-            );
-            mapDiscoveryHudOffsetX = getHudPercent(
-                    config, "mapDiscoveryHudOffsetX",
-                    mapDiscoveryHudOffsetX, 0.0D, 100.0D,
-                    "Horizontal location-discovery banner position within the available scaled screen width."
-            );
-            mapDiscoveryHudOffsetY = getHudPercent(
-                    config, "mapDiscoveryHudOffsetY",
-                    mapDiscoveryHudOffsetY, 0.0D, 100.0D,
-                    "Vertical location-discovery banner position within the available scaled screen height."
-            );
-            areaNoticeHudOffsetX = getHudPercent(
-                    config, "areaNoticeHudOffsetX",
-                    areaNoticeHudOffsetX, 0.0D, 100.0D,
-                    "Horizontal area-name notice position within the available scaled screen width."
-            );
-            areaNoticeHudOffsetY = getHudPercent(
-                    config, "areaNoticeHudOffsetY",
-                    areaNoticeHudOffsetY, 0.0D, 100.0D,
-                    "Vertical area-name notice position within the available scaled screen height."
+            notificationHudOffsetY = getHudPercent(
+                    config, "notificationHudOffsetY",
+                    notificationHudOffsetY, 0.0D, 100.0D,
+                    "Vertical position of the notification slot within the available scaled screen height."
             );
             showWorldQuestMarkers = config.getBoolean(
                     "showWorldQuestMarkers",
@@ -1701,7 +1678,7 @@ public final class LostTalesConfig {
             quickLootHudOffsetY = 32;
             questHudOffsetX = 2;
             questHudOffsetY = 38;
-            setNotificationPresetOffsets(50, 75, 50, 35, 50, 15);
+            setNotificationPresetOffsets(50, 35);
         } else if (HUD_PRESET_LOTR_SAFE.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 12;
@@ -1711,7 +1688,7 @@ public final class LostTalesConfig {
             quickLootHudOffsetY = 34;
             questHudOffsetX = 2;
             questHudOffsetY = 52;
-            setNotificationPresetOffsets(50, 78, 50, 32, 50, 27);
+            setNotificationPresetOffsets(50, 32);
         } else if (HUD_PRESET_COMPACT.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 7;
@@ -1721,7 +1698,7 @@ public final class LostTalesConfig {
             quickLootHudOffsetY = 37;
             questHudOffsetX = 1;
             questHudOffsetY = 57;
-            setNotificationPresetOffsets(50, 78, 50, 30, 50, 22);
+            setNotificationPresetOffsets(50, 30);
         } else if (HUD_PRESET_MINIMAL.equals(key)) {
             compassHudOffsetX = 50;
             compassHudOffsetY = 4;
@@ -1731,20 +1708,13 @@ public final class LostTalesConfig {
             quickLootHudOffsetY = 42;
             questHudOffsetX = 1;
             questHudOffsetY = 70;
-            setNotificationPresetOffsets(50, 82, 50, 28, 50, 18);
+            setNotificationPresetOffsets(50, 28);
         }
     }
 
-    private static void setNotificationPresetOffsets(
-            int questX, int questY,
-            int discoveryX, int discoveryY,
-            int areaX, int areaY) {
-        questNotificationHudOffsetX = questX;
-        questNotificationHudOffsetY = questY;
-        mapDiscoveryHudOffsetX = discoveryX;
-        mapDiscoveryHudOffsetY = discoveryY;
-        areaNoticeHudOffsetX = areaX;
-        areaNoticeHudOffsetY = areaY;
+    private static void setNotificationPresetOffsets(int x, int y) {
+        notificationHudOffsetX = x;
+        notificationHudOffsetY = y;
     }
 
     public static String normalizeHudPreset(String preset) {
@@ -1818,15 +1788,9 @@ public final class LostTalesConfig {
         } else if ("quest".equals(key)) {
             questHudOffsetX = x;
             questHudOffsetY = y;
-        } else if ("questnotifications".equals(key)) {
-            questNotificationHudOffsetX = x;
-            questNotificationHudOffsetY = y;
-        } else if ("mapdiscovery".equals(key)) {
-            mapDiscoveryHudOffsetX = x;
-            mapDiscoveryHudOffsetY = y;
-        } else if ("areanotice".equals(key)) {
-            areaNoticeHudOffsetX = x;
-            areaNoticeHudOffsetY = y;
+        } else if ("notifications".equals(key)) {
+            notificationHudOffsetX = x;
+            notificationHudOffsetY = y;
         } else {
             return false;
         }
@@ -1847,17 +1811,9 @@ public final class LostTalesConfig {
         if ("quest".equals(key)) {
             return setHudOffset(key, questHudOffsetX + dx, questHudOffsetY + dy);
         }
-        if ("questnotifications".equals(key)) {
-            return setHudOffset(key, questNotificationHudOffsetX + dx,
-                    questNotificationHudOffsetY + dy);
-        }
-        if ("mapdiscovery".equals(key)) {
-            return setHudOffset(key, mapDiscoveryHudOffsetX + dx,
-                    mapDiscoveryHudOffsetY + dy);
-        }
-        if ("areanotice".equals(key)) {
-            return setHudOffset(key, areaNoticeHudOffsetX + dx,
-                    areaNoticeHudOffsetY + dy);
+        if ("notifications".equals(key)) {
+            return setHudOffset(key, notificationHudOffsetX + dx,
+                    notificationHudOffsetY + dy);
         }
         return false;
     }
@@ -1882,23 +1838,22 @@ public final class LostTalesConfig {
         if ("quest".equals(key) || "quests".equals(key) || "questhud".equals(key) || "tracker".equals(key)) {
             return "quest";
         }
-        if ("questnotifications".equals(key)
-                || "questnotification".equals(key)
-                || "notifications".equals(key)
+        // The three notices share one slot; every name any of them went
+        // by names the slot.
+        if ("notifications".equals(key)
                 || "notification".equals(key)
+                || "notices".equals(key)
+                || "questnotifications".equals(key)
+                || "questnotification".equals(key)
                 || "toast".equals(key)
-                || "toasts".equals(key)) {
-            return "questnotifications";
-        }
-        if ("mapdiscovery".equals(key)
+                || "toasts".equals(key)
+                || "mapdiscovery".equals(key)
                 || "locationdiscovery".equals(key)
-                || "discovery".equals(key)) {
-            return "mapdiscovery";
-        }
-        if ("areanotice".equals(key)
+                || "discovery".equals(key)
+                || "areanotice".equals(key)
                 || "areaname".equals(key)
                 || "area".equals(key)) {
-            return "areanotice";
+            return "notifications";
         }
         return "";
     }
@@ -1912,14 +1867,8 @@ public final class LostTalesConfig {
         quickLootHudOffsetY = clampPercent(quickLootHudOffsetY);
         questHudOffsetX = clampPercent(questHudOffsetX);
         questHudOffsetY = clampPercent(questHudOffsetY);
-        questNotificationHudOffsetX = clampPercent(
-                questNotificationHudOffsetX);
-        questNotificationHudOffsetY = clampPercent(
-                questNotificationHudOffsetY);
-        mapDiscoveryHudOffsetX = clampPercent(mapDiscoveryHudOffsetX);
-        mapDiscoveryHudOffsetY = clampPercent(mapDiscoveryHudOffsetY);
-        areaNoticeHudOffsetX = clampPercent(areaNoticeHudOffsetX);
-        areaNoticeHudOffsetY = clampPercent(areaNoticeHudOffsetY);
+        notificationHudOffsetX = clampPercent(notificationHudOffsetX);
+        notificationHudOffsetY = clampPercent(notificationHudOffsetY);
     }
 
     static boolean isLegacyChatPingSound(String sound) {
@@ -2226,18 +2175,10 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "questHudMaxTrackedQuests", questHudMaxTrackedQuests).set(questHudMaxTrackedQuests);
         config.get(CATEGORY_CLIENT, "questHudObjectiveLineCount", questHudObjectiveLineCount).set(questHudObjectiveLineCount);
         config.get(CATEGORY_CLIENT, "showQuestHudNotifications", showQuestHudNotifications).set(showQuestHudNotifications);
-        config.get(CATEGORY_CLIENT, "questNotificationHudOffsetX",
-                questNotificationHudOffsetX).set(questNotificationHudOffsetX);
-        config.get(CATEGORY_CLIENT, "questNotificationHudOffsetY",
-                questNotificationHudOffsetY).set(questNotificationHudOffsetY);
-        config.get(CATEGORY_CLIENT, "mapDiscoveryHudOffsetX",
-                mapDiscoveryHudOffsetX).set(mapDiscoveryHudOffsetX);
-        config.get(CATEGORY_CLIENT, "mapDiscoveryHudOffsetY",
-                mapDiscoveryHudOffsetY).set(mapDiscoveryHudOffsetY);
-        config.get(CATEGORY_CLIENT, "areaNoticeHudOffsetX",
-                areaNoticeHudOffsetX).set(areaNoticeHudOffsetX);
-        config.get(CATEGORY_CLIENT, "areaNoticeHudOffsetY",
-                areaNoticeHudOffsetY).set(areaNoticeHudOffsetY);
+        config.get(CATEGORY_CLIENT, "notificationHudOffsetX",
+                notificationHudOffsetX).set(notificationHudOffsetX);
+        config.get(CATEGORY_CLIENT, "notificationHudOffsetY",
+                notificationHudOffsetY).set(notificationHudOffsetY);
         config.get(CATEGORY_CLIENT, "showWorldQuestMarkers", showWorldQuestMarkers).set(showWorldQuestMarkers);
         config.get(CATEGORY_CLIENT, "showDiscoveredWorldMapMarkers", showDiscoveredWorldMapMarkers).set(showDiscoveredWorldMapMarkers);
         config.get(CATEGORY_CLIENT, "worldQuestMarkerMaxDistance", worldQuestMarkerMaxDistance).set(worldQuestMarkerMaxDistance);

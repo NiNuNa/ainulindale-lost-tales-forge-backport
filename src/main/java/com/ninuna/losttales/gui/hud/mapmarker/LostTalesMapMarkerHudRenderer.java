@@ -2,7 +2,7 @@ package com.ninuna.losttales.gui.hud.mapmarker;
 
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.config.LostTalesConfig;
-import com.ninuna.losttales.gui.hud.HudPlacementLayout;
+import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -10,7 +10,10 @@ import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.MathHelper;
 import org.lwjgl.opengl.GL11;
 
-/** Draws Skyrim-style map marker discovery and small area-entry text. */
+/**
+ * Draws Skyrim-style map marker discovery and small area-entry text, each
+ * in the shared notification slot.
+ */
 public final class LostTalesMapMarkerHudRenderer {
     private static final int MIN_TEXT_ALPHA = 4;
     private static final int DISCOVERY_LINE_WIDTH = 88;
@@ -22,22 +25,6 @@ public final class LostTalesMapMarkerHudRenderer {
     private static final int AREA_NOTICE_HEIGHT = 12;
 
     private LostTalesMapMarkerHudRenderer() {}
-
-    public static int getDiscoveryPlacementWidth() {
-        return DISCOVERY_NOTICE_WIDTH;
-    }
-
-    public static int getDiscoveryPlacementHeight() {
-        return DISCOVERY_NOTICE_HEIGHT;
-    }
-
-    public static int getAreaPlacementWidth() {
-        return AREA_NOTICE_WIDTH;
-    }
-
-    public static int getAreaPlacementHeight() {
-        return AREA_NOTICE_HEIGHT;
-    }
 
     public static void render(Minecraft minecraft, float partialTicks) {
         if (!LostTalesConfig.showLostTalesHud || !LostTalesConfig.showCompassHud || minecraft == null || minecraft.thePlayer == null || minecraft.theWorld == null || minecraft.gameSettings.hideGUI) {
@@ -70,17 +57,12 @@ public final class LostTalesMapMarkerHudRenderer {
         }
 
         FontRenderer font = minecraft.fontRenderer;
-        HudPlacementLayout.Bounds placement = HudPlacementLayout.calculate(
-                resolution.getScaledWidth(), resolution.getScaledHeight(),
-                DISCOVERY_NOTICE_WIDTH, DISCOVERY_NOTICE_HEIGHT,
-                LostTalesConfig.mapDiscoveryHudOffsetX,
-                LostTalesConfig.mapDiscoveryHudOffsetY,
-                HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT,
-                HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT);
-        int centerX = placement.x + placement.width / 2;
-        int y = placement.y;
+        int centerX = LostTalesNotificationHud.centerX(
+                resolution.getScaledWidth(), resolution.getScaledHeight());
+        int y = LostTalesNotificationHud.claim(resolution.getScaledWidth(),
+                resolution.getScaledHeight(), DISCOVERY_NOTICE_HEIGHT);
         String title = "Location Discovered";
-        String name = trimToWidth(font, notice.getName(), placement.width);
+        String name = trimToWidth(font, notice.getName(), DISCOVERY_NOTICE_WIDTH);
 
         int titleColor = colorWithAlpha(0xD9D1B8, alpha * 0.78F);
         int nameColor = colorWithAlpha(0xFFFFFF, alpha);
@@ -114,15 +96,10 @@ public final class LostTalesMapMarkerHudRenderer {
         }
 
         FontRenderer font = minecraft.fontRenderer;
-        HudPlacementLayout.Bounds placement = HudPlacementLayout.calculate(
-                resolution.getScaledWidth(), resolution.getScaledHeight(),
-                AREA_NOTICE_WIDTH, AREA_NOTICE_HEIGHT,
-                LostTalesConfig.areaNoticeHudOffsetX,
-                LostTalesConfig.areaNoticeHudOffsetY,
-                HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT,
-                HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT);
-        int x = placement.x + placement.width / 2;
-        int y = placement.y;
+        int x = LostTalesNotificationHud.centerX(
+                resolution.getScaledWidth(), resolution.getScaledHeight());
+        int y = LostTalesNotificationHud.claim(resolution.getScaledWidth(),
+                resolution.getScaledHeight(), AREA_NOTICE_HEIGHT);
 
         String text = trimToWidth(font, notice.getName(),
                 Math.round(AREA_NOTICE_WIDTH / 0.72F));

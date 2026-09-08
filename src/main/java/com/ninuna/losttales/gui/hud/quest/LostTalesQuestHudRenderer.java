@@ -8,6 +8,7 @@ import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
+import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderHelper;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
@@ -39,7 +40,6 @@ public final class LostTalesQuestHudRenderer {
     private static final double QUEST_MARKER_NEAR_DISTANCE_SQ = 16.0D;
     private static final int NOTIFICATION_WIDTH = 272;
     private static final int NOTIFICATION_HEIGHT = 34;
-    private static final int NOTIFICATION_GAP = 4;
     private static final int MAX_VISIBLE_NOTIFICATIONS = 4;
 
     private LostTalesQuestHudRenderer() {}
@@ -56,15 +56,6 @@ public final class LostTalesQuestHudRenderer {
         return PANEL_PADDING * 2 + 12
                 + entries * entryHeight
                 + Math.max(0, entries - 1) * QUEST_ENTRY_GAP;
-    }
-
-    public static int getNotificationPlacementWidth() {
-        return NOTIFICATION_WIDTH;
-    }
-
-    public static int getNotificationPlacementHeight() {
-        return MAX_VISIBLE_NOTIFICATIONS * NOTIFICATION_HEIGHT
-                + (MAX_VISIBLE_NOTIFICATIONS - 1) * NOTIFICATION_GAP;
     }
 
     public static void render(Minecraft minecraft, float partialTicks) {
@@ -422,21 +413,13 @@ public final class LostTalesQuestHudRenderer {
         }
 
         FontRenderer font = minecraft.fontRenderer;
-        int actualHeight = notifications.size() * NOTIFICATION_HEIGHT
-                + Math.max(0, notifications.size() - 1) * NOTIFICATION_GAP;
-        HudPlacementLayout.Bounds placement = HudPlacementLayout.calculate(
-                resolution.getScaledWidth(), resolution.getScaledHeight(),
-                getNotificationPlacementWidth(),
-                getNotificationPlacementHeight(),
-                LostTalesConfig.questNotificationHudOffsetX,
-                LostTalesConfig.questNotificationHudOffsetY,
-                HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT,
-                HudPlacementLayout.CoordinateMode.AVAILABLE_SPACE_PERCENT);
-        int x = placement.x;
-        int baseY = placement.y + placement.height - actualHeight;
+        // Banners stack down the shared notification slot, under whatever
+        // notice already stands in it this frame.
+        int x = LostTalesNotificationHud.centerX(resolution.getScaledWidth(),
+                resolution.getScaledHeight()) - NOTIFICATION_WIDTH / 2;
         long now = System.currentTimeMillis();
 
-        for (int i = 0; i < notifications.size(); i++) {
+        for (int i = 0; i < Math.min(notifications.size(), MAX_VISIBLE_NOTIFICATIONS); i++) {
             LostTalesClientQuestNotificationStore.Notification notification = notifications.get(i);
             float alpha = notification.getAlpha(now);
             if (alpha <= 0.0F) {
@@ -444,7 +427,8 @@ public final class LostTalesQuestHudRenderer {
             }
 
             int a = MathHelper.clamp_int((int) (alpha * 210.0F), 0, 210);
-            int y = baseY + i * (NOTIFICATION_HEIGHT + NOTIFICATION_GAP);
+            int y = LostTalesNotificationHud.claim(resolution.getScaledWidth(),
+                    resolution.getScaledHeight(), NOTIFICATION_HEIGHT);
             int background = (a << 24);
             int border = (MathHelper.clamp_int((int) (alpha * 170.0F), 0, 170) << 24) | notification.getType().getColor();
             int textColor = (MathHelper.clamp_int((int) (alpha * 255.0F), 0, 255) << 24) | 0xFFFFFF;

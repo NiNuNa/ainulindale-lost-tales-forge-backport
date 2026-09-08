@@ -1,7 +1,13 @@
 package com.ninuna.losttales.client.character;
 
+import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
+import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
+import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.character.server.CharacterCreationRequest;
+import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.character.validation.CharacterValidator;
+
+import java.util.UUID;
 
 /**
  * What an account wants its default character to start as: the same
@@ -128,6 +134,38 @@ public final class CharacterTemplate {
         int length = CharacterValidator.normalizeName(this.name).length();
         return length >= CharacterValidator.MIN_NAME_LENGTH
                 && length <= CharacterValidator.MAX_NAME_LENGTH;
+    }
+
+    /**
+     * Whether this is a character the account can start playing as: a
+     * usable name and a race, sex and skin all chosen. The main menu
+     * opens the play controls only once this holds, and the character
+     * room offers them on the same rule. A template the creator saved
+     * always satisfies it; one edited by hand may not.
+     */
+    public boolean isSetUp() {
+        return hasUsableName() && this.raceId.length() > 0
+                && this.genderId.length() > 0 && this.skinId.length() > 0;
+    }
+
+    /**
+     * The template as an appearance the body model can be built from,
+     * for that account. A choice not made resolves to what a world would
+     * make the account's default character as: a human of the account's
+     * own skin.
+     */
+    public CharacterAppearance toAppearance(UUID accountId) {
+        String race = this.raceId.length() > 0
+                ? this.raceId : CharacterRaceRegistry.HUMAN;
+        String gender = this.genderId.length() > 0
+                ? this.genderId
+                : CharacterRaceRegistry.normalizeGenderForRace(
+                        race, CharacterGenderRegistry.MALE);
+        String skin = this.skinId.length() > 0
+                ? this.skinId
+                : CharacterSkinRegistry.getDefaultSkinId(race, gender, accountId);
+        return new CharacterAppearance(accountId, race, gender, skin,
+                this.bodyTypeId, this.chestTypeId);
     }
 
     @Override

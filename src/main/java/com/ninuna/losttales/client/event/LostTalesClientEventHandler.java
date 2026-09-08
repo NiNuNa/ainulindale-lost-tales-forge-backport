@@ -18,6 +18,9 @@ import com.ninuna.losttales.client.camera.ThirdPersonProjectileTrajectoryRendere
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.character.CharacterTemplateOffer;
+import com.ninuna.losttales.client.character.room.CharacterRoomJourneyPrompt;
+import com.ninuna.losttales.client.character.room.CharacterRoomSession;
+import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterFigureRenderer;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache;
@@ -156,6 +159,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientQuickLootCache.clear();
         ClientCharacterRosterCache.clear();
         CharacterTemplateOffer.clear();
+        CharacterRoomSession.clear();
         LostTalesCharacterFigureRenderer.clear();
         ClientCharacterAppearanceCache.clear();
         PlayerAppearanceResolver.clear();
@@ -251,6 +255,18 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     @SubscribeEvent
     public void updateWraithWorldEffect(TickEvent.ClientTickEvent event) {
         WraithWorldVisualEffect.onClientTick(event);
+    }
+
+    /** A visit to the character room: the creator on arrival, then the room. */
+    @SubscribeEvent
+    public void runCharacterRoomVisit(TickEvent.ClientTickEvent event) {
+        CharacterRoomSession.onClientTick(event);
+    }
+
+    /** In the character room the pause menu is the room's own menu. */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void replaceCharacterRoomPauseMenu(GuiOpenEvent event) {
+        CharacterRoomSession.replacePauseMenu(event);
     }
 
     /** Returns the native pointer as soon as Minecraft leaves its GUI layer. */
@@ -476,11 +492,15 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     public void renderHud(RenderGameOverlayEvent.Post event) {
         if (event.type == RenderGameOverlayEvent.ElementType.ALL
                 && !isHudHidden()) {
+            // Every passing notice claims its strip of the one slot, top
+            // down, in the order it is drawn here.
+            LostTalesNotificationHud.beginFrame();
             LostTalesQuickLootHudRenderer.render(Minecraft.getMinecraft());
             LostTalesCompassHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
             LostTalesMapMarkerHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
             LostTalesPartyHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
             LostTalesQuestHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
+            CharacterRoomJourneyPrompt.render(Minecraft.getMinecraft());
         }
     }
 
