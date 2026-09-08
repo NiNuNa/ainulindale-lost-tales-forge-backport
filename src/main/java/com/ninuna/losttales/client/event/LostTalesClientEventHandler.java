@@ -48,7 +48,6 @@ import com.ninuna.losttales.client.mapmarker.LostTalesMapDecorationRenderer;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapTerrainCache;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapTerrainRenderer;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapViewMemory;
-import com.ninuna.losttales.client.mapmarker.LostTalesLotrMainMenuMapHook;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapMarkerIconOverlay;
 import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
@@ -419,7 +418,6 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void replaceLotrMapGui(GuiOpenEvent event) {
-        LostTalesLotrMainMenuMapHook.install(event.gui);
         if (event.gui != null && event.gui.getClass() == LOTRGuiMap.class) {
             event.gui = LostTalesLotrMapGui.replace(
                     (LOTRGuiMap)event.gui);

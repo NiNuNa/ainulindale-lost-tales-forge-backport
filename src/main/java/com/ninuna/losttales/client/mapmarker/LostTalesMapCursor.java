@@ -19,6 +19,7 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Cursor;
 import org.lwjgl.input.Mouse;
+import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
 
 /**
@@ -35,9 +36,8 @@ import org.lwjgl.opengl.GL11;
  * than by an offset that has to be kept in step.</p>
  *
  * <p>Native cursor state outlives any one screen, so it is owned here alone and
- * given back whenever Minecraft leaves the GUI layer or a frame fails to draw.
- * A hidden cursor left behind is unusable
- * desktop, not a cosmetic bug.</p>
+ * given back whenever the pointer leaves the active client area, Minecraft
+ * leaves the GUI layer, or a frame fails to draw.</p>
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesMapCursor {
@@ -168,6 +168,10 @@ public final class LostTalesMapCursor {
      * simply draws nothing over it rather than drawing two pointers.</p>
      */
     public static void acquire() {
+        if (!isInsideActiveClient()) {
+            release();
+            return;
+        }
         if (held || cursorUnavailable) {
             return;
         }
@@ -201,7 +205,7 @@ public final class LostTalesMapCursor {
     }
 
     /**
-     * Gives the pointer back when Minecraft no longer has an open GUI.
+     * Gives the pointer back outside an active GUI's client area.
      *
      * <p>The safety net for screens that stop being current without closing
      * tidily. Keeping ownership while one GUI replaces another also avoids a
@@ -211,9 +215,20 @@ public final class LostTalesMapCursor {
         if (!held) {
             return;
         }
-        if (minecraft == null || minecraft.currentScreen == null) {
+        if (minecraft == null || minecraft.currentScreen == null
+                || !isInsideActiveClient()) {
             release();
         }
+    }
+
+    /**
+     * Raw coordinates are clamped to the window in LWJGL 2, so coordinates
+     * alone cannot distinguish its last pixel from a pointer on the desktop.
+     */
+    private static boolean isInsideActiveClient() {
+        return Display.isCreated() && Mouse.isCreated()
+                && Display.isActive() && !Mouse.isGrabbed()
+                && Mouse.isInsideWindow();
     }
 
     static boolean isHeld() {
@@ -232,8 +247,15 @@ public final class LostTalesMapCursor {
         // Spent whether or not it is drawn, so a pose asked for by one
         // frame can never show up on a later one.
         requestedPose = null;
-        if (!held || minecraft == null
+        if (minecraft == null || minecraft.currentScreen == null
                 || minecraft.getTextureManager() == null) {
+            release();
+            return;
+        }
+        // Maps acquire on opening, while other screens acquire every frame.
+        // Recheck here as well so either path resumes as the pointer returns.
+        acquire();
+        if (!held) {
             return;
         }
         int sheetWidth = sheetWidth(minecraft);
@@ -276,8 +298,7 @@ public final class LostTalesMapCursor {
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
                     GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
             // The pointer carries the interface's own drop shadow: the
-            // same flat colour, the same one-pixel offset, at half the
-            // opacity, so it sits over a GUI like every glyph in it.
+            // same flat colour, one-pixel offset, and shared opacity.
             LostTalesSilhouetteRenderState.begin(SHADOW_RGB);
             try {
                 GL11.glColor4f(1.0F, 1.0F, 1.0F, LostTalesColors.SHADOW_OPACITY);

@@ -14,20 +14,16 @@ final class LostTalesLanguageButton extends LostTalesButton {
 
     LostTalesLanguageButton(int id, int x, int y, int width, int height,
                            String label) {
-        // An odd-sized icon needs an odd-sized frame for equal whole-pixel
-        // margins. The standard 20x20 menu slot becomes 21x21 with 4px padding.
-        super(id, x, y, oddSize(width), oddSize(height), label);
-    }
-
-    private static int oddSize(int size) {
-        return size % 2 == 0 ? size + 1 : size;
+        super(id, x, y, width, height, label);
     }
 
     @Override
     protected void drawContents(Minecraft minecraft, int mouseX, int mouseY,
                                 boolean highlighted) {
-        int x = this.xPosition + (this.width - ICON_SIZE) / 2;
-        int y = this.yPosition + (this.height - ICON_SIZE) / 2;
+        // Match modern SpriteIconButton: center both dimensions using integer
+        // halves. Odd-sized artwork stays on whole GUI pixels at every scale.
+        int x = this.xPosition + this.width / 2 - ICON_SIZE / 2;
+        int y = this.yPosition + this.height / 2 - ICON_SIZE / 2;
         int textureY = highlighted ? 130 : 110;
         minecraft.getTextureManager().bindTexture(buttonTextures);
         LostTalesSkyrimUiStyle.beginContent();

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import java.lang.reflect.Field;
+import cpw.mods.fml.common.FMLLog;
 import lotr.client.LOTRTextures;
 import lotr.client.gui.LOTRGuiMap;
 import lotr.common.LOTRConfig;
@@ -46,6 +47,19 @@ final class LostTalesLotrSmoothMapRenderer {
     private static boolean proceduralNoiseUnavailable;
 
     private LostTalesLotrSmoothMapRenderer() {}
+
+    static int[] captureImageBounds() throws IllegalAccessException {
+        if (!ensureReflection()) return null;
+        return new int[] {mapXMinWorldField.getInt(null), mapXMaxWorldField.getInt(null),
+                mapYMinWorldField.getInt(null), mapYMaxWorldField.getInt(null)};
+    }
+
+    static void restoreImageBounds(int[] bounds) throws IllegalAccessException {
+        mapXMinWorldField.setInt(null, bounds[0]);
+        mapXMaxWorldField.setInt(null, bounds[1]);
+        mapYMinWorldField.setInt(null, bounds[2]);
+        mapYMaxWorldField.setInt(null, bounds[3]);
+    }
 
     static boolean render(LOTRGuiMap gui, boolean sepia,
                           float alpha, boolean drawOverlay) {
@@ -93,15 +107,18 @@ final class LostTalesLotrSmoothMapRenderer {
             // same one, so nothing on the paper can come loose from it.
             boolean sheeted =
                     LostTalesLotrMapRotation.pushSheetTransform(gui);
-            beginSheetClipping(viewportXMin, viewportXMax,
-                    viewportYMin, viewportYMax, sheeted);
+            boolean clipped = false;
             try {
+                beginSheetClipping(viewportXMin, viewportXMax,
+                        viewportYMin, viewportYMax, sheeted);
+                clipped = true;
                 drawMapImage(sepia, alpha, drawOverlay,
                         posX, posY, scale, clip,
                         mapXMin, mapXMax, mapYMin, mapYMax,
                         viewportXMin, viewportXMax,
                         viewportYMin, viewportYMax);
-                if (shouldDrawOpaqueBackground(alpha)) {
+                if (shouldDrawOpaqueBackground(alpha)
+                        && LostTalesMapScene.presentationOf(gui).knownTerrain) {
                     LostTalesMapTerrainRenderer.render(
                             gui, sepia || LOTRConfig.osrsMap,
                             scale, posX, posY,
@@ -110,7 +127,11 @@ final class LostTalesLotrSmoothMapRenderer {
                             viewportYMin, viewportYMax);
                 }
             } finally {
-                endSheetClipping(sheeted);
+                if (clipped) {
+                    endSheetClipping(sheeted);
+                } else if (sheeted) {
+                    GL11.glPopMatrix();
+                }
             }
             // Straight onto the ground, and only on the pass that draws it:
             // the faction overlay comes through here a second time with its
@@ -121,80 +142,80 @@ final class LostTalesLotrSmoothMapRenderer {
                         viewportYMin, viewportYMax, !sepia);
             }
             return true;
-        } catch (Throwable ignored) {
+        } catch (Throwable failure) {
             reflectionFailed = true;
             reflectionReady = false;
+            FMLLog.warning("[losttales] Shared map layers unavailable; using LOTR fallback: %s", failure);
             return false;
         }
     }
 
-    /**
-     * The hour and the clouds, on the Lost Tales map only.
-     *
-     * <p>LOTR's own windowed map and its menu background are left exactly as
-     * the base mod draws them.</p>
-     */
+    /** Shared ground scenery and atmosphere, controlled by the view's profile. */
     private static void renderAtmosphere(
             LOTRGuiMap gui, float posX, float posY, float scale,
             int viewportXMin, int viewportXMax,
             int viewportYMin, int viewportYMax,
             boolean drawWeatherLayers) {
-        if (!(gui instanceof LostTalesLotrMapGui)
-                || !LostTalesLotrMapLayout.isFullscreenLayoutActive(gui)) {
+        LostTalesMapPresentation presentation = LostTalesMapScene.presentationOf(gui);
+        if (!presentation.scenery) {
             return;
         }
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft == null || minecraft.theWorld == null) {
+        if (minecraft == null) {
             return;
         }
-        float rain = minecraft.theWorld.getRainStrength(1.0F);
-        float thunder = minecraft.theWorld.getWeightedThunderStrength(1.0F);
+        // A title screen has no world. It presents clear daylight while its
+        // scenery uses an independent monotonic animation clock.
+        boolean worldBacked = minecraft.theWorld != null
+                && presentation != LostTalesMapPresentation.MAIN_MENU;
+        float rain = worldBacked ? minecraft.theWorld.getRainStrength(1.0F) : 0.0F;
+        float thunder = worldBacked ? minecraft.theWorld.getWeightedThunderStrength(1.0F) : 0.0F;
         // Some 1.7.10 dimension providers report a zero interpolation value
         // on the first rainy frames even though the world's weather flag is
         // already active. The map should answer the actual state immediately.
-        if (minecraft.theWorld.isRaining()) {
+        if (worldBacked && minecraft.theWorld.isRaining()) {
             rain = Math.max(rain, 0.4F);
         }
-        if (minecraft.theWorld.isThundering()) {
+        if (worldBacked && minecraft.theWorld.isThundering()) {
             thunder = Math.max(thunder, 0.4F);
         }
-        long worldTime = minecraft.theWorld.getWorldTime();
+        long worldTime = worldBacked ? minecraft.theWorld.getWorldTime() : 6000L;
+        long animationTime = worldBacked ? minecraft.theWorld.getTotalWorldTime()
+                : LostTalesMapScene.animationTicks();
+        drawWeatherLayers &= presentation.weather;
         LostTalesLotrMapAtmosphere.render(
-                (LostTalesLotrMapGui)gui, worldTime, rain, thunder,
+                gui, worldTime, rain, thunder,
                 posX, posY, scale,
                 viewportXMin, viewportXMax, viewportYMin, viewportYMax);
-        // Lighting is independent of the chosen LOTR map palette. Keeping
-        // this return after the light pass prevents sepia mode from silently
-        // freezing at a flat shade while retaining its established lack of
-        // decorative weather layers.
-        if (!drawWeatherLayers) {
-            return;
+        if (drawWeatherLayers) {
+            LostTalesLotrMapAtmosphere.renderCloudShadows(
+                    gui, worldTime, rain, thunder,
+                    posX, posY, scale,
+                    viewportXMin, viewportXMax, viewportYMin, viewportYMax);
         }
-        LostTalesLotrMapAtmosphere.renderCloudShadows(
-                (LostTalesLotrMapGui)gui, worldTime, rain, thunder,
-                posX, posY, scale,
-                viewportXMin, viewportXMax, viewportYMin, viewportYMax);
         // Road dots are ink on the ground. Drawing their unchanged native
         // pass here puts standing scenery and weather in front; their names
         // are deferred to LOTR's later label position and remain readable.
-        ((LostTalesLotrMapGui)gui).renderRoadsBelowClouds();
+        LostTalesMapScene.renderRoadsBelowScenery(gui);
         // Decorations stand above that road ink. Labels and markers are all
         // drawn later in LOTR's own order.
         LostTalesMapDecorationRenderer.render(
-                (LostTalesLotrMapGui)gui,
-                minecraft.theWorld.getTotalWorldTime(),
+                gui, animationTime,
                 posX, posY, scale,
                 viewportXMin, viewportXMax, viewportYMin, viewportYMax);
         // Last of the ground layers: haze lies over the country and the things
         // standing on it.
+        if (!drawWeatherLayers) {
+            return;
+        }
         LostTalesLotrMapAtmosphere.renderDistanceHaze(
-                (LostTalesLotrMapGui)gui, worldTime, rain, thunder,
+                gui, worldTime, rain, thunder,
                 viewportXMin, viewportXMax, viewportYMin, viewportYMax);
         // Rain and clouds are above the standing artwork, but remain
         // translucent and below labels, markers and controls drawn after this
         // map-image pass.
         LostTalesLotrMapAtmosphere.renderClouds(
-                (LostTalesLotrMapGui)gui, worldTime, rain, thunder,
+                gui, worldTime, rain, thunder,
                 posX, posY, scale,
                 viewportXMin, viewportXMax, viewportYMin, viewportYMax);
     }
@@ -599,8 +620,9 @@ final class LostTalesLotrSmoothMapRenderer {
                     LOTRTextures.class, "sepiaMapTexture");
             reflectionReady = true;
             return true;
-        } catch (Throwable ignored) {
+        } catch (Throwable failure) {
             reflectionFailed = true;
+            FMLLog.warning("[losttales] Shared map reflection unavailable: %s", failure);
             return false;
         }
     }

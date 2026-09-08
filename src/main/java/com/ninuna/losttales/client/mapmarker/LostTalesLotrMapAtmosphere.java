@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.mapmarker;
 import com.ninuna.losttales.LostTalesMetaData;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import lotr.client.gui.LOTRGuiMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
@@ -463,7 +464,7 @@ final class LostTalesLotrMapAtmosphere {
      * @param posX      map-image position the camera is centred on
      * @param zoomScale map-image pixels per screen pixel
      */
-    static void render(LostTalesLotrMapGui gui, long worldTime,
+    static void render(LOTRGuiMap gui, long worldTime,
                        float rain, float thunder,
                        float posX, float posY, float zoomScale,
                        int viewportXMin, int viewportXMax,
@@ -508,7 +509,7 @@ final class LostTalesLotrMapAtmosphere {
      * Draws semi-transparent clouds above ground decorations and below map
      * navigation graphics.
      */
-    static void renderClouds(LostTalesLotrMapGui gui, long worldTime,
+    static void renderClouds(LOTRGuiMap gui, long worldTime,
                              float rain, float thunder,
                              float posX, float posY, float zoomScale,
                              int viewportXMin, int viewportXMax,
@@ -544,7 +545,7 @@ final class LostTalesLotrMapAtmosphere {
 
     /** Draws a restrained cloud footprint on the ground below map artwork. */
     static void renderCloudShadows(
-            LostTalesLotrMapGui gui, long worldTime,
+            LOTRGuiMap gui, long worldTime,
             float rain, float thunder,
             float posX, float posY, float zoomScale,
             int viewportXMin, int viewportXMax,
@@ -612,7 +613,7 @@ final class LostTalesLotrMapAtmosphere {
      * weather above it.</p>
      */
     private static void drawSky(
-            LostTalesLotrMapGui gui, long worldTime,
+            LOTRGuiMap gui, long worldTime,
             float rain, float thunder, float posX, float posY,
             float zoomScale, int viewportXMin, int viewportXMax,
             int viewportYMin, int viewportYMax) {
@@ -715,7 +716,7 @@ final class LostTalesLotrMapAtmosphere {
      * reasons.</p>
      */
     private static void drawCloudLayer(
-            Tessellator tessellator, LostTalesLotrMapGui gui, long worldTime,
+            Tessellator tessellator, LOTRGuiMap gui, long worldTime,
             double animationTime,
             float rain, float thunder, float posX, float posY,
             float zoomScale, int viewportXMin, int viewportXMax,
@@ -777,7 +778,7 @@ final class LostTalesLotrMapAtmosphere {
     }
 
     private static void drawCloudSite(
-            Tessellator tessellator, LostTalesLotrMapGui gui,
+            Tessellator tessellator, LOTRGuiMap gui,
             int cellX, int cellY,
             float rain, float thunder, long worldTime, double animationTime,
             float drift, float posX, float posY,
@@ -1392,7 +1393,7 @@ final class LostTalesLotrMapAtmosphere {
 
     /** One cloud-shaped shadow projected through the map's ground transform. */
     private static void drawCloudShadow(
-            Tessellator tessellator, LostTalesLotrMapGui gui,
+            Tessellator tessellator, LOTRGuiMap gui,
             float centerX, float centerY,
             float width, float height, int variant, float alpha) {
         float halfWidth = width * 0.5F;
@@ -1419,7 +1420,7 @@ final class LostTalesLotrMapAtmosphere {
     }
 
     private static void projectShadowCorner(
-            LostTalesLotrMapGui gui, float x, float y, int output) {
+            LOTRGuiMap gui, float x, float y, int output) {
         CLOUD_SHADOW_POINT[0] = x;
         CLOUD_SHADOW_POINT[1] = y;
         LostTalesLotrMapRotation.rotate(CLOUD_SHADOW_POINT, gui);
@@ -1495,7 +1496,7 @@ final class LostTalesLotrMapAtmosphere {
      * and would cost the map its legs.</p>
      */
     static void renderDistanceHaze(
-            LostTalesLotrMapGui gui, long worldTime, float rain, float thunder,
+            LOTRGuiMap gui, long worldTime, float rain, float thunder,
             int viewportXMin, int viewportXMax,
             int viewportYMin, int viewportYMax) {
         float lean = LostTalesLotrMapRotation.leanOf(gui);

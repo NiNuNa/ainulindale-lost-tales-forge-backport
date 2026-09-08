@@ -23,6 +23,60 @@ import static org.junit.Assert.assertTrue;
 /** Verifies the supported LOTR v36.15 integration points against the local jar. */
 public final class LostTalesClassTransformerTest {
     @Test
+    public void startupDimensionsAreResolvedBeforeCurrentAndRestoredSizeAreStored() throws Exception {
+        String name = "net.minecraft.client.Minecraft";
+        String hookOwner = "com/ninuna/losttales/client/gui/LostTalesWindowDefaults";
+        byte[] original = readResource("net/minecraft/client/Minecraft.class");
+        LostTalesClassTransformer transformer = new LostTalesClassTransformer();
+        for (boolean srg : new boolean[] {false, true}) {
+            ClassNode input = new ClassNode();
+            new ClassReader(original).accept(input, 0);
+            MethodNode constructor = findMethod(input, "<init>");
+            for (AbstractInsnNode instruction = constructor.instructions.getFirst();
+                 instruction != null; instruction = instruction.getNext()) {
+                if (srg && instruction instanceof FieldInsnNode) {
+                    FieldInsnNode field = (FieldInsnNode) instruction;
+                    if ("displayWidth".equals(field.name)) field.name = "field_71443_c";
+                    if ("displayHeight".equals(field.name)) field.name = "field_71440_d";
+                    if ("tempDisplayWidth".equals(field.name)) field.name = "field_71436_X";
+                    if ("tempDisplayHeight".equals(field.name)) field.name = "field_71435_Y";
+                }
+            }
+            ClassWriter writer = new ClassWriter(0);
+            input.accept(writer);
+            System.clearProperty(LostTalesClassTransformer.WINDOW_DEFAULTS_ACTIVE_PROPERTY);
+            byte[] result = transformer.transform(name, name, writer.toByteArray());
+            ClassNode patched = new ClassNode();
+            new ClassReader(result).accept(patched, 0);
+            MethodNode init = findMethod(patched, "<init>");
+            assertEquals(1, countCalls(init, hookOwner, "resolve"));
+            boolean resolved = false;
+            int dimensionStores = 0;
+            for (AbstractInsnNode instruction = init.instructions.getFirst();
+                 instruction != null; instruction = instruction.getNext()) {
+                if (instruction instanceof MethodInsnNode
+                        && hookOwner.equals(((MethodInsnNode) instruction).owner)) {
+                    resolved = true;
+                    assertEquals("(II)[I", ((MethodInsnNode) instruction).desc);
+                }
+                if (instruction instanceof FieldInsnNode && instruction.getOpcode() == Opcodes.PUTFIELD) {
+                    String field = ((FieldInsnNode) instruction).name;
+                    if (field.equals(srg ? "field_71443_c" : "displayWidth")
+                            || field.equals(srg ? "field_71440_d" : "displayHeight")
+                            || field.equals(srg ? "field_71436_X" : "tempDisplayWidth")
+                            || field.equals(srg ? "field_71435_Y" : "tempDisplayHeight")) {
+                        assertTrue(resolved);
+                        dimensionStores++;
+                    }
+                }
+            }
+            assertEquals(4, dimensionStores);
+            assertTrue(Boolean.getBoolean(LostTalesClassTransformer.WINDOW_DEFAULTS_ACTIVE_PROPERTY));
+            assertArrayEquals(result, transformer.transform(name, name, result));
+        }
+    }
+
+    @Test
     public void vanillaMainMenuTextUsesPaletteHooks() throws Exception {
         assertMainMenuTextHooks("net.minecraft.client.gui.GuiMainMenu",
                 LostTalesClassTransformer.MAIN_MENU_TEXT_ACTIVE_PROPERTY);
@@ -254,10 +308,55 @@ public final class LostTalesClassTransformerTest {
 
     @Test
     public void menusFollowThePlayersFramerateLimit() throws Exception {
-        ClassNode minecraft = transform("net.minecraft.client.Minecraft");
-        assertTrue(containsStaticHook(
-                minecraft, "getLimitFramerate",
-                MENU_FRAMERATE_HOOK_OWNER, "menuFramerateLimit"));
+        String name = "net.minecraft.client.Minecraft";
+        String owner = name.replace('.', '/');
+        byte[] original = readResource(owner + ".class");
+        LostTalesClassTransformer transformer = new LostTalesClassTransformer();
+        for (boolean srg : new boolean[] {false, true}) {
+            ClassNode input = new ClassNode();
+            new ClassReader(original).accept(input, 0);
+            String getter = srg ? "func_90020_K" : "getLimitFramerate";
+            for (Object value : input.methods) {
+                MethodNode method = (MethodNode) value;
+                if ("getLimitFramerate".equals(method.name)) {
+                    method.name = getter;
+                }
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (instruction instanceof MethodInsnNode) {
+                        MethodInsnNode call = (MethodInsnNode) instruction;
+                        if (owner.equals(call.owner)
+                                && "getLimitFramerate".equals(call.name)) {
+                            call.name = getter;
+                        }
+                    }
+                }
+            }
+            ClassWriter writer = new ClassWriter(0);
+            input.accept(writer);
+            System.clearProperty(LostTalesClassTransformer.MENU_FRAMERATE_ACTIVE_PROPERTY);
+            byte[] result = transformer.transform(name, name, writer.toByteArray());
+            ClassNode patched = new ClassNode();
+            new ClassReader(result).accept(patched, 0);
+            MethodNode limit = findMethod(patched, getter);
+            assertEquals(1, countCalls(limit,
+                    MENU_FRAMERATE_HOOK_OWNER, "menuFramerateLimit"));
+            assertTrue(containsStaticHook(patched, getter,
+                    MENU_FRAMERATE_HOOK_OWNER, "menuFramerateLimit"));
+            for (AbstractInsnNode instruction = limit.instructions.getFirst();
+                 instruction != null; instruction = instruction.getNext()) {
+                assertFalse("The menu's fixed 30 FPS return must be replaced",
+                        instruction instanceof org.objectweb.asm.tree.IntInsnNode
+                                && ((org.objectweb.asm.tree.IntInsnNode) instruction).operand == 30);
+            }
+            assertEquals("Unlimited must use the same getter to bypass sync", 1,
+                    countCalls(findMethod(patched, "isFramerateLimitBelowMax"), owner, getter));
+            assertTrue(Boolean.getBoolean(LostTalesClassTransformer.MENU_FRAMERATE_ACTIVE_PROPERTY));
+            System.clearProperty(LostTalesClassTransformer.MENU_FRAMERATE_ACTIVE_PROPERTY);
+            assertArrayEquals("Applying the hook twice must leave the bytes unchanged",
+                    result, transformer.transform(name, name, result));
+            assertTrue(Boolean.getBoolean(LostTalesClassTransformer.MENU_FRAMERATE_ACTIVE_PROPERTY));
+        }
     }
 
     @Test

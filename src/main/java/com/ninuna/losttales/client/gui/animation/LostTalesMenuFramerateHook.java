@@ -21,8 +21,7 @@ public final class LostTalesMenuFramerateHook {
         try {
             Minecraft minecraft = Minecraft.getMinecraft();
             if (minecraft != null && minecraft.gameSettings != null) {
-                return Math.max(VANILLA_MENU_FRAMERATE,
-                        minecraft.gameSettings.limitFramerate);
+                return minecraft.gameSettings.limitFramerate;
             }
         } catch (RuntimeException ignored) {
             // The vanilla cap is always a safe answer.

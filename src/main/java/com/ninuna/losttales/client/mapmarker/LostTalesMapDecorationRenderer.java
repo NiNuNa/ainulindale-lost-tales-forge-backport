@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.mapmarker;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.Arrays;
+import lotr.client.gui.LOTRGuiMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
@@ -263,7 +264,7 @@ public final class LostTalesMapDecorationRenderer {
      * @param posX      map-image position the camera is centred on
      * @param zoomScale screen pixels per map-image pixel
      */
-    static void render(LostTalesLotrMapGui gui, long worldTime,
+    static void render(LOTRGuiMap gui, long worldTime,
                        float posX, float posY, float zoomScale,
                        int viewportXMin, int viewportXMax,
                        int viewportYMin, int viewportYMax) {
@@ -327,7 +328,7 @@ public final class LostTalesMapDecorationRenderer {
     }
 
     private static void collectScattered(
-            LostTalesLotrMapGui gui, Scattered kind,
+            LOTRGuiMap gui, Scattered kind,
             long worldTime, float posX, float posY, float zoomScale,
             float centerX, float centerY, float reachX, float reachY,
             int viewportXMin, int viewportXMax,
@@ -391,7 +392,7 @@ public final class LostTalesMapDecorationRenderer {
     }
 
     private static void collectScatteredSite(
-            LostTalesLotrMapGui gui, Scattered kind,
+            LOTRGuiMap gui, Scattered kind,
             int cellX, int cellY, float mapX, float mapY, float alpha,
             long worldTime, float posX, float posY, float zoomScale,
             float centerX, float centerY, float worldWidth, float worldHeight,
@@ -497,7 +498,7 @@ public final class LostTalesMapDecorationRenderer {
      * answer alone. See {@link #flushSprites}.</p>
      */
     private static void collectStanding(
-            LostTalesLotrMapGui gui,
+            LOTRGuiMap gui,
             LostTalesMapDecorationSprite sprite,
             float mapX, float mapY, int frame, float alpha, boolean mirror,
             float sizeScale, boolean shadow, float posX, float posY,
@@ -637,7 +638,7 @@ public final class LostTalesMapDecorationRenderer {
 
     /** Carries one map position onto the screen, through the sheet. */
     private static void project(
-            LostTalesLotrMapGui gui, float mapX, float mapY,
+            LOTRGuiMap gui, float mapX, float mapY,
             float posX, float posY, float zoomScale,
             float centerX, float centerY, float[] result) {
         result[0] = (mapX - posX) * zoomScale + centerX;

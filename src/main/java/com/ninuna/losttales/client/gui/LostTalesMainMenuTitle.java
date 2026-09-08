@@ -42,12 +42,18 @@ public final class LostTalesMainMenuTitle {
             double right = left + layout.width;
             double top = MainMenuTitleLayout.TOP;
             double bottom = top + layout.height;
+            double minU = (double) MainMenuTitleLayout.TEXTURE_PADDING
+                    / MainMenuTitleLayout.TEXTURE_WIDTH;
+            double minV = (double) MainMenuTitleLayout.TEXTURE_PADDING
+                    / MainMenuTitleLayout.TEXTURE_HEIGHT;
+            double maxU = 1.0D - minU;
+            double maxV = 1.0D - minV;
             Tessellator tessellator = Tessellator.instance;
             tessellator.startDrawingQuads();
-            tessellator.addVertexWithUV(left, bottom, 0.0D, 0.0D, 1.0D);
-            tessellator.addVertexWithUV(right, bottom, 0.0D, 1.0D, 1.0D);
-            tessellator.addVertexWithUV(right, top, 0.0D, 1.0D, 0.0D);
-            tessellator.addVertexWithUV(left, top, 0.0D, 0.0D, 0.0D);
+            tessellator.addVertexWithUV(left, bottom, 0.0D, minU, maxV);
+            tessellator.addVertexWithUV(right, bottom, 0.0D, maxU, maxV);
+            tessellator.addVertexWithUV(right, top, 0.0D, maxU, minV);
+            tessellator.addVertexWithUV(left, top, 0.0D, minU, minV);
             tessellator.draw();
         } finally {
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, minFilter);

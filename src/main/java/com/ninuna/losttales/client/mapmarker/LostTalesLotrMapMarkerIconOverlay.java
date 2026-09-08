@@ -1509,8 +1509,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             beginIconRender();
             try {
                 for (LostTalesMapMarkerData marker :
-                        LostTalesClientMapMarkerStore
-                                .getDecorativeMarkers()) {
+                        LostTalesMapScene.backgroundMarkers(gui)) {
                     if (!shouldRenderDecorativeMarker(marker)) {
                         continue;
                     }

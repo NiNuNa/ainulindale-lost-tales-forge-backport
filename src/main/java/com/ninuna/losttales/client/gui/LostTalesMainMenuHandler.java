@@ -29,8 +29,8 @@ import java.util.UUID;
  * Styles the main menu's standard controls and adds the account's
  * default-character template button before any world is open.
  *
- * <p>The menu is not gated: Singleplayer and Multiplayer stay where they
- * are and do what they always did. A world makes the account's default
+ * <p>The menu is not gated: Singleplayer and Multiplayer keep their usual
+ * actions. A world makes the account's default
  * character whether or not a template was ever written, so a player who
  * ignores this button loses nothing but the chance to say who they start
  * as.</p>
@@ -83,6 +83,12 @@ public final class LostTalesMainMenuHandler {
         }
         styleMenuButtons(event);
         MainMenuButtonLayout.arrange(event.buttonList);
+        MainMenuButtonLayout.position(event.buttonList, event.gui.width, event.gui.height);
+        addCharacterButton(event, minecraft);
+    }
+
+    private void addCharacterButton(GuiScreenEvent.InitGuiEvent.Post event,
+                                    Minecraft minecraft) {
         // The character frame spans the final, uniformly spaced rows.
         GuiButton singleplayer = findButton(event, SINGLEPLAYER_ID);
         GuiButton multiplayer = findButton(event, MULTIPLAYER_ID);

@@ -26,6 +26,16 @@ import org.objectweb.asm.tree.VarInsnNode;
  * do not expose the required camera, debug-box, identity, and LOTR behavior.
  */
 public final class LostTalesClassTransformer implements IClassTransformer {
+    public static final String LOTR_MAP_SCENE_ACTIVE_PROPERTY =
+            "losttales.lotrMapSceneTransformer.active";
+    public static final String LOTR_MAP_BACKGROUND_ACTIVE_PROPERTY =
+            "losttales.lotrMapBackgroundTransformer.active";
+    private static final String LOTR_MAP_SCENE_HOOK_OWNER =
+            "com/ninuna/losttales/client/mapmarker/LostTalesMapScene";
+    public static final String WINDOW_DEFAULTS_ACTIVE_PROPERTY =
+            "losttales.windowDefaultsTransformer.active";
+    private static final String WINDOW_DEFAULTS_HOOK_OWNER =
+            "com/ninuna/losttales/client/gui/LostTalesWindowDefaults";
     public static final String MAIN_MENU_TEXT_ACTIVE_PROPERTY =
             "losttales.mainMenuTextTransformer.active";
     public static final String LOTR_MAIN_MENU_TEXT_ACTIVE_PROPERTY =
@@ -406,8 +416,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return transformGuiContainer(basicClass);
         }
         if (MINECRAFT.equals(transformedName)) {
-            return transformMinecraftMenuFramerate(
-                    transformMinecraftPickBlock(basicClass));
+            return transformMinecraftWindowDefaults(transformMinecraftMenuFramerate(
+                    transformMinecraftPickBlock(basicClass)));
         }
         if (PLAYER_CONTROLLER.equals(transformedName)) {
             return transformPlayerController(basicClass);
@@ -464,10 +474,77 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return transformLotrAlignmentLift(basicClass);
         }
         if (LOTR_GUI_MAP.equals(transformedName)) {
-            return transformLotrGuiMap(basicClass);
+            return transformLotrMapScene(transformLotrGuiMap(basicClass), false);
+        }
+        if ("lotr.client.gui.LOTRGuiRendererMap".equals(transformedName)) {
+            return transformLotrMapScene(basicClass, true);
         }
         if (LOTR_LEVEL_DATA.equals(transformedName)) {
             return transformLotrPlayerLocations(basicClass);
+        }
+        return basicClass;
+    }
+
+    /** Shares ground layers across gameplay, embedded and animated LOTR maps. */
+    private static byte[] transformLotrMapScene(byte[] basicClass, boolean background) {
+        String property = background ? LOTR_MAP_BACKGROUND_ACTIVE_PROPERTY : LOTR_MAP_SCENE_ACTIVE_PROPERTY;
+        String name = background ? "renderMap" : "renderMapAndOverlay";
+        String descriptor = background
+                ? "(Lnet/minecraft/client/gui/GuiScreen;Llotr/client/gui/LOTRGuiMap;FIIII)V" : "(ZFZ)V";
+        String hookName = background ? "renderBackground" : "renderMap";
+        try {
+            ClassNode owner = read(basicClass);
+            if (background) {
+                boolean found = false;
+                for (Object value : owner.fields) {
+                    org.objectweb.asm.tree.FieldNode field = (org.objectweb.asm.tree.FieldNode)value;
+                    found |= "sepia".equals(field.name) && "Z".equals(field.desc)
+                            && (field.access & Opcodes.ACC_STATIC) == 0;
+                }
+                if (!found) {
+                    warn("Shared background map requires LOTRGuiRendererMap.sepia; keeping LOTR rendering");
+                    return basicClass;
+                }
+            }
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                // LOTR's own names are identical in development and production.
+                if (!name.equals(method.name) || !descriptor.equals(method.desc)) continue;
+                if (containsHook(method, LOTR_MAP_SCENE_HOOK_OWNER, hookName)) {
+                    System.setProperty(property, "true");
+                    return basicClass;
+                }
+                InsnList hook = new InsnList();
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                if (background) {
+                    hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                    hook.add(new VarInsnNode(Opcodes.ALOAD, 2));
+                    hook.add(new VarInsnNode(Opcodes.FLOAD, 3));
+                    for (int slot = 4; slot <= 7; slot++) hook.add(new VarInsnNode(Opcodes.ILOAD, slot));
+                    hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    hook.add(new FieldInsnNode(Opcodes.GETFIELD, owner.name, "sepia", "Z"));
+                } else {
+                    hook.add(new VarInsnNode(Opcodes.ILOAD, 1));
+                    hook.add(new VarInsnNode(Opcodes.FLOAD, 2));
+                    hook.add(new VarInsnNode(Opcodes.ILOAD, 3));
+                }
+                hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC, LOTR_MAP_SCENE_HOOK_OWNER,
+                        hookName, background
+                        ? "(Llotr/client/gui/LOTRGuiRendererMap;Lnet/minecraft/client/gui/GuiScreen;Llotr/client/gui/LOTRGuiMap;FIIIIZ)Z"
+                        : "(Llotr/client/gui/LOTRGuiMap;ZFZ)Z"));
+                LabelNode fallback = new LabelNode();
+                hook.add(new JumpInsnNode(Opcodes.IFEQ, fallback));
+                hook.add(new InsnNode(Opcodes.RETURN));
+                hook.add(fallback);
+                method.instructions.insert(hook);
+                byte[] transformed = write(owner);
+                System.setProperty(property, "true");
+                info("Patched shared map scene: " + owner.name + "#" + name);
+                return transformed;
+            }
+            warn("Could not locate shared map target " + name + descriptor + "; keeping LOTR rendering");
+        } catch (Throwable failure) {
+            warn("Failed to patch shared map scene: " + failure);
         }
         return basicClass;
     }
@@ -895,6 +972,51 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         guard.add(new org.objectweb.asm.tree.InsnNode(Opcodes.IRETURN));
         guard.add(vanilla);
         method.instructions.insert(guard);
+    }
+
+    /** Supplies the window default before display creation and Forge initialization. */
+    private static byte[] transformMinecraftWindowDefaults(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            // Constructor names and parameter slots are identical in MCP and SRG.
+            String descriptor = "(Lnet/minecraft/util/Session;IIZZLjava/io/File;"
+                    + "Ljava/io/File;Ljava/io/File;Ljava/net/Proxy;Ljava/lang/String;"
+                    + "Lcom/google/common/collect/Multimap;Ljava/lang/String;)V";
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode) value;
+                if (!"<init>".equals(method.name) || !descriptor.equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, WINDOW_DEFAULTS_HOOK_OWNER, "resolve")) {
+                    System.setProperty(WINDOW_DEFAULTS_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                // Rewrite only the dimension arguments. Vanilla stores these in
+                // displayWidth/Height and tempDisplayWidth/Height for F11 restore.
+                // Its subsequent options.txt overrides still take precedence.
+                InsnList hook = new InsnList();
+                hook.add(new VarInsnNode(Opcodes.ILOAD, 2));
+                hook.add(new VarInsnNode(Opcodes.ILOAD, 3));
+                hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                        WINDOW_DEFAULTS_HOOK_OWNER, "resolve", "(II)[I"));
+                hook.add(new InsnNode(Opcodes.DUP));
+                hook.add(new InsnNode(Opcodes.ICONST_0));
+                hook.add(new InsnNode(Opcodes.IALOAD));
+                hook.add(new VarInsnNode(Opcodes.ISTORE, 2));
+                hook.add(new InsnNode(Opcodes.ICONST_1));
+                hook.add(new InsnNode(Opcodes.IALOAD));
+                hook.add(new VarInsnNode(Opcodes.ISTORE, 3));
+                method.instructions.insert(hook);
+                byte[] transformed = write(owner);
+                System.setProperty(WINDOW_DEFAULTS_ACTIVE_PROPERTY, "true");
+                info("Patched default startup window dimensions");
+                return transformed;
+            }
+            warn("Could not locate Minecraft constructor; keeping vanilla window dimensions");
+        } catch (Throwable throwable) {
+            warn("Failed to patch startup window dimensions: " + throwable);
+        }
+        return basicClass;
     }
 
     /** Preserves vanilla hotbar slot IDs after appending the accessory slot. */

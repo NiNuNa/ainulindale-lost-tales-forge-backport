@@ -352,10 +352,13 @@ public final class LostTalesLotrMapRotation {
     /**
      * How far the map is turned for this screen.
      *
-     * <p>Only the Lost Tales map screen can be turned. LOTR's menu background
-     * and any other map this code is reached from stay square.</p>
+     * <p>Gameplay owns its interactive angle; background views borrow a
+     * scoped presentation angle from the shared scene.</p>
      */
     static float degreesOf(LOTRGuiMap gui) {
+        if (LostTalesMapScene.isBackground(gui)) {
+            return LostTalesMapScene.backgroundDegrees(gui);
+        }
         return gui instanceof LostTalesLotrMapGui
                 ? ((LostTalesLotrMapGui)gui).getMapRotationDegrees()
                 : 0.0F;
@@ -492,16 +495,21 @@ public final class LostTalesLotrMapRotation {
         if ((degrees == 0.0F && lean <= 0.0F) || !ensureReflection()) {
             return false;
         }
+        boolean pushed = false;
         try {
             float centerX = centerX();
             float centerY = centerY();
             GL11.glPushMatrix();
+            pushed = true;
             GL11.glTranslatef(centerX, centerY, 0.0F);
             multiplyLean(lean);
             GL11.glRotatef(degrees, 0.0F, 0.0F, 1.0F);
             GL11.glTranslatef(-centerX, -centerY, 0.0F);
             return true;
         } catch (Throwable ignored) {
+            if (pushed) {
+                GL11.glPopMatrix();
+            }
             return false;
         }
     }
@@ -674,6 +682,9 @@ public final class LostTalesLotrMapRotation {
      * How far the map is leaning for this screen, from 0 flat to 1.
      */
     static float leanOf(LOTRGuiMap gui) {
+        if (LostTalesMapScene.isBackground(gui)) {
+            return LostTalesMapScene.backgroundLean(gui);
+        }
         return gui instanceof LostTalesLotrMapGui
                 ? ((LostTalesLotrMapGui)gui).getMapLean() : 0.0F;
     }

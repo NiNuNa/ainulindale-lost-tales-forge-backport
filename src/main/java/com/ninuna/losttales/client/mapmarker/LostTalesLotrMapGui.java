@@ -543,8 +543,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     @Override
     public void renderMapAndOverlay(
             boolean sepia, float alpha, boolean drawOverlay) {
-        if (!this.smoothZoomInitialized
-                || !LostTalesLotrSmoothMapRenderer.render(
+        if (!LostTalesMapScene.renderMap(
                         this, sepia, alpha, drawOverlay)) {
             super.renderMapAndOverlay(sepia, alpha, drawOverlay);
         }
