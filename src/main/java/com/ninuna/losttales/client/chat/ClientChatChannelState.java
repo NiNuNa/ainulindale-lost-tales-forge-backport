@@ -155,6 +155,40 @@ public final class ClientChatChannelState {
      */
     private static synchronized ChatTab cycle(int step) {
         ChatTab current = getSelected();
+        List<ChatTab> order = selectedWindowOrder(current);
+        int index = Math.max(0, order.indexOf(current));
+        selected = order.get(
+                ((index + step) % order.size() + order.size())
+                        % order.size());
+        return selected;
+    }
+
+    /**
+     * The tab at {@code ordinal} (from one) along the selected tab's
+     * window, the way a browser's Ctrl+1 to Ctrl+8 reach its tabs; nine
+     * is always the last tab, whatever the row holds. A number past the
+     * row leaves the selection where it is.
+     */
+    public static synchronized ChatTab selectOrdinal(int ordinal) {
+        ChatTab current = getSelected();
+        if (ordinal < 1) {
+            return current;
+        }
+        List<ChatTab> order = selectedWindowOrder(current);
+        int index = ordinal >= 9 ? order.size() - 1 : ordinal - 1;
+        if (index >= order.size()) {
+            return current;
+        }
+        selected = order.get(index);
+        return selected;
+    }
+
+    /**
+     * The tabs of the selected tab's window in row order, those the
+     * player may use; every open tab when the selection has no window,
+     * and Global when nothing is open at all. Never empty.
+     */
+    private static List<ChatTab> selectedWindowOrder(ChatTab current) {
         ChatWindow window = ChatWindowLayout.windowOf(current);
         List<ChatTab> order = new ArrayList<ChatTab>();
         if (window != null) {
@@ -170,11 +204,7 @@ public final class ClientChatChannelState {
         if (order.isEmpty()) {
             order.add(ChatTab.of(ChatChannel.ALL));
         }
-        int index = Math.max(0, order.indexOf(current));
-        selected = order.get(
-                ((index + step) % order.size() + order.size())
-                        % order.size());
-        return selected;
+        return order;
     }
 
     /**

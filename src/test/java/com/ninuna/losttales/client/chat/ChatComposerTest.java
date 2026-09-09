@@ -52,6 +52,31 @@ public final class ChatComposerTest {
         assertEquals(ChatReplyReference.NONE, composer.replyReference());
     }
 
+    /**
+     * A line nobody named is answered by its words: no id, but an
+     * author and an excerpt, which is a reply all the same. Without an
+     * author there is nothing to quote and it is no reply.
+     */
+    @Test
+    public void anUnnamedLineIsAnsweredByItsWords() {
+        ChatComposer composer = new ChatComposer();
+        composer.startReply(ChatTab.of(ChatChannel.ALL), ChatMessageIds.NONE,
+                "System", "Bilbo has just earned the achievement [Taking Inventory]");
+        assertTrue(composer.isReplying());
+        ChatReplyReference reference = composer.replyReference();
+        assertTrue(reference.exists());
+        assertFalse(reference.isAnchored());
+        assertEquals(ChatMessageIds.NONE, reference.getMessageId());
+        assertEquals("System", reference.getAuthor());
+        assertEquals("Bilbo has just earned the achievement [Taking Inventory]",
+                reference.getExcerpt());
+        composer.cancelReply();
+        composer.startReply(ChatTab.of(ChatChannel.ALL), ChatMessageIds.NONE,
+                "", "words with nobody behind them");
+        assertFalse(composer.isReplying());
+        assertEquals(ChatReplyReference.NONE, composer.replyReference());
+    }
+
     @Test
     public void anEditPutsAReplyDownAndIsForgottenWithItsMessage() {
         ChatComposer composer = new ChatComposer();

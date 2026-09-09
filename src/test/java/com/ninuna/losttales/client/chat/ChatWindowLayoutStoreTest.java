@@ -5,9 +5,15 @@ import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatPresentationMode;
 import com.ninuna.losttales.chat.ChatChannelDescriptor;
 import com.ninuna.losttales.chat.ChatChannelAccess;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -15,6 +21,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public final class ChatWindowLayoutStoreTest {
@@ -66,6 +73,76 @@ public final class ChatWindowLayoutStoreTest {
     }
 
     /** Whether some window holds the trade channel and nothing else. */
+    /**
+     * The layout is the account's: its file is named after the account,
+     * nothing is named without one, and an account with no file yet
+     * starts from the file every account once shared — which is read
+     * and left alone, the account's own file being written from the
+     * first change.
+     */
+    @Test
+    public void theLayoutIsTheAccountsOwnAndStartsFromTheSharedFile()
+            throws IOException {
+        UUID steve = UUID.fromString("c6000000-0000-0000-0000-00000000006c");
+        assertNull(ChatWindowLayoutStore.fileFor(null, steve));
+        assertNull(ChatWindowLayoutStore.fileFor(new File("client"), null));
+        assertEquals(new File(new File("client", "chat/layouts"), steve + ".txt"),
+                ChatWindowLayoutStore.fileFor(new File("client"), steve));
+
+        File folder = File.createTempFile("losttales-layout", "");
+        assertTrue(folder.delete());
+        assertTrue(folder.mkdirs());
+        File shared = new File(folder, ChatWindowLayoutStore.SHARED_FILE_PATH);
+        try {
+            write(shared, "window w2 locked=false x=50.00 y=25.00 active=ooc tabs=ooc\n");
+            ChatWindowLayoutStore.initialize(folder, steve);
+            ChatWindow window = ChatWindowLayout.window("w2");
+            assertNotNull("the shared file is the account's starting point", window);
+            assertEquals(50.0D, window.getOffsetX(), 0.0D);
+            File own = ChatWindowLayoutStore.fileFor(folder, steve);
+            assertFalse("nothing is written before the account changes anything",
+                    own.isFile());
+            ChatWindowLayoutStore.save();
+            assertTrue(own.isFile());
+            assertTrue("the shared file is left as it was", shared.isFile());
+            // The account's own file is what is read from then on, and
+            // another account still starts from the shared one.
+            ChatWindowLayout.reset();
+            ChatWindowLayoutStore.initialize(folder, steve);
+            assertNotNull(ChatWindowLayout.window("w2"));
+            UUID alex = UUID.fromString("d6000000-0000-0000-0000-00000000006d");
+            ChatWindowLayoutStore.initialize(folder, alex);
+            assertNotNull(ChatWindowLayout.window("w2"));
+            assertFalse(ChatWindowLayoutStore.fileFor(folder, alex).isFile());
+        } finally {
+            ChatWindowLayoutStore.initialize(null);
+            deleteTree(folder);
+        }
+    }
+
+    private static void write(File file, String text) throws IOException {
+        File parent = file.getParentFile();
+        if (parent != null && !parent.isDirectory()) {
+            assertTrue(parent.mkdirs());
+        }
+        Writer writer = new OutputStreamWriter(new FileOutputStream(file), "UTF-8");
+        try {
+            writer.write(text);
+        } finally {
+            writer.close();
+        }
+    }
+
+    private static void deleteTree(File file) {
+        File[] children = file.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                deleteTree(child);
+            }
+        }
+        file.delete();
+    }
+
     private static boolean holdsTrade(ChatChannel trade) {
         for (ChatWindow window : ChatWindowLayout.windows()) {
             if (Collections.singletonList(trade).equals(window.getChannels())) {

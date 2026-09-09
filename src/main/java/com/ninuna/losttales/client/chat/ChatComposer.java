@@ -57,10 +57,17 @@ final class ChatComposer {
         this.editingTab = tab;
     }
 
-    /** Whether a reply is being composed in the tab now selected. */
+    /**
+     * Whether a reply is being composed in the tab now selected: one
+     * answering a message the server named, or one quoting a line
+     * nobody named by its author and words alone. A client-local id is
+     * neither — it names nothing anyone else could be shown.
+     */
     boolean isReplying() {
-        return ChatMessageIds.isServerId(this.replyToMessageId)
-                && this.replyTab != null
+        boolean named = ChatMessageIds.isServerId(this.replyToMessageId)
+                || (this.replyToMessageId == ChatMessageIds.NONE
+                        && this.replyToName.length() > 0);
+        return named && this.replyTab != null
                 && this.replyTab.equals(ClientChatChannelState.getSelected());
     }
 
@@ -78,10 +85,14 @@ final class ChatComposer {
 
     /** The message a sent line answers; {@link ChatReplyReference#NONE} for none. */
     ChatReplyReference replyReference() {
-        return isReplying()
+        if (!isReplying()) {
+            return ChatReplyReference.NONE;
+        }
+        return ChatMessageIds.isServerId(this.replyToMessageId)
                 ? ChatReplyReference.of(this.replyToMessageId, this.replyToName,
                         this.replyToExcerpt)
-                : ChatReplyReference.NONE;
+                : ChatReplyReference.unanchored(this.replyToName,
+                        this.replyToExcerpt, ChatReplyReference.NO_COLOR);
     }
 
     /** Forgets the message being replied to; the chip goes with it. */

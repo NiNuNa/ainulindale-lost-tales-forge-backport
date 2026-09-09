@@ -203,8 +203,6 @@ public final class ChatWindowPlacementTest {
                     window, null, 1000, 600);
             assertEquals(136.07D, box.room, 0.0001D);
             assertEquals(22 + 2 + 136.07D + 33, box.height, 0.0001D);
-            assertEquals(13, LostTalesChatOverlayRenderer.linesForRoom(
-                    (float)box.room, 1.0F));
         } finally {
             ChatWindowFrame.clear();
         }

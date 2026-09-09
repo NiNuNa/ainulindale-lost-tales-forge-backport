@@ -78,6 +78,16 @@ final class ChatLayoutMarker {
                 + label);
     }
 
+    /**
+     * A body break that opens the body behind nothing at all — no
+     * chevron and no words — for a body whose own first run is its
+     * opener: a command echo's slash, which is part of the command and
+     * copied with it. {@link #bodyLabel} answers with an empty label.
+     */
+    static ChatComponentText bodyBreakBare(int senderColor) {
+        return marker(PREFIX + BODY + (senderColor & 0xFFFFFF) + ':');
+    }
+
     static ChatComponentText indent(int closedWidth, int openWidth) {
         return indent(closedWidth, openWidth, -1, -1);
     }
@@ -193,9 +203,9 @@ final class ChatLayoutMarker {
     }
 
     /**
-     * The label a body break opens the body with, or null for the
-     * chat's chevron — and null as well when the component is not a
-     * body break at all.
+     * The label a body break opens the body with: null for the chat's
+     * chevron — and when the component is not a body break at all —
+     * and empty for a bare break that opens the body behind nothing.
      */
     static String bodyLabel(IChatComponent component) {
         String payload = payloadOf(component);
@@ -204,7 +214,7 @@ final class ChatLayoutMarker {
         }
         String fields = payload.substring(BODY.length());
         int labelStart = fields.indexOf(':');
-        if (labelStart < 0 || labelStart + 1 >= fields.length()) {
+        if (labelStart < 0) {
             return null;
         }
         return fields.substring(labelStart + 1);

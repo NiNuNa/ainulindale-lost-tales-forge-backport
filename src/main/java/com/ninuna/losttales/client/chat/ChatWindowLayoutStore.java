@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.character.LostTalesClientAccount;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 import com.ninuna.losttales.chat.ChatChannel;
 import java.io.BufferedReader;
@@ -16,16 +17,20 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 /**
- * File-backed persistence for {@link ChatWindowLayout}: a per-installation
- * presentation preference like the emoji favourites, kept under
- * {@code config/} and never synchronized or cleared between worlds. The
- * file is a few plain lines — one per window, one per closed channel,
- * one per preference (muted, mentions muted, hidden) — so a hand edit
- * or a stale entry from an older version cannot corrupt anything:
- * whatever does not parse is skipped and the layout repairs itself on
- * load.
+ * File-backed persistence for {@link ChatWindowLayout}: a presentation
+ * preference of the signed-in account, kept under {@code config/} in a
+ * file named after the account and never synchronized or cleared
+ * between worlds. Two people sharing a machine keep their own windows,
+ * and one person with two accounts keeps an arrangement for each; the
+ * file every account once shared is read as an account's starting
+ * point while it has no file of its own. The file is a few plain lines
+ * — one per window, one per closed channel, one per preference (muted,
+ * mentions muted, hidden) — so a hand edit or a stale entry from an
+ * older version cannot corrupt anything: whatever does not parse is
+ * skipped and the layout repairs itself on load.
  *
  * <pre>
  * window w1 locked=false x=0.00 y=0.00 active=console tabs=console,admin
@@ -39,8 +44,10 @@ import java.util.Locale;
  * </pre>
  */
 public final class ChatWindowLayoutStore {
-    /** Under the client's config folder. */
-    static final String FILE_PATH = LostTalesConfigFiles.CHAT_LAYOUT;
+    /** The folder under the client's, one file per account. */
+    static final String FOLDER = LostTalesConfigFiles.CHAT_LAYOUTS;
+    /** The file every account once shared: a starting point, never written. */
+    static final String SHARED_FILE_PATH = LostTalesConfigFiles.CHAT_LAYOUT;
     private static final Charset UTF_8 = Charset.forName("UTF-8");
 
     private static File storeFile;
@@ -61,10 +68,27 @@ public final class ChatWindowLayoutStore {
 
     private ChatWindowLayoutStore() {}
 
+    /**
+     * Reads the signed-in account's layout as the client starts. The
+     * account is the session's own, the one the template file is named
+     * after, so every world reads the same file whatever id a server
+     * hands out; with no account to name, nothing is read or written.
+     */
     public static synchronized void initialize(File configDirectory) {
-        storeFile = configDirectory == null
-                ? null : new File(configDirectory, FILE_PATH);
+        initialize(configDirectory, configDirectory == null ? null
+                : LostTalesClientAccount.templateId());
+    }
+
+    /** As above, for a named account; visible for tests. */
+    static synchronized void initialize(File configDirectory, UUID accountId) {
+        storeFile = fileFor(configDirectory, accountId);
         List<String> lines = readLines(storeFile);
+        if (lines == null && storeFile != null) {
+            // An account with no file of its own starts from the file
+            // every account once shared, which stays as it is: the
+            // account's own file is written from the first change.
+            lines = readLines(new File(configDirectory, SHARED_FILE_PATH));
+        }
         if (lines != null) {
             load(lines);
         } else {
@@ -79,6 +103,19 @@ public final class ChatWindowLayoutStore {
                 save();
             }
         });
+    }
+
+    /**
+     * Where an account's layout lives: one file per account in the
+     * layouts folder. Null with no folder or no account, and nothing is
+     * then written.
+     */
+    static File fileFor(File configDirectory, UUID accountId) {
+        if (configDirectory == null || accountId == null) {
+            return null;
+        }
+        return new File(new File(configDirectory, FOLDER),
+                accountId.toString() + ".txt");
     }
 
     /**

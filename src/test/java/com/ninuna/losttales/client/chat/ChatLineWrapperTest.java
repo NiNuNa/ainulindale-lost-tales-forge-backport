@@ -389,13 +389,11 @@ public final class ChatLineWrapperTest {
     }
 
     /**
-     * A line naming its own separator — a command echo's "Used the
-     * command:" — opens its body behind those words where a message
-     * opens behind the chevron, and its continuations are inset by the
-     * words' width up to the same ceiling a long header's indent has,
-     * so a wide label cannot push the wrapped rest past half the width.
-     * The words are the chat's, not the sender's: a copy reads the
-     * command alone.
+     * A command echo opens its body behind nothing: no chevron, no
+     * words, so the command's own slash stands where the chevron stands
+     * and its continuations start at the body's edge. The slash and
+     * the command are the body's own text: a copy reads the command
+     * whole, and the separator adds nothing to it.
      */
     @Test
     public void labelledBodyBreaksOpenTheBodyBehindTheLabel() {
@@ -411,10 +409,7 @@ public final class ChatLineWrapperTest {
                             "losttales:human_ranger_male_2"),
                     ChatTab.of(ChatChannel.ALL), new int[0], false,
                     ChatBodyKind.COMMAND);
-            String label = "Used the command: ";
-            int labelWidth = METRICS.width(label);
-            int ceiling = Math.round(200 * ChatLineWrapper.MAX_INDENT_RATIO);
-            assertTrue(labelWidth > ceiling);
+            String label = "";
             for (int state = 0; state < 2; state++) {
                 boolean chatOpen = state == 1;
                 List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
@@ -422,12 +417,13 @@ public final class ChatLineWrapperTest {
                 assertNotNull(lines);
                 assertTrue(lines.size() > 2);
                 assertEquals("Global: <  Arathorn> ", plain(lines.get(0)));
-                assertTrue(plain(lines.get(1)).startsWith(label));
+                assertTrue(plain(lines.get(1)).startsWith("/losttales"));
                 assertEquals(-1, indentOf(lines.get(1), chatOpen));
                 for (int index = 2; index < lines.size(); index++) {
-                    assertEquals(ceiling,
-                            indentOf(lines.get(index), chatOpen));
+                    assertEquals(0, indentOf(lines.get(index), chatOpen));
                 }
+                // The slash and the command after it read back as the
+                // command typed; the bare separator adds nothing.
                 assertEquals("Global: <  Arathorn> " + command,
                         joinedText(lines));
                 // The separator carries the sender's colour, as the

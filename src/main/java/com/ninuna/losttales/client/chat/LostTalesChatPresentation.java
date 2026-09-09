@@ -24,10 +24,12 @@ import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
@@ -359,7 +361,8 @@ public final class LostTalesChatPresentation {
         ClientChatMessageIds.remember(chatLineId, packet.getMessageId());
         // Kept so the same line can be built again if it is edited.
         ClientChatMessages.remember(packet, tab, showcaseIds);
-        noteLinePrinted(chatLineId, tab, mentioned);
+        noteLinePrinted(chatLineId, tab, mentioned,
+                packet.getTimestampMillis());
         return chatLineId;
     }
 
@@ -610,13 +613,15 @@ public final class LostTalesChatPresentation {
 
     /** Records animation timing and the line's tab for the tab views. */
     private static void noteLinePrinted(int chatLineId, ChatTab tab,
-                                        boolean mentioned) {
+                                        boolean mentioned,
+                                        long timestampMillis) {
         lastMessageChatLineId = chatLineId;
         hasLastMessage = true;
         lastMessageNanos = System.nanoTime();
         lastMessageTab = tab;
         ClientChatChannelViews.record(chatLineId, tab,
                 ClientChatChannelState.getSelected(), mentioned);
+        ClientChatChannelViews.recordTime(chatLineId, timestampMillis);
     }
 
     /**
@@ -683,24 +688,123 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * Whether the message on this line can be answered: it has a name at
-     * all, and the tab it lives in takes messages. A console notice and
-     * an adopted stray have no name and so are nobody's to answer; a
-     * line this client wrote itself has one of its own, and an NPC's
-     * conversation is answered exactly as a player's is — locally, since
-     * nobody else ever sees either half of it. One rule, asked by the
-     * message menu and by the toolbar.
+     * Whether the line can be answered: it is a line at all — a blank
+     * row and a day's rule are nobody's — and the tab it lives in takes
+     * messages. A message the server named is answered by its id; an
+     * announcement, a death message, a console notice, a command's echo
+     * or an NPC's speech is answered by quoting its words, since nothing
+     * names it. One rule, asked by the message menu and by the toolbar.
      */
     static boolean isRepliable(int chatLineId) {
-        return ClientChatMessageIds.messageIdOf(chatLineId)
-                        != ChatMessageIds.NONE
+        return chatLineId != 0
                 && ClientChatChannelState.canSend(
                         ClientChatChannelViews.tabOf(chatLineId));
+    }
+
+    /**
+     * The name a reply quotes a line under: whoever signed it, else the
+     * chat's own word for a line nobody signed.
+     */
+    static String quoteAuthorFor(String signedName) {
+        return signedName != null && signedName.trim().length() > 0
+                ? signedName.trim()
+                : StatCollector.translateToLocal(
+                        "chat.losttales.reply.unnamed");
     }
 
     /** Whether the line belongs to the message the pointer is on. */
     static boolean isHoveredLine(int chatLineId) {
         return hoveredChatLineId != 0 && chatLineId == hoveredChatLineId;
+    }
+
+    /**
+     * The component the pointer rests on this frame, or null: what the
+     * text drawing underlines when the component answers to a click or
+     * carries a card, so a link, a name or a quote says it can be used
+     * before it is.
+     */
+    private static IChatComponent hoveredComponent;
+
+    static void setHoveredComponent(IChatComponent component) {
+        hoveredComponent = component;
+    }
+
+    /** Whether this very component is the one under the pointer. */
+    static boolean isHoveredComponent(IChatComponent component) {
+        return component != null && component == hoveredComponent;
+    }
+
+    /** The component under the pointer this frame, or null. */
+    static IChatComponent hoveredComponent() {
+        return hoveredComponent;
+    }
+
+    /**
+     * How far each message's hover shade has crossed in, by chat line
+     * id, and the frame it was last advanced on. Advanced once per
+     * frame however many wrapped rows the message has, and forgotten
+     * once it has crossed back out or the message has left the screen.
+     */
+    private static final Map<Integer, HoverFade> HOVER_FADES =
+            new HashMap<Integer, HoverFade>();
+    private static long frameIndex;
+    private static long frameNanos;
+    private static double frameElapsedSeconds;
+
+    private static final class HoverFade {
+        float value;
+        long frame;
+    }
+
+    /**
+     * Opens a frame of the chat screen: reads the clock every fade below
+     * steps on, and forgets the fades of lines the last frame did not
+     * draw. Called once per frame, before any window is drawn.
+     */
+    static void beginFrame() {
+        long now = System.nanoTime();
+        frameElapsedSeconds = frameNanos == 0L ? 0.0D
+                : Math.min(0.25D, (now - frameNanos) / 1.0E9D);
+        frameNanos = now;
+        frameIndex++;
+        Iterator<HoverFade> stale = HOVER_FADES.values().iterator();
+        while (stale.hasNext()) {
+            if (stale.next().frame < frameIndex - 1) {
+                stale.remove();
+            }
+        }
+    }
+
+    /**
+     * The share of the pointer's shade a message wears this frame: 1
+     * while the pointer rests on it, 0 while it does not, and on the way
+     * between them the controls' own crossfade — so the shade and the
+     * stamp it brings out come and go rather than switch. A hard cut
+     * while the chat's animations are off.
+     */
+    static float lineHoverFade(int chatLineId, boolean hovered) {
+        if (chatLineId == 0 || !LostTalesConfig.enableChatAnimations) {
+            return hovered ? 1.0F : 0.0F;
+        }
+        Integer key = Integer.valueOf(chatLineId);
+        HoverFade fade = HOVER_FADES.get(key);
+        if (fade == null) {
+            if (!hovered) {
+                return 0.0F;
+            }
+            fade = new HoverFade();
+            HOVER_FADES.put(key, fade);
+        }
+        if (fade.frame != frameIndex) {
+            fade.frame = frameIndex;
+            fade.value = LostTalesChatVisualStyle.hoverFade(fade.value,
+                    hovered, frameElapsedSeconds);
+        }
+        if (fade.value <= 0.0F && !hovered) {
+            HOVER_FADES.remove(key);
+            return 0.0F;
+        }
+        return fade.value;
     }
 
     /**
@@ -770,6 +874,9 @@ public final class LostTalesChatPresentation {
         flashedChatLineId = 0;
         flashedNanos = 0L;
         hoveredChatLineId = 0;
+        hoveredComponent = null;
+        HOVER_FADES.clear();
+        frameNanos = 0L;
         commandTab = null;
         commandUntilMillis = 0L;
         ChatSpoilerMarker.clear();
@@ -968,8 +1075,10 @@ public final class LostTalesChatPresentation {
                                    LostTalesChatMessagePacket packet,
                                    int[] showcaseIds, ChatChannel channel,
                                    ChatBodyKind kind) {
-        root.appendSibling(ChatLayoutMarker.bodyBreak(
-                packet.getNameColor(), bodyLabel(kind)));
+        root.appendSibling(kind.opensBare()
+                ? ChatLayoutMarker.bodyBreakBare(packet.getNameColor())
+                : ChatLayoutMarker.bodyBreak(packet.getNameColor(),
+                        bodyLabel(kind)));
         int bodyStart = root.getSiblings().size();
         if (kind.parsesBody()) {
             appendMessageBody(root, packet.getMessage(), showcaseIds,
@@ -977,10 +1086,30 @@ public final class LostTalesChatPresentation {
             ChatSpoilerMarker.mark(root.getSiblings(), bodyStart,
                     packet.getMessageId());
         } else {
-            root.appendSibling(text(packet.getMessage(),
-                    EnumChatFormatting.WHITE, false));
+            // A command was not said: its slash stands where the chevron
+            // stands, in the sender's colour, with the chevron's own gap
+            // after it, and the rest follows in the chat's white. The
+            // slash and the command are the body's own text, so a copy
+            // reads the command whole; the gap is a spacer, which draws
+            // nothing and adds nothing to a copy.
+            String command = packet.getMessage();
+            if (command.startsWith("/")) {
+                root.appendSibling(ChatColorMarker.apply(text("/",
+                        nearestFormatting(packet.getNameColor()), false),
+                        packet.getNameColor()));
+                root.appendSibling(ChatSpacerMarker.of(COMMAND_GAP));
+                command = command.substring(1);
+            }
+            root.appendSibling(text(command, null, false));
         }
     }
+
+    /**
+     * The gap between a command echo's slash and the command: the width
+     * of the space the chevron carries after itself, so the two openers
+     * hold their bodies the same distance off.
+     */
+    static final int COMMAND_GAP = 4;
 
     /**
      * The words a kind opens the body with, and the one space that
@@ -993,13 +1122,8 @@ public final class LostTalesChatPresentation {
         if (kind.getLabelKey().length() == 0) {
             return "";
         }
-        return ChatEpithet.translate(kind.getLabelKey(),
-                COMMAND_LABEL_FALLBACK).trim() + " ";
+        return ChatEpithet.translate(kind.getLabelKey(), "").trim() + " ";
     }
-
-    /** What a command echo opens its body with when no lang file says. */
-    private static final String COMMAND_LABEL_FALLBACK =
-            "Used the command:";
 
     /**
      * The row a reply opens with: the message it answers, quoted in the
@@ -1108,6 +1232,7 @@ public final class LostTalesChatPresentation {
                 buildSystemLine(shown, channel, now), chatLineId);
         ClientChatChannelViews.record(chatLineId, tab,
                 ClientChatChannelState.getSelected(), mentioned);
+        ClientChatChannelViews.recordTime(chatLineId, now);
         if (mentioned) {
             markPinged(chatLineId);
             if (audibleMentionCue && ChatWindowLayout.isPingAudible(tab)) {
@@ -1265,6 +1390,7 @@ public final class LostTalesChatPresentation {
                 chatLineId);
         ClientChatChannelViews.record(chatLineId, tab,
                 ClientChatChannelState.getSelected(), false);
+        ClientChatChannelViews.recordTime(chatLineId, timestampMillis);
     }
 
     /**
@@ -1287,12 +1413,14 @@ public final class LostTalesChatPresentation {
             return false;
         }
         int chatLineId = allocateChatLineId();
+        long now = System.currentTimeMillis();
         messages.set(index, new ChatLine(line.getUpdatedCounter(),
                 buildSystemLine(line.func_151461_a(), ChatChannel.CONSOLE,
-                        System.currentTimeMillis()), chatLineId));
+                        now), chatLineId));
         ClientChatChannelViews.record(chatLineId,
                 ChatTab.of(ChatChannel.CONSOLE),
                 ClientChatChannelState.getSelected(), false);
+        ClientChatChannelViews.recordTime(chatLineId, now);
         return true;
     }
 
@@ -1567,7 +1695,7 @@ public final class LostTalesChatPresentation {
         // sees it, so it is named locally like the player's replies.
         ClientChatMessageIds.remember(chatLineId,
                 ClientChatMessageIds.nextLocal());
-        noteLinePrinted(chatLineId, tab, mentioned);
+        noteLinePrinted(chatLineId, tab, mentioned, now);
         if (mentioned) {
             markPinged(chatLineId);
             if (ChatWindowLayout.isPingAudible(tab)) {

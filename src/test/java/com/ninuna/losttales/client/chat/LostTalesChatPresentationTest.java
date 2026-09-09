@@ -591,10 +591,11 @@ public final class LostTalesChatPresentationTest {
 
     /**
      * A command echo is a line of the sender's like any other: the same
-     * header, part for part, and a body row that opens with the words
-     * saying it was a command instead of the chevron. The body is the
-     * command exactly as typed — nothing in it is markup, an emoji or a
-     * mention — and its grouped form carries the same words.
+     * header, part for part, and a body row that opens with the
+     * command's own slash instead of the chevron. The body is the rest
+     * of the command exactly as typed, in grey since it was not said —
+     * nothing in it is markup, an emoji or a mention — and its grouped
+     * form opens the same way.
      */
     @Test
     public void commandEchoesShareTheHeaderAndKeepTheBodyVerbatim() {
@@ -620,14 +621,24 @@ public final class LostTalesChatPresentationTest {
             assertEquals(headerOf(said), headerOf(used));
             assertEquals("Global: <  Arathorn> ", headerOf(used));
             assertNull(labelOf(said));
-            assertEquals("Used the command: ", labelOf(used));
+            // A bare break: the body opens behind nothing.
+            assertEquals("", labelOf(used));
 
             java.util.List<IChatComponent> body = bodyOf(used);
-            assertEquals(1, body.size());
-            assertEquals(command, body.get(0).getUnformattedTextForChat());
-            assertEquals(EnumChatFormatting.WHITE,
-                    body.get(0).getChatStyle().getColor());
-            assertNull(body.get(0).getChatStyle().getChatClickEvent());
+            assertEquals(3, body.size());
+            // The slash in the sender's colour, where the chevron stands,
+            // then the chevron's own gap as a spacer that copies as
+            // nothing, then the command in the chat's white.
+            assertEquals("/", body.get(0).getUnformattedTextForChat());
+            assertEquals(Integer.valueOf(packet.getNameColor()),
+                    ChatColorMarker.decode(body.get(0)));
+            assertEquals(LostTalesChatPresentation.COMMAND_GAP,
+                    ChatSpacerMarker.decode(body.get(1)));
+            assertEquals("", body.get(1).getUnformattedTextForChat());
+            assertEquals(command.substring(1),
+                    body.get(2).getUnformattedTextForChat());
+            assertNull(body.get(2).getChatStyle().getColor());
+            assertNull(body.get(2).getChatStyle().getChatClickEvent());
             // The message form of the same words is read for markup.
             assertTrue(bodyOf(said).size() > 1);
 
@@ -635,9 +646,10 @@ public final class LostTalesChatPresentationTest {
                     packet, ChatTab.of(ChatChannel.ALL), new int[0], true,
                     ChatBodyKind.COMMAND);
             assertEquals("", headerOf(grouped));
-            assertEquals("Used the command: ", labelOf(grouped));
-            assertEquals(command,
-                    bodyOf(grouped).get(0).getUnformattedTextForChat());
+            assertEquals("", labelOf(grouped));
+            assertEquals("/", bodyOf(grouped).get(0).getUnformattedTextForChat());
+            assertEquals(command.substring(1),
+                    bodyOf(grouped).get(2).getUnformattedTextForChat());
         } finally {
             LostTalesConfig.showChatTimestamps = originalTimestamps;
             LostTalesConfig.enableChatEmojis = originalEmojis;

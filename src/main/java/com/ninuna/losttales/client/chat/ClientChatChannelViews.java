@@ -51,6 +51,13 @@ public final class ClientChatChannelViews {
     public static final ChatChannel SYSTEM_LINE_VIEW = ChatChannel.CONSOLE;
     private static final LinkedHashMap<Integer, ChatTab> TAB_BY_LINE_ID =
             new LinkedHashMap<Integer, ChatTab>();
+    /**
+     * When each Lost Tales line was said, by chat line id: what a
+     * window reads to stand a dated rule over each day's first message.
+     * Bounded like the tab index and cleared with it.
+     */
+    private static final LinkedHashMap<Integer, Long> TIME_BY_LINE_ID =
+            new LinkedHashMap<Integer, Long>();
     /** Where each view is scrolled to, in message lines. */
     private static final Map<ChatTab, Double> SCROLL =
             new HashMap<ChatTab, Double>();
@@ -176,6 +183,23 @@ public final class ClientChatChannelViews {
                                            boolean mentionsLocalPlayer) {
         record(chatLineId, ChatTab.of(channel), ChatTab.of(selected),
                 mentionsLocalPlayer);
+    }
+
+    /** Remembers when a printed line was said. */
+    public static synchronized void recordTime(int chatLineId,
+                                               long timestampMillis) {
+        TIME_BY_LINE_ID.put(Integer.valueOf(chatLineId),
+                Long.valueOf(timestampMillis));
+        while (TIME_BY_LINE_ID.size() > maxTrackedLines()) {
+            Iterator<Integer> iterator = TIME_BY_LINE_ID.keySet().iterator();
+            iterator.next();
+            iterator.remove();
+        }
+    }
+
+    /** When the line was said, or null for a line nobody stamped. */
+    public static synchronized Long timeOf(int chatLineId) {
+        return TIME_BY_LINE_ID.get(Integer.valueOf(chatLineId));
     }
 
     /**
@@ -730,6 +754,7 @@ public final class ClientChatChannelViews {
     public static synchronized void clear() {
         ClientChatContextHistory.clear();
         TAB_BY_LINE_ID.clear();
+        TIME_BY_LINE_ID.clear();
         SCROLL.clear();
         RENDERED.clear();
         ANCHORS.clear();

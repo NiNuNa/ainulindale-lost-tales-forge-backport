@@ -2,12 +2,15 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.share.ChatShareKind;
+import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.item.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.event.ClickEvent;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 
@@ -50,6 +53,39 @@ final class LostTalesChatVisualStyle {
             LostTalesSkyrimUiStyle.PLUM_BLACK);
     static final int SURFACE_HIGHLIGHT_RGB = LostTalesSkyrimUiStyle.rgb(
             LostTalesSkyrimUiStyle.PLUM_GRAY);
+
+    /**
+     * The open chat's history panel and the rows framing it, in the
+     * palette colour the client chose; plum black until it chooses.
+     * Read on every draw, so a choice made in a window's menu shows the
+     * same frame.
+     */
+    static int backdropRgb() {
+        return paletteRgb(LostTalesConfig.chatBackgroundColor,
+                LostTalesColors.PLUM_BLACK);
+    }
+
+    /** The line under the pointer, in the client's chosen palette colour. */
+    static int selectedLineRgb() {
+        return paletteRgb(LostTalesConfig.chatSelectedLineColor,
+                LostTalesColors.PLUM_GRAY);
+    }
+
+    /** A line that @-mentions this player, in the client's chosen palette colour. */
+    static int mentionLineRgb() {
+        return paletteRgb(LostTalesConfig.chatMentionLineColor,
+                LostTalesColors.MULBERRY);
+    }
+
+    /** The line a reply's quote jumped to, while it is lit, in the chosen colour. */
+    static int replyHighlightRgb() {
+        return paletteRgb(LostTalesConfig.chatReplyHighlightColor,
+                LostTalesColors.APRICOT);
+    }
+
+    private static int paletteRgb(String name, int fallback) {
+        return LostTalesColors.rgb(LostTalesColors.paletteColor(name, fallback));
+    }
     /** Shadow offset shared by text, sprites, and icons. */
     static final int SHADOW_OFFSET = 1;
     /** Shared palette opacity for every chat text, icon and portrait shadow. */
@@ -422,6 +458,14 @@ final class LostTalesChatVisualStyle {
         boolean afterHead = false;
         boolean identitySeen = false;
         boolean colours = chatColoursEnabled();
+        IChatComponent hovered = LostTalesChatPresentation.hoveredComponent();
+        // The sender is one thing under the pointer — head, brackets and
+        // name — so resting on any of them underlines all of them, on
+        // this line alone: a head shares nothing with another line's
+        // name.
+        boolean personHovered = hovered != null && containsPart(line, hovered)
+                && (ChatSenderSpan.isSenderName(hovered)
+                        || ChatHeadMarker.isMarker(hovered));
         for (Object value : line) {
             if (!(value instanceof IChatComponent)) {
                 continue;
@@ -551,10 +595,139 @@ final class LostTalesChatVisualStyle {
             beginContent();
             font.drawString(rendered, cursor, y, argb(color, alpha));
             int declared = ChatInlineIcons.declaredWidth(part);
-            cursor += declared >= 0 ? declared
+            int width = declared >= 0 ? declared
                     : measure(font, formatting, text, colours);
+            boolean underlined;
+            int underlineColor = color;
+            if (marker != null) {
+                // The head's slot is underlined with the name, in the
+                // name's colour, so the sender reads as one thing.
+                underlined = personHovered;
+                if (colours && !shadowPass) {
+                    underlineColor = marker.nameColor;
+                }
+            } else {
+                // A run that answers to a click or carries a card is
+                // underlined while the pointer rests on it — or on any
+                // run acting with it, so a name is underlined with its
+                // head and brackets and a reply's quote as a whole — in
+                // its own colour, on the row the font's own underline
+                // takes, so it reads as usable before it is used. The
+                // underline goes with the pointer.
+                underlined = rendered.trim().length() > 0
+                        && isInteractable(part)
+                        && (sharesInteraction(part, hovered)
+                                || (personHovered
+                                        && ChatSenderSpan.isSenderName(part)));
+            }
+            if (width > 0 && underlined) {
+                LostTalesChatOverlayRenderer.fillRect(cursor,
+                        y + UNDERLINE_ROW, cursor + width - 1,
+                        y + UNDERLINE_ROW + 1, argb(underlineColor, alpha));
+            }
+            cursor += width;
             identitySeen |= replyIdentity;
         }
+    }
+
+    /**
+     * The row under a run's glyphs the font draws its own underline on:
+     * one above the row the shadow of the descenders reaches.
+     */
+    private static final int UNDERLINE_ROW = 8;
+
+    /**
+     * Whether a run does something under the pointer: it answers to a
+     * click (a link, a name, a mention, a reply's quote, a share, a
+     * covered spoiler) or carries a card to read. The chat's own
+     * markers ride on click events too — a colour, a title, the
+     * chevron, a timestamp — and answer to nothing, so a click event
+     * alone says nothing: only one that is not a marker's payload
+     * counts.
+     */
+    private static boolean isInteractable(IChatComponent part) {
+        if (part == null || part.getChatStyle() == null) {
+            return false;
+        }
+        if (part.getChatStyle().getChatHoverEvent() != null
+                || ChatShowcaseMarker.decode(part) != null
+                || ChatMentionMarker.decode(part) != null
+                || ChatSenderSpan.isSenderName(part)
+                || ChatReplyMarker.messageIdOf(part) != 0L) {
+            return true;
+        }
+        if (ChatSpoilerMarker.isMarker(part)) {
+            return !ChatSpoilerMarker.isRevealed(part);
+        }
+        return genuineClick(part) != null;
+    }
+
+    /**
+     * The click a run answers to, or null: a link, a command, a
+     * suggestion. Every marker the chat lays into a line is carried as
+     * a suggestion too, and none of those is a click.
+     */
+    private static ClickEvent genuineClick(IChatComponent part) {
+        if (part == null || part.getChatStyle() == null) {
+            return null;
+        }
+        ClickEvent click = part.getChatStyle().getChatClickEvent();
+        if (click == null || ChatColorMarker.isMarker(part)
+                || ChatPrefixMarker.isMarker(part)
+                || ChatEmojiMarker.isMarker(part)
+                || ChatTitleMarker.isMarker(part)
+                || ChatReplyMarker.isMarker(part)
+                || ChatBodyMarker.isMarker(part)
+                || ChatLayoutMarker.isMarker(part)
+                || ChatSpacerMarker.isMarker(part)
+                || ChatSpoilerMarker.isMarker(part)
+                || ChatHeadMarker.isMarker(part)
+                || ChatShowcaseMarker.decode(part) != null
+                || ChatMentionMarker.decode(part) != null) {
+            return null;
+        }
+        return click;
+    }
+
+    /** Whether the run is one of the line's own, by identity. */
+    private static boolean containsPart(IChatComponent line,
+                                        IChatComponent part) {
+        if (line == null || part == null) {
+            return false;
+        }
+        for (Object value : line) {
+            if (value == part) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a run acts with the hovered one: it is the hovered run,
+     * or it answers exactly as that run does — the sender's name and
+     * the brackets around it share one whisper suggestion, the runs of
+     * one reply quote share the message they lead to, the pieces of one
+     * link share its address — so all of it is underlined together.
+     */
+    private static boolean sharesInteraction(IChatComponent part,
+                                             IChatComponent hovered) {
+        if (part == null || hovered == null) {
+            return false;
+        }
+        if (part == hovered) {
+            return true;
+        }
+        long reply = ChatReplyMarker.messageIdOf(part);
+        if (reply != 0L) {
+            return reply == ChatReplyMarker.messageIdOf(hovered);
+        }
+        ClickEvent own = genuineClick(part);
+        ClickEvent theirs = genuineClick(hovered);
+        return own != null && theirs != null
+                && own.getAction() == theirs.getAction()
+                && own.getValue() != null
+                && own.getValue().equals(theirs.getValue());
     }
 
     private static void drawShareIcon(ChatShowcaseMarker.Data share,

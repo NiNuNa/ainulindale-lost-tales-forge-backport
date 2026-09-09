@@ -9,6 +9,7 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
+import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.net.URI;
@@ -373,6 +374,15 @@ public final class LostTalesChatGui extends GuiChat {
             this.tabActions.selectChannel(ClientChatChannelState.cycleBack());
             return;
         }
+        // Ctrl+1 to Ctrl+8 pick the selected window's tabs by place and
+        // Ctrl+9 its last, as a browser's do; the digits are the main
+        // row's, which sit together in the keyboard's own numbering.
+        if (isCtrlKeyDown() && keyCode >= Keyboard.KEY_1
+                && keyCode <= Keyboard.KEY_9) {
+            this.tabActions.selectChannel(ClientChatChannelState.selectOrdinal(
+                    keyCode - Keyboard.KEY_1 + 1));
+            return;
+        }
         if (isCtrlKeyDown() && keyCode == Keyboard.KEY_W) {
             this.tabActions.closeMarkedOrActiveTabs();
             return;
@@ -635,9 +645,17 @@ public final class LostTalesChatGui extends GuiChat {
         int mouseX = Mouse.getEventX() * this.width / this.mc.displayWidth;
         int mouseY = this.height - Mouse.getEventY() * this.height
                 / this.mc.displayHeight - 1;
+        // One turn of the wheel is one distance everywhere in the chat:
+        // vanilla's step in whole lines, one line with Shift, in pixels
+        // — the history, a menu's rows and a picker's cells all move by
+        // it, each turning it into its own units.
+        int wheelPixels = (wheel > 0 ? 1 : -1)
+                * LostTalesChatOverlayRenderer.LINE_HEIGHT
+                * (isShiftKeyDown() ? 1 : WHEEL_LINES);
         // A wheel turn over the open menu scrolls its rows.
         if (this.menus.isOpen() && this.menus.contains(mouseX, mouseY)) {
-            this.menus.scrollBy(wheel > 0 ? -1 : 1);
+            this.menus.scrollBy(-wheelPixels
+                    / (double)ChatPopupMenu.ROW_HEIGHT);
             return;
         }
         // A wheel turn over an open picker scrolls that picker's list;
@@ -648,17 +666,13 @@ public final class LostTalesChatGui extends GuiChat {
                     - Math.round(this.bar.entranceOffset());
             if (picker.isInsidePanel(mouseX, adjustedMouseY,
                     this.bar.inputBarRight(), this.bar.pickerAnchor())) {
-                picker.scrollBy((wheel > 0 ? -1 : 1) * picker.cellHeight());
+                picker.scrollBy(-wheelPixels);
                 return;
             }
         }
         // Vanilla scrolled its own (now unused) offset above; the visible
-        // history scrolls per channel view instead, with vanilla's step,
-        // in the window under the pointer (the main one elsewhere).
-        int step = wheel > 0 ? 1 : -1;
-        if (!isShiftKeyDown()) {
-            step *= WHEEL_LINES;
-        }
+        // history scrolls per channel view instead, in the window under
+        // the pointer (the main one elsewhere).
         ChatWindowFrame frame = ChatWindowFrame.drawnAt(mouseX, mouseY);
         if (frame == null) {
             frame = this.bar.activeFrame();
@@ -666,12 +680,18 @@ public final class LostTalesChatGui extends GuiChat {
         if (frame == null || frame.view == null) {
             return;
         }
-        // A page is the window's own message room, fractions of a line
-        // included, so scrolling to either end lands on a whole message.
-        // The reach is the rows the window draws, not its message lines:
-        // the two differ by the unread divider's own row.
-        ClientChatChannelViews.scroll(frame.view, step,
-                frame.contentRows(), frame.roomLines());
+        // A turn moves the page a fixed distance in pixels — vanilla's
+        // step in whole lines — which the frame turns into rows, since
+        // the rows are not all one height. The reach is the rows the
+        // window draws, not its message lines: the two differ by the
+        // unread divider's own row and the blank rows between runs.
+        int rows = frame.contentRows();
+        double roomLines = frame.roomLines();
+        double current = ClientChatChannelViews.getScroll(frame.view, rows,
+                roomLines);
+        ClientChatChannelViews.scrollTo(frame.view,
+                frame.rowsAfterScrolling(current, wheelPixels), rows,
+                roomLines);
     }
 
     /**
@@ -725,8 +745,11 @@ public final class LostTalesChatGui extends GuiChat {
                     partialTicks, (float)LostTalesConfig.guiBlurStrength);
         }
         this.gestures.advance(mouseX, mouseY);
+        LostTalesChatPresentation.beginFrame();
         LostTalesChatPresentation.setHoveredLine(
                 hoveredMessageLine(mouseX, mouseY));
+        LostTalesChatPresentation.setHoveredComponent(
+                hoveredComponent(mouseX, mouseY));
         this.gestures.markScrollbarsWanted(mouseX, mouseY);
         drawWindows(mouseX, mouseY, partialTicks);
         if (!this.gestures.isDragging()) {
@@ -1103,6 +1126,10 @@ public final class LostTalesChatGui extends GuiChat {
         row.left = (int)Math.floor(frame.drawnLeft()) + 2;
         row.right = (int)Math.floor(frame.drawnLeft()) + (int)Math.round(
                 frame.boxRight - frame.boxLeft) - 2;
+        // The edge as it really stands, so the tabs follow a resize by
+        // the fraction the edge moves rather than a pixel at a time.
+        row.rightExact = Math.floor(frame.drawnLeft())
+                + (frame.boxRight - frame.boxLeft) - 2;
         row.offsetX = 0;
         row.locked = window.isLocked();
         row.moving = this.gestures.isMovingWindow(window.getId());
@@ -1739,6 +1766,12 @@ public final class LostTalesChatGui extends GuiChat {
         if (remembered != null) {
             name = remembered.packet.getIdentityName();
         }
+        // A line the server never named — a client-local one included —
+        // is quoted by its words alone.
+        if (!ChatMessageIds.isServerId(id)) {
+            id = ChatMessageIds.NONE;
+            name = LostTalesChatPresentation.quoteAuthorFor(name);
+        }
         // Composing happens where the message lives, and selecting a tab
         // clears any reply, so the target is set after the move.
         this.tabActions.selectChannel(tab);
@@ -1753,8 +1786,29 @@ public final class LostTalesChatGui extends GuiChat {
      * hovered while a menu is open or something is being dragged: the
      * pointer is on that, whatever lies under it.
      */
-    private int hoveredMessageLine(int mouseX, int mouseY) {
+    /**
+     * The component under the pointer, or null: read the same way the
+     * hover card is, so what is underlined is exactly what a click
+     * would reach.
+     */
+    private IChatComponent hoveredComponent(int mouseX, int mouseY) {
         if (this.menus.isOpen() || this.gestures.isDragging()) {
+            return null;
+        }
+        LostTalesChatOverlayRenderer.Hit hit =
+                LostTalesChatOverlayRenderer.hitAt(this.mc,
+                        mouseX + 0.5F, mouseY + 0.5F);
+        return hit == null ? null : hit.component;
+    }
+
+    private int hoveredMessageLine(int mouseX, int mouseY) {
+        if (this.menus.isOpen()) {
+            // The menu has the pointer, but the message it was opened
+            // over keeps its shade while the menu stands, so what the
+            // menu acts on stays in sight.
+            return this.menus.messageMenuChatLineId();
+        }
+        if (this.gestures.isDragging()) {
             return 0;
         }
         LostTalesChatOverlayRenderer.Band band =

@@ -388,12 +388,12 @@ final class ChatWindowGestures {
         float top = mouseY - this.scrollbarDrag.grabOffset;
         float taken = (frame.scrollbarTrackBottom - thumbHeight - top)
                 / travel;
-        double roomLines = frame.roomLines();
-        int rows = frame.contentRows();
-        double reach = Math.max(0.0D, rows - roomLines);
+        // The thumb's travel is the stack's height in pixels, and the
+        // rows are not all one height: the frame turns the share of the
+        // travel into the row offset that stands there.
         ClientChatChannelViews.scrollTo(frame.view,
-                reach * Math.max(0.0F, Math.min(1.0F, taken)),
-                rows, roomLines);
+                frame.scrollRowsForShare(taken), frame.contentRows(),
+                frame.roomLines());
     }
 
     /* ---- Resizing ---- */
@@ -746,6 +746,18 @@ final class ChatWindowGestures {
                         ChatWindowPlacement.chatWidthForBox(
                                 resize.right - resize.left, this.mc),
                         false);
+                if (resize.edge.fromLeft) {
+                    // The width is whole pixels, so one edge takes its
+                    // rounding: the edge under the hand, which steps by
+                    // a pixel as the pointer crosses the half, while the
+                    // anchored edge stays exactly where it was — as the
+                    // left edge does when the right one is dragged.
+                    // With the rounding left on the far edge, that edge
+                    // and everything hanging from it wobbled a pixel
+                    // either way with the pointer.
+                    resize.left = resize.right - ChatWindowPlacement
+                            .windowWidth(window, this.mc);
+                }
             } else {
                 ChatWindowLines.logUnavailableOnce();
             }

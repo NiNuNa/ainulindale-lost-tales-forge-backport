@@ -15,6 +15,7 @@ import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelDescriptor;
 import com.ninuna.losttales.chat.ChatChannelGates;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.compat.discord.DiscordChannelBindings;
@@ -159,6 +160,21 @@ public final class LostTalesConfig {
     private static final String[] LEGACY_CHAT_PING_SOUNDS = {
             "lotr:item.horn", "note.pling"};
     public static String chatPingSound = DEFAULT_CHAT_PING_SOUND;
+    /**
+     * The open chat's surfaces, each a palette entry by name: the
+     * history panel and the rows that frame it, the line under the
+     * pointer, and a line that mentions this player. Names, not
+     * numbers, so every choice is one of the palette's colours.
+     */
+    static final String DEFAULT_CHAT_BACKGROUND_COLOR = "PLUM_BLACK";
+    static final String DEFAULT_CHAT_SELECTED_LINE_COLOR = "PLUM_GRAY";
+    static final String DEFAULT_CHAT_MENTION_LINE_COLOR = "MULBERRY";
+    static final String DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR = "APRICOT";
+    public static String chatBackgroundColor = DEFAULT_CHAT_BACKGROUND_COLOR;
+    public static String chatSelectedLineColor = DEFAULT_CHAT_SELECTED_LINE_COLOR;
+    public static String chatMentionLineColor = DEFAULT_CHAT_MENTION_LINE_COLOR;
+    /** The line a reply's quote jumps to, lit while the eye finds it. */
+    public static String chatReplyHighlightColor = DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR;
     public static boolean enableChatAnimations = true;
     /**
      * Developer aid: a local PNG drawn on the local player instead of the
@@ -980,7 +996,7 @@ public final class LostTalesConfig {
                     "gates",
                     CATEGORY_CHANNELS,
                     new String[] {ChatRoleConfig.DEFAULT_ADMIN_GATE},
-                    "The roles a channel asks for, one channel per line as <channel>=read:<role,role|any|none>;send:<role,role|any|none>. A side left out or set to any is open to everyone the channel already admits; none closes it; a side naming a role that does not exist is closed until the entry is fixed. A fresh file starts with the Operator channel asking for the operator role on both sides."
+                    "The roles a channel asks for, one channel per line as <channel>=read:<role,role|any|none>;send:<role,role|any|none>. A side left out or set to any is open to everyone the channel already admits; none closes it; a side naming a role that does not exist is closed until the entry is fixed. A fresh file starts with the Operator channel asking for the operator role on both sides, and that line is put back whenever it is missing; to open the channel on purpose, keep the line and set its sides to any."
             );
             installChatRoles();
             discordEnabled = config.getBoolean(
@@ -1138,6 +1154,34 @@ public final class LostTalesConfig {
                     chatPingSound,
                     "Sound event played when a chat message @-mentions you; empty disables the sound."
             );
+            chatBackgroundColor = paletteName(config.getString(
+                    "chatBackgroundColor",
+                    CATEGORY_CLIENT,
+                    chatBackgroundColor,
+                    "Palette colour of the open chat's history panel and the rows framing it. Also set from a chat window's own menu.",
+                    LostTalesColors.paletteNames()
+            ), DEFAULT_CHAT_BACKGROUND_COLOR);
+            chatSelectedLineColor = paletteName(config.getString(
+                    "chatSelectedLineColor",
+                    CATEGORY_CLIENT,
+                    chatSelectedLineColor,
+                    "Palette colour of the chat line under the pointer. Also set from a chat window's own menu.",
+                    LostTalesColors.paletteNames()
+            ), DEFAULT_CHAT_SELECTED_LINE_COLOR);
+            chatMentionLineColor = paletteName(config.getString(
+                    "chatMentionLineColor",
+                    CATEGORY_CLIENT,
+                    chatMentionLineColor,
+                    "Palette colour of a chat line that @-mentions you. Also set from a chat window's own menu.",
+                    LostTalesColors.paletteNames()
+            ), DEFAULT_CHAT_MENTION_LINE_COLOR);
+            chatReplyHighlightColor = paletteName(config.getString(
+                    "chatReplyHighlightColor",
+                    CATEGORY_CLIENT,
+                    chatReplyHighlightColor,
+                    "Palette colour a chat line is lit in when a reply's quote jumps to it. Also set from a chat window's own menu.",
+                    LostTalesColors.paletteNames()
+            ), DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR);
             devSkinOverridePath = config.getString(
                     "devSkinOverridePath",
                     CATEGORY_CLIENT,
@@ -1581,6 +1625,10 @@ public final class LostTalesConfig {
                         warnings.warn(message);
                     }
                 });
+        // The Operator channel's gate is put back when its line is
+        // missing, before the gates are read, and the value written back
+        // with the rest of the file at the end of this load.
+        chatChannelRoles = ChatRoleConfig.withRequiredGates(chatChannelRoles, warnings);
         ChatChannelGates.install(ChatRoleConfig.parseGates(chatChannelRoles, catalog, warnings));
     }
 
@@ -1887,6 +1935,18 @@ public final class LostTalesConfig {
         return clampPercent(50.0D + clampPercent(legacyOffsetX) / 2.0D);
     }
 
+    /**
+     * A colour option's value as the palette knows it, or the option's
+     * default when the file names no palette entry: a colour is only
+     * ever one of the palette's.
+     */
+    static String paletteName(String value, String fallback) {
+        if (!LostTalesColors.isPaletteName(value)) {
+            return fallback;
+        }
+        return value.trim().toUpperCase(java.util.Locale.ROOT);
+    }
+
     private static double clampPercent(double value) {
         if (Double.isNaN(value) || Double.isInfinite(value)) {
             return 0.0D;
@@ -2001,6 +2061,14 @@ public final class LostTalesConfig {
                 enableChatPings).set(enableChatPings);
         config.get(CATEGORY_CLIENT, "chatPingSound",
                 chatPingSound).set(chatPingSound);
+        config.get(CATEGORY_CLIENT, "chatBackgroundColor",
+                chatBackgroundColor).set(chatBackgroundColor);
+        config.get(CATEGORY_CLIENT, "chatSelectedLineColor",
+                chatSelectedLineColor).set(chatSelectedLineColor);
+        config.get(CATEGORY_CLIENT, "chatMentionLineColor",
+                chatMentionLineColor).set(chatMentionLineColor);
+        config.get(CATEGORY_CLIENT, "chatReplyHighlightColor",
+                chatReplyHighlightColor).set(chatReplyHighlightColor);
         config.get(CATEGORY_CLIENT, "enableChatAnimations",
                 enableChatAnimations).set(enableChatAnimations);
         config.get(CATEGORY_CLIENT, "chatAnimationDurationMillis",

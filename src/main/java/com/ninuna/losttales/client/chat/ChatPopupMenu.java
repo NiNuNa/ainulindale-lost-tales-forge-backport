@@ -50,6 +50,8 @@ final class ChatPopupMenu {
     /** Width of the upright colour bar before a channel's name, and its gap. */
     private static final int SWATCH_WIDTH = 1;
     private static final int SWATCH_GAP = 4;
+    /** Width of the colour chip before a palette entry's name. */
+    private static final int CHIP_WIDTH = 7;
     /** The hairline that says the list continues past an edge. */
     private static final int MORE_RGB =
             LostTalesColors.rgb(LostTalesColors.HONEY);
@@ -66,6 +68,12 @@ final class ChatPopupMenu {
         final boolean dim;
         /** The channel's colour, shown as a small bar before the name; -1 for none. */
         final int color;
+        /**
+         * Whether the colour is the row's subject rather than its
+         * channel's mark: a palette entry shows it as a chip wide
+         * enough to read as a colour, not as a hairline.
+         */
+        boolean chip;
         /** The tab whose icon stands before the name, or null for none. */
         final ChatTab icon;
         /** Player whose head stands before the name, or null for none. */
@@ -89,6 +97,12 @@ final class ChatPopupMenu {
         /** The same entry with its label in the given colour. */
         Entry withLabelColor(int color) {
             this.labelColor = color;
+            return this;
+        }
+
+        /** The same entry showing its colour as a chip; a palette row. */
+        Entry asChip() {
+            this.chip = true;
             return this;
         }
 
@@ -151,6 +165,8 @@ final class ChatPopupMenu {
     private int x;
     private int y;
     private int width;
+    /** Width of the colour column: a bar, or a chip when a row is a colour. */
+    private int swatchWidth = SWATCH_WIDTH;
     private int height;
     /** Left edge of the labels inside the menu, past any swatch column. */
     private int labelX = PADDING_X;
@@ -163,7 +179,7 @@ final class ChatPopupMenu {
     private final ChatLockAnimation lockAnimation = new ChatLockAnimation();
     /** First row asked for — the wheel's target; rows above it lie past
      *  the top edge. */
-    private int scrollRows;
+    private double scrollRows;
     /**
      * The row offset the list is drawn at, easing toward
      * {@link #scrollRows} with the chat's shared scroll motion so a
@@ -281,17 +297,19 @@ final class ChatPopupMenu {
         this.fieldHeight = this.filter == null ? 0
                 : Math.max(ROW_HEIGHT,
                         LostTalesInputIconRenderer.BASE_ICON_HEIGHT) + 1;
-        int keptScroll = samePlace ? this.scrollRows : 0;
+        double keptScroll = samePlace ? this.scrollRows : 0.0D;
         this.kind = kind == null ? "" : kind;
         this.channel = channel;
         this.entries = new ArrayList<Entry>(entries);
         int widest = 0;
         boolean swatches = false;
+        boolean chips = false;
         boolean icons = false;
         boolean locks = false;
         for (Entry entry : this.entries) {
             widest = Math.max(widest, font.getStringWidth(entry.label));
             swatches |= entry.color >= 0;
+            chips |= entry.color >= 0 && entry.chip;
             icons |= entry.icon != null || entry.head != null
                     || entry.sprite != null;
             locks |= entry.lockControl != null;
@@ -299,7 +317,8 @@ final class ChatPopupMenu {
         // One swatch column and one icon column for the whole list, so
         // the names line up; headers hang left of them with the padding.
         // A lock control keeps its own column at the right end.
-        this.labelX = PADDING_X + (swatches ? SWATCH_WIDTH + SWATCH_GAP : 0)
+        this.swatchWidth = chips ? CHIP_WIDTH : SWATCH_WIDTH;
+        this.labelX = PADDING_X + (swatches ? this.swatchWidth + SWATCH_GAP : 0)
                 + (icons ? ChatChannelIcons.SIZE + ChatChannelIcons.GAP : 0);
         this.lockWidth = locks
                 ? SWATCH_GAP + ChatChannelTabBar.END_CONTROL_SIZE : 0;
@@ -373,7 +392,7 @@ final class ChatPopupMenu {
         this.entries = Collections.emptyList();
         this.kind = "";
         this.channel = null;
-        this.scrollRows = 0;
+        this.scrollRows = 0.0D;
         this.renderedScrollRows = 0.0D;
         this.visibleRows = 0;
         this.lockWidth = 0;
@@ -451,13 +470,13 @@ final class ChatPopupMenu {
 
     /** Moves the list's target by whole rows; beyond either end it stays
      *  put. The drawn rows glide after the target. */
-    void scrollBy(int rows) {
+    void scrollBy(double rows) {
         this.scrollRows = clampScroll(this.scrollRows + rows);
     }
 
-    private int clampScroll(int rows) {
-        return Math.max(0, Math.min(
-                this.entries.size() - this.visibleRows, rows));
+    private double clampScroll(double rows) {
+        return Math.max(0.0D, Math.min(
+                (double)(this.entries.size() - this.visibleRows), rows));
     }
 
     /**
@@ -589,9 +608,11 @@ final class ChatPopupMenu {
             }
             if (entry.color >= 0) {
                 // The channel's colour as a one-pixel upright bar the
-                // height of the row's text.
+                // height of the row's text; a palette row's as a chip
+                // the width of the column.
                 Gui.drawRect(this.x + PADDING_X, rowY + 1,
-                        this.x + PADDING_X + SWATCH_WIDTH,
+                        this.x + PADDING_X
+                                + (entry.chip ? this.swatchWidth : SWATCH_WIDTH),
                         rowY + ROW_HEIGHT - 1,
                         LostTalesChatVisualStyle.argb(entry.color, 0xFF));
             }
@@ -647,7 +668,7 @@ final class ChatPopupMenu {
             LostTalesChatOverlayRenderer.endVerticalClip(clipped);
         }
         // A hairline on an edge the list continues past.
-        if (this.scrollRows > 0) {
+        if (this.scrollRows > 0.0D) {
             Gui.drawRect(this.x + 1, this.y + 1, this.x + this.width - 1,
                     this.y + 2,
                     LostTalesChatVisualStyle.argb(MORE_RGB, 0xFF));

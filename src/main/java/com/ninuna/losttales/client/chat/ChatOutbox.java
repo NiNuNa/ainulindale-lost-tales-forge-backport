@@ -142,7 +142,11 @@ final class ChatOutbox {
                         echoNonce,
                         tab.isWhisper()
                                 ? ClientChatChannelState.partnerCharacterIdOf(tab)
-                                : null));
+                                : null,
+                        // A quote of a line nobody named travels whole;
+                        // one the server named travels as its id.
+                        reply.isAnchored() ? "" : reply.getAuthor(),
+                        reply.isAnchored() ? "" : reply.getExcerpt()));
     }
 
     /**

@@ -484,6 +484,33 @@ public final class ChatRoleConfig {
         }
     }
 
+    /**
+     * The gate entries with the Operator channel's put back when no
+     * entry names that channel at all. A staff channel with no gate is
+     * open to everyone, and a line can go missing by a slip of the
+     * editor as easily as on purpose, so a missing line is treated as a
+     * slip: the seeded gate returns and the file is told so. An entry
+     * that names the channel is a decision and stands as written —
+     * {@code admin=read:any;send:any} opens the channel on purpose.
+     */
+    public static String[] withRequiredGates(String[] entries, Warnings warnings) {
+        String[] kept = entries == null ? new String[0] : entries;
+        for (String entry : kept) {
+            if (!isBlankOrComment(entry)
+                    && ChatChannel.fromId(keyOf(entry)) == ChatChannel.ADMIN) {
+                return kept;
+            }
+        }
+        (warnings == null ? SILENT : warnings).warn("The Operator channel has no "
+                + "gate entry in channels.cfg; the seeded one has been put back so "
+                + "the channel stays the operators' own. To open it on purpose, "
+                + "keep the line and set its sides to any.");
+        String[] reseeded = new String[kept.length + 1];
+        System.arraycopy(kept, 0, reseeded, 0, kept.length);
+        reseeded[kept.length] = DEFAULT_ADMIN_GATE;
+        return reseeded;
+    }
+
     /** The gates the entries describe, over the roles of {@code catalog}. */
     public static ChatChannelGates parseGates(String[] entries, ChatRoleCatalog catalog,
                                               Warnings warnings) {

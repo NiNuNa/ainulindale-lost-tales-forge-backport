@@ -40,16 +40,24 @@ final class ChatWindowFrame {
     final String windowId;
     final ChatLineBands bands = new ChatLineBands();
     final ChatChannelTabBar tabBar = new ChatChannelTabBar();
+    /**
+     * Where every row of {@link #lines} starts and how tall it is, the
+     * divider's row included; see {@link #resolveRows}. The scroll
+     * range, the scrollbar, the window's own height and the draw all
+     * measure the stack through this.
+     */
+    final ChatStackRows rows = new ChatStackRows();
     /** The view's line list drawn last; the bands index into it. */
     List<ChatLine> lines = Collections.emptyList();
     /**
-     * The most wrapped rows any tab of this window has been drawn with
-     * this session. A window that follows the game's chat height is as
-     * tall as this rather than as tall as the tab in front, so every
-     * tab of the window shares one height and switching tabs never
-     * resizes it; a tab with fewer lines shows empty rows above them.
+     * The tallest stack any tab of this window has been drawn with this
+     * session, in lines and fractions of one. A window that follows the
+     * game's chat height is as tall as this rather than as tall as the
+     * tab in front, so every tab of the window shares one height and
+     * switching tabs never resizes it; a tab with a shorter stack shows
+     * empty rows above it.
      */
-    int peakLines;
+    double peakContentLines;
     /**
      * Index in {@link #lines} of the oldest wrapped row of the message
      * the unread divider stands above, or -1 while this view shows no
@@ -60,6 +68,15 @@ final class ChatWindowFrame {
      * renders the same measurement.
      */
     int dividerLineIndex = -1;
+    /**
+     * Index in {@link #lines} of a day's rule standing directly over
+     * the first unread message, or -1. That row carries the unread
+     * divider then — it reads as the divider, in the divider's crimson,
+     * until the divider goes and the date is back on it — and
+     * {@link #dividerLineIndex} is -1 for it, so the two never stand
+     * together and no row of its own is added for the divider.
+     */
+    int dividerDateLineIndex = -1;
     /** What {@link #dividerLineIndex} was worked out from. */
     private List<ChatLine> dividerSource;
     private int dividerSourceSize;
@@ -260,9 +277,11 @@ final class ChatWindowFrame {
         // The feed's frame is never pruned, so what it remembers about
         // the history it was reading has to be let go with the history.
         FEED.dividerLineIndex = -1;
+        FEED.dividerDateLineIndex = -1;
         FEED.dividerSource = null;
         FEED.dividerSourceSize = 0;
         FEED.dividerSourceLineId = 0;
+        FEED.rows.reset((List<ChatLine>)null, -1);
     }
 
     /**
@@ -416,6 +435,13 @@ final class ChatWindowFrame {
         this.dividerSourceLineId = lineId;
         this.dividerLineIndex = lineId == 0 ? -1
                 : lastRowOf(drawnLines, lineId);
+        this.dividerDateLineIndex = -1;
+        int above = this.dividerLineIndex + 1;
+        if (this.dividerLineIndex >= 0 && above < size
+                && ChatWindowLines.isDateDivider(drawnLines.get(above))) {
+            this.dividerDateLineIndex = above;
+            this.dividerLineIndex = -1;
+        }
     }
 
     /**
@@ -474,10 +500,95 @@ final class ChatWindowFrame {
                 + (this.dividerLineIndex >= 0 ? 1 : 0);
     }
 
-    /** Rows of content the window has room for, fractions included. */
+    /**
+     * Lays the stack's rows out for the current line list and divider,
+     * when either has changed since the last draw. Called once the
+     * lines and the divider are known and before anything measures the
+     * stack: the window's own height, the scroll hold and the clamp.
+     */
+    void resolveRows() {
+        int size = this.lines == null ? 0 : this.lines.size();
+        if (!this.rows.describes(this.lines, size, this.dividerLineIndex)) {
+            this.rows.reset(this.lines, this.dividerLineIndex);
+        }
+    }
+
+    /** Whether {@link #rows} describes the stack as it stands. */
+    private boolean rowsResolved() {
+        int size = this.lines == null ? 0 : this.lines.size();
+        return this.rows.describes(this.lines, size, this.dividerLineIndex)
+                && this.rows.count() == contentRows();
+    }
+
+    /**
+     * Height of the whole stack in the chat's own (unscaled) pixels,
+     * blank rows at their half height. Before the rows are resolved
+     * every row counts as a whole line.
+     */
+    double contentHeight() {
+        if (rowsResolved()) {
+            return this.rows.total();
+        }
+        return contentRows() * (double)LostTalesChatOverlayRenderer.LINE_HEIGHT;
+    }
+
+    /** {@link #contentHeight} in lines and fractions of one. */
+    double contentLines() {
+        return contentHeight() / LostTalesChatOverlayRenderer.LINE_HEIGHT;
+    }
+
+    /** The window's message room in the chat's own (unscaled) pixels. */
+    private double roomUnscaled() {
+        return this.room / Math.max(1.0F, this.scale);
+    }
+
+    /**
+     * Rows of content the window has room for, fractions included,
+     * measured where the scroll ceiling is: from the oldest row down.
+     * Rows are not all one height, so the room holds a different
+     * number of them at every offset; taken at the top of the stack,
+     * {@code contentRows - roomLines} is exactly the offset that puts
+     * the oldest row on the window's top edge, which is what the clamp
+     * needs. A stack shorter than the room answers with all its rows,
+     * so the view cannot scroll into nothing.
+     */
     double roomLines() {
-        return this.room / (double)Math.max(1.0F,
-                LostTalesChatOverlayRenderer.LINE_HEIGHT * this.scale);
+        if (!rowsResolved()) {
+            return this.room / (double)Math.max(1.0F,
+                    LostTalesChatOverlayRenderer.LINE_HEIGHT * this.scale);
+        }
+        int count = this.rows.count();
+        return count - this.rows.rowsAt(this.rows.total() - roomUnscaled());
+    }
+
+    /**
+     * The scroll offset, in rows, that stands {@code pixels} of stack
+     * further up than {@code rows} does: what a wheel turn asks for, so
+     * a turn moves the page the same distance whatever rows it passes —
+     * a blank row between two runs is a third of a line, and counted
+     * as a whole row it made the wheel stumble over every group.
+     */
+    double rowsAfterScrolling(double rows, double pixels) {
+        if (!rowsResolved()) {
+            return Math.max(0.0D, rows
+                    + pixels / LostTalesChatOverlayRenderer.LINE_HEIGHT);
+        }
+        return this.rows.rowsAt(this.rows.offsetOf(rows) + pixels);
+    }
+
+    /**
+     * The scroll offset, in rows, that stands {@code share} of the way
+     * from the newest row to the ceiling, measured in pixels of stack:
+     * what a scrollbar drag asks for, so the thumb follows the pointer
+     * whatever the rows under it measure.
+     */
+    double scrollRowsForShare(double share) {
+        double bounded = Math.max(0.0D, Math.min(1.0D, share));
+        if (!rowsResolved()) {
+            return bounded * Math.max(0.0D, contentRows() - roomLines());
+        }
+        double reach = Math.max(0.0D, this.rows.total() - roomUnscaled());
+        return this.rows.rowsAt(bounded * reach);
     }
 
     /**

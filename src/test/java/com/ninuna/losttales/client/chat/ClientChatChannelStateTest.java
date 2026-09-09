@@ -234,6 +234,38 @@ public final class ClientChatChannelStateTest {
     }
 
     /**
+     * Ctrl+1 to Ctrl+8 pick the selected window's tabs by place, Ctrl+9
+     * its last; a number past the row changes nothing, and a window of
+     * one tab answers every number with that tab.
+     */
+    @Test
+    public void aDigitPicksTheSelectedWindowsTabByPlace() {
+        ClientChatChannelState.select(ChatChannel.OOC);
+        assertEquals(ChatChannel.ALL,
+                ClientChatChannelState.selectOrdinal(1).getChannel());
+        assertEquals(ChatChannel.PROXIMITY,
+                ClientChatChannelState.selectOrdinal(2).getChannel());
+        assertEquals(ChatChannel.OOC,
+                ClientChatChannelState.selectOrdinal(3).getChannel());
+        assertEquals(ChatChannel.ALL,
+                ClientChatChannelState.selectOrdinal(1).getChannel());
+        // Past the row: nothing moves. Nine: the last, whatever the row holds.
+        assertEquals(ChatChannel.ALL,
+                ClientChatChannelState.selectOrdinal(4).getChannel());
+        assertEquals(ChatChannel.OOC,
+                ClientChatChannelState.selectOrdinal(9).getChannel());
+        assertEquals(ChatChannel.OOC,
+                ClientChatChannelState.selectOrdinal(0).getChannel());
+        ClientChatChannelState.select(ChatChannel.CONSOLE);
+        assertEquals(ChatChannel.CONSOLE,
+                ClientChatChannelState.selectOrdinal(1).getChannel());
+        assertEquals(ChatChannel.CONSOLE,
+                ClientChatChannelState.selectOrdinal(9).getChannel());
+        assertEquals(ChatChannel.CONSOLE,
+                ClientChatChannelState.selectOrdinal(3).getChannel());
+    }
+
+    /**
      * Ctrl+Tab walks every open tab across windows, both ways, wrapping
      * at the ends; Tab on its own stays inside the selected window.
      */

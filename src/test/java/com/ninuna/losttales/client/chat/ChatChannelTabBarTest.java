@@ -8,11 +8,13 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The row's way of fitting too many tabs: the tab in front is reserved
- * whole, the others' names and controls are capped to one common room,
- * each tab decides for itself which controls its drawn width holds,
- * and the seams are laid down from the exact running total so a row
- * settling into new widths never steps back and forth.
+ * The row's way of fitting too many tabs: every tab is one width, the
+ * default while the row holds them all at it and a narrower one they
+ * all share once it does not; each tab decides for itself which
+ * controls its drawn width holds, the tab in front keeping its cross
+ * at the cost of its icon; and the seams are laid down from the exact
+ * running total so a row settling into new widths never steps back
+ * and forth.
  */
 public final class ChatChannelTabBarTest {
 
@@ -68,29 +70,31 @@ public final class ChatChannelTabBarTest {
         }
     }
 
+    /**
+     * Every tab of a run is one width: the default while the row holds
+     * them all at it, else the widest they can share once the seams
+     * between them are paid; never less than nothing.
+     */
     @Test
-    public void widestLabelsAreCappedToOneWidthThatFits() {
-        int[] widths = {40, 10, 60, 25};
-        ChatChannelTabBar.capLabels(widths, 135);
-        // Everything fits whole: nothing changes.
-        assertArrayEquals(new int[] {40, 10, 60, 25}, widths);
-        widths = new int[] {40, 10, 60, 25};
-        ChatChannelTabBar.capLabels(widths, 100);
-        // 60 and 40 come down to the same cap; 25 + 10 + 2 * cap <= 100.
-        assertArrayEquals(new int[] {32, 10, 32, 25}, widths);
-        widths = new int[] {40, 10, 60, 25};
-        ChatChannelTabBar.capLabels(widths, 40);
-        assertArrayEquals(new int[] {10, 10, 10, 10}, widths);
-    }
-
-    @Test
-    public void noRoomLeavesNoLabelRatherThanAnOverflow() {
-        int[] widths = {40, 10};
-        ChatChannelTabBar.capLabels(widths, 0);
-        assertArrayEquals(new int[] {0, 0}, widths);
-        widths = new int[] {40, 10};
-        ChatChannelTabBar.capLabels(widths, -5);
-        assertArrayEquals(new int[] {0, 0}, widths);
+    public void everyTabIsOneWidth() {
+        int gap = ChatChannelTabBar.TAB_GAP;
+        int fallback = ChatChannelTabBar.DEFAULT_TAB_WIDTH;
+        assertEquals(fallback, ChatChannelTabBar.uniformTabWidth(1000, 3),
+                EPSILON);
+        assertEquals(fallback, ChatChannelTabBar.uniformTabWidth(
+                fallback * 3 + gap * 2, 3), EPSILON);
+        assertEquals(fallback - 1, ChatChannelTabBar.uniformTabWidth(
+                fallback * 3 + gap * 2 - 3, 3), EPSILON);
+        // Fractions of a pixel are kept: a window's edge dragged a third
+        // of a pixel narrows every tab by a ninth of one.
+        assertEquals((200.0D - 2 * gap) / 3,
+                ChatChannelTabBar.uniformTabWidth(200, 3), EPSILON);
+        assertEquals((200.0D - 2 * gap) / 3 - 1.0D / 9.0D,
+                ChatChannelTabBar.uniformTabWidth(200 - 1.0D / 3.0D, 3),
+                EPSILON);
+        assertEquals(0, ChatChannelTabBar.uniformTabWidth(0, 3), EPSILON);
+        assertEquals(0, ChatChannelTabBar.uniformTabWidth(50, 0), EPSILON);
+        assertEquals(0, ChatChannelTabBar.uniformTabWidth(-5, 2), EPSILON);
     }
 
 
@@ -105,14 +109,14 @@ public final class ChatChannelTabBarTest {
         int name = 40;
         // Room for the whole name and both controls: everything shows.
         ChatChannelTabBar.TabControls full =
-                ChatChannelTabBar.controlsFor(name, name + 2 * CONTROL, true, false);
+                ChatChannelTabBar.controlsFor(name, name + 2 * CONTROL, true, false, 0);
         assertTrue(full.cog);
         assertTrue(full.close);
         assertEquals(name, full.labelRoom);
         // One pixel less: the cog goes at once, and the name keeps the
         // whole of what is left beside the cross.
         ChatChannelTabBar.TabControls cut =
-                ChatChannelTabBar.controlsFor(name, name + 2 * CONTROL - 1, true, false);
+                ChatChannelTabBar.controlsFor(name, name + 2 * CONTROL - 1, true, false, 0);
         assertFalse(cut.cog);
         assertTrue(cut.close);
         assertEquals(name + CONTROL - 1, Math.min(name, cut.labelRoom) + CONTROL - 1
@@ -120,25 +124,25 @@ public final class ChatChannelTabBarTest {
         assertEquals(name, cut.labelRoom);
         // The cross stays while at least half the name shows beside it.
         ChatChannelTabBar.TabControls half =
-                ChatChannelTabBar.controlsFor(name, name / 2 + CONTROL, true, false);
+                ChatChannelTabBar.controlsFor(name, name / 2 + CONTROL, true, false, 0);
         assertFalse(half.cog);
         assertTrue(half.close);
         assertEquals(name / 2, half.labelRoom);
         // Less than half: the cross goes too and the name has the room.
         ChatChannelTabBar.TabControls bare =
-                ChatChannelTabBar.controlsFor(name, name / 2 + CONTROL - 1, true, false);
+                ChatChannelTabBar.controlsFor(name, name / 2 + CONTROL - 1, true, false, 0);
         assertFalse(bare.cog);
         assertFalse(bare.close);
         assertEquals(name / 2 + CONTROL - 1, bare.labelRoom);
         // No room at all: an icon alone.
         ChatChannelTabBar.TabControls none =
-                ChatChannelTabBar.controlsFor(name, 0, true, false);
+                ChatChannelTabBar.controlsFor(name, 0, true, false, 0);
         assertFalse(none.cog);
         assertFalse(none.close);
         assertEquals(0, none.labelRoom);
-        assertEquals(0, ChatChannelTabBar.controlsFor(name, -7, true, false).labelRoom);
+        assertEquals(0, ChatChannelTabBar.controlsFor(name, -7, true, false, 0).labelRoom);
         // The name is never given more than it is wide.
-        assertEquals(name, ChatChannelTabBar.controlsFor(name, 500, true, false).labelRoom);
+        assertEquals(name, ChatChannelTabBar.controlsFor(name, 500, true, false, 0).labelRoom);
     }
 
     /** Where no cross is offered, the cog is the only control to give up. */
@@ -146,59 +150,140 @@ public final class ChatChannelTabBarTest {
     public void withoutACrossOnlyTheCogGivesWay() {
         int name = 30;
         ChatChannelTabBar.TabControls full =
-                ChatChannelTabBar.controlsFor(name, name + CONTROL, false, false);
+                ChatChannelTabBar.controlsFor(name, name + CONTROL, false, false, 0);
         assertTrue(full.cog);
         assertFalse(full.close);
         assertEquals(name, full.labelRoom);
         ChatChannelTabBar.TabControls cut =
-                ChatChannelTabBar.controlsFor(name, name + CONTROL - 1, false, false);
+                ChatChannelTabBar.controlsFor(name, name + CONTROL - 1, false, false, 0);
         assertFalse(cut.cog);
         assertFalse(cut.close);
         assertEquals(name, cut.labelRoom);
-        assertEquals(12, ChatChannelTabBar.controlsFor(name, 12, false, false).labelRoom);
+        assertEquals(12, ChatChannelTabBar.controlsFor(name, 12, false, false, 0).labelRoom);
     }
 
-    /** The tab in front keeps both controls; its name gives way before they do. */
+    /**
+     * The tab in front never loses its cross: it gives up its cog like
+     * any tab, and where another tab would give up the cross it keeps
+     * it beside its icon and lets the name shrink between them to
+     * nothing; the icon goes last, only when the room past it can no
+     * longer hold the cross, which then stands alone.
+     */
     @Test
-    public void theTabInFrontKeepsItsControls() {
+    public void theTabInFrontKeepsItsCrossAndGivesUpItsIconLast() {
         int name = 40;
-        ChatChannelTabBar.TabControls settled =
-                ChatChannelTabBar.controlsFor(name, name + 2 * CONTROL, true, true);
-        assertTrue(settled.cog);
-        assertTrue(settled.close);
-        assertEquals(name, settled.labelRoom);
-        // Drawn narrower than it will settle: the controls stand, the
-        // name is cut.
-        ChatChannelTabBar.TabControls narrow =
-                ChatChannelTabBar.controlsFor(name, 2 * CONTROL + 15, true, true);
-        assertTrue(narrow.cog);
+        int icon = 13;
+        ChatChannelTabBar.TabControls full = ChatChannelTabBar.controlsFor(
+                name, name + 2 * CONTROL, true, true, icon);
+        assertTrue(full.cog);
+        assertTrue(full.close);
+        assertTrue(full.icon);
+        assertEquals(name, full.labelRoom);
+        // One pixel less: the cog goes, the cross and the icon stay, as
+        // on any tab.
+        ChatChannelTabBar.TabControls cut = ChatChannelTabBar.controlsFor(
+                name, name + 2 * CONTROL - 1, true, true, icon);
+        assertFalse(cut.cog);
+        assertTrue(cut.close);
+        assertTrue(cut.icon);
+        assertEquals(name, cut.labelRoom);
+        // Less than half the name beside the cross: another tab would
+        // drop the cross; the tab in front keeps both the cross and the
+        // icon, and the name has what stands between them.
+        ChatChannelTabBar.TabControls narrow = ChatChannelTabBar.controlsFor(
+                name, name / 2 + CONTROL - 1, true, true, icon);
+        assertFalse(narrow.cog);
         assertTrue(narrow.close);
-        assertEquals(15, narrow.labelRoom);
-        assertEquals(0, ChatChannelTabBar.controlsFor(name, 5, true, true).labelRoom);
-        ChatChannelTabBar.TabControls unclosable =
-                ChatChannelTabBar.controlsFor(name, name + CONTROL, false, true);
-        assertTrue(unclosable.cog);
+        assertTrue(narrow.icon);
+        assertEquals(name / 2 - 1, narrow.labelRoom);
+        // Exactly the cross's room past the icon: the two stand together
+        // and the name is gone; the cross keeps its place at the right.
+        ChatChannelTabBar.TabControls pair = ChatChannelTabBar.controlsFor(
+                name, CONTROL, true, true, icon);
+        assertTrue(pair.close);
+        assertTrue(pair.icon);
+        assertEquals(0, pair.labelRoom);
+        int tabWidth = ChatChannelTabBar.PADDING_X * 2 + 10;
+        assertEquals(100 + tabWidth - ChatChannelTabBar.PADDING_X
+                - ChatChannelTabBar.CONTROL_SIZE,
+                ChatChannelTabBar.closeLeft(pair, 100, tabWidth));
+        // One pixel less: the icon gives its room to the cross, which
+        // stands alone, centred where a tab behind stands its icon.
+        ChatChannelTabBar.TabControls bare = ChatChannelTabBar.controlsFor(
+                name, CONTROL - 1, true, true, icon);
+        assertTrue(bare.close);
+        assertFalse(bare.icon);
+        assertEquals(0, bare.labelRoom);
+        assertEquals(100 + (tabWidth - ChatChannelTabBar.CONTROL_SIZE) / 2,
+                ChatChannelTabBar.closeLeft(bare, 100, tabWidth));
+        assertEquals(100 + (tabWidth - ChatChannelTabBar.CONTROL_SIZE) / 2.0D,
+                ChatChannelTabBar.closeLeftExact(bare, 100, tabWidth), 0.0D);
+        assertEquals(100 + tabWidth - ChatChannelTabBar.PADDING_X
+                - ChatChannelTabBar.CONTROL_SIZE,
+                ChatChannelTabBar.closeLeftExact(narrow, 100, tabWidth),
+                0.0D);
+        // A tab with no icon has nothing to give up: once its name is
+        // gone its cross stands alone at once.
+        ChatChannelTabBar.TabControls plain = ChatChannelTabBar.controlsFor(
+                name, CONTROL, true, true, 0);
+        assertTrue(plain.close);
+        assertFalse(plain.icon);
+        assertEquals(0, plain.labelRoom);
+        assertEquals(100 + (tabWidth - ChatChannelTabBar.CONTROL_SIZE) / 2,
+                ChatChannelTabBar.closeLeft(plain, 100, tabWidth));
+        // Without a cross to keep, the tab in front gives way like the rest.
+        ChatChannelTabBar.TabControls unclosable = ChatChannelTabBar.controlsFor(
+                name, name + CONTROL - 1, false, true, icon);
+        assertFalse(unclosable.cog);
         assertFalse(unclosable.close);
+        assertTrue(unclosable.icon);
         assertEquals(name, unclosable.labelRoom);
     }
 
     /**
-     * A row is asked for the widest tab whole and every other at its
-     * icon: whichever tab comes to the front must fit with its whole
-     * name and both controls.
+     * The name's exact room follows the stage the whole pixels chose:
+     * what lies past the controls that stand, fractions included, never
+     * more than the name and never below nothing.
      */
     @Test
-    public void aRowIsReservedTheWidestTabWholeAndTheOthersIcons() {
-        int[] natural = { 60, 90, 45 };
-        int[] minimum = { 25, 25, 22 };
-        assertEquals(90 + 25 + 22, ChatChannelTabBar.reservedRowWidth(natural, minimum));
-        assertEquals(60, ChatChannelTabBar.reservedRowWidth(
-                new int[] { 60 }, new int[] { 25 }));
-        assertEquals(0, ChatChannelTabBar.reservedRowWidth(new int[0], new int[0]));
-        // The first of two equally wide tabs is the one reserved; the
-        // answer is the same either way.
-        assertEquals(50 + 20, ChatChannelTabBar.reservedRowWidth(
-                new int[] { 50, 50 }, new int[] { 20, 20 }));
+    public void theNamesExactRoomFollowsTheTabsEdge() {
+        int name = 40;
+        ChatChannelTabBar.TabControls full = ChatChannelTabBar.controlsFor(
+                name, name + 2 * CONTROL, true, false, 0);
+        assertEquals(name, ChatChannelTabBar.labelRoomExact(full, name,
+                name + 2 * CONTROL + 0.4D), 0.0D);
+        // Half a pixel short of the whole name beside both controls: the
+        // stage still shows both, and the name is cut by the half.
+        assertEquals(name - 0.5D, ChatChannelTabBar.labelRoomExact(full, name,
+                name + 2 * CONTROL - 0.5D), 1.0E-9D);
+        ChatChannelTabBar.TabControls cut = ChatChannelTabBar.controlsFor(
+                name, name / 2 + CONTROL, true, false, 0);
+        assertEquals(name / 2 + 0.25D, ChatChannelTabBar.labelRoomExact(cut,
+                name, name / 2 + CONTROL + 0.25D), 1.0E-9D);
+        // A name the stage has already dropped has no room at all, and
+        // a name with no controls beside it has the whole room.
+        ChatChannelTabBar.TabControls bare = ChatChannelTabBar.controlsFor(
+                name, 0, true, true, 13);
+        assertEquals(0.0D, ChatChannelTabBar.labelRoomExact(bare, name, 3.7D),
+                0.0D);
+        ChatChannelTabBar.TabControls behind = ChatChannelTabBar.controlsFor(
+                name, 12, true, false, 0);
+        assertEquals(12.6D, ChatChannelTabBar.labelRoomExact(behind, name,
+                12.6D), 1.0E-9D);
+        assertEquals(name, ChatChannelTabBar.labelRoomExact(behind, name,
+                80.0D), 0.0D);
+    }
+
+    /**
+     * A row is asked for every tab at its narrowest, no tab reserved
+     * more: the tab in front is the width of the rest, whichever it is.
+     */
+    @Test
+    public void aRowIsReservedEveryTabAtItsNarrowest() {
+        assertEquals(25 + 25 + 22,
+                ChatChannelTabBar.reservedRowWidth(new int[] { 25, 25, 22 }));
+        assertEquals(25, ChatChannelTabBar.reservedRowWidth(new int[] { 25 }));
+        assertEquals(0, ChatChannelTabBar.reservedRowWidth(new int[0]));
     }
 
     /**

@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatDeletePacket;
@@ -67,6 +68,19 @@ final class ChatScreenMenus {
     private static final String ENTRY_DETACH = "detach";
     private static final String ENTRY_WINDOW_UNSTICK = "window_unstick";
     private static final String ENTRY_WINDOW_RESET = "window_reset";
+    /** The window menu's colour rows, each opening the palette for one surface. */
+    private static final String ENTRY_WINDOW_COLOR_BACKGROUND =
+            "window_color_background";
+    private static final String ENTRY_WINDOW_COLOR_SELECTED =
+            "window_color_selected";
+    private static final String ENTRY_WINDOW_COLOR_MENTION =
+            "window_color_mention";
+    private static final String ENTRY_WINDOW_COLOR_REPLY =
+            "window_color_reply";
+    /** Marks a palette row; the rest of the id is the palette entry's name. */
+    private static final String ENTRY_COLOR_PREFIX = "color:";
+    /** The palette menu, opened from one of the window menu's colour rows. */
+    static final String POPUP_COLOR = "color";
     /** How often the open {@code +} menu re-reads its rows. */
     private static final long RESTORE_REFRESH_NANOS = 500L * 1000000L;
 
@@ -106,10 +120,17 @@ final class ChatScreenMenus {
     /** The sender's account, when the line still has its packet; else null. */
     private UUID menuMessageSenderId;
     private String menuMessageText = "";
+    /** The line the message menu was opened over. */
+    private int menuChatLineId;
     /** Window a restore popup was opened from. */
     private String restoreWindowId;
     /** Window the open window-settings menu belongs to, or null. */
     private String settingsWindowId;
+    /** Where that menu was opened, so the palette opens in its place. */
+    private int settingsAnchorX;
+    private int settingsAnchorBottom;
+    /** Which surface the open palette menu recolours: a colour row's id. */
+    private String colorRole;
     private long restoreRefreshedNanos;
     /** A command a chosen row asked for, handed to the screen with the click. */
     private String pendingCommand;
@@ -137,6 +158,15 @@ final class ChatScreenMenus {
         return this.popup.isOpen();
     }
 
+    /**
+     * The line the open message menu was opened over, or zero while no
+     * message menu is open.
+     */
+    int messageMenuChatLineId() {
+        return isOpen() && POPUP_MESSAGE.equals(kind())
+                ? this.menuChatLineId : 0;
+    }
+
     String kind() {
         return this.popup.kind();
     }
@@ -158,7 +188,7 @@ final class ChatScreenMenus {
         return this.popup.contains(mouseX, mouseY);
     }
 
-    void scrollBy(int rows) {
+    void scrollBy(double rows) {
         this.popup.scrollBy(rows);
     }
 
@@ -275,14 +305,20 @@ final class ChatScreenMenus {
      * a neighbour, and the size entry puts the window back to the chat's
      * default shape. A locked window never reaches this menu: it offers
      * no cog, so the entries that would be refused are never shown.
+     * Below them, the chat's colours: the history panel, the line under
+     * the pointer and a line that mentions this player, each row wearing
+     * the colour it stands for and opening the palette to change it —
+     * a client preference, so every window shows the choice at once.
      */
     void openWindowPopup(ChatWindow window, int anchorX, int anchorBottom) {
         if (window == null) {
             return;
         }
         this.settingsWindowId = window.getId();
+        this.settingsAnchorX = anchorX;
+        this.settingsAnchorBottom = anchorBottom;
         List<ChatPopupMenu.Entry> entries =
-                new ArrayList<ChatPopupMenu.Entry>(2);
+                new ArrayList<ChatPopupMenu.Entry>(5);
         if (window.isLinked()) {
             entries.add(new ChatPopupMenu.Entry(ENTRY_WINDOW_UNSTICK,
                     StatCollector.translateToLocal(
@@ -291,9 +327,96 @@ final class ChatScreenMenus {
         entries.add(new ChatPopupMenu.Entry(ENTRY_WINDOW_RESET,
                 StatCollector.translateToLocal(
                         "gui.losttales.chat.window.reset_size")));
+        entries.add(colorRow(ENTRY_WINDOW_COLOR_BACKGROUND,
+                "gui.losttales.chat.window.color.background"));
+        entries.add(colorRow(ENTRY_WINDOW_COLOR_SELECTED,
+                "gui.losttales.chat.window.color.selected"));
+        entries.add(colorRow(ENTRY_WINDOW_COLOR_MENTION,
+                "gui.losttales.chat.window.color.mention"));
+        entries.add(colorRow(ENTRY_WINDOW_COLOR_REPLY,
+                "gui.losttales.chat.window.color.reply"));
         this.popup.open(POPUP_WINDOW, null, entries, this.font,
                 anchorX - 4, anchorBottom, this.screenWidth,
                 this.screenHeight);
+    }
+
+    /** One of the window menu's colour rows, chipped in its current colour. */
+    private static ChatPopupMenu.Entry colorRow(String id, String labelKey) {
+        return new ChatPopupMenu.Entry(id,
+                StatCollector.translateToLocal(labelKey), false,
+                LostTalesColors.rgb(LostTalesColors.paletteColor(
+                        currentColorName(id), LostTalesColors.PLUM_BLACK)),
+                null).asChip();
+    }
+
+    /** The palette entry a colour row currently stands for. */
+    private static String currentColorName(String role) {
+        if (ENTRY_WINDOW_COLOR_SELECTED.equals(role)) {
+            return LostTalesConfig.chatSelectedLineColor;
+        }
+        if (ENTRY_WINDOW_COLOR_MENTION.equals(role)) {
+            return LostTalesConfig.chatMentionLineColor;
+        }
+        if (ENTRY_WINDOW_COLOR_REPLY.equals(role)) {
+            return LostTalesConfig.chatReplyHighlightColor;
+        }
+        return LostTalesConfig.chatBackgroundColor;
+    }
+
+    /**
+     * The palette, in the window menu's place: every entry as a chip
+     * beside its name, the one in use named in honey. Choosing one is
+     * the whole change — the option is written to the client file and
+     * every window is drawn in it from the next frame.
+     */
+    private void openColorPopup(String role) {
+        this.colorRole = role;
+        String current = currentColorName(role);
+        String[] names = LostTalesColors.paletteNames();
+        List<ChatPopupMenu.Entry> entries =
+                new ArrayList<ChatPopupMenu.Entry>(names.length);
+        for (int index = 0; index < names.length; index++) {
+            ChatPopupMenu.Entry entry = new ChatPopupMenu.Entry(
+                    ENTRY_COLOR_PREFIX + names[index], paletteLabel(names[index]),
+                    false, LostTalesColors.rgb(LostTalesColors.paletteColor(
+                            names[index], LostTalesColors.PLUM_BLACK)),
+                    null).asChip();
+            if (names[index].equalsIgnoreCase(current)) {
+                entry.withLabelColor(LostTalesColors.rgb(LostTalesColors.HONEY));
+            }
+            entries.add(entry);
+        }
+        this.popup.open(POPUP_COLOR, null, entries, this.font,
+                this.settingsAnchorX - 4, this.settingsAnchorBottom,
+                this.screenWidth, this.screenHeight);
+    }
+
+    /** A palette entry's name as the language file gives it. */
+    private static String paletteLabel(String name) {
+        String key = "losttales.palette." + name.toLowerCase(Locale.ROOT);
+        String label = StatCollector.translateToLocal(key);
+        return key.equals(label) ? name : label;
+    }
+
+    /** One row of the palette: the chosen colour becomes the surface's. */
+    private void handleColorEntry(ChatPopupMenu.Entry entry) {
+        if (entry == null || !entry.id.startsWith(ENTRY_COLOR_PREFIX)) {
+            return;
+        }
+        String name = entry.id.substring(ENTRY_COLOR_PREFIX.length());
+        if (!LostTalesColors.isPaletteName(name)) {
+            return;
+        }
+        if (ENTRY_WINDOW_COLOR_SELECTED.equals(this.colorRole)) {
+            LostTalesConfig.chatSelectedLineColor = name;
+        } else if (ENTRY_WINDOW_COLOR_MENTION.equals(this.colorRole)) {
+            LostTalesConfig.chatMentionLineColor = name;
+        } else if (ENTRY_WINDOW_COLOR_REPLY.equals(this.colorRole)) {
+            LostTalesConfig.chatReplyHighlightColor = name;
+        } else {
+            LostTalesConfig.chatBackgroundColor = name;
+        }
+        LostTalesConfig.save();
     }
 
     /**
@@ -649,6 +772,7 @@ final class ChatScreenMenus {
                 || band.lines.get(band.viewIndex) == null
                 ? 0 : band.lines.get(band.viewIndex).getChatLineID();
         this.menuMessageText = text;
+        this.menuChatLineId = chatLineId;
         this.menuMessageId = band == null ? ChatMessageIds.NONE
                 : ClientChatMessageIds.messageIdOf(chatLineId);
         // Who the message is resolved from the packet it was built of,
@@ -676,9 +800,8 @@ final class ChatScreenMenus {
         }
         List<ChatPopupMenu.Entry> entries =
                 new ArrayList<ChatPopupMenu.Entry>();
-        // Only a message the server named can be replied to: a console
-        // notice, an adopted stray and this client's own NPC lines are
-        // nobody's to answer.
+        // Any line in a tab that takes messages can be answered: one
+        // the server named by its id, any other by its words.
         if (LostTalesChatPresentation.isRepliable(chatLineId)) {
             entries.add(new ChatPopupMenu.Entry(ENTRY_REPLY,
                     StatCollector.translateToLocal(
@@ -896,14 +1019,20 @@ final class ChatScreenMenus {
     /** Answers the message the menu was opened over, in its own tab. */
     private void startReply() {
         ChatTab tab = this.popup.channel();
-        if (!ChatMessageIds.isServerId(this.menuMessageId) || tab == null) {
+        if (tab == null) {
             return;
         }
-        long id = this.menuMessageId;
+        // A line the server named is answered by its id; any other — a
+        // client-local one included — by its words alone.
+        long id = ChatMessageIds.isServerId(this.menuMessageId)
+                ? this.menuMessageId : ChatMessageIds.NONE;
         // The chip and the local quote name the identity the line was
         // signed with, exactly as the server's own quote will.
         String name = this.menuMessageIdentity.length() > 0
                 ? this.menuMessageIdentity : this.menuMessageAccount;
+        if (id == ChatMessageIds.NONE) {
+            name = LostTalesChatPresentation.quoteAuthorFor(name);
+        }
         // The menu resolved the message when it opened, which is also
         // the quote an NPC's conversation has to build for itself.
         String excerpt = this.menuMessageText;
@@ -1123,18 +1252,31 @@ final class ChatScreenMenus {
                 openFromRestoreMenu(entry);
             }
         } else if (POPUP_WINDOW.equals(this.popup.kind())) {
-            handleWindowEntry(entry);
+            return handleWindowEntry(entry);
+        } else if (POPUP_COLOR.equals(this.popup.kind())) {
+            handleColorEntry(entry);
         } else if (POPUP_RESTORE.equals(this.popup.kind())) {
             openFromRestoreMenu(entry);
         }
         return false;
     }
 
-    /** One row of the window's own menu. */
-    private void handleWindowEntry(ChatPopupMenu.Entry entry) {
+    /**
+     * One row of the window's own menu, answering whether the menu
+     * stays open: a colour row swaps the menu for the palette in its
+     * place, the rest are done with it.
+     */
+    private boolean handleWindowEntry(ChatPopupMenu.Entry entry) {
         ChatWindow window = ChatWindowLayout.window(this.settingsWindowId);
         if (window == null) {
-            return;
+            return false;
+        }
+        if (ENTRY_WINDOW_COLOR_BACKGROUND.equals(entry.id)
+                || ENTRY_WINDOW_COLOR_SELECTED.equals(entry.id)
+                || ENTRY_WINDOW_COLOR_MENTION.equals(entry.id)
+                || ENTRY_WINDOW_COLOR_REPLY.equals(entry.id)) {
+            openColorPopup(entry.id);
+            return true;
         }
         if (ENTRY_WINDOW_UNSTICK.equals(entry.id)) {
             ChatWindowLayout.unlink(window.getId());
@@ -1150,6 +1292,7 @@ final class ChatScreenMenus {
                     ChatChannelTabBar.chatWidthForWholeRow(this.mc, window),
                     true);
         }
+        return false;
     }
 
     /**

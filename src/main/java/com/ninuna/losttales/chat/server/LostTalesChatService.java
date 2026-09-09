@@ -7,6 +7,7 @@ import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatEpithet;
+import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageOrigin;
 import com.ninuna.losttales.chat.ChatMessageValidator;
@@ -113,7 +114,8 @@ public final class LostTalesChatService {
                 request.getAppearanceKind(),
                 request.getAppearanceCharacterId(),
                 request.getReplyToMessageId(), request.getTargetIdentity(),
-                request.getEchoNonce(), request.getTargetCharacterId());
+                request.getEchoNonce(), request.getTargetCharacterId(),
+                request.getQuoteAuthor(), request.getQuoteExcerpt());
     }
 
     private static void send(EntityPlayerMP sender,
@@ -122,7 +124,8 @@ public final class LostTalesChatService {
                              String target, int appearanceKind,
                              UUID appearanceCharacterId,
                              long replyToMessageId, String requestedIdentity,
-                             long echoNonce, UUID targetCharacterId) {
+                             long echoNonce, UUID targetCharacterId,
+                             String quoteAuthor, String quoteExcerpt) {
         String targetIdentity = requestedIdentity == null ? "" : requestedIdentity;
         if (sender == null || sender.worldObj == null
                 || sender.worldObj.isRemote || channel == null
@@ -265,13 +268,25 @@ public final class LostTalesChatService {
         // everyone online.
         String replyScope = ChatChannelPolicy.scopeValueOf(
                 channel, party, factionId);
-        ChatReplyReference reply = ChatMessageIds.NONE == replyToMessageId
-                ? ChatReplyReference.NONE
-                : ChatHistory.quoteFor(replyToMessageId,
-                        sender.getUniqueID(), channel, replyScope);
-        if (replyToMessageId != ChatMessageIds.NONE && !reply.exists()) {
-            sender.addChatMessage(new ChatComponentTranslation(
-                    "chat.losttales.reply.unavailable"));
+        ChatReplyReference reply;
+        if (replyToMessageId != ChatMessageIds.NONE) {
+            reply = ChatHistory.quoteFor(replyToMessageId,
+                    sender.getUniqueID(), channel, replyScope);
+            if (!reply.exists()) {
+                sender.addChatMessage(new ChatComponentTranslation(
+                        "chat.losttales.reply.unavailable"));
+            }
+        } else {
+            // A quote of a line nobody named: an announcement, a death
+            // message, a console notice, a command's echo. No record
+            // here can resolve it, so the words travel as the sender
+            // saw them — bounded by the packet, stripped of formatting
+            // codes like every other text off the wire, and never a
+            // quote at all without an author.
+            reply = ChatReplyReference.unanchored(
+                    ChatFormattingCodes.stripSectionCodes(quoteAuthor),
+                    ChatFormattingCodes.stripSectionCodes(quoteExcerpt),
+                    ChatReplyReference.NO_COLOR);
         }
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
                 channel, sender.getUniqueID(), identityName,

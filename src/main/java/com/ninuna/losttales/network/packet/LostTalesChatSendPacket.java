@@ -2,6 +2,7 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.chat.share.ChatShareKind;
@@ -90,6 +91,16 @@ public final class LostTalesChatSendPacket implements IMessage {
      * the message it names.
      */
     private long replyToMessageId = ChatMessageIds.NONE;
+    /**
+     * The quote of a line nobody named — an announcement, a death
+     * message, a console notice, a command's echo — that this message
+     * answers: its author and its words, as this client saw them, since
+     * no server ever distributed the line and none can resolve it. Only
+     * with no message id; empty otherwise. The server bounds and strips
+     * both like any other text off the wire.
+     */
+    private String quoteAuthor = "";
+    private String quoteExcerpt = "";
     private boolean malformed;
 
     public LostTalesChatSendPacket() {}
@@ -154,6 +165,21 @@ public final class LostTalesChatSendPacket implements IMessage {
                                    long replyToMessageId,
                                    String targetIdentity, long echoNonce,
                                    UUID targetCharacterId) {
+        this(channel, message, references, target, appearanceKind,
+                appearanceCharacterId, replyToMessageId, targetIdentity,
+                echoNonce, targetCharacterId, "", "");
+    }
+
+    public LostTalesChatSendPacket(ChatChannel channel, String message,
+                                   List<ChatShareReference> references,
+                                   String target, int appearanceKind,
+                                   UUID appearanceCharacterId,
+                                   long replyToMessageId,
+                                   String targetIdentity, long echoNonce,
+                                   UUID targetCharacterId,
+                                   String quoteAuthor, String quoteExcerpt) {
+        this.quoteAuthor = quoteAuthor == null ? "" : quoteAuthor.trim();
+        this.quoteExcerpt = quoteExcerpt == null ? "" : quoteExcerpt.trim();
         this.targetCharacterId = targetCharacterId;
         this.echoNonce = echoNonce;
         this.targetIdentity = targetIdentity == null ? ""
@@ -221,16 +247,32 @@ public final class LostTalesChatSendPacket implements IMessage {
             // a fixed tail so a payload cut short inside it stays
             // malformed rather than reading as an older layout.
             this.targetCharacterId = null;
+            boolean targetTail = false;
             if (buffer.readableBytes() >= TARGET_ID_TAIL_BYTES) {
                 boolean present = buffer.readBoolean();
                 long most = buffer.readLong();
                 long least = buffer.readLong();
                 this.targetCharacterId = present ? new UUID(most, least) : null;
+                targetTail = true;
+            }
+            // Appended after that: the quote of a line nobody named,
+            // author then words, written only when there is one. It can
+            // only follow a whole target tail, so a payload cut short
+            // inside that tail is never read as a quote.
+            this.quoteAuthor = "";
+            this.quoteExcerpt = "";
+            if (targetTail && buffer.readableBytes() >= 1) {
+                this.quoteAuthor = LostTalesPacketCodec.readUtf8String(
+                        buffer, ChatReplyReference.MAX_AUTHOR_BYTES).trim();
+                this.quoteExcerpt = LostTalesPacketCodec.readUtf8String(
+                        buffer, ChatReplyReference.MAX_EXCERPT_BYTES).trim();
             }
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
             this.malformed = true;
+            this.quoteAuthor = "";
+            this.quoteExcerpt = "";
             this.targetCharacterId = null;
             this.target = "";
             this.references = Collections.emptyList();
@@ -279,11 +321,29 @@ public final class LostTalesChatSendPacket implements IMessage {
                 : this.targetCharacterId.getMostSignificantBits());
         buffer.writeLong(this.targetCharacterId == null ? 0L
                 : this.targetCharacterId.getLeastSignificantBits());
+        if (this.quoteAuthor.length() > 0) {
+            LostTalesPacketCodec.writeUtf8String(buffer, this.quoteAuthor,
+                    ChatReplyReference.MAX_AUTHOR_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer, this.quoteExcerpt,
+                    ChatReplyReference.MAX_EXCERPT_BYTES);
+        }
     }
 
     private void validate() {
         if (this.replyToMessageId != ChatMessageIds.NONE
                 && !ChatMessageIds.isServerId(this.replyToMessageId)
+                // A quote of an unnamed line and a message id are two
+                // answers to one question.
+                || (this.replyToMessageId != ChatMessageIds.NONE
+                        && (this.quoteAuthor.length() > 0
+                                || this.quoteExcerpt.length() > 0))
+                || (this.quoteAuthor.length() == 0
+                        && this.quoteExcerpt.length() > 0)
+                || !LostTalesPacketCodec.isUtf8WithinLimit(
+                        this.quoteAuthor, ChatReplyReference.MAX_AUTHOR_BYTES)
+                || !LostTalesPacketCodec.isUtf8WithinLimit(
+                        this.quoteExcerpt,
+                        ChatReplyReference.MAX_EXCERPT_BYTES)
                 || this.appearanceKind < APPEARANCE_DEFAULT
                 || this.appearanceKind > APPEARANCE_CHARACTER
                 || (this.appearanceKind == APPEARANCE_CHARACTER
@@ -337,6 +397,10 @@ public final class LostTalesChatSendPacket implements IMessage {
     public long getReplyToMessageId() {
         return this.replyToMessageId;
     }
+    /** Who signed the unnamed line this one quotes; empty for none. */
+    public String getQuoteAuthor() { return this.quoteAuthor; }
+    /** What the unnamed line this one quotes said; empty for none. */
+    public String getQuoteExcerpt() { return this.quoteExcerpt; }
     public boolean isMalformed() { return this.malformed; }
 
     public static final class Handler implements IMessageHandler<

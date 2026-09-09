@@ -15,6 +15,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiNewChat;
+import net.minecraft.event.ClickEvent;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.IChatComponent;
 
@@ -85,9 +86,85 @@ final class ChatWindowLines {
         return CHAT_LINES != null;
     }
 
+    /**
+     * What a day's dated rule is known by: its label rides the click
+     * event of an empty component, so the row draws no glyph, measures
+     * nothing, answers no click, and is still told apart from a
+     * message's row by every walk over the list.
+     */
+    private static final String DATE_DIVIDER_PREFIX = "losttales-chat-day:";
+
     /** Whether the row is a blank between two runs rather than a message's. */
     static boolean isSpacer(ChatLine line) {
         return line != null && line.func_151461_a() == SPACER;
+    }
+
+    /**
+     * A row standing over a day's first message: a dated rule, drawn
+     * like the unread divider, with the day written on it. Not a
+     * message's row and never a blank one.
+     */
+    static IChatComponent dateDivider(String label) {
+        ChatComponentText marker = new ChatComponentText("");
+        marker.setChatStyle(marker.getChatStyle().setChatClickEvent(
+                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
+                        DATE_DIVIDER_PREFIX + (label == null ? "" : label))));
+        return marker;
+    }
+
+    /** The day written on the row's rule, or null when the row is not one. */
+    static String dateDividerLabel(ChatLine line) {
+        IChatComponent component = line == null ? null : line.func_151461_a();
+        if (component == null || component == SPACER
+                || component.getChatStyle() == null) {
+            return null;
+        }
+        ClickEvent event = component.getChatStyle().getChatClickEvent();
+        String value = event == null ? null : event.getValue();
+        if (event == null || event.getAction() != ClickEvent.Action.SUGGEST_COMMAND
+                || value == null || !value.startsWith(DATE_DIVIDER_PREFIX)) {
+            return null;
+        }
+        return value.substring(DATE_DIVIDER_PREFIX.length());
+    }
+
+    static boolean isDateDivider(ChatLine line) {
+        return dateDividerLabel(line) != null;
+    }
+
+    /**
+     * Whether the row stands for no message: a blank between two runs
+     * or a day's rule. What the pointer, the clipboard and a scroll
+     * hold pass over.
+     */
+    static boolean isFiller(ChatLine line) {
+        return isSpacer(line) || isDateDivider(line);
+    }
+
+    /**
+     * Where a view stands a day's rule: above the message at each index
+     * (newest first) that is the first said on its day — the oldest
+     * message with a known time included, so the history opens under a
+     * date — written as that day's label, else null. A line nobody
+     * stamped opens no day and closes none: the days run on over it.
+     */
+    static String[] dayDividersAfter(int[] lineIdsNewestFirst) {
+        int count = lineIdsNewestFirst == null ? 0 : lineIdsNewestFirst.length;
+        String[] labels = new String[count];
+        long olderDay = Long.MIN_VALUE;
+        for (int index = count - 1; index >= 0; index--) {
+            Long time = ClientChatChannelViews.timeOf(lineIdsNewestFirst[index]);
+            if (time == null) {
+                continue;
+            }
+            long day = ChatTimestampFormatter.dayKey(time.longValue());
+            if (day != olderDay) {
+                labels[index] = ChatTimestampFormatter.formatDay(
+                        time.longValue());
+            }
+            olderDay = day;
+        }
+        return labels;
     }
 
     /**
@@ -117,12 +194,12 @@ final class ChatWindowLines {
         for (int distance = 0; distance < lines.size(); distance++) {
             int before = start - distance;
             if (before >= 0 && lines.get(before) != null
-                    && !isSpacer(lines.get(before))) {
+                    && !isFiller(lines.get(before))) {
                 return before;
             }
             int after = start + distance;
             if (after < lines.size() && lines.get(after) != null
-                    && !isSpacer(lines.get(after))) {
+                    && !isFiller(lines.get(after))) {
                 return after;
             }
         }
@@ -476,6 +553,10 @@ final class ChatWindowLines {
                     ? ChatGroupRuns.continuationsInFeed(lineIds)
                     : ChatGroupRuns.continuationsOf(lineIds);
             boolean[] spacers = spacersAfter(lineIds, grouped);
+            // A window stands a dated rule over each day's first
+            // message; the feed, which shows the last few seconds, does
+            // not.
+            String[] days = this.fading ? null : dayDividersAfter(lineIds);
             Map<ChatLine, Piece> kept = new IdentityHashMap<ChatLine, Piece>(
                     this.wrapped.size() + 1);
             // A fading view fades a run as one, so every line of a run
@@ -507,6 +588,14 @@ final class ChatWindowLines {
             for (int index = 0; index < pieces.size(); index++) {
                 Piece piece = pieces.get(index);
                 result.addAll(piece.lines);
+                // A day's rule stands directly over its first message,
+                // on that message's clock, and marks the gap above it by
+                // itself: no blank row is laid beside it.
+                if (days != null && days[index] != null) {
+                    result.add(new ChatLine(piece.updatedCounter,
+                            dateDivider(days[index]), 0));
+                    continue;
+                }
                 // The blank row between this run and the older one
                 // above it stands only while both have something on
                 // screen: a neighbour that draws no glyph leaves no gap

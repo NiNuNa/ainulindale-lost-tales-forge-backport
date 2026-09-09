@@ -513,10 +513,24 @@ public final class LostTalesChatMessagePacket implements IMessage {
             // Appended after that: the colour the quoted author's name
             // was drawn in. A payload written before it says nothing, and
             // the quote is drawn quietly, which is what it did then.
-            if (this.reply.exists() && buffer.readableBytes() >= 4) {
+            if (this.reply.isAnchored() && buffer.readableBytes() >= 4) {
                 this.reply = ChatReplyReference.of(
                         this.reply.getMessageId(), this.reply.getAuthor(),
                         this.reply.getExcerpt(), buffer.readInt());
+            }
+            // Appended last: a quote of a line nobody named, which has
+            // no id and travels as its author, its words and the
+            // author's colour. Written only when there is one, so a
+            // line that quotes nothing ends where it always did.
+            if (replyTo == ChatMessageIds.NONE
+                    && buffer.readableBytes() >= 1) {
+                String quoteAuthor = LostTalesPacketCodec.readUtf8String(
+                        buffer, ChatReplyReference.MAX_AUTHOR_BYTES);
+                String quoteExcerpt = LostTalesPacketCodec.readUtf8String(
+                        buffer, ChatReplyReference.MAX_EXCERPT_BYTES);
+                int quoteColor = buffer.readInt();
+                this.reply = ChatReplyReference.unanchored(quoteAuthor,
+                        quoteExcerpt, quoteColor);
             }
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
@@ -622,7 +636,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(buffer, this.partnerIdentity,
                 MAX_IDENTITY_BYTES);
         buffer.writeLong(this.echoNonce);
-        if (this.reply.exists()) {
+        if (this.reply.isAnchored()) {
             LostTalesPacketCodec.writeUtf8String(buffer,
                     this.reply.getAuthor(),
                     ChatReplyReference.MAX_AUTHOR_BYTES);
@@ -636,7 +650,17 @@ public final class LostTalesChatMessagePacket implements IMessage {
         writeOptionalUuid(buffer, this.partnerCharacterId);
         LostTalesPacketCodec.writeUtf8String(buffer, this.scopeValue,
                 MAX_SCOPE_VALUE_BYTES);
-        if (this.reply.exists()) {
+        if (this.reply.isAnchored()) {
+            buffer.writeInt(this.reply.getAuthorColor());
+        } else if (this.reply.exists()) {
+            // A quote of a line nobody named: author, words and colour,
+            // and only when there is one.
+            LostTalesPacketCodec.writeUtf8String(buffer,
+                    this.reply.getAuthor(),
+                    ChatReplyReference.MAX_AUTHOR_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer,
+                    this.reply.getExcerpt(),
+                    ChatReplyReference.MAX_EXCERPT_BYTES);
             buffer.writeInt(this.reply.getAuthorColor());
         }
     }

@@ -82,6 +82,25 @@ public final class ChatReplyReference {
                 authorColor);
     }
 
+    /**
+     * A quote of a line no server named — an announcement, a death
+     * message, a console notice, a command's echo, an NPC's speech —
+     * which travels as its author and its words alone, with no id to
+     * jump to or to match a later edit against. The author is whoever
+     * the line was signed by, or the chat's own word for a line nobody
+     * signed. A nameless one is {@link #NONE}.
+     */
+    public static ChatReplyReference unanchored(String author,
+                                                String message,
+                                                int authorColor) {
+        String name = author == null ? "" : author.trim();
+        if (name.length() == 0) {
+            return NONE;
+        }
+        return new ChatReplyReference(ChatMessageIds.NONE, name,
+                excerptOf(message), authorColor);
+    }
+
     /** The message as one glanceable line, cut with a trailing mark. */
     public static String excerptOf(String message) {
         String text = message == null ? "" : message.trim();
@@ -101,6 +120,15 @@ public final class ChatReplyReference {
 
     /** Whether the line replies to anything at all. */
     public boolean exists() {
+        return this.author.length() > 0;
+    }
+
+    /**
+     * Whether the quote names a message by id — one a click can jump
+     * to and an edit can be matched against — rather than quoting a
+     * line nobody named.
+     */
+    public boolean isAnchored() {
         return this.messageId != ChatMessageIds.NONE;
     }
 

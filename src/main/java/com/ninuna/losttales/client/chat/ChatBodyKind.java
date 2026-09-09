@@ -14,11 +14,13 @@ enum ChatBodyKind {
      */
     MESSAGE(""),
     /**
-     * A command the player sent: the body opens behind the words that
-     * say so and is the command exactly as typed, since a command is
-     * not prose and nothing in it is a mention, an emoji or a share.
+     * A command the player sent: the body opens behind nothing — its
+     * own slash stands where the chevron stands, in the sender's colour
+     * and with the chevron's gap after it, and the rest of the command
+     * as typed follows in the chat's white; a command is not prose and
+     * nothing in it is a mention, an emoji or a share.
      */
-    COMMAND("chat.losttales.command.used");
+    COMMAND("");
 
     private final String labelKey;
 
@@ -37,5 +39,14 @@ enum ChatBodyKind {
     /** Whether the body is read for markup, emoji, links and mentions. */
     boolean parsesBody() {
         return this == MESSAGE;
+    }
+
+    /**
+     * Whether the body opens behind nothing at all rather than the
+     * chevron or a label: its own first run is the opener, and is
+     * copied with the rest of it.
+     */
+    boolean opensBare() {
+        return this == COMMAND;
     }
 }

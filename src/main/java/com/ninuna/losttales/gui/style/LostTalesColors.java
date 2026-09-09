@@ -1,5 +1,9 @@
 package com.ninuna.losttales.gui.style;
 
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+
 /**
  * Single shared Lost Tales colour system.
  *
@@ -82,7 +86,55 @@ public class LostTalesColors {
     public static final int BORDER_DIM = withAlpha(MAUVE, 0x44);
     public static final int BLACK_SHADOW = withAlpha(PLUM_BLACK, SHADOW_ALPHA);
 
+    // ---- The palette by name, for options a player picks a colour for ----
+    private static final String[] PALETTE_NAMES = {
+            "SEAFOAM", "TEAL", "STEEL_BLUE", "SLATE_BLUE", "INDIGO",
+            "DUSK_VIOLET", "PLUM_BLACK", "PLUM_DARK", "PLUM_GRAY", "MAUVE",
+            "ROSE_GRAY", "ROSE_BEIGE", "SAND", "IVORY", "MEADOW_GREEN",
+            "FERN_GREEN", "SEA_GREEN", "HARBOR_BLUE", "PARCHMENT", "TAN",
+            "CLAY", "RUST", "MAROON", "SALMON", "ORCHID", "MULBERRY",
+            "DARK_MULBERRY", "WINE", "CRIMSON", "CORAL", "APRICOT", "HONEY"};
+    private static final int[] PALETTE_VALUES = {
+            SEAFOAM, TEAL, STEEL_BLUE, SLATE_BLUE, INDIGO,
+            DUSK_VIOLET, PLUM_BLACK, PLUM_DARK, PLUM_GRAY, MAUVE,
+            ROSE_GRAY, ROSE_BEIGE, SAND, IVORY, MEADOW_GREEN,
+            FERN_GREEN, SEA_GREEN, HARBOR_BLUE, PARCHMENT, TAN,
+            CLAY, RUST, MAROON, SALMON, ORCHID, MULBERRY,
+            DARK_MULBERRY, WINE, CRIMSON, CORAL, APRICOT, HONEY};
+    private static final Map<String, Integer> PALETTE_BY_NAME = paletteByName();
+
+    private static Map<String, Integer> paletteByName() {
+        Map<String, Integer> byName = new HashMap<String, Integer>();
+        for (int index = 0; index < PALETTE_NAMES.length; index++) {
+            byName.put(PALETTE_NAMES[index], Integer.valueOf(PALETTE_VALUES[index]));
+        }
+        return byName;
+    }
+
     protected LostTalesColors() {}
+
+    /** Every palette entry's name, in sheet order; what a colour option offers. */
+    public static String[] paletteNames() {
+        return PALETTE_NAMES.clone();
+    }
+
+    /** Whether the name is a palette entry's; case and surrounding space do not count. */
+    public static boolean isPaletteName(String name) {
+        return name != null && PALETTE_BY_NAME.containsKey(name.trim().toUpperCase(Locale.ROOT));
+    }
+
+    /**
+     * The opaque palette colour of that name, or {@code fallback} when
+     * the name is not one of the palette's. Colour options are kept as
+     * names so a palette change restyles every saved choice with it.
+     */
+    public static int paletteColor(String name, int fallback) {
+        if (name == null) {
+            return fallback;
+        }
+        Integer value = PALETTE_BY_NAME.get(name.trim().toUpperCase(Locale.ROOT));
+        return value == null ? fallback : value.intValue();
+    }
 
     /** Strips the alpha byte so a renderer can supply its own opacity. */
     public static int rgb(int argb) {

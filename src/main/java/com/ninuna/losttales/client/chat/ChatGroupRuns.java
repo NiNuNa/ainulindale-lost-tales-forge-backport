@@ -192,6 +192,26 @@ final class ChatGroupRuns {
                 && next.timestampMillis >= previous.timestampMillis;
     }
 
+    /**
+     * Whether two printed messages are the same voice — the same sender
+     * as the same identity in the same tab — whenever they were said.
+     * Two lines with no identity, system lines both, count as one
+     * voice; a system line beside a player's message does not. What
+     * the timestamp column reads to stamp each speaker's turn once
+     * rather than each minute once.
+     */
+    static synchronized boolean sameVoice(int chatLineId, int otherChatLineId) {
+        Entry entry = of(chatLineId);
+        Entry other = of(otherChatLineId);
+        if (entry == null || other == null) {
+            return entry == other;
+        }
+        return entry.tab.equals(other.tab)
+                && entry.senderId.equals(other.senderId)
+                && entry.accountLine == other.accountLine
+                && entry.identityName.equalsIgnoreCase(other.identityName);
+    }
+
     static synchronized void clear() {
         ENTRIES.clear();
     }

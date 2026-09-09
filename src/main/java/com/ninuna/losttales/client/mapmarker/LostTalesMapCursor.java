@@ -222,13 +222,17 @@ public final class LostTalesMapCursor {
     }
 
     /**
-     * Raw coordinates are clamped to the window in LWJGL 2, so coordinates
-     * alone cannot distinguish its last pixel from a pointer on the desktop.
+     * Whether the pointer is over the game's client area, focused or
+     * not: a window the player has clicked away from still shows the
+     * GUI's own pointer the moment the mouse comes back over it, before
+     * any click brings the window forward, the way the game's own
+     * screens behave. Raw coordinates are clamped to the window in
+     * LWJGL 2, so coordinates alone cannot distinguish its last pixel
+     * from a pointer on the desktop.
      */
     private static boolean isInsideActiveClient() {
         return Display.isCreated() && Mouse.isCreated()
-                && Display.isActive() && !Mouse.isGrabbed()
-                && Mouse.isInsideWindow();
+                && !Mouse.isGrabbed() && Mouse.isInsideWindow();
     }
 
     static boolean isHeld() {

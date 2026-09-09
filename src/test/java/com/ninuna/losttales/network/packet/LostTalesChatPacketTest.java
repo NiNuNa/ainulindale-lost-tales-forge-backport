@@ -599,6 +599,78 @@ public final class LostTalesChatPacketTest {
         assertTrue(quoted.readableBytes() > size);
     }
 
+    /**
+     * A line nobody named is quoted by its author and words: the quote
+     * crosses both wires whole, names no message, and a request may not
+     * carry both a quote and an id, nor words without an author.
+     */
+    @Test
+    public void anUnnamedLineIsQuotedByItsWordsOverTheWire() {
+        LostTalesChatSendPacket request = new LostTalesChatSendPacket(
+                ChatChannel.ALL, "well done", null, "",
+                LostTalesChatSendPacket.APPEARANCE_DEFAULT, null,
+                ChatMessageIds.NONE, "", 0L, null, "System",
+                "Bilbo has just earned the achievement [Taking Inventory]");
+        ByteBuf buffer = Unpooled.buffer();
+        request.toBytes(buffer);
+        LostTalesChatSendPacket decodedRequest = new LostTalesChatSendPacket();
+        decodedRequest.fromBytes(buffer);
+        assertFalse(decodedRequest.isMalformed());
+        assertEquals(ChatMessageIds.NONE, decodedRequest.getReplyToMessageId());
+        assertEquals("System", decodedRequest.getQuoteAuthor());
+        assertEquals("Bilbo has just earned the achievement [Taking Inventory]",
+                decodedRequest.getQuoteExcerpt());
+        // A request without a quote reads back without one.
+        ByteBuf plain = Unpooled.buffer();
+        new LostTalesChatSendPacket(ChatChannel.ALL, "hello").toBytes(plain);
+        LostTalesChatSendPacket decodedPlain = new LostTalesChatSendPacket();
+        decodedPlain.fromBytes(plain);
+        assertFalse(decodedPlain.isMalformed());
+        assertEquals("", decodedPlain.getQuoteAuthor());
+        assertEquals("", decodedPlain.getQuoteExcerpt());
+        try {
+            new LostTalesChatSendPacket(ChatChannel.ALL, "hello", null, "",
+                    LostTalesChatSendPacket.APPEARANCE_DEFAULT, null,
+                    ChatMessageIdAllocator.next(), "", 0L, null, "System",
+                    "x");
+            fail("a quote and an id were both accepted");
+        } catch (IllegalArgumentException expected) {
+            assertNotNull(expected);
+        }
+        try {
+            new LostTalesChatSendPacket(ChatChannel.ALL, "hello", null, "",
+                    LostTalesChatSendPacket.APPEARANCE_DEFAULT, null,
+                    ChatMessageIds.NONE, "", 0L, null, "", "x");
+            fail("words without an author were accepted");
+        } catch (IllegalArgumentException expected) {
+            assertNotNull(expected);
+        }
+
+        ChatReplyReference reply = ChatReplyReference.unanchored("System",
+                "Bilbo has just earned the achievement [Taking Inventory]",
+                0x4A90D9);
+        assertTrue(reply.exists());
+        assertFalse(reply.isAnchored());
+        assertEquals(ChatReplyReference.NONE,
+                ChatReplyReference.unanchored("  ", "x", 0));
+        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
+                ChatChannel.ALL, UUID.randomUUID(), "Beren", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "well done", 1L, "", null, "", "", 0,
+                false, ChatMessageIdAllocator.next(), reply);
+        ByteBuf line = Unpooled.buffer();
+        packet.toBytes(line);
+        LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
+        decoded.fromBytes(line);
+        assertFalse(decoded.isMalformed());
+        assertTrue(decoded.getReply().exists());
+        assertFalse(decoded.getReply().isAnchored());
+        assertEquals(ChatMessageIds.NONE, decoded.getReply().getMessageId());
+        assertEquals("System", decoded.getReply().getAuthor());
+        assertEquals("Bilbo has just earned the achievement [Taking Inventory]",
+                decoded.getReply().getExcerpt());
+        assertEquals(0x4A90D9, decoded.getReply().getAuthorColor());
+    }
+
     /** A request may only name an id a server could have handed out. */
     @Test
     public void aRequestCannotNameALocalId() {

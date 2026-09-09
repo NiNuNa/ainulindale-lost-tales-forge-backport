@@ -144,7 +144,7 @@ final class LostTalesChatClipboard {
 
     private static boolean sameMessage(ChatLine line, int chatLineId,
                                        int updateCounter) {
-        return line != null && !ChatWindowLines.isSpacer(line)
+        return line != null && !ChatWindowLines.isFiller(line)
                 && (chatLineId != 0
                         ? line.getChatLineID() == chatLineId
                         : line.getUpdatedCounter() == updateCounter);
