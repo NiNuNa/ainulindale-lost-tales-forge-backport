@@ -1,5 +1,7 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
+import com.ninuna.losttales.client.camera.CameraMath;
+
 /**
  * How the character on the creator's stage is framed, and how it answers
  * the mouse.
@@ -38,7 +40,7 @@ public final class CharacterStagePose {
     /** The turn past which the head has fully let the pointer go. */
     private static final float HEAD_FOLLOW_FADE_END = 120.0F;
 
-    private static final float DEGREES_PER_DRAG_PIXEL = 1.2F;
+    static final float DEGREES_PER_DRAG_PIXEL = 1.2F;
     private static final float PITCH_PER_DRAG_PIXEL = 0.45F;
     private static final float ZOOM_PER_NOTCH = 1.12F;
     /** The distance, in pixels, over which the head's turn eases off. */
@@ -122,11 +124,6 @@ public final class CharacterStagePose {
         this.shotFocus = shot.getFocus();
     }
 
-    /** The pointer moved that far while holding the figure. */
-    public void drag(int deltaX, int deltaY) {
-        drag((float)deltaX, (float)deltaY);
-    }
-
     /**
      * The pointer moved that far while holding the figure, in fractional
      * pixels: what a window-pixel movement comes to in interface pixels.
@@ -141,11 +138,6 @@ public final class CharacterStagePose {
     public void pan(float deltaX, float deltaY) {
         this.panX = clamp(this.panX + deltaX, -PAN_LIMIT, PAN_LIMIT);
         this.panY = clamp(this.panY + deltaY, -PAN_LIMIT, PAN_LIMIT);
-    }
-
-    /** Turns by whole degrees, for the keyboard. */
-    public void turn(float degrees) {
-        this.yaw = wrap(this.yaw + degrees);
     }
 
     /** The wheel moved that many notches; forward brings the figure nearer. */
@@ -253,13 +245,7 @@ public final class CharacterStagePose {
 
     /** Degrees brought into the half-open range from -180 to 180. */
     public static float wrap(float degrees) {
-        float wrapped = degrees % 360.0F;
-        if (wrapped >= 180.0F) {
-            wrapped -= 360.0F;
-        } else if (wrapped < -180.0F) {
-            wrapped += 360.0F;
-        }
-        return wrapped;
+        return (float)CameraMath.wrapDegrees(degrees);
     }
 
     private static float clamp(float value, float min, float max) {

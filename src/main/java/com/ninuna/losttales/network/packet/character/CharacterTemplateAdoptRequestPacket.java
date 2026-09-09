@@ -125,7 +125,7 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
         CharacterPacketCodec.writeString(
                 buffer, this.description, CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
         buffer.writeInt(this.age);
-        // Appended after the original layout: the cape the template chose.
+        // The cape the template chose comes last; the wire layout only grows.
         buffer.writeBoolean(this.showMinecraftCape);
         buffer.writeInt(this.cosmeticCapeId);
     }

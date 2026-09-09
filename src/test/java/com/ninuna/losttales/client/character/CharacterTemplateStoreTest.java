@@ -51,7 +51,6 @@ public final class CharacterTemplateStoreTest {
     public void anAccountWithNoTemplateReadsAnEmptyOne() {
         assertSame(CharacterTemplate.EMPTY,
                 CharacterTemplateStore.load(ACCOUNT));
-        assertFalse(CharacterTemplateStore.has(ACCOUNT));
     }
 
     @Test
@@ -60,7 +59,6 @@ public final class CharacterTemplateStoreTest {
         assertTrue(CharacterTemplateStore.save(ACCOUNT, saved));
 
         assertEquals(saved, CharacterTemplateStore.load(ACCOUNT));
-        assertTrue(CharacterTemplateStore.has(ACCOUNT));
     }
 
     /**
@@ -85,7 +83,6 @@ public final class CharacterTemplateStoreTest {
 
         assertSame(CharacterTemplate.EMPTY, CharacterTemplateStore.load(null));
         assertFalse(CharacterTemplateStore.save(null, template("Nobody", "")));
-        assertFalse(CharacterTemplateStore.has(null));
     }
 
     /** Before the client says where its folder is, nothing is read or written. */
@@ -169,16 +166,6 @@ public final class CharacterTemplateStoreTest {
         assertEquals("Aldric", CharacterTemplateStore.load(ACCOUNT).getName());
     }
 
-    @Test
-    public void aClearedTemplateIsGone() {
-        CharacterTemplateStore.save(ACCOUNT, template("Aldric", ""));
-        assertTrue(CharacterTemplateStore.clear(ACCOUNT));
-
-        assertFalse(CharacterTemplateStore.has(ACCOUNT));
-        assertFalse("clearing twice is not an error",
-                CharacterTemplateStore.clear(ACCOUNT));
-    }
-
     /** Saving twice leaves one file, not a file and a half-written one. */
     @Test
     public void savingTwiceLeavesNoTemporaryBehind() {
@@ -245,5 +232,15 @@ public final class CharacterTemplateStoreTest {
             }
         }
         file.delete();
+    }
+
+    @Test
+    public void aFileFarTooLargeToBeATemplateReadsAsNone() throws IOException {
+        StringBuilder contents = new StringBuilder("name=Aldric\n");
+        while (contents.length() <= CharacterTemplateStore.MAX_FILE_BYTES) {
+            contents.append("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+        }
+        writeRaw(ACCOUNT, contents.toString());
+        assertSame(CharacterTemplate.EMPTY, CharacterTemplateStore.load(ACCOUNT));
     }
 }

@@ -9,6 +9,7 @@ import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSmoothing;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterCreationGui;
 import com.ninuna.losttales.gui.style.LostTalesButtonStyle;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import net.minecraft.client.Minecraft;
@@ -39,8 +40,9 @@ import java.util.UUID;
  * play controls are offered again from within.</p>
  *
  * <p>An installation that cannot say which account it is signed in as
- * keeps no template and is never gated: the menu stays as vanilla built
- * it, since there is nothing to keep a character under.</p>
+ * keeps no template and is never gated: the menu is restyled like any
+ * other but its play controls stay, since there is nothing to keep a
+ * character under.</p>
  *
  * <p>Keyed on {@link GuiMainMenu} rather than an exact class: LOTR
  * replaces the menu with a subclass of it, and that subclass is the one
@@ -89,7 +91,7 @@ public final class LostTalesMainMenuHandler {
             return;
         }
         styleMenuButtons(event);
-        UUID account = LostTalesClientAccount.id();
+        UUID account = LostTalesClientAccount.templateId();
         CharacterTemplate template = account == null
                 ? CharacterTemplate.EMPTY : CharacterTemplateStore.load(account);
         boolean characterRequired = account != null && !template.isSetUp();
@@ -240,9 +242,15 @@ public final class LostTalesMainMenuHandler {
         GL11.glDisable(GL11.GL_DEPTH_TEST);
         try {
             LostTalesSkyrimUiStyle.drawPanel(x, y, width, height);
+            // Two passes keep the palette shadow, as the button's own label
+            // draws it; vanilla's drawStringWithShadow would darken the text
+            // colour instead.
             LostTalesSkyrimUiStyle.beginContent();
-            font.drawStringWithShadow(label, x + LABEL_PADDING,
-                    y + LABEL_PADDING, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
+            font.drawString(label, x + LABEL_PADDING + 1, y + LABEL_PADDING + 1,
+                    LostTalesColors.BLACK_SHADOW);
+            LostTalesSkyrimUiStyle.beginContent();
+            font.drawString(label, x + LABEL_PADDING, y + LABEL_PADDING,
+                    LostTalesSkyrimUiStyle.TEXT_BRIGHT);
         } finally {
             if (depthTest) {
                 GL11.glEnable(GL11.GL_DEPTH_TEST);

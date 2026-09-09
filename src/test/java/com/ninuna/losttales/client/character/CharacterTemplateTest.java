@@ -64,4 +64,23 @@ public final class CharacterTemplateTest {
         assertTrue(appearance.getGenderId().length() > 0);
         assertTrue(appearance.getSkinId().length() > 0);
     }
+
+    @Test
+    public void aRaceNobodyMayChooseIsNotSetUp() {
+        CharacterTemplate template = new CharacterTemplate("Bogdal",
+                CharacterRaceRegistry.HALF_TROLL, "male", "half_troll_male_1",
+                "", "", "", "", 30, false);
+        assertTrue(template.hasUsableName());
+        assertFalse(template.hasSelectableRace());
+        assertFalse(template.isSetUp());
+    }
+
+    @Test
+    public void aCapeOrSettingsChoiceAloneIsNotEmpty() {
+        assertFalse(new CharacterTemplate("", "", "", "", "", "", "", "", 0,
+                false, false, 0).isEmpty());
+        assertFalse(new CharacterTemplate("", "", "", "", "", "", "", "", 0,
+                true).isEmpty());
+        assertTrue(CharacterTemplate.EMPTY.isEmpty());
+    }
 }

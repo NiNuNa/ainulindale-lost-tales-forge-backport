@@ -110,7 +110,7 @@ public final class CreatorWidgets {
         Gui.drawRect(x + width - 1, y, x + width, y + height, color);
     }
 
-    static boolean within(int mouseX, int mouseY, int x, int y,
+    public static boolean within(int mouseX, int mouseY, int x, int y,
                           int width, int height) {
         return mouseX >= x && mouseX < x + width
                 && mouseY >= y && mouseY < y + height;

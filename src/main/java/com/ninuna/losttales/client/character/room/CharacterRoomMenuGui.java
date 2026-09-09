@@ -46,7 +46,7 @@ public final class CharacterRoomMenuGui extends GuiScreen {
     public void initGui() {
         this.buttonList.clear();
         this.templateSetUp = CharacterTemplateStore.load(
-                LostTalesClientAccount.id()).isSetUp();
+                LostTalesClientAccount.templateId()).isSetUp();
         int[] rows = rowTops(this.height, this.templateSetUp);
         int x = (this.width - BUTTON_WIDTH) / 2;
         this.buttonList.add(new LostTalesButton(BUTTON_CHANGE, x, rows[0],

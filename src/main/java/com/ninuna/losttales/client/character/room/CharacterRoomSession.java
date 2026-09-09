@@ -167,15 +167,6 @@ public final class CharacterRoomSession {
         return !creatorAlreadyOpened && !screenOpen;
     }
 
-    /**
-     * The perspective the room is in once a screen has gone: first person
-     * when the screen was the creator, which had the camera out looking at
-     * the character; otherwise whatever the player had.
-     */
-    static int perspectiveAfterScreen(boolean creatorWasShowing, int current) {
-        return creatorWasShowing ? 0 : current;
-    }
-
     private static void wearSavedAppearance(Minecraft minecraft) {
         CharacterAppearance appearance;
         synchronized (CharacterRoomSession.class) {
@@ -198,8 +189,9 @@ public final class CharacterRoomSession {
             creatorShowing = false;
         }
         if (creatorWasShowing && minecraft.gameSettings != null) {
-            minecraft.gameSettings.thirdPersonView = perspectiveAfterScreen(true,
-                    minecraft.gameSettings.thirdPersonView);
+            // The creator had the camera out looking at the character; the
+            // room is walked in first person once it has gone.
+            minecraft.gameSettings.thirdPersonView = 0;
         }
     }
 }

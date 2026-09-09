@@ -19,6 +19,7 @@ import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.character.CharacterTemplateOffer;
 import com.ninuna.losttales.client.character.room.CharacterRoomJourneyPrompt;
+import com.ninuna.losttales.client.character.room.CharacterRoomLauncher;
 import com.ninuna.losttales.client.character.room.CharacterRoomSession;
 import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterFigureRenderer;
@@ -159,7 +160,6 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientQuickLootCache.clear();
         ClientCharacterRosterCache.clear();
         CharacterTemplateOffer.clear();
-        CharacterRoomSession.clear();
         LostTalesCharacterFigureRenderer.clear();
         ClientCharacterAppearanceCache.clear();
         PlayerAppearanceResolver.clear();
@@ -191,6 +191,11 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesQuickLootHudRenderer.resetHud();
         LotrRaceProfileAdapter.getInstance().clear();
         ThirdPersonCameraRuntime.resetSession();
+        // Last, after the camera has given the perspective back: a visit
+        // to the character room that ended without its own menu is
+        // cleaned up here, and that restores the perspective the visit
+        // began with.
+        CharacterRoomLauncher.onWorldLeft(Minecraft.getMinecraft());
     }
 
     /**

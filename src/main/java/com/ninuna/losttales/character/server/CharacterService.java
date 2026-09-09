@@ -366,12 +366,12 @@ public final class CharacterService {
                         adoption.getChestTypeId(), adoption.getDescription(),
                         adoption.getAge());
         if (!appearance.isValid()) {
-            return CharacterOperationResult.failure(appearance.getErrorId(), roster);
+            return refuseTemplate(data, roster, appearance.getErrorId());
         }
         CharacterValidationResult cape = this.capeEligibilityPolicy.validate(
                 player, current, adoption.getCosmeticCapeId());
         if (!cape.isValid()) {
-            return CharacterOperationResult.failure(cape.getErrorId(), roster);
+            return refuseTemplate(data, roster, cape.getErrorId());
         }
         ValidatedCharacterAppearance wanted = appearance.getAppearance();
         RoleplayCharacter adopted = RoleplayCharacter.builder(current)
@@ -395,6 +395,21 @@ public final class CharacterService {
         FMLLog.info("[%s] The default character for %s took the account template",
                 LostTalesMetaData.MOD_ID, player.getUniqueID());
         return CharacterOperationResult.success(true, roster, adopted);
+    }
+
+    /**
+     * A template this server does not accept. The world's one reading is
+     * spent all the same: the default character stays as it is, to be
+     * edited in the world, and a template fixed later is for the next
+     * world. The refusal goes back with the roster so the client can say
+     * why.
+     */
+    private static CharacterOperationResult refuseTemplate(
+            CharacterWorldData data, CharacterRoster roster, CharacterErrorId errorId) {
+        roster.markTemplateTaken();
+        roster.incrementRevision();
+        data.saveRoster(roster);
+        return CharacterOperationResult.failure(errorId, roster);
     }
 
     public synchronized CharacterOperationResult updateCapeSettings(

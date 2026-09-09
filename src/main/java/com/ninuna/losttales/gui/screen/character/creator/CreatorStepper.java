@@ -36,10 +36,6 @@ public final class CreatorStepper extends CreatorControl {
         return !this.choice.isFixed() && this.choice.count() > 1;
     }
 
-    private int valueTop() {
-        return this.y + LABEL_HEIGHT;
-    }
-
     private int rightArrowX() {
         return this.x + this.width - CreatorWidgets.ARROW_BOX;
     }
@@ -47,7 +43,7 @@ public final class CreatorStepper extends CreatorControl {
     @Override
     public void draw(int mouseX, int mouseY) {
         FontRenderer font = this.context.getFont();
-        CreatorWidgets.drawLabel(font, this.label, this.x, this.y);
+        drawLabel(this.label);
         int top = valueTop();
         boolean steps = canStep();
         boolean overLeft = steps && CreatorWidgets.within(mouseX, mouseY,

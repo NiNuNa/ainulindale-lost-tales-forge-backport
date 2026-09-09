@@ -63,6 +63,11 @@ public final class AgeSliderScale {
         if (coarse) {
             step *= 10;
         }
+        if (age > MAX) {
+            // Typed past the track's reach: a nudge down steps down from
+            // where the age is, and a nudge up has nowhere to go.
+            return direction < 0 ? Math.max(MAX, age - step) : age;
+        }
         if (direction > 0 && current < KNEE && current + step > KNEE) {
             // The knee is a stop on the way up, not something to leap.
             return KNEE;

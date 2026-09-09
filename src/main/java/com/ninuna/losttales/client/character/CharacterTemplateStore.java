@@ -12,6 +12,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,6 +42,8 @@ public final class CharacterTemplateStore {
     private static final Charset UTF_8 = Charset.forName("UTF-8");
     /** A file longer than this is not a template. */
     static final int MAX_LINES = 64;
+    /** The most a template file may weigh before it is not read at all. */
+    static final long MAX_FILE_BYTES = 32L * 1024L;
     /** A stored value is bounded by the longest field a template holds. */
     static final int MAX_VALUE_LENGTH = CharacterValidator.MAX_DESCRIPTION_LENGTH;
 
@@ -88,13 +93,12 @@ public final class CharacterTemplateStore {
                 values.get(KEY_GENDER), values.get(KEY_SKIN),
                 values.get(KEY_BODY), values.get(KEY_CHEST),
                 values.get(KEY_FACTION), values.get(KEY_DESCRIPTION),
-                parseAge(values.get(KEY_AGE)),
+                parseNonNegative(values.get(KEY_AGE)),
                 Boolean.parseBoolean(values.get(KEY_UNCONVENTIONAL)),
-                // A file from before the cape was kept shows the cape, as
-                // every character did then.
+                // A file without the key shows the cape.
                 values.get(KEY_MINECRAFT_CAPE) == null
                         || Boolean.parseBoolean(values.get(KEY_MINECRAFT_CAPE)),
-                parseAge(values.get(KEY_COSMETIC_CAPE)));
+                parseNonNegative(values.get(KEY_COSMETIC_CAPE)));
     }
 
     /**
@@ -139,17 +143,6 @@ public final class CharacterTemplateStore {
         return write(file, lines);
     }
 
-    /** Forgets this account's template. */
-    public static synchronized boolean clear(UUID accountId) {
-        File file = fileFor(accountId);
-        return file != null && file.isFile() && file.delete();
-    }
-
-    /** Whether this account has a template worth opening a form from. */
-    public static synchronized boolean has(UUID accountId) {
-        return !load(accountId).isEmpty();
-    }
-
     static File fileFor(UUID accountId) {
         if (templateFolder == null || accountId == null) {
             return null;
@@ -160,6 +153,12 @@ public final class CharacterTemplateStore {
 
     private static Map<String, String> read(File file) {
         Map<String, String> values = new LinkedHashMap<String, String>();
+        if (file.length() > MAX_FILE_BYTES) {
+            // Far more than the longest template the creator writes; a
+            // file that size is not one, and reading it line by line
+            // would hold all of it in memory first.
+            return values;
+        }
         BufferedReader reader = null;
         try {
             reader = new BufferedReader(new InputStreamReader(
@@ -214,11 +213,18 @@ public final class CharacterTemplateStore {
         } finally {
             closeQuietly(writer);
         }
-        if (file.isFile() && !file.delete()) {
-            temporary.delete();
-            return false;
-        }
-        if (!temporary.renameTo(file)) {
+        // Moved over the old file in one step, so a move that fails leaves
+        // the previous template where it was.
+        try {
+            try {
+                Files.move(temporary.toPath(), file.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException plainMoveOnly) {
+                Files.move(temporary.toPath(), file.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException unmovable) {
             temporary.delete();
             return false;
         }
@@ -234,7 +240,7 @@ public final class CharacterTemplateStore {
         return key + "=" + stored.replace('\n', ' ').replace('\r', ' ');
     }
 
-    private static int parseAge(String value) {
+    private static int parseNonNegative(String value) {
         if (value == null) {
             return 0;
         }

@@ -68,9 +68,23 @@ public final class ThirdPersonCameraInspection {
         if (owner != screen) {
             previousPerspective = minecraft.gameSettings.thirdPersonView;
             owner = screen;
-            placement = null;
+            // The last holder's framing is not this one's: the world is
+            // drawn before the new screen's first frame says where it
+            // wants the character.
+            resetFraming();
         }
         minecraft.gameSettings.thirdPersonView = 1;
+    }
+
+    private static void resetFraming() {
+        placement = null;
+        yawOffset = 0.0F;
+        pitch = 0.0F;
+        zoom = 1.0F;
+        screenX = 0.0D;
+        screenY = 0.0D;
+        heightFraction = 0.5D;
+        focus = 0.5D;
     }
 
     /**
@@ -114,18 +128,30 @@ public final class ThirdPersonCameraInspection {
         }
         owner = null;
         placement = null;
+        restorePerspective(minecraft);
+    }
+
+    /**
+     * Dropped with the rest of the client's camera state when a world is
+     * left. A screen still holding the camera then gets no other chance
+     * to give the perspective back, since its own close finds no owner,
+     * so it is given back here.
+     */
+    public static synchronized void reset() {
+        if (owner != null) {
+            restorePerspective(Minecraft.getMinecraft());
+        }
+        owner = null;
+        resetFraming();
+        lastFov = DEFAULT_FOV;
+    }
+
+    /** Puts the perspective back, unless the player changed it while the camera was borrowed. */
+    private static void restorePerspective(Minecraft minecraft) {
         if (minecraft != null && minecraft.gameSettings != null
                 && minecraft.gameSettings.thirdPersonView == 1) {
             minecraft.gameSettings.thirdPersonView = previousPerspective;
         }
-    }
-
-    /** Dropped with the rest of the client's camera state when a world is left. */
-    public static synchronized void reset() {
-        owner = null;
-        placement = null;
-        zoom = 1.0F;
-        lastFov = DEFAULT_FOV;
     }
 
     /** Whether the camera is borrowed right now, for that view entity. */

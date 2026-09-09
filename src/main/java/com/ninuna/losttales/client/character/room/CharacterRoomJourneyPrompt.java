@@ -26,8 +26,8 @@ public final class CharacterRoomJourneyPrompt {
     static final long FADE_OUT_MS = 700L;
     static final long REST_MS = 1300L;
     static final long CYCLE_MS = FADE_IN_MS + HOLD_MS + FADE_OUT_MS + REST_MS;
-    /** The font draws an alpha below this as opaque; nothing is drawn instead. */
-    private static final int MIN_ALPHA = 8;
+    /** The font draws an alpha below four as opaque; below this nothing is drawn instead. */
+    private static final int MIN_ALPHA = 4;
     /** Between the words and the key. */
     private static final int KEY_GAP = 4;
     /** Where the key goes in the translated line. */

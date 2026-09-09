@@ -79,10 +79,6 @@ public final class CreatorSlider extends CreatorControl {
         this.typing.updateCursorCounter();
     }
 
-    private int rowTop() {
-        return this.y + LABEL_HEIGHT;
-    }
-
     private int readoutX() {
         return this.x + this.width - READOUT_WIDTH;
     }
@@ -96,13 +92,13 @@ public final class CreatorSlider extends CreatorControl {
     }
 
     private int trackY() {
-        return rowTop() + (CreatorWidgets.FIELD_HEIGHT - TRACK_HEIGHT) / 2;
+        return valueTop() + (CreatorWidgets.FIELD_HEIGHT - TRACK_HEIGHT) / 2;
     }
 
     @Override
     public void draw(int mouseX, int mouseY) {
         FontRenderer font = this.context.getFont();
-        CreatorWidgets.drawLabel(font, this.label, this.x, this.y);
+        drawLabel(this.label);
         int left = trackLeft();
         int right = trackRight();
         int trackY = trackY();
@@ -130,7 +126,7 @@ public final class CreatorSlider extends CreatorControl {
                 trackY + TRACK_HEIGHT + 5, LostTalesSkyrimUiStyle.GOLD_DARK);
         // The thumb.
         boolean overThumb = this.dragging || CreatorWidgets.within(mouseX, mouseY,
-                thumbX - THUMB_WIDTH / 2 - 1, rowTop(), THUMB_WIDTH + 2,
+                thumbX - THUMB_WIDTH / 2 - 1, valueTop(), THUMB_WIDTH + 2,
                 CreatorWidgets.FIELD_HEIGHT);
         int thumbTop = trackY + TRACK_HEIGHT / 2 - THUMB_HEIGHT / 2;
         Gui.drawRect(thumbX - THUMB_WIDTH / 2, thumbTop,
@@ -151,18 +147,18 @@ public final class CreatorSlider extends CreatorControl {
 
         // The readout, or the field standing in for it.
         int readoutX = readoutX();
-        CreatorWidgets.drawFieldBox(readoutX, rowTop(), READOUT_WIDTH,
+        CreatorWidgets.drawFieldBox(readoutX, valueTop(), READOUT_WIDTH,
                 CreatorWidgets.FIELD_HEIGHT, this.typingOpen);
         if (this.typingOpen) {
             this.typing.xPosition = readoutX + 4;
-            this.typing.yPosition = rowTop() + (CreatorWidgets.FIELD_HEIGHT
+            this.typing.yPosition = valueTop() + (CreatorWidgets.FIELD_HEIGHT
                     - font.FONT_HEIGHT) / 2 + 1;
             this.typing.drawTextBox();
         } else {
             String number = String.valueOf(Math.max(1, this.value.get()));
             font.drawStringWithShadow(number,
                     readoutX + (READOUT_WIDTH - font.getStringWidth(number)) / 2,
-                    rowTop() + (CreatorWidgets.FIELD_HEIGHT - font.FONT_HEIGHT) / 2 + 1,
+                    valueTop() + (CreatorWidgets.FIELD_HEIGHT - font.FONT_HEIGHT) / 2 + 1,
                     LostTalesSkyrimUiStyle.TEXT_BRIGHT);
         }
     }
@@ -172,13 +168,13 @@ public final class CreatorSlider extends CreatorControl {
         if (button != 0 || !contains(mouseX, mouseY)) {
             return false;
         }
-        if (CreatorWidgets.within(mouseX, mouseY, readoutX(), rowTop(),
+        if (CreatorWidgets.within(mouseX, mouseY, readoutX(), valueTop(),
                 READOUT_WIDTH, CreatorWidgets.FIELD_HEIGHT)) {
             openTyping();
             return true;
         }
         closeTyping(true);
-        if (mouseY >= rowTop() && mouseY < rowTop() + CreatorWidgets.FIELD_HEIGHT
+        if (mouseY >= valueTop() && mouseY < valueTop() + CreatorWidgets.FIELD_HEIGHT
                 && mouseX < readoutX()) {
             this.dragging = true;
             setFromPointer(mouseX);
@@ -217,6 +213,11 @@ public final class CreatorSlider extends CreatorControl {
                 closeTyping(keyCode != Keyboard.KEY_ESCAPE);
                 return true;
             }
+            if (keyCode == Keyboard.KEY_TAB) {
+                // Keeps what was typed and lets the screen move the focus on.
+                closeTyping(true);
+                return false;
+            }
             if (Character.isDigit(typedChar) || keyCode == Keyboard.KEY_BACK
                     || keyCode == Keyboard.KEY_DELETE
                     || keyCode == Keyboard.KEY_LEFT
@@ -225,8 +226,8 @@ public final class CreatorSlider extends CreatorControl {
                     || keyCode == Keyboard.KEY_END) {
                 this.typing.textboxKeyTyped(typedChar, keyCode);
             }
-            // Every key is the field's while it is open; none leaks out to
-            // turn the figure or change the page.
+            // Every other key is the field's while it is open; none leaks
+            // out to turn the figure or change the page.
             return true;
         }
         if (keyCode == Keyboard.KEY_LEFT) {
@@ -237,12 +238,12 @@ public final class CreatorSlider extends CreatorControl {
             nudge(1);
             return true;
         }
-        if (keyCode == Keyboard.KEY_RETURN || Character.isDigit(typedChar)) {
+        // A digit starts typing an exact age; Enter stays the screen's,
+        // to confirm from any page.
+        if (Character.isDigit(typedChar)) {
             openTyping();
-            if (Character.isDigit(typedChar)) {
-                this.typing.setText(String.valueOf(typedChar));
-                this.typing.setCursorPositionEnd();
-            }
+            this.typing.setText(String.valueOf(typedChar));
+            this.typing.setCursorPositionEnd();
             return true;
         }
         return false;

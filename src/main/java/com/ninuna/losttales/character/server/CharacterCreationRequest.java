@@ -24,26 +24,6 @@ public final class CharacterCreationRequest {
     private final boolean showMinecraftCape;
     private final int cosmeticCapeId;
 
-    public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
-                                    String name, String raceId, String genderId,
-                                    String skinId, int age,
-                                    String startingFactionId) {
-        this(expectedRosterRevision, slotIndex, name, raceId, genderId,
-                skinId, age, startingFactionId, "", false,
-                "");
-    }
-
-    public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
-                                    String name, String raceId, String genderId,
-                                    String skinId, int age,
-                                    String startingFactionId,
-                                    String startingWaypointId,
-                                    boolean unconventionalSettings) {
-        this(expectedRosterRevision, slotIndex, name, raceId, genderId,
-                skinId, age, startingFactionId, startingWaypointId,
-                unconventionalSettings, "");
-    }
-
     /** Empty body and chest types let validation pick the defaults for the sex. */
     public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
                                     String name, String raceId, String genderId,

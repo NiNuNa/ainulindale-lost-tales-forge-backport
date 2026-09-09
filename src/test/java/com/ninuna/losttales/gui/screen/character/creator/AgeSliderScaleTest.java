@@ -82,4 +82,12 @@ public class AgeSliderScaleTest {
         assertEquals(AgeSliderScale.MIN, AgeSliderScale.nudge(3, -1, true));
         assertEquals(AgeSliderScale.MAX, AgeSliderScale.nudge(9990, 1, true));
     }
+
+    @Test
+    public void anAgeTypedPastTheTrackStepsDownFromWhereItIs() {
+        assertEquals(49990, AgeSliderScale.nudge(50000, -1, false));
+        assertEquals(49900, AgeSliderScale.nudge(50000, -1, true));
+        assertEquals(50000, AgeSliderScale.nudge(50000, 1, false));
+        assertEquals(AgeSliderScale.MAX, AgeSliderScale.nudge(10005, -1, true));
+    }
 }

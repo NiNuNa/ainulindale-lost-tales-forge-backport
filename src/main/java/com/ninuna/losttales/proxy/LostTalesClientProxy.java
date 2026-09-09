@@ -11,6 +11,7 @@ import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
 import com.ninuna.losttales.client.character.CharacterClientTaskQueue;
+import com.ninuna.losttales.character.sync.CharacterOperationFeedback;
 import com.ninuna.losttales.client.character.CharacterTemplateOffer;
 import com.ninuna.losttales.client.character.CharacterTemplateStore;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
@@ -410,7 +411,9 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             ClientCharacterRosterCache.markProtocolError(packet == null ? 0 : packet.getRequestId());
             return;
         }
-        ClientCharacterRosterCache.acceptOperation(packet.toFeedback());
+        CharacterOperationFeedback feedback = packet.toFeedback();
+        ClientCharacterRosterCache.acceptOperation(feedback);
+        CharacterTemplateOffer.onResult(feedback);
     }
 
     @Override

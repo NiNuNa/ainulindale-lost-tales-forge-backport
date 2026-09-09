@@ -2,6 +2,9 @@ package com.ninuna.losttales.client.character;
 
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.server.CharacterTemplateAdoption;
+import com.ninuna.losttales.character.sync.CharacterOperationFeedback;
+import com.ninuna.losttales.character.sync.CharacterOperationType;
+import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 import org.junit.Test;
 
@@ -54,10 +57,10 @@ public final class CharacterTemplateOfferTest {
 
     @Test
     public void aTemplateNamingARaceNobodyMayChooseIsNotOffered() {
-        // Half-trolls are no longer anyone's to be. A template written
-        // before that is not sent, so the world spends its one reading
-        // cleanly instead of being refused on every login; the template
-        // editor names the missing choice the next time it is opened.
+        // The half-troll is registered but nobody may choose it. A template
+        // naming it is not sent, so the world spends its one reading cleanly
+        // instead of on a refusal; the template editor names the missing
+        // choice the next time it is opened.
         CharacterTemplateAdoption adoption = CharacterTemplateOffer.adoption(3L,
                 new CharacterTemplate("Bogdal", CharacterRaceRegistry.HALF_TROLL,
                         "non_binary", "", "", "", "", "", 30, false));
@@ -72,5 +75,17 @@ public final class CharacterTemplateOfferTest {
                         "human_male_1", "", "", "", "", 0, false));
         assertTrue(adoption.isOffered());
         assertEquals(CharacterValidator.MIN_AGE, adoption.getAge());
+    }
+
+    @Test
+    public void onlyTheAnswerToTheOfferStillWaitingCounts() {
+        CharacterOperationFeedback refused = new CharacterOperationFeedback(7,
+                CharacterOperationType.CREATE, false, false,
+                CharacterErrorId.INTERNAL_ERROR, 2L, 0L, true);
+        assertTrue(CharacterTemplateOffer.isAnswerTo(refused, 7));
+        // Another request's answer, an offer already answered, no offer.
+        assertFalse(CharacterTemplateOffer.isAnswerTo(refused, 8));
+        assertFalse(CharacterTemplateOffer.isAnswerTo(refused, 0));
+        assertFalse(CharacterTemplateOffer.isAnswerTo(null, 7));
     }
 }

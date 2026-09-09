@@ -6,16 +6,21 @@ import net.minecraft.client.Minecraft;
 import java.util.UUID;
 
 /**
- * Which account this client is signed in as, before it has joined
- * anywhere. The main menu has no player to ask, so the answer comes from
- * the session Minecraft started with.
+ * Which account this client is playing as.
+ *
+ * <p>Two answers, which agree on an online server and in single player.
+ * {@link #id()} is the account the game files data under right now: in a
+ * world, the id the server gave the player, which an offline-mode server
+ * or a proxy derives from the name; before any world is joined, the
+ * session's own id. {@link #templateId()} is always the signed-in
+ * session's account, the one the template file on this installation is
+ * named after, so the main menu and every world read the same file
+ * whatever id a server hands out.</p>
  *
  * <p>A session signed in with Mojang carries its own id. One that is not
  * — an offline login, a development launch — carries none, and the
  * session names it after the account instead, exactly as a server in
- * offline mode does. Either way the id is the one the world will file the
- * account under, which is what makes a template written here the template
- * that world reads.</p>
+ * offline mode does.</p>
  *
  * <p>Null only when there is no session at all to ask. Everything that
  * keeps something per account treats that as "this installation has no
@@ -25,18 +30,28 @@ public final class LostTalesClientAccount {
 
     private LostTalesClientAccount() {}
 
-    /** The signed-in account's id, or null when the session does not say. */
+    /** The account the game files data under right now, or null when nothing says. */
     public static UUID id() {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft == null) {
             return null;
         }
-        // In world the player is the better answer: it is the account the
-        // server accepted, which is what its data is filed under.
+        // In world the player is the answer: it is the account the server
+        // accepted, which is what its data is filed under.
         if (minecraft.thePlayer != null
                 && minecraft.thePlayer.getUniqueID() != null) {
             return minecraft.thePlayer.getUniqueID();
         }
+        return sessionId(minecraft);
+    }
+
+    /** The account the template file is named after, or null when the session does not say. */
+    public static UUID templateId() {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        return minecraft == null ? null : sessionId(minecraft);
+    }
+
+    private static UUID sessionId(Minecraft minecraft) {
         try {
             if (minecraft.getSession() == null) {
                 return null;

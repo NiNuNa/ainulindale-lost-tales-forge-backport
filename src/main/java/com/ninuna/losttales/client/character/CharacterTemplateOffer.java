@@ -1,10 +1,11 @@
 package com.ninuna.losttales.client.character;
 
-import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
-import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.server.CharacterTemplateAdoption;
+import com.ninuna.losttales.character.sync.CharacterOperationFeedback;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.validation.CharacterValidator;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.ChatComponentTranslation;
 
 import java.util.UUID;
 
@@ -21,12 +22,19 @@ import java.util.UUID;
  * <p>An account with no template still offers, with nothing in it. That
  * is what spends the reading, and it is what makes the world's default
  * character that world's from then on — a template written afterwards is
- * for the next world.</p>
+ * for the next world. A template the server refuses spends it too, and
+ * the refusal is said in chat, so the player knows the world's default
+ * character is the plain one and can change it there.</p>
  */
 public final class CharacterTemplateOffer {
 
+    /** The chat line for a refusal; its one argument is the reason. */
+    static final String REFUSED_KEY = "gui.losttales.character.template.refused";
+
     /** The roster this session has already offered to. */
     private static UUID offeredFor;
+    /** The offer the server has not answered yet; zero for none. */
+    private static int pendingRequestId;
 
     private CharacterTemplateOffer() {}
 
@@ -39,28 +47,63 @@ public final class CharacterTemplateOffer {
         if (ownerId == null || ownerId.equals(offeredFor)) {
             return;
         }
-        UUID account = LostTalesClientAccount.id();
-        if (account == null || !account.equals(ownerId)) {
+        UUID player = LostTalesClientAccount.id();
+        if (player == null || !player.equals(ownerId)) {
             // Somebody else's roster, or a session that cannot say whose
             // it is; there is no template of this account's to offer.
             return;
         }
+        UUID account = LostTalesClientAccount.templateId();
+        if (account == null) {
+            return;
+        }
         offeredFor = ownerId;
-        ClientCharacterNetwork.adoptTemplate(
+        pendingRequestId = ClientCharacterNetwork.adoptTemplate(
                 adoption(snapshot.getRevision(),
                         CharacterTemplateStore.load(account)));
+    }
+
+    /**
+     * The server's answer to an offer this session made. Nothing needs
+     * doing on success; a refusal is said in chat with its reason.
+     */
+    public static void onResult(CharacterOperationFeedback feedback) {
+        int request;
+        synchronized (CharacterTemplateOffer.class) {
+            if (!isAnswerTo(feedback, pendingRequestId)) {
+                return;
+            }
+            request = pendingRequestId;
+            pendingRequestId = 0;
+        }
+        ClientCharacterRosterCache.clearOperation(request);
+        if (feedback.isSuccessful()) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.ingameGUI == null) {
+            return;
+        }
+        minecraft.ingameGUI.getChatGUI().printChatMessage(
+                new ChatComponentTranslation(REFUSED_KEY,
+                        ClientCharacterDisplayNames.error(feedback)));
+    }
+
+    /** Whether that answer is to the offer still waiting for one. */
+    static boolean isAnswerTo(CharacterOperationFeedback feedback, int pendingRequestId) {
+        return feedback != null && pendingRequestId != 0
+                && feedback.getRequestId() == pendingRequestId;
     }
 
     /** What the template asks for, or an empty offer when there is none. */
     static CharacterTemplateAdoption adoption(long rosterRevision,
                                               CharacterTemplate template) {
         if (template == null || template.isEmpty() || !template.hasUsableName()
-                || !isSelectableRace(template.getRaceId())) {
+                || !template.hasSelectableRace()) {
             // A template no server would accept is not offered: a name
-            // too short, or a race nobody may choose any more. Refusing
-            // it here spends the reading cleanly rather than failing on
-            // every login, and the template editor names the missing
-            // choice the next time it is opened.
+            // too short, or a race the registry does not let anyone choose.
+            // Refusing it here spends the reading cleanly, and the template
+            // editor names the missing choice the next time it is opened.
             return CharacterTemplateAdoption.none(rosterRevision);
         }
         return new CharacterTemplateAdoption(rosterRevision, true,
@@ -75,14 +118,9 @@ public final class CharacterTemplateOffer {
                 template.isMinecraftCapeVisible(), template.getCosmeticCapeId());
     }
 
-    /** Whether that race is one a character may still be made as. */
-    private static boolean isSelectableRace(String raceId) {
-        CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);
-        return race != null && race.isSelectable();
-    }
-
     /** Cleared with every other client cache when the world is left. */
     public static synchronized void clear() {
         offeredFor = null;
+        pendingRequestId = 0;
     }
 }

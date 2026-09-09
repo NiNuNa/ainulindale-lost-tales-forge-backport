@@ -392,4 +392,33 @@ public final class CharacterAppearance {
                 ? description.substring(0, MAX_DESCRIPTION_LENGTH)
                 : description;
     }
+
+    /**
+     * Whether the other appearance shows the same thing: every field the
+     * same, so a renderer handed this one after the other has nothing to
+     * rebuild.
+     */
+    public boolean sameAs(CharacterAppearance other) {
+        return other != null
+                && this.kind == other.kind
+                && same(this.playerId, other.playerId)
+                && same(this.characterId, other.characterId)
+                && same(this.accountName, other.accountName)
+                && same(this.characterName, other.characterName)
+                && same(this.raceId, other.raceId)
+                && same(this.genderId, other.genderId)
+                && same(this.skinId, other.skinId)
+                && same(this.bodyTypeId, other.bodyTypeId)
+                && same(this.chestTypeId, other.chestTypeId)
+                && this.showMinecraftCape == other.showMinecraftCape
+                && this.cosmeticCapeId == other.cosmeticCapeId
+                && same(this.startingFactionId, other.startingFactionId)
+                && this.roleplayLevel == other.roleplayLevel
+                && this.age == other.age
+                && same(this.description, other.description);
+    }
+
+    private static boolean same(Object a, Object b) {
+        return a == null ? b == null : a.equals(b);
+    }
 }

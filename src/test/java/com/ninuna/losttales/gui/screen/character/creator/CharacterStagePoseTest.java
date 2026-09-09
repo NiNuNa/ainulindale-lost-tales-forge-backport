@@ -109,9 +109,9 @@ public class CharacterStagePoseTest {
     @Test
     public void theEaseTakesTheShortWayRoundTheCircle() {
         CharacterStagePose pose = new CharacterStagePose();
-        pose.turn(170.0F);
+        pose.drag(170.0F / CharacterStagePose.DEGREES_PER_DRAG_PIXEL, 0.0F);
         pose.advance(1000000000L);
-        pose.turn(30.0F);
+        pose.drag(30.0F / CharacterStagePose.DEGREES_PER_DRAG_PIXEL, 0.0F);
         // Asked for -160 from 170: twenty degrees on, not three hundred back.
         pose.advance(1016000000L);
         assertTrue(pose.getShownYaw() > 170.0F || pose.getShownYaw() < -160.0F);
@@ -133,7 +133,7 @@ public class CharacterStagePoseTest {
     @Test
     public void theHeadLetsThePointerGoOnceTheFigureIsTurnedAway() {
         CharacterStagePose pose = new CharacterStagePose();
-        pose.turn(180.0F);
+        pose.drag(180.0F / CharacterStagePose.DEGREES_PER_DRAG_PIXEL, 0.0F);
         // The head follows what is drawn, so the turn has to be shown first.
         pose.advance(1L);
         assertEquals(0.0F, pose.headYawToward(40.0F), EPSILON);
@@ -144,7 +144,7 @@ public class CharacterStagePoseTest {
     public void thePageShotAndThePlayersTurnAddUp() {
         CharacterStagePose pose = new CharacterStagePose();
         pose.setShot(CharacterCreatorShot.FULL_BACK);
-        pose.turn(30.0F);
+        pose.drag(30.0F / CharacterStagePose.DEGREES_PER_DRAG_PIXEL, 0.0F);
         pose.advance(1L);
         assertEquals(-150.0F, pose.getShownYaw(), EPSILON);
         assertEquals(CharacterCreatorShot.FULL_BACK.getFocus(), pose.getShownFocus(), EPSILON);
@@ -180,7 +180,7 @@ public class CharacterStagePoseTest {
         // head's turn shrinks step by step and never jumps back up.
         for (float turn = CharacterStagePose.HEAD_FOLLOW_LIMIT; turn <= 130.0F; turn += 5.0F) {
             CharacterStagePose turned = new CharacterStagePose();
-            turned.turn(turn);
+            turned.drag(turn / CharacterStagePose.DEGREES_PER_DRAG_PIXEL, 0.0F);
             turned.advance(1L);
             float follow = Math.abs(turned.headYawToward(0.0F));
             assertTrue("turn " + turn, follow <= previous + EPSILON);

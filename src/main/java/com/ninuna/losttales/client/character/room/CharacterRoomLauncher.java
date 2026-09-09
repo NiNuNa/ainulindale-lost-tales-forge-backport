@@ -69,9 +69,15 @@ public final class CharacterRoomLauncher {
         try {
             minecraft.launchIntegratedServer(FOLDER, WORLD_NAME, settings);
         } catch (RuntimeException exception) {
-            CharacterRoomSession.clear();
-            FMLLog.warning("[%s] The character room could not be opened: %s",
-                    LostTalesMetaData.MOD_ID, exception.toString());
+            abandon(minecraft, exception.toString());
+            return false;
+        }
+        if (minecraft.getIntegratedServer() == null) {
+            // FML asked the player something on the way in, most often
+            // about a level file of an earlier visit it could not remove,
+            // and the player declined: the world was unloaded again before
+            // this returned.
+            abandon(minecraft, "the world was not started");
             return false;
         }
         return true;
@@ -91,13 +97,49 @@ public final class CharacterRoomLauncher {
             minecraft.theWorld.sendQuittingDisconnectingPacket();
         }
         minecraft.loadWorld((WorldClient) null);
+        cleanUp(minecraft);
+        minecraft.displayGuiScreen(screenFor(destination));
+    }
+
+    /**
+     * A visit that ended some other way than through the room menu: the
+     * title-screen button after a death, the room's server failing, or
+     * another mod's way out. Called with the rest of the session's clears
+     * once the world is gone, and does what leaving does, so the save and
+     * the player's perspective never outlive the visit.
+     */
+    public static void onWorldLeft(Minecraft minecraft) {
+        if (minecraft == null || !CharacterRoomSession.isActive()) {
+            return;
+        }
+        if (minecraft.getIntegratedServer() != null) {
+            // The room's server is still there, so its folder is not
+            // touched; the next visit deletes it before building anew.
+            CharacterRoomSession.clear();
+            restorePerspective(minecraft);
+            return;
+        }
+        cleanUp(minecraft);
+    }
+
+    private static void abandon(Minecraft minecraft, String reason) {
+        CharacterRoomSession.clear();
+        restorePerspective(minecraft);
+        FMLLog.warning("[%s] The character room could not be opened: %s",
+                LostTalesMetaData.MOD_ID, reason);
+    }
+
+    private static void cleanUp(Minecraft minecraft) {
         deleteSave(minecraft);
+        restorePerspective(minecraft);
+        CharacterRoomSession.clear();
+    }
+
+    private static void restorePerspective(Minecraft minecraft) {
         if (perspectiveOnEntry >= 0 && minecraft.gameSettings != null) {
             minecraft.gameSettings.thirdPersonView = perspectiveOnEntry;
         }
         perspectiveOnEntry = -1;
-        CharacterRoomSession.clear();
-        minecraft.displayGuiScreen(screenFor(destination));
     }
 
     private static GuiScreen screenFor(Destination destination) {

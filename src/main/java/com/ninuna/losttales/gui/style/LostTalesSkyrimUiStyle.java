@@ -155,6 +155,9 @@ public final class LostTalesSkyrimUiStyle extends LostTalesColors {
         }
     }
 
+    /** How far below a centered header's y its subtitle line sits. */
+    public static final int HEADER_SUBTITLE_OFFSET = 15;
+
     public static void drawCenteredHeader(FontRenderer font, String title, String subtitle, int width, int y) {
         String titleText = uppercase(title);
         int titleWidth = font.getStringWidth(titleText);
@@ -164,7 +167,8 @@ public final class LostTalesSkyrimUiStyle extends LostTalesColors {
         font.drawStringWithShadow(titleText, centerX - titleWidth / 2, y + 2, TEXT_BRIGHT);
         if (subtitle != null && subtitle.length() > 0) {
             String subtitleText = uppercase(subtitle);
-            font.drawStringWithShadow(subtitleText, centerX - font.getStringWidth(subtitleText) / 2, y + 15, TEXT_MUTED);
+            font.drawStringWithShadow(subtitleText, centerX - font.getStringWidth(subtitleText) / 2,
+                    y + HEADER_SUBTITLE_OFFSET, TEXT_MUTED);
         }
     }
 

@@ -18,7 +18,21 @@ public final class LostTalesMainMenuTextStyle {
         if (font == null || text == null) {
             return;
         }
+        drawPlain(font, COLOR_CODES.matcher(text).replaceAll(""), x, y, color);
+    }
+
+    /** Keeps vanilla's centered splash centered after palette substitution. */
+    public static void drawCenteredString(Gui gui, FontRenderer font, String text,
+                                          int x, int y, int color) {
+        if (font == null || text == null) {
+            return;
+        }
         String label = COLOR_CODES.matcher(text).replaceAll("");
+        drawPlain(font, label, x - font.getStringWidth(label) / 2, y, color);
+    }
+
+    private static void drawPlain(FontRenderer font, String label,
+                                  int x, int y, int color) {
         int alpha = (color & 0xFC000000) == 0 ? 255 : color >>> 24;
         int shadowAlpha = Math.round(alpha * LostTalesColors.SHADOW_OPACITY);
         if (shadowAlpha >= 4) {
@@ -29,15 +43,6 @@ public final class LostTalesMainMenuTextStyle {
         LostTalesSkyrimUiStyle.beginContent();
         font.drawString(label, x, y,
                 LostTalesColors.withAlpha(textColor(color), alpha));
-    }
-
-    /** Keeps vanilla's centered splash centered after palette substitution. */
-    public static void drawCenteredString(Gui gui, FontRenderer font, String text,
-                                          int x, int y, int color) {
-        if (font != null && text != null) {
-            String label = COLOR_CODES.matcher(text).replaceAll("");
-            drawString(gui, font, label, x - font.getStringWidth(label) / 2, y, color);
-        }
     }
 
     private static int textColor(int color) {

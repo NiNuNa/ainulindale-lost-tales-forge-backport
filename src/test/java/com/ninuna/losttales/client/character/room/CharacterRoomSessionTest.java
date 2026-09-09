@@ -26,15 +26,6 @@ public final class CharacterRoomSessionTest {
     }
 
     @Test
-    public void closingTheCreatorLeavesTheRoomInFirstPerson() {
-        assertEquals(0, CharacterRoomSession.perspectiveAfterScreen(true, 1));
-        assertEquals(0, CharacterRoomSession.perspectiveAfterScreen(true, 2));
-        // Any other screen leaves the player's own choice alone.
-        assertEquals(1, CharacterRoomSession.perspectiveAfterScreen(false, 1));
-        assertEquals(0, CharacterRoomSession.perspectiveAfterScreen(false, 0));
-    }
-
-    @Test
     public void menuIsOnlyForTheRoom() {
         // Outside a visit the use key keeps its ordinary meaning.
         CharacterRoomSession.clear();

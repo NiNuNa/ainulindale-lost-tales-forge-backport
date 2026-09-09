@@ -1054,6 +1054,7 @@ gui.losttales.character.error.switch_cooldown=Character switching is on cooldown
 gui.losttales.character.template.saved=Saved as your default character. New worlds will start you from it.
 gui.losttales.character.template.unsaved=Your default character could not be saved.
 gui.losttales.character.template.unavailable=This server does not offer: %s. Choose again.
+gui.losttales.character.template.refused=Your default character was not applied to this world: %s You can change it from the character menu.
 gui.losttales.character.template.button=Set Up Your Character
 gui.losttales.character.template.title=Your Default Character
 gui.losttales.character.template.save=Save

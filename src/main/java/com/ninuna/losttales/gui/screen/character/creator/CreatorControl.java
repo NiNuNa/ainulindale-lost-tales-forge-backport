@@ -81,7 +81,17 @@ public abstract class CreatorControl {
 
     /** Whether that point is on the row. */
     public boolean contains(int mouseX, int mouseY) {
-        return mouseX >= this.x && mouseX < this.x + this.width
-                && mouseY >= this.y && mouseY < this.y + height();
+        return CreatorWidgets.within(mouseX, mouseY, this.x, this.y,
+                this.width, height());
+    }
+
+    /** Where a row's value sits, under its label. */
+    protected final int valueTop() {
+        return this.y + LABEL_HEIGHT;
+    }
+
+    /** The row's label, in the top-left corner every labelled row shares. */
+    protected final void drawLabel(String label) {
+        CreatorWidgets.drawLabel(this.context.getFont(), label, this.x, this.y);
     }
 }

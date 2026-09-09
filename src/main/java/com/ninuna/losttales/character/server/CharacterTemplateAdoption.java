@@ -40,17 +40,7 @@ public final class CharacterTemplateAdoption {
     /** An account with no template: the reading is spent, nothing changes. */
     public static CharacterTemplateAdoption none(long expectedRosterRevision) {
         return new CharacterTemplateAdoption(expectedRosterRevision, false,
-                "", "", "", "", "", "", "", 0);
-    }
-
-    /** The Minecraft cape shown and no cosmetic cape, as a character starts unless asked otherwise. */
-    public CharacterTemplateAdoption(long expectedRosterRevision, boolean offered,
-                                     String name, String raceId, String genderId,
-                                     String skinId, String bodyTypeId,
-                                     String chestTypeId, String description,
-                                     int age) {
-        this(expectedRosterRevision, offered, name, raceId, genderId, skinId,
-                bodyTypeId, chestTypeId, description, age, true, 0);
+                "", "", "", "", "", "", "", 0, true, 0);
     }
 
     public CharacterTemplateAdoption(long expectedRosterRevision, boolean offered,

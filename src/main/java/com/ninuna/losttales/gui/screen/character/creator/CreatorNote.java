@@ -11,22 +11,25 @@ public final class CreatorNote extends CreatorControl {
     private static final int LINE = 10;
 
     private final String text;
-    private final int color;
 
     public CreatorNote(CreatorContext context, String text) {
-        this(context, text, LostTalesSkyrimUiStyle.TEXT_MUTED);
-    }
-
-    public CreatorNote(CreatorContext context, String text, int color) {
         super(context);
         this.text = text == null ? "" : text;
-        this.color = color;
     }
+
+    /** The text wrapped to the width it was last asked for. */
+    private List<String> lines;
+    private int linesWidth = -1;
 
     @SuppressWarnings("unchecked")
     private List<String> lines() {
-        return this.context.getFont().listFormattedStringToWidth(
-                this.text, Math.max(20, this.width));
+        int width = Math.max(20, this.width);
+        if (this.lines == null || this.linesWidth != width) {
+            this.lines = this.context.getFont().listFormattedStringToWidth(
+                    this.text, width);
+            this.linesWidth = width;
+        }
+        return this.lines;
     }
 
     @Override
@@ -40,7 +43,8 @@ public final class CreatorNote extends CreatorControl {
         LostTalesSkyrimUiStyle.beginContent();
         int lineY = this.y;
         for (String line : lines()) {
-            font.drawStringWithShadow(line, this.x, lineY, this.color);
+            font.drawStringWithShadow(line, this.x, lineY,
+                    LostTalesSkyrimUiStyle.TEXT_MUTED);
             lineY += LINE;
         }
     }

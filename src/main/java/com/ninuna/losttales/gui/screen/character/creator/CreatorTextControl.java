@@ -60,18 +60,14 @@ public final class CreatorTextControl extends CreatorControl {
         this.field.updateCursorCounter();
     }
 
-    private int fieldTop() {
-        return this.y + LABEL_HEIGHT;
-    }
-
     @Override
     public void draw(int mouseX, int mouseY) {
         FontRenderer font = this.context.getFont();
-        CreatorWidgets.drawLabel(font, this.label, this.x, this.y);
-        CreatorWidgets.drawFieldBox(this.x, fieldTop(), this.width,
+        drawLabel(this.label);
+        CreatorWidgets.drawFieldBox(this.x, valueTop(), this.width,
                 CreatorWidgets.FIELD_HEIGHT, isFocused());
         this.field.xPosition = this.x + 4;
-        this.field.yPosition = fieldTop()
+        this.field.yPosition = valueTop()
                 + (CreatorWidgets.FIELD_HEIGHT - font.FONT_HEIGHT) / 2 + 1;
         this.field.width = this.width - 8;
         this.field.drawTextBox();

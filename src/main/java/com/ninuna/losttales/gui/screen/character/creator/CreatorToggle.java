@@ -93,7 +93,8 @@ public final class CreatorToggle extends CreatorControl {
 
     @Override
     public boolean keyTyped(char typedChar, int keyCode) {
-        if (keyCode == Keyboard.KEY_SPACE || keyCode == Keyboard.KEY_RETURN
+        // Enter is the screen's, to confirm from any page.
+        if (keyCode == Keyboard.KEY_SPACE
                 || keyCode == Keyboard.KEY_LEFT || keyCode == Keyboard.KEY_RIGHT) {
             this.value.set(!this.value.get());
             return true;

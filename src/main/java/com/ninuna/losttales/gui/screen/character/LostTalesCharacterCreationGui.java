@@ -36,6 +36,7 @@ import com.ninuna.losttales.gui.screen.character.creator.CharacterCreatorCategor
 import com.ninuna.losttales.gui.screen.character.creator.CharacterCreatorLayout;
 import com.ninuna.losttales.gui.screen.character.creator.CharacterStagePose;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorChoice;
+import com.ninuna.losttales.gui.screen.character.creator.PlainChoice;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorContext;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorControl;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorKeyValues;
@@ -47,6 +48,7 @@ import com.ninuna.losttales.gui.screen.character.creator.CreatorTextControl;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorTileGrid;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorToggle;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorWidgets;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -69,9 +71,9 @@ import java.util.UUID;
  * character itself on a stage taking the rest of the screen, and the
  * control bar every full-screen menu here ends in.
  *
- * <p>The column has five pages — race, body, skin, identity, origin — and
- * the player moves between them freely; nothing is a step that has to be
- * finished before the next. In a world the stage is the world itself: the
+ * <p>The column has six pages — race, body, skin, identity, origin and
+ * capes — and the player moves between them freely; nothing is a step
+ * that has to be finished before the next. In a world the stage is the world itself: the
  * screen borrows the third-person camera, stands it in front of the
  * player wearing the choices as they stand, and the player orbits it by
  * dragging and brings it nearer with the wheel. The main menu opens it
@@ -104,6 +106,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     /** How far one wheel notch scrolls the column. */
     private static final int SCROLL_STEP = 20;
     /** Inside the tab strip's ends. */
+    /** Where the header's title is drawn; the status takes its subtitle line when there is no stage. */
+    private static final int HEADER_TEXT_Y = 8;
+    private static final int HEADER_SUBTITLE_OFFSET =
+            LostTalesSkyrimUiStyle.HEADER_SUBTITLE_OFFSET;
     private static final int TAB_INSET = 4;
     private static final int BUTTON_HEIGHT = 20;
     private static final int BUTTON_GAP = 6;
@@ -176,6 +182,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private int dragWindowY;
 
     private int pendingRequestId;
+
+    /** The look the player's body was last given as a preview; unset when none is worn. */
+
+    private CharacterAppearance shownPreview;
     private String statusMessage = "";
     private boolean statusError;
 
@@ -212,7 +222,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
      */
     private void seedFromTemplate() {
         CharacterTemplate template = CharacterTemplateStore.load(
-                LostTalesClientAccount.id());
+                LostTalesClientAccount.templateId());
         if (template.isEmpty()) {
             return;
         }
@@ -574,7 +584,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     }
 
     private void buildRacePage() {
-        this.controls.add(new CreatorList(this.context, new CreatorChoice() {
+        this.controls.add(new CreatorList(this.context, new PlainChoice() {
             @Override public int count() { return raceIds.size(); }
             @Override public int index() { return raceIndex; }
             @Override public String id(int index) { return raceIds.get(index); }
@@ -582,11 +592,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 return ClientCharacterDisplayNames.race(raceIds.get(index));
             }
             @Override public void choose(int index) { selectRace(index); }
-            @Override public boolean isFixed() { return false; }
-            @Override public String fixedLabel() { return ""; }
-            @Override public String emptyLabel() {
-                return I18n.format("gui.losttales.character.no_options");
-            }
         }));
         if (!this.templateMode) {
             this.controls.add(new RaceAttributes(this.context));
@@ -598,7 +603,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
 
     private void buildBodyPage() {
         this.controls.add(new CreatorStepper(this.context,
-                I18n.format("gui.losttales.character.gender"), new CreatorChoice() {
+                I18n.format("gui.losttales.character.gender"), new PlainChoice() {
             @Override public int count() { return genderIds.size(); }
             @Override public int index() { return genderIndex; }
             @Override public String id(int index) { return genderIds.get(index); }
@@ -606,11 +611,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 return ClientCharacterDisplayNames.gender(genderIds.get(index));
             }
             @Override public void choose(int index) { selectGender(index); }
-            @Override public boolean isFixed() { return false; }
-            @Override public String fixedLabel() { return ""; }
-            @Override public String emptyLabel() {
-                return I18n.format("gui.losttales.character.no_options");
-            }
         }));
         this.controls.add(new CreatorStepper(this.context,
                 I18n.format("gui.losttales.character.body"), new CreatorChoice() {
@@ -656,7 +656,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
 
     private void buildSkinPage() {
         this.controls.add(new CreatorTileGrid(this.context,
-                I18n.format("gui.losttales.character.skin"), new CreatorChoice() {
+                I18n.format("gui.losttales.character.skin"), new PlainChoice() {
             @Override public int count() { return skinIds.size(); }
             @Override public int index() { return skinIndex; }
             @Override public String id(int index) { return skinIds.get(index); }
@@ -665,11 +665,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
             }
             @Override public void choose(int index) {
                 skinIndex = clampIndex(index, skinIds.size());
-            }
-            @Override public boolean isFixed() { return false; }
-            @Override public String fixedLabel() { return ""; }
-            @Override public String emptyLabel() {
-                return I18n.format("gui.losttales.character.no_options");
             }
         }));
         this.controls.add(new CreatorNote(this.context,
@@ -703,7 +698,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private void buildOriginPage() {
         this.controls.add(new CreatorStepper(this.context,
                 I18n.format("gui.losttales.character.starting_faction"),
-                new CreatorChoice() {
+                new PlainChoice() {
             @Override public int count() { return factionIds.size(); }
             @Override public int index() { return factionIndex; }
             @Override public String id(int index) { return factionIds.get(index); }
@@ -714,8 +709,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 factionIndex = clampIndex(index, factionIds.size());
                 rebuildWaypoints();
             }
-            @Override public boolean isFixed() { return false; }
-            @Override public String fixedLabel() { return ""; }
             @Override public String emptyLabel() {
                 return I18n.format(ClientCharacterDisplayNames.isLotrIntegrationAvailable()
                         ? "gui.losttales.character.no_compatible_faction"
@@ -727,7 +720,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
             // that against its own map, so only a world asks for it.
             this.controls.add(new CreatorStepper(this.context,
                     I18n.format("gui.losttales.character.starting_waypoint"),
-                    new CreatorChoice() {
+                    new PlainChoice() {
                 @Override public int count() { return waypointIds.size(); }
                 @Override public int index() { return waypointIndex; }
                 @Override public String id(int index) { return waypointIds.get(index); }
@@ -736,11 +729,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 }
                 @Override public void choose(int index) {
                     waypointIndex = clampIndex(index, waypointIds.size());
-                }
-                @Override public boolean isFixed() { return false; }
-                @Override public String fixedLabel() { return ""; }
-                @Override public String emptyLabel() {
-                    return I18n.format("gui.losttales.character.no_options");
                 }
             }));
         }
@@ -774,7 +762,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         }));
         this.controls.add(new CreatorStepper(this.context,
                 I18n.format("gui.losttales.character.creator.cape.cosmetic"),
-                new CreatorChoice() {
+                new PlainChoice() {
             @Override public int count() { return capeIds.size(); }
             @Override public int index() { return capeIndex; }
             @Override public String id(int index) {
@@ -786,8 +774,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
             @Override public void choose(int index) {
                 capeIndex = clampIndex(index, capeIds.size());
             }
-            @Override public boolean isFixed() { return false; }
-            @Override public String fixedLabel() { return ""; }
             @Override public String emptyLabel() {
                 return I18n.format("gui.losttales.character.cape.none");
             }
@@ -800,14 +786,30 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         }
     }
 
-    /** The race's numbers, read fresh each frame from whichever race is chosen. */
+    /** The race's numbers, for whichever race is chosen. */
     private final class RaceAttributes extends CreatorControl {
+        /** The table for the race and width it was last built for. */
+        private CreatorKeyValues table;
+        private String tableRaceId;
+        private int tableWidth = -1;
+
         private RaceAttributes(CreatorContext context) {
             super(context);
         }
 
         private CreatorKeyValues table() {
             String raceId = selected(raceIds, raceIndex);
+            if (this.table == null || this.tableWidth != this.width
+                    || !raceId.equals(this.tableRaceId)) {
+                this.table = build(raceId);
+                this.tableRaceId = raceId;
+                this.tableWidth = this.width;
+                this.table.place(this.x, this.y, this.width);
+            }
+            return this.table;
+        }
+
+        private CreatorKeyValues build(String raceId) {
             CharacterRaceGameplayProfile profile = ClientCharacterRaceAttributes.resolve(
                     mc == null ? null : mc.theWorld, raceId);
             return new CreatorKeyValues(this.context,
@@ -827,14 +829,13 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
 
         @Override
         public int height() {
-            CreatorKeyValues table = table();
-            table.place(this.x, this.y, this.width);
-            return table.height();
+            return table().height();
         }
 
         @Override
         public void draw(int mouseX, int mouseY) {
             CreatorKeyValues table = table();
+            // The column scrolls; the table follows this row.
             table.place(this.x, this.y, this.width);
             table.draw(mouseX, mouseY);
         }
@@ -951,11 +952,12 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 I18n.format(this.templateMode
                         ? "gui.losttales.character.template.title"
                         : "gui.losttales.character.creation"),
-                this.templateMode
+                // With no stage the status takes the subtitle's line.
+                isStatusInHeader() ? "" : this.templateMode
                         ? I18n.format("gui.losttales.character.template.subtitle")
                         : I18n.format("gui.losttales.character.slot",
                                 Integer.valueOf(this.slotIndex + 1)),
-                this.width, 8);
+                this.width, HEADER_TEXT_Y);
 
         drawStage(mouseX, mouseY);
         drawColumn(mouseX, mouseY);
@@ -1140,19 +1142,35 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                         || (this.factionIds.size() > 0 && this.waypointIds.size() > 0));
     }
 
-    /** The message about the last thing that happened, over the stage. */
+    /** Whether the status shows on the header's subtitle line, there being no stage to show it over. */
+    private boolean isStatusInHeader() {
+        return this.statusMessage.length() > 0 && !this.layout.hasStage();
+    }
+
+    /**
+     * The message about the last thing that happened: over the stage, or
+     * on the header's subtitle line when the window is too narrow for one.
+     */
     private void drawStatus() {
-        if (this.statusMessage.length() == 0 || !this.layout.hasStage()) {
+        if (this.statusMessage.length() == 0) {
             return;
         }
         LostTalesSkyrimUiStyle.beginContent();
+        int color = this.statusError
+                ? LostTalesSkyrimUiStyle.RED : LostTalesSkyrimUiStyle.GREEN;
+        if (isStatusInHeader()) {
+            String line = LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj,
+                    this.statusMessage, this.width - 16);
+            this.fontRendererObj.drawStringWithShadow(line,
+                    this.width / 2 - this.fontRendererObj.getStringWidth(line) / 2,
+                    HEADER_TEXT_Y + HEADER_SUBTITLE_OFFSET, color);
+            return;
+        }
         int width = this.layout.getStageWidth() - 16;
         @SuppressWarnings("unchecked")
         List<String> lines = this.fontRendererObj.listFormattedStringToWidth(
                 this.statusMessage, Math.max(40, width));
         int y = this.layout.getStageTop() + 4;
-        int color = this.statusError
-                ? LostTalesSkyrimUiStyle.RED : LostTalesSkyrimUiStyle.GREEN;
         for (int index = 0; index < lines.size() && index < 2; index++) {
             String line = lines.get(index);
             this.fontRendererObj.drawStringWithShadow(line,
@@ -1262,11 +1280,15 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 this.pose.getShownFocus());
         UUID player = this.mc.thePlayer.getUniqueID();
         CharacterAppearance appearance = currentAppearance(player);
-        if (appearance != null) {
-            // Presentation only: the cache keeps physics on the synced record.
-            ClientCharacterAppearanceCache.setPreview(appearance);
-        } else {
+        if (appearance == null) {
             ClientCharacterAppearanceCache.clearPreview(player);
+            this.shownPreview = null;
+        } else if (this.shownPreview == null || !this.shownPreview.sameAs(appearance)) {
+            // Presentation only: the cache keeps physics on the synced
+            // record. Set only when a choice changed, since the renderer
+            // rebuilds the body for every new appearance it is handed.
+            ClientCharacterAppearanceCache.setPreview(appearance);
+            this.shownPreview = appearance;
         }
     }
 
@@ -1276,9 +1298,9 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         float left = centerX - halfWidth;
         float right = centerX + halfWidth;
         int color = LostTalesSkyrimUiStyle.SAND;
-        float red = (color >> 16 & 0xFF) / 255.0F;
-        float green = (color >> 8 & 0xFF) / 255.0F;
-        float blue = (color & 0xFF) / 255.0F;
+        float red = LostTalesColors.redF(color);
+        float green = LostTalesColors.greenF(color);
+        float blue = LostTalesColors.blueF(color);
         float peak = 0.30F;
         Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
         // Two quads across, meeting under the feet, so the band fades in
@@ -1617,8 +1639,8 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     }
 
     private static boolean within(int[] bounds, int mouseX, int mouseY) {
-        return mouseX >= bounds[0] && mouseX < bounds[0] + bounds[2]
-                && mouseY >= bounds[1] && mouseY < bounds[1] + bounds[3];
+        return CreatorWidgets.within(mouseX, mouseY,
+                bounds[0], bounds[1], bounds[2], bounds[3]);
     }
 
     // ------------------------------------------------------------------
@@ -1670,7 +1692,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         // What this account starts as on the next world it joins. The
         // creation itself is the server's answer; this only remembers the
         // choices that led to it.
-        CharacterTemplateStore.save(LostTalesClientAccount.id(),
+        CharacterTemplateStore.save(LostTalesClientAccount.templateId(),
                 CharacterTemplate.of(request));
     }
 
@@ -1700,7 +1722,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 this.draftAge, this.unconventionalSettings,
                 this.showMinecraftCape, selectedCapeId());
         boolean saved = CharacterTemplateStore.save(
-                LostTalesClientAccount.id(), template);
+                LostTalesClientAccount.templateId(), template);
         setStatus(I18n.format(saved
                 ? "gui.losttales.character.template.saved"
                 : "gui.losttales.character.template.unsaved"), !saved);

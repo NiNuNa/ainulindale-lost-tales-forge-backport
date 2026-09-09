@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.character;
 
+import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
@@ -120,7 +121,14 @@ public final class CharacterTemplate {
                 && this.chestTypeId.length() == 0
                 && this.startingFactionId.length() == 0
                 && this.description.length() == 0 && this.age == 0
-                && this.cosmeticCapeId == 0;
+                && this.cosmeticCapeId == 0 && this.showMinecraftCape
+                && !this.unconventionalSettings;
+    }
+
+    /** Whether the race is one a character may still be made as. */
+    public boolean hasSelectableRace() {
+        CharacterRaceDefinition race = CharacterRaceRegistry.get(this.raceId);
+        return race != null && race.isSelectable();
     }
 
     /**
@@ -138,13 +146,15 @@ public final class CharacterTemplate {
 
     /**
      * Whether this is a character the account can start playing as: a
-     * usable name and a race, sex and skin all chosen. The main menu
-     * opens the play controls only once this holds, and the character
-     * room offers them on the same rule. A template the creator saved
+     * usable name, a race that may be chosen, and a sex and skin. The
+     * main menu opens the play controls only once this holds, and the
+     * character room offers them on the same rule; it is the rule the
+     * offer to a world applies too, so nothing the menu lets through is
+     * refused before it is even sent. A template the creator saved
      * always satisfies it; one edited by hand may not.
      */
     public boolean isSetUp() {
-        return hasUsableName() && this.raceId.length() > 0
+        return hasUsableName() && hasSelectableRace()
                 && this.genderId.length() > 0 && this.skinId.length() > 0;
     }
 

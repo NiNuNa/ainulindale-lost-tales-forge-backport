@@ -75,8 +75,7 @@ public final class CreatorTileGrid extends CreatorControl {
         if (count > 0 && selected >= 0 && selected < count) {
             title = this.label + ": " + this.choice.label(selected);
         }
-        CreatorWidgets.drawLabel(font, LostTalesSkyrimUiStyle.trimToWidth(
-                font, title, this.width), this.x, this.y);
+        drawLabel(LostTalesSkyrimUiStyle.trimToWidth(font, title, this.width));
         if (count == 0) {
             font.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(font,
                     this.choice.emptyLabel(), this.width), this.x, gridTop(),
