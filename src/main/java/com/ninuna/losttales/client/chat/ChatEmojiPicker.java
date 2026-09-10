@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.chat.ChatMessageIds;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -16,6 +17,31 @@ final class ChatEmojiPicker extends ChatPickerPanel {
     static final int FREQUENT_LIMIT = 6;
     private static final int CELL_SIZE = 14;
     private static final int COLUMNS = 6;
+    /**
+     * The message the picker was opened to react to, or NONE while it
+     * inserts into the field. Closing the picker ends it, so a picker
+     * opened from its own button always inserts.
+     */
+    private long reactionTarget = ChatMessageIds.NONE;
+
+    /** Opens the picker so the next pick reacts to {@code messageId}. */
+    void openForReaction(long messageId) {
+        setOpen(true);
+        this.reactionTarget = messageId;
+    }
+
+    /** The message a pick reacts to, or NONE while the picker inserts. */
+    long reactionTarget() {
+        return isOpen() ? this.reactionTarget : ChatMessageIds.NONE;
+    }
+
+    @Override
+    void setOpen(boolean open) {
+        super.setOpen(open);
+        if (!open) {
+            this.reactionTarget = ChatMessageIds.NONE;
+        }
+    }
 
     @Override
     int columns() {
@@ -142,14 +168,14 @@ final class ChatEmojiPicker extends ChatPickerPanel {
     }
 
     /** The emoji cell under the mouse while the picker is open, else null. */
-    ChatEmoji emojiAt(int mouseX, int mouseY,
+    ChatEmoji emojiAt(double mouseX, double mouseY,
                       int screenWidth, int screenHeight) {
         Entry entry = entryAt(mouseX, mouseY, screenWidth, screenHeight);
         return entry == null ? null : (ChatEmoji)entry.value;
     }
 
     /** Right-click favoriting; true when a cell was toggled. */
-    boolean toggleFavoriteAt(int mouseX, int mouseY,
+    boolean toggleFavoriteAt(double mouseX, double mouseY,
                              int screenWidth, int screenHeight) {
         ChatEmoji emoji = emojiAt(mouseX, mouseY, screenWidth, screenHeight);
         if (emoji == null) {

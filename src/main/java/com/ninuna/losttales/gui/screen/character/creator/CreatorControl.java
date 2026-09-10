@@ -47,6 +47,15 @@ public abstract class CreatorControl {
         return false;
     }
 
+    /**
+     * Whether a left click at that point would act on the row: choose,
+     * step, flip or set something. Taking the focus alone does not count,
+     * and neither does placing a text cursor.
+     */
+    public boolean isPointerOverAction(int mouseX, int mouseY) {
+        return false;
+    }
+
     /** The pointer moved while a button the control took is still held. */
     public void mouseDragged(int mouseX, int mouseY) {}
 

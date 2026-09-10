@@ -173,7 +173,11 @@ final class ChatLineWrapper {
         }
         for (int index = bodyIndex + 1; index < parts.size(); index++) {
             IChatComponent part = parts.get(index);
-            if (ChatLayoutMarker.isBodyBreak(part)) {
+            if (ChatLayoutMarker.isRowBreak(part)) {
+                // The reactions stand on a row of their own under the
+                // words, where the body's own continuations start.
+                builder.breakRow();
+            } else if (ChatLayoutMarker.isBodyBreak(part)) {
                 int senderColor = ChatLayoutMarker.bodyColor(part);
                 String label = ChatLayoutMarker.bodyLabel(part);
                 builder.beginBody(senderColor < 0 ? nameColor
@@ -233,7 +237,8 @@ final class ChatLineWrapper {
     /** Glyph slots are single indivisible words, spaces or not. */
     private static boolean isAtomic(IChatComponent part) {
         if (ChatEmojiMarker.isMarker(part) || ChatHeadMarker.isMarker(part)
-                || ChatSpacerMarker.isMarker(part)) {
+                || ChatSpacerMarker.isMarker(part)
+                || ChatReactionMarker.isMarker(part)) {
             return true;
         }
         ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
@@ -400,6 +405,16 @@ final class ChatLineWrapper {
             this.lineStart = 0;
             this.firstLine = true;
             this.fresh = true;
+        }
+
+        /**
+         * Ends the body's last row and opens a continuation row under
+         * it, at the body's own inset; a row just opened is kept.
+         */
+        void breakRow() {
+            if (!this.fresh) {
+                newLine();
+            }
         }
 
         private void newLine() {

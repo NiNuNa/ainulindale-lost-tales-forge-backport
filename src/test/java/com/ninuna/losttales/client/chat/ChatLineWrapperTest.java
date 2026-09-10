@@ -130,6 +130,41 @@ public final class ChatLineWrapperTest {
         return -1;
     }
 
+    /**
+     * A message's reactions stand on a row of their own under its words,
+     * inset where the body's own continuation rows are, and the row is
+     * told apart from the words by its first chip.
+     */
+    @Test
+    public void reactionsStandOnARowOfTheirOwnUnderTheWords() {
+        ChatComponentText root = new ChatComponentText("");
+        root.appendSibling(ChatLayoutMarker.anchor());
+        root.appendSibling(text("<N>"));
+        root.appendSibling(ChatLayoutMarker.bodyBreak(0xFFFFFF));
+        root.appendSibling(text("hello"));
+        root.appendSibling(ChatLayoutMarker.rowBreak());
+        root.appendSibling(ChatReactionMarker.create(
+                com.ninuna.losttales.chat.emoji.ChatEmoji.SMILE, 3, true,
+                12345L, 6));
+        root.appendSibling(ChatSpacerMarker.of(ChatReactionMarker.BETWEEN));
+        root.appendSibling(ChatReactionMarker.create(
+                com.ninuna.losttales.chat.emoji.ChatEmoji.JOY, 1, false,
+                12345L, 6));
+        List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS, root, 200,
+                true);
+        assertEquals(3, lines.size());
+        assertFalse(ChatReactionMarker.isReactionRow(lines.get(1)));
+        assertTrue(ChatReactionMarker.isReactionRow(lines.get(2)));
+        // Under the body's words: the chevron's width in, as a wrapped
+        // word of the body would be.
+        assertEquals(12, indentOf(lines.get(2), true));
+        assertEquals(ChatReactionMarker.PAD + ChatReactionMarker.ICON
+                + ChatReactionMarker.GAP + 6 + ChatReactionMarker.TRAIL,
+                ChatInlineIcons.declaredWidth(ChatReactionMarker.create(
+                        com.ninuna.losttales.chat.emoji.ChatEmoji.SMILE, 3,
+                        true, 12345L, 6)));
+    }
+
     @Test
     public void linesWithoutAnAnchorAreLeftToVanilla() {
         ChatComponentText vanilla = new ChatComponentText("hello world");

@@ -28,8 +28,12 @@ public final class DiscordGatewayProtocol {
     public static final int OP_INVALID_SESSION = 9;
     public static final int OP_HELLO = 10;
     public static final int OP_HEARTBEAT_ACK = 11;
-    /** GUILDS, GUILD_MESSAGES and MESSAGE_CONTENT: what reading bound channels needs. */
-    public static final int INTENTS = 1 | (1 << 9) | (1 << 15);
+    /**
+     * GUILDS, GUILD_MESSAGES, GUILD_MESSAGE_REACTIONS and MESSAGE_CONTENT:
+     * what reading bound channels and the reactions on them needs. Only
+     * MESSAGE_CONTENT is privileged.
+     */
+    public static final int INTENTS = 1 | (1 << 9) | (1 << 10) | (1 << 15);
 
     /** What the connection is to do with a payload. */
     public static final class Action {

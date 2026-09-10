@@ -120,6 +120,41 @@ public final class ChatScrollHoldTest {
                 0.0001D);
     }
 
+    /**
+     * The window is made taller under a view scrolled to its oldest
+     * line: the ceiling comes down, and the view comes to rest on it
+     * rather than being held above it and clamped back every frame.
+     */
+    @Test
+    public void aTallerWindowLowersTheCeilingWithoutAJitter() {
+        ChatTab tab = ChatTab.of(ChatChannel.ALL);
+        List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
+        ChatWindowFrame frame = frameOver(lines, -1);
+        // Three lines of room: the ceiling is seven rows up.
+        frame.room = 3 * LostTalesChatOverlayRenderer.LINE_HEIGHT;
+        ClientChatChannelViews.scroll(tab, 7, lines.size(), 3.0D);
+        ClientChatChannelViews.holdPosition(tab, frame);
+        assertEquals(7.0D,
+                ClientChatChannelViews.getScroll(tab, lines.size(), 3.0D),
+                0.0001D);
+        // Five lines of room: the ceiling is five rows up, and the held
+        // line stands above it.
+        frame.room = 5 * LostTalesChatOverlayRenderer.LINE_HEIGHT;
+        ClientChatChannelViews.holdPosition(tab, frame);
+        assertEquals(5.0D,
+                ClientChatChannelViews.getScroll(tab, lines.size(), 5.0D),
+                0.0001D);
+        // The next frame stays there instead of climbing back.
+        ClientChatChannelViews.holdPosition(tab, frame);
+        assertEquals(5.0D,
+                ClientChatChannelViews.getScroll(tab, lines.size(), 5.0D),
+                0.0001D);
+        ClientChatChannelViews.holdPosition(tab, frame);
+        assertEquals(5.0D,
+                ClientChatChannelViews.getScroll(tab, lines.size(), 5.0D),
+                0.0001D);
+    }
+
     @Test
     public void scrollingAgainTakesAFreshHold() {
         ChatTab tab = ChatTab.of(ChatChannel.ALL);

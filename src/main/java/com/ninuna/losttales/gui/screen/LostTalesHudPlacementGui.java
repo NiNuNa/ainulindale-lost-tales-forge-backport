@@ -4,6 +4,8 @@ import com.ninuna.losttales.client.chat.ChatWindow;
 import com.ninuna.losttales.client.chat.ChatWindowLayout;
 import com.ninuna.losttales.client.chat.ChatWindowPlacement;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
+import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
+import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
@@ -28,7 +30,8 @@ import org.lwjgl.input.Keyboard;
  * window is shown but cannot be moved here: the lock is the chat's own
  * and this editor offers no override for it.
  */
-public class LostTalesHudPlacementGui extends GuiScreen {
+public class LostTalesHudPlacementGui extends GuiScreen
+        implements LostTalesPointerInteractable {
     private static final int GRID_MINOR_SPACING = 10;
     private static final int GRID_MAJOR_SPACING = 50;
     private static final int CENTER_SNAP_THRESHOLD = 6;
@@ -139,6 +142,18 @@ public class LostTalesHudPlacementGui extends GuiScreen {
             }
         }
         super.mouseClicked(mouseX, mouseY, mouseButton);
+    }
+
+    /**
+     * A press on any element selects it, a locked one included, and starts a
+     * drag on one that can move. {@link #getElementAt} decides it here as it
+     * does for the hover outline and the click.
+     */
+    @Override
+    public boolean isPointerOverInteractable(int mouseX, int mouseY) {
+        return getElementAt(mouseX, mouseY) != null
+                || LostTalesGuiPointerTargets.isOverEnabledButton(
+                        this, mouseX, mouseY);
     }
 
     @Override

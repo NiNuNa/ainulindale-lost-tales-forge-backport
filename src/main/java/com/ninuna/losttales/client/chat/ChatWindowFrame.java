@@ -149,7 +149,7 @@ final class ChatWindowFrame {
     private static final int[] NO_KINDS = new int[0];
 
     /** Whether the point lies on the toolbar drawn this frame. */
-    boolean toolbarContains(float x, float y) {
+    boolean toolbarContains(double x, double y) {
         return this.drawn && this.toolbarRight > this.toolbarLeft
                 && this.toolbarKinds.length > 0
                 && x >= this.toolbarLeft && x < this.toolbarRight
@@ -157,7 +157,7 @@ final class ChatWindowFrame {
     }
 
     /** The control under the point, or -1 when the point is not on one. */
-    int toolbarKindAt(float x, float y) {
+    int toolbarKindAt(double x, double y) {
         if (!toolbarContains(x, y)) {
             return -1;
         }
@@ -188,7 +188,7 @@ final class ChatWindowFrame {
     boolean scrollbarWanted;
 
     /** Whether the point lies on the scrollbar's track drawn this frame. */
-    boolean scrollbarContains(float x, float y) {
+    boolean scrollbarContains(double x, double y) {
         return this.drawn && this.scrollbarRight > this.scrollbarLeft
                 && x >= this.scrollbarLeft && x < this.scrollbarRight
                 && y >= this.scrollbarTrackTop
@@ -196,7 +196,7 @@ final class ChatWindowFrame {
     }
 
     /** Whether the point lies on the pill drawn this frame. */
-    boolean jumpPillContains(float x, float y) {
+    boolean jumpPillContains(double x, double y) {
         return this.drawn && this.jumpPillRight > this.jumpPillLeft
                 && x >= this.jumpPillLeft && x < this.jumpPillRight
                 && y >= this.jumpPillTop && y < this.jumpPillBottom;
@@ -224,7 +224,7 @@ final class ChatWindowFrame {
     }
 
     /** The frontmost drawn window under a screen point, or null. */
-    static ChatWindowFrame drawnAt(int mouseX, int mouseY) {
+    static ChatWindowFrame drawnAt(double mouseX, double mouseY) {
         List<ChatWindowFrame> frames = drawnFrames();
         for (int index = frames.size() - 1; index >= 0; index--) {
             if (frames.get(index).contains(mouseX, mouseY)) {
@@ -562,10 +562,23 @@ final class ChatWindowFrame {
     }
 
     /**
+     * The furthest the view may scroll: the offset that stands the
+     * oldest row on the window's top edge, which is what the clamp
+     * holds every offset to. Unbounded while the window has not been
+     * measured, so nothing is clamped against a room of nothing.
+     */
+    double scrollCeiling() {
+        if (this.room <= 0.0D) {
+            return Double.POSITIVE_INFINITY;
+        }
+        return Math.max(0.0D, contentRows() - Math.max(1.0D, roomLines()));
+    }
+
+    /**
      * The scroll offset, in rows, that stands {@code pixels} of stack
      * further up than {@code rows} does: what a wheel turn asks for, so
      * a turn moves the page the same distance whatever rows it passes —
-     * a blank row between two runs is a third of a line, and counted
+     * a blank row between two runs is half a line, and counted
      * as a whole row it made the wheel stumble over every group.
      */
     double rowsAfterScrolling(double rows, double pixels) {

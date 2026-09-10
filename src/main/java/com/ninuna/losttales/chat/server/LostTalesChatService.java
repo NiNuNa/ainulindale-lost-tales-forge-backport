@@ -14,6 +14,7 @@ import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatRecipientRule;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.moderation.ChatAuditLog;
 import com.ninuna.losttales.chat.moderation.ChatMuteDurations;
 import com.ninuna.losttales.chat.moderation.ChatMuteEntry;
@@ -44,6 +45,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatConsoleSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatHistorySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import com.ninuna.losttales.network.packet.LostTalesChatReactionSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
@@ -832,6 +834,137 @@ public final class LostTalesChatService {
      * needs to hear nothing: the history they are replayed on joining
      * already says what the message says now, or no longer holds it.
      */
+    /* ---- Reactions ---- */
+
+    /**
+     * Adds or takes back a player's reaction to a kept message and tells
+     * every reader what the reactions are now. The server decides all of
+     * it from its own record: whether the player may read the message —
+     * exactly what a reply may quote — and the name they react as, the
+     * one their line in that channel would be signed with. A reaction
+     * puts something in front of the readers, so a mute refuses one as
+     * it refuses an edit. The bridge's own reaction on a Discord copy
+     * stands for the players: it comes with the first of them and goes
+     * with the last.
+     */
+    public static void react(EntityPlayerMP player, long messageId,
+                             String emojiName, boolean add) {
+        if (player == null || player.worldObj == null
+                || player.worldObj.isRemote) {
+            return;
+        }
+        ChatEmoji emoji = ChatEmoji.fromName(emojiName);
+        ChatChannel channel = ChatHistory.channelOf(messageId);
+        if (emoji == null || channel == null) {
+            return;
+        }
+        ChatMuteEntry mute = activeMute(player);
+        if (mute != null) {
+            tellMuted(player, mute);
+            return;
+        }
+        ChatHistory.ReactionChange change = ChatHistory.react(messageId,
+                requesterFor(player), player.getUniqueID(),
+                reactorName(player, channel), emoji.getName(), add);
+        if (change == null) {
+            return;
+        }
+        tellReactions(messageId, change.readers);
+        if (change.gameCountBefore == 0 && change.gameCountAfter > 0) {
+            LostTalesDiscordBridge.getInstance().relayReaction(messageId,
+                    emoji, true);
+        } else if (change.gameCountBefore > 0 && change.gameCountAfter == 0) {
+            LostTalesDiscordBridge.getInstance().relayReaction(messageId,
+                    emoji, false);
+        }
+    }
+
+    /**
+     * A Discord member's reaction to a message that crossed the bridge,
+     * delivered on the server thread: kept under the sender id the
+     * bridge signs that member with, and told to every reader. Nothing
+     * goes back to Discord — the reaction came from there.
+     */
+    public static void reactFromDiscord(long messageId, String discordUserId,
+                                        String name, ChatEmoji emoji,
+                                        boolean add) {
+        if (emoji == null || discordUserId == null
+                || discordUserId.length() == 0) {
+            return;
+        }
+        ChatHistory.ReactionChange change = ChatHistory.react(messageId, null,
+                LostTalesChatMessagePacket.discordSenderId(discordUserId),
+                name, emoji.getName(), add);
+        if (change != null) {
+            tellReactions(messageId, change.readers);
+        }
+    }
+
+    /**
+     * Discord took every member's reaction off a message that crossed
+     * the bridge — with one emoji, or with all when {@code emoji} is
+     * null. The players' own reactions stay.
+     */
+    public static void clearDiscordReactions(long messageId, ChatEmoji emoji) {
+        Set<UUID> readers = ChatHistory.clearDiscordReactions(messageId,
+                emoji == null ? null : emoji.getName());
+        if (readers != null) {
+            tellReactions(messageId, readers);
+        }
+    }
+
+    /** Each online reader is sent the reactions as they are shown them. */
+    private static void tellReactions(long messageId, Set<UUID> readers) {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null
+                || readers == null) {
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        List<EntityPlayerMP> online =
+                server.getConfigurationManager().playerEntityList;
+        for (EntityPlayerMP player : online) {
+            if (player != null && readers.contains(player.getUniqueID())) {
+                LostTalesNetworkHandler.CHANNEL.sendTo(
+                        new LostTalesChatReactionSyncPacket(messageId,
+                                ChatHistory.reactionsFor(messageId,
+                                        player.getUniqueID())),
+                        player);
+            }
+        }
+    }
+
+    /** What the server knows of a player asking about a kept message, read live. */
+    private static ChatHistory.Requester requesterFor(EntityPlayerMP player) {
+        Party party = PartyService.getInstance().getPartyForActiveCharacter(player);
+        return new ChatHistory.Requester(player.getUniqueID(),
+                ChatChannelPolicy.ownedFactions(player),
+                party == null ? null : party.getPartyId(),
+                readableChannels(player));
+    }
+
+    /**
+     * The name a player reacts as in a channel: the character they are
+     * playing where lines are signed in character, the account where
+     * they are not — the identity their own line there would wear.
+     */
+    private static String reactorName(EntityPlayerMP player,
+                                      ChatChannel channel) {
+        String account = player.getGameProfile() == null
+                ? player.getCommandSenderName()
+                : player.getGameProfile().getName();
+        if (ChatRolePresentation.isInCharacter(channel)) {
+            PlayableIdentityResolver.Resolution identity =
+                    PlayableIdentityResolver.resolve(player);
+            RoleplayCharacter character = identity.isAvailable()
+                    ? identity.getCharacter() : null;
+            if (character != null) {
+                return characterNameOrFallback(character, account);
+            }
+        }
+        return account;
+    }
+
     private static void tellRecipients(Set<UUID> recipients,
                                        LostTalesChatUpdatePacket update) {
         MinecraftServer server = MinecraftServer.getServer();

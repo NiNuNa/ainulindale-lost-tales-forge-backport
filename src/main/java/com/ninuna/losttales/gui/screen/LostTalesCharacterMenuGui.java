@@ -1,5 +1,7 @@
 package com.ninuna.losttales.gui.screen;
 
+import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
+import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.client.gui.animation.LostTalesControlBarAnimation;
 import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar;
 import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar.Hint;
@@ -21,7 +23,8 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
 /** Skyrim-style radial character menu. */
-public class LostTalesCharacterMenuGui extends GuiScreen {
+public class LostTalesCharacterMenuGui extends GuiScreen
+        implements LostTalesPointerInteractable {
     private static final int BUTTON_SETTINGS = 42100;
     private static final int NONE = CharacterMenuSectorResolver.NONE;
     private static final int OPTION_PROFILE = CharacterMenuSectorResolver.PROFILE;
@@ -54,8 +57,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
         int centerX = this.width / 2;
         int centerY = this.height / 2;
         int radius = Math.max(72, Math.min(this.width, this.height) / 4);
-        this.hoveredOption = getOptionAt(
-                mouseX, mouseY, centerX, centerY, this.width, this.height);
+        this.hoveredOption = optionAt(mouseX, mouseY);
 
         LostTalesSkyrimUiStyle.drawScreenShade(this.width, this.height);
         LostTalesSkyrimUiStyle.drawCenteredHeader(this.fontRendererObj, "Character Menu", getHoveredSubtitle(), this.width, 12);
@@ -172,11 +174,14 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
         GL11.glPopAttrib();
     }
 
-    private int getOptionAt(int mouseX, int mouseY, int centerX, int centerY,
-                            int screenWidth, int screenHeight) {
+    /**
+     * The sector under the point, or {@code NONE} on the exact centre. The
+     * hover sector, the click and the pointer all ask this one question.
+     */
+    private int optionAt(int mouseX, int mouseY) {
         return CharacterMenuSectorResolver.resolve(
-                mouseX, mouseY, centerX, centerY,
-                screenWidth, screenHeight);
+                mouseX, mouseY, this.width / 2, this.height / 2,
+                this.width, this.height);
     }
 
     private String getHoveredSubtitle() {
@@ -224,14 +229,34 @@ public class LostTalesCharacterMenuGui extends GuiScreen {
             super.mouseClicked(controlMouseX, controlMouseY, button);
             return;
         }
-        int option = getOptionAt(mouseX, mouseY,
-                this.width / 2, this.height / 2, this.width, this.height);
+        int option = optionAt(mouseX, mouseY);
         this.hoveredOption = option;
         if (button == 0 && option != NONE) {
             openOption(option);
             return;
         }
         super.mouseClicked(controlMouseX, controlMouseY, button);
+    }
+
+    /**
+     * Asked in the order {@link #mouseClicked} resolves a press: the
+     * settings button in the control bar's space first, then the sector
+     * under the point. The sectors fill the screen, so the plain pointer
+     * shows only on the exact centre and over a disabled settings button.
+     */
+    @Override
+    public boolean isPointerOverInteractable(int mouseX, int mouseY) {
+        int controlMouseX = LostTalesControlBarAnimation.fixedMouseX(
+                this, mouseX);
+        int controlMouseY = LostTalesControlBarAnimation.fixedMouseY(
+                this, mouseY);
+        if (isSettingsButtonAt(controlMouseX, controlMouseY)) {
+            return LostTalesGuiPointerTargets.isOverEnabledButton(
+                    this, controlMouseX, controlMouseY);
+        }
+        return optionAt(mouseX, mouseY) != NONE
+                || LostTalesGuiPointerTargets.isOverEnabledButton(
+                        this, controlMouseX, controlMouseY);
     }
 
     private boolean isSettingsButtonAt(int mouseX, int mouseY) {

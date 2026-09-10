@@ -316,8 +316,21 @@ public final class ClientChatChannelViews {
         if (anchor != null && anchor.revision == revision(view)) {
             int index = anchor.locate(lines);
             if (index >= 0) {
-                place(view, LostTalesChatOverlayRenderer.rowOfLine(
-                        index, divider) + anchor.delta, current);
+                double offset = LostTalesChatOverlayRenderer.rowOfLine(
+                        index, divider) + anchor.delta;
+                double ceiling = frame.scrollCeiling();
+                if (offset > ceiling) {
+                    // The window has grown under a view scrolled to its
+                    // top: the held line would now stand above the
+                    // ceiling the clamp holds the view to. Held and
+                    // clamped by turns, the page would jitter between
+                    // the two every frame, so the hold is let go here
+                    // and taken again at the ceiling on the next frame.
+                    place(view, ceiling, current);
+                    ANCHORS.remove(view);
+                } else {
+                    place(view, offset, current);
+                }
                 return;
             }
         }
@@ -432,11 +445,15 @@ public final class ClientChatChannelViews {
         return divider == null ? null : Integer.valueOf(divider.lineId);
     }
 
-    /** The divider's date label: the day its unread run began. */
-    public static synchronized String unreadDividerLabel(ChatTab tab) {
+    /**
+     * When the tab's unread run began: the time its first line was
+     * said, or zero without a divider. What the divider's label dates
+     * itself by when that was not today.
+     */
+    public static synchronized long unreadDividerTimestamp(ChatTab tab) {
         UnreadDivider divider = tab == null ? null
                 : UNREAD_DIVIDERS.get(key(tab));
-        return divider == null ? "" : divider.label;
+        return divider == null ? 0L : divider.timestampMillis;
     }
 
     /**
@@ -499,19 +516,17 @@ public final class ClientChatChannelViews {
     private static final class UnreadDivider {
         final int lineId;
         /**
-         * The day the run's first line was said, formatted once: the
-         * line's own time, so a run replayed from yesterday is dated
-         * yesterday and not the day it was shown.
+         * When the run's first line was said: the line's own time, so
+         * a run replayed from yesterday is dated yesterday and not the
+         * day it was shown.
          */
-        final String label;
+        final long timestampMillis;
         boolean seen;
 
         UnreadDivider(int lineId, long timestampMillis) {
             this.lineId = lineId;
-            this.label = java.text.DateFormat.getDateInstance(
-                    java.text.DateFormat.LONG).format(new java.util.Date(
-                            timestampMillis > 0L ? timestampMillis
-                                    : System.currentTimeMillis()));
+            this.timestampMillis = timestampMillis > 0L ? timestampMillis
+                    : System.currentTimeMillis();
         }
     }
 

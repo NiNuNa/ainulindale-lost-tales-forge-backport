@@ -168,7 +168,7 @@ abstract class ChatPickerPanel {
         return anchorY - BUTTON_ANCHOR_OFFSET;
     }
 
-    boolean isInsideButton(int mouseX, int mouseY,
+    boolean isInsideButton(double mouseX, double mouseY,
                            int anchorRight, int anchorY) {
         int left = buttonLeft(anchorRight);
         int top = buttonTop(anchorY);
@@ -176,7 +176,7 @@ abstract class ChatPickerPanel {
                 && mouseY >= top && mouseY < top + BUTTON_SIZE;
     }
 
-    boolean isInsidePanel(int mouseX, int mouseY,
+    boolean isInsidePanel(double mouseX, double mouseY,
                           int anchorRight, int screenHeight) {
         if (!this.targetOpen) {
             return false;
@@ -188,11 +188,13 @@ abstract class ChatPickerPanel {
     }
 
     /**
-     * Click handling inside the panel: search focus and section folding.
-     * Returns true when a section header consumed the click.
+     * A press inside the panel: the search field takes it in whole
+     * pixels, as a text field does, and a folding section's label folds
+     * or unfolds. True when a label took the press.
      */
-    boolean mouseClicked(int mouseX, int mouseY, int button,
-                         int anchorRight, int screenHeight) {
+    boolean mouseClicked(int mouseX, int mouseY, double pointerX,
+                         double pointerY, int button, int anchorRight,
+                         int screenHeight) {
         if (!this.targetOpen) {
             return false;
         }
@@ -204,47 +206,81 @@ abstract class ChatPickerPanel {
         if (button != 0) {
             return false;
         }
-        for (Label label : layout.labels) {
-            if (label.collapsible && mouseX >= layout.left
-                    && mouseX < layout.left + panelWidth()
-                    && mouseY >= label.y && mouseY < label.y + LABEL_HEIGHT
-                    && layout.showsRow(label.y, LABEL_HEIGHT)) {
-                toggleCollapsed(label.key);
-                return true;
-            }
+        String key = labelAt(layout, pointerX, pointerY);
+        if (key == null) {
+            return false;
         }
-        return false;
+        toggleCollapsed(key);
+        return true;
     }
 
-    /** The cell under the mouse while the picker is open, else null. */
-    Entry entryAt(int mouseX, int mouseY, int anchorRight, int screenHeight) {
+    /** The key of the folding section label under the point, or null. */
+    String labelAt(double x, double y, int anchorRight, int screenHeight) {
+        return this.targetOpen
+                ? labelAt(buildLayout(anchorRight, screenHeight), x, y) : null;
+    }
+
+    private String labelAt(Layout layout, double x, double y) {
+        for (Label label : layout.labels) {
+            if (label.collapsible && x >= layout.left
+                    && x < layout.left + panelWidth()
+                    && y >= label.y && y < label.y + LABEL_HEIGHT
+                    && layout.showsRow(label.y, LABEL_HEIGHT)) {
+                return label.key;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The cell under the point while the picker is open, else null: the
+     * one test the cell's highlight, a press and the pointer all ask.
+     */
+    Entry entryAt(double x, double y, int anchorRight, int screenHeight) {
         if (!this.targetOpen) {
             return null;
         }
         Layout layout = buildLayout(anchorRight, screenHeight);
         for (Cell cell : layout.cells) {
-            if (mouseX >= cell.x && mouseX < cell.x + cellWidth()
-                    && mouseY >= cell.y && mouseY < cell.y + cellHeight()
-                    && layout.showsRow(cell.y, cellHeight())) {
+            if (cellContains(layout, cell, x, y)) {
                 return cell.entry;
             }
         }
         return null;
     }
 
+    /**
+     * Whether the point is on the cell as it shows: inside the cell and
+     * inside the body the list is clipped to.
+     */
+    private boolean cellContains(Layout layout, Cell cell, double x,
+                                 double y) {
+        return x >= cell.x && x < cell.x + cellWidth()
+                && y >= cell.y && y < cell.y + cellHeight()
+                && y >= layout.bodyTop && y < layout.bodyBottom
+                && layout.showsRow(cell.y, cellHeight());
+    }
+
+    /**
+     * Draws the button and, while open, the panel. {@code pointerX}/
+     * {@code pointerY} is the pointer while the picker has it, else
+     * {@link ChatHover#AWAY}; the tooltip stands beside the whole-pixel
+     * {@code tipX}/{@code tipY}.
+     */
     void draw(Minecraft minecraft, ChatPointerRegions regions,
-              int anchorRight, int screenHeight, int mouseX, int mouseY) {
+              int anchorRight, int screenHeight, double pointerX,
+              double pointerY, int tipX, int tipY) {
         this.hoveredEntry = null;
         drawButton(minecraft, regions, anchorRight, screenHeight,
-                mouseX, mouseY);
+                pointerX, pointerY);
         drawPanel(minecraft, regions, anchorRight, screenHeight,
-                mouseX, mouseY);
-        drawTooltip(minecraft.fontRenderer, mouseX, mouseY, anchorRight);
+                pointerX, pointerY);
+        drawTooltip(minecraft.fontRenderer, tipX, tipY, anchorRight);
     }
 
     private void drawButton(Minecraft minecraft, ChatPointerRegions regions,
                             int anchorRight, int screenHeight,
-                            int mouseX, int mouseY) {
+                            double mouseX, double mouseY) {
         int left = buttonLeft(anchorRight);
         int top = buttonTop(screenHeight);
         boolean lifted = this.targetOpen || isInsideButton(mouseX, mouseY,
@@ -265,7 +301,7 @@ abstract class ChatPickerPanel {
 
     private void drawPanel(Minecraft minecraft, ChatPointerRegions regions,
                            int anchorRight, int screenHeight,
-                           int mouseX, int mouseY) {
+                           double mouseX, double mouseY) {
         float progress = openProgress();
         if (progress <= 0.0F) {
             return;
@@ -306,10 +342,7 @@ abstract class ChatPickerPanel {
                     continue;
                 }
                 boolean hovered = this.targetOpen && slide == 0
-                        && mouseX >= cell.x && mouseX < cell.x + cellWidth()
-                        && mouseY >= cell.y && mouseY < cell.y + cellHeight()
-                        && mouseY >= layout.bodyTop
-                        && mouseY < layout.bodyBottom;
+                        && cellContains(layout, cell, mouseX, mouseY);
                 if (hovered) {
                     this.hoveredEntry = cell.entry;
                     Gui.drawRect(cell.x, cell.y, cell.x + cellWidth(),

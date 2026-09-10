@@ -274,7 +274,7 @@ final class ChatInputBar {
         return barSlotLeft(barRight, this.toolbarToggleIndex);
     }
 
-    boolean isInsideToolbarToggle(int mouseX, int mouseY, int barRight) {
+    boolean isInsideToolbarToggle(double mouseX, double mouseY, int barRight) {
         int toggleLeft = toolbarToggleLeft(barRight);
         int controlTop = barControlTop();
         return mouseX >= toggleLeft
@@ -355,7 +355,7 @@ final class ChatInputBar {
     }
 
     /** The picker whose button the point is on, or null. */
-    ChatPickerPanel pickerButtonAt(int mouseX, int mouseY, int barRight) {
+    ChatPickerPanel pickerButtonAt(double mouseX, double mouseY, int barRight) {
         int anchor = pickerAnchor();
         for (ChatPickerPanel candidate : this.pickers) {
             if (isPickerShown(candidate) && candidate.isInsideButton(
@@ -452,7 +452,7 @@ final class ChatInputBar {
      * under the pointer like the buttons beside it, with the sheet's
      * hover state.
      */
-    void drawToolbarToggle(int barRight, int mouseX, int mouseY) {
+    void drawToolbarToggle(int barRight, double mouseX, double mouseY) {
         boolean collapsed = ChatWindowLayout.isToolbarCollapsed();
         boolean hovered = isInsideToolbarToggle(mouseX, mouseY, barRight);
         int toggleLeft = toolbarToggleLeft(barRight);
@@ -467,17 +467,18 @@ final class ChatInputBar {
     }
 
     /** Every picker's button and open panel, in bar space. */
-    void drawPickers(int barRight, int mouseX, int mouseY) {
+    void drawPickers(int barRight, double mouseX, double mouseY, int tipX,
+                     int tipY) {
         for (ChatPickerPanel picker : this.pickers) {
             if (isPickerShown(picker)) {
                 picker.draw(this.mc, this.regions, barRight, pickerAnchor(),
-                        mouseX, mouseY);
+                        mouseX, mouseY, tipX, tipY);
             }
         }
     }
 
     /** The {@code [Channel]} indicator, in the tab's colour, ivory under the pointer. */
-    void drawIndicator(int mouseX, int mouseY) {
+    void drawIndicator(double mouseX, double mouseY) {
         ChatTab channel = ClientChatChannelState.getSelected();
         int width = indicatorWidth();
         int indicatorLeft = indicatorLeft();
@@ -522,7 +523,7 @@ final class ChatInputBar {
                         ClientChatChannelState.getSelected())) - 1;
     }
 
-    boolean isInsideCharacterButton(int mouseX, int mouseY) {
+    boolean isInsideCharacterButton(double mouseX, double mouseY) {
         int buttonLeft = characterButtonLeft();
         int controlTop = barControlTop();
         return mouseX >= buttonLeft
@@ -539,7 +540,7 @@ final class ChatInputBar {
      * choice is locked. Returns whether the pointer is on it, for the
      * tip the screen offers.
      */
-    boolean drawCharacterSelectionButton(int mouseX, int mouseY,
+    boolean drawCharacterSelectionButton(double mouseX, double mouseY,
                                          boolean menuOpen) {
         int buttonLeft = characterButtonLeft();
         int controlTop = barControlTop();
@@ -609,7 +610,7 @@ final class ChatInputBar {
         }
     }
 
-    boolean isInsideIndicator(int mouseX, int mouseY) {
+    boolean isInsideIndicator(double mouseX, double mouseY) {
         int indicatorLeft = indicatorLeft();
         return mouseX >= indicatorLeft
                 && mouseX < indicatorLeft + indicatorWidth()
@@ -632,7 +633,7 @@ final class ChatInputBar {
         return barSlotLeft(barRight, SEND_BUTTON_INDEX);
     }
 
-    boolean isInsideSendButton(int mouseX, int mouseY, int barRight) {
+    boolean isInsideSendButton(double mouseX, double mouseY, int barRight) {
         int buttonLeft = sendButtonLeft(barRight);
         int controlTop = barControlTop();
         return mouseX >= buttonLeft
@@ -665,7 +666,7 @@ final class ChatInputBar {
      * there is nothing to send. The sheet holds one arrow, so hovering
      * is told by the lift alone.
      */
-    void drawSendButton(int barRight, int mouseX, int mouseY) {
+    void drawSendButton(int barRight, double mouseX, double mouseY) {
         int buttonLeft = sendButtonLeft(barRight);
         int controlTop = barControlTop();
         boolean hovered = isInsideSendButton(mouseX, mouseY, barRight);

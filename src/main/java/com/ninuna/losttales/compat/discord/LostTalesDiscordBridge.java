@@ -7,6 +7,7 @@ import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.server.ChatHistory;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.compat.discord.gateway.DiscordGatewayClient;
 import com.ninuna.losttales.compat.discord.gateway.DiscordGatewayProtocol;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -393,6 +394,23 @@ public final class LostTalesDiscordBridge {
                 messageId, ChatReplyReference.NONE, null, ""));
     }
 
+    /**
+     * Says that the players' reaction with an emoji came to a game
+     * message, or went from it, so the bot's own reaction on each of its
+     * Discord copies comes or goes with it: one reaction on Discord
+     * stands for every player who reacted, since a bot is one member
+     * there. An emoji of the mod's own, with no Unicode form, has
+     * nothing to be on Discord and stays in the game.
+     */
+    public void relayReaction(long messageId, ChatEmoji emoji, boolean add) {
+        if (emoji == null || emoji.getUnicode().length() == 0) {
+            return;
+        }
+        enqueueOutbound(new Outbound(add ? Outbound.Kind.REACT
+                : Outbound.Kind.UNREACT, "", "", emoji.getUnicode(),
+                messageId, ChatReplyReference.NONE, null, ""));
+    }
+
     private void enqueueOutbound(Outbound entry) {
         Worker running = this.worker;
         if (running == null || !running.posts
@@ -544,6 +562,24 @@ public final class LostTalesDiscordBridge {
             long target = this.links.messageIdOf(message.discordId);
             if (target != ChatMessageIds.NONE) {
                 LostTalesChatService.editFromDiscord(target, message.text);
+            }
+            return;
+        }
+        if (message.kind == Inbound.Kind.REACT_ADD
+                || message.kind == Inbound.Kind.REACT_REMOVE
+                || message.kind == Inbound.Kind.REACT_CLEAR) {
+            // A reaction reaches the game only on a message the bridge
+            // still knows, the way an edit does.
+            long target = this.links.messageIdOf(message.discordId);
+            if (target != ChatMessageIds.NONE) {
+                ChatEmoji emoji = ChatEmoji.fromName(message.text);
+                if (message.kind == Inbound.Kind.REACT_CLEAR) {
+                    LostTalesChatService.clearDiscordReactions(target, emoji);
+                } else {
+                    LostTalesChatService.reactFromDiscord(target,
+                            message.authorId, message.name, emoji,
+                            message.kind == Inbound.Kind.REACT_ADD);
+                }
             }
             return;
         }
@@ -806,7 +842,10 @@ public final class LostTalesDiscordBridge {
                 DiscordJson.Message message = DiscordJson.parseMessage(data);
                 DiscordChannelBinding binding = message == null ? null
                         : readingBindingOf(message.channelId);
-                if (binding == null || message.bot) {
+                // An update without an edit stamp is Discord's own —
+                // a link's embed unfurling, most often — and the words
+                // it carries are the ones already relayed.
+                if (binding == null || message.bot || !message.isEdited()) {
                     return;
                 }
                 String text = DiscordMessageSanitizer.inbound(
@@ -828,6 +867,37 @@ public final class LostTalesDiscordBridge {
                     enqueueInbound(new Inbound(Inbound.Kind.DELETE, "", "", "", id, "",
                             binding.id()));
                 }
+            } else if (name != null && name.startsWith("MESSAGE_REACTION_")) {
+                // A reaction on a message the bridge relayed, either
+                // way. A bot's own — the bridge's above all — is not a
+                // member's, and an emoji the chat cannot draw is left
+                // on Discord.
+                DiscordJson.Reaction reaction = DiscordJson.parseReaction(data);
+                DiscordChannelBinding binding = reaction == null ? null
+                        : readingBindingOf(reaction.channelId);
+                if (binding == null || reaction.bot) {
+                    return;
+                }
+                Inbound.Kind kind;
+                if ("MESSAGE_REACTION_ADD".equals(name)) {
+                    kind = Inbound.Kind.REACT_ADD;
+                } else if ("MESSAGE_REACTION_REMOVE".equals(name)) {
+                    kind = Inbound.Kind.REACT_REMOVE;
+                } else if ("MESSAGE_REACTION_REMOVE_ALL".equals(name)
+                        || "MESSAGE_REACTION_REMOVE_EMOJI".equals(name)) {
+                    kind = Inbound.Kind.REACT_CLEAR;
+                } else {
+                    return;
+                }
+                ChatEmoji emoji = reaction.emoji();
+                boolean all = "MESSAGE_REACTION_REMOVE_ALL".equals(name);
+                if (!all && emoji == null) {
+                    return;
+                }
+                enqueueInbound(new Inbound(kind,
+                        DiscordMessageSanitizer.inboundName(reaction.memberName),
+                        reaction.userId, all ? "" : emoji.getName(),
+                        reaction.messageId, "", binding.id()));
             } else if ("INTERACTION_CREATE".equals(name)) {
                 final DiscordJson.Interaction interaction = DiscordJson.parseInteraction(data);
                 final DiscordGatewayClient client = gateway;
@@ -887,7 +957,8 @@ public final class LostTalesDiscordBridge {
 
     private static final class Inbound {
         /** What reached the game: a message, word about an old one, or a command. */
-        enum Kind { MESSAGE, EDIT, DELETE, COMMAND }
+        enum Kind { MESSAGE, EDIT, DELETE, COMMAND, REACT_ADD, REACT_REMOVE,
+            REACT_CLEAR }
 
         final Kind kind;
         final String name;
@@ -931,7 +1002,7 @@ public final class LostTalesDiscordBridge {
 
     private static final class Outbound {
         /** What the worker is to do with the entry. */
-        enum Kind { POST, EDIT, DELETE }
+        enum Kind { POST, EDIT, DELETE, REACT, UNREACT }
 
         final Kind kind;
         final String username;
@@ -985,6 +1056,8 @@ public final class LostTalesDiscordBridge {
                 new HashMap<String, ChannelCursor>();
         /** Webhooks Discord refused for the session, by URL. */
         private final Set<String> postingDisabled = new HashSet<String>();
+        /** Whether Discord's refusal of a reaction has been said this session. */
+        private boolean reactionRefusalLogged;
         /**
          * What waits to be sent, one lane per webhook, each on a clock
          * of its own: the intake is sorted into them on every pass.
@@ -1603,6 +1676,11 @@ public final class LostTalesDiscordBridge {
                     }
                     continue;
                 }
+                if (next.kind == Outbound.Kind.REACT
+                        || next.kind == Outbound.Kind.UNREACT) {
+                    routeReaction(next);
+                    continue;
+                }
                 Set<String> webhooks = new HashSet<String>();
                 for (DiscordMessageLinks.Copy copy : links.copiesOf(next.messageId)) {
                     if (copy.webhookUrl.length() > 0) {
@@ -1624,6 +1702,94 @@ public final class LostTalesDiscordBridge {
                     }
                 }
             }
+        }
+
+        /**
+         * Puts a reaction on the lane of every copy of its message: a
+         * copy posted through a webhook on that webhook's lane, behind
+         * its post when the post still waits, so the reaction always
+         * finds the copy made; a Discord member's own message on a lane
+         * of its channel's own. The reaction is the bot's, made through
+         * its token, so the lane is only an order to keep.
+         */
+        private void routeReaction(Outbound next) {
+            Set<String> lanesFor = new LinkedHashSet<String>();
+            for (DiscordMessageLinks.Copy copy : links.copiesOf(next.messageId)) {
+                lanesFor.add(copy.webhookUrl.length() > 0 ? copy.webhookUrl
+                        : copy.destination);
+            }
+            for (String webhook : this.lanes.webhooks()) {
+                for (Outbound waiting : this.lanes.items(webhook)) {
+                    if (waiting.kind == Outbound.Kind.POST
+                            && waiting.messageId == next.messageId) {
+                        lanesFor.add(webhook);
+                        break;
+                    }
+                }
+            }
+            for (String lane : lanesFor) {
+                if (lane.length() > 0 && !this.postingDisabled.contains(lane)) {
+                    queueOnLane(lane, next);
+                }
+            }
+        }
+
+        /**
+         * The bot's own reaction put on, or taken off, the copy of a
+         * message that lives on {@code lane}. Answers how long Discord
+         * asked to wait when it limited the request, and zero when the
+         * entry is spent: no copy there, no channel to name, no bot
+         * token, or Discord refusing — said once, since the one usual
+         * cause is a permission the bot lacks.
+         */
+        private long sendReaction(String lane, Outbound next) throws IOException {
+            DiscordMessageLinks.Copy copy = null;
+            for (DiscordMessageLinks.Copy candidate : links.copiesOf(next.messageId)) {
+                if (lane.equals(candidate.webhookUrl)
+                        || (candidate.webhookUrl.length() == 0
+                                && lane.equals(candidate.destination))) {
+                    copy = candidate;
+                    break;
+                }
+            }
+            if (copy == null) {
+                return 0L;
+            }
+            String channelId = channelIdOf(copy.destination);
+            if (channelId.length() == 0 && copy.webhookUrl.length() > 0) {
+                DiscordJson.ChannelInfo info = webhookInfo(copy.webhookUrl);
+                channelId = info == null ? "" : info.channelId;
+            }
+            String token = LostTalesConfig.discordBotToken.trim();
+            if (channelId.length() == 0 || token.length() == 0) {
+                return 0L;
+            }
+            DiscordHttp.Reply reply = next.kind == Outbound.Kind.REACT
+                    ? DiscordHttp.putOwnReaction(token, channelId,
+                            copy.discordId, next.message)
+                    : DiscordHttp.deleteOwnReaction(token, channelId,
+                            copy.discordId, next.message);
+            if (reply.status == 429) {
+                long asked = DiscordJson.retryAfterMillis(reply.body);
+                return asked > 0L ? asked : MIN_BACKOFF_MILLIS;
+            }
+            if (reply.status == 400 || reply.status == 403
+                    || reply.status == 404) {
+                if (!this.reactionRefusalLogged) {
+                    this.reactionRefusalLogged = true;
+                    FMLLog.warning("[%s] Discord refused the bridge's reaction "
+                            + "(HTTP %d): the bot needs Add Reactions and Read "
+                            + "Message History in the bound channel",
+                            LostTalesMetaData.MOD_ID,
+                            Integer.valueOf(reply.status));
+                }
+                return 0L;
+            }
+            if (!reply.isSuccess()) {
+                throw new IOException("Discord replied HTTP " + reply.status
+                        + " to a reaction");
+            }
+            return 0L;
         }
 
         /**
@@ -1659,6 +1825,10 @@ public final class LostTalesDiscordBridge {
          * correct. Any other failure is the bridge's, and backs off.
          */
         private long send(String webhook, Outbound next) throws IOException {
+            if (next.kind == Outbound.Kind.REACT
+                    || next.kind == Outbound.Kind.UNREACT) {
+                return sendReaction(webhook, next);
+            }
             DiscordHttp.Reply reply;
             String header = "";
             if (next.kind == Outbound.Kind.POST && next.notice != null) {

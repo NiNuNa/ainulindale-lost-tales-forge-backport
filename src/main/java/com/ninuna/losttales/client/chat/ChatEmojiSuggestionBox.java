@@ -80,7 +80,7 @@ final class ChatEmojiSuggestionBox {
     }
 
     /** True while the mouse is over the visible popup, including padding. */
-    boolean contains(FontRenderer font, int mouseX, int mouseY,
+    boolean contains(FontRenderer font, double mouseX, double mouseY,
                      int screenHeight, int inputX) {
         if (!isActive()) {
             return false;
@@ -91,30 +91,37 @@ final class ChatEmojiSuggestionBox {
                 && mouseY >= top && mouseY < screenHeight - BOTTOM_MARGIN;
     }
 
-    /** The suggestion under the mouse, or null. Also used for clicks. */
-    ChatEmoji suggestionAt(FontRenderer font, int mouseX, int mouseY,
-                           int screenHeight, int inputX) {
-        if (!contains(font, mouseX, mouseY, screenHeight, inputX)) {
-            return null;
+    /**
+     * The row under the point, or -1: the one test the row's highlight,
+     * a press and the pointer all ask.
+     */
+    int rowAt(FontRenderer font, double mouseX, double mouseY,
+              int screenHeight, int inputX) {
+        if (!contains(font, mouseX, mouseY, screenHeight, inputX)
+                || mouseY < boxTop(screenHeight) + PADDING) {
+            return -1;
         }
-        int top = boxTop(screenHeight);
-        if (mouseY < top + PADDING) {
-            return null;
-        }
-        int row = (mouseY - top - PADDING) / ROW_HEIGHT;
+        int row = (int)Math.floor((mouseY - boxTop(screenHeight) - PADDING)
+                / (double)ROW_HEIGHT);
+        return row >= 0 && row < this.matches.size() ? row : -1;
+    }
+
+    /** The suggestion on a row, or null. */
+    ChatEmoji at(int row) {
         return row >= 0 && row < this.matches.size()
                 ? this.matches.get(row) : null;
     }
 
     void draw(Minecraft minecraft, FontRenderer font,
               ChatPointerRegions regions, int screenHeight,
-              int inputX, int mouseX, int mouseY) {
+              int inputX, double mouseX, double mouseY) {
         if (!isActive()) {
             return;
         }
         int width = boxWidth(font);
         int top = boxTop(screenHeight);
         int bottom = screenHeight - BOTTOM_MARGIN;
+        int hoveredRow = rowAt(font, mouseX, mouseY, screenHeight, inputX);
         regions.add(inputX, top, inputX + width, bottom);
         Gui.drawRect(inputX, top, inputX + width, bottom,
                 LostTalesChatVisualStyle.argb(
@@ -122,9 +129,7 @@ final class ChatEmojiSuggestionBox {
         for (int row = 0; row < this.matches.size(); row++) {
             ChatEmoji emoji = this.matches.get(row);
             int rowTop = top + PADDING + row * ROW_HEIGHT;
-            boolean hovered = mouseX >= inputX
-                    && mouseX < inputX + width
-                    && mouseY >= rowTop && mouseY < rowTop + ROW_HEIGHT;
+            boolean hovered = row == hoveredRow;
             if (hovered) {
                 this.selectedIndex = row;
             }

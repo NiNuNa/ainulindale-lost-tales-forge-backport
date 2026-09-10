@@ -108,13 +108,17 @@ public final class LostTalesChatRoleMaskTest {
         roled.toBytes(buffer);
         // The whole mask is the int ahead of the three id tails: a bit no role
         // occupies, planted there, is refused.
-        buffer.setInt(buffer.writerIndex() - 4 - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES, 0x40000000 | ChatRoleFixtures.OPERATOR.bit());
+        buffer.setInt(buffer.writerIndex() - scopeTailBytes("") - 4
+                - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES,
+                0x40000000 | ChatRoleFixtures.OPERATOR.bit());
         LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
         decoded.fromBytes(buffer.copy());
         assertTrue(decoded.isMalformed());
         assertEquals(0, decoded.getRoles());
         // And the two copies of the mask must agree.
-        buffer.setInt(buffer.writerIndex() - 4 - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES, ChatAccountRole.TEAM.bit());
+        buffer.setInt(buffer.writerIndex() - scopeTailBytes("") - 4
+                - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES,
+                ChatAccountRole.TEAM.bit());
         LostTalesChatMessagePacket disagreeing = new LostTalesChatMessagePacket();
         disagreeing.fromBytes(buffer);
         assertTrue(disagreeing.isMalformed());
@@ -129,7 +133,8 @@ public final class LostTalesChatRoleMaskTest {
         ByteBuf buffer = Unpooled.buffer();
         roled.toBytes(buffer);
         LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
-        decoded.fromBytes(buffer.slice(0, buffer.readableBytes() - 4
+        decoded.fromBytes(buffer.slice(0, buffer.readableBytes()
+                - scopeTailBytes("") - 4
                 - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES));
         assertFalse(decoded.isMalformed());
         assertEquals(ChatRoleFixtures.OPERATOR.bit(), decoded.getRoles());
@@ -146,6 +151,22 @@ public final class LostTalesChatRoleMaskTest {
     private static int scopeTailBytes(String scopeValue) {
         ByteBuf probe = Unpooled.buffer();
         LostTalesPacketCodec.writeUtf8String(probe, scopeValue, 128);
+        // Behind the scope, for a line quoting nothing: the empty quote
+        // of a line nobody named (author, words, colour), then the
+        // quote's head, a server line's component and its named
+        // players, every one of them empty.
+        LostTalesPacketCodec.writeUtf8String(probe, "", 256);
+        LostTalesPacketCodec.writeUtf8String(probe, "", 297);
+        probe.writeInt(0);
+        probe.writeBoolean(false);
+        probe.writeLong(0L);
+        probe.writeLong(0L);
+        probe.writeBoolean(false);
+        LostTalesPacketCodec.writeUtf8String(probe, "", 128);
+        LostTalesPacketCodec.writeUtf8String(probe, "", 8192);
+        probe.writeInt(0);
+        // And the reactions, none.
+        probe.writeInt(0);
         return probe.readableBytes();
     }
 }

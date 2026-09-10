@@ -5,6 +5,8 @@ import com.ninuna.losttales.chat.ChatPresentationMode;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatNamedPlayer;
+import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
 import com.ninuna.losttales.chat.share.ChatShareKind;
@@ -571,6 +573,199 @@ public final class LostTalesChatPacketTest {
         assertEquals("Aldric", decoded.getReply().getAuthor());
     }
 
+    /** The quoted sender's head travels with the quote, so it is drawn whether or not the reader holds the line. */
+    @Test
+    public void aQuoteCarriesTheQuotedSendersHead() {
+        long original = ChatMessageIdAllocator.next();
+        UUID quoted = UUID.randomUUID();
+        ChatReplyReference reply = ChatReplyReference.of(original, "Aldric",
+                "meet me at the gate", 0x4A90D9)
+                .withHead(quoted, false, "skin-7");
+        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
+                ChatChannel.ALL, UUID.randomUUID(), "Beren", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "on my way", 1L, "", null, "", "", 0,
+                false, ChatMessageIdAllocator.next(), reply);
+        ByteBuf buffer = Unpooled.buffer();
+        packet.toBytes(buffer);
+        LostTalesChatMessagePacket decoded =
+                new LostTalesChatMessagePacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertTrue(decoded.getReply().hasHead());
+        assertEquals(quoted, decoded.getReply().getSenderId());
+        assertFalse(decoded.getReply().isAccountLine());
+        assertEquals("skin-7", decoded.getReply().getSkinId());
+        assertEquals(0x4A90D9, decoded.getReply().getAuthorColor());
+        // The head survives every copy a client makes of the line.
+        assertTrue(decoded.withMessage("changed").getReply().hasHead());
+        // A quote of nothing wears no head, whatever it is handed.
+        assertFalse(ChatReplyReference.NONE.withHead(quoted, true, "")
+                .hasHead());
+    }
+
+    /**
+     * A server line carries its own component and the players it
+     * names, so a replay shows it as the live line was shown; a
+     * player's line may carry neither.
+     */
+    @Test
+    public void aServerLineCarriesItsComponentAndNamedPlayers() {
+        String json = "{\"translate\":\"chat.type.achievement\","
+                + "\"with\":[\"Steve\",{\"translate\":\"achievement.openInventory\","
+                + "\"color\":\"green\"}]}";
+        List<ChatNamedPlayer> named = Arrays.asList(
+                new ChatNamedPlayer("Steve", "Aldric", 0x4A90D9),
+                new ChatNamedPlayer("Alex", "", 0xFFFFFF));
+        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
+                ChatChannel.ALL, LostTalesChatMessagePacket.SERVER_SENDER_ID,
+                "Server", "Server", "", 0xFFFFFF, 0xFFFFFF,
+                "Steve has just earned the achievement [Taking Inventory]",
+                1L, "", null, "", "", 0, true, ChatMessageIdAllocator.next(),
+                ChatReplyReference.NONE).withServerBody(json, named);
+        ByteBuf buffer = Unpooled.buffer();
+        packet.toBytes(buffer);
+        LostTalesChatMessagePacket decoded =
+                new LostTalesChatMessagePacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(json, decoded.getBodyJson());
+        assertEquals(2, decoded.getNamedPlayers().size());
+        assertEquals(new ChatNamedPlayer("Steve", "Aldric", 0x4A90D9),
+                decoded.getNamedPlayers().get(0));
+        assertEquals("a nameless identity is the account",
+                "Alex", decoded.getNamedPlayers().get(1).getIdentityName());
+        assertEquals(json, decoded.withNameColor(0x123456).getBodyJson());
+        assertEquals(2, decoded.withScope("").getNamedPlayers().size());
+
+        // A player's line keeps no component, whatever it is handed.
+        LostTalesChatMessagePacket player = new LostTalesChatMessagePacket(
+                ChatChannel.ALL, UUID.randomUUID(), "Beren", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "hello", 1L, "").withServerBody(json, named);
+        assertEquals("", player.getBodyJson());
+        assertEquals(2, player.getNamedPlayers().size());
+        ByteBuf playerBuffer = Unpooled.buffer();
+        player.toBytes(playerBuffer);
+        LostTalesChatMessagePacket playerDecoded =
+                new LostTalesChatMessagePacket();
+        playerDecoded.fromBytes(playerBuffer);
+        assertFalse(playerDecoded.isMalformed());
+        assertEquals("", playerDecoded.getBodyJson());
+
+        // A component too large to carry is left behind, not cut.
+        StringBuilder huge = new StringBuilder();
+        while (huge.length() <= LostTalesChatMessagePacket.MAX_BODY_BYTES) {
+            huge.append("{\"text\":\"x\"},");
+        }
+        assertEquals("", packet.withServerBody(huge.toString(), null)
+                .getBodyJson());
+    }
+
+    /** A payload written before the tail decodes as a line with nothing appended. */
+    @Test
+    public void anOlderLayoutWithoutTheTailStillDecodes() {
+        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
+                ChatChannel.ALL, UUID.randomUUID(), "Beren", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "hello", 1L, "");
+        ByteBuf buffer = Unpooled.buffer();
+        packet.toBytes(buffer);
+        // The older layout ended where the quote block starts: nothing
+        // for a line that quotes nothing. An empty string is one byte
+        // of length; the tail is a head (17 and a flag), a skin, a
+        // component and a count of named players.
+        int tail = 17 + 1 + 1 + 1 + 4 + 4;
+        int quoteBlock = 1 + 1 + 4;
+        ByteBuf older = Unpooled.buffer();
+        older.writeBytes(buffer, buffer.readableBytes() - tail - quoteBlock);
+        LostTalesChatMessagePacket decoded =
+                new LostTalesChatMessagePacket();
+        decoded.fromBytes(older);
+        assertFalse(decoded.isMalformed());
+        assertFalse(decoded.getReply().exists());
+        assertEquals("", decoded.getBodyJson());
+        assertTrue(decoded.getNamedPlayers().isEmpty());
+    }
+
+    /** The reactions ride on the line a reader is handed, and survive its copies. */
+    @Test
+    public void aLineCarriesItsReactionsAsItsReaderSeesThem() {
+        ChatReactionSummary reactions = new ChatReactionSummary(Arrays.asList(
+                new ChatReactionSummary.Reaction("smile", 3, true,
+                        Arrays.asList("Aldric", "Beren")),
+                new ChatReactionSummary.Reaction("joy", 1, false,
+                        Arrays.asList("Nils"))));
+        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
+                ChatChannel.ALL, UUID.randomUUID(), "Beren", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "hello", 1L, "", null, "", "", 0, false,
+                ChatMessageIdAllocator.next(), ChatReplyReference.NONE)
+                .withReactions(reactions);
+        ByteBuf buffer = Unpooled.buffer();
+        packet.toBytes(buffer);
+        LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(2, decoded.getReactions().getReactions().size());
+        ChatReactionSummary.Reaction smile = decoded.getReactions().find("smile");
+        assertEquals(3, smile.count);
+        assertTrue(smile.mine);
+        assertEquals(Arrays.asList("Aldric", "Beren"), smile.names);
+        assertEquals(1, decoded.withMessage("edited").getReactions()
+                .find("joy").count);
+    }
+
+    @Test
+    public void aReactionRequestNamesAKnownEmojiAndAServerMessage() {
+        long id = ChatMessageIdAllocator.next();
+        LostTalesChatReactPacket request = new LostTalesChatReactPacket(id,
+                "smile", true);
+        ByteBuf buffer = Unpooled.buffer();
+        request.toBytes(buffer);
+        LostTalesChatReactPacket decoded = new LostTalesChatReactPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(id, decoded.getMessageId());
+        assertEquals("smile", decoded.getEmoji());
+        assertTrue(decoded.isAdd());
+
+        ByteBuf forged = Unpooled.buffer();
+        forged.writeLong(id);
+        LostTalesPacketCodec.writeUtf8String(forged, "not_an_emoji", 64);
+        forged.writeBoolean(true);
+        LostTalesChatReactPacket refused = new LostTalesChatReactPacket();
+        refused.fromBytes(forged);
+        assertTrue(refused.isMalformed());
+    }
+
+    @Test
+    public void aReactionSyncRoundTripsAndRefusesAnEmojiTwice() {
+        long id = ChatMessageIdAllocator.next();
+        ChatReactionSummary reactions = new ChatReactionSummary(Arrays.asList(
+                new ChatReactionSummary.Reaction("smile", 2, false,
+                        Arrays.asList("Aldric"))));
+        ByteBuf buffer = Unpooled.buffer();
+        new LostTalesChatReactionSyncPacket(id, reactions).toBytes(buffer);
+        LostTalesChatReactionSyncPacket decoded =
+                new LostTalesChatReactionSyncPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(id, decoded.getMessageId());
+        assertEquals(2, decoded.getReactions().find("smile").count);
+
+        ByteBuf twice = Unpooled.buffer();
+        twice.writeLong(id);
+        twice.writeInt(2);
+        for (int index = 0; index < 2; index++) {
+            LostTalesPacketCodec.writeUtf8String(twice, "smile", 64);
+            twice.writeInt(1);
+            twice.writeBoolean(false);
+            twice.writeInt(0);
+        }
+        LostTalesChatReactionSyncPacket refused =
+                new LostTalesChatReactionSyncPacket();
+        refused.fromBytes(twice);
+        assertTrue(refused.isMalformed());
+        assertTrue(refused.getReactions().isEmpty());
+    }
+
     /** An ordinary line replies to nothing and pays nothing for it. */
     @Test
     public void anOrdinaryLineCarriesNoQuote() {
@@ -891,6 +1086,22 @@ public final class LostTalesChatPacketTest {
     private static int scopeTailBytes(String scopeValue) {
         ByteBuf probe = Unpooled.buffer();
         LostTalesPacketCodec.writeUtf8String(probe, scopeValue, 128);
+        // Behind the scope, for a line quoting nothing: the empty quote
+        // of a line nobody named (author, words, colour), then the
+        // quote's head, a server line's component and its named
+        // players, every one of them empty.
+        LostTalesPacketCodec.writeUtf8String(probe, "", 256);
+        LostTalesPacketCodec.writeUtf8String(probe, "", 297);
+        probe.writeInt(0);
+        probe.writeBoolean(false);
+        probe.writeLong(0L);
+        probe.writeLong(0L);
+        probe.writeBoolean(false);
+        LostTalesPacketCodec.writeUtf8String(probe, "", 128);
+        LostTalesPacketCodec.writeUtf8String(probe, "", 8192);
+        probe.writeInt(0);
+        // And the reactions, none.
+        probe.writeInt(0);
         return probe.readableBytes();
     }
 }

@@ -5,6 +5,8 @@ import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.chat.ChatNamedPlayer;
+import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.share.ChatShareKind;
@@ -119,6 +121,13 @@ public final class LostTalesChatMessagePacket implements IMessage {
         return Long.toUnsignedString(senderId.getLeastSignificantBits());
     }
 
+    /**
+     * The most a server line's own component takes, as the JSON the
+     * game itself sends chat in: an achievement with its hover, a
+     * death naming a weapon with its item, a join. A line past it
+     * travels as its words alone.
+     */
+    public static final int MAX_BODY_BYTES = 8192;
     /** The most one line takes on the wire; the history batch reads it too. */
     public static final int MAX_PACKET_BYTES = 2048
             + ChatMessageValidator.MAX_UTF8_BYTES
@@ -126,7 +135,16 @@ public final class LostTalesChatMessagePacket implements IMessage {
             + ChatReplyReference.MAX_AUTHOR_BYTES
             + ChatReplyReference.MAX_EXCERPT_BYTES
             // The quoted author's name colour, at the payload's tail.
-            + 4;
+            + 4
+            // The quoted sender's head: id, account flag and skin.
+            + 1 + 16 + 1 + 4 + ChatReplyReference.MAX_SKIN_ID_BYTES
+            // A server line's own component, and the players it names.
+            + 4 + MAX_BODY_BYTES
+            + 1 + ChatNamedPlayer.MAX_PER_LINE * (4
+                    + ChatNamedPlayer.MAX_ACCOUNT_BYTES + 4
+                    + ChatNamedPlayer.MAX_IDENTITY_BYTES + 4)
+            // The reactions on the line as this reader is shown them.
+            + LostTalesChatReactionCodec.MAX_BYTES;
     /** The appended identity tail: a presence flag and a UUID, always whole. */
     static final int IDENTITY_ID_TAIL_BYTES = 1 + 16;
     private static final int MAX_CHANNEL_BYTES = 16;
@@ -227,6 +245,29 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * not they hold the original.
      */
     private ChatReplyReference reply = ChatReplyReference.NONE;
+    /**
+     * A server line's own component as the game's chat JSON — its
+     * hover, its colours, its links — so a replay from the history
+     * shows an achievement or a death exactly as the live line was
+     * shown; empty for every line of a player's, and for a server line
+     * whose component would not fit. Appended; empty from an older
+     * layout.
+     */
+    private String bodyJson = "";
+    /**
+     * The players a server line names, as the server knew them when
+     * the line was said, so a replay names each by the identity they
+     * were playing whether or not they are still online. Appended;
+     * none from an older layout.
+     */
+    private List<ChatNamedPlayer> namedPlayers = Collections.emptyList();
+    /**
+     * The reactions on the line as the reader it is sent to is shown
+     * them: added by the server to the copy it hands a reader, never
+     * part of what it keeps, since "is it mine" is each reader's own.
+     * Appended; none from an older layout.
+     */
+    private ChatReactionSummary reactions = ChatReactionSummary.EMPTY;
     private boolean malformed;
 
     public LostTalesChatMessagePacket() {}
@@ -575,10 +616,62 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 this.reply = ChatReplyReference.unanchored(quoteAuthor,
                         quoteExcerpt, quoteColor);
             }
+            // Appended after the quote: the head the quote wears — a
+            // sender id, whether the line wore the account, its skin —
+            // then a server line's own component and the players it
+            // names. A payload written before any of it ends here.
+            this.bodyJson = "";
+            this.namedPlayers = Collections.emptyList();
+            if (buffer.readableBytes() >= IDENTITY_ID_TAIL_BYTES + 1) {
+                UUID quotedSender = readOptionalUuid(buffer);
+                boolean quotedAccountLine = buffer.readBoolean();
+                String quotedSkin = LostTalesPacketCodec.readUtf8String(
+                        buffer, ChatReplyReference.MAX_SKIN_ID_BYTES);
+                if (quotedSender != null) {
+                    this.reply = this.reply.withHead(quotedSender,
+                            quotedAccountLine, quotedSkin);
+                }
+                String body = LostTalesPacketCodec.readUtf8String(
+                        buffer, MAX_BODY_BYTES);
+                if (body.length() > 0 && !isSystemSender(this.senderId)) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "a component on a line that is not the server's");
+                }
+                this.bodyJson = body;
+                int named = LostTalesPacketCodec.readCount(buffer,
+                        ChatNamedPlayer.MAX_PER_LINE, "named players");
+                List<ChatNamedPlayer> players =
+                        new ArrayList<ChatNamedPlayer>(named);
+                for (int index = 0; index < named; index++) {
+                    ChatNamedPlayer player = new ChatNamedPlayer(
+                            LostTalesPacketCodec.readUtf8String(buffer,
+                                    ChatNamedPlayer.MAX_ACCOUNT_BYTES),
+                            LostTalesPacketCodec.readUtf8String(buffer,
+                                    ChatNamedPlayer.MAX_IDENTITY_BYTES),
+                            buffer.readInt());
+                    if (!player.isValid()) {
+                        throw new LostTalesPacketCodec.DecodeException(
+                                "a named player without an account");
+                    }
+                    players.add(player);
+                }
+                this.namedPlayers = players.isEmpty()
+                        ? Collections.<ChatNamedPlayer>emptyList()
+                        : Collections.unmodifiableList(players);
+            }
+            // Appended after those: the reactions as this reader is
+            // shown them. A payload written before them has none.
+            this.reactions = ChatReactionSummary.EMPTY;
+            if (buffer.readableBytes() >= 4) {
+                this.reactions = LostTalesChatReactionCodec.read(buffer);
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
             this.malformed = true;
+            this.bodyJson = "";
+            this.namedPlayers = Collections.emptyList();
+            this.reactions = ChatReactionSummary.EMPTY;
             this.showcases = Collections.emptyList();
             this.factionName = "";
             this.partner = "";
@@ -695,9 +788,10 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 MAX_SCOPE_VALUE_BYTES);
         if (this.reply.isAnchored()) {
             buffer.writeInt(this.reply.getAuthorColor());
-        } else if (this.reply.exists()) {
-            // A quote of a line nobody named: author, words and colour,
-            // and only when there is one.
+        } else {
+            // A quote of a line nobody named: author, words and colour.
+            // Written whether or not there is one, so the tail behind
+            // it stands at one place: an empty author is no quote.
             LostTalesPacketCodec.writeUtf8String(buffer,
                     this.reply.getAuthor(),
                     ChatReplyReference.MAX_AUTHOR_BYTES);
@@ -706,6 +800,25 @@ public final class LostTalesChatMessagePacket implements IMessage {
                     ChatReplyReference.MAX_EXCERPT_BYTES);
             buffer.writeInt(this.reply.getAuthorColor());
         }
+        // The quote's head, the server line's component, the players it
+        // names: see fromBytes.
+        writeOptionalUuid(buffer, this.reply.getSenderId());
+        buffer.writeBoolean(this.reply.isAccountLine());
+        LostTalesPacketCodec.writeUtf8String(buffer, this.reply.getSkinId(),
+                ChatReplyReference.MAX_SKIN_ID_BYTES);
+        LostTalesPacketCodec.writeUtf8String(buffer, this.bodyJson,
+                MAX_BODY_BYTES);
+        LostTalesPacketCodec.writeCount(buffer, this.namedPlayers.size(),
+                ChatNamedPlayer.MAX_PER_LINE, "named players");
+        for (ChatNamedPlayer player : this.namedPlayers) {
+            LostTalesPacketCodec.writeUtf8String(buffer, player.getAccount(),
+                    ChatNamedPlayer.MAX_ACCOUNT_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer,
+                    player.getIdentityName(),
+                    ChatNamedPlayer.MAX_IDENTITY_BYTES);
+            buffer.writeInt(player.getNameColor());
+        }
+        LostTalesChatReactionCodec.write(buffer, this.reactions);
     }
 
     /** A presence flag and a UUID, always {@link #IDENTITY_ID_TAIL_BYTES} long. */
@@ -755,6 +868,14 @@ public final class LostTalesChatMessagePacket implements IMessage {
                         this.factionName, MAX_FACTION_NAME_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.partner, MAX_ACCOUNT_NAME_BYTES)
+                || !LostTalesPacketCodec.isUtf8WithinLimit(
+                        this.reply.getSkinId(),
+                        ChatReplyReference.MAX_SKIN_ID_BYTES)
+                || !LostTalesPacketCodec.isUtf8WithinLimit(
+                        this.bodyJson, MAX_BODY_BYTES)
+                || (this.bodyJson.length() > 0
+                        && !isSystemSender(this.senderId))
+                || this.namedPlayers.size() > ChatNamedPlayer.MAX_PER_LINE
                 || (ChatChannel.fromId(this.channelId) == ChatChannel.WHISPER
                         && this.partner.length() == 0)
                 || this.timestampMillis <= 0L
@@ -835,15 +956,78 @@ public final class LostTalesChatMessagePacket implements IMessage {
                                                ChatReplyReference reply,
                                                long echoNonce, UUID ownCharacterId,
                                                UUID partnerCharacterId) {
-        return new LostTalesChatMessagePacket(getChannel(), this.senderId,
+        return carrying(new LostTalesChatMessagePacket(getChannel(), this.senderId,
                 this.identityName, this.accountName, this.title,
                 this.titleColor, this.nameColor, message,
                 this.timestampMillis, this.skinId, this.showcases,
                 this.factionName, partner, this.roles,
                 this.accountLine, this.messageId, reply,
                 partnerIdentity, echoNonce, this.identityCharacterId,
-                ownCharacterId, partnerCharacterId, this.scopeValue);
+                ownCharacterId, partnerCharacterId, this.scopeValue));
     }
+
+    /**
+     * The copy with this line's own component and named players: the
+     * one place the appended presentation tail is carried across a
+     * copy, so every {@code with} form keeps it.
+     */
+    private LostTalesChatMessagePacket carrying(LostTalesChatMessagePacket copy) {
+        copy.bodyJson = this.bodyJson;
+        copy.namedPlayers = this.namedPlayers;
+        copy.reactions = this.reactions;
+        return copy;
+    }
+
+    /** The same line wearing {@code reactions}, as one reader is shown them. */
+    public LostTalesChatMessagePacket withReactions(ChatReactionSummary reactions) {
+        LostTalesChatMessagePacket copy = withNameColor(this.nameColor);
+        copy.reactions = reactions == null ? ChatReactionSummary.EMPTY
+                : reactions;
+        return copy;
+    }
+
+    /** The reactions on the line as its reader is shown them; never null. */
+    public ChatReactionSummary getReactions() { return this.reactions; }
+
+    /**
+     * The same line carrying its own component as the game's chat
+     * JSON, and the players it names as the server knew them. Only a
+     * line of the server's own may carry a component; anything else
+     * keeps none, whatever it is handed.
+     */
+    public LostTalesChatMessagePacket withServerBody(
+            String componentJson, List<ChatNamedPlayer> named) {
+        LostTalesChatMessagePacket copy = carrying(withNameColor(
+                this.nameColor));
+        String body = componentJson == null ? "" : componentJson;
+        copy.bodyJson = isSystemSender(this.senderId)
+                && LostTalesPacketCodec.isUtf8WithinLimit(body,
+                        MAX_BODY_BYTES) ? body : "";
+        List<ChatNamedPlayer> players = new ArrayList<ChatNamedPlayer>();
+        for (int index = 0; named != null && index < named.size()
+                && players.size() < ChatNamedPlayer.MAX_PER_LINE; index++) {
+            ChatNamedPlayer player = named.get(index);
+            if (player != null && player.isValid()
+                    && LostTalesPacketCodec.isUtf8WithinLimit(
+                            player.getAccount(),
+                            ChatNamedPlayer.MAX_ACCOUNT_BYTES)
+                    && LostTalesPacketCodec.isUtf8WithinLimit(
+                            player.getIdentityName(),
+                            ChatNamedPlayer.MAX_IDENTITY_BYTES)) {
+                players.add(player);
+            }
+        }
+        copy.namedPlayers = players.isEmpty()
+                ? Collections.<ChatNamedPlayer>emptyList()
+                : Collections.unmodifiableList(players);
+        return copy;
+    }
+
+    /** The server line's own component as chat JSON; empty for none. */
+    public String getBodyJson() { return this.bodyJson; }
+
+    /** The players a server line names, as the server knew them; never null. */
+    public List<ChatNamedPlayer> getNamedPlayers() { return this.namedPlayers; }
 
     /**
      * The same line, said in one conversation of a scoped channel: the
@@ -851,26 +1035,26 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * one conversation.
      */
     public LostTalesChatMessagePacket withScope(String scopeValue) {
-        return new LostTalesChatMessagePacket(getChannel(), this.senderId,
+        return carrying(new LostTalesChatMessagePacket(getChannel(), this.senderId,
                 this.identityName, this.accountName, this.title,
                 this.titleColor, this.nameColor, this.message,
                 this.timestampMillis, this.skinId, this.showcases,
                 this.factionName, this.partner, this.roles,
                 this.accountLine, this.messageId, this.reply,
                 this.partnerIdentity, this.echoNonce, this.identityCharacterId,
-                this.ownCharacterId, this.partnerCharacterId, scopeValue);
+                this.ownCharacterId, this.partnerCharacterId, scopeValue));
     }
 
     /** The same line with its name drawn in another colour. */
     public LostTalesChatMessagePacket withNameColor(int color) {
-        return new LostTalesChatMessagePacket(getChannel(), this.senderId,
+        return carrying(new LostTalesChatMessagePacket(getChannel(), this.senderId,
                 this.identityName, this.accountName, this.title,
                 this.titleColor, color, this.message,
                 this.timestampMillis, this.skinId, this.showcases,
                 this.factionName, this.partner, this.roles,
                 this.accountLine, this.messageId, this.reply,
                 this.partnerIdentity, this.echoNonce, this.identityCharacterId,
-                this.ownCharacterId, this.partnerCharacterId, this.scopeValue);
+                this.ownCharacterId, this.partnerCharacterId, this.scopeValue));
     }
 
     /** Which conversation on a scoped channel the line is in; empty for one. */

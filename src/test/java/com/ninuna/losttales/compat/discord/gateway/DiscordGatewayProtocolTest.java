@@ -36,7 +36,7 @@ public final class DiscordGatewayProtocolTest {
         assertEquals(TOKEN, identify.getAsJsonObject("d").get("token").getAsString());
         assertEquals(DiscordGatewayProtocol.INTENTS,
                 identify.getAsJsonObject("d").get("intents").getAsInt());
-        assertEquals(33281, DiscordGatewayProtocol.INTENTS);
+        assertEquals(34305, DiscordGatewayProtocol.INTENTS);
     }
 
     @Test

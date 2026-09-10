@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.share.ChatShareKind;
+import com.ninuna.losttales.client.gui.LostTalesPointerOwner;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
@@ -10,10 +11,13 @@ import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatReactionSummary;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatCommandContextPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatReactPacket;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -58,7 +62,8 @@ import org.lwjgl.opengl.GL11;
  * handling consult that record before touching the message stack, so
  * whatever is painted on top is also what owns the pointer.
  */
-public final class LostTalesChatGui extends GuiChat {
+public final class LostTalesChatGui extends GuiChat
+        implements LostTalesPointerOwner {
     /**
      * Message lines one notch of the wheel moves. Short, because the
      * view glides to the new offset rather than jumping to it: a long
@@ -123,7 +128,12 @@ public final class LostTalesChatGui extends GuiChat {
     private URI clickedLinkUri;
     private boolean openAnimationStarted;
     /** The tab-strip control under the pointer as the windows were drawn. */
-    private ChatChannelTabBar.Hit hoveredRowHit;
+    /**
+     * What the pointer is on this frame, found once before anything is
+     * drawn: what every highlight, tip and card of the frame and the
+     * pointer's pose read.
+     */
+    private ChatHover hover = ChatHover.NONE;
     /** The empty state's + as drawn this frame; width zero while none was. */
     private int emptyPlusLeft;
     private int emptyPlusTop;
@@ -665,10 +675,12 @@ public final class LostTalesChatGui extends GuiChat {
             return;
         }
         // The wheel event carries no pointer of its own: it is read off
-        // the mouse in window pixels and scaled to the screen.
-        int mouseX = Mouse.getEventX() * this.width / this.mc.displayWidth;
-        int mouseY = this.height - Mouse.getEventY() * this.height
-                / this.mc.displayHeight - 1;
+        // the mouse in window pixels and scaled to the screen, to the
+        // same fraction the hover reads.
+        double mouseX = Mouse.getEventX() * (double)this.width
+                / this.mc.displayWidth;
+        double mouseY = this.height - Mouse.getEventY() * (double)this.height
+                / this.mc.displayHeight - 1.0D;
         // One turn of the wheel is one distance everywhere in the chat:
         // vanilla's step in whole lines, one line with Shift, in pixels
         // — the history, a menu's rows and a picker's cells all move by
@@ -676,23 +688,21 @@ public final class LostTalesChatGui extends GuiChat {
         int wheelPixels = (wheel > 0 ? 1 : -1)
                 * LostTalesChatOverlayRenderer.LINE_HEIGHT
                 * (isShiftKeyDown() ? 1 : WHEEL_LINES);
-        // A wheel turn over the open menu scrolls its rows.
-        if (this.menus.isOpen() && this.menus.contains(mouseX, mouseY)) {
+        // The wheel scrolls what the pointer is on, found as the hover
+        // finds it: the open menu's rows, the open picker's list, else
+        // the history of the window under the pointer.
+        ChatHover under = resolveHover(mouseX, mouseY);
+        if (under.is(ChatHover.Kind.MENU) || under.is(ChatHover.Kind.MENU_ENTRY)
+                || under.is(ChatHover.Kind.MENU_LOCK)) {
             this.menus.scrollBy(-wheelPixels
                     / (double)ChatPopupMenu.ROW_HEIGHT);
             return;
         }
-        // A wheel turn over an open picker scrolls that picker's list;
-        // anywhere else it scrolls the history as before.
-        ChatPickerPanel picker = this.bar.openPicker();
-        if (picker != null) {
-            int adjustedMouseY = mouseY
-                    - Math.round(this.bar.entranceOffset());
-            if (picker.isInsidePanel(mouseX, adjustedMouseY,
-                    this.bar.inputBarRight(), this.bar.pickerAnchor())) {
-                picker.scrollBy(-wheelPixels);
-                return;
-            }
+        if (under.picker != null && (under.is(ChatHover.Kind.PICKER)
+                || under.is(ChatHover.Kind.PICKER_CELL)
+                || under.is(ChatHover.Kind.PICKER_LABEL))) {
+            under.picker.scrollBy(-wheelPixels);
+            return;
         }
         // Vanilla scrolled its own (now unused) offset above; the visible
         // history scrolls per channel view instead, in the window under
@@ -751,14 +761,31 @@ public final class LostTalesChatGui extends GuiChat {
         this.tabActions.syncSelection();
         this.bar.noteInputWindow();
         this.bar.refreshPickers();
+        // A reaction the message menu asked for opens the emoji picker
+        // on that message, whichever way the menu entry was chosen.
+        long reactTo = this.menus.takeReactionTarget();
+        if (reactTo != ChatMessageIds.NONE) {
+            openReactionPicker(reactTo);
+        }
         // The bars enter from below on their own curve while the rest of
         // the window rides the shared opening motion; everything drawn
         // with a bar is hit in the bar's own space.
         float entrance = this.bar.entranceOffset();
-        int entranceOffset = Math.round(entrance);
-        int adjustedMouseY = mouseY - entranceOffset;
+        this.gestures.advance(mouseX, mouseY);
+        // The pointer's exact GUI position, the one the drawn cursor tip
+        // stands on. What is under it is found once, against what is on
+        // screen — the windows, rows, lists and regions the last frame
+        // drew — before any of it is drawn again, and every highlight,
+        // tip and card of this frame, and the pointer's pose, read that
+        // one answer: nothing lights, shows the hand or answers a press
+        // on pixels the others do not name.
+        double pointerX = pointerX();
+        double pointerY = pointerY();
+        this.hover = resolveHover(pointerX, pointerY);
         this.regions.reset();
-        this.hoverTip = "";
+        this.hoverTip = tipFor(this.hover);
+        this.hoverTipX = mouseX;
+        this.hoverTipY = mouseY;
         // The frame as drawn so far — world and HUD — is captured and
         // blurred once, before anything of the chat is on it; each
         // window then pastes its own rectangle of the result under its
@@ -768,69 +795,30 @@ public final class LostTalesChatGui extends GuiChat {
             LostTalesGuiRegionBlur.getInstance().capture(this.mc,
                     partialTicks, (float)LostTalesConfig.guiBlurStrength);
         }
-        this.gestures.advance(mouseX, mouseY);
         LostTalesChatPresentation.beginFrame();
-        // The pointer's exact GUI position: hover resolves against the
-        // same fractional coordinate the drawn cursor tip stands on, so
-        // a hitbox never reads shifted by the integer conversion's
-        // truncation — the underline under a run, the card over a name
-        // and the hand cursor all ask about the same point.
-        float pointerX = (float)ChatWindowPlacement.preciseMouseX(
-                this.mc, this.width);
-        float pointerY = (float)ChatWindowPlacement.preciseMouseY(
-                this.mc, this.height);
-        LostTalesChatPresentation.setHoveredLine(
-                hoveredMessageLine(mouseX, mouseY));
-        LostTalesChatOverlayRenderer.Hit hovered =
-                hoveredComponent(pointerX, pointerY);
+        LostTalesChatPresentation.setHoveredLine(shadedLine(pointerX,
+                pointerY));
+        boolean onLine = this.hover.is(ChatHover.Kind.LINE);
+        LostTalesChatOverlayRenderer.Hit line = onLine ? this.hover.line : null;
+        LostTalesChatHoverCard.Found person = onLine ? this.hover.person : null;
         LostTalesChatPresentation.setHoveredComponent(
-                hovered == null ? null : hovered.line,
-                hovered == null ? -1 : hovered.index,
-                hovered == null ? null : hovered.component);
+                line == null ? null : line.line,
+                line == null ? -1 : line.index,
+                line == null ? null : line.component);
         LostTalesChatPresentation.setHoveredSenderRow(
-                this.menus.isOpen() || this.gestures.isDragging()
-                        || LostTalesChatHoverCard.isPinned() ? null
-                        : LostTalesChatHoverCard.senderRowAt(this.mc,
-                                pointerX, pointerY));
-        this.gestures.markScrollbarsWanted(mouseX, mouseY);
-        drawWindows(mouseX, mouseY, partialTicks);
+                person != null && person.sender ? person.row : null);
+        this.gestures.markScrollbarsWanted(pointerX, pointerY);
+        drawWindows(mouseX, mouseY, pointerX, pointerY, partialTicks);
         landPendingJump();
-        if (!this.gestures.isDragging()) {
-            List<ChatWindowFrame> pillFrames = ChatWindowFrame.drawnFrames();
-            for (int index = pillFrames.size() - 1; index >= 0; index--) {
-                ChatWindowFrame frame = pillFrames.get(index);
-                if (frame.jumpPillContains(mouseX, mouseY)) {
-                    this.hoverTip = StatCollector.translateToLocal(
-                            "gui.losttales.chat.jump_to_present");
-                    this.hoverTipX = mouseX;
-                    this.hoverTipY = mouseY;
-                    break;
-                }
-                if (frame.contains(mouseX, mouseY)) {
-                    break;
-                }
-            }
-            // The reply chip's cross, and then the message toolbar's
-            // controls, which are drawn as glyphs and say nothing on
-            // their own. Asked in the order a click resolves them —
-            // after the jump-to-present button, which is drawn over
-            // both where they meet, and from the front window back — so
-            // the tip always names what a click would actually reach.
-            if (this.hoverTip.length() == 0
-                    && this.composer.chipContains(mouseX, mouseY)) {
-                this.hoverTip = StatCollector.translateToLocal(
-                        "gui.losttales.chat.message.cancel_reply");
-                this.hoverTipX = mouseX;
-                this.hoverTipY = mouseY;
-            }
-            if (this.hoverTip.length() == 0) {
-                nameToolbarControl(mouseX, mouseY);
-            }
-        }
         // The field follows the active window's bar as just drawn.
         this.bar.updateInputBounds();
         this.menus.refreshRestorePopup();
         this.menus.registerRegion(this.regions);
+        boolean onMenu = this.hover.is(ChatHover.Kind.MENU)
+                || this.hover.is(ChatHover.Kind.MENU_ENTRY)
+                || this.hover.is(ChatHover.Kind.MENU_LOCK);
+        double menuX = onMenu ? pointerX : ChatHover.AWAY;
+        double menuY = onMenu ? pointerY : ChatHover.AWAY;
         if (isEmptyState()) {
             // Nothing is open to type into, so the screen shows what it
             // has instead of a bar with no channel behind it. The bar's
@@ -838,89 +826,392 @@ public final class LostTalesChatGui extends GuiChat {
             if (this.bar.openPicker() != null) {
                 this.bar.closePickers();
             }
-            drawEmptyState(mouseX, mouseY);
+            boolean onPlus = this.hover.is(ChatHover.Kind.EMPTY_PLUS);
+            drawEmptyState(onPlus ? pointerX : ChatHover.AWAY,
+                    onPlus ? pointerY : ChatHover.AWAY);
             this.bar.drawNotice();
-            this.menus.draw(this.regions, mouseX, mouseY);
-            if (this.hoverTip.length() > 0 && !this.menus.isOpen()) {
-                drawHoverTip();
-            }
-            updatePointerFeedback(mouseX, mouseY);
+            this.menus.draw(this.regions, menuX, menuY);
+            drawHoverTipFor(this.hover);
             return;
         }
         int barRight = this.bar.inputBarRight();
         int anchor = this.bar.inputAnchor();
+        // The bar group's own space: the pointer less the bar's own
+        // translation, its fraction and its entrance included. Each
+        // control is handed the pointer only while it is what the
+        // pointer is on.
+        double barX = pointerX - this.bar.fractionX();
+        double barY = pointerY - this.bar.fractionY() - entrance;
+        boolean onControl = isBarControl(this.hover);
+        boolean onPicker = this.hover.picker != null;
+        boolean onList = this.hover.is(ChatHover.Kind.SUGGESTION)
+                || this.hover.is(ChatHover.Kind.SUGGESTIONS);
+        double controlX = onControl ? barX : ChatHover.AWAY;
+        double controlY = onControl ? barY : ChatHover.AWAY;
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(this.bar.fractionX(),
                     this.bar.fractionY() + entrance, 0.0F);
             this.bar.drawBar(barRight);
-            boolean characterHovered = this.bar.drawCharacterSelectionButton(
-                    mouseX, adjustedMouseY, this.menus.isKindOpen(
-                            ChatScreenMenus.POPUP_CHARACTERS));
-            if (characterHovered && !this.gestures.isDragging()) {
-                this.hoverTip = StatCollector.translateToLocal(
-                        "gui.losttales.chat.character_selection.tip");
-                this.hoverTipX = mouseX;
-                this.hoverTipY = mouseY;
-            }
-            this.bar.drawIndicator(mouseX, adjustedMouseY);
-            this.bar.drawToolbarToggle(barRight, mouseX, adjustedMouseY);
-            if (this.bar.isInsideToolbarToggle(mouseX, adjustedMouseY,
-                    barRight) && !this.gestures.isDragging()) {
-                this.hoverTip = StatCollector.translateToLocal(
-                        ChatWindowLayout.isToolbarCollapsed()
-                                ? "gui.losttales.chat.toolbar.expand"
-                                : "gui.losttales.chat.toolbar.collapse");
-                this.hoverTipX = mouseX;
-                this.hoverTipY = mouseY;
-            }
-            this.bar.drawPickers(barRight, mouseX, adjustedMouseY);
+            this.bar.drawCharacterSelectionButton(controlX, controlY,
+                    this.menus.isKindOpen(ChatScreenMenus.POPUP_CHARACTERS));
+            this.bar.drawIndicator(controlX, controlY);
+            this.bar.drawToolbarToggle(barRight, controlX, controlY);
+            this.bar.drawPickers(barRight,
+                    onPicker ? barX : ChatHover.AWAY,
+                    onPicker ? barY : ChatHover.AWAY,
+                    mouseX, mouseY - Math.round(entrance));
             this.bar.drawSendDivider(barRight);
-            this.bar.drawSendButton(barRight, mouseX, adjustedMouseY);
+            this.bar.drawSendButton(barRight, controlX, controlY);
             this.bar.drawCounter(barRight);
             this.completion.draw(anchor, this.inputField.xPosition,
-                    mouseX, adjustedMouseY);
+                    onList ? barX : ChatHover.AWAY,
+                    onList ? barY : ChatHover.AWAY);
         } finally {
             GL11.glPopMatrix();
         }
-        if (!this.regions.contains(mouseX, mouseY)) {
-            drawChatLineHover(pointerX, pointerY, mouseX, mouseY);
-        }
+        drawChatLineHover(line, mouseX, mouseY);
         this.bar.drawNotice();
-        ChatMentionCandidate hoveredCandidate = this.completion.hoveredMention(
-                mouseX, adjustedMouseY, this.bar.inputAnchor(),
-                this.inputField.xPosition);
-        if (hoveredCandidate != null) {
-            LostTalesChatHoverCard.drawForCandidate(this.mc,
-                    hoveredCandidate, mouseX, mouseY,
-                    this.width, this.height);
-        } else if (!this.regions.contains(mouseX, mouseY)) {
-            LostTalesChatHoverCard.draw(this.mc, pointerX, pointerY,
+        ChatMentionCandidate candidate =
+                this.hover.is(ChatHover.Kind.SUGGESTION)
+                        ? this.completion.mentionAt(this.hover.suggestion)
+                        : null;
+        if (candidate != null) {
+            LostTalesChatHoverCard.drawForCandidate(this.mc, candidate,
+                    mouseX, mouseY, this.width, this.height);
+        } else {
+            LostTalesChatHoverCard.draw(this.mc, person, mouseX, mouseY,
                     this.width, this.height);
         }
         // The card a click opened stands over the lines until it is
         // closed, wherever the pointer has gone since.
         LostTalesChatHoverCard.drawPinned(this.mc, this.width, this.height);
         this.gestures.drawLinkHighlight();
-        this.menus.draw(this.regions, mouseX, mouseY);
-        ChatPopupMenu.Entry hoveredLock =
-                this.menus.lockControlAt(mouseX, mouseY);
-        if (hoveredLock != null && !this.gestures.isDragging()) {
-            // The lock in the character selection menu answers with the
-            // same tip its states answer with everywhere else.
-            this.hoverTip = StatCollector.translateToLocal(
-                    ClientChatAppearances.isLocked(
-                            ClientChatChannelState.getSelected())
-                            ? "gui.losttales.chat.character_selection.unlock"
-                            : "gui.losttales.chat.character_selection.lock");
-            this.hoverTipX = mouseX;
-            this.hoverTipY = mouseY;
+        this.menus.draw(this.regions, menuX, menuY);
+        drawHoverTipFor(this.hover);
+    }
+
+    /**
+     * The tip beside the pointer, when what it rests on has one. Behind
+     * an open menu the rest of the screen keeps quiet; the lock inside
+     * the character menu speaks for itself there.
+     */
+    private void drawHoverTipFor(ChatHover hover) {
+        if (this.hoverTip.length() > 0 && (hover.is(ChatHover.Kind.MENU_LOCK)
+                || !this.menus.isOpen())) {
             drawHoverTip();
         }
-        if (hoverTip.length() > 0 && !this.menus.isOpen()) {
-            drawHoverTip();
+    }
+
+    /** Whether the pointer is on one of the bar's own controls. */
+    private static boolean isBarControl(ChatHover hover) {
+        return hover.is(ChatHover.Kind.CHARACTER_BUTTON)
+                || hover.is(ChatHover.Kind.INDICATOR)
+                || hover.is(ChatHover.Kind.SEND_BUTTON)
+                || hover.is(ChatHover.Kind.TOOLBAR_TOGGLE);
+    }
+
+    /**
+     * The message the frame shades: the one a menu was opened over while
+     * the menu stands, else the one under the pointer while the pointer
+     * is on the lines rather than on anything drawn above them.
+     */
+    private int shadedLine(double x, double y) {
+        switch (this.hover.kind) {
+            case LINE:
+            case WINDOW:
+            case NONE:
+            case MESSAGE_TOOLBAR:
+            case SCROLLBAR:
+            case JUMP_PILL:
+                return hoveredMessageLine((float)x, (float)y);
+            default:
+                return this.menus.messageMenuChatLineId();
         }
-        updatePointerFeedback(mouseX, mouseY);
+    }
+
+    private double pointerX() {
+        return ChatWindowPlacement.preciseMouseX(this.mc, this.width);
+    }
+
+    private double pointerY() {
+        return ChatWindowPlacement.preciseMouseY(this.mc, this.height);
+    }
+
+    /* ---- What is under the pointer ---- */
+
+    /**
+     * What is under a GUI-space point, from the top of what is drawn
+     * down, in the order a press is handled: the card a click opened,
+     * the open menu, the completion lists, the open picker, a window's
+     * edge, the tab rows, another window's bar strip, the bar's
+     * controls, anything else painted above the lines, the jump pill,
+     * the reply chip, a message's toolbar, a scrollbar, a run of the
+     * lines, and the window itself. Each is asked with the one hit test
+     * its highlight and its press use, so the answer is the same
+     * whichever of them asks. Nothing is under the pointer while
+     * something is being dragged.
+     */
+    ChatHover resolveHover(double x, double y) {
+        if (this.gestures.isDragging()) {
+            return ChatHover.NONE;
+        }
+        if (LostTalesChatHoverCard.isPinned()
+                && LostTalesChatHoverCard.pinnedContains(x, y)) {
+            return new ChatHover(ChatHover.Kind.CARD);
+        }
+        if (this.menus.isOpen() && this.menus.contains(x, y)) {
+            ChatPopupMenu.Entry lock = this.menus.lockControlAt(x, y);
+            ChatPopupMenu.Entry entry = lock != null ? lock
+                    : this.menus.entryAt(x, y);
+            ChatHover hover = new ChatHover(lock != null
+                    ? ChatHover.Kind.MENU_LOCK : entry != null
+                            ? ChatHover.Kind.MENU_ENTRY : ChatHover.Kind.MENU);
+            hover.menuEntry = entry;
+            return hover;
+        }
+        if (isEmptyState()) {
+            return emptyStateContains(x, y)
+                    ? new ChatHover(ChatHover.Kind.EMPTY_PLUS)
+                    : ChatHover.NONE;
+        }
+        double barX = x - this.bar.fractionX();
+        double barY = y - this.bar.fractionY() - this.bar.entranceOffset();
+        int barRight = this.bar.inputBarRight();
+        ChatInputCompletion.Slot slot = this.completion.slotAt(barX, barY,
+                this.bar.inputAnchor(), this.inputField.xPosition);
+        if (slot != null) {
+            ChatHover hover = new ChatHover(slot.row >= 0
+                    ? ChatHover.Kind.SUGGESTION : ChatHover.Kind.SUGGESTIONS);
+            hover.suggestion = slot;
+            return hover;
+        }
+        ChatPickerPanel open = this.bar.openPicker();
+        int pickerAnchor = this.bar.pickerAnchor();
+        if (open != null && open.isInsidePanel(barX, barY, barRight,
+                pickerAnchor)) {
+            ChatPickerPanel.Entry cell = open.entryAt(barX, barY, barRight,
+                    pickerAnchor);
+            ChatHover hover = new ChatHover(cell != null
+                    ? ChatHover.Kind.PICKER_CELL
+                    : open.labelAt(barX, barY, barRight, pickerAnchor) != null
+                            ? ChatHover.Kind.PICKER_LABEL
+                            : ChatHover.Kind.PICKER);
+            hover.picker = open;
+            hover.pickerEntry = cell;
+            return hover;
+        }
+        ChatWindowGestures.ResizeTarget edge =
+                ChatWindowGestures.resizeUnderPointer(x, y, this.regions);
+        if (edge != null && ChatWindowLayout.window(edge.frame.windowId)
+                != null) {
+            ChatHover hover = new ChatHover(ChatHover.Kind.RESIZE);
+            hover.resize = edge;
+            hover.frame = edge.frame;
+            return hover;
+        }
+        ChatHover row = rowHoverAt(x, y);
+        if (row != null) {
+            return row;
+        }
+        ChatWindowFrame otherBar = otherBarAt(x, barY);
+        if (otherBar != null) {
+            ChatHover hover = new ChatHover(ChatHover.Kind.OTHER_BAR);
+            hover.frame = otherBar;
+            return hover;
+        }
+        if (this.bar.isInsideCharacterButton(barX, barY)) {
+            return new ChatHover(ChatHover.Kind.CHARACTER_BUTTON);
+        }
+        if (this.bar.isInsideIndicator(barX, barY)) {
+            return new ChatHover(ChatHover.Kind.INDICATOR);
+        }
+        if (this.bar.isInsideSendButton(barX, barY, barRight)) {
+            return new ChatHover(ChatHover.Kind.SEND_BUTTON);
+        }
+        if (this.bar.isInsideToolbarToggle(barX, barY, barRight)) {
+            return new ChatHover(ChatHover.Kind.TOOLBAR_TOGGLE);
+        }
+        ChatPickerPanel button = this.bar.pickerButtonAt(barX, barY,
+                barRight);
+        if (button != null) {
+            ChatHover hover = new ChatHover(ChatHover.Kind.PICKER_BUTTON);
+            hover.picker = button;
+            return hover;
+        }
+        if (this.regions.contains(x, y)) {
+            return new ChatHover(ChatHover.Kind.OVERLAY);
+        }
+        List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
+        for (int index = frames.size() - 1; index >= 0; index--) {
+            ChatWindowFrame frame = frames.get(index);
+            if (frame.jumpPillContains(x, y)) {
+                ChatHover hover = new ChatHover(ChatHover.Kind.JUMP_PILL);
+                hover.frame = frame;
+                return hover;
+            }
+            if (frame.contains(x, y)) {
+                break;
+            }
+        }
+        if (this.composer.chipContains(x, y)) {
+            return new ChatHover(ChatHover.Kind.REPLY_CHIP);
+        }
+        for (int index = frames.size() - 1; index >= 0; index--) {
+            ChatWindowFrame frame = frames.get(index);
+            int kind = frame.toolbarKindAt(x, y);
+            if (kind >= 0) {
+                ChatHover hover = new ChatHover(
+                        ChatHover.Kind.MESSAGE_TOOLBAR);
+                hover.frame = frame;
+                hover.toolbarKind = kind;
+                return hover;
+            }
+        }
+        for (int index = frames.size() - 1; index >= 0; index--) {
+            ChatWindowFrame frame = frames.get(index);
+            if (frame.scrollbarContains(x, y)) {
+                ChatHover hover = new ChatHover(ChatHover.Kind.SCROLLBAR);
+                hover.frame = frame;
+                return hover;
+            }
+        }
+        // A window that is not the one being typed in answers to a press
+        // by becoming it, so all of it acts.
+        ChatWindowFrame under = ChatWindowFrame.drawnAt(x, y);
+        boolean focuses = under != null && bringsForward(under);
+        LostTalesChatOverlayRenderer.Hit hit =
+                LostTalesChatOverlayRenderer.hitAt(this.mc, (float)x, (float)y);
+        if (hit != null) {
+            ChatHover hover = new ChatHover(ChatHover.Kind.LINE);
+            hover.line = hit;
+            hover.frame = hit.band != null ? hit.band.frame : under;
+            hover.person = LostTalesChatHoverCard.locate(this.mc, hit);
+            hover.acts = hover.person != null || focuses
+                    || ChatInteractions.isClick(ChatInteractions.actionOf(
+                            hit.component, this.mc.gameSettings.chatLinks));
+            return hover;
+        }
+        if (under != null) {
+            ChatHover hover = new ChatHover(ChatHover.Kind.WINDOW);
+            hover.frame = under;
+            hover.acts = focuses;
+            return hover;
+        }
+        return ChatHover.NONE;
+    }
+
+    /**
+     * The tab row, or the bare stretch of one, under a point: the rows
+     * front to back, each asked by the one hit test its own draw asks,
+     * and nothing while a tab is under the hand or a window's edge is
+     * being dragged.
+     */
+    private ChatHover rowHoverAt(double x, double y) {
+        LostTalesGuiAnimationSample opening =
+                ClientChatChannelViews.openSample();
+        List<ChatWindow> windows = ChatWindowLayout.stacked();
+        for (int index = windows.size() - 1; index >= 0; index--) {
+            ChatWindow window = windows.get(index);
+            ChatWindowFrame frame = frameFor(window);
+            ChatChannelTabBar.Row row = rowFor(window, frame, opening);
+            if (row == null) {
+                continue;
+            }
+            ChatChannelTabBar.Hit hit = row.dragging != null || row.resizing
+                    ? null : frame.tabBar.hitAt(this.fontRendererObj, row,
+                            x, y);
+            if (hit == null && !(ChatChannelTabBar.inRowBand(row, y)
+                    && x >= frame.boxLeft && x < frame.boxRight)) {
+                continue;
+            }
+            ChatHover hover = new ChatHover(hit != null
+                    ? ChatHover.Kind.TAB_ROW : ChatHover.Kind.STRIP);
+            hover.window = window;
+            hover.frame = frame;
+            hover.row = row;
+            hover.tabHit = hit;
+            // Only the grip's own glyph offers the move tip; the bare
+            // strip beside it drags without saying so.
+            hover.overGrip = hit != null
+                    && hit.kind == ChatChannelTabBar.HitKind.GRIP
+                    && frame.tabBar.isOverGripHandle(this.fontRendererObj,
+                            row, x, y);
+            return hover;
+        }
+        return null;
+    }
+
+    /** Whether a press on the window brings it forward: it is not the one being typed in. */
+    private static boolean bringsForward(ChatWindowFrame frame) {
+        ChatWindow window = ChatWindowLayout.window(frame.windowId);
+        ChatTab front = window == null ? null
+                : ChatWindowFrame.activeTab(window,
+                        ChatWindowFrame.visibleTabs(window));
+        return front != null
+                && !front.equals(ClientChatChannelState.getSelected());
+    }
+
+    /**
+     * The pointer's pose for the frame just drawn: a held edge keeps its
+     * resize wherever the pointer has gone, the way a pressed control
+     * keeps its look; a drag keeps the arrow; otherwise the pose of what
+     * the frame found under the pointer.
+     */
+    @Override
+    public LostTalesMapCursor.Pose pointerPose(int mouseX, int mouseY) {
+        ChatWindowGestures.ResizeEdge resizing =
+                this.gestures.armedResizeEdge();
+        if (resizing != null) {
+            return ChatWindowGestures.cursorPose(resizing);
+        }
+        return this.gestures.isDragging() ? LostTalesMapCursor.Pose.ARROW
+                : this.hover.pose();
+    }
+
+    /** The words beside the pointer for what it rests on, empty for none. */
+    private String tipFor(ChatHover hover) {
+        switch (hover.kind) {
+            case TAB_ROW:
+                return hover.tabHit == null || hover.window == null ? ""
+                        : tipFor(hover.tabHit, hover.window, hover.overGrip);
+            case EMPTY_PLUS:
+                return StatCollector.translateToLocal(
+                        "gui.losttales.chat.tab.restore");
+            case JUMP_PILL:
+                return StatCollector.translateToLocal(
+                        "gui.losttales.chat.jump_to_present");
+            case REPLY_CHIP:
+                return StatCollector.translateToLocal(
+                        "gui.losttales.chat.message.cancel_reply");
+            case MESSAGE_TOOLBAR:
+                return StatCollector.translateToLocal(
+                        hover.toolbarKind
+                                == LostTalesChatOverlayRenderer.TOOLBAR_REACT
+                                ? "gui.losttales.chat.message.react"
+                                : hover.toolbarKind
+                                        == LostTalesChatOverlayRenderer.TOOLBAR_REPLY
+                                        ? "gui.losttales.chat.message.reply"
+                                        : "gui.losttales.chat.message.copy");
+            case CHARACTER_BUTTON:
+                return StatCollector.translateToLocal(
+                        "gui.losttales.chat.character_selection.tip");
+            case TOOLBAR_TOGGLE:
+                return StatCollector.translateToLocal(
+                        ChatWindowLayout.isToolbarCollapsed()
+                                ? "gui.losttales.chat.toolbar.expand"
+                                : "gui.losttales.chat.toolbar.collapse");
+            case MENU_LOCK:
+                // The lock in the character selection menu answers with
+                // the same tip its states answer with everywhere else.
+                return StatCollector.translateToLocal(
+                        ClientChatAppearances.isLocked(
+                                ClientChatChannelState.getSelected())
+                                ? "gui.losttales.chat.character_selection.unlock"
+                                : "gui.losttales.chat.character_selection.lock");
+            default:
+                return "";
+        }
     }
 
     private static ChatWindowFrame frameFor(ChatWindow window) {
@@ -944,7 +1235,7 @@ public final class LostTalesChatGui extends GuiChat {
      * saying so. Placed and sized from the closed-chat feed's own box,
      * so it lands where the messages do at any resolution or GUI scale.
      */
-    private void drawEmptyState(int mouseX, int mouseY) {
+    private void drawEmptyState(double mouseX, double mouseY) {
         ChatWindowPlacement.Box box = ChatWindowPlacement.feedBounds(
                 this.mc, this.width, this.height);
         int left = (int)Math.round(box.x);
@@ -987,16 +1278,10 @@ public final class LostTalesChatGui extends GuiChat {
                 LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE), 0xFF);
         this.regions.add(this.emptyPlusLeft, this.emptyPlusTop,
                 this.emptyPlusRight, this.emptyPlusBottom);
-        if (hovered && !this.menus.isOpen()) {
-            this.hoverTip = StatCollector.translateToLocal(
-                    "gui.losttales.chat.tab.restore");
-            this.hoverTipX = mouseX;
-            this.hoverTipY = mouseY;
-        }
     }
 
     /** Whether the point is on the empty state's + as drawn last frame. */
-    private boolean emptyStateContains(int mouseX, int mouseY) {
+    private boolean emptyStateContains(double mouseX, double mouseY) {
         return this.emptyPlusRight > this.emptyPlusLeft
                 && mouseX >= this.emptyPlusLeft && mouseX < this.emptyPlusRight
                 && mouseY >= this.emptyPlusTop && mouseY < this.emptyPlusBottom;
@@ -1029,13 +1314,11 @@ public final class LostTalesChatGui extends GuiChat {
      * is one, it belongs to the window being typed in, and it is drawn
      * once with the bar group wherever it has travelled to.
      */
-    private void drawWindows(int mouseX, int mouseY, float partialTicks) {
+    private void drawWindows(int mouseX, int mouseY, double pointerX,
+                             double pointerY, float partialTicks) {
         LostTalesGuiAnimationSample opening =
                 ClientChatChannelViews.openSample();
         List<ChatWindow> windows = ChatWindowLayout.stacked();
-        ChatChannelTabBar.Hit hoveredHit = null;
-        ChatWindow hoveredWindow = null;
-        boolean hoveredGrip = false;
         boolean blurActive = LostTalesConfig.enableChatBackgroundBlur
                 && LostTalesConfig.enableGuiBackgroundBlur;
         List<ChatWindowPlacement.Box> drawnBoxes = blurActive
@@ -1076,66 +1359,22 @@ public final class LostTalesChatGui extends GuiChat {
             GL11.glPushMatrix();
             try {
                 GL11.glTranslatef(row.fractionX, row.fractionY, 0.0F);
+                // Only the row the pointer is on sees it: a row under a
+                // menu, a list or another window is drawn with the
+                // pointer away.
+                boolean onRow = this.hover.isOnRowOf(frame);
                 frame.tabBar.draw(this.fontRendererObj, this.regions, row,
-                        mouseX, mouseY, opening.getOpacity());
+                        onRow ? pointerX : ChatHover.AWAY,
+                        onRow ? pointerY : ChatHover.AWAY,
+                        opening.getOpacity());
             } finally {
                 GL11.glPopMatrix();
-            }
-            // Asked as the row asks for itself: nothing while a tab is
-            // under the hand or the window's edge is being dragged.
-            ChatChannelTabBar.Hit hit = row.dragging != null || row.resizing
-                    ? null : frame.tabBar.hitAt(
-                            this.fontRendererObj, row, mouseX, mouseY);
-            if (hit != null) {
-                hoveredHit = hit;
-                hoveredWindow = window;
-                // Only the grip's own glyph offers the move tip; the
-                // bare strip beside it drags without saying so.
-                hoveredGrip = frame.tabBar.isOverGripHandle(
-                        this.fontRendererObj, row, mouseX, mouseY);
             }
             drawTypingLine(window, frame, opening, mouseX, mouseY);
             LostTalesChatOverlayRenderer.drawBottomRule(this.mc, frame,
                     opening);
             LostTalesChatOverlayRenderer.drawWindowLeftEdge(this.mc, frame,
                     opening);
-        }
-        this.hoveredRowHit = hoveredHit;
-        if (hoveredHit != null && !this.gestures.isDragging()) {
-            this.hoverTip = tipFor(hoveredHit, hoveredWindow, hoveredGrip);
-            this.hoverTipX = mouseX;
-            this.hoverTipY = mouseY;
-        }
-    }
-
-    /**
-     * The pointer says what a press would do. Asked once the whole chat
-     * has been drawn, so it reads the same complete set of regions
-     * {@link #mouseClicked} does and cannot promise something a press
-     * would not start. A resize in progress keeps saying so wherever the
-     * pointer has gone, the way a pressed control keeps its look.
-     */
-    private void updatePointerFeedback(int mouseX, int mouseY) {
-        ChatWindowGestures.ResizeEdge resizing =
-                this.gestures.armedResizeEdge();
-        if (resizing != null) {
-            LostTalesMapCursor.requestPose(
-                    ChatWindowGestures.cursorPose(resizing));
-            return;
-        }
-        if (this.gestures.isDragging()) {
-            return;
-        }
-        ChatWindowGestures.ResizeTarget target =
-                ChatWindowGestures.resizeUnderPointer(mouseX, mouseY,
-                        this.regions);
-        if (target != null) {
-            LostTalesMapCursor.requestPose(
-                    ChatWindowGestures.cursorPose(target.edge));
-        } else if (isOverInteractable(mouseX, mouseY, this.hoveredRowHit)) {
-            // The chat's own controls are drawn, not vanilla widgets, so
-            // it says for itself what answers to a click.
-            LostTalesMapCursor.requestPose(LostTalesMapCursor.Pose.HAND);
         }
     }
 
@@ -1277,8 +1516,7 @@ public final class LostTalesChatGui extends GuiChat {
      * room is still part of the window's box, and pressing it asks for
      * the bar to come there, which is what the bar then does.
      */
-    private boolean handleBarClick(int mouseX, int rawMouseY) {
-        int mouseY = rawMouseY - Math.round(this.bar.entranceOffset());
+    private ChatWindowFrame otherBarAt(double x, double barY) {
         ChatWindowFrame active = this.bar.activeFrame();
         List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
         for (int index = frames.size() - 1; index >= 0; index--) {
@@ -1286,22 +1524,24 @@ public final class LostTalesChatGui extends GuiChat {
             if (frame == active) {
                 continue;
             }
-            double left = frame.boxLeft;
             double top = frame.barTop();
-            if (mouseX >= left && mouseX < frame.boxRight
-                    && mouseY >= top
-                    && mouseY < top + ChatWindowPlacement.INPUT_HEIGHT) {
-                ChatWindow window = ChatWindowLayout.window(frame.windowId);
-                ChatTab front = window == null ? null
-                        : ChatWindowFrame.activeTab(window,
-                                ChatWindowFrame.visibleTabs(window));
-                if (front != null) {
-                    this.tabActions.selectChannel(front);
-                }
-                return true;
+            if (x >= frame.boxLeft && x < frame.boxRight && barY >= top
+                    && barY < top + ChatWindowPlacement.INPUT_HEIGHT) {
+                return frame;
             }
         }
-        return false;
+        return null;
+    }
+
+    /** Moves the input to the window whose bar strip was pressed. */
+    private void focusBarOf(ChatWindowFrame frame) {
+        ChatWindow window = ChatWindowLayout.window(frame.windowId);
+        ChatTab front = window == null ? null
+                : ChatWindowFrame.activeTab(window,
+                        ChatWindowFrame.visibleTabs(window));
+        if (front != null) {
+            this.tabActions.selectChannel(front);
+        }
     }
 
     /**
@@ -1314,11 +1554,15 @@ public final class LostTalesChatGui extends GuiChat {
      * hit position is the pointer's fractional coordinate; the tooltip
      * itself anchors on the whole-pixel one.
      */
-    private void drawChatLineHover(float hitX, float hitY,
+    private void drawChatLineHover(LostTalesChatOverlayRenderer.Hit hovered,
                                    int drawMouseX, int drawMouseY) {
-        LostTalesChatOverlayRenderer.Hit hovered =
-                LostTalesChatOverlayRenderer.hitAt(this.mc, hitX, hitY);
         if (hovered == null) {
+            return;
+        }
+        ChatReactionMarker.Data chip =
+                ChatReactionMarker.decode(hovered.component);
+        if (chip != null) {
+            drawReactionTooltip(chip, drawMouseX, drawMouseY);
             return;
         }
         ChatShowcaseMarker.Data share =
@@ -1422,37 +1666,53 @@ public final class LostTalesChatGui extends GuiChat {
      * then a cell inserts its token, and a right-click on an emoji or a
      * marker cell marks it as a favourite.
      */
-    private void clickPickerPanel(ChatPickerPanel picker, int mouseX,
-                                  int adjustedMouseY, int button) {
+    private void clickPickerPanel(ChatHover press, int mouseX,
+                                  int adjustedMouseY, double x, double y,
+                                  int button) {
+        ChatPickerPanel picker = press.picker;
         int barRight = this.bar.inputBarRight();
         int pickerAnchor = this.bar.pickerAnchor();
-        if (picker.mouseClicked(mouseX, adjustedMouseY, button, barRight,
-                pickerAnchor)) {
+        double barX = x - this.bar.fractionX();
+        double barY = y - this.bar.fractionY() - this.bar.entranceOffset();
+        if (picker.mouseClicked(mouseX, adjustedMouseY, barX, barY, button,
+                barRight, pickerAnchor)) {
             return;
         }
-        ChatPickerPanel.Entry entry = picker.entryAt(mouseX, adjustedMouseY,
-                barRight, pickerAnchor);
-        if (button == 0 && entry != null) {
+        ChatPickerPanel.Entry entry = press.pickerEntry;
+        if (button == 0 && entry != null && picker == this.bar.emojiPicker()
+                && this.bar.emojiPicker().reactionTarget() != ChatMessageIds.NONE) {
+            // Opened to react to a message: the pick is the reaction,
+            // and nothing is written into the field.
+            ChatEmoji emoji = (ChatEmoji)entry.value;
+            sendReaction(this.bar.emojiPicker().reactionTarget(), emoji, true);
+            ChatEmojiUsageStore.recordUse(emoji);
+            this.bar.closePickers();
+        } else if (button == 0 && entry != null) {
             this.completion.insertToken(picker.insertionText(entry));
             this.inputField.setFocused(true);
         } else if (button == 1 && picker == this.bar.emojiPicker()) {
-            this.bar.emojiPicker().toggleFavoriteAt(mouseX, adjustedMouseY,
-                    barRight, pickerAnchor);
+            this.bar.emojiPicker().toggleFavoriteAt(barX, barY, barRight,
+                    pickerAnchor);
         } else if (button == 1 && picker == this.bar.markerPicker()) {
-            this.bar.markerPicker().toggleFavoriteAt(mouseX, adjustedMouseY,
-                    barRight, pickerAnchor);
+            this.bar.markerPicker().toggleFavoriteAt(barX, barY, barRight,
+                    pickerAnchor);
         }
     }
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
+        // What a press lands on is found at the pointer's exact position,
+        // the way the hover finds it; whole pixels only for the input
+        // field and for where a menu opens.
+        double x = pointerX();
+        double y = pointerY();
         int adjustedMouseY = mouseY - Math.round(this.bar.entranceOffset());
         // A card a click opened takes a press on itself and nothing
         // happens; a press anywhere else closes it and goes on to
         // whatever is under it, so another name opens its own card at
         // once.
         if (LostTalesChatHoverCard.isPinned()) {
-            if (LostTalesChatHoverCard.pinnedContains(mouseX, mouseY)) {
+            if (LostTalesChatHoverCard.pinnedContains(x, y)) {
                 return;
             }
             LostTalesChatHoverCard.unpin();
@@ -1460,8 +1720,7 @@ public final class LostTalesChatGui extends GuiChat {
         // An open menu takes the press first; a press beside it closes
         // it and goes on to whatever is under it, which is told which
         // menu it closed so a switch does not reopen what it put away.
-        ChatScreenMenus.Click menuClick = this.menus.click(mouseX, mouseY,
-                button);
+        ChatScreenMenus.Click menuClick = this.menus.click(x, y, button);
         String closedPopupKind = menuClick.closedKind;
         if (menuClick.command != null) {
             sendCommand(menuClick.command);
@@ -1472,133 +1731,135 @@ public final class LostTalesChatGui extends GuiChat {
         if (isEmptyState()) {
             // The + is the whole of the screen's furniture here; a click
             // anywhere else is the player closing what is not there.
-            if (button == 0 && emptyStateContains(mouseX, mouseY)) {
+            if (button == 0 && emptyStateContains(x, y)) {
                 this.menus.openRestorePopup(null, mouseX,
                         this.emptyPlusTop - 2);
             }
             return;
         }
-        int barRight = this.bar.inputBarRight();
-        int anchor = this.bar.inputAnchor();
-        if (this.completion.click(mouseX, adjustedMouseY, button, anchor,
-                this.inputField.xPosition)) {
+        ChatHover press = resolveHover(x, y);
+        switch (press.kind) {
+            case SUGGESTION:
+                if (button == 0) {
+                    this.completion.accept(press.suggestion);
+                }
+                return;
+            case SUGGESTIONS:
+                return;
+            case PICKER_CELL:
+            case PICKER_LABEL:
+            case PICKER:
+                clickPickerPanel(press, mouseX, adjustedMouseY, x, y, button);
+                return;
+            case RESIZE:
+                if (button == 0) {
+                    ChatWindow edgeWindow = ChatWindowLayout.window(
+                            press.resize.frame.windowId);
+                    if (edgeWindow != null) {
+                        this.gestures.armResize(press.resize, edgeWindow,
+                                mouseX, mouseY);
+                    }
+                    return;
+                }
+                break;
+            default:
+                break;
+        }
+        // The rows: the top resize border meets the row's band along the
+        // window's edge, and only a left press there resizes; any other
+        // press there is the row's.
+        ChatHover onRow = press.is(ChatHover.Kind.TAB_ROW)
+                || press.is(ChatHover.Kind.STRIP) ? press
+                : press.is(ChatHover.Kind.RESIZE) ? rowHoverAt(x, y) : null;
+        if (onRow != null) {
+            if (button == 0) {
+                handleRowClick(onRow, mouseX, mouseY, closedPopupKind);
+            } else if (button == 1) {
+                handleRowRightClick(onRow, mouseX);
+            } else if (button == 2) {
+                closeTabFrom(onRow);
+            }
             return;
         }
-        ChatPickerPanel picker = this.bar.openPicker();
-        if (picker != null && picker.isInsidePanel(mouseX, adjustedMouseY,
-                barRight, this.bar.pickerAnchor())) {
-            clickPickerPanel(picker, mouseX, adjustedMouseY, button);
-            return;
-        }
-        // Pickers and completion lists paint above the tab rows, so they
-        // are asked first. The resize border comes next: it overlaps the
-        // tab strip along the window's top edge, and the pointer shows a
-        // resize there, so a press there must resize.
         if (button == 0) {
-            ChatWindowGestures.ResizeTarget edge =
-                    ChatWindowGestures.resizeUnderPointer(mouseX, mouseY,
-                            this.regions);
-            ChatWindow edgeWindow = edge == null ? null
-                    : ChatWindowLayout.window(edge.frame.windowId);
-            if (edgeWindow != null) {
-                this.gestures.armResize(edge, edgeWindow, mouseX, mouseY);
-                return;
-            }
-        }
-        if (button == 0) {
-            if (handleRowClick(mouseX, mouseY, closedPopupKind)) {
-                return;
-            }
             // The marks are the row's; a press anywhere else lets them go.
             ChatTabSelection.clear();
         }
-        // A right-click on a tab opens the tab's own menu, the one the
-        // cog opens. Asked here, beside the left press on the rows and
-        // before the overlay guard below: the strip registers the
-        // rectangle it painted, so a press on it never reaches the
-        // message menus further down.
-        if (button == 1 && handleRowRightClick(mouseX, mouseY)) {
-            return;
-        }
-        if (button == 2 && closeTabAt(mouseX, mouseY)) {
-            return;
-        }
-        if (button == 0 && handleBarClick(mouseX, mouseY)) {
-            return;
-        }
-        if (button == 0 && this.bar.isInsideCharacterButton(mouseX,
-                adjustedMouseY)) {
-            // A click on the button while its own menu was open has just
-            // closed it above; only then does the click not reopen it.
-            if (!ChatScreenMenus.POPUP_CHARACTERS.equals(closedPopupKind)) {
-                this.menus.openCharacterSelectionMenu(
-                        this.bar.characterButtonLeft(),
-                        this.bar.barControlTop() - 2);
-            }
-            return;
-        }
-        if (button == 0 && this.bar.isInsideIndicator(mouseX, adjustedMouseY)) {
-            this.tabActions.selectChannel(ClientChatChannelState.cycle());
-            return;
-        }
-        if (button == 0 && this.bar.isInsideSendButton(mouseX, adjustedMouseY,
-                barRight)) {
-            submitInput();
-            return;
-        }
-        if (button == 0 && this.bar.isInsideToolbarToggle(mouseX,
-                adjustedMouseY, barRight)) {
-            // Folding the inserts takes their panels with them; the
-            // emoji picker is outside the fold and keeps its own.
-            this.bar.closeInsertPickers();
-            ChatWindowLayout.setToolbarCollapsed(
-                    !ChatWindowLayout.isToolbarCollapsed());
-            return;
-        }
-        if (button == 0) {
-            ChatPickerPanel candidate = this.bar.pickerButtonAt(mouseX,
-                    adjustedMouseY, barRight);
-            if (candidate != null) {
-                boolean open = candidate.isOpen();
-                this.bar.closePickers();
-                candidate.setOpen(!open);
+        switch (press.kind) {
+            case OTHER_BAR:
+                if (button == 0) {
+                    focusBarOf(press.frame);
+                }
                 return;
-            }
+            case CHARACTER_BUTTON:
+                // A click on the button while its own menu was open has
+                // just closed it above; only then does the click not
+                // reopen it.
+                if (button == 0 && !ChatScreenMenus.POPUP_CHARACTERS.equals(
+                        closedPopupKind)) {
+                    this.menus.openCharacterSelectionMenu(
+                            this.bar.characterButtonLeft(),
+                            this.bar.barControlTop() - 2);
+                }
+                return;
+            case INDICATOR:
+                if (button == 0) {
+                    this.tabActions.selectChannel(
+                            ClientChatChannelState.cycle());
+                }
+                return;
+            case SEND_BUTTON:
+                if (button == 0) {
+                    submitInput();
+                }
+                return;
+            case TOOLBAR_TOGGLE:
+                if (button == 0) {
+                    // Folding the inserts takes their panels with them;
+                    // the emoji picker is outside the fold and keeps
+                    // its own.
+                    this.bar.closeInsertPickers();
+                    ChatWindowLayout.setToolbarCollapsed(
+                            !ChatWindowLayout.isToolbarCollapsed());
+                }
+                return;
+            case PICKER_BUTTON:
+                if (button == 0) {
+                    boolean open = press.picker.isOpen();
+                    this.bar.closePickers();
+                    press.picker.setOpen(!open);
+                }
+                return;
+            default:
+                break;
         }
-        if (button == 0 && picker != null) {
-            // Clicks inside the panel were consumed above; anything else
-            // closes the picker and is processed normally.
+        // Anything past the bar closes an open picker and goes on.
+        if (button == 0 && this.bar.openPicker() != null) {
             this.bar.closePickers();
         }
-        if (this.regions.contains(mouseX, mouseY)) {
-            // An overlay owns this spot even when no row was hit; the
-            // message stack underneath must not receive the click.
+        if (press.is(ChatHover.Kind.OVERLAY)) {
+            // An overlay owns this spot even when nothing on it was hit;
+            // the message stack underneath must not receive the press.
             return;
         }
         if (button == 0) {
-            // The jump-to-newest pill floats over the stack; a click on
-            // it glides the scrolled view home. Front to back, so the
-            // front window's pill wins where windows overlap.
-            List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
-            for (int index = frames.size() - 1; index >= 0; index--) {
-                ChatWindowFrame frame = frames.get(index);
-                if (frame.jumpPillContains(mouseX, mouseY)) {
-                    ClientChatChannelViews.scrollHome(frame.view);
+            switch (press.kind) {
+                case JUMP_PILL:
+                    ClientChatChannelViews.scrollHome(press.frame.view);
                     return;
-                }
-                if (frame.contains(mouseX, mouseY)) {
+                case REPLY_CHIP:
+                    this.composer.cancelComposing(this.inputField);
+                    return;
+                case MESSAGE_TOOLBAR:
+                    clickMessageToolbar(press);
+                    return;
+                case SCROLLBAR:
+                    if (this.gestures.grabScrollbar(x, y)) {
+                        return;
+                    }
                     break;
-                }
-            }
-            if (this.composer.chipContains(mouseX, mouseY)) {
-                this.composer.cancelComposing(this.inputField);
-                return;
-            }
-            if (clickMessageToolbar(mouseX, mouseY)) {
-                return;
-            }
-            if (this.gestures.grabScrollbar(mouseX, mouseY)) {
-                return;
+                default:
+                    break;
             }
         }
         // A right-click on a person — the sender's identity span or a
@@ -1606,9 +1867,10 @@ public final class LostTalesChatGui extends GuiChat {
         // menu: message them, ignore them. Anywhere else on a line it
         // opens the message's menu: reply, copy, edit, delete.
         if (button == 1) {
-            if (LostTalesChatHoverCard.isPointerOnPerson(this.mc,
-                    mouseX + 0.5F, mouseY + 0.5F)) {
-                if (this.menus.openPlayerPopup(mouseX, mouseY)) {
+            LostTalesChatHoverCard.Found person =
+                    press.is(ChatHover.Kind.LINE) ? press.person : null;
+            if (person != null) {
+                if (this.menus.openPlayerPopup(person.target, mouseX, mouseY)) {
                     return;
                 }
             } else if (this.menus.openMessagePopup(mouseX, mouseY)) {
@@ -1616,7 +1878,7 @@ public final class LostTalesChatGui extends GuiChat {
             }
         }
         if (button == 0) {
-            ChatWindowFrame frame = ChatWindowFrame.drawnAt(mouseX, mouseY);
+            ChatWindowFrame frame = ChatWindowFrame.drawnAt(x, y);
             ChatWindow window = frame == null ? null
                     : ChatWindowLayout.window(frame.windowId);
             // Typing follows the pointer: a press anywhere in a window —
@@ -1633,7 +1895,7 @@ public final class LostTalesChatGui extends GuiChat {
                 ChatWindowLayout.raise(window.getId());
                 this.tabActions.selectWindow(window);
             }
-            if (clickLines(mouseX, mouseY, adjustedMouseY, button)) {
+            if (clickLines(press, mouseX, adjustedMouseY, button)) {
                 return;
             }
             // Nothing in the window answered, and the window was already
@@ -1643,7 +1905,7 @@ public final class LostTalesChatGui extends GuiChat {
             }
             return;
         }
-        clickLines(mouseX, mouseY, adjustedMouseY, button);
+        clickLines(press, mouseX, adjustedMouseY, button);
     }
 
     /**
@@ -1692,20 +1954,18 @@ public final class LostTalesChatGui extends GuiChat {
      * Component clicks on the lines, then the input field's own click.
      * Answers whether something on the lines took the press.
      */
-    private boolean clickLines(int mouseX, int mouseY, int adjustedMouseY,
-                               int button) {
-        // Whole-pixel press coordinates sample the pixel's centre, the
-        // best estimate of where inside it the pointer actually was.
-        // The quote a reply opens with goes first: it is the one click
-        // that acts on the window rather than on what it points at, and
-        // it answers whatever the chat-links option says.
-        if (button == 0 && jumpToQuotedMessage(mouseX, mouseY)) {
-            return true;
-        }
-        if (button == 0 && handleComponentClick(
-                LostTalesChatOverlayRenderer.hitAt(
-                        this.mc, mouseX + 0.5F, mouseY + 0.5F))) {
-            return true;
+    private boolean clickLines(ChatHover press, int mouseX,
+                               int adjustedMouseY, int button) {
+        // The press lands on the run the hover found at the pointer, so
+        // what was lit is what answers. The quote a reply opens with
+        // goes first: it is the one click that acts on the window rather
+        // than on what it points at, and it answers whatever the
+        // chat-links option says.
+        if (button == 0 && press.is(ChatHover.Kind.LINE)) {
+            if (jumpToQuotedMessage(press.line)
+                    || handleComponentClick(press.line)) {
+                return true;
+            }
         }
         // GuiChat's own component handling relies on GuiNewChat's 9px hit
         // testing, which does not match the 11px layout; only the input
@@ -1715,53 +1975,29 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
-     * Names the toolbar control under the pointer, if it is on one: what
-     * a glyph would say if it could. The same words the message's menu
-     * offers, so the two ways to the same action read the same.
-     */
-    private void nameToolbarControl(int mouseX, int mouseY) {
-        List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
-        for (int index = frames.size() - 1; index >= 0; index--) {
-            int kind = frames.get(index).toolbarKindAt(mouseX, mouseY);
-            if (kind < 0) {
-                continue;
-            }
-            this.hoverTip = StatCollector.translateToLocal(
-                    kind == LostTalesChatOverlayRenderer.TOOLBAR_REPLY
-                            ? "gui.losttales.chat.message.reply"
-                            : "gui.losttales.chat.message.copy");
-            this.hoverTipX = mouseX;
-            this.hoverTipY = mouseY;
-            return;
-        }
-    }
-
-    /**
      * The hovered message's own controls: reply to it, or copy it. The
      * same two the message's menu offers, acting on the message the
      * toolbar was drawn for rather than on whatever lies under the
      * pointer now — the toolbar covers its own message, so the two
      * agree, but the id is the one the draw recorded either way.
      */
-    private boolean clickMessageToolbar(int mouseX, int mouseY) {
-        List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
-        for (int index = frames.size() - 1; index >= 0; index--) {
-            ChatWindowFrame frame = frames.get(index);
-            if (!frame.toolbarContains(mouseX, mouseY)) {
-                continue;
-            }
-            int chatLineId = frame.toolbarChatLineId;
-            int kind = frame.toolbarKindAt(mouseX, mouseY);
-            if (kind == LostTalesChatOverlayRenderer.TOOLBAR_REPLY) {
-                replyToLine(frame, chatLineId);
-            } else if (LostTalesChatClipboard.copy(
-                    messageTextOf(frame, chatLineId))) {
-                showNotice(StatCollector.translateToLocal(
-                        "gui.losttales.chat.copied"));
-            }
-            return true;
+    private boolean clickMessageToolbar(ChatHover press) {
+        ChatWindowFrame frame = press.frame;
+        if (frame == null || press.toolbarKind < 0) {
+            return false;
         }
-        return false;
+        int chatLineId = frame.toolbarChatLineId;
+        if (press.toolbarKind == LostTalesChatOverlayRenderer.TOOLBAR_REACT) {
+            openReactionPicker(ClientChatMessageIds.messageIdOf(chatLineId));
+        } else if (press.toolbarKind
+                == LostTalesChatOverlayRenderer.TOOLBAR_REPLY) {
+            replyToLine(frame, chatLineId);
+        } else if (LostTalesChatClipboard.copy(
+                messageTextOf(frame, chatLineId))) {
+            showNotice(StatCollector.translateToLocal(
+                    "gui.losttales.chat.copied"));
+        }
+        return true;
     }
 
     /** The whole body of the message drawn on {@code chatLineId}. */
@@ -1836,22 +2072,7 @@ public final class LostTalesChatGui extends GuiChat {
      * hovered while a menu is open or something is being dragged: the
      * pointer is on that, whatever lies under it.
      */
-    /**
-     * The component under the pointer, or null: read the same way the
-     * hover card is, so what is underlined is exactly what a click
-     * would reach.
-     */
-    private LostTalesChatOverlayRenderer.Hit hoveredComponent(
-            float pointerX, float pointerY) {
-        if (this.menus.isOpen() || this.gestures.isDragging()
-                || LostTalesChatHoverCard.isPinned()) {
-            return null;
-        }
-        return LostTalesChatOverlayRenderer.hitAt(this.mc, pointerX,
-                pointerY);
-    }
-
-    private int hoveredMessageLine(int mouseX, int mouseY) {
+    private int hoveredMessageLine(float pointerX, float pointerY) {
         if (this.menus.isOpen()) {
             // The menu has the pointer, but the message it was opened
             // over keeps its shade while the menu stands, so what the
@@ -1862,8 +2083,8 @@ public final class LostTalesChatGui extends GuiChat {
             return 0;
         }
         LostTalesChatOverlayRenderer.Band band =
-                LostTalesChatOverlayRenderer.bandAt(this.mc,
-                        mouseX + 0.5F, mouseY + 0.5F);
+                LostTalesChatOverlayRenderer.bandAt(this.mc, pointerX,
+                        pointerY);
         if (band == null || band.lines == null
                 || band.viewIndex >= band.lines.size()
                 || band.lines.get(band.viewIndex) == null) {
@@ -1883,16 +2104,11 @@ public final class LostTalesChatGui extends GuiChat {
      * <p>Returns whether the click was a quote's, spent or not: a quote
      * that leads nowhere still belongs to the quote.</p>
      */
-    private boolean jumpToQuotedMessage(int mouseX, int mouseY) {
-        LostTalesChatOverlayRenderer.Hit hit =
-                LostTalesChatOverlayRenderer.hitAt(this.mc,
-                        mouseX + 0.5F, mouseY + 0.5F);
+    private boolean jumpToQuotedMessage(LostTalesChatOverlayRenderer.Hit hit) {
         if (hit == null || !ChatReplyMarker.isMarker(hit.component)) {
             return false;
         }
-        LostTalesChatOverlayRenderer.Band band =
-                LostTalesChatOverlayRenderer.bandAt(this.mc,
-                        mouseX + 0.5F, mouseY + 0.5F);
+        LostTalesChatOverlayRenderer.Band band = hit.band;
         if (band == null || band.lines == null) {
             showNotice(StatCollector.translateToLocal(
                     "gui.losttales.chat.message.gone"));
@@ -1983,167 +2199,15 @@ public final class LostTalesChatGui extends GuiChat {
     /* ---- Tab rows: clicks, drags, docking, detaching, window moves ---- */
 
     /**
-     * Whether the point is on something the chat answers to: a tab or
-     * one of its controls, the lock, the restore control, the grip, the
-     * channel indicator, the send arrow, a picker button or an open
-     * overlay of one. The input bar's own field is not a control — a
-     * caret belongs there — but everything the player clicks is.
-     *
-     * <p>A window's own furniture is not taken as interactive merely
-     * because it was painted: the strip of a locked window is drawn like
-     * any other and answers to nothing, and its grip does not drag it.
-     * What is asked here is what a press would actually do, in the same
-     * order {@link #mouseClicked} resolves it, so the pointer cannot
-     * promise a grab the window would refuse.</p>
-     */
-    private boolean isOverInteractable(int mouseX, int mouseY,
-                                       ChatChannelTabBar.Hit hovered) {
-        if (hovered != null) {
-            return true;
-        }
-        // Only what is drawn above the windows counts as painted-is-live;
-        // the windows themselves are asked about below.
-        if (this.regions.containsOverlay(mouseX, mouseY)) {
-            return true;
-        }
-        int barRight = this.bar.inputBarRight();
-        if (this.bar.isInsideIndicator(mouseX, mouseY)
-                || this.bar.isInsideSendButton(mouseX, mouseY, barRight)) {
-            return true;
-        }
-        int anchor = this.bar.pickerAnchor();
-        for (ChatPickerPanel picker : this.bar.pickers()) {
-            if (this.bar.isPickerShown(picker) && picker.isInsideButton(
-                    mouseX, mouseY, barRight, anchor)) {
-                return true;
-            }
-        }
-        if (this.bar.isInsideToolbarToggle(mouseX, mouseY, barRight)) {
-            return true;
-        }
-        // The furniture the history draws over itself: the pill that
-        // takes a scrolled view home, the hovered message's own
-        // controls, and the scrollbar a drag takes hold of. All three
-        // are recorded from the draw, so asking them here is asking the
-        // same question the click asks.
-        List<ChatWindowFrame> drawnFrames = ChatWindowFrame.drawnFrames();
-        for (int index = drawnFrames.size() - 1; index >= 0; index--) {
-            ChatWindowFrame drawnFrame = drawnFrames.get(index);
-            if (drawnFrame.jumpPillContains(mouseX, mouseY)
-                    || drawnFrame.toolbarContains(mouseX, mouseY)
-                    || drawnFrame.scrollbarContains(mouseX, mouseY)) {
-                return true;
-            }
-            if (drawnFrame.contains(mouseX, mouseY)) {
-                break;
-            }
-        }
-        // What the lines themselves act on: a reply's quote jumps to the
-        // message it names, a covered spoiler reveals, a shared marker
-        // flies the map, a link opens. The hit is the very one a click
-        // resolves, so the pointer promises exactly what a press would
-        // do — and nothing for spans that only consume the click, a
-        // name or a mention, whose answer is the hover card already
-        // showing.
-        LostTalesChatOverlayRenderer.Hit lineHit =
-                LostTalesChatOverlayRenderer.hitAt(this.mc, mouseX + 0.5F,
-                        mouseY + 0.5F);
-        if (lineHit != null && actsOnClick(lineHit.component)) {
-            return true;
-        }
-        // A person answers a click with their card, on exactly the
-        // pixels the card's own hit test names.
-        if (LostTalesChatHoverCard.isPointerOnPerson(this.mc,
-                mouseX + 0.5F, mouseY + 0.5F)) {
-            return true;
-        }
-        // A window that is not the one being typed in answers to a
-        // click by becoming it, so the pointer says so over all of it.
-        ChatWindowFrame frame = ChatWindowFrame.drawnAt(mouseX, mouseY);
-        if (frame == null) {
-            return false;
-        }
-        ChatWindow window = ChatWindowLayout.window(frame.windowId);
-        ChatTab front = window == null ? null
-                : ChatWindowFrame.activeTab(window,
-                        ChatWindowFrame.visibleTabs(window));
-        if (front != null
-                && !front.equals(ClientChatChannelState.getSelected())) {
-            return true;
-        }
-        // The window already being typed in: its strip is a handle only
-        // while the window can be moved by it. A locked window's strip,
-        // grip and all, is inert, and the pointer says so.
-        return window != null && !window.isLocked()
-                && isOnWindowStrip(frame, mouseY);
-    }
-
-    /**
-     * Whether a click on the run would actually do something, which is
-     * what earns the pointer's hand: the checks mirror
-     * {@link #handleComponentClick} and {@link #jumpToQuotedMessage},
-     * leaving out the spans that only consume the press.
-     */
-    private boolean actsOnClick(IChatComponent component) {
-        if (component == null) {
-            return false;
-        }
-        if (ChatReplyMarker.isMarker(component)
-                || ChatChannelLinkMarker.isMarker(component)) {
-            return true;
-        }
-        if (ChatSpoilerMarker.isMarker(component)
-                && !ChatSpoilerMarker.isRevealed(component)) {
-            return true;
-        }
-        ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(component);
-        if (share != null && share.kind == ChatShareKind.MARKER) {
-            return this.mc.gameSettings.chatLinks;
-        }
-        ClickEvent event = component.getChatStyle() == null ? null
-                : component.getChatStyle().getChatClickEvent();
-        return event != null
-                && event.getAction() == ClickEvent.Action.OPEN_URL
-                && this.mc.gameSettings.chatLinks;
-    }
-
-    /** Whether a screen y falls in the window's tab strip as drawn. */
-    private static boolean isOnWindowStrip(ChatWindowFrame frame,
-                                           int mouseY) {
-        int rowBottom = (int)Math.floor(frame.tabRowBottom());
-        return mouseY >= ChatChannelTabBar.rowTop(rowBottom)
-                && mouseY < rowBottom;
-    }
-
-    /**
      * A middle press on a tab closes it, the way browser tabs close;
      * anywhere else on a row is swallowed so the click does not fall
      * through to the lines. Same guarded close as the cross.
      */
-    private boolean closeTabAt(int mouseX, int mouseY) {
-        LostTalesGuiAnimationSample opening =
-                ClientChatChannelViews.openSample();
-        List<ChatWindow> windows = ChatWindowLayout.stacked();
-        for (int index = windows.size() - 1; index >= 0; index--) {
-            ChatWindow window = windows.get(index);
-            ChatWindowFrame frame = frameFor(window);
-            ChatChannelTabBar.Row row = rowFor(window, frame, opening);
-            if (row == null) {
-                continue;
-            }
-            ChatChannelTabBar.Hit hit = frame.tabBar.hitAt(
-                    this.fontRendererObj, row, mouseX, mouseY);
-            if (hit != null && hit.tab != null) {
-                this.tabActions.closeChannel(hit.tab);
-                return true;
-            }
-            if (hit != null || (ChatChannelTabBar.inRowBand(row, mouseY)
-                    && mouseX >= frame.boxLeft
-                    && mouseX < frame.boxRight)) {
-                return true;
-            }
+    private boolean closeTabFrom(ChatHover press) {
+        if (press.tabHit != null && press.tabHit.tab != null) {
+            this.tabActions.closeChannel(press.tabHit.tab);
         }
-        return false;
+        return true;
     }
 
     /**
@@ -2155,34 +2219,21 @@ public final class LostTalesChatGui extends GuiChat {
      * press belongs to that window like any other, and is spent on the
      * strip either way — a strip is not a line and opens no message menu.
      */
-    private boolean handleRowRightClick(int mouseX, int mouseY) {
-        LostTalesGuiAnimationSample opening =
-                ClientChatChannelViews.openSample();
-        List<ChatWindow> windows = ChatWindowLayout.stacked();
-        for (int index = windows.size() - 1; index >= 0; index--) {
-            ChatWindow window = windows.get(index);
-            ChatWindowFrame frame = frameFor(window);
-            ChatChannelTabBar.Row row = rowFor(window, frame, opening);
-            if (row == null) {
-                continue;
-            }
-            ChatChannelTabBar.Hit hit = frame.tabBar.hitAt(
-                    this.fontRendererObj, row, mouseX, mouseY);
-            if (hit == null && !(ChatChannelTabBar.inRowBand(row, mouseY)
-                    && mouseX >= frame.boxLeft
-                    && mouseX < frame.boxRight)) {
-                continue;
-            }
-            int anchorBottom = ChatChannelTabBar.rowTop(row.rowBottom) - 2;
-            this.tabActions.selectWindow(window);
-            if (hit != null && hit.tab != null) {
-                this.menus.openSettingsPopup(hit.tab, mouseX, anchorBottom);
-            } else if (!window.isLocked()) {
-                this.menus.openWindowPopup(window, mouseX, anchorBottom);
-            }
-            return true;
+    private boolean handleRowRightClick(ChatHover press, int mouseX) {
+        ChatWindow window = press.window;
+        ChatChannelTabBar.Row row = press.row;
+        if (window == null || row == null) {
+            return false;
         }
-        return false;
+        int anchorBottom = ChatChannelTabBar.rowTop(row.rowBottom) - 2;
+        this.tabActions.selectWindow(window);
+        if (press.tabHit != null && press.tabHit.tab != null) {
+            this.menus.openSettingsPopup(press.tabHit.tab, mouseX,
+                    anchorBottom);
+        } else if (!window.isLocked()) {
+            this.menus.openWindowPopup(window, mouseX, anchorBottom);
+        }
+        return true;
     }
 
     /**
@@ -2193,130 +2244,116 @@ public final class LostTalesChatGui extends GuiChat {
      * closed, if any, so a control whose own menu was open reads as
      * closing it rather than reopening it.
      */
-    private boolean handleRowClick(int mouseX, int mouseY,
+    private boolean handleRowClick(ChatHover press, int mouseX, int mouseY,
                                    String closedPopupKind) {
-        LostTalesGuiAnimationSample opening =
-                ClientChatChannelViews.openSample();
-        List<ChatWindow> windows = ChatWindowLayout.stacked();
-        // Front to back: the window drawn on top is hit first.
-        for (int index = windows.size() - 1; index >= 0; index--) {
-            ChatWindow window = windows.get(index);
-            ChatWindowFrame frame = frameFor(window);
-            ChatChannelTabBar.Row row = rowFor(window, frame, opening);
-            if (row == null) {
-                continue;
+        ChatWindow window = press.window;
+        ChatWindowFrame frame = press.frame;
+        ChatChannelTabBar.Row row = press.row;
+        ChatChannelTabBar.Hit hit = press.tabHit;
+        if (window == null || frame == null || row == null) {
+            return false;
+        }
+        if (hit == null) {
+            // The strip itself belongs to the window, and moves it.
+            ChatTabSelection.clear();
+            this.tabActions.selectWindow(window);
+            if (!window.isLocked()) {
+                this.gestures.armWindowDrag(frame, mouseX, mouseY, true);
             }
-            ChatChannelTabBar.Hit hit = frame.tabBar.hitAt(
-                    this.fontRendererObj, row, mouseX, mouseY);
-            if (hit == null) {
-                if (ChatChannelTabBar.inRowBand(row, mouseY)
-                        && mouseX >= frame.boxLeft
-                        && mouseX < frame.boxRight) {
-                    // The strip itself belongs to the window, and moves it.
-                    ChatTabSelection.clear();
-                    this.tabActions.selectWindow(window);
-                    if (!window.isLocked()) {
-                        this.gestures.armWindowDrag(frame, mouseX, mouseY,
-                                true);
-                    }
+            return true;
+        }
+        // Anything on a window's strip is a click on that window,
+        // so the input moves there whichever control was pressed.
+        this.tabActions.selectWindow(window);
+        switch (hit.kind) {
+            case TAB:
+                if (isShiftKeyDown()) {
+                    // Marking a tab does not bring it forward: what
+                    // is being typed stays where it was, and a set
+                    // being started is seeded with it, so what is
+                    // marked always includes the tab in front.
+                    ChatTabSelection.toggle(window.getId(),
+                            ChatWindowFrame.activeTab(window, row.tabs),
+                            hit.tab);
                     return true;
                 }
-                continue;
-            }
-            // Anything on a window's strip is a click on that window,
-            // so the input moves there whichever control was pressed.
-            this.tabActions.selectWindow(window);
-            switch (hit.kind) {
-                case TAB:
-                    if (isShiftKeyDown()) {
-                        // Marking a tab does not bring it forward: what
-                        // is being typed stays where it was, and a set
-                        // being started is seeded with it, so what is
-                        // marked always includes the tab in front.
-                        ChatTabSelection.toggle(window.getId(),
-                                ChatWindowFrame.activeTab(window, row.tabs),
-                                hit.tab);
-                        return true;
-                    }
-                    // A press on a tab already in a group keeps the
-                    // group: the drag it may start is the group's, and
-                    // a press that never travels collapses it on the
-                    // release instead.
-                    List<ChatTab> group =
-                            ChatWindowGestures.draggedGroup(window, hit.tab);
-                    boolean kept = group.size() > 1;
-                    // Everything the window holds — its only tab, or all
-                    // of them marked at once — has nothing to be taken
-                    // out of and nowhere to be reordered: the tabs are
-                    // the window's title bar, so the drag begins already
-                    // torn off into the window they are in and the
-                    // window itself is what moves. Carrying it onto
-                    // another window's row docks the tabs there, the way
-                    // a browser merges a window back into another.
-                    boolean wholeWindow =
-                            group.size() >= window.getTabs().size();
-                    if (!kept) {
-                        ChatTabSelection.selectOnly(window.getId(), hit.tab);
-                    }
-                    this.tabActions.selectChannel(hit.tab);
-                    if (!window.isLocked()) {
-                        this.gestures.armTabDrag(window, frame, row,
-                                hit.tab, group, mouseX, mouseY, kept,
-                                wholeWindow);
-                    } else if (kept) {
-                        // A locked row starts no drag, so the press is
-                        // only ever a pick.
-                        ChatTabSelection.selectOnly(window.getId(), hit.tab);
-                    }
-                    return true;
-                case CLOSE:
-                    this.tabActions.closeChannel(hit.tab);
-                    return true;
-                case SETTINGS:
-                    this.menus.openSettingsPopup(hit.tab, mouseX,
+                // A press on a tab already in a group keeps the
+                // group: the drag it may start is the group's, and
+                // a press that never travels collapses it on the
+                // release instead.
+                List<ChatTab> group =
+                        ChatWindowGestures.draggedGroup(window, hit.tab);
+                boolean kept = group.size() > 1;
+                // Everything the window holds — its only tab, or all
+                // of them marked at once — has nothing to be taken
+                // out of and nowhere to be reordered: the tabs are
+                // the window's title bar, so the drag begins already
+                // torn off into the window they are in and the
+                // window itself is what moves. Carrying it onto
+                // another window's row docks the tabs there, the way
+                // a browser merges a window back into another.
+                boolean wholeWindow =
+                        group.size() >= window.getTabs().size();
+                if (!kept) {
+                    ChatTabSelection.selectOnly(window.getId(), hit.tab);
+                }
+                this.tabActions.selectChannel(hit.tab);
+                if (!window.isLocked()) {
+                    this.gestures.armTabDrag(window, frame, row,
+                            hit.tab, group, mouseX, mouseY, kept,
+                            wholeWindow);
+                } else if (kept) {
+                    // A locked row starts no drag, so the press is
+                    // only ever a pick.
+                    ChatTabSelection.selectOnly(window.getId(), hit.tab);
+                }
+                return true;
+            case CLOSE:
+                this.tabActions.closeChannel(hit.tab);
+                return true;
+            case SETTINGS:
+                this.menus.openSettingsPopup(hit.tab, mouseX,
+                        ChatChannelTabBar.rowTop(row.rowBottom) - 2);
+                return true;
+            case LOCK:
+                this.tabActions.setWindowLocked(window, !window.isLocked());
+                return true;
+            case RESTORE:
+                // A switch like the search control beside it: a
+                // press with the list already out puts it away.
+                if (!ChatScreenMenus.POPUP_RESTORE.equals(
+                        closedPopupKind)) {
+                    this.menus.openRestorePopup(window.getId(), mouseX,
                             ChatChannelTabBar.rowTop(row.rowBottom) - 2);
-                    return true;
-                case LOCK:
-                    this.tabActions.setWindowLocked(window, !window.isLocked());
-                    return true;
-                case RESTORE:
-                    // A switch like the search control beside it: a
-                    // press with the list already out puts it away.
-                    if (!ChatScreenMenus.POPUP_RESTORE.equals(
-                            closedPopupKind)) {
-                        this.menus.openRestorePopup(window.getId(), mouseX,
-                                ChatChannelTabBar.rowTop(row.rowBottom) - 2);
-                    }
-                    return true;
-                case SEARCH:
-                    // The control is a switch: a press with its own
-                    // panel already out has just closed it above, and
-                    // only then does the press not open it again.
-                    if (!ChatScreenMenus.POPUP_SEARCH.equals(
-                            closedPopupKind)) {
-                        this.menus.openSearchPanel(window, mouseX,
-                                ChatChannelTabBar.rowTop(row.rowBottom) - 2,
-                                -1, -1);
-                    }
-                    return true;
-                case WINDOW_SETTINGS:
-                    this.menus.openWindowPopup(window, mouseX,
-                            ChatChannelTabBar.rowTop(row.rowBottom) - 2);
-                    return true;
-                case WINDOW_CLOSE:
-                    this.tabActions.closeWindow(window);
-                    return true;
-                case GRIP:
-                    if (!window.isLocked()) {
-                        this.gestures.armWindowDrag(frame, mouseX, mouseY,
-                                true);
-                    }
-                    return true;
-                default:
-                    return true;
-            }
+                }
+                return true;
+            case SEARCH:
+                // The control is a switch: a press with its own
+                // panel already out has just closed it above, and
+                // only then does the press not open it again.
+                if (!ChatScreenMenus.POPUP_SEARCH.equals(
+                        closedPopupKind)) {
+                    this.menus.openSearchPanel(window, mouseX,
+                            ChatChannelTabBar.rowTop(row.rowBottom) - 2,
+                            -1, -1);
+                }
+                return true;
+            case WINDOW_SETTINGS:
+                this.menus.openWindowPopup(window, mouseX,
+                        ChatChannelTabBar.rowTop(row.rowBottom) - 2);
+                return true;
+            case WINDOW_CLOSE:
+                this.tabActions.closeWindow(window);
+                return true;
+            case GRIP:
+                if (!window.isLocked()) {
+                    this.gestures.armWindowDrag(frame, mouseX, mouseY,
+                            true);
+                }
+                return true;
+            default:
+                return true;
         }
-        return false;
     }
 
     @Override
@@ -2336,7 +2373,8 @@ public final class LostTalesChatGui extends GuiChat {
             ChatWindowGestures.WindowDrag click = this.gestures.onRelease();
             if (click != null) {
                 // Never moved: the press was a click on the lines.
-                clickLines(click.pressX, click.pressY, click.pressY
+                clickLines(resolveHover(pointerX(), pointerY()),
+                        click.pressX, click.pressY
                         - Math.round(this.bar.entranceOffset()), 0);
             }
         }
@@ -2344,95 +2382,79 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
-     * Vanilla component-click behaviour resolved against this mod's line
-     * layout. The head marker acts as the sender like the visible name
-     * does; a shared marker opens the map on its location; colour, emoji,
-     * and item markers are internal metadata and never a user-facing
-     * action.
+     * A click on a run of a line, resolved through the one table the
+     * hand cursor and the underline read: a spoiler reveals, a channel
+     * link brings its tab forward, a person opens their card, an
+     * achievement opens its screen, a marker flies the map, a link
+     * opens, a suggestion is taken into the field, a command runs. The
+     * chat's own metadata spends the click and does nothing. Answers
+     * whether the click was taken.
      */
     private boolean handleComponentClick(
             LostTalesChatOverlayRenderer.Hit hit) {
         if (hit == null) {
             return false;
         }
-        // A spoiler answers before anything else, and whatever the
-        // chat-links option says: revealing covered text is the chat's
-        // own furniture, not a link. The click is spent either way, so
-        // the marker's carrier can never fall through to the input.
-        if (ChatSpoilerMarker.isMarker(hit.component)) {
-            ChatSpoilerMarker.reveal(hit.component);
-            return true;
-        }
-        // A channel named as a link is the chat's own furniture too: the
-        // tab comes forward, and the line it names is landed on.
-        ChatChannelLinkMarker.Data channelLink =
-                ChatChannelLinkMarker.decode(hit.component);
-        if (channelLink != null) {
-            openChannelLink(channelLink);
-            return true;
-        }
-        // A person is not a link either, and answers whatever the
-        // chat-links option says: a click on the head, the name, its
-        // brackets and title, or a mention opens the person's card in
-        // full, the way a messenger opens a profile from a name. What
-        // to do about them stays with the person menu on a right-click.
-        if (ChatHeadMarker.isMarker(hit.component)
-                || ChatMentionMarker.decode(hit.component) != null
-                || ChatSenderSpan.isSenderName(hit.component)) {
-            openPersonCard();
-            return true;
-        }
-        if (!this.mc.gameSettings.chatLinks) {
-            return false;
-        }
-        ChatShowcaseMarker.Data share =
-                ChatShowcaseMarker.decode(hit.component);
-        if (share != null) {
-            if (share.kind == ChatShareKind.MARKER) {
-                ClientChatShowcaseStore.Marker marker =
-                        ClientChatShowcaseStore.getMarker(share.showcaseId);
+        IChatComponent part = hit.component;
+        ChatInteractions.Action action = ChatInteractions.actionOf(part,
+                this.mc.gameSettings.chatLinks);
+        switch (action) {
+            case SPOILER:
+                ChatSpoilerMarker.reveal(part);
+                return true;
+            case CHANNEL_LINK:
+                openChannelLink(ChatChannelLinkMarker.decode(part));
+                return true;
+            case PERSON:
+                // A click on the head, the name, its brackets and title,
+                // or a mention opens the person's card in full, the way
+                // a messenger opens a profile from a name. What to do
+                // about them stays with the person menu on a right-click.
+                openPersonCard(personOf(hit));
+                return true;
+            case REPLY_JUMP:
+                // The quote was asked first; a click that reached here
+                // belongs to it all the same.
+                return true;
+            case REACTION: {
+                // A chip adds the reader's own reaction with its emoji,
+                // or takes it back when it is already theirs.
+                ChatReactionMarker.Data chip = ChatReactionMarker.decode(part);
+                if (chip != null) {
+                    sendReaction(chip.messageId, chip.emoji, !chip.mine);
+                }
+                return true;
+            }
+            case ACHIEVEMENT:
+                ChatAchievementScreens.open(this.mc, part);
+                return true;
+            case MARKER_SHARE: {
+                ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
+                ClientChatShowcaseStore.Marker marker = share == null ? null
+                        : ClientChatShowcaseStore.getMarker(share.showcaseId);
                 if (marker != null) {
                     LostTalesLotrMapGui.openFocusedOn(marker.id,
                             marker.dimensionId, marker.x, marker.z);
                 }
+                return true;
             }
-            return true;
+            case CONSUMED:
+                return true;
+            case LINK:
+            case SUGGESTION:
+            case COMMAND:
+                break;
+            default:
+                return false;
         }
-        if (ChatColorMarker.isMarker(hit.component)
-                || ChatPrefixMarker.isMarker(hit.component)
-                || ChatEmojiMarker.isMarker(hit.component)
-                || ChatTitleMarker.isMarker(hit.component)
-                || ChatReplyMarker.isMarker(hit.component)
-                // The chevron a body opens with is the chat's own
-                // punctuation: it is drawn, but it answers to nothing.
-                || ChatBodyMarker.isMarker(hit.component)
-                // The indent a wrapped line hangs under, and the gap an
-                // icon reserves: both are drawn, both are wide enough to
-                // be hit, and neither is anything to act on. Without
-                // them the click below would read their payload as a
-                // suggestion and paste it over whatever was being typed.
-                || ChatLayoutMarker.isMarker(hit.component)
-                || ChatSpacerMarker.isMarker(hit.component)) {
-            return true;
-        }
-        ClickEvent event =
-                hit.component.getChatStyle().getChatClickEvent();
-        if (event == null) {
-            return false;
-        }
+        ClickEvent event = part.getChatStyle().getChatClickEvent();
         if (isShiftKeyDown()) {
-            this.inputField.writeText(
-                    hit.component.getUnformattedTextForChat());
+            this.inputField.writeText(part.getUnformattedTextForChat());
             return true;
         }
-        if (event.getAction() == ClickEvent.Action.SUGGEST_COMMAND
-                && event.getValue().startsWith(ChatSenderSpan.WHISPER_PREFIX)) {
-            // The sender's own name and brackets: a person, not a link.
-            openPersonCard();
-            return true;
-        } else if (event.getAction() == ClickEvent.Action.SUGGEST_COMMAND) {
+        if (action == ChatInteractions.Action.SUGGESTION) {
             this.inputField.setText(event.getValue());
-        } else if (event.getAction() == ClickEvent.Action.RUN_COMMAND) {
+        } else if (action == ChatInteractions.Action.COMMAND) {
             // A line's click may run a command or say something: a
             // command is echoed as a typed one is, anything else goes
             // out as the message it is.
@@ -2443,7 +2465,7 @@ public final class LostTalesChatGui extends GuiChat {
             } else if (value.length() > 0) {
                 this.func_146403_a(value);
             }
-        } else if (event.getAction() == ClickEvent.Action.OPEN_URL) {
+        } else {
             openChatLink(event.getValue());
         }
         return true;
@@ -2454,16 +2476,80 @@ public final class LostTalesChatGui extends GuiChat {
      * the hover card shows; a click that lands on nobody — the gap after
      * a closing bracket — opens nothing.
      */
-    private void openPersonCard() {
-        float pointerX = (float)ChatWindowPlacement.preciseMouseX(
-                this.mc, this.width);
-        float pointerY = (float)ChatWindowPlacement.preciseMouseY(
-                this.mc, this.height);
-        LostTalesChatHoverCard.Target person =
-                LostTalesChatHoverCard.personAt(this.mc, pointerX, pointerY);
-        if (person != null) {
-            LostTalesChatHoverCard.pin(person, (int)pointerX, (int)pointerY);
+    private void openPersonCard(LostTalesChatHoverCard.Found person) {
+        if (person == null) {
+            return;
         }
+        LostTalesChatHoverCard.pin(person.target,
+                (int)ChatWindowPlacement.preciseMouseX(this.mc, this.width),
+                (int)ChatWindowPlacement.preciseMouseY(this.mc, this.height));
+    }
+
+    /** The person a hit stands on, read from the frame when it is the frame's hit. */
+    private LostTalesChatHoverCard.Found personOf(
+            LostTalesChatOverlayRenderer.Hit hit) {
+        return LostTalesChatHoverCard.locate(this.mc, hit);
+    }
+
+    /**
+     * Opens the emoji picker to react to a message: a pick is sent as a
+     * reaction to it rather than written into the field. Only while the
+     * picker itself is offered.
+     */
+    private void openReactionPicker(long messageId) {
+        if (!ChatMessageIds.isServerId(messageId)
+                || !this.bar.isPickerShown(this.bar.emojiPicker())) {
+            return;
+        }
+        this.bar.closePickers();
+        this.bar.emojiPicker().openForReaction(messageId);
+    }
+
+    /** Asks the server to add a reaction, or take one back; its answer redraws the chips. */
+    private static void sendReaction(long messageId, ChatEmoji emoji,
+                                     boolean add) {
+        if (emoji == null || !ChatMessageIds.isServerId(messageId)) {
+            return;
+        }
+        LostTalesNetworkHandler.CHANNEL.sendToServer(
+                new LostTalesChatReactPacket(messageId, emoji.getName(), add));
+    }
+
+    /**
+     * A chip's card: the emoji by name, who reacted with it — the first
+     * few, then how many more — and what a click does.
+     */
+    private void drawReactionTooltip(ChatReactionMarker.Data chip,
+                                     int mouseX, int mouseY) {
+        List<String> lines = new ArrayList<String>(3);
+        lines.add(":" + chip.emoji.getName() + ":");
+        ClientChatMessages.Remembered held =
+                ClientChatMessages.get(chip.messageId);
+        ChatReactionSummary.Reaction reaction = held == null ? null
+                : held.packet.getReactions().find(chip.emoji.getName());
+        if (reaction != null && !reaction.names.isEmpty()) {
+            StringBuilder names = new StringBuilder();
+            for (int index = 0; index < reaction.names.size(); index++) {
+                if (index > 0) {
+                    names.append(", ");
+                }
+                names.append(reaction.names.get(index));
+            }
+            lines.add(reaction.others() > 0
+                    ? StatCollector.translateToLocalFormatted(
+                            "gui.losttales.chat.reaction.by_more",
+                            names.toString(),
+                            Integer.toString(reaction.others()))
+                    : StatCollector.translateToLocalFormatted(
+                            "gui.losttales.chat.reaction.by",
+                            names.toString()));
+        }
+        lines.add(EnumChatFormatting.GRAY + StatCollector.translateToLocal(
+                chip.mine ? "gui.losttales.chat.reaction.remove"
+                        : "gui.losttales.chat.reaction.add"));
+        LostTalesChatHoverCard.drawTextCard(this.mc, lines, mouseX, mouseY,
+                this.width, this.height);
+        GL11.glDisable(GL11.GL_LIGHTING);
     }
 
     /**
@@ -2553,12 +2639,15 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
-     * Whether an overlay drawn this frame owns the given GUI-space point.
-     * Used by the vanilla hit-test hook so third-party chat hover cards
-     * (LOTR's achievement card among them) stay silent under popups.
+     * The run of the lines under a GUI-space point, as the chat's own
+     * hover finds it: none while anything drawn above the lines has the
+     * point. What the vanilla hit-test hook hands another mod asking
+     * where the pointer is, so LOTR's achievement card among others
+     * stays silent under a menu.
      */
-    public boolean isPointerOwnedByOverlay(int mouseX, int mouseY) {
-        return this.regions.contains(mouseX, mouseY);
+    public LostTalesChatOverlayRenderer.Hit lineHitAt(double x, double y) {
+        ChatHover under = resolveHover(x, y);
+        return under.is(ChatHover.Kind.LINE) ? under.line : null;
     }
 
     /** A short confirmation above the bar: what the bar draws. */

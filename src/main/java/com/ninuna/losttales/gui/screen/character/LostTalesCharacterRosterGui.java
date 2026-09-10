@@ -10,6 +10,8 @@ import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
+import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
+import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 
@@ -33,7 +35,8 @@ import org.lwjgl.input.Keyboard;
  * Until a world has minted the record the row falls back to the account's
  * own name and face, which is what it stands for.</p>
  */
-public final class LostTalesCharacterRosterGui extends GuiScreen {
+public final class LostTalesCharacterRosterGui extends GuiScreen
+        implements LostTalesPointerInteractable {
 
     private static final int BUTTON_PRIMARY = 1;
     private static final int BUTTON_DELETE = 2;
@@ -47,6 +50,8 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
     private static final int DEFAULT_ROW_HEIGHT = 26;
     /** The head drawn at the left of the default character's row. */
     private static final int DEFAULT_HEAD_SIZE = 16;
+    /** What {@link #tileAt} answers where there is no tile. */
+    private static final int NO_TILE = Integer.MIN_VALUE;
 
     private static final int PANEL_TOP = 44;
     /** Where the panel starts when the header has to share the room. */
@@ -301,14 +306,12 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
         this.cellHeight = Math.max(CELL_HEIGHT_MIN, gridSpace / 3);
 
         CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
+        int hoveredTile = tileAt(mouseX, mouseY);
         drawDefaultRow(snapshot, this.defaultRowX, this.defaultRowY,
-                this.defaultRowWidth, mouseX, mouseY);
+                this.defaultRowWidth, hoveredTile == DEFAULT_ROW_SLOT);
         for (int slot = 0; slot < CharacterRoster.MAX_SLOTS; slot++) {
-            int column = slot % 3;
-            int row = slot / 3;
-            int x = this.gridX + column * (this.cellWidth + this.gap);
-            int y = this.gridY + row * (this.cellHeight + this.gap);
-            drawSlot(snapshot, slot, x, y, mouseX, mouseY);
+            drawSlot(snapshot, slot, slotX(slot), slotY(slot),
+                    hoveredTile == slot);
         }
         if (roomForDetails) {
             drawSelectedDetails(snapshot, panelX + 12, panelY + panelHeight - 39,
@@ -371,9 +374,7 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
      * account's name and face, which is what the record will carry.
      */
     private void drawDefaultRow(CharacterRosterSnapshot snapshot, int x, int y,
-                                int width, int mouseX, int mouseY) {
-        boolean hovered = mouseX >= x && mouseX < x + width
-                && mouseY >= y && mouseY < y + DEFAULT_ROW_HEIGHT;
+                                int width, boolean hovered) {
         drawTileFrame(x, y, width, DEFAULT_ROW_HEIGHT, isDefaultRowSelected(), hovered);
         CharacterSummary character = snapshot == null
                 ? null : snapshot.getCharacterAtSlot(DEFAULT_ROW_SLOT);
@@ -427,9 +428,7 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
     }
 
     private void drawSlot(CharacterRosterSnapshot snapshot, int slot, int x, int y,
-                          int mouseX, int mouseY) {
-        boolean hovered = mouseX >= x && mouseX < x + this.cellWidth
-                && mouseY >= y && mouseY < y + this.cellHeight;
+                          boolean hovered) {
         drawTileFrame(x, y, this.cellWidth, this.cellHeight, slot == this.selectedSlot, hovered);
 
         String slotLabel = I18n.format("gui.losttales.character.slot", Integer.valueOf(slot + 1));
@@ -496,36 +495,77 @@ public final class LostTalesCharacterRosterGui extends GuiScreen {
                 : this.mc.thePlayer.getCommandSenderName();
     }
 
+    private int slotX(int slot) {
+        return this.gridX + (slot % 3) * (this.cellWidth + this.gap);
+    }
+
+    private int slotY(int slot) {
+        return this.gridY + (slot / 3) * (this.cellHeight + this.gap);
+    }
+
+    /**
+     * The tile under the point: {@link #DEFAULT_ROW_SLOT} for the account's
+     * row, a slot index for one of the nine, or {@link #NO_TILE}.
+     */
+    private int tileAt(int mouseX, int mouseY) {
+        if (mouseX >= this.defaultRowX
+                && mouseX < this.defaultRowX + this.defaultRowWidth
+                && mouseY >= this.defaultRowY
+                && mouseY < this.defaultRowY + DEFAULT_ROW_HEIGHT) {
+            return DEFAULT_ROW_SLOT;
+        }
+        for (int slot = 0; slot < CharacterRoster.MAX_SLOTS; slot++) {
+            int x = slotX(slot);
+            int y = slotY(slot);
+            if (mouseX >= x && mouseX < x + this.cellWidth
+                    && mouseY >= y && mouseY < y + this.cellHeight) {
+                return slot;
+            }
+        }
+        return NO_TILE;
+    }
+
+    /**
+     * Whether a click on the tile selects it: the account's row always,
+     * one of the nine once the roster is known and the slot is not hidden.
+     */
+    private static boolean isSelectable(CharacterRosterSnapshot snapshot, int tile) {
+        if (tile == DEFAULT_ROW_SLOT) {
+            return true;
+        }
+        return tile != NO_TILE && snapshot != null
+                && snapshot.getSlotState(tile) != CharacterSlotState.HIDDEN;
+    }
+
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
         if (button == 0) {
-            if (mouseX >= this.defaultRowX
-                    && mouseX < this.defaultRowX + this.defaultRowWidth
-                    && mouseY >= this.defaultRowY
-                    && mouseY < this.defaultRowY + DEFAULT_ROW_HEIGHT) {
-                this.selectedSlot = DEFAULT_ROW_SLOT;
-                this.statusMessage = "";
-                updateButtonState();
-                return;
-            }
-            for (int slot = 0; slot < CharacterRoster.MAX_SLOTS; slot++) {
-                int column = slot % 3;
-                int row = slot / 3;
-                int x = this.gridX + column * (this.cellWidth + this.gap);
-                int y = this.gridY + row * (this.cellHeight + this.gap);
-                if (mouseX >= x && mouseX < x + this.cellWidth
-                        && mouseY >= y && mouseY < y + this.cellHeight) {
-                    CharacterRosterSnapshot snapshot = ClientCharacterRosterCache.getSnapshot();
-                    if (snapshot != null && snapshot.getSlotState(slot) != CharacterSlotState.HIDDEN) {
-                        this.selectedSlot = slot;
-                        this.statusMessage = "";
-                        updateButtonState();
-                    }
-                    return;
+            int tile = tileAt(mouseX, mouseY);
+            if (tile != NO_TILE) {
+                // A tile that cannot be selected still takes the click.
+                if (isSelectable(ClientCharacterRosterCache.getSnapshot(), tile)) {
+                    this.selectedSlot = tile;
+                    this.statusMessage = "";
+                    updateButtonState();
                 }
+                return;
             }
         }
         super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    /**
+     * The same hit tests a click takes, in the same order, at the point the
+     * screen's own draw and clicks see. A hidden slot, and every slot before the roster arrives, lights
+     * under the pointer but selects nothing, so it keeps the arrow.
+     */
+    @Override
+    public boolean isPointerOverInteractable(int x, int y) {
+        int tile = tileAt(x, y);
+        if (tile != NO_TILE) {
+            return isSelectable(ClientCharacterRosterCache.getSnapshot(), tile);
+        }
+        return LostTalesGuiPointerTargets.isOverEnabledButton(this, x, y);
     }
 
     @Override

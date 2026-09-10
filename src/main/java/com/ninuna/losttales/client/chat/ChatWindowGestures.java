@@ -155,7 +155,7 @@ final class ChatWindowGestures {
      * fade out from under a drag that has wandered off it. Set before
      * the windows draw, since the draw is what eases it in and out.
      */
-    void markScrollbarsWanted(int mouseX, int mouseY) {
+    void markScrollbarsWanted(double mouseX, double mouseY) {
         // Only the window the pointer is really in shows its bar: one
         // covered by another is not being read, whatever its box says.
         ChatWindowFrame pointed = this.scrollbarDrag == null
@@ -202,10 +202,11 @@ final class ChatWindowGestures {
     /* ---- Mouse events ---- */
 
     /**
-     * A press-and-move with the left button. Every armed drag becomes
-     * live once the pointer has travelled the threshold; a live one
-     * follows the pointer. True when a drag took the event, so the
-     * screen leaves vanilla's own handling alone.
+     * A press-and-move with the left button. A resize is live from its
+     * press; an armed window or tab drag becomes live once the pointer
+     * has travelled the threshold; a live one follows the pointer. True
+     * when a drag took the event, so the screen leaves vanilla's own
+     * handling alone.
      */
     boolean onDragMove(int mouseX, int mouseY) {
         if (this.scrollbarDrag != null) {
@@ -213,15 +214,9 @@ final class ChatWindowGestures {
             return true;
         }
         if (this.windowResize != null) {
-            if (!this.windowResize.active
-                    && travelled(mouseX, mouseY, this.windowResize.pressX,
-                            this.windowResize.pressY)) {
-                this.windowResize.active = true;
-                this.bar.closePickers();
-            }
-            if (this.windowResize.active) {
-                updateResize();
-            }
+            // Live from the press: an edge follows the pointer from the
+            // first pixel, with no travel to overcome first.
+            updateResize();
             return true;
         }
         if (this.windowDrag != null) {
@@ -269,7 +264,7 @@ final class ChatWindowGestures {
         if (this.windowResize != null) {
             WindowResize resize = this.windowResize;
             this.windowResize = null;
-            if (resize.active) {
+            if (resize.moved()) {
                 commitResize(resize);
             }
         }
@@ -348,7 +343,7 @@ final class ChatWindowGestures {
      * taken hold of; pressing the track above or below jumps to there
      * and then carries it, the way a scrollbar anywhere else does.
      */
-    boolean grabScrollbar(int mouseX, int mouseY) {
+    boolean grabScrollbar(double mouseX, double mouseY) {
         List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
         for (int index = frames.size() - 1; index >= 0; index--) {
             ChatWindowFrame frame = frames.get(index);
@@ -359,10 +354,10 @@ final class ChatWindowGestures {
                     - frame.scrollbarThumbTop;
             float offset = mouseY >= frame.scrollbarThumbTop
                     && mouseY < frame.scrollbarThumbBottom
-                            ? mouseY - frame.scrollbarThumbTop
+                            ? (float)(mouseY - frame.scrollbarThumbTop)
                             : thumbHeight / 2.0F;
             this.scrollbarDrag = new ScrollbarDrag(frame.windowId, offset);
-            dragScrollbar(mouseY);
+            dragScrollbar((int)Math.floor(mouseY));
             return true;
         }
         return false;
@@ -470,7 +465,11 @@ final class ChatWindowGestures {
         final double grabY;
         final int pressX;
         final int pressY;
-        boolean active;
+        /**
+         * A resize is live from the press, so nothing under the pointer
+         * has to be overcome before the edge moves.
+         */
+        final boolean active = true;
         /** The box under the pointer right now. */
         double left;
         double right;
@@ -503,6 +502,16 @@ final class ChatWindowGestures {
             this.storedOffsetX = window.getOffsetX();
             this.storedOffsetY = window.getOffsetY();
         }
+
+        /**
+         * Whether the box has left where it started: a press on an edge
+         * that is released in place is not a resize, and writes nothing.
+         */
+        boolean moved() {
+            return this.left != this.startLeft || this.right != this.startRight
+                    || this.top != this.startTop
+                    || this.bottom != this.startBottom;
+        }
     }
 
     /**
@@ -515,7 +524,7 @@ final class ChatWindowGestures {
      * mouse-down and the drag it starts all ask this same question, so
      * what the pointer shows is what the press does.
      */
-    static ResizeTarget resizeUnderPointer(int mouseX, int mouseY,
+    static ResizeTarget resizeUnderPointer(double mouseX, double mouseY,
                                            ChatPointerRegions regions) {
         if (regions.containsOverlay(mouseX, mouseY)) {
             return null;
@@ -529,7 +538,7 @@ final class ChatWindowGestures {
      * tab, a control or the input field never loses a click to it; the
      * frontmost window wins where two overlap.
      */
-    static ResizeTarget resizeTargetAt(int mouseX, int mouseY) {
+    static ResizeTarget resizeTargetAt(double mouseX, double mouseY) {
         List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
         for (int index = frames.size() - 1; index >= 0; index--) {
             ChatWindowFrame frame = frames.get(index);
@@ -555,8 +564,8 @@ final class ChatWindowGestures {
      * strip, its messages and its bar — rather than on the border
      * outside it.
      */
-    static boolean coversPoint(ChatWindowFrame frame, int mouseX,
-                               int mouseY) {
+    static boolean coversPoint(ChatWindowFrame frame, double mouseX,
+                               double mouseY) {
         double left = frame.drawnLeft();
         double right = left + (frame.boxRight - frame.boxLeft);
         double top = frame.boxTop + frame.motionY;
@@ -566,7 +575,8 @@ final class ChatWindowGestures {
     }
 
     /** Which edge or corner of one window's box a point lies on. */
-    static ResizeEdge edgeAt(ChatWindowFrame frame, int mouseX, int mouseY) {
+    static ResizeEdge edgeAt(ChatWindowFrame frame, double mouseX,
+                             double mouseY) {
         double left = frame.drawnLeft();
         double right = left + (frame.boxRight - frame.boxLeft);
         double top = frame.boxTop + frame.motionY;
@@ -629,12 +639,18 @@ final class ChatWindowGestures {
         }
     }
 
-    /** Arms a resize from the pointer's position on an edge. */
+    /**
+     * Takes hold of an edge at the pointer's position. The resize is
+     * live at once: the edge follows the pointer from the first pixel
+     * of travel, and a press released where it was made changes
+     * nothing.
+     */
     void armResize(ResizeTarget target, ChatWindow window, int mouseX,
                    int mouseY) {
         ChatWindowFrame frame = target.frame;
         ChatWindowLayout.raise(frame.windowId);
         this.tabActions.selectWindow(window);
+        this.bar.closePickers();
         double left = frame.drawnLeft();
         double right = left + (frame.boxRight - frame.boxLeft);
         double top = frame.boxTop + frame.motionY;

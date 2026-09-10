@@ -272,7 +272,7 @@ public final class ChatWindowPlacement {
      * for show as empty rows above them, so resizing never moves the
      * window. One following the game setting is as tall as the tallest
      * stack any of its tabs has held, in lines and fractions of one — a
-     * blank row between runs is a third of a line — at least one, at most its
+     * blank row between runs is half a line — at least one, at most its
      * {@link #lineCap}: one height for every tab of the window, so
      * bringing another tab forward never resizes it; a window not drawn
      * yet shows one.

@@ -46,19 +46,17 @@ public final class LostTalesChatHitHooks {
             }
             LostTalesChatGui screen = (LostTalesChatGui)minecraft.currentScreen;
             // The exact fractional GUI position, so third parties get
-            // the same answer the drawn cursor tip stands on; the
-            // overlay check keeps vanilla's whole-pixel arithmetic,
-            // which is how the regions were registered.
+            // the same answer the drawn cursor tip stands on, and the
+            // screen's own answer about it: a run of the lines only when
+            // nothing drawn above them has the pointer, exactly as the
+            // chat's own hover finds it.
             float guiX = rawMouseX * (float)screen.width
                     / minecraft.displayWidth;
             float guiY = screen.height
                     - rawMouseY * (float)screen.height
                             / minecraft.displayHeight - 1.0F;
-            if (screen.isPointerOwnedByOverlay((int)guiX, (int)guiY)) {
-                return null;
-            }
             LostTalesChatOverlayRenderer.Hit hit =
-                    LostTalesChatOverlayRenderer.hitAt(minecraft, guiX, guiY);
+                    screen.lineHitAt(guiX, guiY);
             return hit == null ? null : hit.component;
         } catch (RuntimeException ignored) {
             return null;

@@ -14,9 +14,10 @@ public final class CharacterPlayerEyeHeightHelper {
      * Applies the current standing or sneaking eye position.
      *
      * Forge 1.7.10 deliberately exposes EntityPlayer#eyeHeight. Its value is
-     * relative to the player's unusual posY/yOffset anchor, not an absolute
-     * height above the feet. The default value must therefore remain part of
-     * this conversion.
+     * added directly to posY by suffocation and material checks. The feet are
+     * at posY - yOffset + ySize, so the field contains only the offset from
+     * posY to the race's eyes. The server's default eye height is already a
+     * complete offset, not a correction to add to the race height.
      */
     public static void apply(
             EntityPlayer player,
@@ -53,8 +54,14 @@ public final class CharacterPlayerEyeHeightHelper {
 
     static float toPlayerEyeHeightField(
             EntityPlayer player, float absoluteEyeHeight) {
+        return toPlayerEyeHeightField(
+                absoluteEyeHeight, player.yOffset, player.ySize);
+    }
+
+    static float toPlayerEyeHeightField(
+            float absoluteEyeHeight, float yOffset, float ySize) {
         float safeAbsolute = Math.max(
                 MINIMUM_ABSOLUTE_EYE_HEIGHT, absoluteEyeHeight);
-        return player.getDefaultEyeHeight() + safeAbsolute - player.yOffset;
+        return safeAbsolute - yOffset + ySize;
     }
 }

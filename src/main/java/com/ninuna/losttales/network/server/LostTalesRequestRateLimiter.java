@@ -43,6 +43,10 @@ public final class LostTalesRequestRateLimiter {
         // Correcting a typo or taking a line back is deliberate and rare
         // next to sending; a handful in five seconds covers a fumbled edit.
         CHAT_REVISION(10, 5000L),
+        // A reaction is one click on a chip or one pick in the picker;
+        // twenty in five seconds covers a burst of clicking through a
+        // message's chips and back.
+        CHAT_REACTION(20, 5000L),
         // One ask per conversation the first time it is read, and only
         // for a channel that has more than one; a handful covers a
         // player moving between their characters.

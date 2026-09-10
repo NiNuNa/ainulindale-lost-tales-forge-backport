@@ -4,10 +4,12 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -70,6 +72,18 @@ public final class DiscordJson {
             this.mentionNames = mentionNames;
             this.referencedMessageId = referencedMessageId;
             this.editedTimestamp = editedTimestamp;
+        }
+
+        /**
+         * Whether a member rewrote the message. Discord announces a
+         * message update for more than an edit — a link's embed
+         * unfurling after the post, a pin, a suppressed embed — and
+         * only a rewrite stamps the edit time, so the stamp is what
+         * separates a member's edit from Discord's own bookkeeping.
+         */
+        public boolean isEdited() {
+            return this.editedTimestamp != null
+                    && this.editedTimestamp.length() > 0;
         }
     }
 
@@ -324,6 +338,90 @@ public final class DiscordJson {
         } catch (RuntimeException exception) {
             return null;
         }
+    }
+
+    /**
+     * A reaction as the gateway reports one being added or taken back,
+     * or every reaction — or every one with an emoji — being cleared.
+     * The member and the user are empty where the event does not carry
+     * them: a removal names the user by id alone, a clear names nobody.
+     */
+    public static final class Reaction {
+        public final String userId;
+        public final String channelId;
+        public final String messageId;
+        /** A custom emoji's id; empty for a Unicode one. */
+        public final String emojiId;
+        /** A Unicode emoji itself, or a custom emoji's name. */
+        public final String emojiName;
+        /** The name the member shows in the server, when the event says. */
+        public final String memberName;
+        public final boolean bot;
+
+        Reaction(String userId, String channelId, String messageId,
+                 String emojiId, String emojiName, String memberName,
+                 boolean bot) {
+            this.userId = userId;
+            this.channelId = channelId;
+            this.messageId = messageId;
+            this.emojiId = emojiId;
+            this.emojiName = emojiName;
+            this.memberName = memberName;
+            this.bot = bot;
+        }
+
+        /**
+         * The chat's emoji the reaction is: a Unicode emoji the registry
+         * carries — trailing variation selectors aside, which Discord
+         * adds to some and not others — or a custom emoji named as one
+         * of the registry's names; null for any other, which the chat
+         * cannot draw and does not show.
+         */
+        public ChatEmoji emoji() {
+            if (this.emojiName.length() == 0) {
+                return null;
+            }
+            if (this.emojiId.length() > 0) {
+                return ChatEmoji.fromInputName(
+                        this.emojiName.toLowerCase(Locale.ROOT));
+            }
+            ChatEmoji.UnicodeMatch match =
+                    ChatEmoji.matchUnicode(this.emojiName, 0);
+            if (match == null) {
+                return null;
+            }
+            int end = match.length;
+            while (end < this.emojiName.length()
+                    && this.emojiName.charAt(end) == '\uFE0F') {
+                end++;
+            }
+            return end == this.emojiName.length() ? match.emoji : null;
+        }
+    }
+
+    /** One reaction event's payload, or null when it names no message. */
+    public static Reaction parseReaction(JsonObject data) {
+        if (data == null) {
+            return null;
+        }
+        String channelId = string(data, "channel_id");
+        String messageId = string(data, "message_id");
+        if (channelId.length() == 0 || messageId.length() == 0) {
+            return null;
+        }
+        JsonObject emoji = data.has("emoji") && data.get("emoji").isJsonObject()
+                ? data.getAsJsonObject("emoji") : null;
+        JsonObject member = data.has("member") && data.get("member").isJsonObject()
+                ? data.getAsJsonObject("member") : null;
+        JsonObject user = member != null && member.has("user")
+                && member.get("user").isJsonObject()
+                ? member.getAsJsonObject("user") : null;
+        String nick = member == null ? "" : string(member, "nick");
+        return new Reaction(string(data, "user_id"), channelId, messageId,
+                emoji == null ? "" : string(emoji, "id"),
+                emoji == null ? "" : string(emoji, "name"),
+                nick.length() > 0 ? nick : user == null ? "" : displayName(user),
+                user != null && bool(user, "bot"));
     }
 
     /** The name Discord shows: the global display name, else the username. */

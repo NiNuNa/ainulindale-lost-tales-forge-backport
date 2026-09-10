@@ -65,16 +65,13 @@ final class LostTalesChatHoverCard {
      * what they wear, the rest waiting on a click. Nothing while a
      * clicked card stands open, so the two never show at once.
      */
-    static void draw(Minecraft minecraft, float mouseX, float mouseY,
-                     int screenWidth, int screenHeight) {
-        if (pinned != null) {
+    static void draw(Minecraft minecraft, Found found, int mouseX,
+                     int mouseY, int screenWidth, int screenHeight) {
+        if (pinned != null || found == null) {
             return;
         }
-        Found found = locate(minecraft, mouseX, mouseY);
-        if (found != null) {
-            drawCard(minecraft, found.target, (int)mouseX, (int)mouseY,
-                    screenWidth, screenHeight, false);
-        }
+        drawCard(minecraft, found.target, mouseX, mouseY, screenWidth,
+                screenHeight, false);
     }
 
     /**
@@ -85,7 +82,7 @@ final class LostTalesChatHoverCard {
      */
     static boolean isPointerOnPerson(Minecraft minecraft, float mouseX,
                                      float mouseY) {
-        return locate(minecraft, mouseX, mouseY) != null;
+        return personAt(minecraft, mouseX, mouseY) != null;
     }
 
     /**
@@ -94,21 +91,9 @@ final class LostTalesChatHoverCard {
      */
     static Target personAt(Minecraft minecraft, float mouseX,
                            float mouseY) {
-        Found found = locate(minecraft, mouseX, mouseY);
+        Found found = locate(minecraft,
+                LostTalesChatOverlayRenderer.hitAt(minecraft, mouseX, mouseY));
         return found == null ? null : found.target;
-    }
-
-    /**
-     * The drawn row whose sender — head, brackets, name and title — the
-     * pointer rests on, or null: on a mention, on the words, or off the
-     * lines. The text drawing underlines that row's identity span by
-     * this answer, so the rule lights exactly where the card would show
-     * and the hand cursor points, and nowhere before.
-     */
-    static IChatComponent senderRowAt(Minecraft minecraft, float mouseX,
-                                      float mouseY) {
-        Found found = locate(minecraft, mouseX, mouseY);
-        return found != null && found.sender ? found.row : null;
     }
 
     /**
@@ -131,8 +116,8 @@ final class LostTalesChatHoverCard {
     }
 
     /** Whether a GUI point lies on the clicked card as it was last drawn. */
-    static boolean pinnedContains(int mouseX, int mouseY) {
-        return pinned != null && contains(mouseX + 0.5F, mouseY + 0.5F,
+    static boolean pinnedContains(double mouseX, double mouseY) {
+        return pinned != null && contains((float)mouseX, (float)mouseY,
                 pinnedLeft, pinnedTop, pinnedRight, pinnedBottom);
     }
 
@@ -521,7 +506,7 @@ final class LostTalesChatHoverCard {
      * What the pointer rests on: the person or role, whether it is the
      * row's sender rather than a mention, and the drawn row itself.
      */
-    private static final class Found {
+    static final class Found {
         final Target target;
         final boolean sender;
         final IChatComponent row;
@@ -538,64 +523,63 @@ final class LostTalesChatHoverCard {
         return target == null ? null : new Found(target, sender, row);
     }
 
-    private static Found locate(Minecraft minecraft, float mouseX,
-                                float mouseY) {
-        if (minecraft == null || minecraft.ingameGUI == null
-                || minecraft.fontRenderer == null) {
-            return null;
-        }
-        GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
-        if (chat == null || !chat.getChatOpen()) {
+    /**
+     * The person the hit stands on, or null: a mention answers with
+     * whoever it reaches; the sender's identity span — the opening
+     * bracket, the head with its clear pixels, the name, the title,
+     * the spacers and the closing bracket's own glyphs, never the gap
+     * after them — answers with the row's sender. The hit is the one
+     * the screen took for the frame, so the card, the underline and
+     * the hand cursor all read the same run; the row is walked again
+     * only to know whether that run stands inside the span, and every
+     * width it needs the hit already carries.
+     */
+    static Found locate(Minecraft minecraft,
+                        LostTalesChatOverlayRenderer.Hit hit) {
+        if (minecraft == null || minecraft.fontRenderer == null
+                || hit == null || hit.band == null
+                || hit.band.lines == null) {
             return null;
         }
         try {
-            LostTalesChatOverlayRenderer.Band band =
-                    LostTalesChatOverlayRenderer.bandAt(
-                            minecraft, mouseX, mouseY);
-            List<ChatLine> lines = band == null ? null : band.lines;
-            if (band == null || lines == null
-                    || band.viewIndex >= lines.size()
-                    || lines.get(band.viewIndex) == null) {
-                return null;
-            }
-            // The band already answers the vertical question exactly as
-            // drawn; only the horizontal component walk remains, in the
-            // line's own text space, skipping what the renderer skipped.
-            // The sender's identity is one span — the opening bracket,
-            // the head with its clear pixels, the name, the title, the
-            // spacers, the closing bracket — and every pixel of it
-            // answers with the card, so the card never blinks out in the
-            // hairline gaps between two of its parts.
-            int cursor = 0;
-            boolean identitySpan = false;
-            float previousStart = 0.0F;
-            String previousText = null;
-            IChatComponent row = lines.get(band.viewIndex).func_151461_a();
+            List<ChatLine> lines = hit.band.lines;
+            int viewIndex = hit.band.viewIndex;
+            IChatComponent row = hit.line;
+            // The row's drawn runs in order, with their places on the
+            // row: the walk below looks one run ahead for an NPC's
+            // head, whose bracket carries no whisper and belongs to the
+            // span all the same.
+            List<IChatComponent> parts = new ArrayList<IChatComponent>();
+            List<Integer> places = new ArrayList<Integer>();
+            int index = -1;
             for (Object value : row) {
                 if (!(value instanceof IChatComponent)) {
                     continue;
                 }
+                index++;
                 IChatComponent part = (IChatComponent)value;
-                if (ChatPrefixMarker.isHidden(part, true)) {
-                    continue;
+                if (!ChatPrefixMarker.isHidden(part, true)) {
+                    parts.add(part);
+                    places.add(Integer.valueOf(index));
                 }
-                int partWidth = LostTalesChatVisualStyle.partWidth(
-                        minecraft.fontRenderer, part, true);
-                // A mention shows the card of whoever it reaches, not
-                // the line's sender: a player's card, or for a role
-                // mention the role's own card naming its holders.
+            }
+            boolean identitySpan = false;
+            for (int at = 0; at < parts.size(); at++) {
+                IChatComponent part = parts.get(at);
+                boolean atHit = places.get(at).intValue() == hit.index;
                 ChatMentionMarker.Data mention =
                         ChatMentionMarker.decode(part);
-                if (mention != null && band.localX >= cursor
-                        && band.localX < cursor + partWidth) {
-                    ChatAccountRole role = mention.role();
-                    return found(role != null ? Target.forRole(role)
-                            : targetForAccount(minecraft, mention.account),
-                            false, row);
+                if (mention != null) {
+                    if (atHit) {
+                        ChatAccountRole role = mention.role();
+                        return found(role != null ? Target.forRole(role)
+                                : targetForAccount(minecraft, mention.account),
+                                false, row);
+                    }
+                    continue;
                 }
-                ChatHeadMarker.Data decodedHead =
-                        ChatHeadMarker.decode(part);
-                String text = decodedHead != null ? ""
+                ChatHeadMarker.Data head = ChatHeadMarker.decode(part);
+                String text = head != null ? ""
                         : LostTalesChatVisualStyle.removeColorCodes(
                                 part.getUnformattedTextForChat()).trim();
                 boolean inSpan = identitySpan;
@@ -605,50 +589,53 @@ final class LostTalesChatHoverCard {
                     identitySpan = true;
                     inSpan = true;
                 }
-                if (decodedHead != null) {
+                if (head != null) {
                     inSpan = true;
-                    if (decodedHead.npcIdentity && !identitySpan) {
-                        // An NPC's brackets carry no reply identity —
-                        // nobody is on the other end of a /msg — so its
-                        // span opens at its head and reaches back over
-                        // the bracket standing just before it.
+                    if (head.npcIdentity) {
                         identitySpan = true;
-                        if (previousText != null
-                                && previousText.startsWith("<")
-                                && band.localX >= previousStart
-                                && band.localX < cursor) {
-                            return found(targetForGroup(lines, band.viewIndex),
-                            true, row);
+                    }
+                } else if (!inSpan && text.startsWith("<")
+                        && at + 1 < parts.size()) {
+                    // An NPC's brackets carry no reply identity —
+                    // nobody is on the other end of a /msg — so its
+                    // span opens at its head and reaches back over the
+                    // bracket standing just before it.
+                    ChatHeadMarker.Data next =
+                            ChatHeadMarker.decode(parts.get(at + 1));
+                    if (next != null && next.npcIdentity) {
+                        identitySpan = true;
+                        inSpan = true;
+                    }
+                }
+                boolean closesSpan = identitySpan && head == null
+                        && text.startsWith(">");
+                if (atHit) {
+                    if (!inSpan) {
+                        return null;
+                    }
+                    if (closesSpan) {
+                        // The span's last run is the closing bracket,
+                        // whose trailing space belongs to the gap before
+                        // the message, not to the name: the span ends on
+                        // the bracket's own glyphs, so the hitbox
+                        // matches what is drawn.
+                        String raw = part.getUnformattedTextForChat();
+                        int trimmed = raw.length();
+                        while (trimmed > 0 && raw.charAt(trimmed - 1) == ' ') {
+                            trimmed--;
+                        }
+                        int spanWidth = hit.partWidth
+                                - minecraft.fontRenderer.getCharWidth(' ')
+                                        * (raw.length() - trimmed);
+                        if (hit.localX() >= hit.partLeft + spanWidth) {
+                            return null;
                         }
                     }
-                }
-                // The span's last part is the closing bracket run, whose
-                // trailing space belongs to the gap before the message,
-                // not to the name: the span ends on the bracket's own
-                // glyphs, so the hitbox matches what is drawn.
-                boolean closesSpan = identitySpan && decodedHead == null
-                        && text.startsWith(">");
-                int spanWidth = partWidth;
-                if (closesSpan) {
-                    String raw = part.getUnformattedTextForChat();
-                    int trimmed = raw.length();
-                    while (trimmed > 0 && raw.charAt(trimmed - 1) == ' ') {
-                        trimmed--;
-                    }
-                    spanWidth -= minecraft.fontRenderer.getCharWidth(' ')
-                            * (raw.length() - trimmed);
-                }
-                if (inSpan && band.localX >= cursor
-                        && band.localX < cursor + spanWidth) {
-                    return found(targetForGroup(lines, band.viewIndex),
-                            true, row);
+                    return found(targetForGroup(lines, viewIndex), true, row);
                 }
                 if (closesSpan) {
                     identitySpan = false;
                 }
-                previousStart = cursor;
-                previousText = decodedHead == null ? text : null;
-                cursor += partWidth;
             }
         } catch (RuntimeException ignored) {
             return null;

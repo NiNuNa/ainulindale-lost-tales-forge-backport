@@ -17,7 +17,9 @@ import net.minecraft.util.IChatComponent;
  * {@link ChatLineWrapper} measures everything before it. A <em>line
  * break</em> marker ahead of the anchor closes a row of its own above
  * the message — the quote a reply opens with — and the rest of the line
- * is laid out after it exactly as an unbroken one would be. A <em>body
+ * is laid out after it exactly as an unbroken one would be. A <em>row
+ * break</em> in the body starts a row of its own under the words — the
+ * reactions a message wears — aligned under the body. A <em>body
  * break</em> marker after the sender ends the header row and opens the
  * message body on the next one, behind the separator the wrapper draws
  * in the sender's colour ({@link ChatBodyMarker}) — the chat's chevron,
@@ -36,6 +38,7 @@ final class ChatLayoutMarker {
     private static final String BREAK = "break";
     private static final String BODY = "body:";
     private static final String INDENT = "indent:";
+    private static final String ROW = "row";
 
     private ChatLayoutMarker() {}
 
@@ -50,6 +53,15 @@ final class ChatLayoutMarker {
      */
     static ChatComponentText lineBreak() {
         return marker(PREFIX + BREAK);
+    }
+
+    /**
+     * Starts a row of its own under the message's words, aligned where
+     * the body's own continuation rows are: what the reaction chips
+     * stand on. Draws and measures nothing.
+     */
+    static ChatComponentText rowBreak() {
+        return marker(PREFIX + ROW);
     }
 
     /**
@@ -140,6 +152,9 @@ final class ChatLayoutMarker {
         if (BREAK.equals(payload)) {
             return Data.BREAK;
         }
+        if (ROW.equals(payload)) {
+            return Data.ROW;
+        }
         if (payload.startsWith(BODY)) {
             return Data.BODY;
         }
@@ -178,6 +193,11 @@ final class ChatLayoutMarker {
     static boolean isBodyBreak(IChatComponent component) {
         Data data = decode(component);
         return data != null && data.bodyBreak;
+    }
+
+    static boolean isRowBreak(IChatComponent component) {
+        Data data = decode(component);
+        return data != null && data.rowBreak;
     }
 
     /**
@@ -227,10 +247,13 @@ final class ChatLayoutMarker {
                 new Data(false, true, false, 0, 0, -1, -1);
         static final Data BODY =
                 new Data(false, false, true, 0, 0, -1, -1);
+        static final Data ROW =
+                new Data(false, false, false, 0, 0, -1, -1, true);
 
         final boolean anchor;
         final boolean lineBreak;
         final boolean bodyBreak;
+        final boolean rowBreak;
         private final int closedIndent;
         private final int openIndent;
         /** The sender's colours, or -1 when the line carries none. */
@@ -246,6 +269,14 @@ final class ChatLayoutMarker {
         private Data(boolean anchor, boolean lineBreak, boolean bodyBreak,
                      int closedIndent, int openIndent, int nameColor,
                      int titleColor) {
+            this(anchor, lineBreak, bodyBreak, closedIndent, openIndent,
+                    nameColor, titleColor, false);
+        }
+
+        private Data(boolean anchor, boolean lineBreak, boolean bodyBreak,
+                     int closedIndent, int openIndent, int nameColor,
+                     int titleColor, boolean rowBreak) {
+            this.rowBreak = rowBreak;
             this.anchor = anchor;
             this.lineBreak = lineBreak;
             this.bodyBreak = bodyBreak;

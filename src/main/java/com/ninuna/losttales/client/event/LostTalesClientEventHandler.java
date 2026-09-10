@@ -43,6 +43,7 @@ import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.client.character.CreatorCharacterLight;
 import com.ninuna.losttales.client.gui.LostTalesGuiInventory;
 import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.gui.LostTalesHudHidingScreen;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
@@ -485,10 +486,18 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
             return;
         }
         LostTalesMapCursor.acquire();
+        // One place decides the pose for every screen: the screen's own
+        // answer about what is under the pointer, asked at the point its
+        // draw and its clicks see — the event carries the window's point,
+        // the screen is handed it through the opening animation's
+        // inverse. The sprite itself stands on the window's point.
         LostTalesMapCursor.render(
                 Minecraft.getMinecraft(), event.mouseX, event.mouseY,
-                LostTalesGuiPointerTargets.isOverInteractable(
-                        event.gui, event.mouseX, event.mouseY));
+                LostTalesGuiPointerTargets.poseFor(event.gui,
+                        LostTalesGuiAnimations.inverseMouseX(event.gui,
+                                event.mouseX),
+                        LostTalesGuiAnimations.inverseMouseY(event.gui,
+                                event.mouseY)));
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)

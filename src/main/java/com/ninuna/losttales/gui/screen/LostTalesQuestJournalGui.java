@@ -1,6 +1,8 @@
 package com.ninuna.losttales.gui.screen;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
+import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar;
 import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar.Hint;
@@ -41,7 +43,8 @@ import org.lwjgl.opengl.GL11;
  * client cache and sends small action packets to the server when a quest is tracked.
  * The quest level bar is a placeholder hook until the real quest leveling system is introduced.
  */
-public class LostTalesQuestJournalGui extends GuiScreen {
+public class LostTalesQuestJournalGui extends GuiScreen
+        implements LostTalesPointerInteractable {
     private static final int OUTER_PADDING = 16;
     private static final int TOP_BAR_HEIGHT = 38;
     private static final int FOOTER_HEIGHT = LostTalesControlBar.HEIGHT;
@@ -192,6 +195,7 @@ public class LostTalesQuestJournalGui extends GuiScreen {
             this.listScroll = 0;
         }
 
+        QuestListRow hoveredRow = rowAt(rows, mouseX, mouseY);
         enableScissor(layout.leftX - 8, layout.contentTop - 2, layout.leftWidth + 20, visibleHeight + 4);
         int rowY = layout.contentTop - this.listScroll;
         for (QuestListRow row : rows) {
@@ -199,7 +203,7 @@ public class LostTalesQuestJournalGui extends GuiScreen {
                 if (row.category) {
                     drawCategoryHeader(row.label, layout.leftX, rowY, layout.leftWidth);
                 } else if (row.quest != null) {
-                    drawQuestRow(row.quest, row.questIndex, layout.leftX + 14, rowY, layout.leftWidth - 22, row.height, mouseX, mouseY);
+                    drawQuestRow(row.quest, row.questIndex, layout.leftX + 14, rowY, layout.leftWidth - 22, row.height, row == hoveredRow);
                 }
             }
             rowY += row.height;
@@ -240,9 +244,8 @@ public class LostTalesQuestJournalGui extends GuiScreen {
         this.fontRendererObj.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, text, Math.max(40, width - 36)), x + 12, y + 8, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
     }
 
-    private void drawQuestRow(LostTalesQuestDefinition quest, int questIndex, int x, int y, int width, int height, int mouseX, int mouseY) {
+    private void drawQuestRow(LostTalesQuestDefinition quest, int questIndex, int x, int y, int width, int height, boolean hovered) {
         boolean selected = questIndex == this.selectedQuestIndex;
-        boolean hovered = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
         boolean active = LostTalesClientQuestProgressStore.isQuestActive(quest.getId());
         boolean completed = LostTalesClientQuestProgressStore.isQuestCompleted(quest.getId());
         boolean failed = LostTalesClientQuestProgressStore.isQuestFailed(quest.getId());
@@ -915,6 +918,26 @@ public class LostTalesQuestJournalGui extends GuiScreen {
         return mouseX >= layout.leftX && mouseX < layout.leftX + layout.leftWidth && mouseY >= layout.contentTop && mouseY < layout.contentBottom;
     }
 
+    /**
+     * The list row under the point, or null outside the list viewport. A row
+     * spans the list's full width, so the hover highlight, the click and the
+     * pointer all answer for the same pixels.
+     */
+    private QuestListRow rowAt(List<QuestListRow> rows, int mouseX, int mouseY) {
+        if (rows == null || !isMouseOverList(mouseX, mouseY)) {
+            return null;
+        }
+        int relativeY = mouseY - getLayout().contentTop + this.listScroll;
+        int y = 0;
+        for (QuestListRow row : rows) {
+            if (relativeY >= y && relativeY < y + row.height) {
+                return row;
+            }
+            y += row.height;
+        }
+        return null;
+    }
+
     private void scrollDetails(int amount) {
         this.detailScroll += amount;
         int max = getDetailMaxScroll();
@@ -941,35 +964,38 @@ public class LostTalesQuestJournalGui extends GuiScreen {
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) {
-        if (mouseButton == 0 && isMouseOverList(mouseX, mouseY)) {
-            List<LostTalesQuestDefinition> quests = getVisibleQuests();
-            List<QuestListRow> rows = buildQuestListRows(quests);
-            JournalLayout layout = getLayout();
-            int relativeY = mouseY - layout.contentTop + this.listScroll;
-            int y = 0;
-            for (QuestListRow row : rows) {
-                if (relativeY >= y && relativeY < y + row.height) {
-                    if (row.category) {
-                        toggleCategory(row.label);
-                        return;
-                    }
-                    if (row.quest != null) {
-                        long now = System.currentTimeMillis();
-                        boolean doubleClick = this.lastClickedQuestIndex == row.questIndex && now - this.lastQuestClickMs <= DOUBLE_CLICK_TRACK_MS;
-                        setSelectedQuestIndex(row.questIndex);
-                        if (doubleClick) {
-                            toggleSelectedQuestTracking(row.quest);
-                        }
-                        this.lastClickedQuestIndex = row.questIndex;
-                        this.lastQuestClickMs = now;
-                        return;
-                    }
-                    break;
+        if (mouseButton == 0) {
+            QuestListRow row = rowAt(buildQuestListRows(getVisibleQuests()), mouseX, mouseY);
+            if (row != null && row.category) {
+                toggleCategory(row.label);
+                return;
+            }
+            if (row != null && row.quest != null) {
+                long now = System.currentTimeMillis();
+                boolean doubleClick = this.lastClickedQuestIndex == row.questIndex && now - this.lastQuestClickMs <= DOUBLE_CLICK_TRACK_MS;
+                setSelectedQuestIndex(row.questIndex);
+                if (doubleClick) {
+                    toggleSelectedQuestTracking(row.quest);
                 }
-                y += row.height;
+                this.lastClickedQuestIndex = row.questIndex;
+                this.lastQuestClickMs = now;
+                return;
             }
         }
         super.mouseClicked(mouseX, mouseY, mouseButton);
+    }
+
+    /**
+     * Every list row answers to a click: a category header folds or unfolds
+     * its category and a quest row selects its quest.
+     */
+    @Override
+    public boolean isPointerOverInteractable(int mouseX, int mouseY) {
+        QuestListRow row = rowAt(buildQuestListRows(getVisibleQuests()), mouseX, mouseY);
+        if (row != null && (row.category || row.quest != null)) {
+            return true;
+        }
+        return LostTalesGuiPointerTargets.isOverEnabledButton(this, mouseX, mouseY);
     }
 
     private void toggleCategory(String category) {

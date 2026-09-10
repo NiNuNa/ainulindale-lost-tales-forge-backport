@@ -18,7 +18,9 @@ import com.ninuna.losttales.client.character.CharacterTemplateStore;
 import com.ninuna.losttales.client.character.room.CharacterRoomSession;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.CreatorCharacterLight;
+import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
 import com.ninuna.losttales.client.gui.LostTalesHudHidingScreen;
+import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterRaceAttributes;
@@ -95,7 +97,8 @@ import java.util.UUID;
  * screen refuses on its own is only what it can see is empty.</p>
  */
 public final class LostTalesCharacterCreationGui extends GuiScreen
-        implements LostTalesGuiAnimationOptions, LostTalesHudHidingScreen {
+        implements LostTalesGuiAnimationOptions, LostTalesHudHidingScreen,
+        LostTalesPointerInteractable {
 
     /** The slot a template stands for: none, until a server names one. */
     private static final int TEMPLATE_SLOT = -1;
@@ -1012,11 +1015,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         FontRenderer font = this.fontRendererObj;
         int textY = this.layout.getTabStripTop()
                 + (CharacterCreatorLayout.TAB_STRIP_HEIGHT - font.FONT_HEIGHT) / 2;
+        CharacterCreatorCategory hoveredTab = tabAt(mouseX, mouseY);
         for (int index = 0; index < all.length; index++) {
             boolean current = all[index] == this.category;
-            boolean hovered = !current && mouseX >= bounds[index][0]
-                    && mouseX < bounds[index][0] + bounds[index][1]
-                    && this.layout.isInTabStrip(mouseX, mouseY);
+            boolean hovered = !current && all[index] == hoveredTab;
             String label = LostTalesSkyrimUiStyle.trimToWidth(font,
                     I18n.format(all[index].getLabelKey()), bounds[index][1]);
             font.drawStringWithShadow(label,
@@ -1060,6 +1062,22 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
             x += bounds[index][1];
         }
         return bounds;
+    }
+
+    /** The page whose tab is under the point, or null. */
+    private CharacterCreatorCategory tabAt(int mouseX, int mouseY) {
+        if (!this.layout.isInTabStrip(mouseX, mouseY)) {
+            return null;
+        }
+        int[][] bounds = tabBounds();
+        CharacterCreatorCategory[] all = CharacterCreatorCategory.values();
+        for (int index = 0; index < all.length; index++) {
+            if (mouseX >= bounds[index][0]
+                    && mouseX < bounds[index][0] + bounds[index][1]) {
+                return all[index];
+            }
+        }
+        return null;
     }
 
     /** Thin marks at the content's edges while there is more above or below. */
@@ -1457,14 +1475,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
             return;
         }
         if (button == 0 && this.layout.isInTabStrip(mouseX, mouseY)) {
-            int[][] bounds = tabBounds();
-            CharacterCreatorCategory[] all = CharacterCreatorCategory.values();
-            for (int index = 0; index < all.length; index++) {
-                if (mouseX >= bounds[index][0]
-                        && mouseX < bounds[index][0] + bounds[index][1]) {
-                    showCategory(all[index]);
-                    return;
-                }
+            // The strip takes every click on it, between the tabs as well.
+            CharacterCreatorCategory tab = tabAt(mouseX, mouseY);
+            if (tab != null) {
+                showCategory(tab);
             }
             return;
         }
@@ -1502,6 +1516,39 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
             return;
         }
         super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    /**
+     * The same hit tests a left click takes, in the same order. A tab
+     * counts unless it is the open page, the confirm button while it can
+     * confirm, and a control only where a click acts on it
+     * ({@link CreatorControl#isPointerOverAction}). The stage is dragged
+     * rather than clicked and keeps the arrow. The point is the one the
+     * screen's own draw and clicks see.
+     */
+    @Override
+    public boolean isPointerOverInteractable(int x, int y) {
+        if (this.layout == null) {
+            return false;
+        }
+        if (this.layout.isInTabStrip(x, y)) {
+            CharacterCreatorCategory tab = tabAt(x, y);
+            return tab != null && tab != this.category;
+        }
+        if (within(secondaryButtonBounds(), x, y)) {
+            return true;
+        }
+        if (within(primaryButtonBounds(), x, y)) {
+            return canSubmit();
+        }
+        CreatorControl control = controlAt(x, y);
+        if (control != null) {
+            return control.isPointerOverAction(x, y);
+        }
+        if (this.layout.isInContent(x, y) || this.layout.isOnStage(x, y)) {
+            return false;
+        }
+        return LostTalesGuiPointerTargets.isOverEnabledButton(this, x, y);
     }
 
     @Override

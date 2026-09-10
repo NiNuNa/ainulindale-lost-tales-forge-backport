@@ -13,9 +13,11 @@ import cpw.mods.fml.relauncher.SideOnly;
  * answer comes from the screen that owns the hit test rather than from a copy
  * of it kept somewhere else.</p>
  *
- * <p>The coordinate is the untransformed one {@code drawScreen} is given: a
- * screen that animates or otherwise moves its widgets applies its own
- * transform here, exactly as it does when a click arrives.</p>
+ * <p>The coordinate is the one {@code drawScreen} and {@code mouseClicked}
+ * are given — the opening animation's inverse already applied — so the
+ * same hit test answers here unchanged. A screen that moves its widgets
+ * further by a transform of its own applies that transform here, exactly
+ * as it does when a click arrives.</p>
  */
 @SideOnly(Side.CLIENT)
 public interface LostTalesPointerInteractable {

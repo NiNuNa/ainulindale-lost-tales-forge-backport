@@ -215,7 +215,7 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
     }
 
     /** Right-click favouriting; true when a row was toggled. */
-    boolean toggleFavoriteAt(int mouseX, int mouseY,
+    boolean toggleFavoriteAt(double mouseX, double mouseY,
                              int screenWidth, int screenHeight) {
         Entry entry = entryAt(mouseX, mouseY, screenWidth, screenHeight);
         if (entry == null) {

@@ -298,7 +298,7 @@ final class LostTalesChatOverlayRenderer {
         // one left the oldest message stranded above the ceiling. The
         // rows are laid out here, before the box is measured: a window
         // following the game's chat height is as tall as its stack, and
-        // the stack's blank rows are a third of a line.
+        // the stack's blank rows are half a line.
         frame.resolveDividerRow(lines, view == null ? null
                 : ClientChatChannelViews.unreadDividerLine(view));
         frame.resolveRows();
@@ -554,10 +554,12 @@ final class LostTalesChatOverlayRenderer {
                 if (ChatPrefixMarker.isHidden(part, true)) {
                     continue;
                 }
+                int start = cursor;
                 cursor += LostTalesChatVisualStyle.partWidth(
                         minecraft.fontRenderer, part, true);
                 if (band.localX < cursor) {
-                    return new Hit(part, lineRoot, index);
+                    return new Hit(part, lineRoot, index, band, start,
+                            cursor - start);
                 }
             }
             return null;
@@ -567,22 +569,39 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * A clicked component together with the wrapped line that holds it
-     * and its place on that line, counted over every component the
-     * line's iterator yields. The iterator hands out copies, so the
+     * A component under the pointer together with the wrapped line that
+     * holds it and its place on that line, counted over every component
+     * the line's iterator yields. The iterator hands out copies, so the
      * component is never the same object twice; the line is, and the
-     * place tells the component apart from every other on it.
+     * place tells the component apart from every other on it. The band
+     * the row was found in and the run's own extent on it come along,
+     * so whatever asks a finer question of the hit — where inside the
+     * run the pointer stands — measures nothing again.
      */
     static final class Hit {
         final IChatComponent component;
         final IChatComponent line;
         final int index;
+        /** The drawn row the run is on, the pointer mapped into its text space. */
+        final Band band;
+        /** Where the run starts on the row, in the row's unscaled text space. */
+        final int partLeft;
+        /** The width the run takes there. */
+        final int partWidth;
 
         private Hit(IChatComponent component, IChatComponent line,
-                    int index) {
+                    int index, Band band, int partLeft, int partWidth) {
             this.component = component;
             this.line = line;
             this.index = index;
+            this.band = band;
+            this.partLeft = partLeft;
+            this.partWidth = partWidth;
+        }
+
+        /** The pointer's x in the row's text space. */
+        float localX() {
+            return this.band.localX;
         }
     }
 
@@ -753,7 +772,7 @@ final class LostTalesChatOverlayRenderer {
         // divider is rather than accumulated as the loop passes it, so
         // the stack lands in the same place whichever end of the
         // history the draw starts from. Rows are not all one height —
-        // the blank row between two runs is a third of a line — so every
+        // the blank row between two runs is half a line — so every
         // distance up the stack is read from the frame's row geometry,
         // which is what the scroll ceiling and the scrollbar read too:
         // the three are one geometry.
@@ -937,9 +956,8 @@ final class LostTalesChatOverlayRenderer {
                 int firstRow = Math.max(0, scrollPosition - 1);
                 int firstLine = Math.max(0,
                         lineOfRow(firstRow, dividerIndex));
-                String dividerLabel = dividerIndex < 0 && dividerDateIndex < 0
-                        ? "" : ClientChatChannelViews.unreadDividerLabel(
-                                frame.view);
+                String dividerLabel = unreadDividerLabel(frame, lines,
+                        dividerIndex, dividerDateIndex);
                 // The line in the topmost slot owns the head-room above
                 // it: its band reaches up to the rule instead of being
                 // cut flush on its glyphs. A window with a fixed height
@@ -1477,6 +1495,41 @@ final class LostTalesChatOverlayRenderer {
      * first message in the timestamps' grey. {@code top} is the row's
      * top edge in the caller's stack space.
      */
+    /**
+     * What the unread divider says: how many messages stand above it,
+     * and the day its run began when that was not today. Messages from
+     * an earlier day are dated; today's are simply counted. Empty
+     * without a divider.
+     */
+    private static String unreadDividerLabel(ChatWindowFrame frame,
+                                             List<ChatLine> lines,
+                                             int dividerIndex,
+                                             int dividerDateIndex) {
+        if (dividerIndex < 0 && dividerDateIndex < 0) {
+            return "";
+        }
+        // The divider's own row stands directly above the first unread
+        // message's; a day's rule carrying it stands one further up.
+        int firstUnread = dividerIndex >= 0 ? dividerIndex
+                : dividerDateIndex - 1;
+        int count = ChatWindowLines.messagesThrough(lines, firstUnread);
+        String words = count == 1
+                ? StatCollector.translateToLocal(
+                        "gui.losttales.chat.unread_divider.one")
+                : StatCollector.translateToLocalFormatted(
+                        "gui.losttales.chat.unread_divider",
+                        Integer.toString(count));
+        long began = ClientChatChannelViews.unreadDividerTimestamp(
+                frame.view);
+        if (began > 0L && !ChatTimestampFormatter.isSameDay(began,
+                System.currentTimeMillis())) {
+            words = StatCollector.translateToLocalFormatted(
+                    "gui.losttales.chat.unread_divider.dated", words,
+                    ChatTimestampFormatter.formatDay(began));
+        }
+        return words;
+    }
+
     private static void drawDividerRow(FontRenderer font,
                                        ChatTimestampColumn columns,
                                        float panelLeft, float panelRight,
@@ -1733,12 +1786,15 @@ final class LostTalesChatOverlayRenderer {
     static final int TOOLBAR_REPLY = 1;
     /** Take a copy of the message. */
     static final int TOOLBAR_COPY = 2;
+    /** React to the message. */
+    static final int TOOLBAR_REACT = 3;
 
     /**
-     * The hovered message's own controls, at the top right of it: reply
-     * to it, and copy it — the same two the message's menu offers, where
-     * the pointer already is. Reply is left out for a message nobody can
-     * answer, so a console notice shows only Copy.
+     * The hovered message's own controls, at the top right of it: react
+     * to it, reply to it and copy it — what the message's menu offers,
+     * where the pointer already is. React is left out for a message the
+     * server never named, Reply for one nobody can answer, so a console
+     * notice shows only Copy.
      *
      * <p>Drawn in the stack's space, so it rides the scroll with the
      * message it belongs to, and inside the message's own top row rather
@@ -1758,7 +1814,10 @@ final class LostTalesChatOverlayRenderer {
         }
         // Replying needs a channel this player may speak in; copying
         // needs only a message.
-        List<Integer> offered = new ArrayList<Integer>(2);
+        List<Integer> offered = new ArrayList<Integer>(3);
+        if (LostTalesChatPresentation.isReactable(chatLineId)) {
+            offered.add(Integer.valueOf(TOOLBAR_REACT));
+        }
         if (LostTalesChatPresentation.isRepliable(chatLineId)) {
             offered.add(Integer.valueOf(TOOLBAR_REPLY));
         }
@@ -1786,7 +1845,9 @@ final class LostTalesChatOverlayRenderer {
                 fillRect(buttonLeft - 0.5F, top + 2.0F, buttonLeft + 0.5F,
                         bottom - 2.0F, outline);
             }
-            if (kinds[index] == TOOLBAR_REPLY) {
+            if (kinds[index] == TOOLBAR_REACT) {
+                drawReactGlyph(buttonLeft, top, alpha);
+            } else if (kinds[index] == TOOLBAR_REPLY) {
                 drawReplyGlyph(buttonLeft, top, ivory);
             } else {
                 drawCopyGlyph(buttonLeft, top, ivory);
@@ -1798,6 +1859,14 @@ final class LostTalesChatOverlayRenderer {
         frame.toolbarBottom = originY + bottom * scale;
         frame.toolbarKinds = kinds;
         frame.toolbarChatLineId = chatLineId;
+    }
+
+    /** A face: react to this. The picker's own smile, drawn one texel to one pixel. */
+    private static void drawReactGlyph(float x, float y, int alpha) {
+        LostTalesChatVisualStyle.beginContent();
+        ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(),
+                ChatEmoji.SLIGHT_SMILE, x + 1.0F, y + 1.0F,
+                ChatInlineIcons.CONTENT_SIZE, alpha);
     }
 
     /** An arrow turning back on itself: answer this. */
@@ -1963,7 +2032,8 @@ final class LostTalesChatOverlayRenderer {
      * How far below its own row's baseline the stamp of the message at
      * {@code lineIndex} stands, so that it is centred on the message's
      * whole height: half the rows below the stamped row (the wrapped
-     * words) less half the rows above it (a reply's quote). The rows of
+     * words, its reaction row left out) less half the rows above it (a
+     * reply's quote). The rows of
      * one message share its chat line id and stand together in the
      * list, wrapped continuations toward the newer end and a leading
      * row toward the older; a blank row or a day's rule ends the
@@ -1982,6 +2052,11 @@ final class LostTalesChatOverlayRenderer {
             if (newer == null || newer.getChatLineID() != id
                     || ChatWindowLines.isFiller(newer)) {
                 break;
+            }
+            if (ChatReactionMarker.isReactionRow(newer.func_151461_a())) {
+                // What readers answered with is not the message: the
+                // stamp stays centred on the words.
+                continue;
             }
             below += rows.height(rowOfLine(index, dividerIndex));
         }
@@ -2216,7 +2291,8 @@ final class LostTalesChatOverlayRenderer {
             if (ChatPrefixMarker.isHidden(part, chatOpen)) {
                 continue;
             }
-            ChatHeadMarker.Data marker = ChatHeadMarker.decode(part);
+            // The line's own head, or the head a reply's quote wears.
+            ChatHeadMarker.Data marker = ChatHeadMarker.headOf(part);
             if (marker != null) {
                 float opacity = alpha / 255.0F;
                 ChatEmoji mark = marker.mark();

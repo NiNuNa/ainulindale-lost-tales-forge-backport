@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
 import java.lang.reflect.Field;
 import java.util.List;
 import net.minecraft.client.gui.GuiButton;
@@ -35,6 +36,28 @@ public final class LostTalesGuiPointerTargets {
     private static boolean reflectionFailed;
 
     private LostTalesGuiPointerTargets() {}
+
+    /**
+     * The pointer's pose over a screen, the one every screen's pointer is
+     * drawn with. A screen that finds what is under the pointer itself
+     * ({@link LostTalesPointerOwner}) answers with the pose it chose; any
+     * other earns the hand exactly where it answers to a click. Fails
+     * closed to the arrow.
+     */
+    public static LostTalesMapCursor.Pose poseFor(GuiScreen gui, int mouseX,
+                                                  int mouseY) {
+        if (gui instanceof LostTalesPointerOwner) {
+            try {
+                LostTalesMapCursor.Pose pose = ((LostTalesPointerOwner)gui)
+                        .pointerPose(mouseX, mouseY);
+                return pose == null ? LostTalesMapCursor.Pose.ARROW : pose;
+            } catch (Throwable ignored) {
+                return LostTalesMapCursor.Pose.ARROW;
+            }
+        }
+        return isOverInteractable(gui, mouseX, mouseY)
+                ? LostTalesMapCursor.Pose.HAND : LostTalesMapCursor.Pose.ARROW;
+    }
 
     public static boolean isOverInteractable(
             GuiScreen gui, int mouseX, int mouseY) {

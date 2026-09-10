@@ -168,18 +168,38 @@ public final class CreatorSlider extends CreatorControl {
         if (button != 0 || !contains(mouseX, mouseY)) {
             return false;
         }
-        if (CreatorWidgets.within(mouseX, mouseY, readoutX(), valueTop(),
-                READOUT_WIDTH, CreatorWidgets.FIELD_HEIGHT)) {
+        if (isOverReadout(mouseX, mouseY)) {
             openTyping();
             return true;
         }
         closeTyping(true);
-        if (mouseY >= valueTop() && mouseY < valueTop() + CreatorWidgets.FIELD_HEIGHT
-                && mouseX < readoutX()) {
+        if (isOverTrack(mouseX, mouseY)) {
             this.dragging = true;
             setFromPointer(mouseX);
         }
         return true;
+    }
+
+    private boolean isOverReadout(int mouseX, int mouseY) {
+        return CreatorWidgets.within(mouseX, mouseY, readoutX(), valueTop(),
+                READOUT_WIDTH, CreatorWidgets.FIELD_HEIGHT);
+    }
+
+    /** The band left of the readout, where a click or a drag sets the age. */
+    private boolean isOverTrack(int mouseX, int mouseY) {
+        return contains(mouseX, mouseY)
+                && mouseY >= valueTop()
+                && mouseY < valueTop() + CreatorWidgets.FIELD_HEIGHT
+                && mouseX < readoutX();
+    }
+
+    /**
+     * The whole track acts, not only the thumb that lights. The readout is
+     * a field to type in, and counts no more than any other text field.
+     */
+    @Override
+    public boolean isPointerOverAction(int mouseX, int mouseY) {
+        return isOverTrack(mouseX, mouseY);
     }
 
     @Override

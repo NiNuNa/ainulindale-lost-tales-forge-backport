@@ -142,6 +142,35 @@ final class ChatWindowLines {
     }
 
     /**
+     * How many messages stand on the rows from the newest down to
+     * {@code lastIndex} inclusive: a message's wrapped rows share its
+     * id and count once, and filler rows count for nothing. What the
+     * unread divider counts above itself.
+     */
+    static int messagesThrough(List<ChatLine> lines, int lastIndex) {
+        if (lines == null || lastIndex < 0) {
+            return 0;
+        }
+        int count = 0;
+        int previousId = 0;
+        boolean first = true;
+        int end = Math.min(lastIndex, lines.size() - 1);
+        for (int index = 0; index <= end; index++) {
+            ChatLine line = lines.get(index);
+            if (line == null || isFiller(line)) {
+                continue;
+            }
+            int id = line.getChatLineID();
+            if (first || id != previousId) {
+                count++;
+            }
+            previousId = id;
+            first = false;
+        }
+        return count;
+    }
+
+    /**
      * Where a view stands a day's rule: above the message at each index
      * (newest first) that is the first said on its day — the oldest
      * message with a known time included, so the history opens under a

@@ -80,6 +80,7 @@ import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.network.packet.LostTalesChatConsoleSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatHistorySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
+import com.ninuna.losttales.network.packet.LostTalesChatReactionSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigResultPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -587,6 +588,11 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleChatUpdate(LostTalesChatUpdatePacket packet) {
         LostTalesChatPresentation.applyUpdate(packet);
+    }
+
+    @Override
+    public void handleChatReactions(LostTalesChatReactionSyncPacket packet) {
+        LostTalesChatPresentation.applyReactions(packet);
     }
 
     /**

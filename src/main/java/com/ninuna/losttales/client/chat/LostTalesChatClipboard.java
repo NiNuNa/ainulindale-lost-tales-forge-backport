@@ -53,11 +53,18 @@ final class LostTalesChatClipboard {
             return "";
         }
         try {
-            // A whole-pixel press samples the pixel's centre, the best
-            // estimate of where inside it the pointer actually was.
+            // The pointer's exact position, the one the hover shaded
+            // the message by, so what is copied is the message lit.
+            GuiScreen screen = minecraft.currentScreen;
+            float pointerX = screen == null ? mouseX + 0.5F
+                    : (float)ChatWindowPlacement.preciseMouseX(minecraft,
+                            screen.width);
+            float pointerY = screen == null ? mouseY + 0.5F
+                    : (float)ChatWindowPlacement.preciseMouseY(minecraft,
+                            screen.height);
             LostTalesChatOverlayRenderer.Band band =
                     LostTalesChatOverlayRenderer.bandAt(
-                            minecraft, mouseX + 0.5F, mouseY + 0.5F);
+                            minecraft, pointerX, pointerY);
             List<ChatLine> lines = band == null ? null : band.lines;
             if (band == null || lines == null
                     || band.viewIndex >= lines.size()

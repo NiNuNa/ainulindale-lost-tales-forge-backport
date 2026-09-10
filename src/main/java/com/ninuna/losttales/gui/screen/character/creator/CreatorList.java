@@ -83,6 +83,11 @@ public final class CreatorList extends CreatorControl {
     }
 
     @Override
+    public boolean isPointerOverAction(int mouseX, int mouseY) {
+        return rowAt(mouseX, mouseY) >= 0;
+    }
+
+    @Override
     public boolean keyTyped(char typedChar, int keyCode) {
         int count = this.choice.count();
         if (count == 0) {

@@ -9,10 +9,13 @@ import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatMarkdown;
 import com.ninuna.losttales.chat.ChatMentions;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatReactionSummary;
+import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
@@ -23,6 +26,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
+import com.ninuna.losttales.network.packet.LostTalesChatReactionSyncPacket;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -44,6 +48,7 @@ import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatStyle;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
+import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.StatCollector;
 
@@ -68,7 +73,6 @@ public final class LostTalesChatPresentation {
             new LinkedHashSet<Integer>();
     private static final int[] NO_SHOWCASES = new int[0];
     /** What opens a reply's quote row: a turned arrow, as Discord's is. */
-    private static final String REPLY_MARK = "\u21b3 ";
     /**
      * One cue stands for every ping inside this window. A burst of
      * mentions — an achievement naming half the server, two lines
@@ -146,6 +150,20 @@ public final class LostTalesChatPresentation {
         }
         boolean mentioned = LostTalesConfig.enableChatPings
                 && isLocalPlayerMentioned(minecraft, packet.getMessage());
+        // A line of the server's own that carries its component — an
+        // achievement with its hover, a death, a join — is shown from
+        // that component the way the live line was, the players it
+        // names read as the identities they were playing.
+        IChatComponent body = null;
+        if (LostTalesChatMessagePacket.isSystemSender(packet.getSenderId())
+                && packet.getBodyJson().length() > 0) {
+            boolean[] localMentioned = new boolean[1];
+            body = serverBody(minecraft, packet, localMentioned);
+            if (body != null) {
+                mentioned = LostTalesConfig.enableChatPings
+                        && localMentioned[0];
+            }
+        }
         // A whisper lands in the tab of its conversation, opened on the
         // first message in the window the player is typing in; a plain
         // channel the player closed reopens the same way. A tab that is
@@ -189,7 +207,7 @@ public final class LostTalesChatPresentation {
             Integer above = ClientChatOlderHistory.anchorFor(minecraft, tab,
                     packet.getMessageId());
             if (above != null) {
-                printOlder(minecraft, packet, tab, above.intValue());
+                printOlder(minecraft, packet, tab, above.intValue(), body);
                 return;
             }
         }
@@ -201,7 +219,9 @@ public final class LostTalesChatPresentation {
         receivingReplayed = replayed;
         try {
             chatLineId = confirmed != 0 ? confirmed
-                    : print(minecraft, packet, tab, mentioned);
+                    : print(minecraft, packet, tab, mentioned,
+                            body == null ? ChatBodyKind.MESSAGE
+                                    : ChatBodyKind.ANSWER, body);
         } finally {
             receivingReplayed = false;
         }
@@ -259,6 +279,14 @@ public final class LostTalesChatPresentation {
             }
             return;
         }
+        // Words it already says are no edit: nothing is marked and
+        // nothing redrawn, whichever side the word came from.
+        ClientChatMessages.Remembered held =
+                ClientChatMessages.get(packet.getMessageId());
+        if (held != null
+                && held.packet.getMessage().equals(packet.getMessage())) {
+            return;
+        }
         // The quotes first: every held reply to the edited message
         // re-cuts its excerpt to what the message says now, whether or
         // not the message's own line is still held.
@@ -282,21 +310,92 @@ public final class LostTalesChatPresentation {
             // client cannot rebuild is dropped rather than half-applied.
             return;
         }
-        boolean grouped = !edited.getReply().exists();
-        IChatComponent full = markEdited(build(edited, remembered.tab,
-                remembered.showcaseIds, false));
-        IChatComponent groupedLine = markEdited(build(edited,
-                remembered.tab, remembered.showcaseIds, grouped));
-        if (!ChatWindowLines.replaceMessage(chat, chatLineId.intValue(),
-                full)) {
+        if (!rebuildInPlace(chat, chatLineId.intValue(), remembered, edited,
+                true)) {
             if (quotesChanged) {
                 LostTalesChatHistoryHooks.refresh(chat);
             }
             return;
         }
-        ChatGroupRuns.replaceGroupedLine(chatLineId.intValue(), groupedLine);
         ClientChatMessages.rewrite(packet.getMessageId(), edited);
         LostTalesChatHistoryHooks.refresh(chat);
+    }
+
+    /**
+     * Applies the reactions the server says a message on screen wears
+     * now: the line is built again where it stands with its reaction
+     * row, and remembered wearing them, so a later edit keeps them. A
+     * message this client no longer holds has nothing to redraw.
+     */
+    public static void applyReactions(LostTalesChatReactionSyncPacket packet) {
+        if (packet == null || packet.isMalformed()) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.ingameGUI == null) {
+            return;
+        }
+        ClientChatMessages.Remembered held =
+                ClientChatMessages.get(packet.getMessageId());
+        if (held == null) {
+            return;
+        }
+        LostTalesChatMessagePacket updated;
+        try {
+            updated = held.packet.withReactions(packet.getReactions());
+        } catch (RuntimeException refused) {
+            return;
+        }
+        ClientChatMessages.refresh(packet.getMessageId(), updated);
+        GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
+        Integer chatLineId = ClientChatMessageIds.chatLineIdOf(
+                packet.getMessageId());
+        if (chatLineId != null && rebuildInPlace(chat, chatLineId.intValue(),
+                held, updated, held.edited)) {
+            LostTalesChatHistoryHooks.refresh(chat);
+        }
+    }
+
+    /**
+     * Builds a held message's line again from {@code packet} and puts
+     * both its forms back where the old ones stood — its body shown the
+     * way it was, the server's own component again for a line of the
+     * server's, and marked edited when it is. False when the line is no
+     * longer in the game's history.
+     */
+    private static boolean rebuildInPlace(GuiNewChat chat, int chatLineId,
+                                          ClientChatMessages.Remembered held,
+                                          LostTalesChatMessagePacket packet,
+                                          boolean edited) {
+        boolean grouped = !packet.getReply().exists();
+        IChatComponent full = build(packet, held.tab, held.showcaseIds, false,
+                held.kind, held.body == null ? null : held.body.createCopy());
+        IChatComponent groupedLine = build(packet, held.tab,
+                held.showcaseIds, grouped, held.kind,
+                held.body == null ? null : held.body.createCopy());
+        if (edited) {
+            full = markEdited(full);
+            groupedLine = markEdited(groupedLine);
+        }
+        if (!ChatWindowLines.replaceMessage(chat, chatLineId, full)) {
+            return false;
+        }
+        ChatGroupRuns.replaceGroupedLine(chatLineId, groupedLine);
+        return true;
+    }
+
+    /**
+     * Whether the message drawn on a chat line can be reacted to: one
+     * the server named and this client still holds, while the chat's
+     * emoji are on.
+     */
+    static boolean isReactable(int chatLineId) {
+        if (!LostTalesConfig.enableChatEmojis) {
+            return false;
+        }
+        long messageId = ClientChatMessageIds.messageIdOf(chatLineId);
+        return ChatMessageIds.isServerId(messageId)
+                && ClientChatMessages.get(messageId) != null;
     }
 
     /**
@@ -361,7 +460,28 @@ public final class LostTalesChatPresentation {
                 StatCollector.translateToLocal("gui.losttales.chat.edited"),
                 nearestFormatting(color), false);
         mark.getChatStyle().setItalic(Boolean.TRUE);
-        return line.appendSibling(mark);
+        return insertBeforeReactions(line, mark);
+    }
+
+    /**
+     * Puts a run at the end of the line's words — ahead of its reaction
+     * row when it has one, so a note about the words stays with them.
+     */
+    private static IChatComponent insertBeforeReactions(IChatComponent line,
+                                                        IChatComponent part) {
+        List<?> siblings = line.getSiblings();
+        for (int index = 0; siblings != null && index < siblings.size(); index++) {
+            Object value = siblings.get(index);
+            if (value instanceof IChatComponent
+                    && ChatLayoutMarker.isRowBreak((IChatComponent)value)) {
+                part.getChatStyle().setParentStyle(line.getChatStyle());
+                @SuppressWarnings("unchecked")
+                List<Object> mutable = (List<Object>)siblings;
+                mutable.add(index, part);
+                return line;
+            }
+        }
+        return line.appendSibling(part);
     }
 
     /**
@@ -422,7 +542,9 @@ public final class LostTalesChatPresentation {
      */
     private static void printOlder(Minecraft minecraft,
                                    LostTalesChatMessagePacket packet, ChatTab tab,
-                                   int aboveChatLineId) {
+                                   int aboveChatLineId, IChatComponent body) {
+        ChatBodyKind kind = body == null ? ChatBodyKind.MESSAGE
+                : ChatBodyKind.ANSWER;
         GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
         List<ChatLine> messages = ChatWindowLines.messageHistory(chat);
         List<ChatLine> drawn;
@@ -459,7 +581,7 @@ public final class LostTalesChatPresentation {
         int[] showcaseIds = decodeShowcases(packet);
         int messagesBefore = messages.size();
         chat.printChatMessageWithOptionalDeletion(
-                build(packet, tab, showcaseIds, false, ChatBodyKind.MESSAGE, null),
+                build(packet, tab, showcaseIds, false, kind, body),
                 chatLineId);
         if (messages.size() != messagesBefore + 1 || messages.get(0) == null
                 || messages.get(0).getChatLineID() != chatLineId) {
@@ -490,9 +612,10 @@ public final class LostTalesChatPresentation {
                 packet.getIdentityName(), packet.isAccountLine(),
                 packet.getTimestampMillis(), !packet.getReply().exists(),
                 build(packet, tab, showcaseIds, !packet.getReply().exists(),
-                        ChatBodyKind.MESSAGE, null));
+                        kind, body == null ? null : body.createCopy()));
         ClientChatMessageIds.remember(chatLineId, packet.getMessageId());
-        ClientChatMessages.remember(packet, tab, showcaseIds);
+        ClientChatMessages.remember(packet, tab, showcaseIds, kind,
+                body == null ? null : body.createCopy());
         ClientChatChannelViews.recordBackfilled(chatLineId, tab);
         ClientChatChannelViews.recordTime(chatLineId, packet.getTimestampMillis());
     }
@@ -509,6 +632,9 @@ public final class LostTalesChatPresentation {
                                         ChatBodyKind kind,
                                         IChatComponent groupedBody,
                                         boolean mentioned) {
+        // Taken before the grouped form claims the body as its own.
+        IChatComponent keptBody = groupedBody == null ? null
+                : groupedBody.createCopy();
         ChatGroupRuns.remember(chatLineId, tab, packet.getSenderId(),
                 packet.getIdentityName(), packet.isAccountLine(),
                 packet.getTimestampMillis(),
@@ -518,8 +644,9 @@ public final class LostTalesChatPresentation {
                 build(packet, tab, showcaseIds,
                         !packet.getReply().exists(), kind, groupedBody));
         ClientChatMessageIds.remember(chatLineId, packet.getMessageId());
-        // Kept so the same line can be built again if it is edited.
-        ClientChatMessages.remember(packet, tab, showcaseIds);
+        // Kept so the same line can be built again if it is edited or
+        // its reactions change.
+        ClientChatMessages.remember(packet, tab, showcaseIds, kind, keptBody);
         noteLinePrinted(chatLineId, tab, mentioned,
                 packet.getTimestampMillis());
     }
@@ -1211,6 +1338,50 @@ public final class LostTalesChatPresentation {
                                 ChatTab tab, int[] showcaseIds,
                                 boolean grouped, ChatBodyKind kind,
                                 IChatComponent body) {
+        IChatComponent line = buildLine(packet, tab, showcaseIds, grouped,
+                kind, body);
+        appendReactions(line, packet);
+        return line;
+    }
+
+    /**
+     * The reactions a message wears, on a row of its own under its words
+     * and still a part of it: the same line id, so the row shades,
+     * copies, scrolls and goes with the message. One chip per emoji,
+     * in the order each was first used; nothing for a message without
+     * reactions or one the server never named.
+     */
+    private static void appendReactions(IChatComponent root,
+                                        LostTalesChatMessagePacket packet) {
+        ChatReactionSummary reactions = packet.getReactions();
+        if (reactions.isEmpty()
+                || !ChatMessageIds.isServerId(packet.getMessageId())) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getMinecraft();
+        FontRenderer font = minecraft == null ? null : minecraft.fontRenderer;
+        root.appendSibling(ChatLayoutMarker.rowBreak());
+        boolean first = true;
+        for (ChatReactionSummary.Reaction reaction : reactions.getReactions()) {
+            ChatEmoji emoji = ChatEmoji.fromName(reaction.emoji);
+            if (emoji == null) {
+                continue;
+            }
+            if (!first) {
+                root.appendSibling(ChatSpacerMarker.of(
+                        ChatReactionMarker.BETWEEN));
+            }
+            first = false;
+            root.appendSibling(ChatReactionMarker.create(emoji,
+                    reaction.count, reaction.mine, packet.getMessageId(),
+                    ChatReactionMarker.countWidth(font, reaction.count)));
+        }
+    }
+
+    private static IChatComponent buildLine(LostTalesChatMessagePacket packet,
+                                            ChatTab tab, int[] showcaseIds,
+                                            boolean grouped, ChatBodyKind kind,
+                                            IChatComponent body) {
         ChatChannel channel = packet.getChannel();
         ChatComponentText root = new ChatComponentText("");
         ChatTab named = tab == null ? tabOf(packet) : tab;
@@ -1388,37 +1559,68 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * The row a reply opens with: the message it answers, quoted in the
-     * timestamps' quiet grey so it reads as context rather than as
-     * something said. The author keeps their own name colour, the way
-     * they are named everywhere else. The wrapper cuts the row to one
-     * line, so a long quote never pushes the answer down the window.
+     * The row a reply opens with: the message it answers, quoted the
+     * way that message was said — the chat's speech bubble in the
+     * timestamps' quiet tone, then {@code <HEAD Name>} in the name's own
+     * colour and the
+     * words in the chat's ivory, so the quote reads as the line it
+     * quotes rather than as a line about it. The head is the quoted
+     * sender's, from the quote when the server told it, else from the
+     * line itself when this client still holds it; a quote told
+     * neither names its author bare. Every run is the quote's — the
+     * head slot included — so the whole of it answers one click and
+     * lights as one. The wrapper cuts the row to one line, so a long
+     * quote never pushes the answer down the window.
      */
     private static void appendReplyQuote(ChatComponentText root,
                                          ChatReplyReference reply) {
         int quiet = LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE);
-        // The colour the server drew that name in, which is the only
-        // answer for an in-character author: a character's name belongs
-        // to a character, and the account-role colours this client holds
-        // are keyed by account name and have never seen it. The account
-        // colours still answer for a line from before the quote carried
-        // one, and a quote with neither is drawn quietly.
-        int name = reply.getAuthorColor();
+        int ivory = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
+        long id = reply.getMessageId();
+        // The line as this client holds it, when it does: its head and
+        // its colour are the quoted line's own, exactly as drawn.
+        ClientChatMessages.Remembered held = id == ChatMessageIds.NONE
+                ? null : ClientChatMessages.get(id);
+        LostTalesChatMessagePacket quoted = held == null ? null
+                : held.packet;
+        UUID senderId = reply.hasHead() ? reply.getSenderId()
+                : quoted == null ? null : quoted.getSenderId();
+        boolean accountLine = reply.hasHead() ? reply.isAccountLine()
+                : quoted != null && quoted.isAccountLine();
+        String skinId = reply.hasHead() ? reply.getSkinId()
+                : quoted == null ? "" : quoted.getSkinId();
+        // The colour the name was drawn in: the line's own when held,
+        // else the one the server drew it in, which is the only answer
+        // for an in-character author — a character's name belongs to a
+        // character, and the account-role colours this client holds
+        // are keyed by account name. Those still answer for a quote
+        // from before it carried a colour; one with neither is quiet.
+        int name = quoted != null ? quoted.getNameColor()
+                : reply.getAuthorColor();
         if (name < 0) {
             name = ClientChatAccountRoles.colorOf(reply.getAuthor());
         }
-        long id = reply.getMessageId();
+        if (name < 0) {
+            name = quiet;
+        }
+        root.appendSibling(ChatReplyMarker.applyIcon(
+                text("", null, false), quiet, id));
         root.appendSibling(ChatReplyMarker.apply(
-                text(REPLY_MARK, nearestFormatting(quiet), false),
-                quiet, id));
+                text("<", nearestFormatting(name), false), name, id));
+        if (senderId != null) {
+            root.appendSibling(ChatReplyMarker.applyHead(
+                    text("  ", EnumChatFormatting.WHITE, true), name, id,
+                    senderId, accountLine, false, skinId));
+        }
         root.appendSibling(ChatReplyMarker.apply(
-                text(reply.getAuthor(),
-                        nearestFormatting(name < 0 ? quiet : name), false),
-                name < 0 ? quiet : name, id));
+                text(reply.getAuthor(), nearestFormatting(name), false),
+                name, id));
+        root.appendSibling(ChatSpacerMarker.of(ChatInlineIcons.NAME_GAP - 1));
         root.appendSibling(ChatReplyMarker.apply(
-                text(": " + reply.getExcerpt(),
-                        nearestFormatting(quiet), false),
-                quiet, id));
+                text("> ", nearestFormatting(name), false), name, id));
+        root.appendSibling(ChatReplyMarker.apply(
+                text(reply.getExcerpt(), nearestFormatting(ivory), false),
+                ivory, id));
     }
 
     /**
@@ -1476,6 +1678,33 @@ public final class LostTalesChatPresentation {
                                             long messageId) {
         return receiveSystemLine(message, channel, audibleMentionCue,
                 timestampMillis, true, messageId);
+    }
+
+    /**
+     * The component a server line carries, read back from the JSON the
+     * server kept it as, with every player it names rewritten to the
+     * identity the server recorded for them — as the live line's names
+     * are rewritten from the appearances this client holds — or null
+     * when the JSON cannot be read, in which case the words the packet
+     * kept stand in. {@code localMentioned[0]} says whether one of the
+     * names was this player's own.
+     */
+    private static IChatComponent serverBody(Minecraft minecraft,
+                                             LostTalesChatMessagePacket packet,
+                                             boolean[] localMentioned) {
+        IChatComponent component;
+        try {
+            component = IChatComponent.Serializer.func_150699_a(
+                    packet.getBodyJson());
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
+        if (component == null || !LostTalesConfig.enableChatPings) {
+            return component;
+        }
+        return rewritePlayerNames(component, packet.getChannel(),
+                localMentionNames(minecraft), localMentioned,
+                packet.getNamedPlayers());
     }
 
     /**
@@ -1549,7 +1778,8 @@ public final class LostTalesChatPresentation {
         if (LostTalesConfig.enableChatPings) {
             boolean[] localMentioned = new boolean[1];
             shown = rewritePlayerNames(message, channel,
-                    localMentionNames(minecraft), localMentioned);
+                    localMentionNames(minecraft), localMentioned,
+                    Collections.<ChatNamedPlayer>emptyList());
             mentioned = localMentioned[0];
         }
         long now = timestampMillis;
@@ -1613,7 +1843,7 @@ public final class LostTalesChatPresentation {
                     && !"Server".equalsIgnoreCase(actor)) {
                 IChatComponent mention = asMentionName(actor,
                         ChatChannel.CONSOLE, localMentionNames(minecraft),
-                        mentioned);
+                        mentioned, Collections.<ChatNamedPlayer>emptyList());
                 line.appendSibling(mention != null ? mention
                         : text(actor, EnumChatFormatting.WHITE, false));
                 line.appendSibling(text(" ", null, false));
@@ -1646,7 +1876,7 @@ public final class LostTalesChatPresentation {
                                                 boolean[] mentioned) {
         IChatComponent actor = asMentionName(event.getActor(),
                 ChatChannel.CONSOLE, localMentionNames(minecraft),
-                mentioned);
+                mentioned, Collections.<ChatNamedPlayer>emptyList());
         if (actor == null) {
             actor = text(event.getActor(), null, false);
         }
@@ -1858,23 +2088,35 @@ public final class LostTalesChatPresentation {
         if (remembered != null && remembered.packet.getReply().exists()) {
             return remembered.packet.getReply();
         }
+        // The quote reads bubble, {@code <}, head, name, {@code >},
+        // words: the name is the first run inside the brackets, the
+        // words the run after the closing one.
         String author = null;
         String words = "";
+        boolean closed = false;
         for (Object value : replyRow) {
-            if (!(value instanceof IChatComponent)
-                    || !ChatReplyMarker.isMarker((IChatComponent)value)) {
+            if (!(value instanceof IChatComponent)) {
                 continue;
             }
-            String run = ((IChatComponent)value).getUnformattedTextForChat();
-            if (run.equals(REPLY_MARK)) {
+            IChatComponent part = (IChatComponent)value;
+            if (!ChatReplyMarker.isMarker(part)
+                    || ChatReplyMarker.isIconSlot(part)
+                    || ChatReplyMarker.headOf(part) != null) {
                 continue;
             }
+            String run = part.getUnformattedTextForChat();
             if (author == null) {
-                author = run;
-            } else {
-                words = run.startsWith(": ") ? run.substring(2) : run;
-                break;
+                if (!run.equals("<")) {
+                    author = run;
+                }
+                continue;
             }
+            if (!closed) {
+                closed = run.startsWith(">");
+                continue;
+            }
+            words = run;
+            break;
         }
         return author == null ? null : ChatReplyReference.unanchored(author,
                 words, ChatReplyReference.NO_COLOR);
@@ -2127,12 +2369,13 @@ public final class LostTalesChatPresentation {
      */
     private static IChatComponent rewritePlayerNames(
             IChatComponent component, ChatChannel channel,
-            List<String> localNames, boolean[] localMentioned) {
+            List<String> localNames, boolean[] localMentioned,
+            List<ChatNamedPlayer> named) {
         if (component == null) {
             return null;
         }
         IChatComponent mention = asMention(component, channel, localNames,
-                localMentioned);
+                localMentioned, named);
         if (mention != null) {
             return mention;
         }
@@ -2145,7 +2388,7 @@ public final class LostTalesChatPresentation {
             }
             IChatComponent sibling = (IChatComponent)value;
             IChatComponent replaced = rewritePlayerNames(sibling, channel,
-                    localNames, localMentioned);
+                    localNames, localMentioned, named);
             if (replaced != sibling) {
                 @SuppressWarnings("unchecked")
                 List<Object> mutable = (List<Object>)siblings;
@@ -2168,11 +2411,11 @@ public final class LostTalesChatPresentation {
             if (argument instanceof IChatComponent) {
                 rewritten[index] = rewritePlayerNames(
                         (IChatComponent)argument, channel, localNames,
-                        localMentioned);
+                        localMentioned, named);
             } else if (argument instanceof String) {
-                IChatComponent named = asMentionName((String)argument,
-                        channel, localNames, localMentioned);
-                rewritten[index] = named != null ? named : argument;
+                IChatComponent mentionOf = asMentionName((String)argument,
+                        channel, localNames, localMentioned, named);
+                rewritten[index] = mentionOf != null ? mentionOf : argument;
             } else {
                 rewritten[index] = argument;
             }
@@ -2213,26 +2456,45 @@ public final class LostTalesChatPresentation {
     private static IChatComponent asMention(IChatComponent component,
                                             ChatChannel channel,
                                             List<String> localNames,
-                                            boolean[] localMentioned) {
+                                            boolean[] localMentioned,
+                                            List<ChatNamedPlayer> named) {
         if (!(component instanceof ChatComponentText)
                 || !component.getSiblings().isEmpty()) {
             return null;
         }
         return asMentionName(component.getUnformattedTextForChat(),
-                channel, localNames, localMentioned);
+                channel, localNames, localMentioned, named);
     }
 
-    /** As above from a bare name, for a translation's string argument. */
+    /**
+     * As above from a bare name, for a translation's string argument.
+     * {@code named} is what the server recorded about the players a
+     * replayed line names: a name this client cannot place — its
+     * player gone since — is placed by that record, shown as the
+     * identity they were playing in the colour that identity wore.
+     */
     private static IChatComponent asMentionName(String rawText,
                                                 ChatChannel channel,
                                                 List<String> localNames,
-                                                boolean[] localMentioned) {
+                                                boolean[] localMentioned,
+                                                List<ChatNamedPlayer> named) {
         String text = rawText == null ? "" : rawText.trim();
         if (text.length() == 0) {
             return null;
         }
         boolean local = matchesAny(text, localNames);
         String account = ChatMentionColors.accountFor(text);
+        ChatNamedPlayer recorded = account == null
+                ? ChatNamedPlayer.find(named, text) : null;
+        if (recorded != null) {
+            if (local) {
+                localMentioned[0] = true;
+            }
+            ChatComponentText piece = text("@" + recorded.getIdentityName(),
+                    nearestFormatting(recorded.getNameColor()), false);
+            return ChatMentionMarker.apply(piece, recorded.getNameColor(),
+                    recorded.getAccount());
+        }
         if (!local && account == null) {
             return null;
         }

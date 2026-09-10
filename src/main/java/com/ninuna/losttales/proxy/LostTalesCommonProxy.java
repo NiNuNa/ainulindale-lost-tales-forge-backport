@@ -61,6 +61,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatConsoleSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatHistorySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
+import com.ninuna.losttales.network.packet.LostTalesChatReactionSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigResultPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -327,6 +328,9 @@ public class LostTalesCommonProxy {
     public void handleChatTyping(LostTalesChatTypingSyncPacket packet) {}
 
     public void handleChatUpdate(LostTalesChatUpdatePacket packet) {}
+
+    /** The reactions on a message on screen changed; the client redraws its line. */
+    public void handleChatReactions(LostTalesChatReactionSyncPacket packet) {}
 
     public void handleChatHistory(LostTalesChatHistorySyncPacket packet) {}
 

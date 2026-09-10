@@ -10,7 +10,7 @@ import net.minecraft.client.gui.ChatLine;
  *
  * <p>The stack's rows are not all one height: a message's row and the
  * unread divider's are a whole line, while the blank row between two
- * runs is a third of one, so groups read apart without a whole empty line
+ * runs is half of one, so groups read apart without a whole empty line
  * between them. Scrolling still counts rows — a scroll offset is a row
  * and a fraction of the next — but every distance up the stack is a
  * sum of row heights, and this is the one place those sums are taken:
@@ -27,10 +27,10 @@ final class ChatStackRows {
     /** A message's row, and the unread divider's. */
     static final int LINE_HEIGHT = LostTalesChatOverlayRenderer.LINE_HEIGHT;
     /**
-     * The blank row between two runs: a third of a line, rounded up to
-     * a whole pixel so the rows above it stay on the pixel grid.
+     * The blank row between two runs: half a line, rounded up to a
+     * whole pixel so the rows above it stay on the pixel grid.
      */
-    static final int SPACER_HEIGHT = (LINE_HEIGHT + 1) / 3;
+    static final int SPACER_HEIGHT = (LINE_HEIGHT + 1) / 2;
     private static final int INITIAL_CAPACITY = 32;
 
     /** {@code tops[r]} is where row {@code r} starts; {@code tops[count]} is the total. */
@@ -89,7 +89,7 @@ final class ChatStackRows {
                 && this.dividerIndex == dividerIndex;
     }
 
-    /** The height a line's row takes: a third of a line for a blank row between runs. */
+    /** The height a line's row takes: half a line for a blank row between runs. */
     static int heightOf(ChatLine line) {
         return ChatWindowLines.isSpacer(line) ? SPACER_HEIGHT : LINE_HEIGHT;
     }

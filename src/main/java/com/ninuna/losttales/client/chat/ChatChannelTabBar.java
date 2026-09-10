@@ -489,20 +489,26 @@ final class ChatChannelTabBar {
     }
 
     /** Whether a GUI-space point lies in the row's vertical band. */
-    static boolean inRowBand(Row row, int mouseY) {
-        return mouseY >= rowTop(row.rowBottom) && mouseY < row.rowBottom;
+    /**
+     * Whether a screen y lies in the row's band as drawn: the row is laid
+     * out in whole pixels and drawn moved by its fraction, so the band
+     * is read the same way.
+     */
+    static boolean inRowBand(Row row, double mouseY) {
+        double y = mouseY - row.fractionY;
+        return y >= rowTop(row.rowBottom) && y < row.rowBottom;
     }
 
     /**
      * What lies under a GUI-space point: a tab, one of the selected tab's
      * controls, an end control, the grip, or nothing.
      */
-    Hit hitAt(FontRenderer font, Row row, int mouseX, int mouseY) {
+    Hit hitAt(FontRenderer font, Row row, double mouseX, double mouseY) {
         if (!inRowBand(row, mouseY)) {
             return null;
         }
         List<Tab> tabs = layout(font, row);
-        int localX = mouseX - row.offsetX;
+        double localX = mouseX - row.offsetX - row.fractionX;
         if (tabs.isEmpty()) {
             return null;
         }
@@ -549,7 +555,7 @@ final class ChatChannelTabBar {
      * and a five-pixel glyph is a small thing to hit exactly. A control
      * the row is not showing (a negative x) is never hit.
      */
-    private static boolean hitsControl(int localX, int x, int width) {
+    private static boolean hitsControl(double localX, int x, int width) {
         return x >= 0 && localX >= x - END_CONTROL_SLACK
                 && localX < x + width + END_CONTROL_SLACK;
     }
@@ -560,8 +566,8 @@ final class ChatChannelTabBar {
      * glyph is what the hover highlight and the move tip answer to, so
      * neither follows a pointer resting on the bare strip.
      */
-    boolean isOverGripHandle(FontRenderer font, Row row, int mouseX,
-                             int mouseY) {
+    boolean isOverGripHandle(FontRenderer font, Row row, double mouseX,
+                             double mouseY) {
         if (row == null || row.locked || !inRowBand(row, mouseY)) {
             return false;
         }
@@ -569,7 +575,7 @@ final class ChatChannelTabBar {
         if (row.right - this.controlsRight < MIN_GRIP_WIDTH) {
             return false;
         }
-        int localX = mouseX - row.offsetX;
+        double localX = mouseX - row.offsetX - row.fractionX;
         int right = row.right - GRIP_INSET;
         return localX >= right - ChatIconSheet.GRIP.getWidth()
                 && localX < right;
@@ -606,7 +612,7 @@ final class ChatChannelTabBar {
      * the rectangle registered with {@code regions} is the one painted.
      */
     void draw(FontRenderer font, ChatPointerRegions regions, Row row,
-              int mouseX, int mouseY, float alphaScale) {
+              double mouseX, double mouseY, float alphaScale) {
         List<Tab> tabs = layout(font, row);
         if (row.dragging == null) {
             // No hand on this row: whatever the last drag remembered

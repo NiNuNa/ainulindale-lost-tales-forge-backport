@@ -56,7 +56,7 @@ final class ChatCommandSuggestionBox {
         return shown + (this.candidates.size() > MAX_ROWS ? 1 : 0);
     }
 
-    boolean contains(FontRenderer font, int mouseX, int mouseY,
+    boolean contains(FontRenderer font, double mouseX, double mouseY,
                      int screenHeight, int inputX) {
         if (!isActive()) {
             return false;
@@ -67,25 +67,28 @@ final class ChatCommandSuggestionBox {
     }
 
     /** The candidate index under the mouse, or -1. Fold row answers -1. */
-    int candidateAt(FontRenderer font, int mouseX, int mouseY,
+    int candidateAt(FontRenderer font, double mouseX, double mouseY,
                     int screenHeight, int inputX) {
         if (!contains(font, mouseX, mouseY, screenHeight, inputX)
                 || mouseY < boxTop(screenHeight) + PADDING) {
             return -1;
         }
-        int row = (mouseY - boxTop(screenHeight) - PADDING) / ROW_HEIGHT;
+        int row = (int)Math.floor((mouseY - boxTop(screenHeight) - PADDING)
+                / (double)ROW_HEIGHT);
         return row >= 0 && row < Math.min(this.candidates.size(), MAX_ROWS)
                 ? row : -1;
     }
 
     void draw(FontRenderer font, ChatPointerRegions regions,
-              int screenHeight, int inputX, int mouseX, int mouseY) {
+              int screenHeight, int inputX, double mouseX, double mouseY) {
         if (!isActive()) {
             return;
         }
         int width = boxWidth(font);
         int top = boxTop(screenHeight);
         int bottom = screenHeight - BOTTOM_MARGIN;
+        int hoveredRow = candidateAt(font, mouseX, mouseY, screenHeight,
+                inputX);
         regions.add(inputX, top, inputX + width, bottom);
         Gui.drawRect(inputX, top, inputX + width, bottom,
                 LostTalesChatVisualStyle.argb(
@@ -93,8 +96,7 @@ final class ChatCommandSuggestionBox {
         int shown = Math.min(this.candidates.size(), MAX_ROWS);
         for (int row = 0; row < shown; row++) {
             int rowTop = top + PADDING + row * ROW_HEIGHT;
-            boolean hovered = mouseX >= inputX && mouseX < inputX + width
-                    && mouseY >= rowTop && mouseY < rowTop + ROW_HEIGHT;
+            boolean hovered = row == hoveredRow;
             if (row == this.selectedIndex || hovered) {
                 Gui.drawRect(inputX + 1, rowTop, inputX + width - 1,
                         rowTop + ROW_HEIGHT,

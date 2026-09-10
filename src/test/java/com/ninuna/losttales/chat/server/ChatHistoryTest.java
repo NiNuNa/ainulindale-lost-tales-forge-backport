@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -564,6 +565,102 @@ public final class ChatHistoryTest {
     }
 
     /** As below, with the conversation of a scoped channel stamped on the line. */
+    /* ---- an edit that changes nothing ---- */
+
+    @Test
+    public void anEditToTheSameWordsIsNoEdit() {
+        long id = record(ChatChannel.OOC, ALICE, "https://example.com/gif",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        assertNull("nobody is told of an edit that changes nothing",
+                ChatHistory.applyEdit(id, ALICE, "https://example.com/gif"));
+        assertNotNull(ChatHistory.applyEdit(id, ALICE, "a real edit"));
+    }
+
+    /* ---- reactions ---- */
+
+    private static ChatHistory.Requester reader(UUID account) {
+        return new ChatHistory.Requester(account, "", 0L, null, EVERY_CHANNEL);
+    }
+
+    @Test
+    public void aReaderMayReactAndEveryReaderIsTold() {
+        long id = record(ChatChannel.ALL, ALICE, "hail",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        ChatHistory.ReactionChange change = ChatHistory.react(id, reader(BOB),
+                BOB, "Beren", "smile", true);
+        assertNotNull(change);
+        assertTrue(change.readers.contains(ALICE));
+        assertEquals(0, change.gameCountBefore);
+        assertEquals(1, change.gameCountAfter);
+        assertNull("the same reaction twice changes nothing",
+                ChatHistory.react(id, reader(BOB), BOB, "Beren", "smile", true));
+
+        ChatReactionSummary forBob = ChatHistory.reactionsFor(id, BOB);
+        assertTrue(forBob.find("smile").mine);
+        assertFalse(ChatHistory.reactionsFor(id, ALICE).find("smile").mine);
+    }
+
+    @Test
+    public void aReactionIsOnlyForThoseWhoMayReadTheLine() {
+        long whisper = record(ChatChannel.WHISPER, ALICE, "the vault code",
+                Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
+        assertNull(ChatHistory.react(whisper, reader(CAROL), CAROL, "Celeb",
+                "smile", true));
+        assertNotNull(ChatHistory.react(whisper, reader(BOB), BOB, "Beren",
+                "smile", true));
+        assertNull("a message not kept takes no reaction",
+                ChatHistory.react(whisper + 99, reader(BOB), BOB, "Beren",
+                        "smile", true));
+    }
+
+    @Test
+    public void anEditKeepsTheReactions() {
+        long id = record(ChatChannel.ALL, ALICE, "hail",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        ChatHistory.react(id, reader(BOB), BOB, "Beren", "smile", true);
+        assertNotNull(ChatHistory.applyEdit(id, ALICE, "hail, friends"));
+        assertEquals(1, ChatHistory.reactionsFor(id, BOB).find("smile").count);
+    }
+
+    @Test
+    public void aReplayWearsTheReactionsAndMakesTheReplayedAReader() {
+        long id = record(ChatChannel.ALL, ALICE, "Alice joined the game",
+                Arrays.asList(ALICE), ChatHistory.Audience.everyone());
+        ChatHistory.react(id, reader(ALICE), ALICE, "Aldric", "smile", true);
+
+        List<LostTalesChatMessagePacket> replay =
+                ChatHistory.replayFor(reader(CAROL), 0L);
+        assertEquals(1, replay.size());
+        ChatReactionSummary.Reaction smile =
+                replay.get(0).getReactions().find("smile");
+        assertNotNull(smile);
+        assertFalse(smile.mine);
+        assertEquals("Aldric", smile.names.get(0));
+
+        // Carol was handed the line, so a reaction made later reaches her.
+        ChatHistory.ReactionChange change = ChatHistory.react(id, reader(BOB),
+                BOB, "Beren", "smile", true);
+        assertTrue(change.readers.contains(CAROL));
+    }
+
+    @Test
+    public void aDiscordMemberReactsWithoutARequesterAndIsClearedAlone() {
+        long id = record(ChatChannel.OOC, ALICE, "hail",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        UUID member = LostTalesChatMessagePacket.discordSenderId("42");
+        ChatHistory.ReactionChange change = ChatHistory.react(id, null, member,
+                "Nils", "smile", true);
+        assertNotNull(change);
+        assertEquals("a Discord member is not one the bridge reacts for",
+                0, change.gameCountAfter);
+        assertFalse(change.readers.contains(member));
+        ChatHistory.react(id, reader(BOB), BOB, "Beren", "smile", true);
+        assertNotNull(ChatHistory.clearDiscordReactions(id, null));
+        assertEquals(1, ChatHistory.reactionsFor(id, BOB).find("smile").count);
+        assertNull(ChatHistory.clearDiscordReactions(id, null));
+    }
+
     private static long record(ChatChannel channel, UUID author, String text,
                                List<UUID> sentTo, ChatHistory.Audience audience,
                                String scopeValue) {

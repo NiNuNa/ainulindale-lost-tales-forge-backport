@@ -1,7 +1,9 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -207,8 +209,16 @@ public final class ChatHistory {
         if (!(quotedScope == null ? "" : quotedScope).equals(replyScope)) {
             return ChatReplyReference.NONE;
         }
-        return ChatReplyReference.of(messageId, entry.author, entry.excerpt,
-                entry.forOthers.getNameColor());
+        return withHead(ChatReplyReference.of(messageId, entry.author,
+                entry.excerpt, entry.forOthers.getNameColor()), entry);
+    }
+
+    /** The quote wearing the head the quoted line was drawn with. */
+    private static ChatReplyReference withHead(ChatReplyReference quote,
+                                               Entry entry) {
+        return quote.withHead(entry.forOthers.getSenderId(),
+                entry.forOthers.isAccountLine(),
+                entry.forOthers.getSkinId());
     }
 
     /**
@@ -226,22 +236,27 @@ public final class ChatHistory {
             long messageId) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
         return entry == null ? ChatReplyReference.NONE
-                : ChatReplyReference.of(messageId, entry.author,
-                        entry.excerpt, entry.forOthers.getNameColor());
+                : withHead(ChatReplyReference.of(messageId, entry.author,
+                        entry.excerpt, entry.forOthers.getNameColor()),
+                        entry);
     }
 
     /**
      * Rewrites what a message says and answers with everyone who has to
-     * be told, or null when {@code editor} may not change it: no such
-     * message, or one they did not write. The excerpt is recut, so a
-     * reply made after the edit quotes what the message says now, and
-     * the kept lines say it too, so a replay shows the edited words.
+     * be told, or null when nothing is to change: no such message, one
+     * {@code editor} did not write, or new words that are the words it
+     * already says — an edit that changes nothing is not an edit, and
+     * nobody is told of one, whichever side it came from. The excerpt is
+     * recut, so a reply made after the edit quotes what the message says
+     * now, and the kept lines say it too, so a replay shows the edited
+     * words. The reactions stay with the message.
      */
     public static synchronized Set<UUID> applyEdit(long messageId,
                                                    UUID editor,
                                                    String message) {
         Entry entry = authored(messageId, editor);
-        if (entry == null) {
+        if (entry == null || message == null
+                || message.equals(entry.forOthers.getMessage())) {
             return null;
         }
         LostTalesChatMessagePacket forSender;
@@ -257,9 +272,115 @@ public final class ChatHistory {
         ENTRIES.put(Long.valueOf(messageId), new Entry(entry.authorId,
                 entry.author, ChatReplyReference.excerptOf(message),
                 entry.seenBy, entry.channelId, forSender, forOthers,
-                entry.audience, entry.timestampMillis));
+                entry.audience, entry.timestampMillis, entry.reactions));
         changed();
         return Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy));
+    }
+
+    /* ---- Reactions ---- */
+
+    /**
+     * What one reaction changed: everyone to tell, and how many players
+     * reacted with the emoji before and after — what decides whether the
+     * bridge's own reaction on Discord comes or goes.
+     */
+    public static final class ReactionChange {
+        public final Set<UUID> readers;
+        public final int gameCountBefore;
+        public final int gameCountAfter;
+
+        ReactionChange(Set<UUID> readers, int gameCountBefore,
+                       int gameCountAfter) {
+            this.readers = readers;
+            this.gameCountBefore = gameCountBefore;
+            this.gameCountAfter = gameCountAfter;
+        }
+    }
+
+    /**
+     * Adds or takes back one reaction to a kept message, and answers
+     * with what changed, or null when nothing did: no such message, a
+     * reactor who may not read it, a reaction already there or not
+     * there to take back, or one past the bounds. A player may react to
+     * what they were sent or may be shown now, exactly what a reply may
+     * quote; {@code requester} is null for a Discord member, whose
+     * message crossed the bridge and whose reaction reached the game by
+     * it. A player who reacts is one of the message's readers from then
+     * on.
+     */
+    public static synchronized ReactionChange react(long messageId,
+                                                    Requester requester,
+                                                    UUID reactor, String name,
+                                                    String emoji, boolean add) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        if (entry == null || reactor == null) {
+            return null;
+        }
+        if (requester != null && !(entry.seenBy.contains(reactor)
+                || entry.audience.admits(requester, entry))) {
+            return null;
+        }
+        int before = entry.reactions.gameCount(emoji);
+        if (!entry.reactions.set(emoji, reactor, name, add)) {
+            return null;
+        }
+        if (requester != null) {
+            entry.seenBy.add(reactor);
+        }
+        changed();
+        return new ReactionChange(
+                Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy)),
+                before, entry.reactions.gameCount(emoji));
+    }
+
+    /**
+     * Takes back every Discord member's reaction to a kept message — with
+     * one emoji, or with every emoji when {@code emoji} is null — and
+     * answers with everyone to tell, or null when nothing changed.
+     */
+    public static synchronized Set<UUID> clearDiscordReactions(
+            long messageId, String emoji) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        if (entry == null || !entry.reactions.clearDiscord(emoji)) {
+            return null;
+        }
+        changed();
+        return Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy));
+    }
+
+    /** The reactions on a kept message as {@code viewer} is shown them. */
+    public static synchronized ChatReactionSummary reactionsFor(
+            long messageId, UUID viewer) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        return entry == null ? ChatReactionSummary.EMPTY
+                : entry.reactions.summaryFor(viewer);
+    }
+
+    /** The channel a kept message was said in, or null for none kept. */
+    public static synchronized ChatChannel channelOf(long messageId) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        return entry == null ? null : entry.forOthers.getChannel();
+    }
+
+    /**
+     * The copy of a kept line {@code requester} is handed — their own
+     * copy of a line they sent, everyone else's of every other — with
+     * the reactions on it as they are shown them. Handing it makes them
+     * one of its readers: an edit, a removal or a reaction made later
+     * reaches them as it reaches those who were online when it was said.
+     */
+    private static LostTalesChatMessagePacket shownTo(Requester requester,
+                                                      Entry entry) {
+        LostTalesChatMessagePacket line = requester.accountId != null
+                && requester.accountId.equals(entry.authorId)
+                ? entry.forSender : entry.forOthers;
+        if (requester.accountId != null
+                && entry.seenBy.add(requester.accountId)) {
+            changed();
+        }
+        return entry.reactions.isEmpty() ? line
+                : line.withReactions(entry.reactions.summaryFor(
+                        requester.accountId));
     }
 
     /**
@@ -331,9 +452,7 @@ public final class ChatHistory {
                 new ArrayList<LostTalesChatMessagePacket>(admitted.size());
         for (int index = admitted.size() - 1; index >= 0; index--) {
             Entry entry = admitted.get(index);
-            lines.add(requester.accountId != null
-                    && requester.accountId.equals(entry.authorId)
-                    ? entry.forSender : entry.forOthers);
+            lines.add(shownTo(requester, entry));
         }
         return lines;
     }
@@ -372,9 +491,7 @@ public final class ChatHistory {
                 new ArrayList<LostTalesChatMessagePacket>(admitted.size());
         for (int index = admitted.size() - 1; index >= 0; index--) {
             Entry entry = admitted.get(index);
-            lines.add(requester.accountId != null
-                    && requester.accountId.equals(entry.authorId)
-                    ? entry.forSender : entry.forOthers);
+            lines.add(shownTo(requester, entry));
         }
         return lines;
     }
@@ -411,9 +528,7 @@ public final class ChatHistory {
                     || !entry.audience.admits(requester, entry)) {
                 continue;
             }
-            lines.add(requester.accountId != null
-                    && requester.accountId.equals(entry.authorId)
-                    ? entry.forSender : entry.forOthers);
+            lines.add(shownTo(requester, entry));
         }
         return lines;
     }
@@ -682,11 +797,22 @@ public final class ChatHistory {
         final LostTalesChatMessagePacket forOthers;
         final Audience audience;
         final long timestampMillis;
+        /** Who reacted to the line, and with what; empty for none. */
+        final ChatReactions reactions;
 
         Entry(UUID authorId, String author, String excerpt, Set<UUID> seenBy,
               String channelId, LostTalesChatMessagePacket forSender,
               LostTalesChatMessagePacket forOthers, Audience audience,
               long timestampMillis) {
+            this(authorId, author, excerpt, seenBy, channelId, forSender,
+                    forOthers, audience, timestampMillis, new ChatReactions());
+        }
+
+        Entry(UUID authorId, String author, String excerpt, Set<UUID> seenBy,
+              String channelId, LostTalesChatMessagePacket forSender,
+              LostTalesChatMessagePacket forOthers, Audience audience,
+              long timestampMillis, ChatReactions reactions) {
+            this.reactions = reactions == null ? new ChatReactions() : reactions;
             this.authorId = authorId;
             this.author = author;
             this.excerpt = excerpt;

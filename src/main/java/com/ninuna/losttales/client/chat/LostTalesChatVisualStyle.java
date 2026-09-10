@@ -7,6 +7,7 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.gui.Gui;
 import net.minecraft.item.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
@@ -425,6 +426,13 @@ final class LostTalesChatVisualStyle {
      * whole line is plain ivory, exactly as vanilla renders colourless
      * chat. Measuring and drawing always agree because both ask here.
      */
+    /** Whether the game's chat-links option is on: what gates a link, a command, a share. */
+    static boolean chatLinksEnabled() {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        return minecraft == null || minecraft.gameSettings == null
+                || minecraft.gameSettings.chatLinks;
+    }
+
     static boolean chatColoursEnabled() {
         Minecraft minecraft = Minecraft.getMinecraft();
         return minecraft == null || minecraft.gameSettings == null
@@ -499,6 +507,25 @@ final class LostTalesChatVisualStyle {
                 cursor += layout.indent(chatOpen);
                 continue;
             }
+            ChatReactionMarker.Data reaction = ChatReactionMarker.decode(part);
+            if (reaction != null) {
+                // A reaction chip is never underlined: it lights as a
+                // whole under the pointer instead, on the same hit the
+                // hand cursor and the click read. Its emoji and count
+                // carry their own shadows, so the shadow pass leaves it.
+                if (ruleStart >= 0) {
+                    drawRule(ruleStart, ruleEnd - ruleTrailing, y, ruleColor,
+                            alpha);
+                    ruleStart = -1;
+                }
+                if (!shadowPass) {
+                    drawReactionChip(font, reaction, cursor, y, alpha,
+                            LostTalesChatPresentation.isHoveredRun(line, index),
+                            colours);
+                }
+                cursor += reaction.width;
+                continue;
+            }
             String text = part.getUnformattedTextForChat();
             String formatting = part.getChatStyle().getFormattingCode();
             if (ChatSpoilerMarker.isRevealed(part)) {
@@ -548,6 +575,19 @@ final class LostTalesChatVisualStyle {
                     drawShareIcon(share, cursor, y, width, alpha,
                             shadowPass);
                 }
+            } else if (ChatReplyMarker.isIconSlot(part)) {
+                // The bubble a reply's quote opens with, in the quote's
+                // own tone, standing on the caps as the typing line's
+                // bubble does. A piece of the quote, it answers the
+                // quote's click, but the rule starts after it: a line
+                // under a bubble reads as a smudge.
+                width = ChatReplyMarker.ICON_SLOT_WIDTH;
+                Integer quoteColor = ChatReplyMarker.colorOf(part);
+                ChatIconSheet bubble = ChatIconSheet.SPEECH_BUBBLE;
+                bubble.drawSilhouette(shadowPass ? SHADOW
+                                : !colours || quoteColor == null ? IVORY
+                                        : quoteColor.intValue(),
+                        cursor, y + (7 - bubble.getHeight()) / 2, alpha);
             } else if (ChatChannelLinkMarker.isIconSlot(part)) {
                 // The bubble of a link to a message, in the link's own
                 // colour, centred in the slot its two spaces reserve. It
@@ -668,15 +708,20 @@ final class LostTalesChatVisualStyle {
                             : metadata != null ? metadata.nameColor
                             : glyphColor;
                 } else if (marker == null) {
-                    // A run that answers to a click or carries a card is
-                    // underlined while the pointer rests on it — or on a
-                    // run acting with it, so a reply's quote and the
-                    // pieces of one link light together — in its own
-                    // colour, on the row the font's own underline takes,
-                    // so it reads as usable before it is used.
+                    // A run that answers to a click is underlined while
+                    // the pointer rests on it — or on a run acting with
+                    // it, so a reply's quote and the pieces of one link
+                    // light together — in its own colour, on the row the
+                    // font's own underline takes, so it reads as usable
+                    // before it is used. A run that only carries a card
+                    // stays plain: the rule promises a click. The head
+                    // slot a quote wears is a run of the quote and lights
+                    // with it, so the rule runs under the quote whole.
                     underlined = hovered != null
-                            && rendered.trim().length() > 0
-                            && isInteractable(part)
+                            && (rendered.trim().length() > 0
+                                    || ChatReplyMarker.headOf(part) != null)
+                            && ChatInteractions.answersClick(part,
+                                    chatLinksEnabled())
                             && sharesInteraction(part, line, index, hovered);
                     underlineColor = glyphColor;
                 }
@@ -706,6 +751,42 @@ final class LostTalesChatVisualStyle {
         if (ruleStart >= 0) {
             drawRule(ruleStart, ruleEnd - ruleTrailing, y, ruleColor, alpha);
         }
+    }
+
+    /**
+     * One reaction chip: a pill a pixel taller than the line's glyphs
+     * on either side, corners cut, holding the emoji at its native size
+     * and the count. A chip the reader is in wears the accent on its
+     * edge and its count; the hovered one takes the hover fill, the way
+     * every panel row in the palette does.
+     */
+    private static void drawReactionChip(FontRenderer font,
+                                         ChatReactionMarker.Data chip,
+                                         int x, int y, int alpha,
+                                         boolean hovered, boolean colours) {
+        int left = x;
+        int right = x + chip.width;
+        int top = y - 3;
+        int bottom = y + 9;
+        int accent = LostTalesColors.rgb(LostTalesColors.HONEY);
+        int fill = argb(hovered ? LostTalesColors.rgb(LostTalesColors.PANEL_HOVER)
+                : SURFACE_RGB, Math.round(alpha * 0.9F));
+        int edge = argb(chip.mine && colours ? accent : hovered ? IVORY
+                : LostTalesColors.rgb(LostTalesColors.BORDER_DIM), alpha);
+        Gui.drawRect(left + 1, top + 1, right - 1, bottom - 1, fill);
+        Gui.drawRect(left + 1, top, right - 1, top + 1, edge);
+        Gui.drawRect(left + 1, bottom - 1, right - 1, bottom, edge);
+        Gui.drawRect(left, top + 1, left + 1, bottom - 1, edge);
+        Gui.drawRect(right - 1, top + 1, right, bottom - 1, edge);
+        beginContent();
+        ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(), chip.emoji,
+                left + ChatReactionMarker.PAD,
+                y + ChatInlineIcons.CONTENT_TOP_OFFSET,
+                ChatInlineIcons.CONTENT_SIZE, alpha);
+        beginContent();
+        drawColored(font, chip.countText(), left + ChatReactionMarker.PAD
+                + ChatReactionMarker.ICON + ChatReactionMarker.GAP, y,
+                chip.mine && colours ? accent : IVORY, alpha);
     }
 
     /**
@@ -768,61 +849,6 @@ final class LostTalesChatVisualStyle {
     }
 
     /**
-     * Whether a run does something under the pointer: it answers to a
-     * click (a link, a name, a mention, a reply's quote, a channel
-     * link, a share, a covered spoiler) or carries a card to read. The
-     * chat's own markers ride on click events too — a colour, a title,
-     * the chevron, a timestamp — and answer to nothing, so a click
-     * event alone says nothing: only one that is not a marker's
-     * payload counts.
-     */
-    private static boolean isInteractable(IChatComponent part) {
-        if (part == null || part.getChatStyle() == null) {
-            return false;
-        }
-        if (part.getChatStyle().getChatHoverEvent() != null
-                || ChatShowcaseMarker.decode(part) != null
-                || ChatMentionMarker.decode(part) != null
-                || ChatSenderSpan.isSenderName(part)
-                || ChatReplyMarker.isMarker(part)
-                || ChatChannelLinkMarker.isMarker(part)) {
-            return true;
-        }
-        if (ChatSpoilerMarker.isMarker(part)) {
-            return !ChatSpoilerMarker.isRevealed(part);
-        }
-        return genuineClick(part) != null;
-    }
-
-    /**
-     * The click a run answers to, or null: a link, a command, a
-     * suggestion. Every marker the chat lays into a line is carried as
-     * a suggestion too, and none of those is a click.
-     */
-    private static ClickEvent genuineClick(IChatComponent part) {
-        if (part == null || part.getChatStyle() == null) {
-            return null;
-        }
-        ClickEvent click = part.getChatStyle().getChatClickEvent();
-        if (click == null || ChatColorMarker.isMarker(part)
-                || ChatPrefixMarker.isMarker(part)
-                || ChatEmojiMarker.isMarker(part)
-                || ChatTitleMarker.isMarker(part)
-                || ChatReplyMarker.isMarker(part)
-                || ChatChannelLinkMarker.isMarker(part)
-                || ChatBodyMarker.isMarker(part)
-                || ChatLayoutMarker.isMarker(part)
-                || ChatSpacerMarker.isMarker(part)
-                || ChatSpoilerMarker.isMarker(part)
-                || ChatHeadMarker.isMarker(part)
-                || ChatShowcaseMarker.decode(part) != null
-                || ChatMentionMarker.decode(part) != null) {
-            return null;
-        }
-        return click;
-    }
-
-    /**
      * Whether the run at {@code index} of {@code line} acts with the
      * hovered one, which is on the same row: it is the hovered run, or
      * it answers exactly as that run does — the runs of one reply quote
@@ -845,8 +871,8 @@ final class LostTalesChatVisualStyle {
         if (ChatChannelLinkMarker.isMarker(part)) {
             return ChatChannelLinkMarker.sameLink(part, hovered);
         }
-        ClickEvent own = genuineClick(part);
-        ClickEvent theirs = genuineClick(hovered);
+        ClickEvent own = ChatInteractions.genuineClick(part);
+        ClickEvent theirs = ChatInteractions.genuineClick(hovered);
         return own != null && theirs != null
                 && own.getAction() == theirs.getAction()
                 && own.getValue() != null

@@ -123,6 +123,16 @@ final class ChatHeadMarker {
         return new Data(null, false, false, "", "", titleColor, nameColor);
     }
 
+    /**
+     * Whether the run is a head marker's own slot or a quote's head
+     * slot: either way a face, or the mark standing for one, is drawn
+     * in the width the slot declares.
+     */
+    static Data headOf(IChatComponent component) {
+        Data head = decode(component);
+        return head != null ? head : ChatReplyMarker.headOf(component);
+    }
+
     static final class Data {
         final UUID senderId;
         final boolean accountIdentity;
@@ -168,6 +178,17 @@ final class ChatHeadMarker {
             return isSystemSender() ? ChatEmoji.CONSOLE : null;
         }
 
+
+        /**
+         * A head alone — whose it is and what it is drawn with — for a
+         * slot that names no line's sender: a reply's quote wears the
+         * quoted sender's head this way.
+         */
+        static Data head(UUID senderId, boolean accountIdentity,
+                         boolean npcIdentity, String skinId) {
+            return new Data(senderId, accountIdentity, npcIdentity, skinId,
+                    "", 0, 0);
+        }
 
         private Data(UUID senderId, boolean accountIdentity,
                      boolean npcIdentity, String skinId,

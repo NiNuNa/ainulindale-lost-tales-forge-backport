@@ -1,9 +1,14 @@
 package com.ninuna.losttales.chat.server;
 
+import com.ninuna.losttales.character.identity.PlayableIdentity;
+import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
+import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.chat.ChatBroadcastIdMarkers;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
 import com.ninuna.losttales.compat.discord.DiscordGameEventRelay;
 import com.ninuna.losttales.gui.style.LostTalesColors;
@@ -62,8 +67,13 @@ public final class LostTalesServerBroadcastHook {
     /**
      * Gives the line an id and records it for everyone online: they are
      * the ones who can be shown it, so they are the ones who may reply
-     * to it by that id. The history keeps the words alone, cleaned as a
-     * message is, under the Server's name in the Console's colour.
+     * to it by that id. The history keeps the words, cleaned as a
+     * message is, under the Server's name in the Console's colour, and
+     * beside them the component itself as the game's own chat JSON —
+     * its hover, its colours, its links — with the players it names as
+     * they are playing right now, so a replay shows the line as the
+     * live one was shown, naming players who may be long gone by the
+     * identity they had.
      */
     private static void stamp(IChatComponent message) {
         MinecraftServer server = MinecraftServer.getServer();
@@ -90,7 +100,9 @@ public final class LostTalesServerBroadcastHook {
                 LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
                 ChatChannel.CONSOLE.getDisplayColor(), text,
                 System.currentTimeMillis(), "", null, "", "", 0, true,
-                messageId, ChatReplyReference.NONE, "");
+                messageId, ChatReplyReference.NONE, "")
+                .withServerBody(componentJson(message),
+                        namedPlayers(text, online));
         ChatHistory.record(messageId, LostTalesChatMessagePacket.SERVER_SENDER_ID,
                 SERVER_NAME, null, record, recipients,
                 ChatHistory.Audience.everyone());
@@ -103,6 +115,58 @@ public final class LostTalesServerBroadcastHook {
 
     /** The name the server's lines are recorded under; the client shows its own word for it. */
     static final String SERVER_NAME = "Server";
+
+    /**
+     * The component as the JSON the game itself sends chat in, or
+     * empty when it cannot be written. Whether it fits the packet is
+     * the packet's own check.
+     */
+    private static String componentJson(IChatComponent message) {
+        try {
+            String json = IChatComponent.Serializer.func_150696_a(message);
+            return json == null ? "" : json;
+        } catch (RuntimeException unwritable) {
+            return "";
+        }
+    }
+
+    /**
+     * Every online player the line names, whole, as the identity they
+     * are playing — the name and colour their own Global line would be
+     * signed with — so a replay names them as the live line did.
+     */
+    private static List<ChatNamedPlayer> namedPlayers(String text,
+                                                      List<EntityPlayerMP> online) {
+        List<ChatNamedPlayer> named = new ArrayList<ChatNamedPlayer>();
+        for (EntityPlayerMP player : online) {
+            if (named.size() >= ChatNamedPlayer.MAX_PER_LINE) {
+                break;
+            }
+            if (player == null) {
+                continue;
+            }
+            String account = player.getGameProfile() == null
+                    ? player.getCommandSenderName()
+                    : player.getGameProfile().getName();
+            if (!ChatNamedPlayer.names(text, account)) {
+                continue;
+            }
+            PlayableIdentityResolver.Resolution identity =
+                    PlayableIdentityResolver.resolve(player);
+            RoleplayCharacter character = identity.isAvailable()
+                    ? identity.getCharacter() : null;
+            String identityName = character == null ? account
+                    : PlayableIdentity.displayName(character, account);
+            LostTalesChatPresentationResolver.Presentation presentation =
+                    LostTalesChatPresentationResolver.resolve(player, character);
+            int roles = ChatAccountRoleResolver.resolve(player,
+                    character == null ? null : character.getCharacterId());
+            named.add(new ChatNamedPlayer(account, identityName,
+                    ChatRolePresentation.nameColor(ChatChannel.ALL, roles,
+                            character == null, presentation.nameColor)));
+        }
+        return named;
+    }
 
     private static void logOnce(String what, Throwable throwable) {
         if (!failureLogged) {

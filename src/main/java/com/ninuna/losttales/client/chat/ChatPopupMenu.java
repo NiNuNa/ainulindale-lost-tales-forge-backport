@@ -463,7 +463,7 @@ final class ChatPopupMenu {
                         0xA0));
     }
 
-    boolean contains(int mouseX, int mouseY) {
+    boolean contains(double mouseX, double mouseY) {
         return isOpen() && mouseX >= this.x && mouseX < this.x + this.width
                 && mouseY >= this.y && mouseY < this.y + this.height;
     }
@@ -501,7 +501,7 @@ final class ChatPopupMenu {
     /** The clickable entry under the point, resolved against the drawn
      *  offset so a gliding list answers for what is on screen; headers,
      *  display rows and the padding bands are nobody's. */
-    Entry entryAt(int mouseX, int mouseY) {
+    Entry entryAt(double mouseX, double mouseY) {
         Entry entry = rowAt(mouseX, mouseY);
         return entry == null || entry.header || entry.passive ? null : entry;
     }
@@ -511,7 +511,7 @@ final class ChatPopupMenu {
      * lock answers wherever its row is — a display row included — and
      * only on its own square, so the row around it keeps its meaning.
      */
-    Entry lockControlAt(int mouseX, int mouseY) {
+    Entry lockControlAt(double mouseX, double mouseY) {
         Entry entry = rowAt(mouseX, mouseY);
         if (entry == null || entry.lockControl == null) {
             return null;
@@ -528,7 +528,7 @@ final class ChatPopupMenu {
     }
 
     /** The entry drawn under the point, whatever kind it is, or null. */
-    private Entry rowAt(int mouseX, int mouseY) {
+    private Entry rowAt(double mouseX, double mouseY) {
         if (!contains(mouseX, mouseY)
                 || mouseY < this.y + PADDING_Y + this.fieldHeight
                 || mouseY >= this.y + this.height - PADDING_Y) {
@@ -553,8 +553,13 @@ final class ChatPopupMenu {
         }
     }
 
+    /**
+     * Draws the menu. {@code mouseX}/{@code mouseY} is the pointer while
+     * the menu has it, else {@link ChatHover#AWAY}: the rows light by the
+     * same hit test a press and the pointer's pose ask.
+     */
     void draw(FontRenderer font, ChatPointerRegions regions,
-              int mouseX, int mouseY) {
+              double mouseX, double mouseY) {
         if (!isOpen() || font == null) {
             return;
         }

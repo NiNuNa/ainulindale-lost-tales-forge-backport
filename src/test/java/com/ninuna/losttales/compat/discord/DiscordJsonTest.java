@@ -7,6 +7,8 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public final class DiscordJsonTest {
@@ -110,6 +112,66 @@ public final class DiscordJsonTest {
         assertEquals("", messages.get(0).editedTimestamp);
         assertEquals("", messages.get(1).editedTimestamp);
         assertEquals("2026-09-01T00:00:00Z", messages.get(2).editedTimestamp);
+        assertFalse(messages.get(0).isEdited());
+        assertFalse(messages.get(1).isEdited());
+        assertTrue(messages.get(2).isEdited());
+    }
+
+    @Test
+    public void anEmbedUnfurlIsNotAnEdit() {
+        // Discord announces a link's embed with a message update that
+        // carries the same words and no edit stamp.
+        DiscordJson.Message unfurl = DiscordJson.parseMessage(
+                new JsonParser().parse("{\"id\":\"60\","
+                + "\"channel_id\":\"7\","
+                + "\"content\":\"https://example.com/gif\","
+                + "\"embeds\":[{\"type\":\"gifv\"}]}").getAsJsonObject());
+        assertNotNull(unfurl);
+        assertFalse(unfurl.isEdited());
+    }
+
+    @Test
+    public void aReactionIsReadWithItsMemberAndMappedToTheChatsEmoji() {
+        DiscordJson.Reaction added = DiscordJson.parseReaction(
+                new JsonParser().parse("{\"user_id\":\"42\","
+                + "\"channel_id\":\"7\",\"message_id\":\"99\","
+                + "\"emoji\":{\"id\":null,\"name\":\"\uD83D\uDE04\"},"
+                + "\"member\":{\"nick\":\"Ni\",\"user\":{\"id\":\"42\","
+                + "\"username\":\"nils\",\"bot\":false}}}").getAsJsonObject());
+        assertNotNull(added);
+        assertEquals("42", added.userId);
+        assertEquals("99", added.messageId);
+        assertEquals("the server nickname is the name shown", "Ni",
+                added.memberName);
+        assertFalse(added.bot);
+        assertEquals("smile", added.emoji().getName());
+
+        DiscordJson.Reaction custom = DiscordJson.parseReaction(
+                new JsonParser().parse("{\"user_id\":\"42\","
+                + "\"channel_id\":\"7\",\"message_id\":\"99\","
+                + "\"emoji\":{\"id\":\"555\",\"name\":\"Cutesy\"}}")
+                .getAsJsonObject());
+        assertEquals("a custom emoji named as one of ours is ours",
+                "cutesy", custom.emoji().getName());
+        assertEquals("", custom.memberName);
+
+        DiscordJson.Reaction unknown = DiscordJson.parseReaction(
+                new JsonParser().parse("{\"user_id\":\"42\","
+                + "\"channel_id\":\"7\",\"message_id\":\"99\","
+                + "\"emoji\":{\"id\":\"556\",\"name\":\"partyparrot\"}}")
+                .getAsJsonObject());
+        assertNull("an emoji the chat cannot draw is left on Discord",
+                unknown.emoji());
+        assertNull(DiscordJson.parseReaction(new JsonParser().parse(
+                "{\"user_id\":\"42\"}").getAsJsonObject()));
+    }
+
+    @Test
+    public void theBotsOwnReactionIsAReactionUrlOfItsEmojiEncoded()
+            throws java.io.IOException {
+        assertEquals(DiscordHttp.API_BASE
+                + "/channels/7/messages/99/reactions/%F0%9F%98%84/@me",
+                DiscordHttp.ownReactionUrl("7", "99", "\uD83D\uDE04"));
     }
 
     @Test

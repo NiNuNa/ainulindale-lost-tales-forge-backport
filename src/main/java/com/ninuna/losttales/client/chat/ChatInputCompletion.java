@@ -454,7 +454,7 @@ final class ChatInputCompletion {
      * transform; {@code anchor} is the bar's top and {@code inputX} the
      * field's left edge in that space.
      */
-    void draw(int anchor, int inputX, int mouseX, int mouseY) {
+    void draw(int anchor, int inputX, double mouseX, double mouseY) {
         if (LostTalesConfig.enableChatEmojis) {
             this.emojiSuggestions.update(this.field.getText(),
                     this.field.getCursorPosition());
@@ -476,69 +476,114 @@ final class ChatInputCompletion {
                 mouseX, mouseY);
     }
 
-    /** The mention candidate the pointer is on, for its hover card, or null. */
-    ChatMentionCandidate hoveredMention(int mouseX, int mouseY, int anchor,
-                                        int inputX) {
-        return LostTalesConfig.enableChatPings
-                ? this.nameSuggestions.suggestionAt(this.font, mouseX, mouseY,
-                        anchor, inputX)
-                : null;
+    /**
+     * Which open list a point is on, and which of its rows; a row of -1
+     * is the list's own padding.
+     */
+    static final class Slot {
+        static final int EMOJI = 0;
+        static final int NAME = 1;
+        static final int CHANNEL = 2;
+        static final int SHARE = 3;
+        static final int COMMAND = 4;
+
+        final int box;
+        final int row;
+
+        Slot(int box, int row) {
+            this.box = box;
+            this.row = row;
+        }
     }
 
     /**
-     * A click on a row of an open list accepts that row; true when one
-     * did, so the screen looks no further.
+     * The open list under a point in the bar's space, and its row, asked
+     * in the order a press accepts one, so what lights is what a press
+     * takes. Null off every list.
      */
-    boolean click(int mouseX, int mouseY, int button, int anchor,
-                  int inputX) {
-        if (button != 0) {
+    Slot slotAt(double x, double y, int anchor, int inputX) {
+        if (LostTalesConfig.enableChatEmojis && this.emojiSuggestions.contains(
+                this.font, x, y, anchor, inputX)) {
+            return new Slot(Slot.EMOJI, this.emojiSuggestions.rowAt(
+                    this.font, x, y, anchor, inputX));
+        }
+        if (LostTalesConfig.enableChatPings && this.nameSuggestions.contains(
+                this.font, x, y, anchor, inputX)) {
+            return new Slot(Slot.NAME, this.nameSuggestions.rowAt(
+                    this.font, x, y, anchor, inputX));
+        }
+        if (this.channelSuggestions.contains(this.font, x, y, anchor, inputX)) {
+            return new Slot(Slot.CHANNEL, this.channelSuggestions.rowAt(
+                    this.font, x, y, anchor, inputX));
+        }
+        if (this.shareSuggestions.contains(this.font, x, y, anchor, inputX)) {
+            return new Slot(Slot.SHARE, this.shareSuggestions.rowAt(
+                    this.font, x, y, anchor, inputX));
+        }
+        if (this.commandSuggestions.contains(this.font, x, y, anchor, inputX)) {
+            return new Slot(Slot.COMMAND, this.commandSuggestions.candidateAt(
+                    this.font, x, y, anchor, inputX));
+        }
+        return null;
+    }
+
+    /** The mention candidate a slot names, for its hover card, or null. */
+    ChatMentionCandidate mentionAt(Slot slot) {
+        return slot != null && slot.box == Slot.NAME
+                && LostTalesConfig.enableChatPings
+                ? this.nameSuggestions.at(slot.row) : null;
+    }
+
+    /**
+     * Accepts the row a slot names; true when one was taken, so the
+     * screen looks no further.
+     */
+    boolean accept(Slot slot) {
+        if (slot == null || slot.row < 0) {
             return false;
         }
-        if (LostTalesConfig.enableChatEmojis
-                && this.emojiSuggestions.isActive()) {
-            ChatEmoji suggested = this.emojiSuggestions.suggestionAt(
-                    this.font, mouseX, mouseY, anchor, inputX);
-            if (suggested != null) {
-                acceptSuggestion(suggested);
+        switch (slot.box) {
+            case Slot.EMOJI: {
+                ChatEmoji emoji = this.emojiSuggestions.at(slot.row);
+                if (emoji == null) {
+                    return false;
+                }
+                acceptSuggestion(emoji);
                 return true;
             }
-        }
-        if (LostTalesConfig.enableChatPings
-                && this.nameSuggestions.isActive()) {
-            ChatMentionCandidate suggested = this.nameSuggestions.suggestionAt(
-                    this.font, mouseX, mouseY, anchor, inputX);
-            if (suggested != null) {
-                acceptNameSuggestion(suggested);
+            case Slot.NAME: {
+                ChatMentionCandidate candidate =
+                        this.nameSuggestions.at(slot.row);
+                if (candidate == null) {
+                    return false;
+                }
+                acceptNameSuggestion(candidate);
                 return true;
             }
-        }
-        if (this.channelSuggestions.isActive()) {
-            ChatChannel suggested = this.channelSuggestions.suggestionAt(
-                    this.font, mouseX, mouseY, anchor, inputX);
-            if (suggested != null) {
-                acceptChannelSuggestion(suggested);
+            case Slot.CHANNEL: {
+                ChatChannel channel = this.channelSuggestions.at(slot.row);
+                if (channel == null) {
+                    return false;
+                }
+                acceptChannelSuggestion(channel);
                 return true;
             }
-        }
-        if (this.shareSuggestions.isActive()) {
-            ChatShareCandidates.Entry suggested =
-                    this.shareSuggestions.suggestionAt(this.font, mouseX,
-                            mouseY, anchor, inputX);
-            if (suggested != null) {
-                acceptShareSuggestion(suggested);
+            case Slot.SHARE: {
+                ChatShareCandidates.Entry entry =
+                        this.shareSuggestions.at(slot.row);
+                if (entry == null) {
+                    return false;
+                }
+                acceptShareSuggestion(entry);
                 return true;
             }
-        }
-        if (this.commandSuggestions.isActive()) {
-            int candidate = this.commandSuggestions.candidateAt(
-                    this.font, mouseX, mouseY, anchor, inputX);
-            if (candidate >= 0) {
+            case Slot.COMMAND:
                 this.completionCycling = true;
-                insertCompletion(candidate);
+                insertCompletion(slot.row);
                 return true;
-            }
+            default:
+                return false;
         }
-        return false;
     }
 
     /* ---- Insertions ---- */

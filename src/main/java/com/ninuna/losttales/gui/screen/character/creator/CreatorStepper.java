@@ -46,11 +46,9 @@ public final class CreatorStepper extends CreatorControl {
         drawLabel(this.label);
         int top = valueTop();
         boolean steps = canStep();
-        boolean overLeft = steps && CreatorWidgets.within(mouseX, mouseY,
-                this.x, top, CreatorWidgets.ARROW_BOX, CreatorWidgets.ARROW_BOX);
-        boolean overRight = steps && CreatorWidgets.within(mouseX, mouseY,
-                rightArrowX(), top, CreatorWidgets.ARROW_BOX,
-                CreatorWidgets.ARROW_BOX);
+        int arrow = steps ? arrowAt(mouseX, mouseY) : 0;
+        boolean overLeft = arrow < 0;
+        boolean overRight = arrow > 0;
         CreatorWidgets.drawArrowBox(font, this.x, top, false, steps, overLeft);
         CreatorWidgets.drawArrowBox(font, rightArrowX(), top, true, steps,
                 overRight);
@@ -90,16 +88,32 @@ public final class CreatorStepper extends CreatorControl {
         if (button != 0 || !contains(mouseX, mouseY)) {
             return false;
         }
-        int top = valueTop();
-        if (CreatorWidgets.within(mouseX, mouseY, this.x, top,
-                CreatorWidgets.ARROW_BOX, CreatorWidgets.ARROW_BOX)) {
-            step(-1);
-        } else if (CreatorWidgets.within(mouseX, mouseY, rightArrowX(), top,
-                CreatorWidgets.ARROW_BOX, CreatorWidgets.ARROW_BOX)) {
-            step(1);
+        int arrow = arrowAt(mouseX, mouseY);
+        if (arrow != 0) {
+            step(arrow);
         }
         // Clicking anywhere on the row takes the focus, so the keys step it.
         return true;
+    }
+
+    /** -1 over the left arrow, 1 over the right one, 0 anywhere else. */
+    private int arrowAt(int mouseX, int mouseY) {
+        int top = valueTop();
+        if (CreatorWidgets.within(mouseX, mouseY, this.x, top,
+                CreatorWidgets.ARROW_BOX, CreatorWidgets.ARROW_BOX)) {
+            return -1;
+        }
+        if (CreatorWidgets.within(mouseX, mouseY, rightArrowX(), top,
+                CreatorWidgets.ARROW_BOX, CreatorWidgets.ARROW_BOX)) {
+            return 1;
+        }
+        return 0;
+    }
+
+    /** Only the arrows act; the rest of the row takes the focus and nothing more. */
+    @Override
+    public boolean isPointerOverAction(int mouseX, int mouseY) {
+        return canStep() && arrowAt(mouseX, mouseY) != 0;
     }
 
     @Override

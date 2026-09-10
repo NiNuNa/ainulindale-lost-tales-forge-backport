@@ -1,5 +1,7 @@
 package com.ninuna.losttales.gui.screen;
 
+import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
+import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.client.gui.animation.LostTalesControlBarAnimation;
 import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar;
 import com.ninuna.losttales.client.character.CharacterGuiPreviewLayout;
@@ -43,7 +45,8 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 
 /** Client-only character overview/details screen reached from the radial character menu. */
-public class LostTalesCharacterInfoGui extends GuiScreen {
+public class LostTalesCharacterInfoGui extends GuiScreen
+        implements LostTalesPointerInteractable {
     private static final int PANEL_PADDING = 10;
     private static final int BUTTON_MANAGE = 1;
     private static final int BUTTON_BACK = 2;
@@ -534,6 +537,21 @@ public class LostTalesCharacterInfoGui extends GuiScreen {
                 LostTalesControlBarAnimation.fixedMouseX(this, mouseX),
                 LostTalesControlBarAnimation.fixedMouseY(
                         this, mouseY), button);
+    }
+
+    /**
+     * Asked in the order {@link #mouseClicked} resolves a press: the model
+     * panel first, where a press takes hold of the model to turn it, then
+     * the buttons in the control bar's space.
+     */
+    @Override
+    public boolean isPointerOverInteractable(int mouseX, int mouseY) {
+        if (isMouseInsideModelPanel(mouseX, mouseY)) {
+            return true;
+        }
+        return LostTalesGuiPointerTargets.isOverEnabledButton(this,
+                LostTalesControlBarAnimation.fixedMouseX(this, mouseX),
+                LostTalesControlBarAnimation.fixedMouseY(this, mouseY));
     }
 
     @Override

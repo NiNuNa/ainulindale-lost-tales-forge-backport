@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import net.minecraft.util.IChatComponent;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 
@@ -32,12 +33,23 @@ final class ClientChatMessages {
     /** Remembers what a printed message was built from. */
     static synchronized void remember(LostTalesChatMessagePacket packet,
                                       ChatTab tab, int[] showcaseIds) {
+        remember(packet, tab, showcaseIds, ChatBodyKind.MESSAGE, null);
+    }
+
+    /**
+     * As above, with how its body was shown and, for a body shown as a
+     * component of its own — a line of the server's — that component,
+     * so the line is built again exactly as it was.
+     */
+    static synchronized void remember(LostTalesChatMessagePacket packet,
+                                      ChatTab tab, int[] showcaseIds,
+                                      ChatBodyKind kind, IChatComponent body) {
         if (packet == null || tab == null
                 || !ChatMessageIds.isServerId(packet.getMessageId())) {
             return;
         }
         ENTRIES.put(Long.valueOf(packet.getMessageId()),
-                new Remembered(packet, tab, showcaseIds, false));
+                new Remembered(packet, tab, showcaseIds, false, kind, body));
         while (ENTRIES.size() > ClientChatChannelViews.maxTrackedLines()) {
             Iterator<Long> oldest = ENTRIES.keySet().iterator();
             oldest.next();
@@ -61,7 +73,8 @@ final class ClientChatMessages {
         // is forgotten next; the message is edited from here on, and a
         // later rebuild of the line keeps saying so.
         ENTRIES.put(Long.valueOf(messageId),
-                new Remembered(packet, entry.tab, entry.showcaseIds, true));
+                new Remembered(packet, entry.tab, entry.showcaseIds, true,
+                        entry.kind, entry.body));
     }
 
     /**
@@ -76,7 +89,8 @@ final class ClientChatMessages {
             return;
         }
         ENTRIES.put(Long.valueOf(messageId), new Remembered(packet,
-                entry.tab, entry.showcaseIds, entry.edited));
+                entry.tab, entry.showcaseIds, entry.edited, entry.kind,
+                entry.body));
     }
 
     /**
@@ -119,13 +133,23 @@ final class ClientChatMessages {
         final int[] showcaseIds;
         /** Whether the message has been edited; its line says so. */
         final boolean edited;
+        /** How the body was shown. */
+        final ChatBodyKind kind;
+        /**
+         * The body's own component for a line shown from one, else null.
+         * Never put on a line itself: each rebuild takes a copy.
+         */
+        final IChatComponent body;
 
         private Remembered(LostTalesChatMessagePacket packet, ChatTab tab,
-                           int[] showcaseIds, boolean edited) {
+                           int[] showcaseIds, boolean edited,
+                           ChatBodyKind kind, IChatComponent body) {
             this.packet = packet;
             this.tab = tab;
             this.showcaseIds = showcaseIds;
             this.edited = edited;
+            this.kind = kind == null ? ChatBodyKind.MESSAGE : kind;
+            this.body = body;
         }
     }
 }

@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.nbt.NBTTagCompound;
@@ -36,7 +37,16 @@ import net.minecraftforge.common.util.Constants;
 public final class ChatHistoryNbtCodec {
 
     public static final int CURRENT_ROOT_DATA_VERSION = 1;
-    public static final int CURRENT_ENTRY_DATA_VERSION = 1;
+    /**
+     * The newest entry layout this codec reads. An entry is written at
+     * the oldest layout that holds it: {@link #PLAIN_ENTRY_DATA_VERSION}
+     * without reactions, this with them, so an older build still reads
+     * every line nobody reacted to and keeps a reacted line read-only
+     * rather than dropping its reactions.
+     */
+    public static final int CURRENT_ENTRY_DATA_VERSION = 2;
+    /** An entry with no reactions. */
+    static final int PLAIN_ENTRY_DATA_VERSION = 1;
     public static final int CURRENT_QUARANTINE_DATA_VERSION = 1;
     /** Safety bound on kept lines read back; entries past it are quarantined. */
     public static final int MAX_ENTRIES = ChatHistory.MAX_TOTAL;
@@ -64,6 +74,11 @@ public final class ChatHistoryNbtCodec {
     private static final String TAG_AUDIENCE_PARTY = "Party";
     private static final String TAG_AUDIENCE_FACTION = "Faction";
     private static final String TAG_AUDIENCE_GATED = "Gated";
+    private static final String TAG_REACTIONS = "Reactions";
+    private static final String TAG_REACTION_EMOJI = "Emoji";
+    private static final String TAG_REACTION_REACTORS = "Reactors";
+    private static final String TAG_REACTOR_ID = "Id";
+    private static final String TAG_REACTOR_NAME = "Name";
     private static final String TAG_UUID_MOST = "Most";
     private static final String TAG_UUID_LEAST = "Least";
 
@@ -180,7 +195,9 @@ public final class ChatHistoryNbtCodec {
 
     static NBTTagCompound writeEntry(ChatHistory.Entry entry) {
         NBTTagCompound tag = new NBTTagCompound();
-        tag.setInteger(TAG_DATA_VERSION, CURRENT_ENTRY_DATA_VERSION);
+        boolean reacted = entry.reactions != null && !entry.reactions.isEmpty();
+        tag.setInteger(TAG_DATA_VERSION, reacted ? CURRENT_ENTRY_DATA_VERSION
+                : PLAIN_ENTRY_DATA_VERSION);
         tag.setLong(TAG_MESSAGE_ID, entry.forOthers.getMessageId());
         if (entry.authorId != null) {
             writeUuid(tag, TAG_AUTHOR_UUID, entry.authorId);
@@ -207,7 +224,73 @@ public final class ChatHistoryNbtCodec {
                 ? "" : entry.audience.factionId());
         audience.setBoolean(TAG_AUDIENCE_GATED, entry.audience.isGated());
         tag.setTag(TAG_AUDIENCE, audience);
+        if (reacted) {
+            tag.setTag(TAG_REACTIONS, writeReactions(entry.reactions));
+        }
         return tag;
+    }
+
+    /** Each emoji, and under it each reactor by id with the name they reacted as. */
+    private static NBTTagList writeReactions(ChatReactions reactions) {
+        NBTTagList kinds = new NBTTagList();
+        for (Map.Entry<String, Map<UUID, String>> kind
+                : reactions.snapshot().entrySet()) {
+            NBTTagCompound kindTag = new NBTTagCompound();
+            kindTag.setString(TAG_REACTION_EMOJI, kind.getKey());
+            NBTTagList reactors = new NBTTagList();
+            for (Map.Entry<UUID, String> reactor : kind.getValue().entrySet()) {
+                NBTTagCompound reactorTag = new NBTTagCompound();
+                writeUuid(reactorTag, TAG_REACTOR_ID, reactor.getKey());
+                reactorTag.setString(TAG_REACTOR_NAME, reactor.getValue());
+                reactors.appendTag(reactorTag);
+            }
+            kindTag.setTag(TAG_REACTION_REACTORS, reactors);
+            kinds.appendTag(kindTag);
+        }
+        return kinds;
+    }
+
+    /**
+     * The reactions an entry was written with, or null when they cannot
+     * be read back whole: a list of the wrong kind, an emoji the
+     * registry does not know, a reactor without an id, one named twice
+     * under one emoji, or more than the bounds allow. Such an entry is
+     * quarantined whole rather than kept with part of its reactions.
+     */
+    private static ChatReactions readReactions(NBTTagCompound raw) {
+        ChatReactions reactions = new ChatReactions();
+        if (!raw.hasKey(TAG_REACTIONS)) {
+            return reactions;
+        }
+        if (!raw.hasKey(TAG_REACTIONS, Constants.NBT.TAG_LIST)) {
+            return null;
+        }
+        NBTTagList kinds = raw.getTagList(TAG_REACTIONS, Constants.NBT.TAG_COMPOUND);
+        if (kinds.tagCount() > ChatReactions.MAX_KINDS) {
+            return null;
+        }
+        for (int kindIndex = 0; kindIndex < kinds.tagCount(); kindIndex++) {
+            NBTTagCompound kind = kinds.getCompoundTagAt(kindIndex);
+            String emoji = kind.getString(TAG_REACTION_EMOJI);
+            if (!kind.hasKey(TAG_REACTION_REACTORS, Constants.NBT.TAG_LIST)) {
+                return null;
+            }
+            NBTTagList reactors = kind.getTagList(TAG_REACTION_REACTORS,
+                    Constants.NBT.TAG_COMPOUND);
+            if (reactors.tagCount() == 0) {
+                return null;
+            }
+            for (int index = 0; index < reactors.tagCount(); index++) {
+                NBTTagCompound reactor = reactors.getCompoundTagAt(index);
+                UUID id = reactor.hasKey(TAG_REACTOR_ID + TAG_UUID_MOST)
+                        ? readUuid(reactor, TAG_REACTOR_ID) : null;
+                if (id == null || !reactions.set(emoji, id,
+                        reactor.getString(TAG_REACTOR_NAME), true)) {
+                    return null;
+                }
+            }
+        }
+        return reactions;
     }
 
     private static EntryReadResult readEntry(NBTTagCompound raw) {
@@ -285,10 +368,14 @@ public final class ChatHistoryNbtCodec {
                 audienceTag.getBoolean(TAG_AUDIENCE_GATED));
         UUID authorId = raw.hasKey(TAG_AUTHOR_UUID + TAG_UUID_MOST)
                 ? readUuid(raw, TAG_AUTHOR_UUID) : null;
+        ChatReactions reactions = readReactions(raw);
+        if (reactions == null) {
+            return EntryReadResult.failure("invalid_reactions");
+        }
         return EntryReadResult.success(new ChatHistory.Entry(authorId,
                 author.trim(), raw.getString(TAG_EXCERPT), new HashSet<UUID>(seenBy),
                 channelId, forSender, forOthers, audience,
-                raw.getLong(TAG_TIMESTAMP)));
+                raw.getLong(TAG_TIMESTAMP), reactions));
     }
 
     /** The line's wire bytes; what the save keeps and every client already reads. */

@@ -47,6 +47,7 @@ final class ChatScreenMenus {
             Keyboard.KEY_LCONTROL, Keyboard.KEY_LSHIFT, Keyboard.KEY_A };
     private static final String ENTRY_MESSAGE = "message_player";
     private static final String ENTRY_REPLY = "reply";
+    private static final String ENTRY_REACT = "react";
     private static final String ENTRY_COPY = "copy";
     static final String ENTRY_COPY_LINK = "copy_link";
     private static final String ENTRY_EDIT = "edit";
@@ -137,6 +138,8 @@ final class ChatScreenMenus {
     private long restoreRefreshedNanos;
     /** A command a chosen row asked for, handed to the screen with the click. */
     private String pendingCommand;
+    /** A message the menu was asked to react to, until the screen takes it. */
+    private long pendingReactionTarget = ChatMessageIds.NONE;
 
     ChatScreenMenus(ChatTabActions tabActions, ChatComposer composer,
                     ChatNoticeSink notices) {
@@ -187,15 +190,20 @@ final class ChatScreenMenus {
         this.popup.close();
     }
 
-    boolean contains(int mouseX, int mouseY) {
+    boolean contains(double mouseX, double mouseY) {
         return this.popup.contains(mouseX, mouseY);
+    }
+
+    /** The row of the open menu under the point that does something, or null. */
+    ChatPopupMenu.Entry entryAt(double mouseX, double mouseY) {
+        return this.popup.entryAt(mouseX, mouseY);
     }
 
     void scrollBy(double rows) {
         this.popup.scrollBy(rows);
     }
 
-    ChatPopupMenu.Entry lockControlAt(int mouseX, int mouseY) {
+    ChatPopupMenu.Entry lockControlAt(double mouseX, double mouseY) {
         return this.popup.lockControlAt(mouseX, mouseY);
     }
 
@@ -203,7 +211,8 @@ final class ChatScreenMenus {
         this.popup.registerRegion(regions);
     }
 
-    void draw(ChatPointerRegions regions, int mouseX, int mouseY) {
+    /** Draws the open menu; the pointer is {@link ChatHover#AWAY} unless the menu has it. */
+    void draw(ChatPointerRegions regions, double mouseX, double mouseY) {
         this.popup.draw(this.font, regions, mouseX, mouseY);
     }
 
@@ -228,7 +237,7 @@ final class ChatScreenMenus {
      * the menu is showing it. A press outside closes the menu and goes
      * on to whatever is under it, told which menu it closed.
      */
-    Click click(int mouseX, int mouseY, int button) {
+    Click click(double mouseX, double mouseY, int button) {
         if (!this.popup.isOpen()) {
             return new Click(false, "", null);
         }
@@ -767,9 +776,14 @@ final class ChatScreenMenus {
         if (text.length() == 0) {
             return false;
         }
+        // The pointer's exact position, the one the hover shaded the
+        // message by, so the menu is about the message that was lit.
         LostTalesChatOverlayRenderer.Band band =
                 LostTalesChatOverlayRenderer.bandAt(this.mc,
-                        mouseX + 0.5F, mouseY + 0.5F);
+                        (float)ChatWindowPlacement.preciseMouseX(this.mc,
+                                this.screenWidth),
+                        (float)ChatWindowPlacement.preciseMouseY(this.mc,
+                                this.screenHeight));
         int chatLineId = band == null || band.lines == null
                 || band.viewIndex >= band.lines.size()
                 || band.lines.get(band.viewIndex) == null
@@ -805,6 +819,12 @@ final class ChatScreenMenus {
                 new ArrayList<ChatPopupMenu.Entry>();
         // Any line in a tab that takes messages can be answered: one
         // the server named by its id, any other by its words.
+        // A message the server named can be reacted to, as on Discord.
+        if (LostTalesChatPresentation.isReactable(chatLineId)) {
+            entries.add(new ChatPopupMenu.Entry(ENTRY_REACT,
+                    StatCollector.translateToLocal(
+                            "gui.losttales.chat.message.react")));
+        }
         if (LostTalesChatPresentation.isRepliable(chatLineId)) {
             entries.add(new ChatPopupMenu.Entry(ENTRY_REPLY,
                     StatCollector.translateToLocal(
@@ -851,6 +871,17 @@ final class ChatScreenMenus {
     }
 
     /**
+     * The message the menu's Add Reaction was chosen for, handed over
+     * once: the screen opens the emoji picker on it. NONE when nothing
+     * is waiting.
+     */
+    long takeReactionTarget() {
+        long target = this.pendingReactionTarget;
+        this.pendingReactionTarget = ChatMessageIds.NONE;
+        return target;
+    }
+
+    /**
      * The link that names the message drawn on {@code chatLineId} —
      * {@code #Channel/<server id>} — or null for a line the server never
      * named, a whisper, or a channel a link cannot spell.
@@ -869,11 +900,12 @@ final class ChatScreenMenus {
      * opens only over somebody who can be addressed — not an NPC, not a
      * role mention, and not yourself. A Discord member can be ignored
      * but not whispered to, so their menu offers the one entry; the
-     * bridge's own nameless id is nobody and opens nothing.
+     * bridge's own nameless id is nobody and opens nothing. The person
+     * is the one the screen's hit test found under the pointer, so the
+     * menu opens over exactly the pixels the card answers for.
      */
-    boolean openPlayerPopup(int mouseX, int mouseY) {
-        LostTalesChatHoverCard.Target person = LostTalesChatHoverCard
-                .personAt(this.mc, mouseX + 0.5F, mouseY + 0.5F);
+    boolean openPlayerPopup(LostTalesChatHoverCard.Target person,
+                            int mouseX, int mouseY) {
         if (person == null || person.role != null || person.npcIdentity
                 || person.playerId == null
                 || person.accountName.length() == 0
@@ -1275,7 +1307,9 @@ final class ChatScreenMenus {
                 this.pendingCommand = "/losttales chat unmute " + muteTarget();
             }
         } else if (POPUP_MESSAGE.equals(this.popup.kind())) {
-            if (ENTRY_REPLY.equals(entry.id)) {
+            if (ENTRY_REACT.equals(entry.id)) {
+                this.pendingReactionTarget = this.menuMessageId;
+            } else if (ENTRY_REPLY.equals(entry.id)) {
                 startReply();
             } else if (ENTRY_EDIT.equals(entry.id)) {
                 startEdit();

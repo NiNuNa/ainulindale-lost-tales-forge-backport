@@ -1,5 +1,7 @@
 package com.ninuna.losttales.gui.screen.party;
 
+import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
+import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.client.party.ClientPartyDisplayNames;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
@@ -29,7 +31,8 @@ import org.lwjgl.input.Mouse;
  * The screen renders only synchronized snapshots and never mutates local party
  * state optimistically. Every action is revalidated by the server.
  */
-public final class LostTalesPartyManagementGui extends GuiScreen {
+public final class LostTalesPartyManagementGui extends GuiScreen
+        implements LostTalesPointerInteractable {
 
     private static final int BUTTON_BACK = 1;
     private static final int BUTTON_REFRESH = 2;
@@ -722,6 +725,7 @@ public final class LostTalesPartyManagementGui extends GuiScreen {
 
         List<PartyMemberSnapshot> members = party.getMembers();
         int visibleRows = getVisibleRowCount();
+        int hoveredIndex = rowAt(snapshot, mouseX, mouseY);
         for (int visible = 0; visible < visibleRows; visible++) {
             int index = this.membersScroll + visible;
             if (index >= members.size()) {
@@ -731,8 +735,7 @@ public final class LostTalesPartyManagementGui extends GuiScreen {
             int rowY = this.listY + visible * ROW_HEIGHT;
             boolean selected = member.getCharacterId().equals(
                     this.selectedMemberCharacterId);
-            boolean hovered = isInside(mouseX, mouseY,
-                    this.listX, rowY, this.listWidth, ROW_HEIGHT - 2);
+            boolean hovered = index == hoveredIndex;
             LostTalesSkyrimUiStyle.drawSelectionRow(
                     this.listX, rowY, this.listWidth,
                     ROW_HEIGHT - 2, selected, hovered);
@@ -800,6 +803,7 @@ public final class LostTalesPartyManagementGui extends GuiScreen {
             return;
         }
         int visibleRows = getVisibleRowCount();
+        int hoveredIndex = rowAt(snapshot, mouseX, mouseY);
         long now = System.currentTimeMillis();
         for (int visible = 0; visible < visibleRows; visible++) {
             int index = this.invitationsScroll + visible;
@@ -812,8 +816,7 @@ public final class LostTalesPartyManagementGui extends GuiScreen {
             boolean selected = invitation.getInvitationId().equals(
                     this.selectedInvitationId)
                     && entry.incoming == this.selectedInvitationIncoming;
-            boolean hovered = isInside(mouseX, mouseY,
-                    this.listX, rowY, this.listWidth, ROW_HEIGHT - 2);
+            boolean hovered = index == hoveredIndex;
             LostTalesSkyrimUiStyle.drawSelectionRow(
                     this.listX, rowY, this.listWidth,
                     ROW_HEIGHT - 2, selected, hovered);
@@ -904,6 +907,7 @@ public final class LostTalesPartyManagementGui extends GuiScreen {
             return;
         }
         int visibleRows = getVisibleRowCount();
+        int hoveredIndex = rowAt(snapshot, mouseX, mouseY);
         for (int visible = 0; visible < visibleRows; visible++) {
             int index = this.inviteTargetsScroll + visible;
             if (index >= targets.size()) {
@@ -913,8 +917,7 @@ public final class LostTalesPartyManagementGui extends GuiScreen {
             int rowY = this.listY + visible * ROW_HEIGHT;
             boolean selected = target.getOwnerId().equals(
                     this.selectedInviteOwnerId);
-            boolean hovered = isInside(mouseX, mouseY,
-                    this.listX, rowY, this.listWidth, ROW_HEIGHT - 2);
+            boolean hovered = index == hoveredIndex;
             LostTalesSkyrimUiStyle.drawSelectionRow(
                     this.listX, rowY, this.listWidth,
                     ROW_HEIGHT - 2, selected, hovered);
@@ -986,39 +989,101 @@ public final class LostTalesPartyManagementGui extends GuiScreen {
     protected void mouseClicked(int mouseX, int mouseY, int button) {
         if (button == 0 && isInside(mouseX, mouseY,
                 this.listX, this.listY, this.listWidth, this.listHeight)) {
-            int row = (mouseY - this.listY) / ROW_HEIGHT;
             PartyStateSnapshot snapshot = getSnapshot();
             if (snapshot != null) {
-                if (this.tab == Tab.MEMBERS && snapshot.getParty() != null) {
-                    int index = this.membersScroll + row;
-                    if (index >= 0
-                            && index < snapshot.getParty().getMemberCount()) {
-                        this.selectedMemberCharacterId = snapshot.getParty()
-                                .getMembers().get(index).getCharacterId();
-                    }
-                } else if (this.tab == Tab.INVITATIONS) {
-                    List<InvitationEntry> entries =
-                            getInvitationEntries(snapshot);
-                    int index = this.invitationsScroll + row;
-                    if (index >= 0 && index < entries.size()) {
-                        InvitationEntry entry = entries.get(index);
-                        this.selectedInvitationId =
-                                entry.invitation.getInvitationId();
-                        this.selectedInvitationIncoming = entry.incoming;
-                    }
-                } else if (this.tab == Tab.INVITE) {
-                    int index = this.inviteTargetsScroll + row;
-                    if (index >= 0
-                            && index < snapshot.getInviteTargets().size()) {
-                        this.selectedInviteOwnerId = snapshot
-                                .getInviteTargets().get(index).getOwnerId();
-                    }
+                int index = rowAt(snapshot, mouseX, mouseY);
+                if (index >= 0) {
+                    selectRow(snapshot, index);
                 }
                 updateButtons();
             }
             return;
         }
         super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    /**
+     * The same hit tests a click takes, in the same order: the list takes
+     * every click inside it, so only a row counts there. The point is the
+     * one the screen's own draw and clicks see. While the party cache is
+     * not ready, rows still drawn from its snapshot light under the
+     * pointer but take no click, so they keep the arrow.
+     */
+    @Override
+    public boolean isPointerOverInteractable(int x, int y) {
+        if (isInside(x, y, this.listX, this.listY,
+                this.listWidth, this.listHeight)) {
+            return rowAt(getSnapshot(), x, y) >= 0;
+        }
+        return LostTalesGuiPointerTargets.isOverEnabledButton(this, x, y);
+    }
+
+    /**
+     * The index, in the open tab's list, of the row under the point, or -1.
+     * Only a drawn row answers: none while the tab shows a message in place
+     * of its list, and neither the gap under a row nor the space below the
+     * last one.
+     */
+    private int rowAt(PartyStateSnapshot snapshot, int mouseX, int mouseY) {
+        if (!isInside(mouseX, mouseY, this.listX, this.listY,
+                this.listWidth, this.listHeight)) {
+            return -1;
+        }
+        int row = (mouseY - this.listY) / ROW_HEIGHT;
+        if (row >= getVisibleRowCount()
+                || mouseY - this.listY - row * ROW_HEIGHT >= ROW_HEIGHT - 2) {
+            return -1;
+        }
+        int index = getTabScroll() + row;
+        return index < getShownRowCount(snapshot) ? index : -1;
+    }
+
+    private int getTabScroll() {
+        if (this.tab == Tab.MEMBERS) {
+            return this.membersScroll;
+        }
+        if (this.tab == Tab.INVITATIONS) {
+            return this.invitationsScroll;
+        }
+        return this.inviteTargetsScroll;
+    }
+
+    /**
+     * How many entries the open tab lists. None when it shows a message in
+     * their place; the conditions are the early returns of drawMembers,
+     * drawInvitations and drawInviteTargets.
+     */
+    private int getShownRowCount(PartyStateSnapshot snapshot) {
+        if (snapshot == null || !snapshot.isAvailable()) {
+            return 0;
+        }
+        PartySnapshot party = snapshot.getParty();
+        if (this.tab == Tab.MEMBERS) {
+            return party == null ? 0 : party.getMembers().size();
+        }
+        if (this.tab == Tab.INVITATIONS) {
+            return getInvitationEntries(snapshot).size();
+        }
+        if (party == null || !party.isLeader(snapshot.getActiveCharacterId())
+                || party.isFull()) {
+            return 0;
+        }
+        return snapshot.getInviteTargets().size();
+    }
+
+    /** Selects the open tab's entry at an index {@link #rowAt} returned. */
+    private void selectRow(PartyStateSnapshot snapshot, int index) {
+        if (this.tab == Tab.MEMBERS) {
+            this.selectedMemberCharacterId = snapshot.getParty()
+                    .getMembers().get(index).getCharacterId();
+        } else if (this.tab == Tab.INVITATIONS) {
+            InvitationEntry entry = getInvitationEntries(snapshot).get(index);
+            this.selectedInvitationId = entry.invitation.getInvitationId();
+            this.selectedInvitationIncoming = entry.incoming;
+        } else {
+            this.selectedInviteOwnerId = snapshot.getInviteTargets()
+                    .get(index).getOwnerId();
+        }
     }
 
     @Override

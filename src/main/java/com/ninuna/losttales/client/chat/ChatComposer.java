@@ -210,7 +210,7 @@ final class ChatComposer {
     }
 
     /** Whether the point lies on the chip's cross as drawn this frame. */
-    boolean chipContains(int x, int y) {
+    boolean chipContains(double x, double y) {
         return this.chipRight > this.chipLeft
                 && x >= this.chipLeft && x < this.chipRight
                 && y >= this.chipTop && y < this.chipBottom;

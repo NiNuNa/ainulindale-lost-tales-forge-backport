@@ -1,5 +1,7 @@
 package com.ninuna.losttales.chat;
 
+import java.util.UUID;
+
 /**
  * The message a line is a reply to, as its recipients are shown it.
  *
@@ -31,18 +33,74 @@ public final class ChatReplyReference {
             (MAX_EXCERPT_CHARACTERS + 3) * 3;
     /** What stands in for the text an excerpt had to cut. */
     private static final String ELLIPSIS = "...";
+    /** The quoted sender's skin id, bounded as the message packet bounds its own. */
+    public static final int MAX_SKIN_ID_BYTES = 128;
 
     private final long messageId;
     private final String author;
     private final String excerpt;
     private final int authorColor;
+    /**
+     * The sender the quoted line wore, for its head: the sender id,
+     * whether the line wore the account, and the skin it was drawn
+     * with. Null, false and empty for a quote told none.
+     */
+    private final UUID senderId;
+    private final boolean accountLine;
+    private final String skinId;
 
     private ChatReplyReference(long messageId, String author,
                                String excerpt, int authorColor) {
+        this(messageId, author, excerpt, authorColor, null, false, "");
+    }
+
+    private ChatReplyReference(long messageId, String author,
+                               String excerpt, int authorColor,
+                               UUID senderId, boolean accountLine,
+                               String skinId) {
         this.messageId = messageId;
         this.author = author == null ? "" : author;
         this.excerpt = excerpt == null ? "" : excerpt;
         this.authorColor = authorColor;
+        this.senderId = senderId;
+        this.accountLine = accountLine;
+        this.skinId = skinId == null ? "" : skinId;
+    }
+
+    /**
+     * The same quote wearing the quoted sender's head: what the server
+     * adds from its record of the line, so the quote is drawn with the
+     * face the line was, whether or not the reader still holds it. A
+     * quote of nothing stays nothing.
+     */
+    public ChatReplyReference withHead(UUID senderId, boolean accountLine,
+                                       String skinId) {
+        if (!exists() || senderId == null) {
+            return this;
+        }
+        return new ChatReplyReference(this.messageId, this.author,
+                this.excerpt, this.authorColor, senderId, accountLine,
+                skinId);
+    }
+
+    /** Whether the quote was told whose head to wear. */
+    public boolean hasHead() {
+        return this.senderId != null;
+    }
+
+    /** The quoted sender's id, or null for a quote told no head. */
+    public UUID getSenderId() {
+        return this.senderId;
+    }
+
+    /** Whether the quoted line wore the account rather than a character. */
+    public boolean isAccountLine() {
+        return this.accountLine;
+    }
+
+    /** The skin the quoted line's head was drawn with; empty for the account's own. */
+    public String getSkinId() {
+        return this.skinId;
     }
 
     /**

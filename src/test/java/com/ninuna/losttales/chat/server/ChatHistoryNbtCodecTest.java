@@ -200,6 +200,63 @@ public final class ChatHistoryNbtCodecTest {
         assertEquals(0, ChatHistory.restore(result.getEntries()));
     }
 
+    @Test
+    public void reactionsRoundTripAndOnlyAReactedLineWearsTheNewerLayout() {
+        long plain = ChatMessageIdAllocator.next();
+        ChatHistory.record(plain, ALICE, "Aldric", null,
+                line(plain, ChatChannel.ALL, ALICE, "hail", ""),
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        long reacted = ChatMessageIdAllocator.next();
+        ChatHistory.record(reacted, ALICE, "Aldric", null,
+                line(reacted, ChatChannel.ALL, ALICE, "well met", ""),
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        ChatHistory.Requester bob = new ChatHistory.Requester(BOB, "", 0L,
+                null, EVERY_CHANNEL);
+        ChatHistory.react(reacted, bob, BOB, "Beren", "smile", true);
+        ChatHistory.react(reacted, null,
+                LostTalesChatMessagePacket.discordSenderId("42"), "Nils",
+                "joy", true);
+
+        NBTTagCompound written = new NBTTagCompound();
+        ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
+                Collections.<NBTTagCompound>emptyList());
+        NBTTagList entries = written.getTagList("Entries",
+                Constants.NBT.TAG_COMPOUND);
+        assertEquals(1, entries.getCompoundTagAt(0).getInteger("DataVersion"));
+        assertEquals(ChatHistoryNbtCodec.CURRENT_ENTRY_DATA_VERSION,
+                entries.getCompoundTagAt(1).getInteger("DataVersion"));
+
+        ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
+        assertFalse(result.isReadOnly());
+        assertTrue(result.getQuarantineEntriesCopy().isEmpty());
+        ChatHistory.clear();
+        ChatHistory.restore(result.getEntries());
+        assertTrue(ChatHistory.reactionsFor(reacted, BOB).find("smile").mine);
+        assertEquals("Nils",
+                ChatHistory.reactionsFor(reacted, BOB).find("joy").names.get(0));
+        assertTrue(ChatHistory.reactionsFor(plain, BOB).isEmpty());
+    }
+
+    @Test
+    public void unreadableReactionsQuarantineTheLineWhole() {
+        long reacted = ChatMessageIdAllocator.next();
+        ChatHistory.record(reacted, ALICE, "Aldric", null,
+                line(reacted, ChatChannel.ALL, ALICE, "well met", ""),
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        ChatHistory.react(reacted, new ChatHistory.Requester(BOB, "", 0L,
+                null, EVERY_CHANNEL), BOB, "Beren", "smile", true);
+        NBTTagCompound written = new NBTTagCompound();
+        ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
+                Collections.<NBTTagCompound>emptyList());
+        written.getTagList("Entries", Constants.NBT.TAG_COMPOUND)
+                .getCompoundTagAt(0).getTagList("Reactions",
+                        Constants.NBT.TAG_COMPOUND)
+                .getCompoundTagAt(0).setString("Emoji", "not_an_emoji");
+        ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
+        assertTrue(result.getEntries().isEmpty());
+        assertEquals(1, result.getQuarantineEntriesCopy().size());
+    }
+
     private static LostTalesChatMessagePacket line(long id, ChatChannel channel,
                                                    UUID author, String text,
                                                    String partner) {

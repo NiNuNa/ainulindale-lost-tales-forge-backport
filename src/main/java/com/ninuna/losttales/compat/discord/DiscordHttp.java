@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.Charset;
 
 /**
@@ -133,6 +134,37 @@ final class DiscordHttp {
             throws IOException {
         return exchange(open(webhookMessageUrl(webhookUrl, messageId),
                 "DELETE"), null);
+    }
+
+    /**
+     * Puts the bot's own reaction on a message; Discord answers 204. The
+     * bot needs Add Reactions and Read Message History in the channel.
+     * A PUT with an empty body, so Discord is told its length is zero.
+     */
+    static Reply putOwnReaction(String botToken, String channelId,
+                                String messageId, String emoji)
+            throws IOException {
+        HttpURLConnection connection = open(
+                ownReactionUrl(channelId, messageId, emoji), "PUT");
+        connection.setRequestProperty("Authorization", "Bot " + botToken);
+        return exchange(connection, "");
+    }
+
+    /** Takes the bot's own reaction off a message; Discord answers 204. */
+    static Reply deleteOwnReaction(String botToken, String channelId,
+                                   String messageId, String emoji)
+            throws IOException {
+        HttpURLConnection connection = open(
+                ownReactionUrl(channelId, messageId, emoji), "DELETE");
+        connection.setRequestProperty("Authorization", "Bot " + botToken);
+        return exchange(connection, null);
+    }
+
+    /** The bot's own reaction with a Unicode emoji, the emoji percent-encoded. */
+    static String ownReactionUrl(String channelId, String messageId,
+                                 String emoji) throws IOException {
+        return API_BASE + "/channels/" + channelId + "/messages/" + messageId
+                + "/reactions/" + URLEncoder.encode(emoji, "UTF-8") + "/@me";
     }
 
     /** One message of the webhook, any query on the base URL set aside. */

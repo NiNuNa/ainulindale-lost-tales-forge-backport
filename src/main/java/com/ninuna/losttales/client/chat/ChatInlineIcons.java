@@ -77,10 +77,17 @@ final class ChatInlineIcons {
      * about where the next glyph starts.
      */
     static int declaredWidth(net.minecraft.util.IChatComponent part) {
-        ChatHeadMarker.Data head = ChatHeadMarker.decode(part);
+        ChatHeadMarker.Data head = ChatHeadMarker.headOf(part);
         if (head != null) {
             return head.mark() != null
                     ? MARK_HEAD_SLOT_WIDTH : HEAD_SLOT_WIDTH;
+        }
+        if (ChatReplyMarker.isIconSlot(part)) {
+            return ChatReplyMarker.ICON_SLOT_WIDTH;
+        }
+        int chip = ChatReactionMarker.widthOf(part);
+        if (chip >= 0) {
+            return chip;
         }
         return ChatSpacerMarker.decode(part);
     }

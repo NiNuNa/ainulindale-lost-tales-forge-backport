@@ -12,6 +12,8 @@ import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterRaceAttributes;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
+import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
+import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
@@ -24,7 +26,8 @@ import java.util.Collections;
 import java.util.List;
 
 /** Browsable server-synchronized lore-character definitions and ownership. */
-public final class LostTalesLoreCharactersGui extends GuiScreen {
+public final class LostTalesLoreCharactersGui extends GuiScreen
+        implements LostTalesPointerInteractable {
 
     private static final int BUTTON_ACTION = 1;
     private static final int BUTTON_SLOT_PREVIOUS = 2;
@@ -193,15 +196,14 @@ public final class LostTalesLoreCharactersGui extends GuiScreen {
 
     private void drawList(int mouseX, int mouseY) {
         List<LoreCharacterSummary> characters = characters();
+        int hoveredIndex = rowAt(mouseX, mouseY);
         for (int row = 0; row < this.visibleRows; row++) {
             int index = this.scrollOffset + row;
             int y = this.listY + row * ROW_HEIGHT;
             if (index >= characters.size()) break;
             LoreCharacterSummary character = characters.get(index);
             boolean selected = index == this.selectedIndex;
-            boolean hovered = mouseX >= this.listX
-                    && mouseX < this.listX + this.listWidth
-                    && mouseY >= y && mouseY < y + ROW_HEIGHT - 2;
+            boolean hovered = index == hoveredIndex;
             Gui.drawRect(this.listX, y, this.listX + this.listWidth,
                     y + ROW_HEIGHT - 2,
                     selected ? LostTalesSkyrimUiStyle.PANEL_SELECTED
@@ -300,13 +302,9 @@ public final class LostTalesLoreCharactersGui extends GuiScreen {
     }
 
     @Override protected void mouseClicked(int mouseX, int mouseY, int button) {
-        if (button == 0 && mouseX >= this.listX
-                && mouseX < this.listX + this.listWidth
-                && mouseY >= this.listY
-                && mouseY < this.listY + this.visibleRows * ROW_HEIGHT) {
-            int index = this.scrollOffset
-                    + (mouseY - this.listY) / ROW_HEIGHT;
-            if (index >= 0 && index < characters().size()) {
+        if (button == 0) {
+            int index = rowAt(mouseX, mouseY);
+            if (index >= 0) {
                 this.selectedIndex = index;
                 this.status = "";
                 updateButtons();
@@ -314,6 +312,34 @@ public final class LostTalesLoreCharactersGui extends GuiScreen {
             }
         }
         super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    /**
+     * The index of the character whose row is under the point, or -1.
+     * Only a drawn row answers; the gap under each row and the list's
+     * empty space below the last entry do not.
+     */
+    private int rowAt(int mouseX, int mouseY) {
+        if (mouseX < this.listX || mouseX >= this.listX + this.listWidth
+                || mouseY < this.listY) {
+            return -1;
+        }
+        int row = (mouseY - this.listY) / ROW_HEIGHT;
+        if (row >= this.visibleRows
+                || mouseY - this.listY - row * ROW_HEIGHT >= ROW_HEIGHT - 2) {
+            return -1;
+        }
+        int index = this.scrollOffset + row;
+        return index < characters().size() ? index : -1;
+    }
+
+    /**
+     * The same hit tests a click takes, at the point the screen's own
+     * draw and clicks see.
+     */
+    @Override public boolean isPointerOverInteractable(int x, int y) {
+        return rowAt(x, y) >= 0
+                || LostTalesGuiPointerTargets.isOverEnabledButton(this, x, y);
     }
 
     @Override public void handleMouseInput() {

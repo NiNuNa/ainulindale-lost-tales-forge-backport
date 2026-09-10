@@ -92,6 +92,11 @@ public final class CreatorToggle extends CreatorControl {
     }
 
     @Override
+    public boolean isPointerOverAction(int mouseX, int mouseY) {
+        return contains(mouseX, mouseY);
+    }
+
+    @Override
     public boolean keyTyped(char typedChar, int keyCode) {
         // Enter is the screen's, to confirm from any page.
         if (keyCode == Keyboard.KEY_SPACE

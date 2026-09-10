@@ -87,7 +87,7 @@ final class ChatPointerRegions {
     }
 
     /** Whether a screen-space point is inside any registered rectangle. */
-    boolean contains(int x, int y) {
+    boolean contains(double x, double y) {
         return contains(x, y, false);
     }
 
@@ -96,11 +96,11 @@ final class ChatPointerRegions {
      * windows: the pickers, the completion lists, the settings menu and
      * the input bar group.
      */
-    boolean containsOverlay(int x, int y) {
+    boolean containsOverlay(double x, double y) {
         return contains(x, y, true);
     }
 
-    private boolean contains(int x, int y, boolean overlaysOnly) {
+    private boolean contains(double x, double y, boolean overlaysOnly) {
         for (int index = 0; index < this.count; index++) {
             if (overlaysOnly && this.window[index]) {
                 continue;

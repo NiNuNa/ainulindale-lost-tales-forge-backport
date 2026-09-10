@@ -146,18 +146,6 @@ public final class LostTalesMapCursor {
     private static boolean held;
     /** The strip's width, measured from the file; 0 until read. */
     private static int measuredWidth;
-    /** A pose asked for by a screen this frame; spent by the next draw. */
-    private static Pose requestedPose;
-
-    /**
-     * Asks for a pose for the coming frame — a screen that knows better
-     * than "is this clickable" says so here. Spent by the next
-     * {@link #render}, so a frame that does not ask keeps the plain
-     * poses. A pose the sheet has no sprite for is ignored.
-     */
-    public static void requestPose(Pose pose) {
-        requestedPose = pose;
-    }
 
     private LostTalesMapCursor() {}
 
@@ -239,18 +227,21 @@ public final class LostTalesMapCursor {
         return held;
     }
 
-    /**
-     * Draws the pointer, last of everything, at the GUI's hit-test position.
-     *
-     * @param interactable whether the thing under the pointer answers to a
-     *                     click, which is the only thing that decides the pose
-     */
+    /** As below: the hand when the thing under the pointer answers to a click. */
     public static void render(Minecraft minecraft, int mouseX, int mouseY,
                               boolean interactable) {
-        Pose asked = requestedPose;
-        // Spent whether or not it is drawn, so a pose asked for by one
-        // frame can never show up on a later one.
-        requestedPose = null;
+        render(minecraft, mouseX, mouseY,
+                interactable ? Pose.HAND : Pose.ARROW);
+    }
+
+    /**
+     * Draws the pointer, last of everything, at the GUI's hit-test
+     * position, in the pose the screen's own answer about what is under
+     * the pointer chose. A pose the sheet has no sprite for is drawn as
+     * the arrow.
+     */
+    public static void render(Minecraft minecraft, int mouseX, int mouseY,
+                              Pose asked) {
         if (minecraft == null || minecraft.currentScreen == null
                 || minecraft.getTextureManager() == null) {
             release();
@@ -264,7 +255,7 @@ public final class LostTalesMapCursor {
         }
         int sheetWidth = sheetWidth(minecraft);
         Pose pose = asked != null && asked.fitsSheet(sheetWidth)
-                ? asked : (interactable ? Pose.HAND : Pose.ARROW);
+                ? asked : Pose.ARROW;
         // The GUI's mouse coordinate is a whole GUI pixel, but the raw
         // pointer moves display pixel by display pixel — the same
         // granularity a dragged chat window moves at. Drawn at the GUI
