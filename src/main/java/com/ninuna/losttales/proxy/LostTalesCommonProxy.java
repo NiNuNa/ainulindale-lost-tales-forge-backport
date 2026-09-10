@@ -110,6 +110,7 @@ import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.server.ChatConsoleCommandHandler;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.server.ChatCommandContexts;
 import com.ninuna.losttales.chat.server.ChatConsoleStream;
 import com.ninuna.losttales.chat.server.ChatHistory;
 import com.ninuna.losttales.chat.server.LostTalesChatRoleRosterWatcher;
@@ -365,6 +366,7 @@ public class LostTalesCommonProxy {
         ChatMessageIdAllocator.reset();
         ChatHistory.clear();
         ChatConsoleStream.clear();
+        ChatCommandContexts.clear();
         LostTalesChatService.clear();
         LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
                 ChatConsoleEvent.Severity.INFO, "Server", "Server started");
@@ -444,6 +446,7 @@ public class LostTalesCommonProxy {
         ChatMessageIdAllocator.reset();
         ChatHistory.clear();
         ChatConsoleStream.clear();
+        ChatCommandContexts.clear();
         LostTalesChatService.clear();
         ChatAuditLog.onServerStopping();
         LostTalesMobAggroEventHandler.clearAll();

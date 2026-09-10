@@ -21,8 +21,10 @@ public final class LostTalesChatConsoleSyncPacket implements IMessage {
     public static final int MAX_EVENTS = 32;
     private static final int MAX_ACTOR_BYTES = ChatConsoleEvent.MAX_ACTOR_LENGTH * 4;
     private static final int MAX_TEXT_BYTES = ChatConsoleEvent.MAX_TEXT_LENGTH * 4;
+    private static final int MAX_CONTEXT_BYTES = ChatConsoleEvent.MAX_CONTEXT_LENGTH * 4;
     private static final int MAX_PACKET_BYTES = 4
-            + MAX_EVENTS * (8 + 8 + 1 + 1 + 4 + MAX_ACTOR_BYTES + 4 + MAX_TEXT_BYTES);
+            + MAX_EVENTS * (8 + 8 + 1 + 1 + 4 + MAX_ACTOR_BYTES + 4 + MAX_TEXT_BYTES
+                    + 4 + MAX_CONTEXT_BYTES);
 
     private List<ChatConsoleEvent> events = Collections.emptyList();
     private boolean malformed;
@@ -60,13 +62,17 @@ public final class LostTalesChatConsoleSyncPacket implements IMessage {
                         ChatConsoleEvent.Severity.fromOrdinal(buffer.readUnsignedByte());
                 String actor = LostTalesPacketCodec.readUtf8String(buffer, MAX_ACTOR_BYTES);
                 String text = LostTalesPacketCodec.readUtf8String(buffer, MAX_TEXT_BYTES);
+                String context = LostTalesPacketCodec.readUtf8String(buffer, MAX_CONTEXT_BYTES);
                 if (id <= 0L || kind == null || severity == null
                         || actor.length() > ChatConsoleEvent.MAX_ACTOR_LENGTH
                         || text.trim().length() == 0
-                        || text.length() > ChatConsoleEvent.MAX_TEXT_LENGTH) {
+                        || text.length() > ChatConsoleEvent.MAX_TEXT_LENGTH
+                        || context.length() > ChatConsoleEvent.MAX_CONTEXT_LENGTH
+                        || !ChatConsoleEvent.isContext(context)) {
                     throw new LostTalesPacketCodec.DecodeException("invalid console event");
                 }
-                decoded.add(new ChatConsoleEvent(id, timestamp, kind, severity, actor, text));
+                decoded.add(new ChatConsoleEvent(id, timestamp, kind, severity, actor, text,
+                        context));
             }
             LostTalesPacketCodec.requireFinished(buffer);
             this.events = Collections.unmodifiableList(decoded);
@@ -87,6 +93,7 @@ public final class LostTalesChatConsoleSyncPacket implements IMessage {
             buffer.writeByte(event.getSeverity().ordinal());
             LostTalesPacketCodec.writeUtf8String(buffer, event.getActor(), MAX_ACTOR_BYTES);
             LostTalesPacketCodec.writeUtf8String(buffer, event.getText(), MAX_TEXT_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer, event.getContext(), MAX_CONTEXT_BYTES);
         }
     }
 

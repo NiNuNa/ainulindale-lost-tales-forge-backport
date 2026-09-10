@@ -20,7 +20,14 @@ enum ChatBodyKind {
      * as typed follows in the chat's white; a command is not prose and
      * nothing in it is a mention, an emoji or a share.
      */
-    COMMAND("");
+    COMMAND(""),
+    /**
+     * A command's answer, as a line of the server's own: the body
+     * opens behind the chevron and is the server's component shown
+     * exactly as it came, colours, links and all; nothing in it is
+     * read for markup.
+     */
+    ANSWER("");
 
     private final String labelKey;
 

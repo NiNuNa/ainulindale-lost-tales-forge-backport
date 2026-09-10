@@ -41,6 +41,35 @@ public final class ChatMessageValidator {
         return true;
     }
 
+    /**
+     * A component's words as a message may carry them: formatting codes
+     * and characters the chat refuses dropped, line breaks made spaces,
+     * cut to a message's length; empty when nothing is left.
+     */
+    public static String cleaned(String raw) {
+        String text = raw == null ? "" : raw;
+        StringBuilder kept = new StringBuilder(text.length());
+        boolean skipCode = false;
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            if (skipCode) {
+                skipCode = false;
+            } else if (character == '\u00a7') {
+                skipCode = true;
+            } else if (character == '\n' || character == '\r') {
+                kept.append(' ');
+            } else if (ChatAllowedCharacters.isAllowedCharacter(character)) {
+                kept.append(character);
+            }
+        }
+        String words = kept.toString().trim();
+        while (words.length() > 0 && !isValid(words)) {
+            words = words.substring(0, words.length() - 1).trim();
+        }
+        return words;
+    }
+
+
     /** Length as the player perceives it: share tokens count as one. */
     public static int visibleLength(String message) {
         if (message == null) {

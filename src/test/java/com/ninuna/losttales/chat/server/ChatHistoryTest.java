@@ -92,6 +92,23 @@ public final class ChatHistoryTest {
         assertEquals("meet me at the gate", quote.getExcerpt());
     }
 
+    /**
+     * A line for everyone — a server broadcast — is quoted by a player
+     * it was replayed to, not only by those online when it was sent; a
+     * line with an audience of its own stays theirs.
+     */
+    @Test
+    public void aLineForEveryoneIsQuotedByAnyone() {
+        long open = record(ChatChannel.ALL, ALICE, "Alice joined the game",
+                Arrays.asList(ALICE), ChatHistory.Audience.everyone());
+        assertTrue(ChatHistory.quoteFor(open, BOB, ChatChannel.ALL, "").isAnchored());
+        long closed = record(ChatChannel.ALL, ALICE, "for Alice alone",
+                Arrays.asList(ALICE), ChatHistory.Audience.accounts(
+                        Arrays.asList(ALICE), false));
+        assertFalse(ChatHistory.quoteFor(closed, BOB, ChatChannel.ALL, "").isAnchored());
+        assertTrue(ChatHistory.quoteFor(closed, ALICE, ChatChannel.ALL, "").isAnchored());
+    }
+
     @Test
     public void theDiscordChannelIsQuotedWithoutARecipient() {
         long id = record(ChatChannel.OOC, ALICE, "meet me at the gate",

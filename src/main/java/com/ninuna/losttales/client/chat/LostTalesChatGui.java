@@ -12,6 +12,8 @@ import com.google.common.collect.Lists;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.network.LostTalesNetworkHandler;
+import com.ninuna.losttales.network.packet.LostTalesChatCommandContextPacket;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -100,7 +102,7 @@ public final class LostTalesChatGui extends GuiChat {
             new ChatInputCompletion(this.notices);
     /** The selection, and the verbs that open, close, lock and move tabs. */
     private final ChatTabActions tabActions = new ChatTabActions(this.bar,
-            this.completion, this.composer);
+            this.completion, this.composer, this.notices);
     /** The drags: tabs, windows, resizes and scrollbars. */
     private final ChatWindowGestures gestures = new ChatWindowGestures(
             new ChatWindowGestures.RowSource() {
@@ -511,15 +513,27 @@ public final class LostTalesChatGui extends GuiChat {
     /**
      * Sends a command the server answers, however it was asked for —
      * typed, clicked in a line, chosen from a menu. The command and
-     * what it answers are shown in the tab in front, and the console
-     * keeps a copy of both as the log of everything that was asked.
-     * Typed in the console, it is shown there once. The tab in front
-     * stays in front.
+     * what it answers are shown in the tab in front — the answer as a
+     * line of the Server's own — and the operator console is told by
+     * the server who ran what, and where. The tab in front stays in
+     * front.
      */
     private void sendCommand(String command) {
         ChatTab typedIn = ClientChatChannelState.getSelected();
         LostTalesChatPresentation.expectCommandOutput(typedIn);
         LostTalesChatPresentation.echoCommand(typedIn, command);
+        // The tab goes ahead of the command on the same connection, so
+        // the console's entry about the command can say where it was
+        // typed; the command itself still travels vanilla's own way.
+        if (typedIn != null) {
+            try {
+                LostTalesNetworkHandler.CHANNEL.sendToServer(
+                        new LostTalesChatCommandContextPacket(typedIn.id()));
+            } catch (IllegalArgumentException unsendable) {
+                // A tab id the packet cannot carry: the entry names no
+                // tab, and the command goes out all the same.
+            }
+        }
         func_146403_a(command);
     }
 
@@ -748,10 +762,15 @@ public final class LostTalesChatGui extends GuiChat {
         LostTalesChatPresentation.beginFrame();
         LostTalesChatPresentation.setHoveredLine(
                 hoveredMessageLine(mouseX, mouseY));
+        LostTalesChatOverlayRenderer.Hit hovered =
+                hoveredComponent(mouseX, mouseY);
         LostTalesChatPresentation.setHoveredComponent(
-                hoveredComponent(mouseX, mouseY));
+                hovered == null ? null : hovered.line,
+                hovered == null ? -1 : hovered.index,
+                hovered == null ? null : hovered.component);
         this.gestures.markScrollbarsWanted(mouseX, mouseY);
         drawWindows(mouseX, mouseY, partialTicks);
+        landPendingJump();
         if (!this.gestures.isDragging()) {
             List<ChatWindowFrame> pillFrames = ChatWindowFrame.drawnFrames();
             for (int index = pillFrames.size() - 1; index >= 0; index--) {
@@ -1766,10 +1785,9 @@ public final class LostTalesChatGui extends GuiChat {
         if (remembered != null) {
             name = remembered.packet.getIdentityName();
         }
-        // A line the server never named — a client-local one included —
-        // is quoted by its words alone.
+        // A line the server never named is quoted by its words alone;
+        // one this client named keeps its own id, for the jump.
         if (!ChatMessageIds.isServerId(id)) {
-            id = ChatMessageIds.NONE;
             name = LostTalesChatPresentation.quoteAuthorFor(name);
         }
         // Composing happens where the message lives, and selecting a tab
@@ -1791,14 +1809,13 @@ public final class LostTalesChatGui extends GuiChat {
      * hover card is, so what is underlined is exactly what a click
      * would reach.
      */
-    private IChatComponent hoveredComponent(int mouseX, int mouseY) {
+    private LostTalesChatOverlayRenderer.Hit hoveredComponent(int mouseX,
+                                                             int mouseY) {
         if (this.menus.isOpen() || this.gestures.isDragging()) {
             return null;
         }
-        LostTalesChatOverlayRenderer.Hit hit =
-                LostTalesChatOverlayRenderer.hitAt(this.mc,
-                        mouseX + 0.5F, mouseY + 0.5F);
-        return hit == null ? null : hit.component;
+        return LostTalesChatOverlayRenderer.hitAt(this.mc,
+                mouseX + 0.5F, mouseY + 0.5F);
     }
 
     private int hoveredMessageLine(int mouseX, int mouseY) {
@@ -1837,38 +1854,97 @@ public final class LostTalesChatGui extends GuiChat {
         LostTalesChatOverlayRenderer.Hit hit =
                 LostTalesChatOverlayRenderer.hitAt(this.mc,
                         mouseX + 0.5F, mouseY + 0.5F);
-        long messageId = hit == null ? 0L
-                : ChatReplyMarker.messageIdOf(hit.component);
-        if (messageId == 0L) {
+        if (hit == null || !ChatReplyMarker.isMarker(hit.component)) {
             return false;
         }
         LostTalesChatOverlayRenderer.Band band =
                 LostTalesChatOverlayRenderer.bandAt(this.mc,
                         mouseX + 0.5F, mouseY + 0.5F);
-        Integer target = ClientChatMessageIds.chatLineIdOf(messageId);
-        if (band == null || band.lines == null || target == null) {
+        if (band == null || band.lines == null) {
             showNotice(StatCollector.translateToLocal(
                     "gui.losttales.chat.message.gone"));
             return true;
         }
-        int index = firstRowOf(band.lines, target.intValue());
-        if (index < 0) {
-            // Named, but not in this view: the message is in another
-            // channel, or below what this window shows.
+        // A quote naming a message — by the server's id or by this
+        // client's own — leads to the line named. One quoting words
+        // alone leads to the newest older line saying those words under
+        // that name, which is the line it was made from.
+        long messageId = ChatReplyMarker.messageIdOf(hit.component);
+        Integer target = messageId == 0L ? null
+                : ClientChatMessageIds.chatLineIdOf(messageId);
+        if (target == null) {
+            target = LostTalesChatPresentation.quotedLineByWords(
+                    band.lines, band.viewIndex);
+        }
+        if (target == null || !jumpToLine(band, target.intValue())) {
             showNotice(StatCollector.translateToLocal(
                     "gui.losttales.chat.message.gone"));
-            return true;
         }
-        double roomLines = band.frame.roomLines();
-        // Landed near the middle of the window rather than at its edge,
-        // so what was said around it is readable too. The offset counts
-        // rows, so the line's index is translated through the divider.
-        ClientChatChannelViews.scrollTo(band.frame.view,
-                LostTalesChatOverlayRenderer.rowOfLine(index,
-                        band.frame.dividerLineIndex) - roomLines / 2.0D,
-                band.frame.contentRows(), roomLines);
-        LostTalesChatPresentation.flashLine(target.intValue());
         return true;
+    }
+
+    /**
+     * Lands the view on a line: in the window under the pointer when
+     * the line is among its rows, else by bringing the line's own tab
+     * forward and asking the next draw to land on it, since a tab's
+     * rows exist only once it has been drawn. False when the line is
+     * nowhere any more.
+     */
+    private boolean jumpToLine(LostTalesChatOverlayRenderer.Band band,
+                               int chatLineId) {
+        int index = firstRowOf(band.lines, chatLineId);
+        if (index >= 0) {
+            landOn(band.frame, index, chatLineId);
+            return true;
+        }
+        ChatTab tab = ClientChatChannelViews.tabOf(chatLineId);
+        if (tab == null) {
+            return false;
+        }
+        if (!ChatWindowLayout.isOpen(tab)) {
+            tab = ChatWindowLayout.openTab(tab, band.frame.windowId);
+            if (tab == null) {
+                return false;
+            }
+        }
+        this.tabActions.selectChannel(tab);
+        LostTalesChatPresentation.requestJump(chatLineId);
+        return true;
+    }
+
+    /**
+     * Scrolls a window to the row a line starts on and lights the line.
+     * Landed near the middle of the window rather than at its edge, so
+     * what was said around it is readable too. The offset counts rows,
+     * so the line's index is translated through the divider.
+     */
+    private static void landOn(ChatWindowFrame frame, int index,
+                               int chatLineId) {
+        double roomLines = frame.roomLines();
+        ClientChatChannelViews.scrollTo(frame.view,
+                LostTalesChatOverlayRenderer.rowOfLine(index,
+                        frame.dividerLineIndex) - roomLines / 2.0D,
+                frame.contentRows(), roomLines);
+        LostTalesChatPresentation.flashLine(chatLineId);
+    }
+
+    /**
+     * Lands a jump that was waiting for its tab to be drawn: the first
+     * drawn window whose rows hold the line takes it.
+     */
+    private static void landPendingJump() {
+        int chatLineId = LostTalesChatPresentation.pendingJump();
+        if (chatLineId == 0) {
+            return;
+        }
+        for (ChatWindowFrame frame : ChatWindowFrame.drawnFrames()) {
+            int index = firstRowOf(frame.lines, chatLineId);
+            if (index >= 0) {
+                LostTalesChatPresentation.clearPendingJump();
+                landOn(frame, index, chatLineId);
+                return;
+            }
+        }
     }
 
     /* ---- Tab rows: clicks, drags, docking, detaching, window moves ---- */
@@ -1973,7 +2049,8 @@ public final class LostTalesChatGui extends GuiChat {
         if (component == null) {
             return false;
         }
-        if (ChatReplyMarker.isMarker(component)) {
+        if (ChatReplyMarker.isMarker(component)
+                || ChatChannelLinkMarker.isMarker(component)) {
             return true;
         }
         if (ChatSpoilerMarker.isMarker(component)
@@ -2247,6 +2324,14 @@ public final class LostTalesChatGui extends GuiChat {
             ChatSpoilerMarker.reveal(hit.component);
             return true;
         }
+        // A channel named as a link is the chat's own furniture too: the
+        // tab comes forward, and the line it names is landed on.
+        ChatChannelLinkMarker.Data channelLink =
+                ChatChannelLinkMarker.decode(hit.component);
+        if (channelLink != null) {
+            openChannelLink(channelLink);
+            return true;
+        }
         if (!this.mc.gameSettings.chatLinks) {
             return false;
         }
@@ -2319,6 +2404,34 @@ public final class LostTalesChatGui extends GuiChat {
             openChatLink(event.getValue());
         }
         return true;
+    }
+
+    /**
+     * Follows a channel link: the tab it names comes forward — opened
+     * again in the selected tab's window if it was closed — and the
+     * line it names, if any, is landed on once the tab is drawn. A tab
+     * that is nobody's any more says so.
+     */
+    private void openChannelLink(ChatChannelLinkMarker.Data link) {
+        ChatTab tab = ChatTab.fromId(link.tabId);
+        if (tab == null) {
+            showNotice(StatCollector.translateToLocal(
+                    "gui.losttales.chat.channel.gone"));
+            return;
+        }
+        if (!ChatWindowLayout.isOpen(tab)) {
+            tab = ChatWindowLayout.openTab(tab,
+                    LostTalesChatPresentation.windowIdOfSelection());
+            if (tab == null) {
+                showNotice(StatCollector.translateToLocal(
+                        "gui.losttales.chat.channel.gone"));
+                return;
+            }
+        }
+        this.tabActions.selectChannel(tab);
+        if (link.chatLineId != 0) {
+            LostTalesChatPresentation.requestJump(link.chatLineId);
+        }
     }
 
     private void openChatLink(String value) {

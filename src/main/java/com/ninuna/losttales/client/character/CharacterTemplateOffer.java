@@ -40,7 +40,12 @@ public final class CharacterTemplateOffer {
 
     /** Called with every roster the server sends. */
     public static synchronized void onRoster(CharacterRosterSnapshot snapshot) {
-        if (snapshot == null || snapshot.isTemplateTaken()) {
+        if (snapshot == null || snapshot.isTemplateTaken()
+                // A roster with no default character yet has nothing to
+                // take the template onto: the login sequence sends one
+                // before it makes the character, and the one offer this
+                // session makes must not be spent on it.
+                || snapshot.getDefaultCharacter() == null) {
             return;
         }
         UUID ownerId = snapshot.getOwnerId();

@@ -34,6 +34,9 @@ public final class LostTalesRequestRateLimiter {
         WAYSTONE_TRAVEL(6, 5000L),
         // Normal conversation can be fast, but sustained packet floods are bounded.
         CHAT_MESSAGE(20, 5000L),
+        // One ahead of every command a player sends; commands are typed
+        // no faster than messages.
+        CHAT_COMMAND_CONTEXT(20, 5000L),
         // A typing client repeats itself every 2.5 s and sends one stop:
         // three in five seconds in normal use.
         CHAT_TYPING(8, 5000L),

@@ -9,7 +9,9 @@ import net.minecraftforge.event.CommandEvent;
 
 /**
  * Puts every command a person runs into the shared operator console:
- * one entry naming who ran what, with the words the console must not
+ * one entry naming who ran what, and for a player where — the tab
+ * their client reported just ahead of the command
+ * ({@link ChatCommandContexts}) — with the words the console must not
  * repeat left out ({@link ChatConsoleStream#describeCommand}). Only
  * people count — a player, or whoever is at the server's own console;
  * a command block runs on a clock and would drown the stream, and it
@@ -26,8 +28,12 @@ public final class ChatConsoleCommandHandler {
         }
         ICommandSender sender = event.sender;
         String actor;
+        String context = "";
         if (sender instanceof EntityPlayerMP) {
             actor = sender.getCommandSenderName();
+            context = ChatCommandContexts.take(
+                    ((EntityPlayerMP)sender).getUniqueID(),
+                    System.currentTimeMillis());
         } else if (sender instanceof MinecraftServer) {
             actor = "Server";
         } else {
@@ -36,6 +42,6 @@ public final class ChatConsoleCommandHandler {
         LostTalesChatService.console(ChatConsoleEvent.Kind.COMMAND,
                 ChatConsoleEvent.Severity.INFO, actor,
                 ChatConsoleStream.describeCommand(event.command.getCommandName(),
-                        event.parameters));
+                        event.parameters), context);
     }
 }

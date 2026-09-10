@@ -487,7 +487,10 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
     private static boolean isIgnoredLine(LostTalesChatMessagePacket packet) {
         if (packet == null || packet.getSenderId() == null
-                || !ClientChatIgnores.isIgnored(packet.getSenderId())) {
+                || !(ClientChatIgnores.isIgnored(packet.getSenderId())
+                        || ClientChatIgnores.isIgnoredIdentity(
+                                packet.getSenderId(),
+                                packet.getIdentityName()))) {
             return false;
         }
         if (Minecraft.getMinecraft().thePlayer != null
@@ -571,6 +574,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         if (packet != null
                 && (ClientChatIgnores.isIgnoredName(packet.getPartner())
                         || ClientChatIgnores.isIgnoredName(
+                                packet.getIdentityName())
+                        || ClientChatIgnores.isIgnoredIdentityName(
                                 packet.getIdentityName()))) {
             return;
         }

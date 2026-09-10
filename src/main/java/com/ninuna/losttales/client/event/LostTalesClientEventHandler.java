@@ -17,6 +17,7 @@ import com.ninuna.losttales.client.camera.ThirdPersonHeadRenderHook;
 import com.ninuna.losttales.client.camera.ThirdPersonProjectileTrajectoryRenderer;
 import com.ninuna.losttales.client.cache.LostTalesClientMobAggroCache;
 import com.ninuna.losttales.client.cache.LostTalesClientQuickLootCache;
+import com.ninuna.losttales.client.character.CharacterClientTaskQueue;
 import com.ninuna.losttales.client.character.CharacterTemplateOffer;
 import com.ninuna.losttales.client.character.room.CharacterRoomJourneyPrompt;
 import com.ninuna.losttales.client.character.room.CharacterRoomLauncher;
@@ -160,6 +161,9 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientQuickLootCache.clear();
         ClientCharacterRosterCache.clear();
         CharacterTemplateOffer.clear();
+        // A roster sync still queued from this world must not be applied
+        // in the next, whose revisions are its own.
+        CharacterClientTaskQueue.clear();
         LostTalesCharacterFigureRenderer.clear();
         ClientCharacterAppearanceCache.clear();
         PlayerAppearanceResolver.clear();

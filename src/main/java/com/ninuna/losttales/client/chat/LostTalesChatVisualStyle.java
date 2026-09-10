@@ -458,18 +458,34 @@ final class LostTalesChatVisualStyle {
         boolean afterHead = false;
         boolean identitySeen = false;
         boolean colours = chatColoursEnabled();
-        IChatComponent hovered = LostTalesChatPresentation.hoveredComponent();
-        // The sender is one thing under the pointer — head, brackets and
-        // name — so resting on any of them underlines all of them, on
-        // this line alone: a head shares nothing with another line's
-        // name.
-        boolean personHovered = hovered != null && containsPart(line, hovered)
+        // The hovered run is known by the row it is on and its place
+        // there, never by identity: a row's iterator hands out copies.
+        // Nothing on any other row answers to it.
+        IChatComponent hovered = LostTalesChatPresentation.isHoveredLineRow(line)
+                ? LostTalesChatPresentation.hoveredComponent() : null;
+        // The sender is one thing under the pointer — the opening
+        // bracket, the head, the name, the title and the closing
+        // bracket — so resting on any of them underlines the whole
+        // span, in the name's colour.
+        boolean personHovered = hovered != null
                 && (ChatSenderSpan.isSenderName(hovered)
                         || ChatHeadMarker.isMarker(hovered));
+        boolean identitySpan = false;
+        // The rule under whatever is lit: one rectangle per unbroken
+        // run of lit parts, in the colour the first of them is drawn
+        // in, closed by the first part that is not lit and drawn once
+        // its extent is known — so a name reads as one thing with its
+        // head, brackets and title, and a link as one line.
+        int ruleStart = -1;
+        int ruleEnd = 0;
+        int ruleColor = 0;
+        int ruleTrailing = 0;
+        int index = -1;
         for (Object value : line) {
             if (!(value instanceof IChatComponent)) {
                 continue;
             }
+            index++;
             IChatComponent part = (IChatComponent)value;
             if (ChatPrefixMarker.isHidden(part, chatOpen)) {
                 continue;
@@ -489,144 +505,189 @@ final class LostTalesChatVisualStyle {
                 // lives in the text and stays whatever it was.
                 formatting = formatting.replace("§k", "");
             }
+            if (isWebLink(part)) {
+                // A link another mod or Forge underlined for good is
+                // drawn plain: the hover rule underlines it, as it does
+                // every other run that answers to a click.
+                formatting = formatting.replace("§n", "");
+            }
             ChatHeadMarker.Data marker = ChatHeadMarker.decode(part);
             if (marker != null) {
                 afterHead = true;
             }
+            boolean replyIdentity = ChatSenderSpan.isSenderName(part);
+            // The span opens on the bracket, the name or the head —
+            // an NPC's bracket carries no whisper, so its head opens
+            // it — and closes after the run the closing bracket starts.
+            if (!identitySpan && (replyIdentity || marker != null
+                    || "<".equals(text))) {
+                identitySpan = true;
+            }
+            boolean closesSpan = identitySpan && marker == null
+                    && text.startsWith(">");
+            boolean underlined = false;
+            int underlineColor = IVORY;
+            int width;
 
             ChatEmoji emoji = ChatEmojiMarker.decode(part);
+            ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
             if (emoji != null) {
-                int slotWidth = measure(font, formatting, text, colours);
+                width = measure(font, formatting, text, colours);
                 if (ChatEmojiMarker.reservesFullSlot(text)) {
                     ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(), emoji,
-                            ChatInlineIcons.boxLeft(cursor, slotWidth),
-                            ChatInlineIcons.boxTop(y, slotWidth),
-                            ChatInlineIcons.contentSize(slotWidth), alpha,
+                            ChatInlineIcons.boxLeft(cursor, width),
+                            ChatInlineIcons.boxTop(y, width),
+                            ChatInlineIcons.contentSize(width), alpha,
                             shadowPass);
                 }
-                cursor += slotWidth;
-                continue;
-            }
-
-            ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
-            if (share != null && share.icon) {
-                int slotWidth = measure(font, formatting, text, colours);
+            } else if (share != null && share.icon) {
+                width = measure(font, formatting, text, colours);
                 if (ChatEmojiMarker.reservesFullSlot(text)) {
-                    drawShareIcon(share, cursor, y, slotWidth, alpha,
+                    drawShareIcon(share, cursor, y, width, alpha,
                             shadowPass);
                 }
-                cursor += slotWidth;
-                continue;
+            } else {
+                String rendered;
+                int color;
+                Integer prefixColor = ChatPrefixMarker.decode(part);
+                Integer explicitColor = ChatColorMarker.decode(part);
+                if (explicitColor == null) {
+                    // The chevron a body opens with wears the sender's colour.
+                    explicitColor = ChatBodyMarker.decode(part);
+                }
+                if (explicitColor == null) {
+                    // A mention re-resolves as it is drawn, so one built
+                    // before this client learned the roles behind the name
+                    // catches up instead of keeping the fallback forever.
+                    explicitColor = ChatMentionColors.liveMentionColor(
+                            ChatMentionMarker.decode(part));
+                }
+                if (explicitColor == null) {
+                    explicitColor = ChatTitleMarker.colorOf(part);
+                }
+                if (explicitColor == null) {
+                    explicitColor = ChatReplyMarker.colorOf(part);
+                }
+                if (explicitColor == null) {
+                    explicitColor = ChatChannelLinkMarker.colorOf(part);
+                }
+                boolean identityBracket = "<".equals(text)
+                        || (identitySeen && text.startsWith(">"));
+                // The colour the glyphs are drawn in; the rule under a
+                // lit run takes the same, read off the inline codes
+                // where the text carries its own.
+                int glyphColor;
+                if (!colours) {
+                    rendered = stripCodes(formatting + text);
+                    color = shadowPass ? SHADOW : IVORY;
+                    glyphColor = IVORY;
+                } else if (shadowPass) {
+                    rendered = styleCodesOnly(formatting)
+                            + removeColorCodes(text);
+                    color = SHADOW;
+                    glyphColor = SHADOW;
+                } else if (share != null) {
+                    rendered = styleCodesOnly(formatting)
+                            + removeColorCodes(text);
+                    color = share.textColor;
+                    glyphColor = color;
+                } else if (prefixColor != null) {
+                    rendered = styleCodesOnly(formatting)
+                            + removeColorCodes(text);
+                    color = prefixColor.intValue();
+                    glyphColor = color;
+                } else if (explicitColor != null) {
+                    rendered = styleCodesOnly(formatting)
+                            + removeColorCodes(text);
+                    color = explicitColor.intValue();
+                    glyphColor = color;
+                } else if (metadata != null && identityBracket) {
+                    rendered = styleCodesOnly(formatting)
+                            + removeColorCodes(text);
+                    color = metadata.nameColor;
+                    glyphColor = color;
+                } else if (metadata != null && replyIdentity) {
+                    rendered = styleCodesOnly(formatting)
+                            + removeColorCodes(text);
+                    color = metadata.nameColor;
+                    glyphColor = color;
+                } else if (metadata != null && afterHead
+                        && !identitySeen && marker == null) {
+                    rendered = styleCodesOnly(formatting)
+                            + removeColorCodes(text);
+                    color = metadata.titleColor;
+                    glyphColor = color;
+                } else if (part.getChatStyle().getColor() != null) {
+                    // A line from vanilla, LOTR or any other mod says what
+                    // colour it wants in vanilla's sixteen; it is drawn in
+                    // the palette's nearest, so an achievement is still
+                    // green (or yellow, or purple) but in the chat's own
+                    // greens and yellows rather than beside them.
+                    rendered = styleCodesOnly(formatting)
+                            + removeColorCodes(text);
+                    color = paletteRgb(part.getChatStyle().getColor());
+                    glyphColor = color;
+                } else {
+                    rendered = removeExplicitWhite(formatting + text);
+                    color = IVORY;
+                    glyphColor = lastInlineColor(rendered, IVORY);
+                }
+                // Asked again for every run: an inline glyph between two of
+                // them is drawn by code of its own, and whatever that leaves
+                // behind must not decide what the next run's shadow looks
+                // like.
+                beginContent();
+                font.drawString(rendered, cursor, y, argb(color, alpha));
+                int declared = ChatInlineIcons.declaredWidth(part);
+                width = declared >= 0 ? declared
+                        : measure(font, formatting, text, colours);
+                if (personHovered && identitySpan) {
+                    // Every part of the sender, the head's slot and the
+                    // title and the spacers between included, under one
+                    // rule in the name's colour.
+                    underlined = true;
+                    underlineColor = !colours ? IVORY
+                            : marker != null ? marker.nameColor
+                            : metadata != null ? metadata.nameColor
+                            : glyphColor;
+                } else if (marker == null) {
+                    // A run that answers to a click or carries a card is
+                    // underlined while the pointer rests on it — or on a
+                    // run acting with it, so a reply's quote and the
+                    // pieces of one link light together — in its own
+                    // colour, on the row the font's own underline takes,
+                    // so it reads as usable before it is used.
+                    underlined = hovered != null
+                            && rendered.trim().length() > 0
+                            && isInteractable(part)
+                            && sharesInteraction(part, line, index, hovered);
+                    underlineColor = glyphColor;
+                }
             }
 
-            String rendered;
-            int color;
-            Integer prefixColor = ChatPrefixMarker.decode(part);
-            Integer explicitColor = ChatColorMarker.decode(part);
-            if (explicitColor == null) {
-                // The chevron a body opens with wears the sender's colour.
-                explicitColor = ChatBodyMarker.decode(part);
-            }
-            if (explicitColor == null) {
-                // A mention re-resolves as it is drawn, so one built
-                // before this client learned the roles behind the name
-                // catches up instead of keeping the fallback forever.
-                explicitColor = ChatMentionColors.liveMentionColor(
-                        ChatMentionMarker.decode(part));
-            }
-            if (explicitColor == null) {
-                explicitColor = ChatTitleMarker.colorOf(part);
-            }
-            if (explicitColor == null) {
-                explicitColor = ChatReplyMarker.colorOf(part);
-            }
-            boolean replyIdentity = ChatSenderSpan.isSenderName(part);
-            boolean identityBracket = "<".equals(text)
-                    || (identitySeen && text.startsWith(">"));
-            if (!colours) {
-                rendered = stripCodes(formatting + text);
-                color = shadowPass ? SHADOW : IVORY;
-            } else if (shadowPass) {
-                rendered = styleCodesOnly(formatting)
-                        + removeColorCodes(text);
-                color = SHADOW;
-            } else if (share != null) {
-                rendered = styleCodesOnly(formatting)
-                        + removeColorCodes(text);
-                color = share.textColor;
-            } else if (prefixColor != null) {
-                rendered = styleCodesOnly(formatting)
-                        + removeColorCodes(text);
-                color = prefixColor.intValue();
-            } else if (explicitColor != null) {
-                rendered = styleCodesOnly(formatting)
-                        + removeColorCodes(text);
-                color = explicitColor.intValue();
-            } else if (metadata != null && identityBracket) {
-                rendered = styleCodesOnly(formatting)
-                        + removeColorCodes(text);
-                color = metadata.nameColor;
-            } else if (metadata != null && replyIdentity) {
-                rendered = styleCodesOnly(formatting)
-                        + removeColorCodes(text);
-                color = metadata.nameColor;
-            } else if (metadata != null && afterHead
-                    && !identitySeen && marker == null) {
-                rendered = styleCodesOnly(formatting)
-                        + removeColorCodes(text);
-                color = metadata.titleColor;
-            } else if (part.getChatStyle().getColor() != null) {
-                // A line from vanilla, LOTR or any other mod says what
-                // colour it wants in vanilla's sixteen; it is drawn in
-                // the palette's nearest, so an achievement is still
-                // green (or yellow, or purple) but in the chat's own
-                // greens and yellows rather than beside them.
-                rendered = styleCodesOnly(formatting)
-                        + removeColorCodes(text);
-                color = paletteRgb(part.getChatStyle().getColor());
-            } else {
-                rendered = removeExplicitWhite(formatting + text);
-                color = IVORY;
-            }
-            // Asked again for every run: an inline glyph between two of
-            // them is drawn by code of its own, and whatever that leaves
-            // behind must not decide what the next run's shadow looks
-            // like.
-            beginContent();
-            font.drawString(rendered, cursor, y, argb(color, alpha));
-            int declared = ChatInlineIcons.declaredWidth(part);
-            int width = declared >= 0 ? declared
-                    : measure(font, formatting, text, colours);
-            boolean underlined;
-            int underlineColor = color;
-            if (marker != null) {
-                // The head's slot is underlined with the name, in the
-                // name's colour, so the sender reads as one thing.
-                underlined = personHovered;
-                if (colours && !shadowPass) {
-                    underlineColor = marker.nameColor;
+            if (underlined && width > 0) {
+                if (ruleStart < 0) {
+                    ruleStart = cursor;
+                    ruleColor = shadowPass ? SHADOW : underlineColor;
                 }
-            } else {
-                // A run that answers to a click or carries a card is
-                // underlined while the pointer rests on it — or on any
-                // run acting with it, so a name is underlined with its
-                // head and brackets and a reply's quote as a whole — in
-                // its own colour, on the row the font's own underline
-                // takes, so it reads as usable before it is used. The
-                // underline goes with the pointer.
-                underlined = rendered.trim().length() > 0
-                        && isInteractable(part)
-                        && (sharesInteraction(part, hovered)
-                                || (personHovered
-                                        && ChatSenderSpan.isSenderName(part)));
-            }
-            if (width > 0 && underlined) {
-                LostTalesChatOverlayRenderer.fillRect(cursor,
-                        y + UNDERLINE_ROW, cursor + width - 1,
-                        y + UNDERLINE_ROW + 1, argb(underlineColor, alpha));
+                ruleEnd = cursor + width;
+                // The last run's trailing spaces belong to the gap
+                // after it, not to what is lit.
+                ruleTrailing = ChatInlineIcons.declaredWidth(part) >= 0 ? 0
+                        : trailingSpaceWidth(font, text);
+            } else if (ruleStart >= 0) {
+                drawRule(ruleStart, ruleEnd - ruleTrailing, y, ruleColor,
+                        alpha);
+                ruleStart = -1;
             }
             cursor += width;
             identitySeen |= replyIdentity;
+            if (closesSpan) {
+                identitySpan = false;
+            }
+        }
+        if (ruleStart >= 0) {
+            drawRule(ruleStart, ruleEnd - ruleTrailing, y, ruleColor, alpha);
         }
     }
 
@@ -637,13 +698,66 @@ final class LostTalesChatVisualStyle {
     private static final int UNDERLINE_ROW = 8;
 
     /**
+     * One rule from {@code start} to {@code end}, the last pixel left
+     * to the glyph's own trailing gap so the rule ends with the glyphs.
+     */
+    private static void drawRule(int start, int end, int y, int color,
+                                 int alpha) {
+        if (end - 1 > start) {
+            LostTalesChatOverlayRenderer.fillRect(start, y + UNDERLINE_ROW,
+                    end - 1, y + UNDERLINE_ROW + 1, argb(color, alpha));
+        }
+    }
+
+    /** Whether the run opens a web address on a click. */
+    private static boolean isWebLink(IChatComponent part) {
+        ClickEvent click = part.getChatStyle() == null ? null
+                : part.getChatStyle().getChatClickEvent();
+        return click != null && click.getAction() == ClickEvent.Action.OPEN_URL;
+    }
+
+    /** The width of the spaces a run ends with. */
+    private static int trailingSpaceWidth(FontRenderer font, String text) {
+        int spaces = 0;
+        for (int at = text.length() - 1; at >= 0 && text.charAt(at) == ' ';
+             at--) {
+            spaces++;
+        }
+        return spaces * font.getCharWidth(' ');
+    }
+
+    /**
+     * The colour the last inline colour code of a run leaves its glyphs
+     * in, in the palette's tone, or {@code fallback} when the run
+     * carries none.
+     */
+    private static int lastInlineColor(String rendered, int fallback) {
+        int color = fallback;
+        for (int at = 0; at + 1 < rendered.length(); at++) {
+            if (rendered.charAt(at) != '\u00a7') {
+                continue;
+            }
+            char code = Character.toLowerCase(rendered.charAt(at + 1));
+            for (EnumChatFormatting formatting : EnumChatFormatting.values()) {
+                if (formatting.isColor()
+                        && formatting.getFormattingCode() == code) {
+                    color = paletteRgb(formatting);
+                    break;
+                }
+            }
+            at++;
+        }
+        return color;
+    }
+
+    /**
      * Whether a run does something under the pointer: it answers to a
-     * click (a link, a name, a mention, a reply's quote, a share, a
-     * covered spoiler) or carries a card to read. The chat's own
-     * markers ride on click events too — a colour, a title, the
-     * chevron, a timestamp — and answer to nothing, so a click event
-     * alone says nothing: only one that is not a marker's payload
-     * counts.
+     * click (a link, a name, a mention, a reply's quote, a channel
+     * link, a share, a covered spoiler) or carries a card to read. The
+     * chat's own markers ride on click events too — a colour, a title,
+     * the chevron, a timestamp — and answer to nothing, so a click
+     * event alone says nothing: only one that is not a marker's
+     * payload counts.
      */
     private static boolean isInteractable(IChatComponent part) {
         if (part == null || part.getChatStyle() == null) {
@@ -653,7 +767,8 @@ final class LostTalesChatVisualStyle {
                 || ChatShowcaseMarker.decode(part) != null
                 || ChatMentionMarker.decode(part) != null
                 || ChatSenderSpan.isSenderName(part)
-                || ChatReplyMarker.messageIdOf(part) != 0L) {
+                || ChatReplyMarker.isMarker(part)
+                || ChatChannelLinkMarker.isMarker(part)) {
             return true;
         }
         if (ChatSpoilerMarker.isMarker(part)) {
@@ -677,6 +792,7 @@ final class LostTalesChatVisualStyle {
                 || ChatEmojiMarker.isMarker(part)
                 || ChatTitleMarker.isMarker(part)
                 || ChatReplyMarker.isMarker(part)
+                || ChatChannelLinkMarker.isMarker(part)
                 || ChatBodyMarker.isMarker(part)
                 || ChatLayoutMarker.isMarker(part)
                 || ChatSpacerMarker.isMarker(part)
@@ -689,38 +805,25 @@ final class LostTalesChatVisualStyle {
         return click;
     }
 
-    /** Whether the run is one of the line's own, by identity. */
-    private static boolean containsPart(IChatComponent line,
-                                        IChatComponent part) {
-        if (line == null || part == null) {
-            return false;
-        }
-        for (Object value : line) {
-            if (value == part) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /**
-     * Whether a run acts with the hovered one: it is the hovered run,
-     * or it answers exactly as that run does — the sender's name and
-     * the brackets around it share one whisper suggestion, the runs of
-     * one reply quote share the message they lead to, the pieces of one
-     * link share its address — so all of it is underlined together.
+     * Whether the run at {@code index} of {@code line} acts with the
+     * hovered one, which is on the same row: it is the hovered run, or
+     * it answers exactly as that run does — the runs of one reply quote
+     * share the message they lead to, the pieces of one link share its
+     * address — so all of it is underlined together. Nothing on
+     * another row ever acts with it.
      */
     private static boolean sharesInteraction(IChatComponent part,
+                                             IChatComponent line, int index,
                                              IChatComponent hovered) {
         if (part == null || hovered == null) {
             return false;
         }
-        if (part == hovered) {
+        if (LostTalesChatPresentation.isHoveredRun(line, index)) {
             return true;
         }
-        long reply = ChatReplyMarker.messageIdOf(part);
-        if (reply != 0L) {
-            return reply == ChatReplyMarker.messageIdOf(hovered);
+        if (ChatReplyMarker.isMarker(part)) {
+            return ChatReplyMarker.isMarker(hovered);
         }
         ClickEvent own = genuineClick(part);
         ClickEvent theirs = genuineClick(hovered);

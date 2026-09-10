@@ -176,6 +176,9 @@ final class LostTalesChatHoverCard {
         if (title.length() > 0) {
             lines.add(title);
         }
+        // The Server's card says what it is answering: the command the
+        // line under the pointer was the answer to.
+        addDetail(lines, "gui.losttales.chat.card.command", target.note);
         addDetail(lines, "gui.losttales.character.race",
                 details == null ? "" : ClientCharacterDisplayNames.race(
                         details.getRaceId()));
@@ -628,10 +631,16 @@ final class LostTalesChatHoverCard {
             return new Target(marker.senderId, false, true, marker.skinId,
                     identity, "", "", marker.nameColor);
         }
-        return account.length() == 0 ? null
-                : new Target(marker.senderId, marker.accountIdentity,
-                        marker.skinId, identity, title, account,
-                        marker.nameColor);
+        if (account.length() == 0) {
+            return null;
+        }
+        Target target = new Target(marker.senderId, marker.accountIdentity,
+                marker.skinId, identity, title, account, marker.nameColor);
+        if (marker.isSystemSender()) {
+            target = target.withNote(LostTalesChatPresentation
+                    .commandAnsweredOn(selected.getChatLineID()));
+        }
+        return target;
     }
 
     /**
@@ -665,12 +674,17 @@ final class LostTalesChatHoverCard {
     private static void drawHead(Minecraft minecraft, Target target,
                                  float x, float y) {
         if (target.accountIdentity
-                && LostTalesChatMessagePacket.isDiscordSender(
-                        target.playerId)) {
-            // A Discord sender has no account head; the Discord mark
-            // stands in, 1:1 — never scaled — centred in the head's box.
+                && (LostTalesChatMessagePacket.isDiscordSender(
+                        target.playerId)
+                        || LostTalesChatMessagePacket.isSystemSender(
+                                target.playerId))) {
+            // A Discord sender, the server or the client has no account
+            // head; its mark stands in, 1:1 — never scaled — centred in
+            // the head's box.
             float inset = (HEAD_SIZE - ChatEmoji.SPRITE_SIZE) / 2.0F;
-            ChatEmojiRenderer.draw(minecraft, ChatEmoji.DISCORD,
+            ChatEmojiRenderer.draw(minecraft,
+                    LostTalesChatMessagePacket.isSystemSender(target.playerId)
+                            ? ChatEmoji.CONSOLE : ChatEmoji.DISCORD,
                     x + inset, y + inset, ChatEmoji.SPRITE_SIZE, 255);
         } else if (target.npcIdentity) {
             LostTalesCharacterHeadIconRenderer.drawNpcHead(minecraft,
@@ -784,6 +798,11 @@ final class LostTalesChatHoverCard {
         final int nameColor;
         /** A role mention's card target; every other field idle then. */
         final ChatAccountRole role;
+        /**
+         * A line of the card's own about the line under the pointer —
+         * the command a Server line answers — or empty.
+         */
+        final String note;
 
         Target(UUID playerId, boolean accountIdentity, String skinId,
                String identityName, String title, String accountName,
@@ -796,14 +815,14 @@ final class LostTalesChatHoverCard {
                String skinId, String identityName, String title,
                String accountName, int nameColor) {
             this(playerId, accountIdentity, npcIdentity, skinId,
-                    identityName, title, accountName, nameColor, null);
+                    identityName, title, accountName, nameColor, null, "");
         }
 
         private Target(UUID playerId, boolean accountIdentity,
                        boolean npcIdentity, String skinId,
                        String identityName, String title,
                        String accountName, int nameColor,
-                       ChatAccountRole role) {
+                       ChatAccountRole role, String note) {
             this.playerId = playerId;
             this.accountIdentity = accountIdentity;
             this.npcIdentity = npcIdentity;
@@ -813,11 +832,20 @@ final class LostTalesChatHoverCard {
             this.accountName = accountName;
             this.nameColor = nameColor;
             this.role = role;
+            this.note = note == null ? "" : note;
+        }
+
+        /** The same target with a line of its own about the line hovered. */
+        Target withNote(String value) {
+            return new Target(this.playerId, this.accountIdentity,
+                    this.npcIdentity, this.skinId, this.identityName,
+                    this.title, this.accountName, this.nameColor, this.role,
+                    value);
         }
 
         static Target forRole(ChatAccountRole role) {
             return new Target(null, false, false, "", "", "", "",
-                    role.getColor(), role);
+                    role.getColor(), role, "");
         }
     }
 }

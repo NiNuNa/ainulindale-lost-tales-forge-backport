@@ -49,6 +49,11 @@ public final class ChatConsoleEvent {
 
     public static final int MAX_ACTOR_LENGTH = 64;
     public static final int MAX_TEXT_LENGTH = 512;
+    /**
+     * The longest tab id a command's context may name: a whisper
+     * conversation's id carries two names and a character id.
+     */
+    public static final int MAX_CONTEXT_LENGTH = 384;
 
     private final long id;
     private final long timestampMillis;
@@ -57,9 +62,21 @@ public final class ChatConsoleEvent {
     /** Who did it: an account name, {@code Server} for the console, empty for nobody. */
     private final String actor;
     private final String text;
+    /**
+     * For a command, the id of the tab the actor typed it in, as their
+     * client reported it; empty when unknown — a command run from the
+     * server's own console, or by a client that said nothing.
+     */
+    private final String context;
 
     public ChatConsoleEvent(long id, long timestampMillis, Kind kind,
                             Severity severity, String actor, String text) {
+        this(id, timestampMillis, kind, severity, actor, text, "");
+    }
+
+    public ChatConsoleEvent(long id, long timestampMillis, Kind kind,
+                            Severity severity, String actor, String text,
+                            String context) {
         if (kind == null || severity == null) {
             throw new IllegalArgumentException("a console event has a kind and a severity");
         }
@@ -72,6 +89,26 @@ public final class ChatConsoleEvent {
         if (this.text.length() == 0) {
             throw new IllegalArgumentException("a console event says something");
         }
+        String where = context == null ? "" : context.trim();
+        // A context that would not be a tab id names nothing.
+        this.context = kind == Kind.COMMAND && isContext(where)
+                && where.length() <= MAX_CONTEXT_LENGTH ? where : "";
+    }
+
+    /**
+     * Whether a string may stand as a command's context: one line of
+     * printable text, nothing that could break a line or a log.
+     */
+    public static boolean isContext(String value) {
+        if (value == null) {
+            return false;
+        }
+        for (int index = 0; index < value.length(); index++) {
+            if (value.charAt(index) < ' ') {
+                return false;
+            }
+        }
+        return true;
     }
 
     public long getId() { return this.id; }
@@ -80,6 +117,8 @@ public final class ChatConsoleEvent {
     public Severity getSeverity() { return this.severity; }
     public String getActor() { return this.actor; }
     public String getText() { return this.text; }
+    /** The tab a command was typed in, or empty; see {@link #context}. */
+    public String getContext() { return this.context; }
 
     private static String clip(String value, int maximum) {
         String text = value == null ? "" : value.trim();

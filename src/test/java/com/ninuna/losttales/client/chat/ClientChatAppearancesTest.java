@@ -19,9 +19,11 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Every tab follows the active identity unless it is locked to one of
- * its own; a lock belongs to one tab, survives the active character
- * changing, and gives way when its character leaves the roster.
+ * An in-character tab follows the active identity and an
+ * out-of-character tab speaks as the account, unless the tab is locked
+ * to an identity of its own or a passing choice was made on it; a lock
+ * belongs to one tab, survives the active character changing, and gives
+ * way when its character leaves the roster.
  */
 public final class ClientChatAppearancesTest {
 
@@ -35,26 +37,36 @@ public final class ClientChatAppearancesTest {
 
     @Before
     public void setUp() {
-        ClientChatAppearances.clear();
+        ClientChatAppearances.forgetStored();
         ClientCharacterRosterCache.clear();
     }
 
     @After
     public void tearDown() {
-        ClientChatAppearances.clear();
+        ClientChatAppearances.forgetStored();
         ClientCharacterRosterCache.clear();
     }
 
     @Test
-    public void everyTabFollowsTheActiveIdentityByDefault() {
+    public void eachChannelHasItsOwnDefaultIdentity() {
         roster(ARAGORN, ARAGORN, LEGOLAS);
         assertEquals(ARAGORN, ClientChatAppearances.effectiveFor(global).characterId);
         assertEquals(ARAGORN, ClientChatAppearances.effectiveFor(proximity).characterId);
-        assertEquals(ARAGORN, ClientChatAppearances.effectiveFor(ooc).characterId);
         assertEquals(LostTalesChatSendPacket.APPEARANCE_DEFAULT,
                 ClientChatAppearances.wireKind(global));
         assertNull(ClientChatAppearances.wireCharacterId(global));
         assertFalse(ClientChatAppearances.isLocked(global));
+        // The out-of-character channels speak as the account, and say so
+        // on the wire rather than leaving it to the server.
+        assertTrue(ClientChatAppearances.effectiveFor(ooc).account);
+        assertTrue(ClientChatAppearances.effectiveFor(
+                ChatTab.of(ChatChannel.CONSOLE)).account);
+        assertTrue(ClientChatAppearances.effectiveFor(
+                ChatTab.of(ChatChannel.ADMIN)).account);
+        assertEquals(LostTalesChatSendPacket.APPEARANCE_ACCOUNT,
+                ClientChatAppearances.wireKind(ooc));
+        assertNull(ClientChatAppearances.wireCharacterId(ooc));
+        assertFalse(ClientChatAppearances.isLocked(ooc));
 
         // Switching the active character switches every unlocked tab.
         roster(LEGOLAS, ARAGORN, LEGOLAS);
@@ -105,8 +117,10 @@ public final class ClientChatAppearancesTest {
         roster(ARAGORN, ARAGORN, LEGOLAS);
         ClientChatAppearances.select(appearanceOf(LEGOLAS), global);
         assertEquals(LEGOLAS, ClientChatAppearances.effectiveFor(global).characterId);
-        assertEquals("every unlocked tab follows it, not the tab it was picked on",
+        assertEquals("every unlocked in-character tab follows it, not the tab it was picked on",
                 LEGOLAS, ClientChatAppearances.effectiveFor(proximity).characterId);
+        assertTrue("an out-of-character tab keeps the account",
+                ClientChatAppearances.effectiveFor(ooc).account);
         assertEquals(LEGOLAS.toString().toLowerCase(java.util.Locale.ROOT),
                 ClientChatAppearances.viewIdentityKey());
         assertEquals("the character being played is untouched",
@@ -118,6 +132,19 @@ public final class ClientChatAppearancesTest {
 
         // A tab switch is not a change of identity.
         ClientChatAppearances.onChannelSwitched();
+        assertEquals(LEGOLAS, ClientChatAppearances.effectiveFor(global).characterId);
+
+        // A pick on an out-of-character tab is a passing choice: that tab
+        // speaks as the pick until another tab is selected, and the
+        // other out-of-character tabs stay with the account.
+        ClientChatAppearances.select(appearanceOf(LEGOLAS), ooc);
+        assertEquals(LEGOLAS, ClientChatAppearances.effectiveFor(ooc).characterId);
+        assertEquals(LostTalesChatSendPacket.APPEARANCE_CHARACTER,
+                ClientChatAppearances.wireKind(ooc));
+        assertTrue(ClientChatAppearances.effectiveFor(
+                ChatTab.of(ChatChannel.CONSOLE)).account);
+        ClientChatAppearances.onChannelSwitched();
+        assertTrue(ClientChatAppearances.effectiveFor(ooc).account);
         assertEquals(LEGOLAS, ClientChatAppearances.effectiveFor(global).characterId);
 
         // Reading as the character being played again.
@@ -170,13 +197,19 @@ public final class ClientChatAppearancesTest {
     }
 
     @Test
-    public void leavingTheWorldForgetsEveryLock() {
+    public void leavingTheWorldForgetsThePicksAndKeepsTheLocks() {
         roster(ARAGORN, ARAGORN, LEGOLAS);
         ClientChatAppearances.toggleLocked(global);
         ClientChatAppearances.select(appearanceOf(LEGOLAS), ooc);
         ClientChatAppearances.clear();
+        assertTrue("a lock is the layout file's and outlives the world",
+                ClientChatAppearances.isLocked(global));
+        assertEquals(ARAGORN, ClientChatAppearances.effectiveFor(global).characterId);
+        assertTrue(ClientChatAppearances.effectiveFor(ooc).account);
+        ClientChatAppearances.toggleLocked(global);
+        ClientChatAppearances.clear();
         assertFalse(ClientChatAppearances.isLocked(global));
-        assertEquals(ARAGORN, ClientChatAppearances.effectiveFor(ooc).characterId);
+        assertEquals(ARAGORN, ClientChatAppearances.effectiveFor(global).characterId);
         // Nothing to lock without a tab; nothing breaks either.
         ClientChatAppearances.toggleLocked(null);
         ClientChatAppearances.select(appearanceOf(LEGOLAS), null);
@@ -213,6 +246,41 @@ public final class ClientChatAppearancesTest {
         assertEquals("", ClientChatAppearances.activeIdentityKey());
         ClientCharacterRosterCache.clear();
         assertEquals("", ClientChatAppearances.activeIdentityKey());
+    }
+
+    /**
+     * A lock read from the layout file holds its tab before any roster
+     * is known, names its character once one is, and gives way only to
+     * a roster that lacks the character.
+     */
+    @Test
+    public void aStoredLockWaitsForTheRoster() {
+        ClientChatAppearances.restoreLocks(java.util.Arrays.asList(
+                new String[] {"all", LEGOLAS.toString()},
+                new String[] {"ooc", ClientChatAppearances.ACCOUNT_KEY},
+                new String[] {"whisper:Steve", LEGOLAS.toString()},
+                new String[] {"all", "not-a-character"},
+                new String[] {"nowhere", LEGOLAS.toString()}));
+        assertTrue(ClientChatAppearances.isLocked(global));
+        assertEquals(LEGOLAS, ClientChatAppearances.effectiveFor(global).characterId);
+        assertEquals("", ClientChatAppearances.effectiveFor(global).name);
+        assertEquals(LostTalesChatSendPacket.APPEARANCE_CHARACTER,
+                ClientChatAppearances.wireKind(global));
+        assertTrue(ClientChatAppearances.isLocked(ooc));
+        assertTrue(ClientChatAppearances.effectiveFor(ooc).account);
+        assertEquals(2, ClientChatAppearances.describeLocks().size());
+        assertEquals("all", ClientChatAppearances.describeLocks().get(0)[0]);
+        assertEquals(ChatTab.ownerKeyOf(LEGOLAS),
+                ClientChatAppearances.describeLocks().get(0)[1]);
+
+        roster(ARAGORN, ARAGORN, LEGOLAS);
+        assertEquals("Legolas", ClientChatAppearances.effectiveFor(global).name);
+        assertTrue(ClientChatAppearances.isLocked(global));
+
+        roster(ARAGORN, ARAGORN);
+        assertFalse(ClientChatAppearances.isLocked(global));
+        assertEquals(1, ClientChatAppearances.describeLocks().size());
+        assertTrue(ClientChatAppearances.isLocked(ooc));
     }
 
     private static ClientChatAppearances.Appearance appearanceOf(UUID characterId) {

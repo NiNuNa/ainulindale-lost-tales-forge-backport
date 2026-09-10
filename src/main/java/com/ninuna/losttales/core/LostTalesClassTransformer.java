@@ -3452,11 +3452,16 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             "true");
                     return basicClass;
                 }
+                // The hook hands the component back, written over the
+                // parameter itself, so the whole body sends the line
+                // with the id run the hook appended.
                 InsnList hook = new InsnList();
                 hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
                 hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
                         SERVER_BROADCAST_HOOK_OWNER, "onBroadcast",
-                        "(Lnet/minecraft/util/IChatComponent;)V"));
+                        "(Lnet/minecraft/util/IChatComponent;)"
+                                + "Lnet/minecraft/util/IChatComponent;"));
+                hook.add(new VarInsnNode(Opcodes.ASTORE, 1));
                 method.instructions.insert(hook);
                 System.setProperty(SERVER_BROADCAST_ACTIVE_PROPERTY, "true");
                 info("Patched server chat broadcasts to report every "

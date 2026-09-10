@@ -265,6 +265,37 @@ public final class ChatWindowLayoutStoreTest {
         assertEquals(lines, ChatWindowLayoutStore.describe());
     }
 
+    /** The identity locks and the hint flag ride in the file with the layout. */
+    @Test
+    public void identityLocksAndTheHintFlagRoundTrip() {
+        ClientChatAppearances.clear();
+        try {
+            List<String> lines = new java.util.ArrayList<String>(ChatWindowLayoutStore.describe());
+            assertFalse(lines.toString().contains("identity "));
+            lines.add("identity all b0000000-0000-0000-0000-00000000000b");
+            lines.add("identity ooc account");
+            lines.add("identity whisper:Steve account");
+            lines.add("identity all");
+            lines.add("flag identityHintShown=true");
+            ChatWindowLayoutStore.load(lines);
+            assertTrue(ClientChatAppearances.isLocked(ChatTab.of(ChatChannel.ALL)));
+            assertTrue(ClientChatAppearances.isLocked(ChatTab.of(ChatChannel.OOC)));
+            assertFalse(ClientChatAppearances.isLocked(ChatTab.whisper("Steve")));
+            assertTrue(ClientChatAppearances.wasIdentityHintShown());
+            List<String> described = ChatWindowLayoutStore.describe();
+            assertTrue(described.contains(
+                    "identity all b0000000-0000-0000-0000-00000000000b"));
+            assertTrue(described.contains("identity ooc account"));
+            assertTrue(described.contains("flag identityHintShown=true"));
+            assertFalse(described.toString().contains("whisper:Steve"));
+            ChatWindowLayoutStore.load(described);
+            assertEquals(described, ChatWindowLayoutStore.describe());
+        } finally {
+            ChatWindowLayoutStore.load(Collections.<String>emptyList());
+            ClientChatAppearances.forgetStored();
+        }
+    }
+
     @Test
     public void malformedLinesAreSkippedAndTheLayoutRepaired() {
         ChatWindowLayoutStore.load(Arrays.asList(

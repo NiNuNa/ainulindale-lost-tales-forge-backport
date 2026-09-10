@@ -223,30 +223,49 @@ public final class LostTalesChatPresentationTest {
         }
     }
 
+    /**
+     * A line the client printed for itself is adopted as the Client's:
+     * the channel prefix and timestamp every line carries, the Client
+     * for a sender, and the words exactly as they were printed.
+     */
     @Test
-    public void systemLinesCarryTheChannelPrefixAndTimestamp() {
+    public void aStrayLineIsAdoptedAsTheClients() {
         boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
         LostTalesConfig.showChatTimestamps = true;
         try {
-            IChatComponent line = LostTalesChatPresentation.buildSystemLine(
+            net.minecraft.util.ChatComponentText printed =
                     new net.minecraft.util.ChatComponentText(
-                            "Your game mode has been updated"),
-                    ChatChannel.CONSOLE, 123456789L);
+                            "Your game mode has been updated");
+            ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
+            LostTalesChatMessagePacket packet = LostTalesChatPresentation
+                    .clientPacket(console, printed, 123456789L,
+                            com.ninuna.losttales.chat.ChatReplyReference.NONE);
+            assertEquals(LostTalesChatMessagePacket.CLIENT_SENDER_ID,
+                    packet.getSenderId());
+            assertEquals("Your game mode has been updated", packet.getMessage());
+            assertTrue(packet.isAccountLine());
+            IChatComponent line = LostTalesChatPresentation.build(packet,
+                    console, new int[0], false, ChatBodyKind.ANSWER, printed);
             StringBuilder plainText = new StringBuilder();
             boolean anchor = false;
+            boolean head = false;
             Integer prefixColor = null;
             for (Object value : line) {
                 IChatComponent part = (IChatComponent)value;
                 plainText.append(part.getUnformattedTextForChat());
                 anchor |= ChatLayoutMarker.isAnchor(part);
+                ChatHeadMarker.Data marker = ChatHeadMarker.decode(part);
+                head |= marker != null && marker.isSystemSender()
+                        && marker.mark() == com.ninuna.losttales.chat.emoji.ChatEmoji.CONSOLE;
                 if ("Console".equals(part.getUnformattedTextForChat())) {
                     prefixColor = ChatPrefixMarker.decode(part);
                 }
             }
             String rendered = plainText.toString();
-            assertTrue(rendered.startsWith("Console: ["));
-            assertTrue(rendered.endsWith("] Your game mode has been updated"));
+            assertTrue(rendered, rendered.startsWith("Console: ["));
+            assertTrue(rendered, rendered.endsWith("Your game mode has been updated"));
             assertTrue(anchor);
+            assertTrue("the Client wears the console mark for a head", head);
             assertEquals(Integer.valueOf(ChatChannel.CONSOLE.getDisplayColor()),
                     prefixColor);
         } finally {

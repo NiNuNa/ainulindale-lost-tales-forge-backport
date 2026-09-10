@@ -60,13 +60,13 @@ final class ChatComposer {
     /**
      * Whether a reply is being composed in the tab now selected: one
      * answering a message the server named, or one quoting a line
-     * nobody named by its author and words alone. A client-local id is
-     * neither — it names nothing anyone else could be shown.
+     * nobody named by its author and words alone — a client-local id
+     * is one of those, anchored here for the jump and quoted by its
+     * words to everyone else.
      */
     boolean isReplying() {
         boolean named = ChatMessageIds.isServerId(this.replyToMessageId)
-                || (this.replyToMessageId == ChatMessageIds.NONE
-                        && this.replyToName.length() > 0);
+                || this.replyToName.length() > 0;
         return named && this.replyTab != null
                 && this.replyTab.equals(ClientChatChannelState.getSelected());
     }
@@ -88,7 +88,7 @@ final class ChatComposer {
         if (!isReplying()) {
             return ChatReplyReference.NONE;
         }
-        return ChatMessageIds.isServerId(this.replyToMessageId)
+        return this.replyToMessageId != ChatMessageIds.NONE
                 ? ChatReplyReference.of(this.replyToMessageId, this.replyToName,
                         this.replyToExcerpt)
                 : ChatReplyReference.unanchored(this.replyToName,

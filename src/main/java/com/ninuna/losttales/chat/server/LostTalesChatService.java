@@ -185,8 +185,9 @@ public final class LostTalesChatService {
         RoleplayCharacter character = identity.isAvailable()
                 ? identity.getCharacter() : null;
         // The identity the line is signed with: the one the sender chose
-        // for the tab, else the character being played on every channel,
-        // else the account. Any owned character may speak anywhere.
+        // for the tab, else the channel's default — the character being
+        // played on an in-character channel, the account on an
+        // out-of-character one. Any owned character may speak anywhere.
         RoleplayCharacter appearance;
         if (appearanceKind == LostTalesChatSendPacket.APPEARANCE_ACCOUNT) {
             appearance = null;
@@ -199,7 +200,8 @@ public final class LostTalesChatService {
                 return;
             }
         } else if (identity.isAvailable()) {
-            appearance = character;
+            appearance = ChatRolePresentation.isInCharacter(channel)
+                    ? character : null;
         } else if (ChatRolePresentation.isInCharacter(channel)) {
             // The line would wear the active character, and the roster
             // cannot say which: refused rather than quietly spoken as
@@ -515,6 +517,17 @@ public final class LostTalesChatService {
     public static void console(ChatConsoleEvent.Kind kind,
                                ChatConsoleEvent.Severity severity, String actor,
                                String text) {
+        console(kind, severity, actor, text, "");
+    }
+
+    /**
+     * As above for a command, with the tab the actor typed it in as
+     * their client reported it ({@link ChatCommandContexts}); empty
+     * when nothing was reported.
+     */
+    public static void console(ChatConsoleEvent.Kind kind,
+                               ChatConsoleEvent.Severity severity, String actor,
+                               String text, String context) {
         if (kind == null || severity == null || text == null
                 || text.trim().length() == 0) {
             return;
@@ -522,7 +535,8 @@ public final class LostTalesChatService {
         ChatConsoleEvent event;
         try {
             event = new ChatConsoleEvent(ChatMessageIdAllocator.next(),
-                    System.currentTimeMillis(), kind, severity, actor, text);
+                    System.currentTimeMillis(), kind, severity, actor, text,
+                    context);
         } catch (IllegalArgumentException refused) {
             return;
         }
@@ -658,6 +672,7 @@ public final class LostTalesChatService {
                 return;
             }
             appearance = identity.isAvailable()
+                    && ChatRolePresentation.isInCharacter(channel)
                     ? identity.getCharacter() : null;
         }
         String accountName = sender.getGameProfile() == null

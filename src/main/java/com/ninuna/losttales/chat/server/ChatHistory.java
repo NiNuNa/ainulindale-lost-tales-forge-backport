@@ -121,8 +121,12 @@ public final class ChatHistory {
             long messageId, UUID replier,
             ChatChannel replyChannel, String replyScopeValue) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        // A line for everyone may be quoted by anyone: a player shown it
+        // by the replay — their own join, broadcast before they were on
+        // the player list — was as much its reader as anyone online.
         if (entry == null || replier == null || replyChannel == null
-                || !entry.seenBy.contains(replier)) {
+                || !(entry.seenBy.contains(replier)
+                        || entry.audience.isOpen())) {
             return ChatReplyReference.NONE;
         }
         if (!entry.channelId.equals(replyChannel.getId())) {
@@ -344,6 +348,12 @@ public final class ChatHistory {
         /** Everyone online now and later: an open, world-wide channel. */
         public static Audience everyone() {
             return new Audience(null, null, null, false);
+        }
+
+        /** Whether the audience is everyone: no accounts, party, faction or gate. */
+        boolean isOpen() {
+            return this.accounts == null && this.partyId == null
+                    && this.factionId == null && !this.gated;
         }
 
         /**

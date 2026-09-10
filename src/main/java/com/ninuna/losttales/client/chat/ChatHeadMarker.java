@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.nio.charset.Charset;
 import java.util.Base64;
@@ -143,6 +144,30 @@ final class ChatHeadMarker {
                     && LostTalesChatMessagePacket.isDiscordSender(
                             this.senderId);
         }
+
+        /**
+         * Whether the line's sender is the server or the client itself:
+         * its head slot holds the console mark, drawn as the Discord
+         * mark is.
+         */
+        boolean isSystemSender() {
+            return this.accountIdentity
+                    && LostTalesChatMessagePacket.isSystemSender(
+                            this.senderId);
+        }
+
+        /**
+         * The emoji standing where the head would, or null for a
+         * sender with a head of their own: the Discord mark for the
+         * bridge, the console mark for the server and the client.
+         */
+        ChatEmoji mark() {
+            if (isDiscordSender()) {
+                return ChatEmoji.DISCORD;
+            }
+            return isSystemSender() ? ChatEmoji.CONSOLE : null;
+        }
+
 
         private Data(UUID senderId, boolean accountIdentity,
                      boolean npcIdentity, String skinId,

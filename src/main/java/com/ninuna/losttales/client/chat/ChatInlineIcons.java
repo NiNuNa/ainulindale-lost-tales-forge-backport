@@ -52,11 +52,13 @@ final class ChatInlineIcons {
      */
     static final int HEAD_SLOT_WIDTH = 11;
     /**
-     * The slot a Discord-bridge line's head marker reserves: the 10px
-     * Discord mark drawn 1:1 — never scaled — with the same clear
-     * pixels around it a head keeps, so the slot is two pixels wider.
+     * The slot a head marker reserves when a mark stands for the head —
+     * the Discord mark on a bridge line, the console mark on the
+     * server's: a 10px emoji drawn 1:1 — never scaled — with the same
+     * clear pixels around it a head keeps, so the slot is two pixels
+     * wider.
      */
-    static final int DISCORD_HEAD_SLOT_WIDTH = 13;
+    static final int MARK_HEAD_SLOT_WIDTH = 13;
     /** Where the face starts inside that slot. */
     static final float HEAD_SLOT_INSET = 1.0F;
     /** The clear space a name keeps from what is written either side. */
@@ -77,8 +79,8 @@ final class ChatInlineIcons {
     static int declaredWidth(net.minecraft.util.IChatComponent part) {
         ChatHeadMarker.Data head = ChatHeadMarker.decode(part);
         if (head != null) {
-            return head.isDiscordSender()
-                    ? DISCORD_HEAD_SLOT_WIDTH : HEAD_SLOT_WIDTH;
+            return head.mark() != null
+                    ? MARK_HEAD_SLOT_WIDTH : HEAD_SLOT_WIDTH;
         }
         return ChatSpacerMarker.decode(part);
     }

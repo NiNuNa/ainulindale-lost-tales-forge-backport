@@ -503,6 +503,13 @@ public final class LostTalesClassTransformerTest {
         AbstractInsnNode second = nextCode(first);
         assertTrue(second instanceof MethodInsnNode);
         assertEquals("onBroadcast", ((MethodInsnNode)second).name);
+        assertEquals("(Lnet/minecraft/util/IChatComponent;)"
+                + "Lnet/minecraft/util/IChatComponent;",
+                ((MethodInsnNode)second).desc);
+        // What the hook hands back is what the body sends.
+        AbstractInsnNode third = nextCode(second);
+        assertEquals(Opcodes.ASTORE, third.getOpcode());
+        assertEquals(1, ((org.objectweb.asm.tree.VarInsnNode)third).var);
         // Applying the transformer again changes nothing.
         byte[] once = new LostTalesClassTransformer().transform(
                 "net.minecraft.server.management.ServerConfigurationManager",

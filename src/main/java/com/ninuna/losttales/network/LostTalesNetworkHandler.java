@@ -23,6 +23,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatDeletePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatEditPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatCommandContextPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatConsoleSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatContextHistoryPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatHistorySyncPacket;
@@ -126,5 +127,6 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesServerConfigApplyPacket.Handler.class, LostTalesServerConfigApplyPacket.class, 46, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChatContextHistoryPacket.Handler.class, LostTalesChatContextHistoryPacket.class, 50, Side.SERVER);
         CHANNEL.registerMessage(CharacterTemplateAdoptRequestPacket.Handler.class, CharacterTemplateAdoptRequestPacket.class, 51, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesChatCommandContextPacket.Handler.class, LostTalesChatCommandContextPacket.class, 52, Side.SERVER);
     }
 }

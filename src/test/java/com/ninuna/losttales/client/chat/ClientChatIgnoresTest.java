@@ -52,6 +52,38 @@ public final class ClientChatIgnoresTest {
         assertEquals(0, ClientChatIgnores.count());
     }
 
+    /**
+     * One character of an account can be ignored on its own: its lines
+     * and its presence go, the account's other characters stay, and
+     * the file keeps it, spaces in the name and all.
+     */
+    @Test
+    public void aCharacterIsIgnoredOnItsOwn() throws Exception {
+        File configDir = temporaryFolder.newFolder();
+        ClientChatIgnores.initialize(configDir);
+        assertTrue(ClientChatIgnores.ignoreIdentity(ACCOUNT_A, "Aldric the Bold"));
+        assertTrue(ClientChatIgnores.isIgnoredIdentity(ACCOUNT_A, "aldric the bold"));
+        assertFalse(ClientChatIgnores.isIgnoredIdentity(ACCOUNT_A, "Aldric"));
+        assertFalse(ClientChatIgnores.isIgnoredIdentity(ACCOUNT_B, "Aldric the Bold"));
+        assertFalse(ClientChatIgnores.isIgnored(ACCOUNT_A));
+        assertTrue(ClientChatIgnores.isIgnoredIdentityName("ALDRIC THE BOLD"));
+        assertFalse(ClientChatIgnores.isIgnoredName("Aldric the Bold"));
+        assertEquals(1, ClientChatIgnores.count());
+
+        ClientChatIgnores.initialize(configDir);
+        assertTrue(ClientChatIgnores.isIgnoredIdentity(ACCOUNT_A, "Aldric the Bold"));
+        assertTrue(ClientChatIgnores.isIgnoredIdentityName("aldric the bold"));
+        assertEquals(1, ClientChatIgnores.count());
+
+        assertTrue(ClientChatIgnores.unignoreIdentity(ACCOUNT_A, "Aldric the Bold"));
+        assertFalse(ClientChatIgnores.unignoreIdentity(ACCOUNT_A, "Aldric the Bold"));
+        assertFalse(ClientChatIgnores.isIgnoredIdentityName("aldric the bold"));
+        ClientChatIgnores.initialize(configDir);
+        assertEquals(0, ClientChatIgnores.count());
+        assertFalse(ClientChatIgnores.ignoreIdentity(null, "x"));
+        assertFalse(ClientChatIgnores.ignoreIdentity(ACCOUNT_A, "  "));
+    }
+
     @Test
     public void learnedNamesLastTheSessionAndAccountNamesLastForever()
             throws Exception {

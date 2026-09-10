@@ -522,10 +522,12 @@ final class LostTalesChatOverlayRenderer {
             IChatComponent lineRoot =
                     lines.get(band.viewIndex).func_151461_a();
             int cursor = 0;
+            int index = -1;
             for (Object value : lineRoot) {
                 if (!(value instanceof IChatComponent)) {
                     continue;
                 }
+                index++;
                 IChatComponent part = (IChatComponent)value;
                 if (ChatPrefixMarker.isHidden(part, true)) {
                     continue;
@@ -533,7 +535,7 @@ final class LostTalesChatOverlayRenderer {
                 cursor += LostTalesChatVisualStyle.partWidth(
                         minecraft.fontRenderer, part, true);
                 if (band.localX < cursor) {
-                    return new Hit(part, lineRoot);
+                    return new Hit(part, lineRoot, index);
                 }
             }
             return null;
@@ -542,14 +544,23 @@ final class LostTalesChatOverlayRenderer {
         }
     }
 
-    /** A clicked component together with the wrapped line that holds it. */
+    /**
+     * A clicked component together with the wrapped line that holds it
+     * and its place on that line, counted over every component the
+     * line's iterator yields. The iterator hands out copies, so the
+     * component is never the same object twice; the line is, and the
+     * place tells the component apart from every other on it.
+     */
     static final class Hit {
         final IChatComponent component;
         final IChatComponent line;
+        final int index;
 
-        private Hit(IChatComponent component, IChatComponent line) {
+        private Hit(IChatComponent component, IChatComponent line,
+                    int index) {
             this.component = component;
             this.line = line;
+            this.index = index;
         }
     }
 
@@ -2135,17 +2146,18 @@ final class LostTalesChatOverlayRenderer {
             ChatHeadMarker.Data marker = ChatHeadMarker.decode(part);
             if (marker != null) {
                 float opacity = alpha / 255.0F;
-                if (marker.isDiscordSender()) {
-                    // A line from the bridge has no account behind it;
-                    // the Discord mark stands where the head would,
-                    // drawn 1:1 — its slot is declared two pixels wider
-                    // than a head's, so it keeps the same clear pixels
-                    // either side instead of eating into them. Centred
-                    // in the line band exactly as an inline emoji is.
+                ChatEmoji mark = marker.mark();
+                if (mark != null) {
+                    // A line from the bridge or from the server has no
+                    // account behind it; its mark stands where the head
+                    // would, drawn 1:1 — its slot is declared two
+                    // pixels wider than a head's, so it keeps the same
+                    // clear pixels either side instead of eating into
+                    // them. Centred in the line band exactly as an
+                    // inline emoji is.
                     float markTop = y - HEAD_TOP_OFFSET
                             + ChatInlineIcons.CONTENT_TOP_OFFSET;
-                    ChatEmojiRenderer.drawShadow(minecraft,
-                            ChatEmoji.DISCORD,
+                    ChatEmojiRenderer.drawShadow(minecraft, mark,
                             x + HEAD_LEFT_OFFSET
                                     + LostTalesChatVisualStyle.SHADOW_OFFSET,
                             markTop + LostTalesChatVisualStyle.SHADOW_OFFSET,
@@ -2153,7 +2165,7 @@ final class LostTalesChatOverlayRenderer {
                             LostTalesChatVisualStyle.SHADOW,
                             Math.round(alpha
                                     * LostTalesChatVisualStyle.SHADOW_OPACITY));
-                    ChatEmojiRenderer.draw(minecraft, ChatEmoji.DISCORD,
+                    ChatEmojiRenderer.draw(minecraft, mark,
                             x + HEAD_LEFT_OFFSET, markTop,
                             ChatEmoji.SPRITE_SIZE, alpha);
                     return;

@@ -44,10 +44,23 @@ public final class ChatComposerTest {
         assertFalse(composer.isReplying());
     }
 
+    /**
+     * A line this client named — an NPC's speech, a command's answer, a
+     * system line — is anchored by its local id here, so a click on the
+     * quote finds it; the outbox sends its words alone. Without an
+     * author it is no reply, whatever the id.
+     */
     @Test
-    public void aLocalIdNeverCountsAsAReply() {
+    public void aLocalIdAnchorsAReplyForThisClientAlone() {
         ChatComposer composer = new ChatComposer();
         composer.startReply(ChatTab.of(ChatChannel.ALL), -7L, "Bilbo", "x");
+        assertTrue(composer.isReplying());
+        ChatReplyReference reference = composer.replyReference();
+        assertTrue(reference.isAnchored());
+        assertEquals(-7L, reference.getMessageId());
+        assertEquals("Bilbo", reference.getAuthor());
+        assertEquals("x", reference.getExcerpt());
+        composer.startReply(ChatTab.of(ChatChannel.ALL), -8L, "", "x");
         assertFalse(composer.isReplying());
         assertEquals(ChatReplyReference.NONE, composer.replyReference());
     }

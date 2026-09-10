@@ -2,10 +2,11 @@ package com.ninuna.losttales.chat;
 
 /**
  * How a channel's lines present their sender. The identity a line wears
- * is the player's choice and defaults to the character being played on
- * every channel; what the channel decides is how that identity reads:
- * in character, with no role worn and the name in the character's
- * faction colour, or out of character, with the primary role tagged and
+ * is the player's choice; left unchosen it follows the mode, the
+ * character being played in character and the account out of
+ * character. The mode also decides how the identity reads: in
+ * character, with no role worn and the name in the character's faction
+ * colour, or out of character, with the primary role tagged and
  * colouring the name. {@link ChatRolePresentation} is the one place the
  * two are turned into tags and colours.
  */

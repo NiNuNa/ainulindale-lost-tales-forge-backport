@@ -340,11 +340,12 @@ public final class CharacterService {
         if (roster == null) {
             return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, null);
         }
-        CharacterValidationResult revision = CharacterValidator.validateExpectedRevision(
-                roster, adoption.getExpectedRosterRevision());
-        if (!revision.isValid()) {
-            return CharacterOperationResult.failure(revision.getErrorId(), roster);
-        }
+        // The revision the offer was made against is not checked: the
+        // offer names no character and no slot, so there is nothing a
+        // revision protects, and the roster is re-read and re-checked
+        // here anyway. The login sequence itself moves the revision —
+        // the roster exists before its default character does — and an
+        // offer made against the earlier snapshot must still be taken.
         RoleplayCharacter current = roster.getDefaultCharacter();
         if (current == null || roster.isTemplateTaken()) {
             // Either there is nothing to take it onto yet, or this world

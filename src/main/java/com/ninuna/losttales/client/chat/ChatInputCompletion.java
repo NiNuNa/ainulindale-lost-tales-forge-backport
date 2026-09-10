@@ -6,6 +6,7 @@ import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatNameSuggester;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
@@ -66,6 +67,8 @@ final class ChatInputCompletion {
             new ChatEmojiSuggestionBox();
     private final ChatNameSuggestionBox nameSuggestions =
             new ChatNameSuggestionBox();
+    private final ChatChannelSuggestionBox channelSuggestions =
+            new ChatChannelSuggestionBox();
     private final ChatShareSuggestionBox shareSuggestions =
             new ChatShareSuggestionBox();
     /**
@@ -165,9 +168,33 @@ final class ChatInputCompletion {
                 return true;
             }
         }
+        refreshChannelSuggestions();
+        if (this.channelSuggestions.isActive()
+                && serveChannelKey(suggestionAction(keyCode))) {
+            return true;
+        }
         refreshShareSuggestions();
         return this.shareSuggestions.isActive()
                 && serveShareKey(suggestionAction(keyCode));
+    }
+
+    private boolean serveChannelKey(int action) {
+        switch (action) {
+            case KEY_UP:
+                this.channelSuggestions.moveSelection(-1);
+                return true;
+            case KEY_DOWN:
+                this.channelSuggestions.moveSelection(1);
+                return true;
+            case KEY_ACCEPT:
+                acceptChannelSuggestion(this.channelSuggestions.getSelected());
+                return true;
+            case KEY_DISMISS:
+                this.channelSuggestions.dismiss();
+                return true;
+            default:
+                return false;
+        }
     }
 
     /** What a key means to an open suggestion list. */
@@ -254,7 +281,23 @@ final class ChatInputCompletion {
         if (LostTalesConfig.enableChatPings) {
             refreshNameSuggestions();
         }
+        refreshChannelSuggestions();
         refreshShareSuggestions();
+    }
+
+    /**
+     * The channels a {@code #} may name: every channel the player can
+     * read, in the order the tabs stand in.
+     */
+    private void refreshChannelSuggestions() {
+        List<ChatChannel> channels = new ArrayList<ChatChannel>();
+        for (ChatChannel channel : ChatChannel.presentationOrder()) {
+            if (ClientChatChannelState.isAvailable(channel)) {
+                channels.add(channel);
+            }
+        }
+        this.channelSuggestions.update(this.field.getText(),
+                this.field.getCursorPosition(), channels);
     }
 
     private void refreshNameSuggestions() {
@@ -423,6 +466,9 @@ final class ChatInputCompletion {
             this.nameSuggestions.draw(this.mc, this.font, this.regions,
                     anchor, inputX, mouseX, mouseY);
         }
+        refreshChannelSuggestions();
+        this.channelSuggestions.draw(this.mc, this.font, this.regions,
+                anchor, inputX, mouseX, mouseY);
         refreshShareSuggestions();
         this.shareSuggestions.draw(this.mc, this.font, this.regions, anchor,
                 inputX, mouseX, mouseY);
@@ -463,6 +509,14 @@ final class ChatInputCompletion {
                     this.font, mouseX, mouseY, anchor, inputX);
             if (suggested != null) {
                 acceptNameSuggestion(suggested);
+                return true;
+            }
+        }
+        if (this.channelSuggestions.isActive()) {
+            ChatChannel suggested = this.channelSuggestions.suggestionAt(
+                    this.font, mouseX, mouseY, anchor, inputX);
+            if (suggested != null) {
+                acceptChannelSuggestion(suggested);
                 return true;
             }
         }
@@ -512,6 +566,17 @@ final class ChatInputCompletion {
         }
         replaceAtCursor(query.atIndex, "@" + candidate.getDisplayName() + " ");
         refreshNameSuggestions();
+    }
+
+    /** Replaces the {@code #prefix} at the cursor with the channel's token. */
+    private void acceptChannelSuggestion(ChatChannel channel) {
+        ChatChannelSuggester.Query query = this.channelSuggestions.getQuery();
+        if (channel == null || query == null) {
+            return;
+        }
+        replaceAtCursor(query.hashIndex,
+                ChatChannelSuggester.token(channel) + " ");
+        refreshChannelSuggestions();
     }
 
     /** Replaces the open share opener at the cursor with a full token. */

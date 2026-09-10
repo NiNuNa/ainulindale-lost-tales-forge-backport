@@ -95,6 +95,7 @@ public final class ChatWindowLayoutStore {
             loadedLines = null;
             layoutTouched = false;
             ChatWindowLayout.reset();
+            ClientChatAppearances.forgetStored();
         }
         ChatWindowLayout.setChangeListener(new Runnable() {
             @Override
@@ -146,6 +147,8 @@ public final class ChatWindowLayoutStore {
         List<ChatTab> muted = new ArrayList<ChatTab>();
         List<ChatTab> pingsMuted = new ArrayList<ChatTab>();
         List<ChatTab> hidden = new ArrayList<ChatTab>();
+        List<String[]> locks = new ArrayList<String[]>();
+        boolean identityHintShown = false;
         double feedX = 0.0D;
         double feedY = 100.0D;
         boolean collapsed = false;
@@ -168,6 +171,18 @@ public final class ChatWindowLayoutStore {
                 addTab(pingsMuted, parts[1]);
             } else if (parts.length == 2 && "hidden".equals(parts[0])) {
                 addTab(hidden, parts[1]);
+            } else if (parts.length == 3 && "identity".equals(parts[0])) {
+                // A tab's identity lock: the tab, and the account or a
+                // character id; one the roster cannot name is resolved
+                // later by ClientChatAppearances, or dropped there.
+                locks.add(new String[] {parts[1], parts[2]});
+            } else if ("flag".equals(parts[0])) {
+                for (int index = 1; index < parts.length; index++) {
+                    if (parts[index].startsWith("identityHintShown=")) {
+                        identityHintShown = "true".equalsIgnoreCase(
+                                parts[index].substring(18));
+                    }
+                }
             } else if (parts.length >= 2 && "window".equals(parts[0])) {
                 ChatWindowLayout.WindowSpec spec = parseWindow(parts);
                 if (spec != null) {
@@ -192,6 +207,8 @@ public final class ChatWindowLayoutStore {
         }
         ChatWindowLayout.load(specs, closed, muted, pingsMuted, hidden,
                 feedX, feedY, collapsed);
+        ClientChatAppearances.restoreLocks(locks);
+        ClientChatAppearances.restoreIdentityHintShown(identityHintShown);
     }
 
     private static void addTab(List<ChatTab> tabs, String id) {
@@ -342,6 +359,12 @@ public final class ChatWindowLayoutStore {
         }
         for (ChatTab tab : ChatWindowLayout.hiddenTabs()) {
             lines.add("hidden " + tab.id());
+        }
+        for (String[] lock : ClientChatAppearances.describeLocks()) {
+            lines.add("identity " + lock[0] + " " + lock[1]);
+        }
+        if (ClientChatAppearances.wasIdentityHintShown()) {
+            lines.add("flag identityHintShown=true");
         }
         return lines;
     }

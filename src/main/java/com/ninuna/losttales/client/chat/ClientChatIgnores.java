@@ -42,6 +42,17 @@ public final class ClientChatIgnores {
             new LinkedHashMap<UUID, String>();
     /** Lower-cased names known to belong to ignored accounts. */
     private static final Set<String> knownNames = new HashSet<String>();
+    /**
+     * Identities ignored on their own — one character of an account,
+     * the account's other characters still heard — keyed by the
+     * account id and the identity's lower-cased name, the name as it
+     * was seen kept for the file and the notices.
+     */
+    private static final Map<String, String> ignoredIdentities =
+            new LinkedHashMap<String, String>();
+    /** Lower-cased names of the ignored identities, for presence. */
+    private static final Set<String> ignoredIdentityNames =
+            new HashSet<String>();
 
     private ClientChatIgnores() {}
 
@@ -50,11 +61,74 @@ public final class ClientChatIgnores {
                 ? null : new File(configDirectory, FILE_PATH);
         ignoredAccounts.clear();
         knownNames.clear();
+        ignoredIdentities.clear();
+        ignoredIdentityNames.clear();
         load();
     }
 
     public static synchronized boolean isIgnored(UUID accountId) {
         return accountId != null && ignoredAccounts.containsKey(accountId);
+    }
+
+    /** Whether one identity of an account is ignored on its own. */
+    public static synchronized boolean isIgnoredIdentity(UUID accountId,
+                                                         String identityName) {
+        String key = identityKey(accountId, identityName);
+        return key != null && ignoredIdentities.containsKey(key);
+    }
+
+    /**
+     * Whether the name is an identity ignored on its own — for presence,
+     * which carries a name and no account.
+     */
+    public static synchronized boolean isIgnoredIdentityName(String name) {
+        String key = nameKey(name);
+        return key.length() > 0 && ignoredIdentityNames.contains(key);
+    }
+
+    /**
+     * Starts ignoring one identity of an account, the account's other
+     * identities still heard; false when the list is full. The list is
+     * one budget for accounts and identities alike.
+     */
+    public static synchronized boolean ignoreIdentity(UUID accountId,
+                                                      String identityName) {
+        String key = identityKey(accountId, identityName);
+        if (key == null) {
+            return false;
+        }
+        if (!ignoredIdentities.containsKey(key) && count() >= MAX_IGNORES) {
+            return false;
+        }
+        ignoredIdentities.put(key, identityName.trim());
+        ignoredIdentityNames.add(nameKey(identityName));
+        save();
+        return true;
+    }
+
+    /** Stops ignoring one identity; false when it was not ignored. */
+    public static synchronized boolean unignoreIdentity(UUID accountId,
+                                                        String identityName) {
+        String key = identityKey(accountId, identityName);
+        if (key == null || ignoredIdentities.remove(key) == null) {
+            return false;
+        }
+        rebuildIdentityNames();
+        save();
+        return true;
+    }
+
+    private static String identityKey(UUID accountId, String identityName) {
+        String name = nameKey(identityName);
+        return accountId == null || name.length() == 0 ? null
+                : accountId + "|" + name;
+    }
+
+    private static void rebuildIdentityNames() {
+        ignoredIdentityNames.clear();
+        for (String name : ignoredIdentities.values()) {
+            ignoredIdentityNames.add(nameKey(name));
+        }
     }
 
     /** Whether the name is known to belong to an ignored account. */
@@ -117,8 +191,9 @@ public final class ClientChatIgnores {
         rebuildKnownNames();
     }
 
+    /** Every ignore kept, accounts and identities together. */
     public static synchronized int count() {
-        return ignoredAccounts.size();
+        return ignoredAccounts.size() + ignoredIdentities.size();
     }
 
     private static void rebuildKnownNames() {
@@ -158,9 +233,7 @@ public final class ClientChatIgnores {
 
     private static void parseLine(String line) {
         String[] parts = line.split(" ");
-        if (parts.length < 2 || parts.length > 3
-                || !"ignore".equals(parts[0])
-                || ignoredAccounts.size() >= MAX_IGNORES) {
+        if (parts.length < 2 || count() >= MAX_IGNORES) {
             return;
         }
         UUID accountId;
@@ -170,7 +243,20 @@ public final class ClientChatIgnores {
             // A malformed id names nobody; the line is dropped.
             return;
         }
-        ignoredAccounts.put(accountId, parts.length == 3 ? parts[2] : "");
+        if ("ignore".equals(parts[0]) && parts.length <= 3) {
+            ignoredAccounts.put(accountId, parts.length == 3 ? parts[2] : "");
+        } else if ("ignore-identity".equals(parts[0]) && parts.length >= 3) {
+            // A character's name may hold spaces: the rest of the line.
+            StringBuilder name = new StringBuilder(parts[2]);
+            for (int index = 3; index < parts.length; index++) {
+                name.append(' ').append(parts[index]);
+            }
+            String key = identityKey(accountId, name.toString());
+            if (key != null) {
+                ignoredIdentities.put(key, name.toString().trim());
+                ignoredIdentityNames.add(nameKey(name.toString()));
+            }
+        }
     }
 
     private static void save() {
@@ -189,6 +275,16 @@ public final class ClientChatIgnores {
                 writer.write("ignore " + entry.getKey()
                         + (entry.getValue().length() > 0
                                 ? " " + entry.getValue() : "") + "\n");
+            }
+            for (Map.Entry<String, String> entry : ignoredIdentities.entrySet()) {
+                writer.write("ignore-identity "
+                        + entry.getKey().substring(0, entry.getKey().indexOf('|'))
+                        + " " + entry.getValue() + "\n");
+            }
+            for (Map.Entry<String, String> entry : ignoredIdentities.entrySet()) {
+                writer.write("ignore-identity "
+                        + entry.getKey().substring(0, entry.getKey().indexOf('|'))
+                        + " " + entry.getValue() + "\n");
             }
         } catch (IOException ignored) {
             // Losing a preference write must never break chat.

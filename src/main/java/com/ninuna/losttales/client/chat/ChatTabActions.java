@@ -26,15 +26,17 @@ final class ChatTabActions {
     private final ChatInputBar bar;
     private final ChatInputCompletion completion;
     private final ChatComposer composer;
+    private final ChatNoticeSink notices;
     private Minecraft mc;
     private GuiTextField field;
     private ChatTab lastSelected;
 
     ChatTabActions(ChatInputBar bar, ChatInputCompletion completion,
-                   ChatComposer composer) {
+                   ChatComposer composer, ChatNoticeSink notices) {
         this.bar = bar;
         this.completion = completion;
         this.composer = composer;
+        this.notices = notices;
     }
 
     /**
@@ -103,7 +105,10 @@ final class ChatTabActions {
             swapDraft(previous, selected);
             // A passing choice ends with the tab it was made on; every
             // tab's lock stays with that tab.
+            ClientChatAppearances.Appearance before =
+                    ClientChatAppearances.effectiveFor(previous);
             ClientChatAppearances.onChannelSwitched();
+            hintIdentityChange(before, selected);
         }
         List<ChatWindow> windows = ChatWindowLayout.windows();
         for (int index = 0; index < windows.size(); index++) {
@@ -111,6 +116,31 @@ final class ChatTabActions {
             ClientChatChannelViews.markViewed(ChatWindowFrame.activeTab(
                     window, ChatWindowFrame.visibleTabs(window)));
         }
+    }
+
+    /**
+     * Says once, the first time a tab switch changes who the player
+     * speaks as by the channel's default alone — the account on an
+     * out-of-character tab after a character on an in-character one,
+     * or the other way — what happened and where to change it, since
+     * the head button changing by itself is easy to miss. A tab locked
+     * or picked on says nothing: the player chose that.
+     */
+    private void hintIdentityChange(ClientChatAppearances.Appearance before,
+                                    ChatTab selected) {
+        if (this.notices == null || before == null || selected == null
+                || ClientChatAppearances.wasIdentityHintShown()
+                || ClientChatAppearances.isLocked(selected)) {
+            return;
+        }
+        ClientChatAppearances.Appearance after =
+                ClientChatAppearances.effectiveFor(selected);
+        if (after == null || after.account == before.account) {
+            return;
+        }
+        ClientChatAppearances.setIdentityHintShown(true);
+        this.notices.showNotice(StatCollector.translateToLocalFormatted(
+                "gui.losttales.chat.identity.hint", after.name));
     }
 
     /**

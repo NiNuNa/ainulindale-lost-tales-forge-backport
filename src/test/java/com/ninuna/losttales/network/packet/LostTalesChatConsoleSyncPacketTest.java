@@ -19,7 +19,7 @@ public final class LostTalesChatConsoleSyncPacketTest {
     public void aBatchRoundTripsInOrder() {
         ChatConsoleEvent command = new ChatConsoleEvent(10L, 5000L,
                 ChatConsoleEvent.Kind.COMMAND, ChatConsoleEvent.Severity.INFO, "Steve",
-                "/gamemode 1");
+                "/gamemode 1", "faction|scope:gondor");
         ChatConsoleEvent warning = new ChatConsoleEvent(11L, 6000L,
                 ChatConsoleEvent.Kind.WARNING, ChatConsoleEvent.Severity.WARNING, "",
                 "the mute list could not be read");
@@ -37,9 +37,28 @@ public final class LostTalesChatConsoleSyncPacketTest {
         assertEquals(ChatConsoleEvent.Kind.COMMAND, first.getKind());
         assertEquals("Steve", first.getActor());
         assertEquals("/gamemode 1", first.getText());
+        assertEquals("faction|scope:gondor", first.getContext());
         ChatConsoleEvent second = decoded.getEvents().get(1);
         assertEquals(ChatConsoleEvent.Severity.WARNING, second.getSeverity());
         assertEquals("", second.getActor());
+        assertEquals("", second.getContext());
+    }
+
+    @Test
+    public void aContextThatIsNoTabIdRefusesTheBatch() {
+        ByteBuf buffer = Unpooled.buffer();
+        buffer.writeInt(1);
+        buffer.writeLong(1L);
+        buffer.writeLong(1L);
+        buffer.writeByte(ChatConsoleEvent.Kind.COMMAND.ordinal());
+        buffer.writeByte(ChatConsoleEvent.Severity.INFO.ordinal());
+        LostTalesPacketCodec.writeUtf8String(buffer, "Steve", 256);
+        LostTalesPacketCodec.writeUtf8String(buffer, "/gamemode 1", 2048);
+        LostTalesPacketCodec.writeUtf8String(buffer, "all\u0001", 2048);
+        LostTalesChatConsoleSyncPacket decoded = new LostTalesChatConsoleSyncPacket();
+        decoded.fromBytes(buffer);
+        assertTrue(decoded.isMalformed());
+        assertTrue(decoded.getEvents().isEmpty());
     }
 
     @Test

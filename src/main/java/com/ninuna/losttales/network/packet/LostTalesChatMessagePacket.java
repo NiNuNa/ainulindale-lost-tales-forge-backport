@@ -66,6 +66,49 @@ public final class LostTalesChatMessagePacket implements IMessage {
     }
 
     /**
+     * The sender id of the server's own lines: a command's answer, and
+     * the operator console's word on who ran what. Nobody's account, so
+     * it is never ignored, muted, whispered or looked up a skin for; a
+     * client shows it with the console mark for a head. Such lines are
+     * built on the client from what the server sent and never travel
+     * as messages, so no packet off the wire is expected to carry it.
+     */
+    public static final UUID SERVER_SENDER_ID = UUID.nameUUIDFromBytes(
+            "losttales:server".getBytes(
+                    java.nio.charset.Charset.forName("UTF-8")));
+
+    /** Whether a sender id names the server itself. */
+    public static boolean isServerSender(UUID senderId) {
+        return SERVER_SENDER_ID.equals(senderId);
+    }
+
+    /**
+     * The sender id of the client's own lines: what the game prints
+     * for itself without any server saying it — a game mode notice, a
+     * saved screenshot, another mod's local print. Shown like the
+     * server's lines, under its own name, so a reader can tell the two
+     * apart. Never travels: nobody but this client ever builds one.
+     */
+    public static final UUID CLIENT_SENDER_ID = UUID.nameUUIDFromBytes(
+            "losttales:client".getBytes(
+                    java.nio.charset.Charset.forName("UTF-8")));
+
+    /** Whether a sender id names the client itself. */
+    public static boolean isClientSender(UUID senderId) {
+        return CLIENT_SENDER_ID.equals(senderId);
+    }
+
+    /**
+     * Whether a sender id names the server or the client rather than
+     * anyone: a line with no account behind it, no skin, no card of a
+     * person, no whisper, nothing to ignore or mute.
+     */
+    public static boolean isSystemSender(UUID senderId) {
+        return isServerSender(senderId) || isClientSender(senderId);
+    }
+
+
+    /**
      * The Discord id of the member a sender id stands for; empty for a
      * player, and for the bridge's own id.
      */
@@ -801,6 +844,18 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 this.accountLine, this.messageId, this.reply,
                 this.partnerIdentity, this.echoNonce, this.identityCharacterId,
                 this.ownCharacterId, this.partnerCharacterId, scopeValue);
+    }
+
+    /** The same line with its name drawn in another colour. */
+    public LostTalesChatMessagePacket withNameColor(int color) {
+        return new LostTalesChatMessagePacket(getChannel(), this.senderId,
+                this.identityName, this.accountName, this.title,
+                this.titleColor, color, this.message,
+                this.timestampMillis, this.skinId, this.showcases,
+                this.factionName, this.partner, this.roles,
+                this.accountLine, this.messageId, this.reply,
+                this.partnerIdentity, this.echoNonce, this.identityCharacterId,
+                this.ownCharacterId, this.partnerCharacterId, this.scopeValue);
     }
 
     /** Which conversation on a scoped channel the line is in; empty for one. */

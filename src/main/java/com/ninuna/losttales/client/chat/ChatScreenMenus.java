@@ -52,6 +52,7 @@ final class ChatScreenMenus {
     /** The second half of deleting: the row that is the confirmation. */
     private static final String ENTRY_DELETE_CONFIRM = "delete_confirm";
     private static final String ENTRY_IGNORE = "ignore_account";
+    private static final String ENTRY_IGNORE_IDENTITY = "ignore_identity";
     /**
      * What an operator's rows are drawn in: the Operator channel's own
      * crimson, so an action that reaches beyond this player's words is
@@ -856,6 +857,7 @@ final class ChatScreenMenus {
                 || person.accountName.length() == 0
                 || LostTalesChatMessagePacket.DISCORD_SENDER_ID.equals(
                         person.playerId)
+                || LostTalesChatMessagePacket.isSystemSender(person.playerId)
                 || (this.mc.thePlayer != null && person.playerId.equals(
                         this.mc.thePlayer.getUniqueID()))) {
             return false;
@@ -883,11 +885,30 @@ final class ChatScreenMenus {
                             "gui.losttales.chat.message.whisper",
                             name.length() > 0 ? name : person.accountName)));
         }
+        // A character can be ignored on its own, the account's other
+        // characters still heard; the account row then says it is the
+        // account. Both rows flip to lifting what they laid.
+        boolean identityRow = name.length() > 0
+                && !name.equalsIgnoreCase(person.accountName);
+        if (identityRow) {
+            entries.add(new ChatPopupMenu.Entry(ENTRY_IGNORE_IDENTITY,
+                    StatCollector.translateToLocalFormatted(
+                            ClientChatIgnores.isIgnoredIdentity(
+                                    person.playerId, name)
+                                    ? "gui.losttales.chat.message.unignore"
+                                    : "gui.losttales.chat.message.ignore",
+                            name)));
+        }
+        boolean accountIgnored = ClientChatIgnores.isIgnored(person.playerId);
         entries.add(new ChatPopupMenu.Entry(ENTRY_IGNORE,
                 StatCollector.translateToLocalFormatted(
-                        ClientChatIgnores.isIgnored(person.playerId)
-                                ? "gui.losttales.chat.message.unignore"
-                                : "gui.losttales.chat.message.ignore",
+                        identityRow
+                                ? accountIgnored
+                                        ? "gui.losttales.chat.message.unignore_account"
+                                        : "gui.losttales.chat.message.ignore_account"
+                                : accountIgnored
+                                        ? "gui.losttales.chat.message.unignore"
+                                        : "gui.losttales.chat.message.ignore",
                         person.accountName)));
         if (ClientChatChannelState.canModerate()) {
             // The server's mute, for moderators: the row offers to lift
@@ -1022,15 +1043,14 @@ final class ChatScreenMenus {
         if (tab == null) {
             return;
         }
-        // A line the server named is answered by its id; any other — a
-        // client-local one included — by its words alone.
-        long id = ChatMessageIds.isServerId(this.menuMessageId)
-                ? this.menuMessageId : ChatMessageIds.NONE;
+        // A line the server named is answered by its id; a client-local
+        // one by its own id here and by its words alone on the wire.
+        long id = this.menuMessageId;
         // The chip and the local quote name the identity the line was
         // signed with, exactly as the server's own quote will.
         String name = this.menuMessageIdentity.length() > 0
                 ? this.menuMessageIdentity : this.menuMessageAccount;
-        if (id == ChatMessageIds.NONE) {
+        if (!ChatMessageIds.isServerId(id)) {
             name = LostTalesChatPresentation.quoteAuthorFor(name);
         }
         // The menu resolved the message when it opened, which is also
@@ -1187,6 +1207,30 @@ final class ChatScreenMenus {
     }
 
     /**
+     * Starts or stops ignoring the one identity behind the menu's
+     * message, the account's other identities still heard.
+     */
+    private void toggleIgnoreIdentity() {
+        String name = LostTalesChatVisualStyle.removeColorCodes(
+                this.menuMessageIdentity).trim();
+        if (this.menuMessageSenderId == null || name.length() == 0) {
+            return;
+        }
+        if (ClientChatIgnores.isIgnoredIdentity(this.menuMessageSenderId, name)) {
+            ClientChatIgnores.unignoreIdentity(this.menuMessageSenderId, name);
+            this.notices.showNotice(StatCollector.translateToLocalFormatted(
+                    "gui.losttales.chat.unignored", name));
+        } else if (ClientChatIgnores.ignoreIdentity(this.menuMessageSenderId,
+                name)) {
+            this.notices.showNotice(StatCollector.translateToLocalFormatted(
+                    "gui.losttales.chat.ignored_identity", name));
+        } else {
+            this.notices.showNotice(StatCollector.translateToLocal(
+                    "gui.losttales.chat.ignore_full"));
+        }
+    }
+
+    /**
      * Acts on a chosen entry, answering whether the menu should stay
      * open: all but one entry are done with the menu once they have
      * been chosen, and the caller closes it. Deleting is the exception —
@@ -1201,6 +1245,8 @@ final class ChatScreenMenus {
                         this.menuMessageIdentity);
             } else if (ENTRY_IGNORE.equals(entry.id)) {
                 toggleIgnore();
+            } else if (ENTRY_IGNORE_IDENTITY.equals(entry.id)) {
+                toggleIgnoreIdentity();
             } else if (ENTRY_MUTE_ACCOUNT.equals(entry.id)) {
                 startMute();
             } else if (ENTRY_UNMUTE_ACCOUNT.equals(entry.id)) {

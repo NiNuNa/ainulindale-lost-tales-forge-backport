@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
@@ -132,21 +133,22 @@ final class ChatOutbox {
                            ChatReplyReference reply) {
         long echoNonce = LostTalesChatPresentation.echoPending(tab, outgoing,
                 resolveLocalShowcases(outgoing), reply);
+        // Only a message the server named travels as its id; a line
+        // this client anchored for itself is quoted by its words.
+        boolean named = ChatMessageIds.isServerId(reply.getMessageId());
         LostTalesNetworkHandler.CHANNEL.sendToServer(
                 new LostTalesChatSendPacket(tab.getChannel(), outgoing,
                         resolveShareReferences(outgoing), tab.getPartner(),
                         ClientChatAppearances.wireKind(tab),
                         ClientChatAppearances.wireCharacterId(tab),
-                        reply.getMessageId(),
+                        named ? reply.getMessageId() : ChatMessageIds.NONE,
                         tab.isWhisper() ? tab.getPartnerIdentity() : "",
                         echoNonce,
                         tab.isWhisper()
                                 ? ClientChatChannelState.partnerCharacterIdOf(tab)
                                 : null,
-                        // A quote of a line nobody named travels whole;
-                        // one the server named travels as its id.
-                        reply.isAnchored() ? "" : reply.getAuthor(),
-                        reply.isAnchored() ? "" : reply.getExcerpt()));
+                        named ? "" : reply.getAuthor(),
+                        named ? "" : reply.getExcerpt()));
     }
 
     /**

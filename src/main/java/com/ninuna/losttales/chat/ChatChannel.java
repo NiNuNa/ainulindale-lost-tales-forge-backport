@@ -71,7 +71,7 @@ public final class ChatChannel {
      */
     public static final ChatChannel CONSOLE = register("console", "Console", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.SELF, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.MAUVE), false);
+            LostTalesColors.rgb(LostTalesColors.ROSE_GRAY), false);
     /**
      * A private conversation between two players, in character. Not a tab of its own:
      * every whisper partner is one tab on this channel, and the client
