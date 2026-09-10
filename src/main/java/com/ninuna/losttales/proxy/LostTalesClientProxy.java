@@ -87,6 +87,7 @@ import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.client.chat.ClientChatAccountRoles;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import com.ninuna.losttales.client.chat.ClientChatIgnores;
+import com.ninuna.losttales.client.chat.ClientChatReadMarks;
 import com.ninuna.losttales.client.chat.ClientChatTypingState;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
@@ -136,6 +137,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         ChatEmojiUsageStore.initialize(clientFolder);
         ClientChatIgnores.initialize(clientFolder);
         ChatWindowLayoutStore.initialize(clientFolder);
+        ClientChatReadMarks.initialize(clientFolder);
         LostTalesClientMapMarkerUsageStore.initialize(clientFolder);
         CharacterTemplateStore.initialize(clientFolder);
         LostTalesThirdPersonConfig.load(

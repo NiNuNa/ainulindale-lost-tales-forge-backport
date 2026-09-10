@@ -11,6 +11,7 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.GuiChat;
+import net.minecraft.client.gui.GuiMainMenu;
 import net.minecraftforge.client.event.ClientChatReceivedEvent;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
@@ -35,9 +36,20 @@ public final class LostTalesChatClientHandler {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void replaceVanillaChat(GuiOpenEvent event) {
-        if (event == null || event.gui == null
-                || event.gui.getClass() != GuiChat.class
-                || DEFAULT_INPUT == null) {
+        if (event == null || event.gui == null) {
+            return;
+        }
+        // The game clears its message list as the main menu opens, right
+        // after this event: leaving a world or a server empties the
+        // chat. Everything the chat knows about those lines is dropped
+        // with them, so the server's replay on the next join is shown
+        // rather than mistaken for lines already held. Asked last, on
+        // the screen every other handler has settled on.
+        if (event.gui instanceof GuiMainMenu) {
+            LostTalesChatPresentation.onVanillaHistoryCleared();
+            return;
+        }
+        if (event.gui.getClass() != GuiChat.class || DEFAULT_INPUT == null) {
             return;
         }
         try {

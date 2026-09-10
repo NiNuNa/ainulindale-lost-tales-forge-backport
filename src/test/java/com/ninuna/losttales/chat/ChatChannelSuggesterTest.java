@@ -50,6 +50,39 @@ public final class ChatChannelSuggesterTest {
     }
 
     @Test
+    public void aMessageLinkIsTheShownNameASlashAndTheServersId() {
+        assertEquals("#Global/1757522000000",
+                ChatChannelSuggester.messageLink(ChatChannel.ALL, 1757522000000L));
+        assertEquals("#OOC&Discord/12",
+                ChatChannelSuggester.messageLink(ChatChannel.OOC, 12L));
+        // What it spells resolves back to the channel it names.
+        assertSame(ChatChannel.OOC, ChatChannelSuggester.resolve("OOC&Discord"));
+        // A whisper cannot be linked to, and neither can a line the
+        // server never named.
+        assertNull(ChatChannelSuggester.messageLink(ChatChannel.WHISPER, 12L));
+        assertNull(ChatChannelSuggester.messageLink(ChatChannel.ALL, 0L));
+        assertNull(ChatChannelSuggester.messageLink(ChatChannel.ALL, -4L));
+        assertNull(ChatChannelSuggester.messageLink(null, 12L));
+    }
+
+    @Test
+    public void theIdAfterAChannelWordIsASlashAndDigits() {
+        String text = "see #Global/1234 and #ooc/ and #all/x #faction/12345678901234567890";
+        int global = ChatChannelSuggester.wordEnd(text, text.indexOf("Global"));
+        assertEquals(text.indexOf(" and"), ChatChannelSuggester.messageIdEnd(text, global));
+        int ooc = ChatChannelSuggester.wordEnd(text, text.indexOf("ooc"));
+        assertEquals("a slash with no digits is no id", ooc,
+                ChatChannelSuggester.messageIdEnd(text, ooc));
+        int all = ChatChannelSuggester.wordEnd(text, text.indexOf("all/"));
+        assertEquals(all, ChatChannelSuggester.messageIdEnd(text, all));
+        int faction = ChatChannelSuggester.wordEnd(text, text.indexOf("faction"));
+        // Eighteen digits at most: what a long can hold.
+        assertEquals(faction + 1 + 18,
+                ChatChannelSuggester.messageIdEnd(text, faction));
+        assertEquals(5, ChatChannelSuggester.messageIdEnd("#all", 5));
+    }
+
+    @Test
     public void aWordResolvesByIdOrShownNameAndTheTokenIsTheId() {
         assertSame(ChatChannel.ALL, ChatChannelSuggester.resolve("all"));
         assertSame(ChatChannel.ALL, ChatChannelSuggester.resolve("Global"));

@@ -287,8 +287,19 @@ public final class ChatAccountRole {
     }
 
     /** Whether a mask only names roles the catalogue in force knows. */
+    /**
+     * Whether every bit of the mask names a role some catalogue in this
+     * JVM knows. Both catalogues are asked: an integrated server shares
+     * the JVM with its client, which resets the installed catalogue on
+     * its first connect and is told the server's again only after the
+     * login replay has gone out — so a kept operator line validated
+     * against the installed catalogue alone would fail on the server
+     * thread in between, and the encoder would drop the connection.
+     */
     public static boolean isValidMask(int mask) {
-        return (mask & ~ChatRoleCatalog.current().knownMask()) == 0;
+        int known = ChatRoleCatalog.current().knownMask()
+                | ChatRoleCatalog.server().knownMask();
+        return (mask & ~known) == 0;
     }
 
     /** The roles set in a mask, in precedence order; unknown bits are ignored. */

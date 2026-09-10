@@ -835,6 +835,7 @@ gui.losttales.chat.card.role.more=and %s more
 gui.losttales.chat.jump_to_present=Jump to Present
 gui.losttales.chat.message.reply=Reply
 gui.losttales.chat.message.copy=Copy Message
+gui.losttales.chat.message.copy_link=Copy Message Link
 gui.losttales.chat.message.replying=Replying to %s
 gui.losttales.chat.message.cancel_reply=Cancel Reply
 gui.losttales.chat.message.whisper=Message %s

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationState;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -103,6 +104,13 @@ public final class ClientChatChannelViews {
      */
     private static final Map<ChatTab, UnreadDivider> UNREAD_DIVIDERS =
             new HashMap<ChatTab, UnreadDivider>();
+    /**
+     * The newest message the server named in each view: what the view's
+     * read mark is moved to when the view is read, so the next join's
+     * replay knows where this player left off.
+     */
+    private static final Map<ChatTab, Long> NEWEST_MESSAGE_BY_VIEW =
+            new HashMap<ChatTab, Long>();
 
     private static long openedNanos;
     private static final LostTalesGuiAnimationState OPEN_STATE =
@@ -135,6 +143,25 @@ public final class ClientChatChannelViews {
     public static synchronized void record(int chatLineId, ChatTab tab,
                                            ChatTab selected,
                                            boolean mentionsLocalPlayer) {
+        record(chatLineId, tab, selected, mentionsLocalPlayer,
+                ChatMessageIds.NONE, System.currentTimeMillis(), false);
+    }
+
+    /**
+     * As above, for a line the server named ({@code messageId}), said
+     * at {@code timestampMillis}. A {@code replayed} line is one the
+     * server is catching this player up on: one this player was shown
+     * before — no newer than the view's read mark on this server — is
+     * filed and nothing else, and the first one they were not stands
+     * under the unread divider, in the tab in front as in any other, the
+     * way a messenger marks where its reader left off.
+     */
+    public static synchronized void record(int chatLineId, ChatTab tab,
+                                           ChatTab selected,
+                                           boolean mentionsLocalPlayer,
+                                           long messageId,
+                                           long timestampMillis,
+                                           boolean replayed) {
         if (tab == null) {
             return;
         }
@@ -146,10 +173,35 @@ public final class ClientChatChannelViews {
             iterator.remove();
         }
         invalidateCache();
+        boolean named = ChatMessageIds.isServerId(messageId);
+        if (named) {
+            Long newest = NEWEST_MESSAGE_BY_VIEW.get(view);
+            if (newest == null || messageId > newest.longValue()) {
+                NEWEST_MESSAGE_BY_VIEW.put(view, Long.valueOf(messageId));
+            }
+        }
+        String server = ClientChatSession.currentKey();
+        if (replayed && named && messageId
+                <= ClientChatReadMarks.lastRead(server, view)) {
+            // Shown before this player left: filed, and nothing to count.
+            return;
+        }
         // Both sides through the same normalisation: the line carries its
         // own conversation while the selection is the channel's row entry,
         // and for a scoped channel those are never the same value.
         if (view.equals(key(selected))) {
+            if (replayed) {
+                // Said while this player was away, in the tab in front:
+                // the divider stands over the first of them and the run
+                // is read from there, marked as seen once the tab is
+                // looked at like any other.
+                UnreadDivider divider = UNREAD_DIVIDERS.get(view);
+                if (divider == null || divider.seen) {
+                    UNREAD_DIVIDERS.put(view,
+                            new UnreadDivider(chatLineId, timestampMillis));
+                }
+                return;
+            }
             // The tab is open in front of the player — but if they have
             // scrolled back to read, a message arriving is one they have
             // not seen. It is counted on the jump-to-present button, and
@@ -161,8 +213,13 @@ public final class ClientChatChannelViews {
                 WAITING_BELOW.put(view, Integer.valueOf(
                         Math.min(MAX_UNREAD + 1, waiting + 1)));
                 if (waiting == 0) {
-                    UNREAD_DIVIDERS.put(view, new UnreadDivider(chatLineId));
+                    UNREAD_DIVIDERS.put(view,
+                            new UnreadDivider(chatLineId, timestampMillis));
                 }
+            } else if (named) {
+                // In front and at the newest line: shown as it arrived,
+                // in the feed or the open window, so it is read.
+                ClientChatReadMarks.markRead(server, view, messageId);
             }
             return;
         }
@@ -173,9 +230,28 @@ public final class ClientChatChannelViews {
                     Math.min(MAX_UNREAD + 1, count(counter, view) + 1)));
             UnreadDivider divider = UNREAD_DIVIDERS.get(view);
             if (divider == null || divider.seen) {
-                UNREAD_DIVIDERS.put(view, new UnreadDivider(chatLineId));
+                UNREAD_DIVIDERS.put(view,
+                        new UnreadDivider(chatLineId, timestampMillis));
             }
         }
+    }
+
+    /**
+     * Files a line laid in above the view's oldest — a page of older
+     * history — and nothing more: it was said before anything on screen,
+     * so it is neither unread nor the newest, and moves no mark.
+     */
+    public static synchronized void recordBackfilled(int chatLineId, ChatTab tab) {
+        if (tab == null) {
+            return;
+        }
+        TAB_BY_LINE_ID.put(Integer.valueOf(chatLineId), tab);
+        while (TAB_BY_LINE_ID.size() > maxTrackedLines()) {
+            Iterator<Integer> iterator = TAB_BY_LINE_ID.keySet().iterator();
+            iterator.next();
+            iterator.remove();
+        }
+        invalidateCache();
     }
 
     public static synchronized void record(int chatLineId, ChatChannel channel,
@@ -322,7 +398,11 @@ public final class ClientChatChannelViews {
         }
     }
 
-    /** Called while a view is on screen; clears its unread counters. */
+    /**
+     * Called while a view is on screen; clears its unread counters and
+     * moves the view's read mark to its newest line, so the next join
+     * knows these were seen.
+     */
     public static synchronized void markViewed(ChatTab tab) {
         tab = key(tab);
         if (tab != null) {
@@ -333,6 +413,11 @@ public final class ClientChatChannelViews {
                 // The divider stays while the tab is read; the next
                 // unread run replaces it.
                 divider.seen = true;
+            }
+            Long newest = NEWEST_MESSAGE_BY_VIEW.get(tab);
+            if (newest != null) {
+                ClientChatReadMarks.markRead(ClientChatSession.currentKey(),
+                        tab, newest.longValue());
             }
         }
     }
@@ -413,14 +498,20 @@ public final class ClientChatChannelViews {
     /** One tab's divider: where the latest unread run starts. */
     private static final class UnreadDivider {
         final int lineId;
-        /** The run's day, formatted once when it began. */
+        /**
+         * The day the run's first line was said, formatted once: the
+         * line's own time, so a run replayed from yesterday is dated
+         * yesterday and not the day it was shown.
+         */
         final String label;
         boolean seen;
 
-        UnreadDivider(int lineId) {
+        UnreadDivider(int lineId, long timestampMillis) {
             this.lineId = lineId;
             this.label = java.text.DateFormat.getDateInstance(
-                    java.text.DateFormat.LONG).format(new java.util.Date());
+                    java.text.DateFormat.LONG).format(new java.util.Date(
+                            timestampMillis > 0L ? timestampMillis
+                                    : System.currentTimeMillis()));
         }
     }
 
@@ -753,6 +844,7 @@ public final class ClientChatChannelViews {
 
     public static synchronized void clear() {
         ClientChatContextHistory.clear();
+        ClientChatOlderHistory.clear();
         TAB_BY_LINE_ID.clear();
         TIME_BY_LINE_ID.clear();
         SCROLL.clear();
@@ -763,6 +855,7 @@ public final class ClientChatChannelViews {
         UNREAD_PINGS.clear();
         UNREAD_OTHER.clear();
         UNREAD_DIVIDERS.clear();
+        NEWEST_MESSAGE_BY_VIEW.clear();
         openedNanos = 0L;
         invalidateCache();
         ChatGroupRuns.clear();
@@ -780,6 +873,41 @@ public final class ClientChatChannelViews {
         ChatWindowLayout.closeConversations();
         ClientChatChannelState.forgetConversationHistory();
         ChatChannelIcons.forgetPortraits();
+    }
+
+    /**
+     * Forgets everything said about the lines themselves — their tabs,
+     * times, ids, runs, scroll and unread state — while keeping what the
+     * session knows about the server: its channels, roles, identities,
+     * conversations and layout. What the game clearing its own message
+     * list calls for, which it does whenever the main menu opens: the
+     * lines are gone from the screen, and the server's replay on the
+     * next join brings them back as new lines, so nothing here may go
+     * on answering for the ids they had.
+     */
+    public static synchronized void forgetLines() {
+        ClientChatContextHistory.clear();
+        ClientChatOlderHistory.clear();
+        TAB_BY_LINE_ID.clear();
+        TIME_BY_LINE_ID.clear();
+        SCROLL.clear();
+        RENDERED.clear();
+        ANCHORS.clear();
+        SCROLL_REVISION.clear();
+        WAITING_BELOW.clear();
+        UNREAD_PINGS.clear();
+        UNREAD_OTHER.clear();
+        UNREAD_DIVIDERS.clear();
+        NEWEST_MESSAGE_BY_VIEW.clear();
+        invalidateCache();
+        ChatGroupRuns.clear();
+        ClientChatMessageIds.clear();
+        ClientChatMessages.clear();
+        ClientChatPendingEchoes.clear();
+        ChatWindowLines.clear();
+        ChatWindowFrame.clear();
+        ClientChatConsoleEvents.clear();
+        ChatTabSelection.clear();
     }
 
     /** Line ids remembered: the history's capacity and a margin. */

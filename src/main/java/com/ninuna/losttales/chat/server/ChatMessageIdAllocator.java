@@ -25,6 +25,17 @@ public final class ChatMessageIdAllocator {
         return lastId;
     }
 
+    /**
+     * Moves past {@code id} when it is ahead: what a restored history
+     * does with its newest line, so a line said after a restart can
+     * never share an id with one the save kept, whatever the clock says.
+     */
+    public static synchronized void seed(long id) {
+        if (id > lastId) {
+            lastId = id;
+        }
+    }
+
     /** Cleared with the rest of the server's chat state. */
     public static synchronized void reset() {
         lastId = 0L;

@@ -34,6 +34,20 @@ import org.lwjgl.opengl.GL11;
  * not to exist.
  */
 final class LostTalesChatHoverCard {
+    /**
+     * The card a click opened, standing where it was opened until a
+     * click elsewhere, Escape or the screen closing takes it down; null
+     * while none is. The hover card shows the person in brief, this one
+     * in full, the way a messenger's profile opens from a name.
+     */
+    private static Target pinned;
+    private static int pinnedX;
+    private static int pinnedY;
+    /** The pinned card's rectangle as last drawn, for the click that closes it. */
+    private static int pinnedLeft;
+    private static int pinnedTop;
+    private static int pinnedRight;
+    private static int pinnedBottom;
     private static final int PADDING = 6;
     private static final int HEAD_SIZE = 16;
     private static final int MIN_WIDTH = 118;
@@ -46,12 +60,20 @@ final class LostTalesChatHoverCard {
 
     private LostTalesChatHoverCard() {}
 
+    /**
+     * The brief card of whoever the pointer rests on: who they are and
+     * what they wear, the rest waiting on a click. Nothing while a
+     * clicked card stands open, so the two never show at once.
+     */
     static void draw(Minecraft minecraft, float mouseX, float mouseY,
                      int screenWidth, int screenHeight) {
-        Target target = find(minecraft, mouseX, mouseY);
-        if (target != null) {
-            drawCard(minecraft, target, (int)mouseX, (int)mouseY,
-                    screenWidth, screenHeight);
+        if (pinned != null) {
+            return;
+        }
+        Found found = locate(minecraft, mouseX, mouseY);
+        if (found != null) {
+            drawCard(minecraft, found.target, (int)mouseX, (int)mouseY,
+                    screenWidth, screenHeight, false);
         }
     }
 
@@ -63,7 +85,7 @@ final class LostTalesChatHoverCard {
      */
     static boolean isPointerOnPerson(Minecraft minecraft, float mouseX,
                                      float mouseY) {
-        return find(minecraft, mouseX, mouseY) != null;
+        return locate(minecraft, mouseX, mouseY) != null;
     }
 
     /**
@@ -72,7 +94,55 @@ final class LostTalesChatHoverCard {
      */
     static Target personAt(Minecraft minecraft, float mouseX,
                            float mouseY) {
-        return find(minecraft, mouseX, mouseY);
+        Found found = locate(minecraft, mouseX, mouseY);
+        return found == null ? null : found.target;
+    }
+
+    /**
+     * The drawn row whose sender — head, brackets, name and title — the
+     * pointer rests on, or null: on a mention, on the words, or off the
+     * lines. The text drawing underlines that row's identity span by
+     * this answer, so the rule lights exactly where the card would show
+     * and the hand cursor points, and nowhere before.
+     */
+    static IChatComponent senderRowAt(Minecraft minecraft, float mouseX,
+                                      float mouseY) {
+        Found found = locate(minecraft, mouseX, mouseY);
+        return found != null && found.sender ? found.row : null;
+    }
+
+    /**
+     * Opens {@code target}'s full card at the pointer, where it stays
+     * until {@link #unpin()}.
+     */
+    static void pin(Target target, int mouseX, int mouseY) {
+        pinned = target;
+        pinnedX = mouseX;
+        pinnedY = mouseY;
+        pinnedLeft = pinnedRight = pinnedTop = pinnedBottom = 0;
+    }
+
+    static void unpin() {
+        pinned = null;
+    }
+
+    static boolean isPinned() {
+        return pinned != null;
+    }
+
+    /** Whether a GUI point lies on the clicked card as it was last drawn. */
+    static boolean pinnedContains(int mouseX, int mouseY) {
+        return pinned != null && contains(mouseX + 0.5F, mouseY + 0.5F,
+                pinnedLeft, pinnedTop, pinnedRight, pinnedBottom);
+    }
+
+    /** The clicked card in full, where the click opened it. */
+    static void drawPinned(Minecraft minecraft, int screenWidth,
+                           int screenHeight) {
+        if (pinned != null) {
+            drawCard(minecraft, pinned, pinnedX, pinnedY, screenWidth,
+                    screenHeight, true);
+        }
     }
 
     /**
@@ -96,7 +166,7 @@ final class LostTalesChatHoverCard {
                 if (candidate.getKey().equalsIgnoreCase(
                         "role:" + role.getId())) {
                     drawRoleCard(minecraft, role, mouseX, mouseY,
-                            screenWidth, screenHeight);
+                            screenWidth, screenHeight, false);
                     return;
                 }
             }
@@ -126,7 +196,7 @@ final class LostTalesChatHoverCard {
                                 : candidate.getCharacterName(),
                         "", candidate.getAccountName(),
                         LostTalesColors.rgb(LostTalesColors.HUD_LABEL)),
-                mouseX, mouseY, screenWidth, screenHeight);
+                mouseX, mouseY, screenWidth, screenHeight, false);
     }
 
     private static UUID parseUuid(String value) {
@@ -145,16 +215,21 @@ final class LostTalesChatHoverCard {
      * draws it. The name line reads {@code Character (Account)} for a
      * character identity and just {@code Account} otherwise; every detail
      * line is omitted rather than shown empty when the value is unknown.
+     * The brief card — the hover — stops after the title, the command a
+     * Server line answers and the roles held; the {@code full} card a
+     * click opens goes on to the character's race, faction, level,
+     * gender, age and biography.
      */
     private static void drawCard(Minecraft minecraft, Target target,
                                  int mouseX, int mouseY,
-                                 int screenWidth, int screenHeight) {
+                                 int screenWidth, int screenHeight,
+                                 boolean full) {
         if (minecraft.fontRenderer == null) {
             return;
         }
         if (target.role != null) {
             drawRoleCard(minecraft, target.role, mouseX, mouseY,
-                    screenWidth, screenHeight);
+                    screenWidth, screenHeight, full);
             return;
         }
         FontRenderer font = minecraft.fontRenderer;
@@ -179,32 +254,39 @@ final class LostTalesChatHoverCard {
         // The Server's card says what it is answering: the command the
         // line under the pointer was the answer to.
         addDetail(lines, "gui.losttales.chat.card.command", target.note);
-        addDetail(lines, "gui.losttales.character.race",
-                details == null ? "" : ClientCharacterDisplayNames.race(
-                        details.getRaceId()));
-        addDetail(lines, "gui.losttales.chat.card.faction",
-                target.npcIdentity
-                        ? ChatChannelIcons.npcFaction(target.playerId)
-                        : details == null
-                                || details.getStartingFactionId().length() == 0
-                        ? "" : ClientCharacterDisplayNames.faction(
-                                details.getStartingFactionId()));
-        addDetail(lines, "gui.losttales.chat.card.level",
-                details == null || details.getRoleplayLevel() <= 0
-                        ? "" : String.valueOf(details.getRoleplayLevel()));
         // The roles belong to the account behind the identity, whichever
         // channel the line was said in: a role not worn on an in-character
         // line is still held, and the card is where it shows.
         addDetail(lines, "gui.losttales.chat.card.roles", target.npcIdentity
                 ? "" : roleNames(ChatMentionColors.rolesFor(account)));
-        addDetail(lines, "gui.losttales.character.gender",
-                details == null || details.getGenderId().length() == 0
-                        ? "" : ClientCharacterDisplayNames.gender(
-                                details.getGenderId()));
-        addDetail(lines, "gui.losttales.character.age",
-                details == null || details.getAge() <= 0
-                        ? "" : String.valueOf(details.getAge()));
-        String description = details == null ? "" : details.getDescription();
+        // An NPC's faction is what its speech was captured with, and the
+        // brief card says it too: without it the card is a name alone.
+        if (full || target.npcIdentity) {
+            addDetail(lines, "gui.losttales.chat.card.faction",
+                    target.npcIdentity
+                            ? ChatChannelIcons.npcFaction(target.playerId)
+                            : details == null
+                                    || details.getStartingFactionId().length() == 0
+                            ? "" : ClientCharacterDisplayNames.faction(
+                                    details.getStartingFactionId()));
+        }
+        String description = "";
+        if (full) {
+            addDetail(lines, "gui.losttales.character.race",
+                    details == null ? "" : ClientCharacterDisplayNames.race(
+                            details.getRaceId()));
+            addDetail(lines, "gui.losttales.chat.card.level",
+                    details == null || details.getRoleplayLevel() <= 0
+                            ? "" : String.valueOf(details.getRoleplayLevel()));
+            addDetail(lines, "gui.losttales.character.gender",
+                    details == null || details.getGenderId().length() == 0
+                            ? "" : ClientCharacterDisplayNames.gender(
+                                    details.getGenderId()));
+            addDetail(lines, "gui.losttales.character.age",
+                    details == null || details.getAge() <= 0
+                            ? "" : String.valueOf(details.getAge()));
+            description = details == null ? "" : details.getDescription();
+        }
 
         int contentWidth = font.getStringWidth(name + suffix);
         for (int index = 0; index < lines.size(); index++) {
@@ -236,6 +318,9 @@ final class LostTalesChatHoverCard {
                 PADDING * 2 + lineCount * font.FONT_HEIGHT);
         int x = cardX(mouseX, width, screenWidth);
         int y = cardY(mouseY, height, screenHeight);
+        if (full) {
+            rememberPinnedBounds(x, y, width, height);
+        }
 
         GL11.glPushMatrix();
         try {
@@ -271,26 +356,32 @@ final class LostTalesChatHoverCard {
 
     /**
      * The card of a mentioned role: {@code @Name} in the role's colour,
-     * what the role is, and the online accounts holding it — the
-     * server's own roster, sent with the chat access, so the list is
-     * its word and not a guess from who happened to speak.
+     * what the role is, and — on the {@code full} card a click opens —
+     * the online accounts holding it, the server's own roster, sent
+     * with the chat access, so the list is its word and not a guess
+     * from who happened to speak.
      */
     private static void drawRoleCard(Minecraft minecraft,
                                      ChatAccountRole role, int mouseX,
                                      int mouseY, int screenWidth,
-                                     int screenHeight) {
+                                     int screenHeight, boolean full) {
         if (minecraft.fontRenderer == null) {
             return;
         }
         FontRenderer font = minecraft.fontRenderer;
         String name = "@" + role.getDisplayName();
         String description = role.getDisplayDescription();
-        List<String> members = ClientChatChannelState.roleHolders(role);
+        List<String> members = full
+                ? ClientChatChannelState.roleHolders(role)
+                : java.util.Collections.<String>emptyList();
         String membersLabel = StatCollector.translateToLocal(
                 "gui.losttales.chat.card.role.members");
 
-        int contentWidth = Math.max(font.getStringWidth(name),
-                font.getStringWidth(membersLabel));
+        int contentWidth = font.getStringWidth(name);
+        if (full) {
+            contentWidth = Math.max(contentWidth,
+                    font.getStringWidth(membersLabel));
+        }
         if (description.length() > 0) {
             contentWidth = Math.max(contentWidth, Math.min(
                     font.getStringWidth(description), DESCRIPTION_WIDTH));
@@ -315,26 +406,31 @@ final class LostTalesChatHoverCard {
                 lines.add(wrapped.get(index).trim());
             }
         }
-        lines.add(membersLabel);
-        int memberStart = lines.size();
-        if (members.isEmpty()) {
-            lines.add("  " + StatCollector.translateToLocal(
-                    "gui.losttales.chat.card.role.nobody"));
-        } else {
-            int shown = Math.min(members.size(), MAX_ROLE_MEMBER_LINES);
-            for (int index = 0; index < shown; index++) {
-                lines.add("  " + members.get(index));
-            }
-            if (members.size() > shown) {
-                lines.add("  " + StatCollector.translateToLocalFormatted(
-                        "gui.losttales.chat.card.role.more",
-                        Integer.valueOf(members.size() - shown)));
+        int memberStart = lines.size() + 1;
+        if (full) {
+            lines.add(membersLabel);
+            if (members.isEmpty()) {
+                lines.add("  " + StatCollector.translateToLocal(
+                        "gui.losttales.chat.card.role.nobody"));
+            } else {
+                int shown = Math.min(members.size(), MAX_ROLE_MEMBER_LINES);
+                for (int index = 0; index < shown; index++) {
+                    lines.add("  " + members.get(index));
+                }
+                if (members.size() > shown) {
+                    lines.add("  " + StatCollector.translateToLocalFormatted(
+                            "gui.losttales.chat.card.role.more",
+                            Integer.valueOf(members.size() - shown)));
+                }
             }
         }
 
         int height = PADDING * 2 + (1 + lines.size()) * font.FONT_HEIGHT;
         int x = cardX(mouseX, width, screenWidth);
         int y = cardY(mouseY, height, screenHeight);
+        if (full) {
+            rememberPinnedBounds(x, y, width, height);
+        }
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(0.0F, 0.0F, 300.0F);
@@ -412,8 +508,38 @@ final class LostTalesChatHoverCard {
         }
     }
 
-    private static Target find(Minecraft minecraft, float mouseX,
-                               float mouseY) {
+    /** Where the clicked card was last drawn, for the click that closes it. */
+    private static void rememberPinnedBounds(int x, int y, int width,
+                                             int height) {
+        pinnedLeft = x;
+        pinnedTop = y;
+        pinnedRight = x + width;
+        pinnedBottom = y + height;
+    }
+
+    /**
+     * What the pointer rests on: the person or role, whether it is the
+     * row's sender rather than a mention, and the drawn row itself.
+     */
+    private static final class Found {
+        final Target target;
+        final boolean sender;
+        final IChatComponent row;
+
+        Found(Target target, boolean sender, IChatComponent row) {
+            this.target = target;
+            this.sender = sender;
+            this.row = row;
+        }
+    }
+
+    private static Found found(Target target, boolean sender,
+                               IChatComponent row) {
+        return target == null ? null : new Found(target, sender, row);
+    }
+
+    private static Found locate(Minecraft minecraft, float mouseX,
+                                float mouseY) {
         if (minecraft == null || minecraft.ingameGUI == null
                 || minecraft.fontRenderer == null) {
             return null;
@@ -444,8 +570,8 @@ final class LostTalesChatHoverCard {
             boolean identitySpan = false;
             float previousStart = 0.0F;
             String previousText = null;
-            for (Object value
-                    : lines.get(band.viewIndex).func_151461_a()) {
+            IChatComponent row = lines.get(band.viewIndex).func_151461_a();
+            for (Object value : row) {
                 if (!(value instanceof IChatComponent)) {
                     continue;
                 }
@@ -463,8 +589,9 @@ final class LostTalesChatHoverCard {
                 if (mention != null && band.localX >= cursor
                         && band.localX < cursor + partWidth) {
                     ChatAccountRole role = mention.role();
-                    return role != null ? Target.forRole(role)
-                            : targetForAccount(minecraft, mention.account);
+                    return found(role != null ? Target.forRole(role)
+                            : targetForAccount(minecraft, mention.account),
+                            false, row);
                 }
                 ChatHeadMarker.Data decodedHead =
                         ChatHeadMarker.decode(part);
@@ -490,7 +617,8 @@ final class LostTalesChatHoverCard {
                                 && previousText.startsWith("<")
                                 && band.localX >= previousStart
                                 && band.localX < cursor) {
-                            return targetForGroup(lines, band.viewIndex);
+                            return found(targetForGroup(lines, band.viewIndex),
+                            true, row);
                         }
                     }
                 }
@@ -512,7 +640,8 @@ final class LostTalesChatHoverCard {
                 }
                 if (inSpan && band.localX >= cursor
                         && band.localX < cursor + spanWidth) {
-                    return targetForGroup(lines, band.viewIndex);
+                    return found(targetForGroup(lines, band.viewIndex),
+                            true, row);
                 }
                 if (closesSpan) {
                     identitySpan = false;

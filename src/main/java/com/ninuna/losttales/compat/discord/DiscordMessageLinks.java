@@ -41,8 +41,8 @@ import java.util.Map;
  * synchronized.</p>
  */
 final class DiscordMessageLinks {
-    /** Messages remembered; past it the oldest message's copies go first. */
-    private static final int MAX_LINKS = 512;
+    /** Messages remembered, as many as the history keeps in all; past it the oldest message's copies go first. */
+    static final int MAX_LINKS = 2000;
 
     private final LinkedHashMap<Long, List<Copy>> copiesByMessage =
             new LinkedHashMap<Long, List<Copy>>();

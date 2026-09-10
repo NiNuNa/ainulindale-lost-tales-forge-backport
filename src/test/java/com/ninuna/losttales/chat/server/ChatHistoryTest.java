@@ -3,6 +3,7 @@ package com.ninuna.losttales.chat.server;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.Arrays;
 import java.util.Collections;
@@ -231,6 +232,112 @@ public final class ChatHistoryTest {
         assertEquals(ChatHistory.MAX_PER_CHANNEL + 1, ChatHistory.size());
         ChatHistory.clear();
         assertEquals(0, ChatHistory.size());
+    }
+
+    @Test
+    public void theChannelCapacityIsTheServersConfigWithinTheBound() {
+        int original = LostTalesConfig.chatHistoryPerChannel;
+        try {
+            LostTalesConfig.chatHistoryPerChannel = 3;
+            assertEquals(3, ChatHistory.perChannelCapacity());
+            long first = record(ChatChannel.ALL, ALICE, "one",
+                    Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
+            for (int index = 0; index < 3; index++) {
+                record(ChatChannel.ALL, ALICE, "more",
+                        Collections.singletonList(ALICE),
+                        ChatHistory.Audience.everyone());
+            }
+            assertEquals(3, ChatHistory.size());
+            assertFalse(ChatHistory.quoteFor(first, ALICE, ChatChannel.ALL, "").exists());
+            LostTalesConfig.chatHistoryPerChannel = ChatHistory.MAX_TOTAL * 2;
+            assertEquals(ChatHistory.MAX_TOTAL, ChatHistory.perChannelCapacity());
+        } finally {
+            LostTalesConfig.chatHistoryPerChannel = original;
+        }
+    }
+
+    @Test
+    public void aRestoredHistoryKeepsItsOrderAndMovesTheAllocatorPast() {
+        long first = record(ChatChannel.ALL, ALICE, "one",
+                Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
+        long second = record(ChatChannel.ALL, ALICE, "two",
+                Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
+        java.util.List<ChatHistory.Entry> snapshot = ChatHistory.snapshot();
+        assertEquals(2, snapshot.size());
+        ChatHistory.clear();
+        ChatMessageIdAllocator.reset();
+        assertEquals(0, ChatHistory.size());
+
+        // Restored twice over: a line already held is not taken again.
+        assertEquals(2, ChatHistory.restore(snapshot));
+        assertEquals(0, ChatHistory.restore(snapshot));
+        List<LostTalesChatMessagePacket> replay = ChatHistory.replayFor(
+                requester(ALICE), ChatMessageIds.NONE);
+        assertEquals(2, replay.size());
+        assertEquals(first, replay.get(0).getMessageId());
+        assertEquals(second, replay.get(1).getMessageId());
+        // The next id said is newer than anything restored, whatever the
+        // clock says, so a reply to it can never mean a kept line.
+        assertTrue(ChatMessageIdAllocator.next() > second);
+        // Nothing to restore leaves the allocator alone.
+        ChatMessageIdAllocator.reset();
+        assertEquals(0, ChatHistory.restore(null));
+        assertEquals(0, ChatHistory.restore(Collections.<ChatHistory.Entry>emptyList()));
+    }
+
+    @Test
+    public void thePageBeforeALineIsTheChannelsNewestOlderLinesNewestFirst() {
+        long[] ids = new long[ChatHistory.MAX_OLDER_PER_REQUEST + 5];
+        for (int index = 0; index < ids.length; index++) {
+            ids[index] = record(ChatChannel.ALL, ALICE, "line " + index,
+                    Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
+        }
+        long otherChannel = record(ChatChannel.OOC, ALICE, "elsewhere",
+                Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
+        long whisper = record(ChatChannel.WHISPER, ALICE, "psst",
+                Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
+        List<LostTalesChatMessagePacket> page = ChatHistory.replayBefore(
+                requester(ALICE), ChatChannel.ALL, "", ids[ids.length - 1]);
+        // At most a page, newest first, none of them the line asked from
+        // or a line of another channel.
+        assertEquals(ChatHistory.MAX_OLDER_PER_REQUEST, page.size());
+        assertEquals(ids[ids.length - 2], page.get(0).getMessageId());
+        assertEquals(ids[ids.length - 1 - ChatHistory.MAX_OLDER_PER_REQUEST],
+                page.get(page.size() - 1).getMessageId());
+        for (LostTalesChatMessagePacket line : page) {
+            assertTrue(line.getMessageId() != otherChannel
+                    && line.getMessageId() != whisper);
+        }
+        // The next page reaches the beginning and stops.
+        List<LostTalesChatMessagePacket> rest = ChatHistory.replayBefore(
+                requester(ALICE), ChatChannel.ALL, "",
+                page.get(page.size() - 1).getMessageId());
+        assertEquals(ids.length - 1 - ChatHistory.MAX_OLDER_PER_REQUEST, rest.size());
+        assertEquals(ids[0], rest.get(rest.size() - 1).getMessageId());
+        assertTrue(ChatHistory.replayBefore(requester(ALICE), ChatChannel.ALL, "",
+                ids[0]).isEmpty());
+        // A stranger the audience does not admit is shown nothing of a
+        // gated channel; a bad request answers with nothing.
+        assertTrue(ChatHistory.replayBefore(requester(ALICE), ChatChannel.ALL, "",
+                ChatMessageIds.NONE).isEmpty());
+        assertTrue(ChatHistory.replayBefore(null, ChatChannel.ALL, "",
+                ids[3]).isEmpty());
+    }
+
+    @Test
+    public void thePageOfAScopedChannelIsItsConversationsAlone() {
+        long gondor = record(ChatChannel.FACTION, ALICE, "the gate holds",
+                Arrays.asList(ALICE), ChatHistory.Audience.everyone(), "gondor");
+        long rohan = record(ChatChannel.FACTION, ALICE, "the horses are ready",
+                Arrays.asList(ALICE), ChatHistory.Audience.everyone(), "rohan");
+        long newest = record(ChatChannel.FACTION, ALICE, "later",
+                Arrays.asList(ALICE), ChatHistory.Audience.everyone(), "gondor");
+        List<LostTalesChatMessagePacket> page = ChatHistory.replayBefore(
+                requester(ALICE), ChatChannel.FACTION, "gondor", newest);
+        assertEquals(1, page.size());
+        assertEquals(gondor, page.get(0).getMessageId());
+        assertTrue(rohan != page.get(0).getMessageId());
     }
 
     /** A replay hands over the newest of a channel, and only so many. */

@@ -167,7 +167,7 @@ public final class LostTalesConfig {
      * numbers, so every choice is one of the palette's colours.
      */
     static final String DEFAULT_CHAT_BACKGROUND_COLOR = "PLUM_BLACK";
-    static final String DEFAULT_CHAT_SELECTED_LINE_COLOR = "PLUM_GRAY";
+    static final String DEFAULT_CHAT_SELECTED_LINE_COLOR = "MAUVE";
     static final String DEFAULT_CHAT_MENTION_LINE_COLOR = "MULBERRY";
     static final String DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR = "APRICOT";
     public static String chatBackgroundColor = DEFAULT_CHAT_BACKGROUND_COLOR;
@@ -196,6 +196,14 @@ public final class LostTalesConfig {
     /** Server only: the opt-in moderation record of what was said. */
     public static boolean chatAuditLogEnabled = false;
     public static int chatAuditRetentionDays = 30;
+    /**
+     * Server only: whether the recent chat history is written with the
+     * world save and read back as the server starts, and how many
+     * messages of each channel it keeps. The count is a safety bound as
+     * much as a preference: the save is written with every world save.
+     */
+    public static boolean chatHistoryPersisted = true;
+    public static int chatHistoryPerChannel = 200;
     /** Tell others when this player is typing; show others' typing. */
     public static boolean sendChatTypingStatus = true;
     public static boolean showChatTypingIndicators = true;
@@ -967,6 +975,20 @@ public final class LostTalesConfig {
                     1,
                     365,
                     "Days of chat audit files kept; files older than this are deleted when the server starts and as the day rolls over."
+            );
+            chatHistoryPersisted = config.getBoolean(
+                    "historyPersisted",
+                    CATEGORY_CHAT,
+                    chatHistoryPersisted,
+                    "Server only: keep the recent chat history in the world save, so a player who rejoins after a restart is still shown the conversation they missed. Off keeps it in memory for the server's run alone."
+            );
+            chatHistoryPerChannel = config.getInt(
+                    "historyPerChannel",
+                    CATEGORY_CHAT,
+                    chatHistoryPerChannel,
+                    20,
+                    1000,
+                    "Server only: the most messages of each channel the history keeps, live and in the save; the oldest go first. A joining player is replayed at most 100 of a channel and 400 in all of them."
             );
             chatPermissions = config.getStringList(
                     "permissions",
@@ -2045,6 +2067,10 @@ public final class LostTalesConfig {
                 enableChargeTiers).set(enableChargeTiers);
         config.get(CATEGORY_CHAT, "proximityRadius",
                 chatProximityRadius).set(chatProximityRadius);
+        config.get(CATEGORY_CHAT, "historyPersisted",
+                chatHistoryPersisted).set(chatHistoryPersisted);
+        config.get(CATEGORY_CHAT, "historyPerChannel",
+                chatHistoryPerChannel).set(chatHistoryPerChannel);
         config.get(CATEGORY_ROLES, "permissions", chatPermissions).set(chatPermissions);
         config.get(CATEGORY_ROLES, "definitions", chatRoles).set(chatRoles);
         config.get(CATEGORY_ROLES, "members", chatRoleMembers).set(chatRoleMembers);

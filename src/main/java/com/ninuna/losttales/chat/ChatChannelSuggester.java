@@ -100,6 +100,43 @@ public final class ChatChannelSuggester {
     }
 
     /**
+     * A link to one message of a channel as it is typed and pasted:
+     * {@code #Global/1234}, the channel by its shown name without its
+     * spaces — which {@link #resolve} reads back — and the server's id
+     * of the message. Null for a channel that cannot be named this way,
+     * or an id the server never gave.
+     */
+    public static String messageLink(ChatChannel channel, long messageId) {
+        if (channel == null || channel == ChatChannel.WHISPER
+                || !ChatMessageIds.isServerId(messageId)) {
+            return null;
+        }
+        String name = channel.getDisplayName().replaceAll("\\s+", "");
+        if (name.length() == 0 || resolve(name) != channel) {
+            return null;
+        }
+        return "#" + name + "/" + messageId;
+    }
+
+    /**
+     * How far a message id reaches from {@code start}, the index of the
+     * {@code /} after a channel word: over the digits of a server id,
+     * or {@code start} itself when no id follows. An id is at most
+     * eighteen digits, so it always fits a long.
+     */
+    public static int messageIdEnd(String text, int start) {
+        if (start >= text.length() || text.charAt(start) != '/') {
+            return start;
+        }
+        int end = start + 1;
+        while (end < text.length() && end - start - 1 < 18
+                && Character.isDigit(text.charAt(end))) {
+            end++;
+        }
+        return end == start + 1 ? start : end;
+    }
+
+    /**
      * How far a channel word reaches from {@code start}, the index just
      * past its {@code #}: over the name characters, and no further.
      */

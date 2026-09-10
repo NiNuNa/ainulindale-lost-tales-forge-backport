@@ -2,6 +2,7 @@ package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.server.ChatHistory;
@@ -591,6 +592,42 @@ public final class LostTalesDiscordBridge {
         return "channel:" + discordChannelId;
     }
 
+    /** The Discord channel id a destination names, or empty for a bare webhook. */
+    private static String channelIdOf(String destination) {
+        return destination != null && destination.startsWith("channel:")
+                ? destination.substring("channel:".length()) : "";
+    }
+
+    /**
+     * How a Discord line's jump links are spelled for the game: a link
+     * to a message the bridge carried either way, in a channel one of
+     * {@code bound}'s bindings names, becomes {@code #Channel/<id>}; any
+     * other stays the URL it is.
+     */
+    private DiscordMessageLinkRewriter.Resolver linkResolver(
+            final DiscordChannelBindings bound) {
+        return new DiscordMessageLinkRewriter.Resolver() {
+            @Override
+            public String jumpUrl(ChatChannel channel, long messageId) {
+                return "";
+            }
+
+            @Override
+            public String gameLink(String guildId, String channelId,
+                                   String discordMessageId) {
+                long messageId = links.messageIdOf(discordMessageId);
+                DiscordChannelBinding binding = bound == null ? null
+                        : bound.forDiscordChannel(channelId);
+                if (!ChatMessageIds.isServerId(messageId) || binding == null) {
+                    return "";
+                }
+                String link = ChatChannelSuggester.messageLink(
+                        binding.getChannel(), messageId);
+                return link == null ? "" : link;
+            }
+        };
+    }
+
     private void enqueueInbound(Inbound entry) {
         if (this.inboundCount.get() >= MAX_QUEUED_INBOUND) {
             return;
@@ -755,7 +792,9 @@ public final class LostTalesDiscordBridge {
                     return;
                 }
                 String author = DiscordMessageSanitizer.inboundName(message.authorName);
-                String text = DiscordMessageSanitizer.inbound(message.content,
+                String text = DiscordMessageSanitizer.inbound(
+                        DiscordMessageLinkRewriter.inbound(message.content,
+                                linkResolver(this.bound)),
                         message.mentionNames);
                 if (author.length() > 0 && text.length() > 0) {
                     rememberAuthor(author, message.authorId);
@@ -770,7 +809,9 @@ public final class LostTalesDiscordBridge {
                 if (binding == null || message.bot) {
                     return;
                 }
-                String text = DiscordMessageSanitizer.inbound(message.content,
+                String text = DiscordMessageSanitizer.inbound(
+                        DiscordMessageLinkRewriter.inbound(message.content,
+                                linkResolver(this.bound)),
                         message.mentionNames);
                 if (text.length() > 0) {
                     enqueueInbound(new Inbound(Inbound.Kind.EDIT, "", "", text,
@@ -967,6 +1008,12 @@ public final class LostTalesDiscordBridge {
          */
         private final Map<String, DiscordJson.ChannelInfo> webhookInfos =
                 new HashMap<String, DiscordJson.ChannelInfo>();
+        /**
+         * Where each read channel is, by its id, learnt as the readers
+         * are checked: what a link to a Discord original is built from.
+         */
+        private final Map<String, DiscordJson.ChannelInfo> readerInfos =
+                new ConcurrentHashMap<String, DiscordJson.ChannelInfo>();
         /** Whether the no-PATCH warning has been said this session. */
         private boolean patchWarned;
         /** Posts each full lane has refused, for the warning that says so. */
@@ -1192,7 +1239,51 @@ public final class LostTalesDiscordBridge {
                 FMLLog.info("[%s] Discord reader '%s' reads guild %s, channel %s",
                         LostTalesMetaData.MOD_ID, binding.id(), info.guildId,
                         info.channelId);
+                readerInfos.put(info.channelId, info);
             }
+        }
+
+        /**
+         * How a game line's links are spelled for a post through
+         * {@code webhookUrl}: a linked message's copy in the very channel
+         * the post goes to is preferred, then any copy the bridge posted
+         * elsewhere, then the Discord original of a line that came in
+         * from Discord; a message with no Discord copy stays as typed.
+         */
+        private DiscordMessageLinkRewriter.Resolver outboundResolver(
+                final String webhookUrl) {
+            return new DiscordMessageLinkRewriter.Resolver() {
+                @Override
+                public String jumpUrl(ChatChannel channel, long messageId) {
+                    List<DiscordMessageLinks.Copy> copies = links.copiesOf(messageId);
+                    if (copies.isEmpty()) {
+                        return "";
+                    }
+                    String own = destinationOf(webhookUrl);
+                    DiscordMessageLinks.Copy chosen = null;
+                    for (DiscordMessageLinks.Copy copy : copies) {
+                        if (copy.destination.equals(own)) {
+                            chosen = copy;
+                            break;
+                        }
+                    }
+                    if (chosen == null) {
+                        chosen = copies.get(0);
+                    }
+                    DiscordJson.ChannelInfo info = chosen.webhookUrl.length() > 0
+                            ? webhookInfo(chosen.webhookUrl)
+                            : readerInfos.get(channelIdOf(chosen.destination));
+                    return info == null ? ""
+                            : DiscordMessageLinkRewriter.jumpUrl(info.guildId,
+                                    info.channelId, chosen.discordId);
+                }
+
+                @Override
+                public String gameLink(String guildId, String channelId,
+                                       String discordMessageId) {
+                    return "";
+                }
+            };
         }
 
         /**
@@ -1350,7 +1441,9 @@ public final class LostTalesDiscordBridge {
                     String name = DiscordMessageSanitizer.inboundName(
                             message.authorName);
                     String text = DiscordMessageSanitizer.inbound(
-                            message.content, message.mentionNames);
+                            DiscordMessageLinkRewriter.inbound(message.content,
+                                    linkResolver(this.bindings)),
+                            message.mentionNames);
                     if (name.length() > 0 && text.length() > 0) {
                         rememberAuthor(name, message.authorId);
                         enqueueInbound(new Inbound(Inbound.Kind.MESSAGE, name,
@@ -1407,7 +1500,9 @@ public final class LostTalesDiscordBridge {
                         DiscordJson.parseMessages(reply.body));
                 for (DiscordJson.Message message : changes.edited) {
                     String text = DiscordMessageSanitizer.inbound(
-                            message.content, message.mentionNames);
+                            DiscordMessageLinkRewriter.inbound(message.content,
+                                    linkResolver(this.bindings)),
+                            message.mentionNames);
                     // Edited down to nothing sayable — an attachment left
                     // alone — keeps the words it was delivered with.
                     if (text.length() > 0) {
@@ -1575,7 +1670,10 @@ public final class LostTalesDiscordBridge {
                 header = replyHeader(next, webhook);
                 reply = DiscordHttp.postWebhook(webhook,
                         DiscordJson.webhookLineBody(next.username,
-                                next.avatarUrl, header + next.message));
+                                next.avatarUrl, header
+                                        + DiscordMessageLinkRewriter.outbound(
+                                                next.message,
+                                                outboundResolver(webhook))));
             } else {
                 DiscordMessageLinks.Copy copy = links.copyThrough(next.messageId, webhook);
                 if (copy == null || (next.kind == Outbound.Kind.EDIT
@@ -1584,8 +1682,10 @@ public final class LostTalesDiscordBridge {
                 }
                 reply = next.kind == Outbound.Kind.EDIT
                         ? DiscordHttp.editWebhookMessage(webhook, copy.discordId,
-                                DiscordJson.webhookLineEditBody(
-                                        copy.header + next.message))
+                                DiscordJson.webhookLineEditBody(copy.header
+                                        + DiscordMessageLinkRewriter.outbound(
+                                                next.message,
+                                                outboundResolver(webhook))))
                         : DiscordHttp.deleteWebhookMessage(webhook, copy.discordId);
                 if (reply.status == 404) {
                     return 0L;

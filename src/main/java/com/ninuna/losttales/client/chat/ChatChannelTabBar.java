@@ -624,8 +624,12 @@ final class ChatChannelTabBar {
         // hand. Asking it during a drag lights whichever tab's resting
         // slot the pointer happens to be crossing — a cog or a cross on
         // a tab the hand is only passing over — so the row simply
-        // answers nothing until the tab is put down.
-        Hit hovered = row.dragging != null ? null
+        // answers nothing until the tab is put down. Nor while the
+        // window's edge is under the hand: the row's band and the top
+        // resize border meet on one scanline, and a resize glides the
+        // band under a pointer that stands still on that line, so
+        // asking would light and unlight a tab every other frame.
+        Hit hovered = row.dragging != null || row.resizing ? null
                 : hitAt(font, row, mouseX, mouseY);
         int bottom = row.rowBottom;
         // The window's title strip, ending exactly on the rule row:
@@ -1638,8 +1642,20 @@ final class ChatChannelTabBar {
             cursor += tab.width + TAB_GAP;
             at++;
         }
-        return reorderSlot(draggedRunLeft(row), heldBefore(tabs, group),
-                restLeft, widths, TAB_GAP, this.reorderLatch);
+        // The row may lay out fewer tabs than it holds when it cannot
+        // fit them all; the place answered is counted among the row's
+        // visible tabs, as the layout's caller counts, so the tabs left
+        // out before the first laid-out one are counted past.
+        int leading = 0;
+        for (int index = 0; index < tabs.get(0).rowIndex
+                && index < row.tabs.size(); index++) {
+            if (!group.contains(row.tabs.get(index))) {
+                leading++;
+            }
+        }
+        return leading + reorderSlot(draggedRunLeft(row),
+                heldBefore(tabs, group), restLeft, widths, TAB_GAP,
+                this.reorderLatch);
     }
 
     /**
@@ -2066,9 +2082,15 @@ final class ChatChannelTabBar {
                     // Where it was on screen a moment ago. The cursor
                     // that will place it is not known until the row is
                     // advanced, so the travel it owes is worked out
-                    // there, against the slot it actually lands in.
-                    built.seedLeftOffset = was.drawnLeftOffset
-                            + was.slide;
+                    // there, against the slot it actually lands in. A
+                    // layout rebuilt before the last one was ever drawn
+                    // (two changes of places between two frames, as a
+                    // fast drag makes) has no drawn place of its own
+                    // yet, so the place it was still owed is carried on
+                    // rather than read off a slot nobody has seen.
+                    built.seedLeftOffset = was.needsSeed
+                            ? was.seedLeftOffset
+                            : was.drawnLeftOffset + was.slide;
                     built.needsSeed = true;
                     built.hoverFade = was.hoverFade;
                     built.cogFade = was.cogFade;

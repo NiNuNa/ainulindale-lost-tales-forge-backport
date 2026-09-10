@@ -33,6 +33,7 @@ import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
 import com.ninuna.losttales.client.chat.LostTalesSpeechBubbleRenderer;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import com.ninuna.losttales.client.chat.ClientChatIgnores;
+import com.ninuna.losttales.client.chat.ClientChatReadMarks;
 import com.ninuna.losttales.client.chat.ClientChatSession;
 import com.ninuna.losttales.client.chat.ClientChatChannelViews;
 import com.ninuna.losttales.client.chat.ClientChatTypingState;
@@ -186,6 +187,10 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         // else instead; see onClientConnect. Only what describes the
         // connection itself goes here.
         ClientChatTypingState.clear();
+        // How far each conversation here was read is written down, so
+        // the next join's replay starts its unread run where this one
+        // left off.
+        ClientChatReadMarks.save();
         // A name learned for an ignored account belongs to this server;
         // on another one it may be somebody else's. The stored accounts
         // themselves persist like every other preference.

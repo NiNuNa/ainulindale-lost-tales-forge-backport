@@ -108,7 +108,17 @@ public final class LostTalesChatPresentation {
         }
         if (ChatMessageIds.isServerId(packet.getMessageId())
                 && ClientChatMessages.get(packet.getMessageId()) != null) {
-            return;
+            // Held, but is it still on screen? The game clears its own
+            // list whenever the main menu opens, and another mod may
+            // clear it too; a message whose line is gone is shown again
+            // rather than remembered into nothing.
+            Integer shown = ClientChatMessageIds.chatLineIdOf(
+                    packet.getMessageId());
+            if (shown != null && ChatWindowLines.holdsLine(
+                    minecraft.ingameGUI.getChatGUI(), shown.intValue())) {
+                return;
+            }
+            ClientChatMessages.forget(packet.getMessageId());
         }
         ChatChannel channel = packet.getChannel();
         // A Discord member has no Minecraft account to look a skin up
@@ -172,12 +182,29 @@ public final class LostTalesChatPresentation {
             ClientChatChannelState.rememberPartnerCharacterId(tab,
                     packet.getPartnerCharacterId());
         }
+        // A replayed line older than everything the view holds is a page
+        // of older history: laid in above the view's oldest line, filed
+        // and remembered, but neither unread, nor a cue, nor the newest.
+        if (replayed) {
+            Integer above = ClientChatOlderHistory.anchorFor(minecraft, tab,
+                    packet.getMessageId());
+            if (above != null) {
+                printOlder(minecraft, packet, tab, above.intValue());
+                return;
+            }
+        }
         // A message this client already showed is not printed again:
         // the line it is standing on becomes the real one, in place.
         int confirmed = replayed ? 0
                 : confirmPendingEcho(minecraft, packet, tab);
-        int chatLineId = confirmed != 0 ? confirmed
-                : print(minecraft, packet, tab, mentioned);
+        int chatLineId;
+        receivingReplayed = replayed;
+        try {
+            chatLineId = confirmed != 0 ? confirmed
+                    : print(minecraft, packet, tab, mentioned);
+        } finally {
+            receivingReplayed = false;
+        }
         if (mentioned || tab.isWhisper()) {
             if (mentioned) {
                 markPinged(chatLineId);
@@ -379,6 +406,95 @@ public final class LostTalesChatPresentation {
         rememberPrinted(chatLineId, packet, tab, showcaseIds, kind,
                 body == null ? null : body.createCopy(), mentioned);
         return chatLineId;
+    }
+
+    /**
+     * Prints a line the server replayed from before everything the view
+     * holds, and lays it in above the view's oldest line: the game
+     * wraps it as it wraps every line, at the newest end; the wrapped
+     * rows and the unwrapped message are then moved to their place
+     * after {@code aboveChatLineId}'s in each of the game's two lists,
+     * with that line's own age so they fade in the feed as it does,
+     * rather than arriving as news. Remembered like any printed line,
+     * but filed as a backfill: no unread count, no divider, no cue, no
+     * read mark. Dropped, not misplaced, when the game's lists cannot be
+     * reached or have no room.
+     */
+    private static void printOlder(Minecraft minecraft,
+                                   LostTalesChatMessagePacket packet, ChatTab tab,
+                                   int aboveChatLineId) {
+        GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
+        List<ChatLine> messages = ChatWindowLines.messageHistory(chat);
+        List<ChatLine> drawn;
+        try {
+            drawn = LostTalesChatOverlayRenderer.getDrawnLines(chat);
+        } catch (IllegalAccessException unavailable) {
+            drawn = null;
+        }
+        if (messages == null || drawn == null
+                || messages.size() + 1 >= LostTalesChatHistoryHooks.capacity()) {
+            return;
+        }
+        int anchorIndex = -1;
+        for (int index = 0; index < messages.size(); index++) {
+            ChatLine line = messages.get(index);
+            if (line != null && line.getChatLineID() == aboveChatLineId) {
+                anchorIndex = index;
+                break;
+            }
+        }
+        int anchorRowEnd = -1;
+        for (int index = drawn.size() - 1; index >= 0; index--) {
+            ChatLine row = drawn.get(index);
+            if (row != null && row.getChatLineID() == aboveChatLineId) {
+                anchorRowEnd = index;
+                break;
+            }
+        }
+        if (anchorIndex < 0 || anchorRowEnd < 0) {
+            return;
+        }
+        int age = messages.get(anchorIndex).getUpdatedCounter();
+        int chatLineId = allocateChatLineId();
+        int[] showcaseIds = decodeShowcases(packet);
+        int messagesBefore = messages.size();
+        chat.printChatMessageWithOptionalDeletion(
+                build(packet, tab, showcaseIds, false, ChatBodyKind.MESSAGE, null),
+                chatLineId);
+        if (messages.size() != messagesBefore + 1 || messages.get(0) == null
+                || messages.get(0).getChatLineID() != chatLineId) {
+            // The list did not grow by the one line at its head: the
+            // game trimmed or refused, and there is nothing to move.
+            ChatWindowLines.noteMutated();
+            return;
+        }
+        ChatLine added = messages.remove(0);
+        messages.add(anchorIndex + 1, new ChatLine(age, added.func_151461_a(),
+                chatLineId));
+        List<ChatLine> rows = new ArrayList<ChatLine>();
+        while (!drawn.isEmpty() && drawn.get(0) != null
+                && drawn.get(0).getChatLineID() == chatLineId) {
+            rows.add(drawn.remove(0));
+        }
+        // The rows stood newest first at the head and keep that order
+        // behind the anchor's last row, so the message reads top down;
+        // taking them off the head moved nothing after them, so the
+        // anchor's last row is where it was found.
+        int insertAt = anchorRowEnd + 1;
+        for (int index = 0; index < rows.size(); index++) {
+            drawn.add(insertAt + index, new ChatLine(age,
+                    rows.get(index).func_151461_a(), chatLineId));
+        }
+        ChatWindowLines.noteMutated();
+        ChatGroupRuns.remember(chatLineId, tab, packet.getSenderId(),
+                packet.getIdentityName(), packet.isAccountLine(),
+                packet.getTimestampMillis(), !packet.getReply().exists(),
+                build(packet, tab, showcaseIds, !packet.getReply().exists(),
+                        ChatBodyKind.MESSAGE, null));
+        ClientChatMessageIds.remember(chatLineId, packet.getMessageId());
+        ClientChatMessages.remember(packet, tab, showcaseIds);
+        ClientChatChannelViews.recordBackfilled(chatLineId, tab);
+        ClientChatChannelViews.recordTime(chatLineId, packet.getTimestampMillis());
     }
 
     /**
@@ -653,6 +769,14 @@ public final class LostTalesChatPresentation {
                 new LostTalesChatPingSound(new ResourceLocation(sound)));
     }
 
+    /**
+     * Whether the line being printed is one the server is replaying from
+     * its history rather than one just said. Set around the print by
+     * {@link #receive(LostTalesChatMessagePacket, boolean)} on the
+     * client thread, read where the line is filed and counted.
+     */
+    private static boolean receivingReplayed;
+
     /** Records animation timing and the line's tab for the tab views. */
     private static void noteLinePrinted(int chatLineId, ChatTab tab,
                                         boolean mentioned,
@@ -662,7 +786,9 @@ public final class LostTalesChatPresentation {
         lastMessageNanos = System.nanoTime();
         lastMessageTab = tab;
         ClientChatChannelViews.record(chatLineId, tab,
-                ClientChatChannelState.getSelected(), mentioned);
+                ClientChatChannelState.getSelected(), mentioned,
+                ClientChatMessageIds.messageIdOf(chatLineId),
+                timestampMillis, receivingReplayed);
         ClientChatChannelViews.recordTime(chatLineId, timestampMillis);
     }
 
@@ -799,6 +925,24 @@ public final class LostTalesChatPresentation {
     }
 
     /**
+     * The drawn row whose sender the pointer rests on this frame, or
+     * null. Answered by the hover card's own hit test — the head, the
+     * brackets, the name and the title, and not the gap after the
+     * closing bracket — so the underline under a name, the card and
+     * the hand cursor all light on the same pixels.
+     */
+    private static IChatComponent hoveredSenderRow;
+
+    static void setHoveredSenderRow(IChatComponent row) {
+        hoveredSenderRow = row;
+    }
+
+    /** Whether the pointer rests on the sender of {@code line}. */
+    static boolean isHoveredSenderRow(IChatComponent line) {
+        return line != null && line == hoveredSenderRow;
+    }
+
+    /**
      * How far each message's hover shade has crossed in, by chat line
      * id, and the frame it was last advanced on. Advanced once per
      * frame however many wrapped rows the message has, and forgotten
@@ -922,6 +1066,37 @@ public final class LostTalesChatPresentation {
         return lastMessageTab;
     }
 
+    /**
+     * The game has cleared its own message list — it does so whenever
+     * the main menu opens, so every trip through it, leaving a world or
+     * a server, empties the chat — and everything said about those lines
+     * goes with them; the tabs, the layout, the identities and what the
+     * session knows of the server stay, and the read marks say where
+     * the replay's unread run begins. The line ids go on counting, so
+     * nothing still holding one can mistake a new line for an old.
+     */
+    public static void onVanillaHistoryCleared() {
+        ClientChatChannelViews.forgetLines();
+        lastMessageChatLineId = 0;
+        hasLastMessage = false;
+        lastMessageTab = null;
+        pingedChatLineIds.clear();
+        flashedChatLineId = 0;
+        flashedNanos = 0L;
+        hoveredChatLineId = 0;
+        hoveredComponent = null;
+        hoveredLine = null;
+        hoveredSenderRow = null;
+        LostTalesChatHoverCard.unpin();
+        hoveredIndex = -1;
+        pendingJumpChatLineId = 0;
+        lastCommandEchoTab = null;
+        lastCommandEchoLineId = 0;
+        lastCommandEcho = null;
+        HOVER_FADES.clear();
+        ChatSpoilerMarker.clear();
+    }
+
     public static void clear() {
         lastMessageNanos = 0L;
         lastMessageChatLineId = 0;
@@ -935,6 +1110,8 @@ public final class LostTalesChatPresentation {
         hoveredChatLineId = 0;
         hoveredComponent = null;
         hoveredLine = null;
+        hoveredSenderRow = null;
+        LostTalesChatHoverCard.unpin();
         hoveredIndex = -1;
         pendingJumpChatLineId = 0;
         lastCommandEchoTab = null;
@@ -1480,11 +1657,12 @@ public final class LostTalesChatPresentation {
                     actor, command);
         }
         int color = ClientChatChannelState.displayColor(typedIn);
-        IChatComponent link = ChatChannelLinkMarker.apply(
-                text("#" + ClientChatChannelState.displayName(typedIn),
-                        nearestFormatting(color), false),
-                color, event.getContext(),
-                commandEchoLineFor(minecraft, event, typedIn));
+        ChatComponentText link = new ChatComponentText("");
+        appendChannelLink(link,
+                "#" + ClientChatChannelState.displayName(typedIn), color,
+                event.getContext(),
+                commandEchoLineFor(minecraft, event, typedIn),
+                ChatMessageIds.NONE);
         return sentence("chat.losttales.console.command.used", actor,
                 command, link);
     }
@@ -2601,17 +2779,63 @@ public final class LostTalesChatPresentation {
                 appendMentions(root, text.substring(literalStart, hash),
                         channel);
             }
-            int color = ClientChatChannelState.displayColor(named);
-            root.appendSibling(ChatChannelLinkMarker.apply(
-                    text("#" + named.getDisplayName(),
-                            nearestFormatting(color), false),
-                    color, ChatTab.of(named).id(), 0));
-            literalStart = end;
-            cursor = end;
+            // A slash and digits after the name link to one message of
+            // the channel, by the id the server gave it.
+            int linkEnd = ChatChannelSuggester.messageIdEnd(text, end);
+            long messageId = linkEnd > end
+                    ? Long.parseLong(text.substring(end + 1, linkEnd))
+                    : ChatMessageIds.NONE;
+            appendChannelLink(root, named, 0, messageId);
+            literalStart = linkEnd;
+            cursor = linkEnd;
         }
         if (literalStart < text.length()) {
             appendMentions(root, text.substring(literalStart), channel);
         }
+    }
+
+    /**
+     * A channel as a link, in its colour: {@code #Name} alone for the
+     * tab, and for a link to one of its messages — by this client's
+     * own line id, or the server's message id — {@code #Name >} and a
+     * speech bubble after it, the way a messenger draws a link to a
+     * message. The pieces carry one marker, so they light together and
+     * any of them answers the click.
+     */
+    static void appendChannelLink(ChatComponentText root, ChatChannel named,
+                                  int chatLineId, long messageId) {
+        int color = ClientChatChannelState.displayColor(named);
+        appendChannelLink(root, "#" + ClientChatChannelState.displayName(
+                ChatTab.of(named)), color, ChatTab.of(named).id(),
+                chatLineId, messageId);
+    }
+
+    static void appendChannelLink(ChatComponentText root, String label,
+                                  int color, String tabId, int chatLineId,
+                                  long messageId) {
+        boolean toMessage = chatLineId != 0
+                || ChatMessageIds.isServerId(messageId);
+        root.appendSibling(link(text(label, nearestFormatting(color), false),
+                color, tabId, chatLineId, messageId));
+        if (!toMessage) {
+            return;
+        }
+        root.appendSibling(link(text(ChatChannelLinkMarker.MESSAGE_SEPARATOR,
+                nearestFormatting(color), false), color, tabId, chatLineId,
+                messageId));
+        ChatComponentText slot = text(ChatChannelLinkMarker.ICON_SLOT,
+                nearestFormatting(color), false);
+        slot.getChatStyle().setBold(Boolean.TRUE);
+        root.appendSibling(link(slot, color, tabId, chatLineId, messageId));
+    }
+
+    private static ChatComponentText link(ChatComponentText run, int color,
+                                          String tabId, int chatLineId,
+                                          long messageId) {
+        return ChatMessageIds.isServerId(messageId)
+                ? ChatChannelLinkMarker.applyMessage(run, color, tabId,
+                        messageId)
+                : ChatChannelLinkMarker.apply(run, color, tabId, chatLineId);
     }
 
     private static void appendMentions(ChatComponentText root, String text,

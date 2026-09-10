@@ -3,6 +3,7 @@ package com.ninuna.losttales.chat.server;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -40,18 +41,23 @@ import java.util.UUID;
  * said before. Proximity lines reach only those who were near, since
  * where a player stood then cannot be asked again.</p>
  *
- * <p>Bounded per channel ({@link #MAX_PER_CHANNEL}) and in all
- * ({@link #MAX_TOTAL}), the oldest going first; a replay hands a player
- * at most {@link #MAX_REPLAY_PER_CHANNEL} of a channel and
- * {@link #MAX_REPLAY_TOTAL} in all. In memory only, cleared with the
- * rest of the server's chat state; the audit log is the record that
- * outlives a restart.</p>
+ * <p>Bounded per channel ({@link #MAX_PER_CHANNEL} unless the server's
+ * config says otherwise) and in all ({@link #MAX_TOTAL}), the oldest
+ * going first; a replay hands a player at most
+ * {@link #MAX_REPLAY_PER_CHANNEL} of a channel and
+ * {@link #MAX_REPLAY_TOTAL} in all. The live store is this class; the
+ * world save keeps a copy through {@link ChatHistoryWorldData}, written
+ * with the world and read back as the server starts, so a restart hands
+ * the recent conversation back. Cleared with the rest of the server's
+ * chat state at both ends of a run, after the save has taken it.</p>
  */
 public final class ChatHistory {
-    /** Messages kept per channel; what a channel's replay can reach back over. */
+    /** Messages kept per channel unless the config says otherwise; what a channel's replay can reach back over. */
     public static final int MAX_PER_CHANNEL = 200;
     /** Messages kept in all, whatever the channels. */
     public static final int MAX_TOTAL = 2000;
+    /** The most one request for older lines of a channel is answered with. */
+    public static final int MAX_OLDER_PER_REQUEST = 50;
     /** The most of one channel a joining player is shown. */
     public static final int MAX_REPLAY_PER_CHANNEL = 100;
     /** The most a joining player is shown in all. */
@@ -61,8 +67,71 @@ public final class ChatHistory {
             new LinkedHashMap<Long, Entry>();
     private static final Map<String, Integer> COUNT_BY_CHANNEL =
             new HashMap<String, Integer>();
+    /** The save the history is written with, or null while it has none. */
+    private static ChatHistoryWorldData store;
 
     private ChatHistory() {}
+
+    /**
+     * The most of one channel the history keeps: the server's config
+     * within the codec's bound, so a lowered setting trims the oldest
+     * rather than refusing the next line.
+     */
+    public static int perChannelCapacity() {
+        return Math.max(1, Math.min(MAX_TOTAL, LostTalesConfig.chatHistoryPerChannel));
+    }
+
+    /** Where every change is written from now on; null detaches. */
+    public static synchronized void attach(ChatHistoryWorldData data) {
+        store = data;
+    }
+
+    static synchronized ChatHistoryWorldData attached() {
+        return store;
+    }
+
+    /** Every kept line, oldest first: what the save writes. */
+    public static synchronized List<Entry> snapshot() {
+        return new ArrayList<Entry>(ENTRIES.values());
+    }
+
+    /**
+     * Takes the save's kept lines back as the live history, oldest first
+     * and within the bounds, and moves the id allocator past the newest
+     * of them so nothing said from here on can share an id with a line
+     * already kept. Answers how many were taken.
+     */
+    public static synchronized int restore(Collection<Entry> entries) {
+        int kept = 0;
+        long newest = ChatMessageIds.NONE;
+        if (entries != null) {
+            for (Entry entry : entries) {
+                if (entry == null || entry.forOthers == null
+                        || !ChatMessageIds.isServerId(
+                                entry.forOthers.getMessageId())) {
+                    continue;
+                }
+                Long id = Long.valueOf(entry.forOthers.getMessageId());
+                if (ENTRIES.containsKey(id)) {
+                    continue;
+                }
+                ENTRIES.put(id, entry);
+                count(entry.channelId, 1);
+                trim(entry.channelId);
+                kept++;
+                newest = Math.max(newest, id.longValue());
+            }
+        }
+        ChatMessageIdAllocator.seed(newest);
+        return kept;
+    }
+
+    /** Tells the save the history changed; nothing without one. */
+    private static void changed() {
+        if (store != null) {
+            store.markDirty();
+        }
+    }
 
     /**
      * Remembers a distributed message: the account that sent it, the
@@ -102,6 +171,7 @@ public final class ChatHistory {
         }
         count(channelId, 1);
         trim(channelId);
+        changed();
     }
 
     /**
@@ -188,6 +258,7 @@ public final class ChatHistory {
                 entry.author, ChatReplyReference.excerptOf(message),
                 entry.seenBy, entry.channelId, forSender, forOthers,
                 entry.audience, entry.timestampMillis));
+        changed();
         return Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy));
     }
 
@@ -308,6 +379,45 @@ public final class ChatHistory {
         return lines;
     }
 
+    /**
+     * The page of a channel before {@code beforeMessageId}, newest first:
+     * the newest kept messages of the channel — and of the conversation
+     * {@code scopeValue} names, for a channel that has more than one —
+     * older than that line whose audience admits the requester, at most
+     * {@link #MAX_OLDER_PER_REQUEST}. What a client scrolled to the top
+     * of a tab asks for; newest first so it can lay each line above the
+     * one before. The requester's entitlement decides line by line,
+     * exactly as it does for the login replay.
+     */
+    public static synchronized List<LostTalesChatMessagePacket> replayBefore(
+            Requester requester, ChatChannel channel, String scopeValue,
+            long beforeMessageId) {
+        if (requester == null || channel == null
+                || !ChatMessageIds.isServerId(beforeMessageId)) {
+            return Collections.emptyList();
+        }
+        String channelId = channel.getId();
+        String scope = scopeValue == null ? "" : scopeValue;
+        List<LostTalesChatMessagePacket> lines =
+                new ArrayList<LostTalesChatMessagePacket>();
+        List<Entry> all = new ArrayList<Entry>(ENTRIES.values());
+        for (int index = all.size() - 1; index >= 0
+                && lines.size() < MAX_OLDER_PER_REQUEST; index--) {
+            Entry entry = all.get(index);
+            if (entry.forOthers.getMessageId() >= beforeMessageId
+                    || !channelId.equals(entry.channelId)
+                    || (channel.isScoped()
+                            && !scope.equals(entry.forOthers.getScopeValue()))
+                    || !entry.audience.admits(requester, entry)) {
+                continue;
+            }
+            lines.add(requester.accountId != null
+                    && requester.accountId.equals(entry.authorId)
+                    ? entry.forSender : entry.forOthers);
+        }
+        return lines;
+    }
+
     /** A message a moderator took back: whose it was and who saw it. */
     public static final class Removal {
         public final UUID authorId;
@@ -392,6 +502,33 @@ public final class ChatHistory {
         /** Nobody: what a line recorded without an audience gets. */
         static Audience nobody() {
             return new Audience(Collections.<UUID>emptySet(), null, null, false);
+        }
+
+        /**
+         * An audience exactly as it was written to the save: the
+         * accounts (null for anyone), the party, the faction and whether
+         * the gate is asked again. Only the codec builds one this way.
+         */
+        static Audience restore(Collection<UUID> accounts, UUID partyId,
+                                String factionId, boolean gated) {
+            return new Audience(accounts, partyId, factionId, gated);
+        }
+
+        /** The accounts, or null for anyone the other parts admit. */
+        Set<UUID> accounts() {
+            return this.accounts;
+        }
+
+        UUID partyId() {
+            return this.partyId;
+        }
+
+        String factionId() {
+            return this.factionId;
+        }
+
+        boolean isGated() {
+            return this.gated;
         }
 
         boolean admits(Requester requester, Entry entry) {
@@ -487,6 +624,7 @@ public final class ChatHistory {
         Entry gone = ENTRIES.remove(Long.valueOf(messageId));
         if (gone != null) {
             count(gone.channelId, -1);
+            changed();
         }
     }
 
@@ -503,7 +641,7 @@ public final class ChatHistory {
     /** Drops the oldest of a channel past its cap, then the oldest of all past the total. */
     private static void trim(String channelId) {
         Integer count = COUNT_BY_CHANNEL.get(channelId);
-        if (count != null && count.intValue() > MAX_PER_CHANNEL) {
+        if (count != null && count.intValue() > perChannelCapacity()) {
             Iterator<Map.Entry<Long, Entry>> oldest = ENTRIES.entrySet().iterator();
             while (oldest.hasNext()) {
                 Map.Entry<Long, Entry> candidate = oldest.next();
@@ -534,7 +672,7 @@ public final class ChatHistory {
     }
 
     /** One distributed message: who wrote it, how it reads, who saw it, who may. */
-    private static final class Entry {
+    static final class Entry {
         final UUID authorId;
         final String author;
         final String excerpt;

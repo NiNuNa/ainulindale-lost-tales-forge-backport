@@ -137,6 +137,7 @@ public final class LostTalesChatGui extends GuiChat {
     @Override
     public void initGui() {
         ClientChatChannelState.ensureAvailable();
+        LostTalesChatHoverCard.unpin();
         super.initGui();
         // The chat draws its own text, shadow and all; vanilla's field
         // would put a quarter-colour shadow under the one thing on the
@@ -217,15 +218,19 @@ public final class LostTalesChatGui extends GuiChat {
     public void onGuiClosed() {
         super.onGuiClosed();
         // A screen closed mid-drag ends the drag where it stands: this
-        // instance is gone and nothing else would ever release it.
+        // instance is gone and nothing else would ever release it. A
+        // card a click opened goes with the screen.
         this.gestures.cancelDrags();
+        LostTalesChatHoverCard.unpin();
         if (!isEmptyState()) {
             ClientChatChannelState.setDraft(
                     this.sent ? "" : this.inputField.getText());
         }
         ClientChatChannelViews.setScrollEasingSuppressed(false);
-        // Every divider that was on a viewed tab has done its job.
+        // Every divider that was on a viewed tab has done its job, and
+        // how far the tabs were read is written down.
         ClientChatChannelViews.dismissSeenDividers();
+        ClientChatReadMarks.save();
         this.outbox.stopTyping();
     }
 
@@ -316,6 +321,11 @@ public final class LostTalesChatGui extends GuiChat {
         }
         if (keyCode != Keyboard.KEY_TAB) {
             this.completion.onKeyNotTab();
+        }
+        if (keyCode == Keyboard.KEY_ESCAPE
+                && LostTalesChatHoverCard.isPinned()) {
+            LostTalesChatHoverCard.unpin();
+            return;
         }
         if (keyCode == Keyboard.KEY_ESCAPE
                 && (this.menus.isOpen() || this.gestures.isDragging())) {
@@ -760,14 +770,28 @@ public final class LostTalesChatGui extends GuiChat {
         }
         this.gestures.advance(mouseX, mouseY);
         LostTalesChatPresentation.beginFrame();
+        // The pointer's exact GUI position: hover resolves against the
+        // same fractional coordinate the drawn cursor tip stands on, so
+        // a hitbox never reads shifted by the integer conversion's
+        // truncation — the underline under a run, the card over a name
+        // and the hand cursor all ask about the same point.
+        float pointerX = (float)ChatWindowPlacement.preciseMouseX(
+                this.mc, this.width);
+        float pointerY = (float)ChatWindowPlacement.preciseMouseY(
+                this.mc, this.height);
         LostTalesChatPresentation.setHoveredLine(
                 hoveredMessageLine(mouseX, mouseY));
         LostTalesChatOverlayRenderer.Hit hovered =
-                hoveredComponent(mouseX, mouseY);
+                hoveredComponent(pointerX, pointerY);
         LostTalesChatPresentation.setHoveredComponent(
                 hovered == null ? null : hovered.line,
                 hovered == null ? -1 : hovered.index,
                 hovered == null ? null : hovered.component);
+        LostTalesChatPresentation.setHoveredSenderRow(
+                this.menus.isOpen() || this.gestures.isDragging()
+                        || LostTalesChatHoverCard.isPinned() ? null
+                        : LostTalesChatHoverCard.senderRowAt(this.mc,
+                                pointerX, pointerY));
         this.gestures.markScrollbarsWanted(mouseX, mouseY);
         drawWindows(mouseX, mouseY, partialTicks);
         landPendingJump();
@@ -859,14 +883,6 @@ public final class LostTalesChatGui extends GuiChat {
         } finally {
             GL11.glPopMatrix();
         }
-        // The pointer's exact GUI position: hover resolves against the
-        // same fractional coordinate the drawn cursor tip stands on, so
-        // a hitbox never reads shifted by the integer conversion's
-        // truncation.
-        float pointerX = (float)ChatWindowPlacement.preciseMouseX(
-                this.mc, this.width);
-        float pointerY = (float)ChatWindowPlacement.preciseMouseY(
-                this.mc, this.height);
         if (!this.regions.contains(mouseX, mouseY)) {
             drawChatLineHover(pointerX, pointerY, mouseX, mouseY);
         }
@@ -882,6 +898,9 @@ public final class LostTalesChatGui extends GuiChat {
             LostTalesChatHoverCard.draw(this.mc, pointerX, pointerY,
                     this.width, this.height);
         }
+        // The card a click opened stands over the lines until it is
+        // closed, wherever the pointer has gone since.
+        LostTalesChatHoverCard.drawPinned(this.mc, this.width, this.height);
         this.gestures.drawLinkHighlight();
         this.menus.draw(this.regions, mouseX, mouseY);
         ChatPopupMenu.Entry hoveredLock =
@@ -1062,8 +1081,11 @@ public final class LostTalesChatGui extends GuiChat {
             } finally {
                 GL11.glPopMatrix();
             }
-            ChatChannelTabBar.Hit hit = frame.tabBar.hitAt(
-                    this.fontRendererObj, row, mouseX, mouseY);
+            // Asked as the row asks for itself: nothing while a tab is
+            // under the hand or the window's edge is being dragged.
+            ChatChannelTabBar.Hit hit = row.dragging != null || row.resizing
+                    ? null : frame.tabBar.hitAt(
+                            this.fontRendererObj, row, mouseX, mouseY);
             if (hit != null) {
                 hoveredHit = hit;
                 hoveredWindow = window;
@@ -1425,6 +1447,16 @@ public final class LostTalesChatGui extends GuiChat {
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
         int adjustedMouseY = mouseY - Math.round(this.bar.entranceOffset());
+        // A card a click opened takes a press on itself and nothing
+        // happens; a press anywhere else closes it and goes on to
+        // whatever is under it, so another name opens its own card at
+        // once.
+        if (LostTalesChatHoverCard.isPinned()) {
+            if (LostTalesChatHoverCard.pinnedContains(mouseX, mouseY)) {
+                return;
+            }
+            LostTalesChatHoverCard.unpin();
+        }
         // An open menu takes the press first; a press beside it closes
         // it and goes on to whatever is under it, which is told which
         // menu it closed so a switch does not reopen what it put away.
@@ -1575,7 +1607,7 @@ public final class LostTalesChatGui extends GuiChat {
         // opens the message's menu: reply, copy, edit, delete.
         if (button == 1) {
             if (LostTalesChatHoverCard.isPointerOnPerson(this.mc,
-                    mouseX, mouseY)) {
+                    mouseX + 0.5F, mouseY + 0.5F)) {
                 if (this.menus.openPlayerPopup(mouseX, mouseY)) {
                     return;
                 }
@@ -1809,13 +1841,14 @@ public final class LostTalesChatGui extends GuiChat {
      * hover card is, so what is underlined is exactly what a click
      * would reach.
      */
-    private LostTalesChatOverlayRenderer.Hit hoveredComponent(int mouseX,
-                                                             int mouseY) {
-        if (this.menus.isOpen() || this.gestures.isDragging()) {
+    private LostTalesChatOverlayRenderer.Hit hoveredComponent(
+            float pointerX, float pointerY) {
+        if (this.menus.isOpen() || this.gestures.isDragging()
+                || LostTalesChatHoverCard.isPinned()) {
             return null;
         }
-        return LostTalesChatOverlayRenderer.hitAt(this.mc,
-                mouseX + 0.5F, mouseY + 0.5F);
+        return LostTalesChatOverlayRenderer.hitAt(this.mc, pointerX,
+                pointerY);
     }
 
     private int hoveredMessageLine(int mouseX, int mouseY) {
@@ -2016,6 +2049,12 @@ public final class LostTalesChatGui extends GuiChat {
                 LostTalesChatOverlayRenderer.hitAt(this.mc, mouseX + 0.5F,
                         mouseY + 0.5F);
         if (lineHit != null && actsOnClick(lineHit.component)) {
+            return true;
+        }
+        // A person answers a click with their card, on exactly the
+        // pixels the card's own hit test names.
+        if (LostTalesChatHoverCard.isPointerOnPerson(this.mc,
+                mouseX + 0.5F, mouseY + 0.5F)) {
             return true;
         }
         // A window that is not the one being typed in answers to a
@@ -2332,16 +2371,19 @@ public final class LostTalesChatGui extends GuiChat {
             openChannelLink(channelLink);
             return true;
         }
+        // A person is not a link either, and answers whatever the
+        // chat-links option says: a click on the head, the name, its
+        // brackets and title, or a mention opens the person's card in
+        // full, the way a messenger opens a profile from a name. What
+        // to do about them stays with the person menu on a right-click.
+        if (ChatHeadMarker.isMarker(hit.component)
+                || ChatMentionMarker.decode(hit.component) != null
+                || ChatSenderSpan.isSenderName(hit.component)) {
+            openPersonCard();
+            return true;
+        }
         if (!this.mc.gameSettings.chatLinks) {
             return false;
-        }
-        if (ChatHeadMarker.isMarker(hit.component)) {
-            // A person is not a link: hovering names them, and what to
-            // do about them is the message menu's to offer.
-            return true;
-        }
-        if (ChatMentionMarker.decode(hit.component) != null) {
-            return true;
         }
         ChatShowcaseMarker.Data share =
                 ChatShowcaseMarker.decode(hit.component);
@@ -2386,6 +2428,7 @@ public final class LostTalesChatGui extends GuiChat {
         if (event.getAction() == ClickEvent.Action.SUGGEST_COMMAND
                 && event.getValue().startsWith(ChatSenderSpan.WHISPER_PREFIX)) {
             // The sender's own name and brackets: a person, not a link.
+            openPersonCard();
             return true;
         } else if (event.getAction() == ClickEvent.Action.SUGGEST_COMMAND) {
             this.inputField.setText(event.getValue());
@@ -2407,13 +2450,43 @@ public final class LostTalesChatGui extends GuiChat {
     }
 
     /**
+     * Opens the full card of whoever the pointer rests on, exactly where
+     * the hover card shows; a click that lands on nobody — the gap after
+     * a closing bracket — opens nothing.
+     */
+    private void openPersonCard() {
+        float pointerX = (float)ChatWindowPlacement.preciseMouseX(
+                this.mc, this.width);
+        float pointerY = (float)ChatWindowPlacement.preciseMouseY(
+                this.mc, this.height);
+        LostTalesChatHoverCard.Target person =
+                LostTalesChatHoverCard.personAt(this.mc, pointerX, pointerY);
+        if (person != null) {
+            LostTalesChatHoverCard.pin(person, (int)pointerX, (int)pointerY);
+        }
+    }
+
+    /**
      * Follows a channel link: the tab it names comes forward — opened
      * again in the selected tab's window if it was closed — and the
      * line it names, if any, is landed on once the tab is drawn. A tab
-     * that is nobody's any more says so.
+     * that is nobody's any more says so. A link to a message names it
+     * by the server's id: the message is landed on in the tab it is
+     * filed under when this client still holds it, and the link's own
+     * tab comes forward with a word that it is gone when it does not.
      */
     private void openChannelLink(ChatChannelLinkMarker.Data link) {
+        int chatLineId = link.chatLineId;
         ChatTab tab = ChatTab.fromId(link.tabId);
+        if (link.messageId != ChatMessageIds.NONE) {
+            Integer held = ClientChatMessageIds.chatLineIdOf(link.messageId);
+            chatLineId = held == null ? 0 : held.intValue();
+            ChatTab filedUnder = held == null ? null
+                    : ClientChatChannelViews.tabOf(chatLineId);
+            if (filedUnder != null) {
+                tab = filedUnder;
+            }
+        }
         if (tab == null) {
             showNotice(StatCollector.translateToLocal(
                     "gui.losttales.chat.channel.gone"));
@@ -2429,8 +2502,11 @@ public final class LostTalesChatGui extends GuiChat {
             }
         }
         this.tabActions.selectChannel(tab);
-        if (link.chatLineId != 0) {
-            LostTalesChatPresentation.requestJump(link.chatLineId);
+        if (chatLineId != 0) {
+            LostTalesChatPresentation.requestJump(chatLineId);
+        } else if (link.messageId != ChatMessageIds.NONE) {
+            showNotice(StatCollector.translateToLocal(
+                    "gui.losttales.chat.message.gone"));
         }
     }
 

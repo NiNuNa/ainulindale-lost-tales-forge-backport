@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
@@ -44,9 +45,16 @@ import org.lwjgl.opengl.GL11;
  * those recorded bands, so it always matches what is on screen.
  */
 final class LostTalesChatOverlayRenderer {
-    /** The rule and date of a day's first message: the timestamps' quiet grey. */
-    private static final int DATE_DIVIDER_RGB =
-            LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
+    /**
+     * The rule and date of a day's first message: the Console's colour,
+     * which the timestamps and the Server's and Client's names wear too
+     * - the chat's one tone for what is said about a line rather than
+     * in it. Read on every draw, so a server that recolours the Console
+     * moves all four together.
+     */
+    private static int dateDividerRgb() {
+        return ClientChatChannelState.displayColor(ChatChannel.CONSOLE);
+    }
     /** Width of the solid bar a mention wears on the window's left edge. */
     private static final float MENTION_BAR_WIDTH = 1.0F;
     /** The unread divider's rule and date: the palette's red. */
@@ -320,6 +328,20 @@ final class LostTalesChatOverlayRenderer {
                                 frame.contentRows(), roomLines));
         frame.renderedScrollLines = scroll;
         frame.drawn = true;
+        if (view != null) {
+            // A conversation of a scoped channel read for the first time
+            // asks for what was said in it before; a view scrolled to its
+            // oldest line asks for the page before that. Both from here,
+            // where the view and its lines are exactly what is drawn.
+            String scope = ClientChatContextHistory.scopeOf(ChatTab.viewed(view));
+            if (scope.length() > 0) {
+                ClientChatContextHistory.request(ChatTab.viewed(view), scope);
+            }
+            double maximum = Math.max(0.0D,
+                    frame.contentRows() - Math.max(1.0D, roomLines));
+            ClientChatOlderHistory.requestIfAtTop(minecraft, view, lines,
+                    maximum > 0.0D && scroll >= maximum - 0.01D);
+        }
         // The window's own rectangle of the blurred frame, under the
         // backdrop; drawn only while the chat screen captured one this
         // frame, so every other path keeps the plain backdrop. The
@@ -1013,7 +1035,7 @@ final class LostTalesChatOverlayRenderer {
                                 y - rowHeight,
                                 unreadHere ? dividerLabel : dayLabel,
                                 unreadHere ? UNREAD_DIVIDER_RGB
-                                        : DATE_DIVIDER_RGB,
+                                        : dateDividerRgb(),
                                 alpha);
                         continue;
                     }
@@ -1139,10 +1161,20 @@ final class LostTalesChatOverlayRenderer {
                         if ((stamped || hoverFade > 0.0F)
                                 && timestampText(line.func_151461_a())
                                         .length() > 0) {
+                            // The stamp stands at the middle of the whole
+                            // message - every wrapped row of it, a reply's
+                            // quote row included - not on the row that
+                            // happens to carry it, so a name on one line
+                            // and its words on the next are stamped
+                            // between them, the way a reply's quote, name
+                            // and words already were.
                             drawTimestampRuns(font, line.func_151461_a(),
                                     Math.round(panelLeft)
                                             + columns.timestampX(),
-                                    y - TEXT_OFFSET, stampAlpha);
+                                    y - TEXT_OFFSET + messageCentreShift(
+                                            lines, lineIndex, rows,
+                                            dividerIndex),
+                                    stampAlpha);
                         }
                     }
                     GL11.glPushMatrix();
@@ -1925,6 +1957,47 @@ final class LostTalesChatOverlayRenderer {
             }
         }
         return true;
+    }
+
+    /**
+     * How far below its own row's baseline the stamp of the message at
+     * {@code lineIndex} stands, so that it is centred on the message's
+     * whole height: half the rows below the stamped row (the wrapped
+     * words) less half the rows above it (a reply's quote). The rows of
+     * one message share its chat line id and stand together in the
+     * list, wrapped continuations toward the newer end and a leading
+     * row toward the older; a blank row or a day's rule ends the
+     * message on either side. Zero for a message on one row.
+     */
+    static int messageCentreShift(List<ChatLine> lines, int lineIndex,
+                                  ChatStackRows rows, int dividerIndex) {
+        ChatLine stamped = lines.get(lineIndex);
+        if (stamped == null) {
+            return 0;
+        }
+        int id = stamped.getChatLineID();
+        int below = 0;
+        for (int index = lineIndex - 1; index >= 0; index--) {
+            ChatLine newer = lines.get(index);
+            if (newer == null || newer.getChatLineID() != id
+                    || ChatWindowLines.isFiller(newer)) {
+                break;
+            }
+            below += rows.height(rowOfLine(index, dividerIndex));
+        }
+        int above = 0;
+        for (int index = lineIndex + 1; index < lines.size(); index++) {
+            ChatLine older = lines.get(index);
+            if (older == null || older.getChatLineID() != id
+                    || ChatWindowLines.isFiller(older)) {
+                break;
+            }
+            above += rows.height(rowOfLine(index, dividerIndex));
+        }
+        // Rows below the stamped one are further down the screen, rows
+        // above it further up: the stamp moves down by half the
+        // difference. Halves round toward the name's row.
+        return (below - above) / 2;
     }
 
     /** The line's timestamp runs as one string, empty when it has none. */

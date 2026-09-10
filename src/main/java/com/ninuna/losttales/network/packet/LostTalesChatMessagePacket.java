@@ -120,7 +120,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
     }
 
     /** The most one line takes on the wire; the history batch reads it too. */
-    static final int MAX_PACKET_BYTES = 2048
+    public static final int MAX_PACKET_BYTES = 2048
             + ChatMessageValidator.MAX_UTF8_BYTES
             + ChatShowcase.MAX_TOTAL_BYTES
             + ChatReplyReference.MAX_AUTHOR_BYTES
@@ -720,6 +720,21 @@ public final class LostTalesChatMessagePacket implements IMessage {
         long most = buffer.readLong();
         long least = buffer.readLong();
         return present ? new UUID(most, least) : null;
+    }
+
+    /**
+     * Whether the line passes the checks {@link #toBytes} makes: what a
+     * server asks before handing a kept line to the encoder, since an
+     * exception there ends the connection. A line built under a channel
+     * or a role the server no longer has answers false.
+     */
+    public boolean isWellFormed() {
+        try {
+            validate();
+            return true;
+        } catch (RuntimeException malformed) {
+            return false;
+        }
     }
 
     private void validate() {

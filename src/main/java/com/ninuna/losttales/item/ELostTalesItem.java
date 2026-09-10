@@ -1,5 +1,6 @@
 package com.ninuna.losttales.item;
 
+import com.ninuna.losttales.user.ELostTalesUser;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.creativetab.ELostTalesCreativeTabs;
 import com.ninuna.losttales.item.armor.LostTalesItemArmor3D;
@@ -274,7 +275,7 @@ public enum ELostTalesItem {
 
     // Community - Items.
     COMMUNITY_LOSSOTH_HARPOON(new LostTalesItemSpear(
-            ELostTalesItemMaterial.LOSSOTH, Type.WEAPON_SPEAR, "Scosher"
+            ELostTalesItemMaterial.LOSSOTH, Type.WEAPON_SPEAR, ELostTalesUser.SCOSHER.getName()
     ).setUnlocalizedName("community_lossoth_harpoon").setCreativeTab(ELostTalesCreativeTabs.COMMUNITY.getCreativeTab())),
 
     COMMUNITY_MORIA_GOBLIN_SCIMITAR(new LostTalesItemSword(

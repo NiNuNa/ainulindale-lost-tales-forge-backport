@@ -139,6 +139,15 @@ enum ChatIconSheet {
      */
     void drawSilhouetteWithShadow(int rgb, float x, float y, int alpha) {
         drawShadow(this.u, this.v, this.width, this.height, x, y, alpha);
+        drawSilhouette(rgb, x, y, alpha);
+    }
+
+    /**
+     * The sprite as a flat silhouette in one colour and nothing else:
+     * what a two-pass renderer draws twice, once in the shadow tone and
+     * once in the run's colour.
+     */
+    void drawSilhouette(int rgb, float x, float y, int alpha) {
         LostTalesSilhouetteRenderState.begin(rgb);
         try {
             draw(x, y, alpha);

@@ -111,26 +111,31 @@ public final class DiscordMessageLinksTest {
     @Test
     public void theOldestMessagesGoFirst() {
         DiscordMessageLinks links = new DiscordMessageLinks();
-        for (int index = 0; index < 600; index++) {
+        int max = DiscordMessageLinks.MAX_LINKS;
+        // Eighty-eight past the bound: the first eighty-eight are gone.
+        int newest = max + 87;
+        for (int index = 0; index <= newest; index++) {
             links.link(1000L + index, "d" + index, "", "", "");
         }
-        assertEquals(512, links.size());
+        assertEquals(max, links.size());
         assertEquals("", firstDiscordIdOf(links, 1000L));
         assertEquals(ChatMessageIds.NONE, links.messageIdOf("d0"));
-        assertEquals("d599", firstDiscordIdOf(links, 1599L));
-        assertEquals(1599L, links.messageIdOf("d599"));
-        // A message given a second copy counts as the newest again.
+        assertEquals("d" + newest, firstDiscordIdOf(links, 1000L + newest));
+        assertEquals(1000L + newest, links.messageIdOf("d" + newest));
+        // A message given a second copy counts as the newest again: the
+        // oldest still held is re-put, then one short of a whole bound
+        // of new messages follows it.
         links.link(1088L, "d88b", "", "channel:2", "");
-        for (int index = 600; index < 1111; index++) {
+        for (int index = newest + 1; index < newest + max; index++) {
             links.link(1000L + index, "d" + index, "", "", "");
         }
-        assertEquals(512, links.size());
+        assertEquals(max, links.size());
         assertEquals("d88", firstDiscordIdOf(links, 1088L));
         assertEquals("d88b", links.discordIdOf(1088L, "channel:2"));
         // The messages that were older than the re-put one went first.
         assertEquals("", firstDiscordIdOf(links, 1089L));
-        assertEquals("", firstDiscordIdOf(links, 1599L));
-        assertEquals("d600", firstDiscordIdOf(links, 1600L));
+        assertEquals("", firstDiscordIdOf(links, 1000L + newest));
+        assertEquals("d" + (newest + 1), firstDiscordIdOf(links, 1000L + newest + 1));
     }
 
     @Test

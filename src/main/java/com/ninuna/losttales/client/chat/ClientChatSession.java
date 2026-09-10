@@ -5,22 +5,17 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
 
 /**
- * Which server the chat history on screen belongs to.
+ * Which server the chat on screen belongs to.
  *
- * <p>Minecraft keeps its own chat history for as long as the game is
- * running — {@code GuiIngame} and its {@code GuiNewChat} are built once —
- * so leaving a server and coming back does not lose the messages. What
- * Lost Tales knows <em>about</em> those messages — which tab each line
- * belongs to, the open conversations, the scroll offsets — has to
- * outlive the disconnect with them, or rejoining would show an empty
- * chat with the lines still in the history.</p>
- *
- * <p>The session keeps that state, and drops it only when the
- * player arrives somewhere else: a different server address, or a
- * different single-player world. That is as close to "until the server
- * restarts" as a client can get on its own — the server never tells a
- * client it was restarted — so a restart while this client stays running
- * leaves the old messages in the history until the client is closed.</p>
+ * <p>The game clears its own message list whenever the main menu opens,
+ * so every trip out of a world or a server empties the chat; the lines
+ * come back from the server's replay on the next join, filed under the
+ * read marks. What outlives the trip is what Lost Tales knows about the
+ * <em>server</em> — its channels, roles, identities, the open
+ * conversations and the layout — and the session keeps that state as
+ * long as the player comes back to the same place: the same server
+ * address, or the same single-player world. Arriving anywhere else
+ * drops it and starts clean.</p>
  */
 public final class ClientChatSession {
     /** Where the chat currently on screen came from; empty before a join. */
@@ -39,6 +34,11 @@ public final class ClientChatSession {
         boolean same = key.length() > 0 && key.equals(serverKey);
         serverKey = key;
         return same;
+    }
+
+    /** Where the chat on screen came from, as {@link #resume} last read it; empty before a join. */
+    public static synchronized String currentKey() {
+        return serverKey;
     }
 
     /**

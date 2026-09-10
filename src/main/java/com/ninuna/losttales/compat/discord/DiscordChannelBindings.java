@@ -583,6 +583,22 @@ public final class DiscordChannelBindings {
         return id == null ? null : this.byId.get(id);
     }
 
+    /**
+     * The first binding naming that Discord channel by id, in config
+     * order, or null: what a Discord jump link's channel is read as.
+     */
+    public DiscordChannelBinding forDiscordChannel(String discordChannelId) {
+        if (discordChannelId == null || discordChannelId.length() == 0) {
+            return null;
+        }
+        for (DiscordChannelBinding binding : this.bindings) {
+            if (binding.getDiscordChannelId().equals(discordChannelId)) {
+                return binding;
+            }
+        }
+        return null;
+    }
+
     public List<DiscordChannelBinding> all() {
         return this.bindings;
     }

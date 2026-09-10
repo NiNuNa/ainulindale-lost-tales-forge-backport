@@ -1370,11 +1370,11 @@ public final class LostTalesChatService {
         } else if (!owned.containsKey(scopeValue)) {
             return;
         }
-        List<LostTalesChatMessagePacket> lines = ChatHistory.replayForContext(
+        List<LostTalesChatMessagePacket> lines = sendable(ChatHistory.replayForContext(
                 new ChatHistory.Requester(player.getUniqueID(), owned,
                         party == null ? null : party.getPartyId(),
                         readableChannels(player)),
-                channel, scopeValue, sinceMessageId);
+                channel, scopeValue, sinceMessageId));
         if (lines.isEmpty()) {
             return;
         }
@@ -1389,6 +1389,88 @@ public final class LostTalesChatService {
         FMLLog.info("[losttales/chat/history] replayed %d lines of %s/%s to %s",
                 Integer.valueOf(lines.size()), channel.getId(), scopeValue,
                 player.getCommandSenderName());
+    }
+
+    /**
+     * Answers a player scrolled to the top of a tab with the page of the
+     * channel before the oldest line they hold, newest first and in
+     * batches. Who they are is read from the live server here, as for
+     * the login replay, and a conversation the requester is not in
+     * answers with nothing whatever the request names. An empty page is
+     * answered with nothing at all; the client stops asking once a page
+     * comes back short.
+     */
+    public static void sendOlderHistory(EntityPlayerMP player, ChatChannel channel,
+                                        String scopeValue, long beforeMessageId) {
+        if (player == null || player.worldObj == null || player.worldObj.isRemote
+                || channel == null || channel == ChatChannel.WHISPER
+                || !ChatMessageIds.isServerId(beforeMessageId)) {
+            return;
+        }
+        String scope = scopeValue == null ? "" : scopeValue.trim();
+        if (channel.isScoped() == (scope.length() == 0)) {
+            return;
+        }
+        Map<String, Long> owned = ChatChannelPolicy.ownedFactions(player);
+        Party party = PartyService.getInstance().getPartyForActiveCharacter(player);
+        if (channel.isScoped()) {
+            if (channel.getScope() == ChatChannelScope.PARTY) {
+                if (party == null || party.getPartyId() == null
+                        || !party.getPartyId().toString().equals(scope)) {
+                    return;
+                }
+            } else if (!owned.containsKey(scope)) {
+                return;
+            }
+        }
+        List<ChatChannel> readable = readableChannels(player);
+        if (!readable.contains(channel)) {
+            return;
+        }
+        List<LostTalesChatMessagePacket> lines = sendable(ChatHistory.replayBefore(
+                new ChatHistory.Requester(player.getUniqueID(), owned,
+                        party == null ? null : party.getPartyId(), readable),
+                channel, scope, beforeMessageId));
+        if (lines.isEmpty()) {
+            return;
+        }
+        for (int from = 0; from < lines.size();
+             from += LostTalesChatHistorySyncPacket.MAX_MESSAGES) {
+            LostTalesNetworkHandler.CHANNEL.sendTo(
+                    new LostTalesChatHistorySyncPacket(lines.subList(from,
+                            Math.min(lines.size(), from
+                                    + LostTalesChatHistorySyncPacket.MAX_MESSAGES))),
+                    player);
+        }
+        FMLLog.info("[losttales/chat/history] replayed %d older lines of %s%s to %s",
+                Integer.valueOf(lines.size()), channel.getId(),
+                scope.length() == 0 ? "" : "/" + scope,
+                player.getCommandSenderName());
+    }
+
+    /**
+     * The kept lines that can still be sent: one built under a channel or
+     * a role the server no longer has is left out with a warning rather
+     * than handed to the encoder, whose exception would end the
+     * connection.
+     */
+    private static List<LostTalesChatMessagePacket> sendable(
+            List<LostTalesChatMessagePacket> lines) {
+        List<LostTalesChatMessagePacket> kept =
+                new ArrayList<LostTalesChatMessagePacket>(lines.size());
+        int dropped = 0;
+        for (LostTalesChatMessagePacket line : lines) {
+            if (line != null && line.isWellFormed()) {
+                kept.add(line);
+            } else {
+                dropped++;
+            }
+        }
+        if (dropped > 0) {
+            FMLLog.warning("[%s] %d kept chat lines can no longer be sent and were left out of a replay",
+                    LostTalesMetaData.MOD_ID, Integer.valueOf(dropped));
+        }
+        return kept;
     }
 
     /**
@@ -1409,11 +1491,11 @@ public final class LostTalesChatService {
         Party party = PartyService.getInstance()
                 .getPartyForActiveCharacter(player);
         List<ChatChannel> readable = readableChannels(player);
-        List<LostTalesChatMessagePacket> lines = ChatHistory.replayFor(
+        List<LostTalesChatMessagePacket> lines = sendable(ChatHistory.replayFor(
                 new ChatHistory.Requester(player.getUniqueID(),
                         ChatChannelPolicy.ownedFactions(player),
                         party == null ? null : party.getPartyId(), readable),
-                ChatMessageIds.NONE);
+                ChatMessageIds.NONE));
         int packets = 0;
         for (int from = 0; from < lines.size();
              from += LostTalesChatHistorySyncPacket.MAX_MESSAGES) {

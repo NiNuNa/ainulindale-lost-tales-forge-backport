@@ -160,6 +160,25 @@ final class ChatInlineIcons {
         }
     }
 
+    /**
+     * A cell of the chat's own icon sheet as an inline glyph: drawn 1:1
+     * on whole pixels, centred in the content box, as a flat silhouette
+     * in {@code rgb} — the shadow tone on the shadow pass — so it takes
+     * the colour of the run it stands in. The sheet's cells are smaller
+     * than the box; the box is never scaled to them.
+     */
+    static void drawSheetSprite(ChatIconSheet sprite, float boxX,
+                                float boxY, float size, int rgb, int alpha,
+                                boolean silhouette) {
+        if (sprite == null || size <= 0.0F) {
+            return;
+        }
+        float x = (float)Math.floor(boxX + (size - sprite.getWidth()) / 2.0F);
+        float y = (float)Math.floor(boxY + (size - sprite.getHeight()) / 2.0F);
+        sprite.drawSilhouette(silhouette
+                ? LostTalesChatVisualStyle.SHADOW : rgb, x, y, alpha);
+    }
+
     /* Two-pass conveniences for callers that draw one glyph at a time. */
 
     static void drawEmoji(Minecraft minecraft, ChatEmoji emoji,

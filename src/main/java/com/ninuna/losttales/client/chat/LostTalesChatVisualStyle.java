@@ -65,10 +65,10 @@ final class LostTalesChatVisualStyle {
                 LostTalesColors.PLUM_BLACK);
     }
 
-    /** The line under the pointer, in the client's chosen palette colour. */
+    /** The line under the pointer, in the client's chosen palette colour; mauve until it chooses. */
     static int selectedLineRgb() {
         return paletteRgb(LostTalesConfig.chatSelectedLineColor,
-                LostTalesColors.PLUM_GRAY);
+                LostTalesColors.MAUVE);
     }
 
     /** A line that @-mentions this player, in the client's chosen palette colour. */
@@ -466,10 +466,12 @@ final class LostTalesChatVisualStyle {
         // The sender is one thing under the pointer — the opening
         // bracket, the head, the name, the title and the closing
         // bracket — so resting on any of them underlines the whole
-        // span, in the name's colour.
-        boolean personHovered = hovered != null
-                && (ChatSenderSpan.isSenderName(hovered)
-                        || ChatHeadMarker.isMarker(hovered));
+        // span, in the name's colour. Whether the pointer is on it is
+        // the hover card's answer, measured against each part's own
+        // pixels with the closing bracket's trailing gap left out, so
+        // the rule, the card and the hand cursor agree to the pixel.
+        boolean personHovered =
+                LostTalesChatPresentation.isHoveredSenderRow(line);
         boolean identitySpan = false;
         // The rule under whatever is lit: one rectangle per unbroken
         // run of lit parts, in the colour the first of them is drawn
@@ -546,6 +548,21 @@ final class LostTalesChatVisualStyle {
                     drawShareIcon(share, cursor, y, width, alpha,
                             shadowPass);
                 }
+            } else if (ChatChannelLinkMarker.isIconSlot(part)) {
+                // The bubble of a link to a message, in the link's own
+                // colour, centred in the slot its two spaces reserve. It
+                // is a piece of the link and answers the click like the
+                // name before it, but the rule stops short of it: a line
+                // under a bubble reads as a smudge.
+                width = measure(font, formatting, text, colours);
+                Integer linkColor = ChatChannelLinkMarker.colorOf(part);
+                ChatInlineIcons.drawSheetSprite(ChatIconSheet.SPEECH_BUBBLE,
+                        ChatInlineIcons.boxLeft(cursor, width),
+                        ChatInlineIcons.boxTop(y, width),
+                        ChatInlineIcons.contentSize(width),
+                        !colours || linkColor == null ? IVORY
+                                : linkColor.intValue(),
+                        alpha, shadowPass);
             } else {
                 String rendered;
                 int color;
@@ -824,6 +841,9 @@ final class LostTalesChatVisualStyle {
         }
         if (ChatReplyMarker.isMarker(part)) {
             return ChatReplyMarker.isMarker(hovered);
+        }
+        if (ChatChannelLinkMarker.isMarker(part)) {
+            return ChatChannelLinkMarker.sameLink(part, hovered);
         }
         ClickEvent own = genuineClick(part);
         ClickEvent theirs = genuineClick(hovered);

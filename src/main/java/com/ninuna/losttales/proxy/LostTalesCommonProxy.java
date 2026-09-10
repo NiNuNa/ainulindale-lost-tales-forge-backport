@@ -113,6 +113,7 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.server.ChatCommandContexts;
 import com.ninuna.losttales.chat.server.ChatConsoleStream;
 import com.ninuna.losttales.chat.server.ChatHistory;
+import com.ninuna.losttales.chat.server.ChatHistoryStorage;
 import com.ninuna.losttales.chat.server.LostTalesChatRoleRosterWatcher;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
@@ -365,6 +366,10 @@ public class LostTalesCommonProxy {
         LostTalesChatRoleRosterWatcher.clear();
         ChatMessageIdAllocator.reset();
         ChatHistory.clear();
+        // After the channels and the config above, since every kept
+        // line names its channel by id: the save's recent lines come
+        // back as the live history, and the save follows it from here.
+        ChatHistoryStorage.restore(event.getServer());
         ChatConsoleStream.clear();
         ChatCommandContexts.clear();
         LostTalesChatService.clear();
@@ -444,6 +449,10 @@ public class LostTalesCommonProxy {
         LostTalesChatRoleRosterWatcher.clear();
         ChatChannel.resetToBuiltIn();
         ChatMessageIdAllocator.reset();
+        // The save takes the history's last state before the store is
+        // cleared: the worlds are saved after this event, and what
+        // they write is that snapshot.
+        ChatHistoryStorage.release();
         ChatHistory.clear();
         ChatConsoleStream.clear();
         ChatCommandContexts.clear();

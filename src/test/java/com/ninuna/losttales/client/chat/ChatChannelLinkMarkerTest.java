@@ -37,6 +37,42 @@ public final class ChatChannelLinkMarkerTest {
     }
 
     @Test
+    public void aLinkToAMessageCarriesTheServersIdAndItsPiecesActTogether() {
+        ChatComponentText name = ChatChannelLinkMarker.applyMessage(
+                new ChatComponentText("#Global"), 0x577F9D, "all", 1757522000000L);
+        ChatChannelLinkMarker.Data data = ChatChannelLinkMarker.decode(name);
+        assertEquals(1757522000000L, data.messageId);
+        assertEquals(0, data.chatLineId);
+        assertEquals("all", data.tabId);
+        assertTrue(data.linksMessage());
+        assertFalse(ChatChannelLinkMarker.isIconSlot(name));
+        // The bubble's slot: the same link on the two reserved spaces.
+        ChatComponentText slot = ChatChannelLinkMarker.applyMessage(
+                new ChatComponentText(ChatChannelLinkMarker.ICON_SLOT),
+                0x577F9D, "all", 1757522000000L);
+        assertTrue(ChatChannelLinkMarker.isIconSlot(slot));
+        assertTrue(ChatChannelLinkMarker.sameLink(name, slot));
+        // Two spaces linking to the tab alone are not a bubble.
+        ChatComponentText plainSlot = ChatChannelLinkMarker.apply(
+                new ChatComponentText(ChatChannelLinkMarker.ICON_SLOT),
+                0x577F9D, "all", 0);
+        assertFalse(ChatChannelLinkMarker.isIconSlot(plainSlot));
+        assertFalse(ChatChannelLinkMarker.decode(plainSlot).linksMessage());
+        assertFalse(ChatChannelLinkMarker.sameLink(name, plainSlot));
+        // A link by this client's own line id is a link to a message too.
+        assertTrue(ChatChannelLinkMarker.decode(ChatChannelLinkMarker.apply(
+                new ChatComponentText("#Global"), 0, "all", -7)).linksMessage());
+        // An id the server never gave is not carried, and not read.
+        assertEquals(0L, ChatChannelLinkMarker.decode(ChatChannelLinkMarker.applyMessage(
+                new ChatComponentText("#Global"), 0, "all", 0L)).messageId);
+        ChatComponentText negative = new ChatComponentText("x");
+        negative.setChatStyle(negative.getChatStyle().setChatClickEvent(
+                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
+                        "losttales-chat-link:000000:0:YWxs:-5")));
+        assertNull(ChatChannelLinkMarker.decode(negative));
+    }
+
+    @Test
     public void nothingElseReadsAsALink() {
         ChatComponentText plain = new ChatComponentText("all");
         assertFalse(ChatChannelLinkMarker.isMarker(plain));

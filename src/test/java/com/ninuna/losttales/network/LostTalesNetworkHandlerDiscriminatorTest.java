@@ -102,7 +102,8 @@ public final class LostTalesNetworkHandlerDiscriminatorTest {
             "LostTalesChatConsoleSyncPacket CLIENT",
             "LostTalesChatContextHistoryPacket SERVER",
             "CharacterTemplateAdoptRequestPacket SERVER",
-            "LostTalesChatCommandContextPacket SERVER"
+            "LostTalesChatCommandContextPacket SERVER",
+            "LostTalesChatOlderHistoryPacket SERVER"
     };
 
     /** One registerMessage call, read back off the stack that fed it. */

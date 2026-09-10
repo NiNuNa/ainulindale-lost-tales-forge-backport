@@ -1,7 +1,9 @@
 package com.ninuna.losttales.user;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -24,6 +26,8 @@ public enum ELostTalesUser {
     BALARAUKO("Balarauko", "e1968bbb-813c-425a-998e-3f75e8aa1b68",
             ELostTalesUserRecognition.TEAM),
     CAPTAIN_CHEESE("captainCheese", "d36e696d-dbbe-48ed-a878-bc8eb480a29c",
+            ELostTalesUserRecognition.TEAM),
+    CEJY("Cejy", "fac280cc-c296-4f52-a100-675ac8d61177",
             ELostTalesUserRecognition.TEAM),
 
     //  LostTales - Community.
@@ -73,6 +77,20 @@ public enum ELostTalesUser {
     public static ELostTalesUser byUniqueId(UUID uniqueId) {
         ELostTalesUser user = uniqueId == null ? null : BY_UUID.get(uniqueId);
         return user == null ? NULL : user;
+    }
+
+    /**
+     * Every recognized user of one kind, in declaration order; the list a
+     * credits screen or a roster print reads. Never contains {@link #NULL}.
+     */
+    public static List<ELostTalesUser> recognizedAs(ELostTalesUserRecognition recognition) {
+        List<ELostTalesUser> users = new ArrayList<ELostTalesUser>();
+        for (ELostTalesUser user : values()) {
+            if (user.isRecognized() && user.recognition == recognition) {
+                users.add(user);
+            }
+        }
+        return Collections.unmodifiableList(users);
     }
 
     private static Map<UUID, ELostTalesUser> index() {

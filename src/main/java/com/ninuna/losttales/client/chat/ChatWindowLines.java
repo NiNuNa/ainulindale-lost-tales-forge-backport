@@ -422,6 +422,33 @@ final class ChatWindowLines {
         return chat == null ? null : messages(chat);
     }
 
+    /**
+     * Tells the cache the game's lists were changed in place — lines laid
+     * in above the oldest — so every window lays itself out again.
+     */
+    static synchronized void noteMutated() {
+        revision++;
+    }
+
+    /**
+     * Whether a line with that id is still in the game's message list.
+     * False when the list cannot be read, so a caller shows a line again
+     * rather than trusting a memory of one it cannot see.
+     */
+    static boolean holdsLine(GuiNewChat chat, int chatLineId) {
+        List<ChatLine> messages = messageHistory(chat);
+        if (messages == null) {
+            return false;
+        }
+        for (int index = 0; index < messages.size(); index++) {
+            ChatLine line = messages.get(index);
+            if (line != null && line.getChatLineID() == chatLineId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     /**
      * What the history looks like right now: enough of it to notice a

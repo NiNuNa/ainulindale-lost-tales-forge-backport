@@ -58,6 +58,11 @@ public final class LostTalesConfigFiles {
     public static final String CHAT_EMOJIS = "chat/emojis.txt";
     /** The ignore list, under the client folder. */
     public static final String CHAT_IGNORES = "chat/ignores.txt";
+    /**
+     * How far each account has read each conversation on each server, a
+     * folder under the client folder holding one file per account.
+     */
+    public static final String CHAT_READ_MARKS = "chat/read_marks";
     /** Map marker favourites and recent destinations, under the client folder. */
     public static final String MAP_MARKERS = "map_markers.txt";
     /**

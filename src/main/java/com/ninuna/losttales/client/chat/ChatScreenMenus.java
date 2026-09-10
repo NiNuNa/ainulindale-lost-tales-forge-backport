@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
@@ -47,6 +48,7 @@ final class ChatScreenMenus {
     private static final String ENTRY_MESSAGE = "message_player";
     private static final String ENTRY_REPLY = "reply";
     private static final String ENTRY_COPY = "copy";
+    static final String ENTRY_COPY_LINK = "copy_link";
     private static final String ENTRY_EDIT = "edit";
     private static final String ENTRY_DELETE = "delete";
     /** The second half of deleting: the row that is the confirmation. */
@@ -811,6 +813,14 @@ final class ChatScreenMenus {
         entries.add(new ChatPopupMenu.Entry(ENTRY_COPY,
                 StatCollector.translateToLocal(
                         "gui.losttales.chat.message.copy")));
+        // A message the server named can be linked to from any other
+        // message, by its id, the way a messenger's message link is
+        // pasted; a whisper's cannot, since nobody else may follow it.
+        if (messageLinkFor(chatLineId) != null) {
+            entries.add(new ChatPopupMenu.Entry(ENTRY_COPY_LINK,
+                    StatCollector.translateToLocal(
+                            "gui.losttales.chat.message.copy_link")));
+        }
         // Your own words are yours to correct or take back. The server
         // decides that too — this only offers what it would allow. An
         // operator may take anyone's words back, but never rewrite them:
@@ -838,6 +848,18 @@ final class ChatScreenMenus {
                 entries, this.font, mouseX, mouseY, this.screenWidth,
                 this.screenHeight);
         return true;
+    }
+
+    /**
+     * The link that names the message drawn on {@code chatLineId} —
+     * {@code #Channel/<server id>} — or null for a line the server never
+     * named, a whisper, or a channel a link cannot spell.
+     */
+    static String messageLinkFor(int chatLineId) {
+        long messageId = ClientChatMessageIds.messageIdOf(chatLineId);
+        ChatTab tab = ClientChatChannelViews.tabOf(chatLineId);
+        return tab == null ? null
+                : ChatChannelSuggester.messageLink(tab.getChannel(), messageId);
     }
 
     /**
@@ -1265,6 +1287,12 @@ final class ChatScreenMenus {
                     && LostTalesChatClipboard.copy(this.menuMessageText)) {
                 this.notices.showNotice(StatCollector.translateToLocal(
                         "gui.losttales.chat.copied"));
+            } else if (ENTRY_COPY_LINK.equals(entry.id)) {
+                String link = messageLinkFor(this.menuChatLineId);
+                if (link != null && LostTalesChatClipboard.copy(link)) {
+                    this.notices.showNotice(StatCollector.translateToLocal(
+                            "gui.losttales.chat.copied"));
+                }
             }
             return false;
         }
