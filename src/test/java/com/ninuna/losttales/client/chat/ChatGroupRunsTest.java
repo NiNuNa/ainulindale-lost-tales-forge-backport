@@ -73,6 +73,29 @@ public final class ChatGroupRunsTest {
                 ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3)));
     }
 
+    /**
+     * A day's rule ends the run it lands in, as Discord's does: the day's
+     * first message opens a run with its header, and the run after it is
+     * measured from it rather than from the run the rule broke.
+     */
+    @Test
+    public void aDaysRuleOpensARunOfItsOwn() {
+        remember(1, ChatChannel.ALL, ALICE, "Alice", START);
+        remember(2, ChatChannel.ALL, ALICE, "Alice", START + 60000L);
+        remember(3, ChatChannel.ALL, ALICE, "Alice", START + 90000L);
+        remember(4, ChatChannel.ALL, ALICE, "Alice", START + 150000L);
+        int[] ids = newestFirst(1, 2, 3, 4);
+        // Without a rule: one run from 1 for two minutes, then 4 opens one.
+        assertArrayEquals(new boolean[] { false, true, true, false },
+                ChatGroupRuns.continuationsOf(ids));
+        assertArrayEquals(ChatGroupRuns.continuationsOf(ids),
+                ChatGroupRuns.continuationsOf(ids, null));
+        // A rule over 2: 2 opens a run, and 3 and 4 fall inside its span.
+        assertArrayEquals(new boolean[] { true, true, false, false },
+                ChatGroupRuns.continuationsOf(ids,
+                        new boolean[] { false, false, true, false }));
+    }
+
     /** Ordinary consecutive messages still group, in either view. */
     @Test
     public void consecutiveMessagesFromOneIdentityGroup() {

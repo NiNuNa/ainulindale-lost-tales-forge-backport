@@ -2,6 +2,7 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.chat.ChatReplyReference;
@@ -227,10 +228,11 @@ public final class ChatHistory {
      * account, so the promise the recipient check keeps is kept by the
      * caller instead — the bridge only ever asks about ids from its own
      * link table, which holds nothing but lines of bridgeable channels
-     * that crossed to or from Discord, and it asks only for a line that
-     * crossed through the same binding the reply arrived by, so a quote
-     * never carries one bound channel's words into another. Nothing
-     * private can be named through it.
+     * that crossed to or from Discord, and it asks only for a line with a
+     * copy in the Discord channel the reply came from, said in the game
+     * channel that Discord channel is read into, so a quote never carries
+     * one bound channel's words into another. Nothing private can be
+     * named through it.
      */
     public static synchronized ChatReplyReference quoteForDiscordChannel(
             long messageId) {
@@ -334,14 +336,39 @@ public final class ChatHistory {
     }
 
     /**
+     * A Discord member's reaction to a kept message, added or taken
+     * back, and what it changed, or null when nothing did. A custom
+     * emoji goes by its id ({@link ChatReactions#discordKeyOf}): an
+     * addition joins the key the message holds for that id, a removal
+     * takes the key with that id that holds the member, so a rename on
+     * Discord neither opens a second chip nor strands a reaction.
+     * {@code emoji} is null for an emoji Discord sent without a name,
+     * {@code customId} empty for a Unicode emoji.
+     */
+    public static synchronized ReactionChange reactFromDiscord(
+            long messageId, UUID reactor, String name, String emoji,
+            String customId, boolean add) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        if (entry == null || reactor == null) {
+            return null;
+        }
+        String key = entry.reactions.discordKeyOf(emoji, customId, reactor,
+                add);
+        return key == null ? null
+                : react(messageId, null, reactor, name, key, add);
+    }
+
+    /**
      * Takes back every Discord member's reaction to a kept message — with
-     * one emoji, or with every emoji when {@code emoji} is null — and
-     * answers with everyone to tell, or null when nothing changed.
+     * one emoji, or with every emoji when {@code emoji} is null and
+     * {@code customId} empty — and answers with everyone to tell, or null
+     * when nothing changed. A custom emoji is cleared by its id, from
+     * every key it is kept under ({@link ChatReactions#clearDiscord(String, String)}).
      */
     public static synchronized Set<UUID> clearDiscordReactions(
-            long messageId, String emoji) {
+            long messageId, String emoji, String customId) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
-        if (entry == null || !entry.reactions.clearDiscord(emoji)) {
+        if (entry == null || !entry.reactions.clearDiscord(emoji, customId)) {
             return null;
         }
         changed();
@@ -360,6 +387,20 @@ public final class ChatHistory {
     public static synchronized ChatChannel channelOf(long messageId) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
         return entry == null ? null : entry.forOthers.getChannel();
+    }
+
+    /**
+     * The faction a kept line of a faction-scoped channel was spoken to;
+     * empty for a line of any other channel, and for none kept.
+     */
+    public static synchronized String factionScopeOf(long messageId) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        ChatChannel channel = entry == null ? null : entry.forOthers.getChannel();
+        if (channel == null || channel.getScope() != ChatChannelScope.FACTION) {
+            return "";
+        }
+        String scope = entry.forOthers.getScopeValue();
+        return scope == null ? "" : scope;
     }
 
     /**

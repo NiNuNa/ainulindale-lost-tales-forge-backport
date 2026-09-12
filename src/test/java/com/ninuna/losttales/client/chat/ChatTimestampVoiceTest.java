@@ -79,6 +79,26 @@ public final class ChatTimestampVoiceTest {
         assertFalse(LostTalesChatOverlayRenderer.opensItsMinute(lines, 0));
     }
 
+    /**
+     * A day's rule opens every turn again: the same clock reading on
+     * another day is another minute.
+     */
+    @Test
+    public void aDaysRuleOpensTheTurnAgain() {
+        remember(1, ALICE, "Alice");
+        remember(2, ALICE, "Alice");
+        List<ChatLine> lines = new ArrayList<ChatLine>();
+        lines.add(stamped(2, "[15:13] "));
+        lines.add(stamped(1, "[15:13] "));
+        assertFalse(LostTalesChatOverlayRenderer.opensItsMinute(lines, 0));
+        // Newest first: 2, gap, the rule, gap, 1.
+        lines.add(1, new ChatLine(0, ChatWindowLines.SPACER, 0));
+        lines.add(2, new ChatLine(0, ChatWindowLines.dateDivider("Tuesday"), 0));
+        lines.add(3, new ChatLine(0, ChatWindowLines.SPACER, 0));
+        assertTrue(LostTalesChatOverlayRenderer.opensItsMinute(lines, 0));
+        assertTrue(LostTalesChatOverlayRenderer.opensItsMinute(lines, 4));
+    }
+
     /** System lines have no voice; beside a player's line they are a change of voice. */
     @Test
     public void systemLinesAreOneVoiceAmongThemselvesAndAnotherBesideAPlayer() {

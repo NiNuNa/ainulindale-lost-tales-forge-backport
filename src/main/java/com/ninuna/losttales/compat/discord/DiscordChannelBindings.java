@@ -82,7 +82,7 @@ public final class DiscordChannelBindings {
      * post through each. What a notice for everyone is sent to.
      */
     private final List<DiscordChannelBinding> destinations;
-    /** Every Discord channel any binding names, once each. */
+    /** Every Discord channel a binding that reads or posts names, once each. */
     private final List<String> channels;
 
     private DiscordChannelBindings(List<DiscordChannelBinding> parsed) {
@@ -119,7 +119,10 @@ public final class DiscordChannelBindings {
                     && !posting.containsKey(binding.getWebhookUrl())) {
                 posting.put(binding.getWebhookUrl(), binding);
             }
-            if (binding.getDiscordChannelId().length() > 0) {
+            // A switched-off entry binds its Discord channel to nothing,
+            // so the bridge leaves that channel alone.
+            if (binding.getDiscordChannelId().length() > 0
+                    && (binding.readsFromDiscord() || binding.sendsToDiscord())) {
                 known.add(binding.getDiscordChannelId());
             }
         }
@@ -511,16 +514,19 @@ public final class DiscordChannelBindings {
 
     /**
      * The game channel key that owns a Discord channel by naming its id
-     * in any entry, or empty. What the bridge asks once it has learnt
-     * which channel a webhook posts into, so a webhook posting into a
-     * channel another game channel reads is caught as well.
+     * in an entry that reads or posts, or empty. What the bridge asks
+     * once it has learnt which channel a webhook posts into, so a
+     * webhook posting into a channel another game channel reads is
+     * caught as well. A switched-off entry owns nothing, as it binds its
+     * channel to nothing.
      */
     public String ownerOfChannel(String discordChannelId) {
         if (discordChannelId == null || discordChannelId.length() == 0) {
             return "";
         }
         for (DiscordChannelBinding binding : this.bindings) {
-            if (binding.getDiscordChannelId().equals(discordChannelId)) {
+            if ((binding.readsFromDiscord() || binding.sendsToDiscord())
+                    && binding.getDiscordChannelId().equals(discordChannelId)) {
                 return binding.key();
             }
         }
@@ -584,15 +590,16 @@ public final class DiscordChannelBindings {
     }
 
     /**
-     * The first binding naming that Discord channel by id, in config
-     * order, or null: what a Discord jump link's channel is read as.
+     * The binding that reads that Discord channel, or null: at most one
+     * binding reads a Discord channel. What word arriving from Discord is
+     * matched by, since a binding's id is not stable across a reordering.
      */
-    public DiscordChannelBinding forDiscordChannel(String discordChannelId) {
+    public DiscordChannelBinding readerOf(String discordChannelId) {
         if (discordChannelId == null || discordChannelId.length() == 0) {
             return null;
         }
-        for (DiscordChannelBinding binding : this.bindings) {
-            if (binding.getDiscordChannelId().equals(discordChannelId)) {
+        for (DiscordChannelBinding binding : this.reading) {
+            if (discordChannelId.equals(binding.getDiscordChannelId())) {
                 return binding;
             }
         }
@@ -617,7 +624,11 @@ public final class DiscordChannelBindings {
         return this.destinations;
     }
 
-    /** Every Discord channel any binding names by id, once each, in config order. */
+    /**
+     * Every Discord channel a binding that reads or posts names by id,
+     * once each, in config order: the channels whose topic is kept. A
+     * channel named only by a switched-off entry is not among them.
+     */
     public List<String> channels() {
         return this.channels;
     }

@@ -380,7 +380,37 @@ public final class ChatWindowLayoutStore {
     }
 
     static synchronized void save() {
-        File file = storeFile;
+        write(storeFile, describe());
+    }
+
+    /**
+     * Writes the feed's position. While nothing has changed the layout
+     * since it was read, the file is written as it was read with only its
+     * feed line replaced: a window on a server's own channel, which the
+     * layout cannot place before that server's channels are in force, is
+     * then still in the file for {@link #reloadForNewChannels} to
+     * restore. Once the layout has been changed it is written whole.
+     */
+    public static synchronized void saveFeedPosition() {
+        if (loadedLines == null || layoutTouched) {
+            ChatWindowLayout.persist();
+            return;
+        }
+        List<String> lines = new ArrayList<String>(loadedLines.size() + 1);
+        for (String raw : loadedLines) {
+            String line = raw == null ? "" : raw.trim();
+            // Every feed line goes, since a read keeps the last one.
+            if (!"feed".equals(line.split("\\s+")[0])) {
+                lines.add(raw);
+            }
+        }
+        lines.add("feed x=" + formatPercent(ChatWindowLayout.feedOffsetX())
+                + " y=" + formatPercent(ChatWindowLayout.feedOffsetY()));
+        loadedLines = lines;
+        write(storeFile, lines);
+    }
+
+    private static void write(File file, List<String> lines) {
         if (file == null) {
             return;
         }
@@ -392,8 +422,8 @@ public final class ChatWindowLayoutStore {
         try {
             writer = new OutputStreamWriter(
                     new FileOutputStream(file), UTF_8);
-            for (String line : describe()) {
-                writer.write(line);
+            for (String line : lines) {
+                writer.write(line == null ? "" : line);
                 writer.write('\n');
             }
         } catch (IOException ignored) {

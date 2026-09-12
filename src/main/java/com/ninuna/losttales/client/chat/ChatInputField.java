@@ -201,10 +201,16 @@ final class ChatInputField extends GuiTextField {
     }
 
     /**
-     * The wash spans the line band the content actually occupies —
-     * emoji boxes reach two rows above the glyph tops, descenders one
-     * below — so it sits centred on what is selected instead of
-     * hanging low on the glyphs alone.
+     * Height of the selection wash: from the top of an emoji box, two
+     * rows above the glyph tops, down to the row under the descenders.
+     * The bar's own measure, not the message row's.
+     */
+    private static final int SELECTION_BAND_HEIGHT = 11;
+
+    /**
+     * The wash spans the band the content actually occupies, so it sits
+     * centred on what is selected instead of hanging low on the glyphs
+     * alone.
      */
     private static int selectionBandTop(int textTop) {
         return textTop + ChatInlineIcons.CONTENT_TOP_OFFSET;
@@ -212,7 +218,7 @@ final class ChatInputField extends GuiTextField {
 
     private static int selectionBandBottom(int textTop) {
         return textTop + ChatInlineIcons.CONTENT_TOP_OFFSET
-                + LostTalesChatOverlayRenderer.LINE_HEIGHT;
+                + SELECTION_BAND_HEIGHT;
     }
 
     /** The caret in the palette's ivory, like the text it stands in. */

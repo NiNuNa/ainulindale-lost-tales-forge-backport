@@ -19,8 +19,8 @@ import net.minecraft.client.gui.ScaledResolution;
  * a frame whose window no longer exists is pruned on the next draw.
  *
  * <p>Every window's box is the one {@link ChatWindowPlacement} derives
- * from the window's percent offsets — the same box the HUD placement
- * editor draws and edits — with the newest line on the baseline, the
+ * from the window's percent offsets, with the newest line on the
+ * baseline, the
  * window's input bar below it, and the tab row standing on the topmost
  * drawn line, or on one empty line when the view is empty. The box is
  * kept in fractional pixels, and the opening motion the window was drawn
@@ -61,16 +61,18 @@ final class ChatWindowFrame {
     /**
      * Index in {@link #lines} of the oldest wrapped row of the message
      * the unread divider stands above, or -1 while this view shows no
-     * divider. The divider takes a whole row of the stack, so it is part
-     * of the window's content height and not only of its drawing: the
+     * divider. The divider takes a row of the stack, its line and the
+     * gaps either side of it, so it is part of the window's
+     * content height and not only of its drawing: the
      * scroll range, the scrollbar and the draw all read it here, which
      * is what keeps the room a view can reach and the rows it actually
      * renders the same measurement.
      */
     int dividerLineIndex = -1;
     /**
-     * Index in {@link #lines} of a day's rule standing directly over
-     * the first unread message, or -1. That row carries the unread
+     * Index in {@link #lines} of a day's rule standing over the first
+     * unread message, with only the rule's own gap between them, or -1.
+     * That row carries the unread
      * divider then — it reads as the divider, in the divider's crimson,
      * until the divider goes and the date is back on it — and
      * {@link #dividerLineIndex} is -1 for it, so the two never stand
@@ -436,10 +438,13 @@ final class ChatWindowFrame {
         this.dividerLineIndex = lineId == 0 ? -1
                 : lastRowOf(drawnLines, lineId);
         this.dividerDateLineIndex = -1;
-        int above = this.dividerLineIndex + 1;
-        if (this.dividerLineIndex >= 0 && above < size
-                && ChatWindowLines.isDateDivider(drawnLines.get(above))) {
-            this.dividerDateLineIndex = above;
+        // A day's rule standing over the first unread message, past the
+        // rule's own gap, carries the divider instead.
+        int rule = this.dividerLineIndex < 0 ? -1
+                : ChatWindowLines.dateDividerOver(drawnLines,
+                        this.dividerLineIndex);
+        if (rule >= 0) {
+            this.dividerDateLineIndex = rule;
             this.dividerLineIndex = -1;
         }
     }
@@ -522,8 +527,9 @@ final class ChatWindowFrame {
 
     /**
      * Height of the whole stack in the chat's own (unscaled) pixels,
-     * blank rows at their half height. Before the rows are resolved
-     * every row counts as a whole line.
+     * every row at its own height ({@link ChatStackRows}): blank rows
+     * shorter than a line, the unread divider's row taller. Before the
+     * rows are resolved every row counts as a whole line.
      */
     double contentHeight() {
         if (rowsResolved()) {
@@ -578,8 +584,8 @@ final class ChatWindowFrame {
      * The scroll offset, in rows, that stands {@code pixels} of stack
      * further up than {@code rows} does: what a wheel turn asks for, so
      * a turn moves the page the same distance whatever rows it passes —
-     * a blank row between two runs is half a line, and counted
-     * as a whole row it made the wheel stumble over every group.
+     * a blank row between two runs is shorter than a line, and counting
+     * it as a whole row would make the wheel stumble over every group.
      */
     double rowsAfterScrolling(double rows, double pixels) {
         if (!rowsResolved()) {

@@ -25,7 +25,7 @@ import net.minecraft.util.IChatComponent;
  *
  * <p>A window is a scrollable log: its runs hold for as long as a
  * conversation reads as one, measured from the message that
- * <em>opened</em> the run ({@link #continuationsOf},
+ * <em>opened</em> the run ({@link #continuationsOf(int[])},
  * {@link #GROUP_WINDOW_MILLIS}), so one speaker cannot extend a single
  * run all evening.</p>
  *
@@ -134,7 +134,18 @@ final class ChatGroupRuns {
      * window — a run holds while the sender keeps talking.
      */
     static synchronized boolean[] continuationsOf(int[] lineIdsNewestFirst) {
-        return walk(lineIdsNewestFirst, GROUP_WINDOW_MILLIS, true);
+        return walk(lineIdsNewestFirst, GROUP_WINDOW_MILLIS, true, null);
+    }
+
+    /**
+     * As {@link #continuationsOf(int[])}, with every message
+     * {@code opensRun} marks opening a run of its own whatever stands
+     * before it: in a window, each day's first message, which stands
+     * under the day's rule. The run after it is measured from it.
+     */
+    static synchronized boolean[] continuationsOf(int[] lineIdsNewestFirst,
+                                                  boolean[] opensRun) {
+        return walk(lineIdsNewestFirst, GROUP_WINDOW_MILLIS, true, opensRun);
     }
 
     /**
@@ -145,24 +156,27 @@ final class ChatGroupRuns {
      */
     static synchronized boolean[] continuationsInFeed(
             int[] lineIdsNewestFirst) {
-        return walk(lineIdsNewestFirst, FEED_RUN_MILLIS, false);
+        return walk(lineIdsNewestFirst, FEED_RUN_MILLIS, false, null);
     }
 
     /**
      * The one walk, oldest first, carrying the message before this one —
      * which decides whether it is the same voice, and, unless the span
      * is measured {@code fromHead}, whether the run is still open — and
-     * the message that opened the run.
+     * the message that opened the run. A message {@code opensRun} marks
+     * opens a run of its own.
      */
     private static boolean[] walk(int[] lineIds, long spanMillis,
-                                  boolean fromHead) {
+                                  boolean fromHead, boolean[] opensRun) {
         boolean[] grouped = new boolean[lineIds == null ? 0 : lineIds.length];
         Entry previous = null;
         Entry runHead = null;
         for (int index = grouped.length - 1; index >= 0; index--) {
             Entry entry = of(lineIds[index]);
             Entry against = fromHead ? runHead : previous;
-            grouped[index] = entry != null && entry.groupable
+            boolean opens = opensRun != null && index < opensRun.length
+                    && opensRun[index];
+            grouped[index] = !opens && entry != null && entry.groupable
                     && sameVoice(previous, entry)
                     && against != null
                     && entry.timestampMillis - against.timestampMillis

@@ -374,6 +374,11 @@ public class LostTalesCommonProxy {
         // line names its channel by id: the save's recent lines come
         // back as the live history, and the save follows it from here.
         ChatHistoryStorage.restore(event.getServer());
+        // Straight after the history, whose kept messages decide which of
+        // the save's Discord links come back, and before the bridge
+        // starts below. Every server gets a map of its own, a character
+        // room included, so nothing reaches it from the world before.
+        LostTalesDiscordBridge.getInstance().restoreLinks(event.getServer());
         ChatConsoleStream.clear();
         ChatCommandContexts.clear();
         LostTalesChatService.clear();
@@ -434,6 +439,10 @@ public class LostTalesCommonProxy {
         // which gives the worker a bounded moment to send them.
         LostTalesDiscordBridge.getInstance().onServerStopping();
         LostTalesDiscordBridge.getInstance().stop();
+        // Once the bridge has stopped adding to them, the links go to the
+        // save the worlds are written with after this event, and the live
+        // map is emptied for the next world.
+        LostTalesDiscordBridge.getInstance().releaseLinks();
         LostTalesServerTaskQueue.stopAcceptingAndClear();
         CharacterLifecycleStateTracker.markServerStopping();
         int checkpointed = CharacterSwitchCoordinator.getInstance()

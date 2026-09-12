@@ -13,6 +13,7 @@ import com.google.common.collect.Lists;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
@@ -56,21 +57,15 @@ import org.lwjgl.opengl.GL11;
  * a window of their own, onto another window's row to dock there; a
  * window is moved by its grip, its strip, or by dragging its messages —
  * a press that does not move stays the click it always was. All of that edits
- * {@link ChatWindowLayout}, the same model the HUD placement editor
- * edits, so the two never disagree. Every overlay registers the rectangle
- * it draws in {@link ChatPointerRegions}; hover, tooltip, and click
+ * {@link ChatWindowLayout}, the one model every window is drawn from; the
+ * chat screen is the only place windows are moved. Every overlay
+ * registers the rectangle it draws in {@link ChatPointerRegions}; hover,
+ * tooltip, and click
  * handling consult that record before touching the message stack, so
  * whatever is painted on top is also what owns the pointer.
  */
 public final class LostTalesChatGui extends GuiChat
         implements LostTalesPointerOwner {
-    /**
-     * Message lines one notch of the wheel moves. Short, because the
-     * view glides to the new offset rather than jumping to it: a long
-     * step would arrive before the eye could follow it. Shift still
-     * moves one line at a time.
-     */
-    private static final int WHEEL_LINES = 2;
     /** Gap between the typing line's bubble and its words. */
     private static final int TYPING_BUBBLE_GAP = 3;
     /**
@@ -303,10 +298,13 @@ public final class LostTalesChatGui extends GuiChat
         int y = (int)Math.floor(frame.drawnBaseline())
                 + LostTalesChatOverlayRenderer.LINE_HEIGHT
                 - LostTalesChatOverlayRenderer.TEXT_OFFSET;
-        // A bubble before the words, on the caps' own middle, and the
-        // line itself in the asides' tone rather than the message ivory.
+        // A bubble before the words, centred in the strip as a box of
+        // its own, on the row a quote's and a message link's bubble take,
+        // and the line itself in the asides' tone rather than the
+        // message ivory.
         ChatIconSheet bubble = ChatIconSheet.SPEECH_BUBBLE;
-        bubble.drawWithShadow(x, y + (7 - bubble.getHeight()) / 2, alpha);
+        bubble.drawWithShadow(x, y + LostTalesChatOverlayRenderer
+                .centredBoxTop(bubble.getHeight()), alpha);
         int textX = x + bubble.getWidth() + TYPING_BUBBLE_GAP;
         LostTalesChatVisualStyle.drawColored(this.fontRendererObj,
                 "§o" + this.fontRendererObj.trimStringToWidth(text,
@@ -681,29 +679,27 @@ public final class LostTalesChatGui extends GuiChat
                 / this.mc.displayWidth;
         double mouseY = this.height - Mouse.getEventY() * (double)this.height
                 / this.mc.displayHeight - 1.0D;
-        // One turn of the wheel is one distance everywhere in the chat:
-        // vanilla's step in whole lines, one line with Shift, in pixels
-        // — the history, a menu's rows and a picker's cells all move by
-        // it, each turning it into its own units.
-        int wheelPixels = (wheel > 0 ? 1 : -1)
-                * LostTalesChatOverlayRenderer.LINE_HEIGHT
-                * (isShiftKeyDown() ? 1 : WHEEL_LINES);
+        // One turn of the wheel is vanilla's step in whole lines, one
+        // line with Shift, counted in the unit of what it scrolls:
+        // message lines for the history, rows for a menu, list lines for
+        // a picker.
+        int lines = ChatWheelStep.lines(wheel, isShiftKeyDown());
         // The wheel scrolls what the pointer is on, found as the hover
         // finds it: the open menu's rows, the open picker's list, else
         // the history of the window under the pointer.
         ChatHover under = resolveHover(mouseX, mouseY);
         if (under.is(ChatHover.Kind.MENU) || under.is(ChatHover.Kind.MENU_ENTRY)
                 || under.is(ChatHover.Kind.MENU_LOCK)) {
-            this.menus.scrollBy(-wheelPixels
-                    / (double)ChatPopupMenu.ROW_HEIGHT);
+            this.menus.scrollBy(-ChatWheelStep.menuRows(lines));
             return;
         }
         if (under.picker != null && (under.is(ChatHover.Kind.PICKER)
                 || under.is(ChatHover.Kind.PICKER_CELL)
                 || under.is(ChatHover.Kind.PICKER_LABEL))) {
-            under.picker.scrollBy(-wheelPixels);
+            under.picker.scrollBy(-ChatWheelStep.pickerPixels(lines));
             return;
         }
+        int wheelPixels = ChatWheelStep.historyPixels(lines);
         // Vanilla scrolled its own (now unused) offset above; the visible
         // history scrolls per channel view instead, in the window under
         // the pointer (the main one elsewhere).
@@ -1968,7 +1964,8 @@ public final class LostTalesChatGui extends GuiChat
             }
         }
         // GuiChat's own component handling relies on GuiNewChat's 9px hit
-        // testing, which does not match the 11px layout; only the input
+        // testing, which does not match this chat's taller rows
+        // (LostTalesChatOverlayRenderer.LINE_HEIGHT); only the input
         // field needs the vanilla click path.
         this.inputField.mouseClicked(mouseX, adjustedMouseY, button);
         return false;
@@ -2418,10 +2415,12 @@ public final class LostTalesChatGui extends GuiChat
                 return true;
             case REACTION: {
                 // A chip adds the reader's own reaction with its emoji,
-                // or takes it back when it is already theirs.
+                // or takes it back when it is already theirs; a foreign
+                // emoji's chip as well, by its key. A chip's click is
+                // never counted as a use of the emoji.
                 ChatReactionMarker.Data chip = ChatReactionMarker.decode(part);
                 if (chip != null) {
-                    sendReaction(chip.messageId, chip.emoji, !chip.mine);
+                    sendReaction(chip.messageId, chip.key, !chip.mine);
                 }
                 return true;
             }
@@ -2508,25 +2507,35 @@ public final class LostTalesChatGui extends GuiChat
     /** Asks the server to add a reaction, or take one back; its answer redraws the chips. */
     private static void sendReaction(long messageId, ChatEmoji emoji,
                                      boolean add) {
-        if (emoji == null || !ChatMessageIds.isServerId(messageId)) {
+        if (emoji != null) {
+            sendReaction(messageId, emoji.getName(), add);
+        }
+    }
+
+    /** As above, by the emoji's reaction key. */
+    private static void sendReaction(long messageId, String emoji,
+                                     boolean add) {
+        if (!ChatForeignEmoji.isReactionKey(emoji)
+                || !ChatMessageIds.isServerId(messageId)) {
             return;
         }
         LostTalesNetworkHandler.CHANNEL.sendToServer(
-                new LostTalesChatReactPacket(messageId, emoji.getName(), add));
+                new LostTalesChatReactPacket(messageId, emoji, add));
     }
 
     /**
      * A chip's card: the emoji by name, who reacted with it — the first
-     * few, then how many more — and what a click does.
+     * few, then how many more — and what a click does. An emoji the
+     * registry lacks is named as Discord names it.
      */
     private void drawReactionTooltip(ChatReactionMarker.Data chip,
                                      int mouseX, int mouseY) {
         List<String> lines = new ArrayList<String>(3);
-        lines.add(":" + chip.emoji.getName() + ":");
+        lines.add(chip.label());
         ClientChatMessages.Remembered held =
                 ClientChatMessages.get(chip.messageId);
         ChatReactionSummary.Reaction reaction = held == null ? null
-                : held.packet.getReactions().find(chip.emoji.getName());
+                : held.packet.getReactions().find(chip.key);
         if (reaction != null && !reaction.names.isEmpty()) {
             StringBuilder names = new StringBuilder();
             for (int index = 0; index < reaction.names.size(); index++) {

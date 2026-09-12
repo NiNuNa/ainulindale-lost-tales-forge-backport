@@ -370,8 +370,8 @@ public final class ClientChatChannelState {
 
     /**
      * Whether the window has a tab the player can currently see. One
-     * that has not is not drawn, not offered in the placement editor,
-     * and in nothing's way until one of its channels becomes available.
+     * that has not is not drawn and is in nothing's way until one of its
+     * channels becomes available.
      */
     public static synchronized boolean isVisible(ChatWindow window) {
         if (window == null) {

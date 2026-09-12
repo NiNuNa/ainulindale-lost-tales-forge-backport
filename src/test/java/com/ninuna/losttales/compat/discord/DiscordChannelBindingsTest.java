@@ -415,6 +415,31 @@ public final class DiscordChannelBindingsTest {
                 "", "", true, true, true, true, "").length);
     }
 
+    /**
+     * A switched-off entry binds its Discord channel to nothing, so a
+     * webhook of another game channel found posting there is not refused
+     * on its account; a reader refused for a conflict leaves the channel
+     * with the reader that had it first.
+     */
+    @Test
+    public void aSwitchedOffEntryOwnsNoDiscordChannel() {
+        DiscordChannelBindings kept = DiscordChannelBindings.parse(new String[] {
+                "all=DISABLED;channel=111;webhook=" + WEBHOOK + "-kept",
+                "ooc=GAME_TO_DISCORD;webhook=" + WEBHOOK + "-ooc",
+        }, true, null);
+        assertEquals("", kept.ownerOfChannel("111"));
+
+        Collected warnings = new Collected();
+        DiscordChannelBindings refused = DiscordChannelBindings.parse(new String[] {
+                "ooc=BIDIRECTIONAL;channel=111;webhook=" + WEBHOOK,
+                "all=DISCORD_TO_GAME;channel=111",
+        }, true, warnings);
+        assertEquals(1, warnings.refusals.size());
+        assertEquals(DiscordBridgeDirection.DISABLED,
+                refused.byId("all").getDirection());
+        assertEquals("ooc", refused.ownerOfChannel("111"));
+    }
+
     @Test
     public void destinationsArePostingWebhooksOnceEach() {
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
@@ -426,8 +451,9 @@ public final class DiscordChannelBindingsTest {
         }, true, null);
         assertEquals(Arrays.asList("all", "ooc", "proximity"),
                 idsOf(bindings.destinations()));
-        assertEquals("every channel named, posting or not, once each",
-                Arrays.asList("1", "2", "3"), bindings.channels());
+        assertEquals("every channel a binding reads or posts, once each; "
+                        + "a switched-off entry binds nothing",
+                Arrays.asList("1", "2"), bindings.channels());
         assertTrue(DiscordChannelBindings.EMPTY.destinations().isEmpty());
         assertTrue(DiscordChannelBindings.EMPTY.channels().isEmpty());
         assertFalse(DiscordChannelBindings.EMPTY.sendsAnything());

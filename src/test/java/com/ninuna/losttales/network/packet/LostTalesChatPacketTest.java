@@ -766,6 +766,78 @@ public final class LostTalesChatPacketTest {
         assertTrue(refused.getReactions().isEmpty());
     }
 
+    /** An emoji the registry lacks rides the reaction wire by its foreign key. */
+    @Test
+    public void aForeignEmojiRidesTheReactionWireAsItsKey() {
+        long id = ChatMessageIdAllocator.next();
+        String parrot = "Party_Parrot:123456789012345678";
+        String family = "👨‍👩‍👧";
+        ChatReactionSummary reactions = new ChatReactionSummary(Arrays.asList(
+                new ChatReactionSummary.Reaction(parrot, 2, true,
+                        Arrays.asList("Nils", "Aldric")),
+                new ChatReactionSummary.Reaction(family, 1, false,
+                        Arrays.asList("Nils"))));
+        ByteBuf buffer = Unpooled.buffer();
+        new LostTalesChatReactionSyncPacket(id, reactions).toBytes(buffer);
+        LostTalesChatReactionSyncPacket decoded =
+                new LostTalesChatReactionSyncPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(2, decoded.getReactions().find(parrot).count);
+        assertTrue(decoded.getReactions().find(parrot).mine);
+        assertEquals(Arrays.asList("Nils"),
+                decoded.getReactions().find(family).names);
+
+        LostTalesChatMessagePacket line = new LostTalesChatMessagePacket(
+                ChatChannel.ALL, UUID.randomUUID(), "Beren", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "hello", 1L, "", null, "", "", 0, false,
+                ChatMessageIdAllocator.next(), ChatReplyReference.NONE)
+                .withReactions(reactions);
+        ByteBuf lineBuffer = Unpooled.buffer();
+        line.toBytes(lineBuffer);
+        LostTalesChatMessagePacket decodedLine = new LostTalesChatMessagePacket();
+        decodedLine.fromBytes(lineBuffer);
+        assertFalse(decodedLine.isMalformed());
+        assertNotNull(decodedLine.getReactions().find(family));
+
+        ByteBuf forged = Unpooled.buffer();
+        forged.writeLong(id);
+        forged.writeInt(1);
+        LostTalesPacketCodec.writeUtf8String(forged, "partyparrot", 64);
+        forged.writeInt(1);
+        forged.writeBoolean(false);
+        forged.writeInt(0);
+        LostTalesChatReactionSyncPacket refused =
+                new LostTalesChatReactionSyncPacket();
+        refused.fromBytes(forged);
+        assertTrue("a bare custom name is no key", refused.isMalformed());
+    }
+
+    @Test
+    public void aReactionRequestMayNameAForeignKeyAndNothingElse() {
+        long id = ChatMessageIdAllocator.next();
+        LostTalesChatReactPacket request = new LostTalesChatReactPacket(id,
+                "partyparrot:556", true);
+        ByteBuf buffer = Unpooled.buffer();
+        request.toBytes(buffer);
+        LostTalesChatReactPacket decoded = new LostTalesChatReactPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals("partyparrot:556", decoded.getEmoji());
+
+        String[] forgeries = {"partyparrot:0556", "😄",
+                "partyparrot", "🦄 "};
+        for (String forgery : forgeries) {
+            ByteBuf forged = Unpooled.buffer();
+            forged.writeLong(id);
+            LostTalesPacketCodec.writeUtf8String(forged, forgery, 64);
+            forged.writeBoolean(true);
+            LostTalesChatReactPacket refused = new LostTalesChatReactPacket();
+            refused.fromBytes(forged);
+            assertTrue(forgery, refused.isMalformed());
+        }
+    }
+
     /** An ordinary line replies to nothing and pays nothing for it. */
     @Test
     public void anOrdinaryLineCarriesNoQuote() {

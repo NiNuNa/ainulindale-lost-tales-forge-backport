@@ -44,9 +44,10 @@ import java.util.Set;
  * <p>This is layout and preference state only: message history stays in
  * vanilla's chat, per-line tabs and unread counts in
  * {@link ClientChatChannelViews}, channel availability in
- * {@link ClientChatChannelState}. The in-game chat screen, the closed-chat
- * overlay and the HUD placement editor all read and write this same
- * model, so a window moved in one place is where the others find it.
+ * {@link ClientChatChannelState}. The in-game chat screen and the
+ * closed-chat overlay both work from this one model. Windows are moved
+ * in the chat screen alone; the HUD placement editor sets only the feed
+ * position.
  * Every mutation is reported to the registered listener, which the
  * file-backed store uses to persist the layout; position changes made
  * while dragging are reported only when the caller asks for it.</p>

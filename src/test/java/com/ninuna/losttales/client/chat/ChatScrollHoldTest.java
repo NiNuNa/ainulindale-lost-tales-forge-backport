@@ -103,6 +103,40 @@ public final class ChatScrollHoldTest {
                 0.0001D);
     }
 
+    /**
+     * With the view's edge halfway through the unread divider's row, the
+     * hold is taken on the message above the divider, in pixels: the
+     * divider moving onto a newly arrived message takes its row away
+     * from under the page, and the page stays exactly where it was.
+     */
+    @Test
+    public void anUnreadDividerMovingAwayLeavesThePageWhereItWas() {
+        ChatTab tab = ChatTab.of(ChatChannel.OOC);
+        List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
+        // The divider stands over the line at index 2; its row is row 3.
+        ChatWindowFrame frame = frameOver(lines, 2);
+        ClientChatChannelViews.scrollTo(tab, 3.5D, lines.size() + 1, 3.0D);
+        ClientChatChannelViews.holdPosition(tab, frame);
+        // The line above the divider (index 3, id 7) stands this far
+        // above the view's edge: the upper half of the divider's row,
+        // which is a gap, the divider's line and a gap.
+        double before = frame.rows.top(LostTalesChatOverlayRenderer
+                .rowOfLine(3, 2)) - frame.rows.offsetOf(3.5D);
+        assertEquals((2 * ChatStackRows.SPACER_HEIGHT
+                        + ChatStackRows.LINE_HEIGHT) / 2.0D, before, 1.0E-9D);
+
+        // A message arrives and the divider moves onto it; the line with
+        // id 7 is at index 4 now.
+        List<ChatLine> grown = history(11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
+        ChatWindowFrame after = frameOver(grown, 0);
+        ClientChatChannelViews.holdPosition(tab, after);
+        double scroll = ClientChatChannelViews.getScroll(tab,
+                grown.size() + 1, 3.0D);
+        after.resolveRows();
+        assertEquals(before, after.rows.top(LostTalesChatOverlayRenderer
+                .rowOfLine(4, 0)) - after.rows.offsetOf(scroll), 1.0E-9D);
+    }
+
     @Test
     public void reWrappingTheHistoryDoesNotMoveThePage() {
         ChatTab tab = ChatTab.of(ChatChannel.ALL);

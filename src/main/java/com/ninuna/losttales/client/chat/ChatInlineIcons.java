@@ -17,9 +17,13 @@ import net.minecraft.item.ItemStack;
  * apparent size: the emoji sheet is drawn 1:1, an item's 16px sprite is
  * scaled onto the box, and a marker's opaque artwork (not its padded
  * atlas cell) is fitted into it by its larger edge, never stretched.</li>
- * <li>The box sits {@link #CONTENT_TOP_OFFSET} above the text's top edge,
- * which centres it in the eleven-pixel line band, so every kind shares the
- * text's baseline relationship.</li>
+ * <li>In the input bar, the pickers and the completion lists the box
+ * sits {@link #CONTENT_TOP_OFFSET} above the text's top edge, which
+ * centres it on the capitals as nearly as whole pixels allow, so every
+ * kind shares the text's baseline relationship. A message row centres
+ * the box and the text's capitals in the row each by the row's one rule
+ * ({@link LostTalesChatOverlayRenderer#ROW_TEXT_TOP}), and
+ * {@link #rowBoxTop} places the box from there.</li>
  * <li>On the toolbar buttons every glyph fills the same
  * {@link #CONTENT_SIZE} box centred in the button square, fitted by its
  * larger edge exactly as it is inline — the emoji 1:1, the item sprite
@@ -65,7 +69,13 @@ final class ChatInlineIcons {
     static final int NAME_GAP = 2;
     /** Common inline content box edge; also the emoji sprite's native size. */
     static final float CONTENT_SIZE = 10.0F;
-    /** Box top relative to the text top: centred in the 11px line band. */
+    /**
+     * Box top relative to the text top in the input bar, the pickers and
+     * the completion lists: two rows above the glyphs, which puts the
+     * box's middle half a pixel above the capitals' middle. A message
+     * row centres its boxes and its text each in the row, and places
+     * its boxes with {@link #rowBoxTop}.
+     */
     static final int CONTENT_TOP_OFFSET = -2;
     private ChatInlineIcons() {}
 
@@ -102,9 +112,25 @@ final class ChatInlineIcons {
         return slotX + Math.max(0.0F, (slotWidth - contentSize(slotWidth)) / 2.0F);
     }
 
-    /** Top edge of the content box for text drawn at {@code textY}. */
+    /**
+     * Top edge of the content box for text drawn at {@code textY} in the
+     * input bar, the pickers and the completion lists.
+     */
     static float boxTop(float textY, int slotWidth) {
         return textY + CONTENT_TOP_OFFSET
+                + (CONTENT_SIZE - contentSize(slotWidth)) / 2.0F;
+    }
+
+    /**
+     * Top edge of the content box for text drawn at {@code textY} in a
+     * message row: the row centres the box itself
+     * ({@link LostTalesChatOverlayRenderer#centredBoxTop}), and a slot too
+     * narrow for the whole box centres the smaller box on the whole box's
+     * middle.
+     */
+    static float rowBoxTop(float textY, int slotWidth) {
+        return textY + LostTalesChatOverlayRenderer.centredBoxTop(
+                        (int)CONTENT_SIZE)
                 + (CONTENT_SIZE - contentSize(slotWidth)) / 2.0F;
     }
 
@@ -168,6 +194,16 @@ final class ChatInlineIcons {
     }
 
     /**
+     * Where a sprite {@code extent} pixels long starts when it is centred
+     * in a box {@code size} pixels long starting at {@code boxStart}:
+     * rounded down to a whole pixel, so from a whole-pixel box an odd
+     * leftover pixel goes after the sprite.
+     */
+    static float spriteStart(float boxStart, float size, int extent) {
+        return (float)Math.floor(boxStart + (size - extent) / 2.0F);
+    }
+
+    /**
      * A cell of the chat's own icon sheet as an inline glyph: drawn 1:1
      * on whole pixels, centred in the content box, as a flat silhouette
      * in {@code rgb} — the shadow tone on the shadow pass — so it takes
@@ -180,8 +216,8 @@ final class ChatInlineIcons {
         if (sprite == null || size <= 0.0F) {
             return;
         }
-        float x = (float)Math.floor(boxX + (size - sprite.getWidth()) / 2.0F);
-        float y = (float)Math.floor(boxY + (size - sprite.getHeight()) / 2.0F);
+        float x = spriteStart(boxX, size, sprite.getWidth());
+        float y = spriteStart(boxY, size, sprite.getHeight());
         sprite.drawSilhouette(silhouette
                 ? LostTalesChatVisualStyle.SHADOW : rgb, x, y, alpha);
     }

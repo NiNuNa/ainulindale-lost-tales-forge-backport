@@ -92,4 +92,16 @@ public final class ChatHistoryStorage {
         }
         ChatHistory.attach(null);
     }
+
+    /**
+     * Whether the live history was read back from the save this run and
+     * is written with it; false while it is kept in memory only — off by
+     * the config, a save from a newer build, or one that could not be
+     * read. Message ids go on from the kept history, so this is what
+     * says whether an id kept elsewhere in the save, such as in the
+     * Discord bridge's links, still names the same message.
+     */
+    public static boolean isRestoredFromSave() {
+        return ChatHistory.attached() != null;
+    }
 }

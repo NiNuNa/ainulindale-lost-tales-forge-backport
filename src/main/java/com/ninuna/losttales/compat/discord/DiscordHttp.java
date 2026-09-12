@@ -1,6 +1,7 @@
 package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -160,11 +161,18 @@ final class DiscordHttp {
         return exchange(connection, null);
     }
 
-    /** The bot's own reaction with a Unicode emoji, the emoji percent-encoded. */
+    /**
+     * The bot's own reaction with an emoji. A custom emoji goes as its
+     * {@code name:id}, which Discord asks for in that form and which is
+     * safe in a path as it stands: its name is letters, digits and
+     * underscores, its id digits. A Unicode emoji is percent-encoded.
+     */
     static String ownReactionUrl(String channelId, String messageId,
                                  String emoji) throws IOException {
+        String segment = ChatForeignEmoji.isCustom(emoji) ? emoji
+                : URLEncoder.encode(emoji, "UTF-8");
         return API_BASE + "/channels/" + channelId + "/messages/" + messageId
-                + "/reactions/" + URLEncoder.encode(emoji, "UTF-8") + "/@me";
+                + "/reactions/" + segment + "/@me";
     }
 
     /** One message of the webhook, any query on the base URL set aside. */

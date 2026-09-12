@@ -2,6 +2,7 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import cpw.mods.fml.common.FMLLog;
 import io.netty.buffer.ByteBuf;
@@ -40,13 +41,19 @@ public final class ChatHistoryNbtCodec {
     /**
      * The newest entry layout this codec reads. An entry is written at
      * the oldest layout that holds it: {@link #PLAIN_ENTRY_DATA_VERSION}
-     * without reactions, this with them, so an older build still reads
-     * every line nobody reacted to and keeps a reacted line read-only
-     * rather than dropping its reactions.
+     * without reactions, {@link #REACTED_ENTRY_DATA_VERSION} with
+     * reactions whose emoji are all the registry's, and this one when a
+     * reaction's emoji is foreign ({@code ChatForeignEmoji}). An older
+     * build reads every entry up to the layout it knows and keeps a
+     * newer one read-only rather than misreading its reactions.
      */
-    public static final int CURRENT_ENTRY_DATA_VERSION = 2;
+    public static final int CURRENT_ENTRY_DATA_VERSION = 3;
     /** An entry with no reactions. */
     static final int PLAIN_ENTRY_DATA_VERSION = 1;
+    /** An entry with reactions, every emoji one of the registry's. */
+    static final int REACTED_ENTRY_DATA_VERSION = 2;
+    /** An entry with at least one reaction whose emoji is foreign. */
+    static final int FOREIGN_ENTRY_DATA_VERSION = 3;
     public static final int CURRENT_QUARANTINE_DATA_VERSION = 1;
     /** Safety bound on kept lines read back; entries past it are quarantined. */
     public static final int MAX_ENTRIES = ChatHistory.MAX_TOTAL;
@@ -187,6 +194,7 @@ public final class ChatHistoryNbtCodec {
                 repaired = true;
             } else {
                 entries.add(result.entry);
+                repaired |= result.repaired;
             }
         }
         Collections.sort(entries, ENTRY_ORDER);
@@ -196,8 +204,9 @@ public final class ChatHistoryNbtCodec {
     static NBTTagCompound writeEntry(ChatHistory.Entry entry) {
         NBTTagCompound tag = new NBTTagCompound();
         boolean reacted = entry.reactions != null && !entry.reactions.isEmpty();
-        tag.setInteger(TAG_DATA_VERSION, reacted ? CURRENT_ENTRY_DATA_VERSION
-                : PLAIN_ENTRY_DATA_VERSION);
+        tag.setInteger(TAG_DATA_VERSION, !reacted ? PLAIN_ENTRY_DATA_VERSION
+                : entry.reactions.hasForeign() ? FOREIGN_ENTRY_DATA_VERSION
+                : REACTED_ENTRY_DATA_VERSION);
         tag.setLong(TAG_MESSAGE_ID, entry.forOthers.getMessageId());
         if (entry.authorId != null) {
             writeUuid(tag, TAG_AUTHOR_UUID, entry.authorId);
@@ -252,12 +261,14 @@ public final class ChatHistoryNbtCodec {
 
     /**
      * The reactions an entry was written with, or null when they cannot
-     * be read back whole: a list of the wrong kind, an emoji the
-     * registry does not know, a reactor without an id, one named twice
-     * under one emoji, or more than the bounds allow. Such an entry is
+     * be read back whole: a list of the wrong kind, an emoji that is no
+     * reaction key, a foreign emoji in an entry written before foreign
+     * emoji had a layout, a reactor without an id, one named twice under
+     * one emoji, or more than the bounds allow. Such an entry is
      * quarantined whole rather than kept with part of its reactions.
      */
-    private static ChatReactions readReactions(NBTTagCompound raw) {
+    private static ChatReactions readReactions(NBTTagCompound raw,
+                                               int version) {
         ChatReactions reactions = new ChatReactions();
         if (!raw.hasKey(TAG_REACTIONS)) {
             return reactions;
@@ -272,7 +283,12 @@ public final class ChatHistoryNbtCodec {
         for (int kindIndex = 0; kindIndex < kinds.tagCount(); kindIndex++) {
             NBTTagCompound kind = kinds.getCompoundTagAt(kindIndex);
             String emoji = kind.getString(TAG_REACTION_EMOJI);
-            if (!kind.hasKey(TAG_REACTION_REACTORS, Constants.NBT.TAG_LIST)) {
+            // Before foreign emoji had a layout an entry held registry
+            // names alone; from then on a foreign key the registry has
+            // come to carry is filed under its name by the restore.
+            if (!kind.hasKey(TAG_REACTION_REACTORS, Constants.NBT.TAG_LIST)
+                    || (version < FOREIGN_ENTRY_DATA_VERSION
+                            && ChatEmoji.fromName(emoji) == null)) {
                 return null;
             }
             NBTTagList reactors = kind.getTagList(TAG_REACTION_REACTORS,
@@ -284,8 +300,8 @@ public final class ChatHistoryNbtCodec {
                 NBTTagCompound reactor = reactors.getCompoundTagAt(index);
                 UUID id = reactor.hasKey(TAG_REACTOR_ID + TAG_UUID_MOST)
                         ? readUuid(reactor, TAG_REACTOR_ID) : null;
-                if (id == null || !reactions.set(emoji, id,
-                        reactor.getString(TAG_REACTOR_NAME), true)) {
+                if (id == null || !reactions.restore(emoji, id,
+                        reactor.getString(TAG_REACTOR_NAME))) {
                     return null;
                 }
             }
@@ -368,14 +384,15 @@ public final class ChatHistoryNbtCodec {
                 audienceTag.getBoolean(TAG_AUDIENCE_GATED));
         UUID authorId = raw.hasKey(TAG_AUTHOR_UUID + TAG_UUID_MOST)
                 ? readUuid(raw, TAG_AUTHOR_UUID) : null;
-        ChatReactions reactions = readReactions(raw);
+        ChatReactions reactions = readReactions(raw, version);
         if (reactions == null) {
             return EntryReadResult.failure("invalid_reactions");
         }
         return EntryReadResult.success(new ChatHistory.Entry(authorId,
                 author.trim(), raw.getString(TAG_EXCERPT), new HashSet<UUID>(seenBy),
                 channelId, forSender, forOthers, audience,
-                raw.getLong(TAG_TIMESTAMP), reactions));
+                raw.getLong(TAG_TIMESTAMP), reactions),
+                reactions.renamedOnRestore());
     }
 
     /** The line's wire bytes; what the save keeps and every client already reads. */
@@ -551,24 +568,28 @@ public final class ChatHistoryNbtCodec {
         final ChatHistory.Entry entry;
         final String failureReason;
         final int unsupportedVersion;
+        /** Whether the entry was read back other than it was saved, and is to be written again. */
+        final boolean repaired;
 
         private EntryReadResult(ChatHistory.Entry entry, String failureReason,
-                                int unsupportedVersion) {
+                                int unsupportedVersion, boolean repaired) {
             this.entry = entry;
             this.failureReason = failureReason;
             this.unsupportedVersion = unsupportedVersion;
+            this.repaired = repaired;
         }
 
-        static EntryReadResult success(ChatHistory.Entry entry) {
-            return new EntryReadResult(entry, null, Integer.MIN_VALUE);
+        static EntryReadResult success(ChatHistory.Entry entry,
+                                       boolean repaired) {
+            return new EntryReadResult(entry, null, Integer.MIN_VALUE, repaired);
         }
 
         static EntryReadResult failure(String reason) {
-            return new EntryReadResult(null, reason, Integer.MIN_VALUE);
+            return new EntryReadResult(null, reason, Integer.MIN_VALUE, false);
         }
 
         static EntryReadResult unsupported(int version) {
-            return new EntryReadResult(null, null, version);
+            return new EntryReadResult(null, null, version, false);
         }
     }
 

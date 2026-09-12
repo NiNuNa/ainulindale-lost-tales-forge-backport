@@ -15,9 +15,10 @@ import org.lwjgl.opengl.GL11;
 
 /**
  * Draws a showcased stack's icon at chat scale. Vanilla item rendering is
- * fixed at sixteen pixels, so the icon is scaled on the matrix; eight
- * pixels (a clean 2:1) keeps item sprites crisp inside the eleven-pixel
- * chat band. The shadow pass renders the same icon in silhouette mode, so
+ * fixed at sixteen pixels, so the icon is scaled on the matrix to the
+ * size the caller asks for: in a message line that is the 10px content
+ * box ({@link ChatInlineIcons#CONTENT_SIZE}), one clear row above and
+ * below it. The shadow pass renders the same icon in silhouette mode, so
  * items share the text and emoji shadow colour instead of a tinted copy.
  *
  * <p>The icon fades with its line. {@code RenderItem} resets the vertex
@@ -30,8 +31,6 @@ import org.lwjgl.opengl.GL11;
  * poses them but drawn here, with blending on.</p>
  */
 final class ChatItemRenderer {
-    /** On-screen icon edge inside the ten-pixel reserved slot. */
-    static final float ICON_SIZE = 8.0F;
     private static final float VANILLA_ICON_SIZE = 16.0F;
     /** Blocks as cubes, without a world; vanilla's own is private. */
     private static final RenderBlocks BLOCK_RENDERER = new RenderBlocks();

@@ -172,6 +172,70 @@ public final class DiscordJsonTest {
         assertEquals(DiscordHttp.API_BASE
                 + "/channels/7/messages/99/reactions/%F0%9F%98%84/@me",
                 DiscordHttp.ownReactionUrl("7", "99", "\uD83D\uDE04"));
+        assertEquals("a Unicode emoji the registry lacks is encoded too",
+                DiscordHttp.API_BASE
+                        + "/channels/7/messages/99/reactions/%F0%9F%A6%84/@me",
+                DiscordHttp.ownReactionUrl("7", "99", "\uD83E\uDD84"));
+        assertEquals("a custom emoji goes as name:id", DiscordHttp.API_BASE
+                + "/channels/7/messages/99/reactions/partyparrot:556/@me",
+                DiscordHttp.ownReactionUrl("7", "99", "partyparrot:556"));
+    }
+
+    @Test
+    public void aReactionTheRegistryLacksCrossesByItsForeignKey() {
+        DiscordJson.Reaction custom = DiscordJson.parseReaction(
+                new JsonParser().parse("{\"user_id\":\"42\","
+                + "\"channel_id\":\"7\",\"message_id\":\"99\","
+                + "\"emoji\":{\"id\":\"556\",\"name\":\"partyparrot\","
+                + "\"animated\":true}}").getAsJsonObject());
+        assertNull(custom.emoji());
+        assertEquals("partyparrot:556", custom.reactionKey());
+
+        DiscordJson.Reaction unicode = DiscordJson.parseReaction(
+                new JsonParser().parse("{\"user_id\":\"42\","
+                + "\"channel_id\":\"7\",\"message_id\":\"99\","
+                + "\"emoji\":{\"id\":null,\"name\":\"\uD83E\uDD84\"}}")
+                .getAsJsonObject());
+        assertEquals("\uD83E\uDD84", unicode.reactionKey());
+
+        DiscordJson.Reaction known = DiscordJson.parseReaction(
+                new JsonParser().parse("{\"user_id\":\"42\","
+                + "\"channel_id\":\"7\",\"message_id\":\"99\","
+                + "\"emoji\":{\"id\":null,\"name\":\"\uD83D\uDE04\"}}")
+                .getAsJsonObject());
+        assertEquals("smile", known.reactionKey());
+
+        DiscordJson.Reaction ours = DiscordJson.parseReaction(
+                new JsonParser().parse("{\"user_id\":\"42\","
+                + "\"channel_id\":\"7\",\"message_id\":\"99\","
+                + "\"emoji\":{\"id\":\"555\",\"name\":\"Cutesy\"}}")
+                .getAsJsonObject());
+        assertEquals("cutesy", ours.reactionKey());
+
+        DiscordJson.Reaction deleted = DiscordJson.parseReaction(
+                new JsonParser().parse("{\"user_id\":\"42\","
+                + "\"channel_id\":\"7\",\"message_id\":\"99\","
+                + "\"emoji\":{\"id\":\"557\",\"name\":null}}")
+                .getAsJsonObject());
+        assertNull("a deleted custom emoji has no name to key",
+                deleted.reactionKey());
+        assertEquals("its id still names it for a removal", "557",
+                deleted.emojiId);
+
+        DiscordJson.Reaction clear = DiscordJson.parseReaction(
+                new JsonParser().parse("{\"channel_id\":\"7\","
+                + "\"message_id\":\"99\"}").getAsJsonObject());
+        assertNull(clear.reactionKey());
+    }
+
+    @Test
+    public void anErrorReplyNamesItsCode() {
+        assertEquals(DiscordJson.ERROR_UNKNOWN_EMOJI, DiscordJson.errorCode(
+                "{\"message\":\"Unknown Emoji\",\"code\":10014}"));
+        assertEquals(0, DiscordJson.errorCode("{\"message\":\"no code\"}"));
+        assertEquals(0, DiscordJson.errorCode("{\"code\":\"not a number\"}"));
+        assertEquals(0, DiscordJson.errorCode("not json"));
+        assertEquals(0, DiscordJson.errorCode(null));
     }
 
     @Test

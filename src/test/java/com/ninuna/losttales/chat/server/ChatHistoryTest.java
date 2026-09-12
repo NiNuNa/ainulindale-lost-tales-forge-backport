@@ -123,6 +123,29 @@ public final class ChatHistoryTest {
         assertFalse(ChatHistory.quoteForDiscordChannel(id).exists());
     }
 
+    /**
+     * Where a kept line was said, as the Discord bridge asks it: the
+     * channel, and for Faction chat the faction, which is what decides
+     * whether its Discord copies are still bound.
+     */
+    @Test
+    public void aKeptLineSaysWhereItWasSaid() {
+        long gondor = record(ChatChannel.FACTION, ALICE, "the gate holds",
+                Arrays.asList(ALICE), ChatHistory.Audience.everyone(),
+                "lotr:gondor");
+        long global = record(ChatChannel.ALL, ALICE, "meet me at the gate",
+                Arrays.asList(ALICE), ChatHistory.Audience.everyone());
+        assertEquals(ChatChannel.FACTION, ChatHistory.channelOf(gondor));
+        assertEquals("lotr:gondor", ChatHistory.factionScopeOf(gondor));
+        assertEquals(ChatChannel.ALL, ChatHistory.channelOf(global));
+        assertEquals("", ChatHistory.factionScopeOf(global));
+        assertNull(ChatHistory.channelOf(global + 1000L));
+        assertEquals("", ChatHistory.factionScopeOf(global + 1000L));
+        ChatHistory.remove(gondor, ALICE);
+        assertNull(ChatHistory.channelOf(gondor));
+        assertEquals("", ChatHistory.factionScopeOf(gondor));
+    }
+
     @Test
     public void someoneWhoWasNotSentItIsQuotedNothing() {
         long id = record(ChatChannel.WHISPER, ALICE, "the key is under the barrel",
@@ -656,9 +679,78 @@ public final class ChatHistoryTest {
                 0, change.gameCountAfter);
         assertFalse(change.readers.contains(member));
         ChatHistory.react(id, reader(BOB), BOB, "Beren", "smile", true);
-        assertNotNull(ChatHistory.clearDiscordReactions(id, null));
+        assertNotNull(ChatHistory.clearDiscordReactions(id, null, ""));
         assertEquals(1, ChatHistory.reactionsFor(id, BOB).find("smile").count);
-        assertNull(ChatHistory.clearDiscordReactions(id, null));
+        assertNull(ChatHistory.clearDiscordReactions(id, null, ""));
+    }
+
+    @Test
+    public void aPlayerJoinsAForeignEmojiButNeverBringsOne() {
+        long id = record(ChatChannel.OOC, ALICE, "hail",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        String parrot = "partyparrot:556";
+        assertNull("nobody on the message reacted with it yet",
+                ChatHistory.react(id, reader(BOB), BOB, "Beren", parrot, true));
+        assertNotNull(ChatHistory.react(id, null,
+                LostTalesChatMessagePacket.discordSenderId("42"), "Nils",
+                parrot, true));
+        ChatHistory.ReactionChange change = ChatHistory.react(id, reader(BOB),
+                BOB, "Beren", parrot, true);
+        assertNotNull(change);
+        assertEquals("the bot reacts on Discord for the first player",
+                0, change.gameCountBefore);
+        assertEquals(1, change.gameCountAfter);
+        assertNotNull(ChatHistory.clearDiscordReactions(id, parrot, "556"));
+        assertEquals(1, ChatHistory.reactionsFor(id, BOB).find(parrot).count);
+        assertTrue(ChatHistory.reactionsFor(id, BOB).find(parrot).mine);
+    }
+
+    /** The custom emoji pepe:556 renamed on Discord to pepe_happy keeps its id. */
+    @Test
+    public void aDiscordReactionFollowsARenamedCustomEmojiByItsId() {
+        long id = record(ChatChannel.OOC, ALICE, "hail",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        UUID first = LostTalesChatMessagePacket.discordSenderId("42");
+        UUID second = LostTalesChatMessagePacket.discordSenderId("43");
+        assertNotNull(ChatHistory.reactFromDiscord(id, first, "Nils",
+                "pepe:556", "556", true));
+
+        assertNotNull("a reaction after the rename joins the chip",
+                ChatHistory.reactFromDiscord(id, second, "Ana",
+                        "pepe_happy:556", "556", true));
+        assertEquals(2, ChatHistory.reactionsFor(id, BOB).find("pepe:556").count);
+        assertNull(ChatHistory.reactionsFor(id, BOB).find("pepe_happy:556"));
+
+        assertNotNull("a removal after the rename finds it",
+                ChatHistory.reactFromDiscord(id, first, "", "pepe_happy:556",
+                        "556", false));
+        assertEquals(1, ChatHistory.reactionsFor(id, BOB).find("pepe:556").count);
+        assertNull("a member with no reaction takes nothing back",
+                ChatHistory.reactFromDiscord(id, first, "", null, "556", false));
+
+        assertNotNull("a removal without a name finds it by the id",
+                ChatHistory.reactFromDiscord(id, second, "", null, "556", false));
+        assertNull(ChatHistory.reactionsFor(id, BOB).find("pepe:556"));
+    }
+
+    @Test
+    public void aDiscordClearOfARenamedEmojiGoesByItsId() {
+        long id = record(ChatChannel.OOC, ALICE, "hail",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        ChatHistory.reactFromDiscord(id,
+                LostTalesChatMessagePacket.discordSenderId("42"), "Nils",
+                "pepe:556", "556", true);
+        ChatHistory.ReactionChange joined = ChatHistory.react(id, reader(BOB),
+                BOB, "Beren", "pepe:556", true);
+        assertNotNull("a player joins the key they were shown", joined);
+        assertEquals(1, joined.gameCountAfter);
+
+        assertNotNull(ChatHistory.clearDiscordReactions(id, "pepe_happy:556",
+                "556"));
+        assertEquals(1, ChatHistory.reactionsFor(id, BOB).find("pepe:556").count);
+        assertTrue(ChatHistory.reactionsFor(id, BOB).find("pepe:556").mine);
+        assertNull("nothing of Discord's left to clear",
+                ChatHistory.clearDiscordReactions(id, null, "556"));
     }
 
     private static long record(ChatChannel channel, UUID author, String text,

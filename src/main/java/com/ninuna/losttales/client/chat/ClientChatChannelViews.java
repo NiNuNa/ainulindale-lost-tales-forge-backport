@@ -312,12 +312,18 @@ public final class ClientChatChannelViews {
             return;
         }
         int divider = frame.dividerLineIndex;
+        frame.resolveRows();
+        ChatStackRows rows = frame.rows;
         Anchor anchor = ANCHORS.get(view);
         if (anchor != null && anchor.revision == revision(view)) {
             int index = anchor.locate(lines);
             if (index >= 0) {
-                double offset = LostTalesChatOverlayRenderer.rowOfLine(
-                        index, divider) + anchor.delta;
+                // Put back by pixels, so a row between the held line and
+                // the edge changing height — the divider's, above all —
+                // cannot stretch the part of a row the edge was in.
+                double offset = rows.rowsAt(rows.top(
+                        LostTalesChatOverlayRenderer.rowOfLine(index, divider))
+                        + anchor.deltaPixels);
                 double ceiling = frame.scrollCeiling();
                 if (offset > ceiling) {
                     // The window has grown under a view scrolled to its
@@ -336,20 +342,42 @@ public final class ClientChatChannelViews {
         }
         // Nothing held yet, or the message that was held has been
         // trimmed away: take hold of whatever is at the view's edge now.
-        int index = Math.max(0, Math.min(lines.size() - 1,
-                LostTalesChatOverlayRenderer.lineOfRow(
-                        (int)Math.floor(current), divider)));
-        // A blank row between runs stands for no message and cannot be
-        // held: the nearest message's row is.
-        index = ChatWindowLines.nearestMessageRow(lines, index);
+        // An edge inside the unread divider's row holds the message above
+        // the divider, so the divider going or moving leaves the page
+        // above it where it is.
+        int edgeRow = (int)Math.floor(current);
+        int index = ChatStackRows.isDividerRow(edgeRow, divider)
+                ? olderMessageOver(lines, divider) : -1;
+        if (index < 0) {
+            index = Math.max(0, Math.min(lines.size() - 1,
+                    LostTalesChatOverlayRenderer.lineOfRow(edgeRow, divider)));
+            // A blank row between runs stands for no message and cannot
+            // be held: the nearest message's row is.
+            index = ChatWindowLines.nearestMessageRow(lines, index);
+        }
         ChatLine line = index < 0 ? null : lines.get(index);
         if (line == null) {
             ANCHORS.remove(view);
             return;
         }
         ANCHORS.put(view, new Anchor(line.getChatLineID(), index,
-                current - LostTalesChatOverlayRenderer.rowOfLine(
-                        index, divider), revision(view)));
+                rows.offsetOf(current) - rows.top(
+                        LostTalesChatOverlayRenderer.rowOfLine(index, divider)),
+                revision(view)));
+    }
+
+    /**
+     * The first message older than the unread divider at
+     * {@code divider}, past any filler between them, or -1 for none.
+     */
+    private static int olderMessageOver(List<ChatLine> lines, int divider) {
+        for (int index = divider + 1; index < lines.size(); index++) {
+            ChatLine line = lines.get(index);
+            if (line != null && !ChatWindowLines.isFiller(line)) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     /**
@@ -373,17 +401,20 @@ public final class ClientChatChannelViews {
     /** What a view is holding on to while it is scrolled back. */
     private static final class Anchor {
         final int chatLineId;
-        /** Rows between that line's own row and the view's offset. */
-        final double delta;
+        /**
+         * Pixels of stack from the bottom of that line's own row up to the
+         * view's offset; negative when the offset is below the line.
+         */
+        final double deltaPixels;
         /** The scroll this hold was taken against; a later one drops it. */
         final int revision;
         /** Where the line was last found, tried first next time. */
         private int lastIndex;
 
-        Anchor(int chatLineId, int index, double delta, int revision) {
+        Anchor(int chatLineId, int index, double deltaPixels, int revision) {
             this.chatLineId = chatLineId;
             this.lastIndex = index;
-            this.delta = delta;
+            this.deltaPixels = deltaPixels;
             this.revision = revision;
         }
 

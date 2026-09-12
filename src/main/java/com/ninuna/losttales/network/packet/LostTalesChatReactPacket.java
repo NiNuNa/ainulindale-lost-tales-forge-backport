@@ -2,7 +2,7 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReactionSummary;
-import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
@@ -19,7 +19,9 @@ import net.minecraft.entity.player.EntityPlayerMP;
  *
  * <p>Names the message, the emoji and which of the two, and nothing
  * more: whether the player may read the message, what name they react
- * as and who has to be told are the server's record to answer.</p>
+ * as and who has to be told are the server's record to answer. The
+ * emoji is a reaction key; a well-formed foreign key passes here, and
+ * the server takes it only where the message already carries it.</p>
  */
 public final class LostTalesChatReactPacket implements IMessage {
     private static final int MAX_PACKET_BYTES =
@@ -74,13 +76,13 @@ public final class LostTalesChatReactPacket implements IMessage {
 
     private void validate() {
         if (!ChatMessageIds.isServerId(this.messageId)
-                || ChatEmoji.fromName(this.emoji) == null) {
+                || !ChatForeignEmoji.isReactionKey(this.emoji)) {
             throw new IllegalArgumentException("invalid chat reaction");
         }
     }
 
     public long getMessageId() { return this.messageId; }
-    /** The emoji's canonical name. */
+    /** The emoji's reaction key. */
     public String getEmoji() { return this.emoji; }
     /** Whether the reaction is added rather than taken back. */
     public boolean isAdd() { return this.add; }

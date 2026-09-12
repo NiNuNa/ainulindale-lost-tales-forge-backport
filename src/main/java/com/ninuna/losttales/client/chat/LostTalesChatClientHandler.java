@@ -1,12 +1,15 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
 import cpw.mods.fml.common.FMLCommonHandler;
+import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
@@ -22,9 +25,11 @@ import net.minecraftforge.common.MinecraftForge;
  * the routing of server-visible vanilla lines into the Global channel.
  */
 public final class LostTalesChatClientHandler {
-    private static final Field DEFAULT_INPUT = findDefaultInputField();
+    private static final Field DEFAULT_INPUT = resolveDefaultInputField();
     /** Newest messages inspected for stray lines before giving up. */
     private static final int UNTRACKED_SCAN_LIMIT = 16;
+    /** Whether the unreadable opening text has been reported. */
+    private static boolean unavailableLogged;
 
     /** The newest history entry the stray-line watcher has seen. */
     private ChatLine watchedHead;
@@ -49,14 +54,19 @@ public final class LostTalesChatClientHandler {
             LostTalesChatPresentation.onVanillaHistoryCleared();
             return;
         }
-        if (event.gui.getClass() != GuiChat.class || DEFAULT_INPUT == null) {
+        if (event.gui.getClass() != GuiChat.class) {
+            return;
+        }
+        if (DEFAULT_INPUT == null) {
+            logUnavailableOnce(null);
             return;
         }
         try {
             event.gui = new LostTalesChatGui(
                     (String)DEFAULT_INPUT.get(event.gui));
-        } catch (IllegalAccessException ignored) {
+        } catch (IllegalAccessException refused) {
             // Keeping the original GUI is safer than losing command input.
+            logUnavailableOnce(refused);
         }
     }
 
@@ -173,16 +183,42 @@ public final class LostTalesChatClientHandler {
         }
     }
 
-    private static Field findDefaultInputField() {
-        try {
-            Field field = GuiChat.class.getDeclaredField(
-                    "defaultInputFieldText");
-            field.setAccessible(true);
-            return field;
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        } catch (RuntimeException ignored) {
-            return null;
+    /**
+     * The text vanilla's chat screen opens with ("/" for the command key),
+     * by either of its names and verified to be the String it is. A
+     * development workspace names it defaultInputFieldText and a release
+     * jar field_146409_v. Without it the game's own chat screen stays.
+     */
+    static Field resolveDefaultInputField() {
+        String[] names = { "defaultInputFieldText", "field_146409_v" };
+        for (String name : names) {
+            try {
+                Field field = GuiChat.class.getDeclaredField(name);
+                if (Modifier.isStatic(field.getModifiers())
+                        || field.getType() != String.class) {
+                    continue;
+                }
+                field.setAccessible(true);
+                return field;
+            } catch (NoSuchFieldException missing) {
+                continue;
+            } catch (RuntimeException inaccessible) {
+                return null;
+            }
         }
+        return null;
+    }
+
+    private static void logUnavailableOnce(Throwable cause) {
+        if (unavailableLogged) {
+            return;
+        }
+        unavailableLogged = true;
+        FMLLog.warning("[%s] GuiChat's opening text (defaultInputFieldText "
+                + "or field_146409_v) could not be read, so the chat key "
+                + "opens the game's own chat screen instead of the Lost "
+                + "Tales chat; another mod may have changed GuiChat (%s)",
+                LostTalesMetaData.MOD_ID,
+                cause == null ? "no such String field" : cause.toString());
     }
 }

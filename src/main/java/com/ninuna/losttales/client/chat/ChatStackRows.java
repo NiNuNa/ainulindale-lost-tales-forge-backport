@@ -8,10 +8,13 @@ import net.minecraft.client.gui.ChatLine;
  * How tall each row of a view's stack is, and where every row starts,
  * measured up from the baseline in the chat's own (unscaled) pixels.
  *
- * <p>The stack's rows are not all one height: a message's row and the
- * unread divider's are a whole line, while the blank row between two
- * runs is half of one, so groups read apart without a whole empty line
- * between them. Scrolling still counts rows — a scroll offset is a row
+ * <p>The stack's rows are not all one height: a message's row and a
+ * day's rule are a whole line, while the blank row between two runs is
+ * two thirds of one, so groups read apart without a whole empty line
+ * between them. The unread divider is a chat element like a run: its
+ * row holds its own line and the same gap on either side of it, sharing
+ * a blank row that already stands beside it. Scrolling still counts
+ * rows — a scroll offset is a row
  * and a fraction of the next — but every distance up the stack is a
  * sum of row heights, and this is the one place those sums are taken:
  * the draw, the scroll ceiling, the scrollbar and the window's own
@@ -24,13 +27,16 @@ import net.minecraft.client.gui.ChatLine;
  * reused across frames.</p>
  */
 final class ChatStackRows {
-    /** A message's row, and the unread divider's. */
+    /** A message's row, a day's rule, and the unread divider's own line. */
     static final int LINE_HEIGHT = LostTalesChatOverlayRenderer.LINE_HEIGHT;
     /**
-     * The blank row between two runs: half a line, rounded up to a
-     * whole pixel so the rows above it stay on the pixel grid.
+     * The one gap the stack lays: the blank row between two runs, and
+     * the space on either side of a day's rule and the unread divider.
+     * Two thirds of a line, rounded to the nearest whole pixel so the
+     * rows above it stay on the pixel grid; two thirds of a whole number
+     * is never a half, so the rounding has no tie to break.
      */
-    static final int SPACER_HEIGHT = (LINE_HEIGHT + 1) / 2;
+    static final int SPACER_HEIGHT = (2 * LINE_HEIGHT + 1) / 3;
     private static final int INITIAL_CAPACITY = 32;
 
     /** {@code tops[r]} is where row {@code r} starts; {@code tops[count]} is the total. */
@@ -39,12 +45,16 @@ final class ChatStackRows {
     private Object source;
     private int sourceSize;
     private int dividerIndex = -1;
+    /** The gap under the divider's own line, inside the divider's row. */
+    private int dividerGapBelow;
 
     /** Lays the rows of a view's line list out, the divider's row included. */
     void reset(List<ChatLine> lines, int dividerIndex) {
         this.source = lines;
         this.sourceSize = lines == null ? 0 : lines.size();
         this.dividerIndex = dividerIndex;
+        this.dividerGapBelow = dividerIndex >= 0
+                ? gapBeside(lines, dividerIndex) : 0;
         int rows = this.sourceSize + (dividerIndex >= 0 ? 1 : 0);
         ensureCapacity(rows);
         this.count = rows;
@@ -52,7 +62,7 @@ final class ChatStackRows {
         for (int row = 0; row < rows; row++) {
             int height;
             if (isDividerRow(row, dividerIndex)) {
-                height = LINE_HEIGHT;
+                height = dividerHeight(lines, dividerIndex);
             } else {
                 int line = LostTalesChatOverlayRenderer.lineOfRow(row,
                         dividerIndex);
@@ -67,6 +77,7 @@ final class ChatStackRows {
         this.source = null;
         this.sourceSize = 0;
         this.dividerIndex = -1;
+        this.dividerGapBelow = 0;
         int rows = heights == null ? 0 : heights.length;
         ensureCapacity(rows);
         this.count = rows;
@@ -89,7 +100,11 @@ final class ChatStackRows {
                 && this.dividerIndex == dividerIndex;
     }
 
-    /** The height a line's row takes: half a line for a blank row between runs. */
+    /**
+     * The height a line's row takes: {@link #SPACER_HEIGHT} for a blank
+     * row, between two runs or beside a day's rule, and a whole line for
+     * any other.
+     */
     static int heightOf(ChatLine line) {
         return ChatWindowLines.isSpacer(line) ? SPACER_HEIGHT : LINE_HEIGHT;
     }
@@ -101,6 +116,40 @@ final class ChatStackRows {
      */
     static boolean isDividerRow(int row, int dividerIndex) {
         return dividerIndex >= 0 && row == dividerIndex + 1;
+    }
+
+    /**
+     * The height of the unread divider's row: its own line, with the
+     * gap two runs stand apart by on each side of it. A side
+     * where a blank row already stands shares that one, and a side with
+     * no line at all, the top of the loaded history, has none.
+     */
+    static int dividerHeight(List<ChatLine> lines, int dividerIndex) {
+        return gapBeside(lines, dividerIndex) + LINE_HEIGHT
+                + gapBeside(lines, dividerIndex + 1);
+    }
+
+    /**
+     * The gap the unread divider's row, or a day's rule, leaves toward
+     * the line at {@code index}:
+     * {@link #SPACER_HEIGHT}, or nothing where no line stands there or
+     * where a blank row already does.
+     */
+    static int gapBeside(List<ChatLine> lines, int index) {
+        if (lines == null || index < 0 || index >= lines.size()) {
+            return 0;
+        }
+        return ChatWindowLines.isSpacer(lines.get(index)) ? 0 : SPACER_HEIGHT;
+    }
+
+    /**
+     * Pixels of stack below the unread divider's own line: the rows
+     * under the divider's row and the gap under the line inside it. The
+     * rule is drawn on that line. Zero without a divider.
+     */
+    int dividerLineBottom() {
+        return this.dividerIndex < 0 ? 0
+                : top(this.dividerIndex + 1) + this.dividerGapBelow;
     }
 
     int count() {
@@ -158,6 +207,23 @@ final class ChatStackRows {
         }
         int row = lastRowBelow(pixels);
         return row + (pixels - this.tops[row]) / (double)height(row);
+    }
+
+    /**
+     * The lowest row the draw starts from for a view scrolled to
+     * {@code scrollRow}: the row under it, and below that every row whose
+     * top stands inside the {@code strip} pixels under the baseline the
+     * clip reveals, the stack moved down by {@code offset}. A blank row in
+     * the strip leaves room for part of the row under it, which is drawn
+     * too.
+     */
+    int firstRowShown(int scrollRow, float offset, float strip) {
+        int first = Math.max(0, Math.min(this.count, scrollRow) - 1);
+        float base = top(scrollRow);
+        while (first > 0 && base - top(first) + offset < strip) {
+            first--;
+        }
+        return first;
     }
 
     /**

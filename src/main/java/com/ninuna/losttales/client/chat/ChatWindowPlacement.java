@@ -9,10 +9,10 @@ import net.minecraft.client.gui.GuiNewChat;
 import org.lwjgl.input.Mouse;
 
 /**
- * Where chat windows sit on screen, for the chat itself and for the HUD
- * placement editor alike. A window is one unit — tab row, messages and
- * its own input bar, all the same width — anchored by its <em>baseline</em>,
- * the edge the newest message sits on: messages grow upward from it and
+ * Where chat windows sit on screen. A window is one unit — tab row,
+ * messages and its own input bar, all the same width — anchored by its
+ * <em>baseline</em>, the edge the newest message sits on: messages grow
+ * upward from it and
  * the input bar hangs below it, so a window never moves when a message
  * arrives. The stored position is the baseline's percent of its travel
  * (with the box at its smallest, one empty line), and the visible box is
@@ -27,7 +27,8 @@ import org.lwjgl.input.Mouse;
  *
  * <p>The closed-chat feed — one stack of every unmuted channel's
  * messages, shown only while the chat is closed — is placed the same way
- * by its own baseline, with no row and no bar.</p>
+ * by its own baseline, with no row and no bar. The HUD placement editor
+ * moves the feed; windows are moved in the chat screen alone.</p>
  *
  * <p>Boxes are computed in fractional pixels with the same margin as
  * {@link HudPlacementLayout}, so a dragged window moves as smoothly as
@@ -272,7 +273,7 @@ public final class ChatWindowPlacement {
      * for show as empty rows above them, so resizing never moves the
      * window. One following the game setting is as tall as the tallest
      * stack any of its tabs has held, in lines and fractions of one — a
-     * blank row between runs is half a line — at least one, at most its
+     * blank row between runs is a fraction of a line — at least one, at most its
      * {@link #lineCap}: one height for every tab of the window, so
      * bringing another tab forward never resizes it; a window not drawn
      * yet shows one.
@@ -595,23 +596,6 @@ public final class ChatWindowPlacement {
         return percent(baseline - minHeight, screenHeight, minHeight);
     }
 
-    /** {@code Chat: Party, OOC} — a window named by its tabs. */
-    public static String displayName(ChatWindow window) {
-        StringBuilder name = new StringBuilder("Chat: ");
-        List<ChatTab> tabs = window.getTabs();
-        for (int index = 0; index < tabs.size(); index++) {
-            if (index > 0) {
-                name.append(", ");
-            }
-            name.append(ClientChatChannelState.displayName(tabs.get(index)));
-        }
-        return name.toString();
-    }
-
-    /**
-     * The pointer in fractional GUI pixels, from the raw mouse, so a drag
-     * is not quantised to whole GUI pixels at higher GUI scales.
-     */
     /**
      * The chat width, in GUI pixels, that gives a window box of about
      * {@code boxWidth}: the inverse of the box width
@@ -671,10 +655,15 @@ public final class ChatWindowPlacement {
                 Math.max(minChatWidth(minecraft), row), minecraft);
     }
 
+    /**
+     * The pointer in fractional GUI pixels, from the raw mouse, so a drag
+     * is not quantised to whole GUI pixels at higher GUI scales.
+     */
     public static double preciseMouseX(Minecraft minecraft, int screenWidth) {
         return LostTalesGuiPointer.x(minecraft, screenWidth);
     }
 
+    /** As above, for y. */
     public static double preciseMouseY(Minecraft minecraft, int screenHeight) {
         return LostTalesGuiPointer.y(minecraft, screenHeight);
     }

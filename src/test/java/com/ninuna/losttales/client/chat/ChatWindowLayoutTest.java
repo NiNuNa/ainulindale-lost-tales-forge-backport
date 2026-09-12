@@ -120,6 +120,34 @@ public final class ChatWindowLayoutTest {
     }
 
     /**
+     * Moving the closed-chat feed, which is all the HUD placement editor
+     * does with the chat layout, moves no window and breaks no link, and
+     * reaches the store only when the caller asks for it.
+     */
+    @Test
+    public void movingTheFeedLeavesEveryWindowAlone() {
+        ChatWindow console = ChatWindowLayout.window("w1");
+        ChatWindow conversation = ChatWindowLayout.window("w2");
+        assertTrue(ChatWindowLayout.link("w2", "w1", false));
+        this.changes = 0;
+
+        ChatWindowLayout.setFeedPosition(35.0D, 60.0D, false);
+        assertEquals(0, this.changes);
+        ChatWindowLayout.setFeedPosition(40.0D, 55.0D, true);
+        assertEquals(1, this.changes);
+
+        assertEquals(40.0D, ChatWindowLayout.feedOffsetX(), 0.0D);
+        assertEquals(55.0D, ChatWindowLayout.feedOffsetY(), 0.0D);
+        assertEquals(2, ChatWindowLayout.windows().size());
+        assertEquals(0.0D, console.getOffsetX(), 0.0D);
+        assertEquals(0.0D, console.getOffsetY(), 0.0D);
+        assertEquals(0.0D, conversation.getOffsetX(), 0.0D);
+        assertEquals(100.0D, conversation.getOffsetY(), 0.0D);
+        assertEquals("w1", conversation.getLinkTarget());
+        assertFalse(console.isLinked());
+    }
+
+    /**
      * Mute (out of the feed) and mention-mute (cue silent) are two
      * independent preferences: each changes only its own half, both
      * survive closing, and both travel with the store.

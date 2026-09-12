@@ -1,6 +1,7 @@
 package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.chat.ChatMessageIds;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.Test;
 
@@ -146,6 +147,71 @@ public final class DiscordMessageLinksTest {
         assertEquals(0, links.size());
         assertEquals("", firstDiscordIdOf(links, 1000L));
         assertEquals(ChatMessageIds.NONE, links.messageIdOf("111"));
+    }
+
+    @Test
+    public void membersLinesAreFoundByTheChannelTheyWereReadFrom() {
+        DiscordMessageLinks links = new DiscordMessageLinks();
+        links.link(1000L, "111", "", "channel:5", "");
+        links.link(2000L, "222", "", "channel:5", "hookA", "ooc");
+        links.link(3000L, "333", "", "channel:6", "");
+        links.link(4000L, "444", "", "channel:5", "");
+        assertEquals(Arrays.asList("111", "444"), links.discordLinesIn("channel:5"));
+        assertEquals(Arrays.asList("333"), links.discordLinesIn("channel:6"));
+        assertTrue(links.discordLinesIn(null).isEmpty());
+        assertEquals("ooc", links.copiesOf(2000L).get(0).bindingId);
+        assertEquals("", links.copiesOf(1000L).get(0).bindingId);
+    }
+
+    @Test
+    public void everyChangeMovesTheRevisionOn() {
+        DiscordMessageLinks links = new DiscordMessageLinks();
+        long start = links.revision();
+        links.link(1000L, "111", "", "channel:5", "");
+        long linked = links.revision();
+        assertTrue(linked != start);
+        // Half a link changes nothing, and a snapshot only reads.
+        links.link(1000L, "", "", "channel:5", "");
+        links.snapshot();
+        assertEquals(linked, links.revision());
+        links.clear();
+        assertTrue(links.revision() != linked);
+    }
+
+    @Test
+    public void aRestoreReplacesWhatIsHeldAndPassesOverClashes() {
+        DiscordMessageLinks links = new DiscordMessageLinks();
+        links.link(9000L, "999", "", "channel:5", "");
+        List<DiscordMessageLinks.SavedLink> saved = Arrays.asList(
+                new DiscordMessageLinks.SavedLink(1000L, Arrays.asList(
+                        new DiscordMessageLinks.SavedCopy("111", "channel:5", "ooc", "-# h\n"),
+                        // A second copy in one channel is passed over.
+                        new DiscordMessageLinks.SavedCopy("112", "channel:5", "ooc", ""))),
+                // A Discord id another message already took is passed over.
+                new DiscordMessageLinks.SavedLink(2000L, Arrays.asList(
+                        new DiscordMessageLinks.SavedCopy("111", "channel:6", "", ""))),
+                new DiscordMessageLinks.SavedLink(3000L, Arrays.asList(
+                        new DiscordMessageLinks.SavedCopy("333", "channel:5", "", ""))));
+        DiscordMessageLinks.MessageIndex allButThree = new DiscordMessageLinks.MessageIndex() {
+            @Override
+            public boolean holds(long messageId) {
+                return messageId != 3000L;
+            }
+        };
+        assertEquals(1, links.restore(saved, allButThree));
+        // What was held before the restore is gone.
+        assertEquals(ChatMessageIds.NONE, links.messageIdOf("999"));
+        assertEquals(1000L, links.messageIdOf("111"));
+        assertEquals(ChatMessageIds.NONE, links.messageIdOf("112"));
+        assertEquals(ChatMessageIds.NONE, links.messageIdOf("333"));
+        assertTrue(links.copiesOf(2000L).isEmpty());
+        DiscordMessageLinks.Copy copy = links.copiesOf(1000L).get(0);
+        assertEquals("", copy.webhookUrl);
+        assertEquals("ooc", copy.bindingId);
+        assertEquals("-# h\n", copy.header);
+        // A restored copy corrects through no webhook of its own; the
+        // bridge finds one among the bindings of its message's channel.
+        assertNull(links.copyThrough(1000L, "hookA"));
     }
 
     /** The Discord id of a game message's first copy, or empty for none. */

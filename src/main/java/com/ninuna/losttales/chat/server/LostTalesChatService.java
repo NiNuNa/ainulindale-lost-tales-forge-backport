@@ -14,7 +14,7 @@ import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatRecipientRule;
-import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
 import com.ninuna.losttales.chat.moderation.ChatAuditLog;
 import com.ninuna.losttales.chat.moderation.ChatMuteDurations;
 import com.ninuna.losttales.chat.moderation.ChatMuteEntry;
@@ -787,6 +787,11 @@ public final class LostTalesChatService {
                 || remover.worldObj.isRemote) {
             return;
         }
+        // Where the message was said, asked before it is forgotten: the
+        // bridge takes a Discord copy back only while that channel is
+        // still bound to the copy's Discord channel.
+        ChatChannel saidIn = ChatHistory.channelOf(messageId);
+        String saidToFaction = ChatHistory.factionScopeOf(messageId);
         Set<UUID> recipients = ChatHistory.remove(messageId,
                 remover.getUniqueID());
         boolean fromDiscord = false;
@@ -824,7 +829,8 @@ public final class LostTalesChatService {
         // which the webhook could not delete anyway: the removal is
         // in-game moderation only, and Discord's moderators keep theirs.
         if (!fromDiscord) {
-            LostTalesDiscordBridge.getInstance().relayDelete(messageId);
+            LostTalesDiscordBridge.getInstance().relayDelete(messageId,
+                    saidIn, saidToFaction);
         }
     }
 
@@ -845,7 +851,9 @@ public final class LostTalesChatService {
      * puts something in front of the readers, so a mute refuses one as
      * it refuses an edit. The bridge's own reaction on a Discord copy
      * stands for the players: it comes with the first of them and goes
-     * with the last.
+     * with the last. {@code emojiName} is a reaction key: a player may
+     * react with a foreign emoji only where the message already carries
+     * it, which {@link ChatReactions} decides.
      */
     public static void react(EntityPlayerMP player, long messageId,
                              String emojiName, boolean add) {
@@ -853,9 +861,8 @@ public final class LostTalesChatService {
                 || player.worldObj.isRemote) {
             return;
         }
-        ChatEmoji emoji = ChatEmoji.fromName(emojiName);
         ChatChannel channel = ChatHistory.channelOf(messageId);
-        if (emoji == null || channel == null) {
+        if (!ChatForeignEmoji.isReactionKey(emojiName) || channel == null) {
             return;
         }
         ChatMuteEntry mute = activeMute(player);
@@ -865,17 +872,17 @@ public final class LostTalesChatService {
         }
         ChatHistory.ReactionChange change = ChatHistory.react(messageId,
                 requesterFor(player), player.getUniqueID(),
-                reactorName(player, channel), emoji.getName(), add);
+                reactorName(player, channel), emojiName, add);
         if (change == null) {
             return;
         }
         tellReactions(messageId, change.readers);
         if (change.gameCountBefore == 0 && change.gameCountAfter > 0) {
             LostTalesDiscordBridge.getInstance().relayReaction(messageId,
-                    emoji, true);
+                    emojiName, true);
         } else if (change.gameCountBefore > 0 && change.gameCountAfter == 0) {
             LostTalesDiscordBridge.getInstance().relayReaction(messageId,
-                    emoji, false);
+                    emojiName, false);
         }
     }
 
@@ -883,18 +890,26 @@ public final class LostTalesChatService {
      * A Discord member's reaction to a message that crossed the bridge,
      * delivered on the server thread: kept under the sender id the
      * bridge signs that member with, and told to every reader. Nothing
-     * goes back to Discord — the reaction came from there.
+     * goes back to Discord — the reaction came from there. {@code emoji}
+     * is a reaction key, foreign for an emoji the registry lacks, or null
+     * for a custom emoji Discord sent without a name. {@code emojiId} is
+     * a custom emoji's id, empty for a Unicode one: a custom emoji is
+     * matched by it, whatever it is called now
+     * ({@link ChatHistory#reactFromDiscord}).
      */
     public static void reactFromDiscord(long messageId, String discordUserId,
-                                        String name, ChatEmoji emoji,
-                                        boolean add) {
-        if (emoji == null || discordUserId == null
+                                        String name, String emoji,
+                                        String emojiId, boolean add) {
+        boolean named = ChatForeignEmoji.isReactionKey(emoji);
+        boolean byId = ChatForeignEmoji.isCustomId(emojiId);
+        if (!(named || byId) || discordUserId == null
                 || discordUserId.length() == 0) {
             return;
         }
-        ChatHistory.ReactionChange change = ChatHistory.react(messageId, null,
+        ChatHistory.ReactionChange change = ChatHistory.reactFromDiscord(
+                messageId,
                 LostTalesChatMessagePacket.discordSenderId(discordUserId),
-                name, emoji.getName(), add);
+                name, named ? emoji : null, byId ? emojiId : "", add);
         if (change != null) {
             tellReactions(messageId, change.readers);
         }
@@ -902,12 +917,14 @@ public final class LostTalesChatService {
 
     /**
      * Discord took every member's reaction off a message that crossed
-     * the bridge — with one emoji, or with all when {@code emoji} is
-     * null. The players' own reactions stay.
+     * the bridge — with one emoji, or with all when {@code emoji} is null
+     * and {@code emojiId} empty. A custom emoji is cleared by its id from
+     * every key it is kept under. The players' own reactions stay.
      */
-    public static void clearDiscordReactions(long messageId, ChatEmoji emoji) {
+    public static void clearDiscordReactions(long messageId, String emoji,
+                                             String emojiId) {
         Set<UUID> readers = ChatHistory.clearDiscordReactions(messageId,
-                emoji == null ? null : emoji.getName());
+                emoji, emojiId);
         if (readers != null) {
             tellReactions(messageId, readers);
         }

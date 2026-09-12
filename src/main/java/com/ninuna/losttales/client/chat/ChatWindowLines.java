@@ -43,7 +43,10 @@ import net.minecraft.util.IChatComponent;
  * any messenger; a row of nothing, with no message behind it, that
  * neither the pointer nor the clipboard nor a scroll hold answers to.
  * Two system lines side by side — command output, a run of notices —
- * are not groups and are not spaced.</p>
+ * are not groups and are not spaced. A window's rule over each day's
+ * first message is a chat element like a run: it ends the run it lands
+ * in and stands between two blank rows of its own, which take the place
+ * of the blank row between the runs either side of it.</p>
  *
  * <p>The feed shows the channel prefix on every line; the open screen
  * hides it — the tabs already name the channel — so a window gives that
@@ -60,10 +63,11 @@ import net.minecraft.util.IChatComponent;
  */
 final class ChatWindowLines {
     /**
-     * The one component every blank row between runs is made of: it
-     * draws nothing, measures nothing, carries no marker, and is the
-     * same instance on every spacer so a row is known for one by
-     * identity. A spacer line carries no chat line id.
+     * The one component every blank row is made of, between two runs
+     * and on either side of a day's rule: it draws nothing, measures
+     * nothing, carries no marker, and is the same instance on every
+     * spacer so a row is known for one by identity. A spacer line
+     * carries no chat line id.
      */
     static final IChatComponent SPACER = new ChatComponentText("");
     /** Vanilla's unwrapped history, newest first. */
@@ -142,10 +146,42 @@ final class ChatWindowLines {
     }
 
     /**
+     * The index of the day's rule standing over the row at
+     * {@code index}, past the blank row laid between them, or -1 when
+     * none does. What tells the unread divider that a day's rule already
+     * stands where it would.
+     */
+    static int dateDividerOver(List<ChatLine> lines, int index) {
+        if (lines == null || index < 0) {
+            return -1;
+        }
+        int above = index + 1;
+        if (above < lines.size() && isSpacer(lines.get(above))) {
+            above++;
+        }
+        return above < lines.size() && isDateDivider(lines.get(above))
+                ? above : -1;
+    }
+
+    /**
+     * Which of a view's messages (newest first) open a run because a
+     * day's rule stands over them: the rule ends whatever run was going,
+     * as Discord's does, so a day's first message always wears its
+     * header. Nothing is marked without rules.
+     */
+    static boolean[] runsOpenedByDays(String[] days) {
+        boolean[] opens = new boolean[days == null ? 0 : days.length];
+        for (int index = 0; index < opens.length; index++) {
+            opens[index] = days[index] != null;
+        }
+        return opens;
+    }
+
+    /**
      * How many messages stand on the rows from the newest down to
      * {@code lastIndex} inclusive: a message's wrapped rows share its
      * id and count once, and filler rows count for nothing. What the
-     * unread divider counts above itself.
+     * unread divider counts below itself.
      */
     static int messagesThrough(List<ChatLine> lines, int lastIndex) {
         if (lines == null || lastIndex < 0) {
@@ -253,6 +289,67 @@ final class ChatWindowLines {
                             || ChatGroupRuns.of(lineIdsNewestFirst[index + 1]) != null);
         }
         return spacers;
+    }
+
+    /**
+     * A view's rows from its messages' layouts, newest first, with the
+     * filler rows between them. A day's rule stands over its day's first
+     * message ({@code days}, as {@link #dayDividersAfter} gives them)
+     * with a blank row on each side where a line stands, so a run, a
+     * gap, the rule, a gap and the next run read apart the way two runs
+     * do; those two blank rows take the place of the one between the
+     * runs, never adding to it, and the oldest rule has nothing above
+     * it. Elsewhere a blank row stands where {@code spacers} asks for
+     * one.
+     */
+    static List<ChatLine> assemble(List<Piece> pieces, String[] days,
+                                   boolean[] spacers, boolean fading) {
+        List<ChatLine> result = new ArrayList<ChatLine>(pieces.size() * 2);
+        for (int index = 0; index < pieces.size(); index++) {
+            Piece piece = pieces.get(index);
+            Piece older = index + 1 < pieces.size()
+                    ? pieces.get(index + 1) : null;
+            result.addAll(piece.lines);
+            if (days != null && index < days.length && days[index] != null) {
+                // The rule and the gap under it are on the day's first
+                // message's clock; the gap above it follows the blank
+                // row's own clock.
+                result.add(new ChatLine(piece.updatedCounter, SPACER, 0));
+                result.add(new ChatLine(piece.updatedCounter,
+                        dateDivider(days[index]), 0));
+                if (older != null) {
+                    result.add(new ChatLine(spacerClock(fading,
+                            piece.updatedCounter, older.updatedCounter),
+                            SPACER, 0));
+                }
+                continue;
+            }
+            // The blank row between this run and the older one above it
+            // stands only while both have something on screen: a
+            // neighbour that draws no glyph leaves no gap to mark, and in
+            // the feed the row goes on the older run's clock, since that
+            // run is the first to fade.
+            if (spacers != null && index < spacers.length && spacers[index]
+                    && older != null && drawsSomething(piece)
+                    && drawsSomething(older)) {
+                result.add(new ChatLine(spacerClock(fading,
+                        piece.updatedCounter, older.updatedCounter),
+                        SPACER, 0));
+            }
+        }
+        return result;
+    }
+
+    /** Whether the message has at least one row with text on it. */
+    private static boolean drawsSomething(Piece piece) {
+        for (ChatLine line : piece.lines) {
+            IChatComponent component = line.func_151461_a();
+            if (component != null
+                    && component.getUnformattedText().trim().length() > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -605,14 +702,15 @@ final class ChatWindowLines {
             for (int index = 0; index < visible.size(); index++) {
                 lineIds[index] = visible.get(index).getChatLineID();
             }
+            // A window stands a dated rule over each day's first
+            // message, and the rule ends the run it lands in; the feed,
+            // which shows the last few seconds, has no rules.
+            String[] days = this.fading ? null : dayDividersAfter(lineIds);
             boolean[] grouped = this.fading
                     ? ChatGroupRuns.continuationsInFeed(lineIds)
-                    : ChatGroupRuns.continuationsOf(lineIds);
+                    : ChatGroupRuns.continuationsOf(lineIds,
+                            runsOpenedByDays(days));
             boolean[] spacers = spacersAfter(lineIds, grouped);
-            // A window stands a dated rule over each day's first
-            // message; the feed, which shows the last few seconds, does
-            // not.
-            String[] days = this.fading ? null : dayDividersAfter(lineIds);
             Map<ChatLine, Piece> kept = new IdentityHashMap<ChatLine, Piece>(
                     this.wrapped.size() + 1);
             // A fading view fades a run as one, so every line of a run
@@ -639,47 +737,9 @@ final class ChatWindowLines {
                 kept.put(message, piece);
                 pieces.add(piece);
             }
-            List<ChatLine> result =
-                    new ArrayList<ChatLine>(messages.size());
-            for (int index = 0; index < pieces.size(); index++) {
-                Piece piece = pieces.get(index);
-                result.addAll(piece.lines);
-                // A day's rule stands directly over its first message,
-                // on that message's clock, and marks the gap above it by
-                // itself: no blank row is laid beside it.
-                if (days != null && days[index] != null) {
-                    result.add(new ChatLine(piece.updatedCounter,
-                            dateDivider(days[index]), 0));
-                    continue;
-                }
-                // The blank row between this run and the older one
-                // above it stands only while both have something on
-                // screen: a neighbour that draws no glyph leaves no gap
-                // to mark, and in the feed the row goes on the older
-                // run's clock, since that run is the first to fade.
-                if (spacers[index] && index + 1 < pieces.size()
-                        && drawsSomething(piece)
-                        && drawsSomething(pieces.get(index + 1))) {
-                    result.add(new ChatLine(spacerClock(this.fading,
-                            piece.updatedCounter,
-                            pieces.get(index + 1).updatedCounter),
-                            SPACER, 0));
-                }
-            }
             this.wrapped = kept;
-            this.lines = Collections.unmodifiableList(result);
-        }
-
-        /** Whether the message has at least one row with text on it. */
-        private static boolean drawsSomething(Piece piece) {
-            for (ChatLine line : piece.lines) {
-                IChatComponent component = line.func_151461_a();
-                if (component != null
-                        && component.getUnformattedText().trim().length() > 0) {
-                    return true;
-                }
-            }
-            return false;
+            this.lines = Collections.unmodifiableList(
+                    assemble(pieces, days, spacers, this.fading));
         }
 
         /**
@@ -706,7 +766,7 @@ final class ChatWindowLines {
      * arrival tick they are drawn with — a fading view's whole run
      * shares the newest one, so the run fades out together.
      */
-    private static final class Piece {
+    static final class Piece {
         final boolean grouped;
         final int updatedCounter;
         private final List<IChatComponent> wrappedLines;

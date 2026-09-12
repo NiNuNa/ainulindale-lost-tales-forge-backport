@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.ChatComponentText;
@@ -19,6 +20,10 @@ import net.minecraft.util.IChatComponent;
  * so drawing, wrapping and hit testing all advance by exactly the same
  * pixels: the padding, the emoji at its native size, a gap, the count,
  * and the padding again.</p>
+ *
+ * <p>The emoji is a reaction key and comes last in the marker, since a
+ * custom emoji's foreign key holds a colon. An emoji the registry lacks
+ * takes the emoji's cell all the same, with a question mark in it.</p>
  */
 final class ChatReactionMarker {
     private static final String PREFIX = "losttales-chat-reaction:";
@@ -26,6 +31,11 @@ final class ChatReactionMarker {
     static final int PAD = 3;
     /** The emoji, drawn one texel to one pixel. */
     static final int ICON = (int)ChatInlineIcons.CONTENT_SIZE;
+    /**
+     * The chip's height: the emoji with one pixel of edge above and below
+     * it. A message row is as tall, so a chip fills its row.
+     */
+    static final int HEIGHT = ICON + 2;
     /** Between the emoji and the count. */
     static final int GAP = 2;
     /** After the count: the font's own trailing column and one more. */
@@ -39,13 +49,18 @@ final class ChatReactionMarker {
 
     static ChatComponentText create(ChatEmoji emoji, int count, boolean mine,
                                     long messageId, int countWidth) {
+        return create(emoji.getName(), count, mine, messageId, countWidth);
+    }
+
+    /** A chip for the emoji with reaction key {@code emoji}. */
+    static ChatComponentText create(String emoji, int count, boolean mine,
+                                    long messageId, int countWidth) {
         int width = PAD + ICON + GAP + Math.max(0, countWidth) + TRAIL;
         ChatComponentText marker = new ChatComponentText("");
         ChatStyle style = marker.getChatStyle().setChatClickEvent(
                 new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
-                        PREFIX + emoji.getName() + ':' + count + ':'
-                                + (mine ? '1' : '0') + ':' + messageId
-                                + ':' + width));
+                        PREFIX + count + ':' + (mine ? '1' : '0') + ':'
+                                + messageId + ':' + width + ':' + emoji));
         marker.setChatStyle(style);
         return marker;
     }
@@ -68,23 +83,19 @@ final class ChatReactionMarker {
                 || value == null || !value.startsWith(PREFIX)) {
             return null;
         }
-        String[] fields = value.substring(PREFIX.length()).split(":", -1);
-        if (fields.length != 5) {
-            return null;
-        }
-        ChatEmoji emoji = ChatEmoji.fromName(fields[0]);
-        if (emoji == null) {
+        String[] fields = value.substring(PREFIX.length()).split(":", 5);
+        if (fields.length != 5 || !ChatForeignEmoji.isReactionKey(fields[4])) {
             return null;
         }
         try {
-            int count = Integer.parseInt(fields[1]);
-            long messageId = Long.parseLong(fields[3]);
-            int width = Integer.parseInt(fields[4]);
+            int count = Integer.parseInt(fields[0]);
+            long messageId = Long.parseLong(fields[2]);
+            int width = Integer.parseInt(fields[3]);
             if (count < 1 || width < 0 || !ChatMessageIds.isServerId(messageId)) {
                 return null;
             }
-            return new Data(emoji, count, "1".equals(fields[2]), messageId,
-                    width);
+            return new Data(fields[4], count, "1".equals(fields[1]),
+                    messageId, width);
         } catch (NumberFormatException ignored) {
             return null;
         }
@@ -127,6 +138,9 @@ final class ChatReactionMarker {
     }
 
     static final class Data {
+        /** The emoji's reaction key, what the server is asked by. */
+        final String key;
+        /** The registry emoji drawn; null for a foreign one. */
         final ChatEmoji emoji;
         final int count;
         /** Whether the reader is one of those who reacted. */
@@ -134,9 +148,10 @@ final class ChatReactionMarker {
         final long messageId;
         final int width;
 
-        private Data(ChatEmoji emoji, int count, boolean mine, long messageId,
+        private Data(String key, int count, boolean mine, long messageId,
                      int width) {
-            this.emoji = emoji;
+            this.key = key;
+            this.emoji = ChatEmoji.fromName(key);
             this.count = count;
             this.mine = mine;
             this.messageId = messageId;
@@ -145,6 +160,11 @@ final class ChatReactionMarker {
 
         String countText() {
             return Integer.toString(this.count);
+        }
+
+        /** The emoji's name as a card shows it, {@code :name:}. */
+        String label() {
+            return ChatForeignEmoji.label(this.key);
         }
     }
 }

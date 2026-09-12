@@ -8,9 +8,10 @@ import java.util.List;
 /**
  * The wire layout of a {@link ChatReactionSummary}, shared by the line
  * it rides on and the update that replaces it: a count of emoji, then
- * for each its canonical name, how many reacted, whether the reader is
- * one of them, and the names shown. Every part is bounded; a summary
- * that breaks a bound does not decode.
+ * for each its reaction key (a registry name or a foreign key, at most
+ * {@link ChatReactionSummary#MAX_EMOJI_BYTES}), how many reacted,
+ * whether the reader is one of them, and the names shown. Every part is
+ * bounded; a summary that breaks a bound does not decode.
  */
 final class LostTalesChatReactionCodec {
     /** The most a summary takes on the wire. */

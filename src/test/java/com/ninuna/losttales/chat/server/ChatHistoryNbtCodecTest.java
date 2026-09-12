@@ -223,7 +223,8 @@ public final class ChatHistoryNbtCodecTest {
         NBTTagList entries = written.getTagList("Entries",
                 Constants.NBT.TAG_COMPOUND);
         assertEquals(1, entries.getCompoundTagAt(0).getInteger("DataVersion"));
-        assertEquals(ChatHistoryNbtCodec.CURRENT_ENTRY_DATA_VERSION,
+        assertEquals("the registry's emoji alone keep the second layout",
+                ChatHistoryNbtCodec.REACTED_ENTRY_DATA_VERSION,
                 entries.getCompoundTagAt(1).getInteger("DataVersion"));
 
         ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
@@ -255,6 +256,118 @@ public final class ChatHistoryNbtCodecTest {
         ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
         assertTrue(result.getEntries().isEmpty());
         assertEquals(1, result.getQuarantineEntriesCopy().size());
+    }
+
+    @Test
+    public void aForeignEmojiRoundTripsUnderTheNewestLayout() {
+        long reacted = ChatMessageIdAllocator.next();
+        ChatHistory.record(reacted, ALICE, "Aldric", null,
+                line(reacted, ChatChannel.OOC, ALICE, "well met", ""),
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        String parrot = "partyparrot:556";
+        String unicorn = "🦄";
+        UUID member = LostTalesChatMessagePacket.discordSenderId("42");
+        ChatHistory.react(reacted, null, member, "Nils", parrot, true);
+        ChatHistory.react(reacted, new ChatHistory.Requester(BOB, "", 0L,
+                null, EVERY_CHANNEL), BOB, "Beren", parrot, true);
+        ChatHistory.react(reacted, null, member, "Nils", unicorn, true);
+        // The member takes their parrot back: Bob holds it alone.
+        ChatHistory.react(reacted, null, member, "", parrot, false);
+
+        NBTTagCompound written = new NBTTagCompound();
+        ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
+                Collections.<NBTTagCompound>emptyList());
+        assertEquals(ChatHistoryNbtCodec.FOREIGN_ENTRY_DATA_VERSION,
+                written.getTagList("Entries", Constants.NBT.TAG_COMPOUND)
+                        .getCompoundTagAt(0).getInteger("DataVersion"));
+        assertTrue("a build that knew only the second layout reads it as newer",
+                ChatHistoryNbtCodec.FOREIGN_ENTRY_DATA_VERSION
+                        > ChatHistoryNbtCodec.REACTED_ENTRY_DATA_VERSION);
+
+        ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
+        assertFalse(result.isReadOnly());
+        assertTrue(result.getQuarantineEntriesCopy().isEmpty());
+        ChatHistory.clear();
+        ChatHistory.restore(result.getEntries());
+        assertEquals(1, ChatHistory.reactionsFor(reacted, BOB).find(parrot).count);
+        assertTrue(ChatHistory.reactionsFor(reacted, BOB).find(parrot).mine);
+        assertEquals("Nils",
+                ChatHistory.reactionsFor(reacted, BOB).find(unicorn).names.get(0));
+    }
+
+    /**
+     * A foreign key the registry has come to carry since the entry was
+     * saved is read back under the registry's name, merged with the
+     * reactions already there, and the read marks the save to be written
+     * again, in the layout its reactions need now.
+     */
+    @Test
+    public void aSavedForeignEmojiTheRegistryNowCarriesIsReadUnderItsName() {
+        long reacted = ChatMessageIdAllocator.next();
+        ChatHistory.record(reacted, ALICE, "Aldric", null,
+                line(reacted, ChatChannel.OOC, ALICE, "well met", ""),
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        UUID member = LostTalesChatMessagePacket.discordSenderId("42");
+        ChatHistory.react(reacted, null, member, "Nils", "partyparrot:556",
+                true);
+        ChatHistory.react(reacted, new ChatHistory.Requester(BOB, "", 0L,
+                null, EVERY_CHANNEL), BOB, "Beren", "grinning", true);
+        NBTTagCompound written = new NBTTagCompound();
+        ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
+                Collections.<NBTTagCompound>emptyList());
+        NBTTagCompound entry = written.getTagList("Entries",
+                Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0);
+        assertEquals(ChatHistoryNbtCodec.FOREIGN_ENTRY_DATA_VERSION,
+                entry.getInteger("DataVersion"));
+        // As a build whose registry lacked the grin would have written the
+        // member's reaction: by its Unicode.
+        entry.getTagList("Reactions", Constants.NBT.TAG_COMPOUND)
+                .getCompoundTagAt(0).setString("Emoji", "😀");
+
+        ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
+        assertFalse(result.isReadOnly());
+        assertTrue(result.getQuarantineEntriesCopy().isEmpty());
+        assertTrue("written again under the registry's name",
+                result.wasRepaired());
+        ChatHistory.clear();
+        ChatHistory.restore(result.getEntries());
+        assertEquals(1, ChatHistory.reactionsFor(reacted, BOB)
+                .getReactions().size());
+        assertEquals(2, ChatHistory.reactionsFor(reacted, BOB)
+                .find("grinning").count);
+        assertTrue(ChatHistory.reactionsFor(reacted, BOB)
+                .find("grinning").mine);
+
+        NBTTagCompound again = new NBTTagCompound();
+        ChatHistoryNbtCodec.write(again, ChatHistory.snapshot(),
+                Collections.<NBTTagCompound>emptyList());
+        assertEquals("the registry's emoji alone keep the second layout",
+                ChatHistoryNbtCodec.REACTED_ENTRY_DATA_VERSION,
+                again.getTagList("Entries", Constants.NBT.TAG_COMPOUND)
+                        .getCompoundTagAt(0).getInteger("DataVersion"));
+    }
+
+    @Test
+    public void aForeignEmojiInAnOlderLayoutIsQuarantined() {
+        long reacted = ChatMessageIdAllocator.next();
+        ChatHistory.record(reacted, ALICE, "Aldric", null,
+                line(reacted, ChatChannel.ALL, ALICE, "well met", ""),
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        ChatHistory.react(reacted, new ChatHistory.Requester(BOB, "", 0L,
+                null, EVERY_CHANNEL), BOB, "Beren", "smile", true);
+        NBTTagCompound written = new NBTTagCompound();
+        ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
+                Collections.<NBTTagCompound>emptyList());
+        NBTTagCompound entry = written.getTagList("Entries",
+                Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0);
+        assertEquals(ChatHistoryNbtCodec.REACTED_ENTRY_DATA_VERSION,
+                entry.getInteger("DataVersion"));
+        entry.getTagList("Reactions", Constants.NBT.TAG_COMPOUND)
+                .getCompoundTagAt(0).setString("Emoji", "partyparrot:556");
+        ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
+        assertTrue(result.getEntries().isEmpty());
+        assertEquals("invalid_reactions",
+                result.getQuarantineEntriesCopy().get(0).getString("Reason"));
     }
 
     private static LostTalesChatMessagePacket line(long id, ChatChannel channel,

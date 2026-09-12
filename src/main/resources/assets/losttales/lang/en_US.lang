@@ -823,7 +823,6 @@ gui.losttales.chat.character_selection.characters=Characters
 gui.losttales.chat.character_selection.lore=Lore Characters
 chat.losttales.appearance.unavailable=That appearance is not available any more.
 gui.losttales.chat.whisper.name_required=Whisper to whom? /msg <player> <message>
-gui.losttales.hud.placement.locked=%s (locked)
 gui.losttales.hud.placement.chat_feed=Chat Feed
 chat.losttales.title.epithet=%s %s
 chat.losttales.tag.team=[Lost Tales Team]

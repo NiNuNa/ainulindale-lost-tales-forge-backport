@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -23,6 +24,8 @@ import java.util.Map;
 public final class DiscordJson {
     /** Messages read at a time; Discord allows up to a hundred. */
     public static final int PAGE_SIZE = 50;
+    /** Discord's error code for an emoji it does not know or the bot may not use. */
+    public static final int ERROR_UNKNOWN_EMOJI = 10014;
 
     private DiscordJson() {}
 
@@ -374,8 +377,8 @@ public final class DiscordJson {
          * The chat's emoji the reaction is: a Unicode emoji the registry
          * carries — trailing variation selectors aside, which Discord
          * adds to some and not others — or a custom emoji named as one
-         * of the registry's names; null for any other, which the chat
-         * cannot draw and does not show.
+         * of the registry's names; null for any other, which reaches the
+         * chat by its foreign key ({@link #reactionKey()}).
          */
         public ChatEmoji emoji() {
             if (this.emojiName.length() == 0) {
@@ -396,6 +399,24 @@ public final class DiscordJson {
                 end++;
             }
             return end == this.emojiName.length() ? match.emoji : null;
+        }
+
+        /**
+         * The reaction's key in the chat: the registry's name for an
+         * emoji it carries ({@link #emoji()}), else the foreign key of
+         * what Discord calls it — {@code name:id} for a custom emoji,
+         * the Unicode itself for any other. Null when Discord names it
+         * in no shape a key holds, such as a deleted custom emoji, which
+         * Discord sends without a name.
+         */
+        public String reactionKey() {
+            ChatEmoji known = emoji();
+            if (known != null) {
+                return known.getName();
+            }
+            return this.emojiId.length() > 0
+                    ? ChatForeignEmoji.customKey(this.emojiName, this.emojiId)
+                    : ChatForeignEmoji.unicodeKey(this.emojiName);
         }
     }
 
@@ -502,6 +523,23 @@ public final class DiscordJson {
         JsonObject body = new JsonObject();
         body.addProperty("topic", topic == null ? "" : topic);
         return body.toString();
+    }
+
+    /**
+     * The {@code code} of an error reply, such as
+     * {@link #ERROR_UNKNOWN_EMOJI}; 0 for anything that does not carry
+     * one.
+     */
+    public static int errorCode(String json) {
+        JsonObject object = parseObject(json);
+        JsonElement code = object == null ? null : object.get("code");
+        try {
+            return code != null && code.isJsonPrimitive()
+                    && code.getAsJsonPrimitive().isNumber()
+                    ? code.getAsInt() : 0;
+        } catch (RuntimeException exception) {
+            return 0;
+        }
     }
 
     /** {@code retry_after} of a rate-limit reply, in milliseconds; 0 if absent. */

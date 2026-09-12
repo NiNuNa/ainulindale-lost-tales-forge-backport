@@ -21,14 +21,15 @@ import java.util.Map;
  *
  * <p>Pure bookkeeping over parsed pages, owned by the worker that reads
  * them — one thread, no locks — and dying with it, exactly like the
- * poll cursor beside it. Bounded to the newest {@link #MAX_TRACKED}
- * relayed messages.</p>
+ * poll cursor beside it; the next worker starts again from the members'
+ * lines the bridge's links still hold ({@link #watch}). Bounded to the
+ * newest {@link #MAX_TRACKED} relayed messages.</p>
  */
 final class DiscordMessageSweep {
     /** Messages watched; past it the oldest is let go first. */
     private static final int MAX_TRACKED = 128;
 
-    /** Relayed message id to the edit stamp it was last seen with. */
+    /** Relayed message id to the edit stamp it was last seen with; null for one not seen yet. */
     private final LinkedHashMap<String, String> tracked =
             new LinkedHashMap<String, String>();
 
@@ -62,6 +63,27 @@ final class DiscordMessageSweep {
             return;
         }
         this.tracked.put(message.id, message.editedTimestamp);
+        trim();
+    }
+
+    /**
+     * Starts watching a message relayed before this watch began — by an
+     * earlier worker, or before the server restarted — whose edit stamp
+     * is not known. The first page that shows it only learns the stamp,
+     * so an edit made before then is not reported; a deletion is, like
+     * any other. A message already watched is left as it is.
+     */
+    void watch(String discordId) {
+        if (discordId == null || discordId.length() == 0
+                || this.tracked.containsKey(discordId)) {
+            return;
+        }
+        this.tracked.put(discordId, null);
+        trim();
+    }
+
+    /** Lets the oldest go past {@link #MAX_TRACKED}. */
+    private void trim() {
         while (this.tracked.size() > MAX_TRACKED) {
             Iterator<String> oldest = this.tracked.keySet().iterator();
             oldest.next();
@@ -96,7 +118,10 @@ final class DiscordMessageSweep {
         for (Map.Entry<String, String> entry : this.tracked.entrySet()) {
             DiscordJson.Message found = byId.get(entry.getKey());
             if (found != null) {
-                if (!found.editedTimestamp.equals(entry.getValue())) {
+                if (entry.getValue() == null) {
+                    // Watched without its stamp: this page supplies it.
+                    entry.setValue(found.editedTimestamp);
+                } else if (!found.editedTimestamp.equals(entry.getValue())) {
                     edited.add(found);
                     entry.setValue(found.editedTimestamp);
                 }

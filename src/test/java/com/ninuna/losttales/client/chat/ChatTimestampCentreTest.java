@@ -41,7 +41,7 @@ public final class ChatTimestampCentreTest {
         // it, none above, so the stamp moves down half a row.
         assertEquals(LINE / 2, LostTalesChatOverlayRenderer.messageCentreShift(
                 lines, 1, rows, -1));
-        // Three rows of words: down a whole row.
+        // Three rows of words: down a row and a half.
         List<ChatLine> longer = lines(new int[] {1, 1, 1, 1},
                 new boolean[] {false, false, false, false});
         assertEquals(LINE * 3 / 2, LostTalesChatOverlayRenderer.messageCentreShift(

@@ -485,7 +485,9 @@ final class LostTalesChatVisualStyle {
         // run of lit parts, in the colour the first of them is drawn
         // in, closed by the first part that is not lit and drawn once
         // its extent is known — so a name reads as one thing with its
-        // head, brackets and title, and a link as one line.
+        // head, brackets and title, and a link as one line. The rule
+        // stands on the row the descenders' shadow takes and is drawn in
+        // the content pass alone, with no shadow of its own.
         int ruleStart = -1;
         int ruleEnd = 0;
         int ruleColor = 0;
@@ -565,7 +567,7 @@ final class LostTalesChatVisualStyle {
                 if (ChatEmojiMarker.reservesFullSlot(text)) {
                     ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(), emoji,
                             ChatInlineIcons.boxLeft(cursor, width),
-                            ChatInlineIcons.boxTop(y, width),
+                            ChatInlineIcons.rowBoxTop(y, width),
                             ChatInlineIcons.contentSize(width), alpha,
                             shadowPass);
                 }
@@ -577,17 +579,20 @@ final class LostTalesChatVisualStyle {
                 }
             } else if (ChatReplyMarker.isIconSlot(part)) {
                 // The bubble a reply's quote opens with, in the quote's
-                // own tone, standing on the caps as the typing line's
-                // bubble does. A piece of the quote, it answers the
-                // quote's click, but the rule starts after it: a line
-                // under a bubble reads as a smudge.
+                // own tone, centred in the row as a box of its own, on
+                // the row the typing line's and a message link's bubble
+                // take. A piece of the quote, it answers the quote's
+                // click, but the rule starts after it: a line under a
+                // bubble reads as a smudge.
                 width = ChatReplyMarker.ICON_SLOT_WIDTH;
                 Integer quoteColor = ChatReplyMarker.colorOf(part);
                 ChatIconSheet bubble = ChatIconSheet.SPEECH_BUBBLE;
                 bubble.drawSilhouette(shadowPass ? SHADOW
                                 : !colours || quoteColor == null ? IVORY
                                         : quoteColor.intValue(),
-                        cursor, y + (7 - bubble.getHeight()) / 2, alpha);
+                        cursor, y + LostTalesChatOverlayRenderer
+                                .centredBoxTop(bubble.getHeight()),
+                        alpha);
             } else if (ChatChannelLinkMarker.isIconSlot(part)) {
                 // The bubble of a link to a message, in the link's own
                 // colour, centred in the slot its two spaces reserve. It
@@ -598,7 +603,7 @@ final class LostTalesChatVisualStyle {
                 Integer linkColor = ChatChannelLinkMarker.colorOf(part);
                 ChatInlineIcons.drawSheetSprite(ChatIconSheet.SPEECH_BUBBLE,
                         ChatInlineIcons.boxLeft(cursor, width),
-                        ChatInlineIcons.boxTop(y, width),
+                        ChatInlineIcons.rowBoxTop(y, width),
                         ChatInlineIcons.contentSize(width),
                         !colours || linkColor == null ? IVORY
                                 : linkColor.intValue(),
@@ -727,10 +732,10 @@ final class LostTalesChatVisualStyle {
                 }
             }
 
-            if (underlined && width > 0) {
+            if (underlined && width > 0 && !shadowPass) {
                 if (ruleStart < 0) {
                     ruleStart = cursor;
-                    ruleColor = shadowPass ? SHADOW : underlineColor;
+                    ruleColor = underlineColor;
                 }
                 ruleEnd = cursor + width;
                 // The last run's trailing spaces belong to the gap
@@ -754,11 +759,12 @@ final class LostTalesChatVisualStyle {
     }
 
     /**
-     * One reaction chip: a pill a pixel taller than the line's glyphs
-     * on either side, corners cut, holding the emoji at its native size
-     * and the count. A chip the reader is in wears the accent on its
+     * One reaction chip: a pill one pixel taller than the emoji on
+     * either side, centred in its row, corners cut, holding the emoji at
+     * its native size and the count. A chip the reader is in wears the accent on its
      * edge and its count; the hovered one takes the hover fill, the way
-     * every panel row in the palette does.
+     * every panel row in the palette does. An emoji the registry lacks
+     * is drawn as {@link #drawUnknownEmoji}.
      */
     private static void drawReactionChip(FontRenderer font,
                                          ChatReactionMarker.Data chip,
@@ -766,8 +772,9 @@ final class LostTalesChatVisualStyle {
                                          boolean hovered, boolean colours) {
         int left = x;
         int right = x + chip.width;
-        int top = y - 3;
-        int bottom = y + 9;
+        int top = y + LostTalesChatOverlayRenderer.centredBoxTop(
+                ChatReactionMarker.HEIGHT);
+        int bottom = top + ChatReactionMarker.HEIGHT;
         int accent = LostTalesColors.rgb(LostTalesColors.HONEY);
         int fill = argb(hovered ? LostTalesColors.rgb(LostTalesColors.PANEL_HOVER)
                 : SURFACE_RGB, Math.round(alpha * 0.9F));
@@ -779,21 +786,54 @@ final class LostTalesChatVisualStyle {
         Gui.drawRect(left, top + 1, left + 1, bottom - 1, edge);
         Gui.drawRect(right - 1, top + 1, right, bottom - 1, edge);
         beginContent();
-        ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(), chip.emoji,
-                left + ChatReactionMarker.PAD,
-                y + ChatInlineIcons.CONTENT_TOP_OFFSET,
-                ChatInlineIcons.CONTENT_SIZE, alpha);
+        if (chip.emoji != null) {
+            ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(), chip.emoji,
+                    left + ChatReactionMarker.PAD,
+                    y + LostTalesChatOverlayRenderer.centredBoxTop(
+                            ChatReactionMarker.ICON),
+                    ChatInlineIcons.CONTENT_SIZE, alpha);
+        } else {
+            drawUnknownEmoji(font, left + ChatReactionMarker.PAD, y, alpha);
+        }
         beginContent();
         drawColored(font, chip.countText(), left + ChatReactionMarker.PAD
                 + ChatReactionMarker.ICON + ChatReactionMarker.GAP, y,
                 chip.mine && colours ? accent : IVORY, alpha);
     }
 
+    /** The glyph that stands in for an emoji the game has no sprite for. */
+    private static final String UNKNOWN_EMOJI_GLYPH = "?";
+
     /**
-     * The row under a run's glyphs the font draws its own underline on:
-     * one above the row the shadow of the descenders reaches.
+     * An emoji the game has no sprite for, in the emoji's own cell: a
+     * tile the size of a sprite with its corners cut, and a question
+     * mark in ivory centred on it, whole pixels throughout. The tile
+     * keeps the chip's shape and makes the mark read as an icon.
      */
-    private static final int UNDERLINE_ROW = 8;
+    private static void drawUnknownEmoji(FontRenderer font, int x, int y,
+                                         int alpha) {
+        int size = ChatReactionMarker.ICON;
+        int top = y + LostTalesChatOverlayRenderer.centredBoxTop(size);
+        int tile = argb(LostTalesColors.rgb(LostTalesColors.PLUM_GRAY), alpha);
+        Gui.drawRect(x + 1, top, x + size - 1, top + size, tile);
+        Gui.drawRect(x, top + 1, x + 1, top + size - 1, tile);
+        Gui.drawRect(x + size - 1, top + 1, x + size, top + size - 1, tile);
+        if (font == null) {
+            return;
+        }
+        // The advance ends in the font's one-pixel gap; the ink is the rest.
+        int ink = Math.max(0, font.getStringWidth(UNKNOWN_EMOJI_GLYPH) - 1);
+        drawColored(font, UNKNOWN_EMOJI_GLYPH, x + (size - ink) / 2, y, IVORY,
+                alpha);
+    }
+
+    /**
+     * The row under a run's glyphs the font draws its own underline on,
+     * counted from the text's top: the row the descenders' shadow falls
+     * on, which in a message row leaves the row's last pixel clear below
+     * it.
+     */
+    static final int UNDERLINE_ROW = 8;
 
     /**
      * One rule from {@code start} to {@code end}, the last pixel left
@@ -884,7 +924,7 @@ final class LostTalesChatVisualStyle {
                                       int alpha, boolean shadowPass) {
         Minecraft minecraft = Minecraft.getMinecraft();
         float boxX = ChatInlineIcons.boxLeft(cursor, slotWidth);
-        float boxY = ChatInlineIcons.boxTop(y, slotWidth);
+        float boxY = ChatInlineIcons.rowBoxTop(y, slotWidth);
         float size = ChatInlineIcons.contentSize(slotWidth);
         if (share.kind == ChatShareKind.ITEM) {
             ItemStack stack = ClientChatShowcaseStore.getItem(share.showcaseId);

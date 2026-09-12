@@ -10,6 +10,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -114,6 +116,53 @@ public final class ChatWindowLayoutStoreTest {
             ChatWindowLayoutStore.initialize(folder, alex);
             assertNotNull(ChatWindowLayout.window("w2"));
             assertFalse(ChatWindowLayoutStore.fileFor(folder, alex).isFile());
+        } finally {
+            ChatWindowLayoutStore.initialize(null);
+            deleteTree(folder);
+        }
+    }
+
+    /**
+     * Moving the feed before a server's channels are in force rewrites
+     * only the file's feed line: a window on one of that server's
+     * channels, which the layout could not place yet, stays in the file
+     * and comes back once the channels do, with the feed where it was
+     * moved to.
+     */
+    @Test
+    public void movingTheFeedEarlyKeepsAWindowOnAServersChannel()
+            throws IOException {
+        UUID steve = UUID.fromString("c6000000-0000-0000-0000-00000000006c");
+        File folder = File.createTempFile("losttales-layout", "");
+        assertTrue(folder.delete());
+        assertTrue(folder.mkdirs());
+        try {
+            File own = ChatWindowLayoutStore.fileFor(folder, steve);
+            String trading =
+                    "window w3 locked=false x=50.00 y=50.00 active=trade tabs=trade";
+            write(own, "window w1 locked=false x=0.00 y=0.00 active=all tabs=all\n"
+                    + trading + "\n"
+                    + "feed x=0.00 y=100.00\n");
+            ChatWindowLayoutStore.initialize(folder, steve);
+            ChatWindowLayout.setFeedPosition(25.0D, 75.0D, false);
+            ChatWindowLayoutStore.saveFeedPosition();
+
+            List<String> written = Files.readAllLines(own.toPath(),
+                    Charset.forName("UTF-8"));
+            assertTrue(written.toString(), written.contains(trading));
+            assertTrue(written.toString(), written.contains("feed x=25.00 y=75.00"));
+            assertFalse(written.toString(), written.contains("feed x=0.00 y=100.00"));
+
+            ChatChannel.installDefined(Collections.singletonList(
+                    new ChatChannelDescriptor("trade", "Trade",
+                            ChatPresentationMode.IN_CHARACTER,
+                            ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
+                            0xC9A227, false)), null);
+            ChatWindowLayoutStore.reloadForNewChannels();
+            assertTrue("the window is back with its channel",
+                    holdsTrade(ChatChannel.fromId("trade")));
+            assertEquals(25.0D, ChatWindowLayout.feedOffsetX(), 0.0D);
+            assertEquals(75.0D, ChatWindowLayout.feedOffsetY(), 0.0D);
         } finally {
             ChatWindowLayoutStore.initialize(null);
             deleteTree(folder);

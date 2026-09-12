@@ -61,26 +61,64 @@ final class LostTalesChatOverlayRenderer {
     private static final int UNREAD_DIVIDER_RGB =
             LostTalesColors.rgb(LostTalesColors.CRIMSON);
     /**
-     * Vertical distance between chat lines. Vanilla uses the 9px font
-     * height, which cannot contain a 10px emoji sprite; an 11px stride
-     * gives the sprite room. Bands are contiguous — each line's backdrop
-     * fills the full stride.
+     * Vertical distance between chat lines: the 10px emoji sprite, which
+     * vanilla's 9px stride cannot contain, and a clear row above and
+     * below it. Bands are contiguous — each line's backdrop fills the
+     * full stride.
      */
-    static final int LINE_HEIGHT = 11;
+    static final int LINE_HEIGHT = 12;
+    /** Height of the font's capitals, the part of a glyph a row centres. */
+    static final int GLYPH_CAP_HEIGHT = 7;
+    /** Height of the content box every inline emoji, item and marker fills. */
+    static final int CONTENT_BOX_HEIGHT = (int)ChatInlineIcons.CONTENT_SIZE;
+    /** Height of a head's face, drawn one texel to one pixel. */
+    static final int HEAD_SIZE = 8;
     /**
-     * Text baseline offset inside a band. Two rows sit above the glyph
-     * caps and two below them, so the 7px cap height is centred in the
-     * 11px band; heads (8px at -0.5) land exactly centred as well.
+     * Where a row's text's top edge stands below the row's top edge.
+     *
+     * <p>Everything in a message row is placed by one rule: an element
+     * {@code h} pixels tall is centred in the row on whole pixels,
+     * {@code (LINE_HEIGHT - h) / 2} rows below the row's top, the
+     * division rounding down, so an element that cannot be centred
+     * exactly puts its odd pixel below itself, never above. The text is
+     * centred by its capitals: in a twelve-pixel row they have two clear
+     * rows above them and three below, the descender and its shadow
+     * taking the first two of those three. Boxes are placed against the
+     * text through {@link #centredBoxTop}, so the row, not the text,
+     * decides where each lands.</p>
      */
-    static final int TEXT_OFFSET = 9;
+    static final int ROW_TEXT_TOP = (LINE_HEIGHT - GLYPH_CAP_HEIGHT) / 2;
     /**
-     * Where a head sits against the text it stands beside: a pixel above
-     * the glyph box, which reads level once the glyphs' own bearing is
-     * accounted for. Whole pixels either way — a head is pixel art at
-     * one texel to one pixel, and half a pixel of centring costs more
-     * than it buys.
+     * How far above a row's bottom edge its text's top edge stands.
+     * Everything drawn against the text — heads, emoji, items, reaction
+     * chips, timestamps — is placed from there.
      */
-    private static final float HEAD_TOP_OFFSET = -1.0F;
+    static final int TEXT_OFFSET = LINE_HEIGHT - ROW_TEXT_TOP;
+    /**
+     * Where a divider's one-pixel rule stands below its row's top edge:
+     * on the middle row of the capitals a message's text would have in
+     * the row, so the date written on the rule is centred on it exactly.
+     * In an even row that is half a pixel above the row's middle, as the
+     * capitals are, with the odd clear row below the rule.
+     */
+    static final int DIVIDER_RULE_OFFSET = ROW_TEXT_TOP + GLYPH_CAP_HEIGHT / 2;
+    /**
+     * Where a head sits against the text it stands beside: centred in the
+     * row by the row's rule ({@link #ROW_TEXT_TOP}), on whole pixels — a
+     * head is pixel art at one texel to one pixel.
+     */
+    static final float HEAD_TOP_OFFSET = (LINE_HEIGHT - HEAD_SIZE) / 2
+            - ROW_TEXT_TOP;
+
+    /**
+     * Where a box {@code height} pixels tall starts against the text's top
+     * edge when it is centred in a message row by the row's rule
+     * ({@link #ROW_TEXT_TOP}): {@code (LINE_HEIGHT - height) / 2} rows
+     * below the row's top, less the rows the text stands below it.
+     */
+    static int centredBoxTop(int height) {
+        return (LINE_HEIGHT - height) / 2 - ROW_TEXT_TOP;
+    }
     /**
      * Where the face sits inside the slot the head marker reserves: one
      * pixel in, so it has two clear either side — the glyph before it
@@ -293,12 +331,11 @@ final class LostTalesChatOverlayRenderer {
             return;
         }
         // The scroll range is taken from the rows the window will draw,
-        // the unread divider's own row included: a synthetic row that
-        // counted toward the drawn height but not toward the reachable
-        // one left the oldest message stranded above the ceiling. The
-        // rows are laid out here, before the box is measured: a window
-        // following the game's chat height is as tall as its stack, and
-        // the stack's blank rows are half a line.
+        // the unread divider's own row included, so the oldest message
+        // can always be scrolled to. The rows are laid out here, before
+        // the box is measured: a window following the game's chat height
+        // is as tall as its stack, and the stack's blank rows are
+        // shorter than a line.
         frame.resolveDividerRow(lines, view == null ? null
                 : ClientChatChannelViews.unreadDividerLine(view));
         frame.resolveRows();
@@ -646,7 +683,10 @@ final class LostTalesChatOverlayRenderer {
         return Math.round(2.0F + (unscaledWidth + 4) * scale);
     }
 
-    /** Lines that fit the user's configured chat pixel height at 11px. */
+    /**
+     * Lines that fit the user's configured chat pixel height at this
+     * chat's stride: vanilla counts that height in its own 9px lines.
+     */
     static int visibleLineCount(GuiNewChat chat) {
         return Math.max(1, chat.func_146232_i() * 9 / LINE_HEIGHT);
     }
@@ -772,13 +812,14 @@ final class LostTalesChatOverlayRenderer {
         // divider is rather than accumulated as the loop passes it, so
         // the stack lands in the same place whichever end of the
         // history the draw starts from. Rows are not all one height —
-        // the blank row between two runs is half a line — so every
+        // the blank row between two runs is ChatStackRows.SPACER_HEIGHT
+        // — so every
         // distance up the stack is read from the frame's row geometry,
         // which is what the scroll ceiling and the scrollbar read too:
         // the three are one geometry.
         int dividerIndex = open ? frame.dividerLineIndex : -1;
-        // A day's rule standing directly over the first unread message
-        // carries the divider instead of a row being added for it.
+        // A day's rule standing over the first unread message carries
+        // the divider instead of a row being added for it.
         int dividerDateIndex = open ? frame.dividerDateLineIndex : -1;
         int dividerRows = dividerIndex >= 0 ? 1 : 0;
         int totalRowCount = totalLineCount + dividerRows;
@@ -950,10 +991,12 @@ final class LostTalesChatOverlayRenderer {
                 clipped = open && beginVerticalClip(minecraft, clipTop,
                         clipBottom, true);
 
-                // A scrolled view starts one row earlier: the row the
-                // first turn of scroll slid into the trailing strip,
-                // clipped where the strip's reveal ends.
-                int firstRow = Math.max(0, scrollPosition - 1);
+                // A scrolled view starts below the baseline: every row
+                // whose top the scroll slid into the trailing strip,
+                // clipped where the strip's reveal ends. A blank row in
+                // the strip leaves room for part of the row under it.
+                int firstRow = rows.firstRowShown(scrollRow, offset,
+                        (clipBottom - restingY) / scale);
                 int firstLine = Math.max(0,
                         lineOfRow(firstRow, dividerIndex));
                 String dividerLabel = unreadDividerLabel(frame, lines,
@@ -1140,7 +1183,7 @@ final class LostTalesChatOverlayRenderer {
                         // The loop walks upward, so the last hovered row
                         // it draws is the message's topmost: where the
                         // toolbar stands, once the stack is done.
-                        hoveredTop = y - rowHeight;
+                        hoveredTop = toolbarTop(y, rowHeight);
                         hoveredLineId = line.getChatLineID();
                     }
                     GL11.glPopMatrix();
@@ -1148,16 +1191,15 @@ final class LostTalesChatOverlayRenderer {
                         // The unread divider's own row, directly above
                         // the first unread message: it rides the stack
                         // but not the line's entry slide, like the
-                        // timestamps. A blank row between runs standing
-                        // above the divider's row widens the gap on that
-                        // side; the rule is lifted by half of it so it
-                        // stays centred between the two groups.
-                        float lift = lineIndex + 1 < lines.size()
-                                && ChatWindowLines.isSpacer(
-                                        lines.get(lineIndex + 1))
-                                ? ChatStackRows.SPACER_HEIGHT / 2.0F : 0.0F;
+                        // timestamps. The row holds the divider's line
+                        // with the gap between runs on either side, so the
+                        // rule stands as far from each group as two
+                        // groups stand apart; the rows say where that
+                        // line is.
+                        int dividerBottom = -(rows.dividerLineBottom()
+                                - Math.round(stackBase));
                         drawDividerRow(font, columns, panelLeft,
-                                panelRight, y - rowHeight - LINE_HEIGHT - lift,
+                                panelRight, dividerBottom - LINE_HEIGHT,
                                 dividerLabel, UNREAD_DIVIDER_RGB, alpha);
                     }
                     // The line's timestamp lives in the column at the
@@ -1222,7 +1264,8 @@ final class LostTalesChatOverlayRenderer {
                 // history short enough to leave room is drawn whole, so
                 // the divider's row is among them.
                 frame.setStackTop(restingY + stackOffset
-                        - (eligibleHeight + dividerRows * LINE_HEIGHT)
+                        - (eligibleHeight + (dividerIndex >= 0
+                                ? rows.height(dividerIndex + 1) : 0))
                                 * scale);
             }
 
@@ -1249,10 +1292,19 @@ final class LostTalesChatOverlayRenderer {
             frame.toolbarKinds = new int[0];
             frame.toolbarChatLineId = 0;
             if (open && hoveredLineId != 0) {
-                drawMessageToolbar(frame, hoveredLineId, panelRight,
-                        hoveredTop, Math.round(255.0F * opacity
-                                * opening.getOpacity()),
-                        originX, originY + stackOffset, scale);
+                // Slid with the stack, as the row it belongs to is: the
+                // pixels and the rectangle recorded for the click both
+                // stand at the row's own place.
+                GL11.glPushMatrix();
+                try {
+                    GL11.glTranslatef(0.0F, offset, 0.0F);
+                    drawMessageToolbar(frame, hoveredLineId, panelRight,
+                            hoveredTop, Math.round(255.0F * opacity
+                                    * opening.getOpacity()),
+                            originX, originY + stackOffset, scale);
+                } finally {
+                    GL11.glPopMatrix();
+                }
             }
             if (open) {
                 if (columns.enabled) {
@@ -1390,6 +1442,17 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
+     * Where the hovered message's toolbar stands, given the bottom edge
+     * and height of the message's topmost row: centred on the row by the
+     * row's rule ({@link #ROW_TEXT_TOP}), whatever that row's height. A
+     * message row as tall as a button is filled by the toolbar exactly.
+     */
+    static int toolbarTop(int rowBottom, int rowHeight) {
+        return rowBottom - rowHeight
+                + (rowHeight - TOOLBAR_BUTTON_SIZE) / 2;
+    }
+
+    /**
      * Rounds a GUI-space distance to a whole number of display pixels,
      * so pixel art moved by it lands on its own texels. Falls back to
      * whole GUI pixels when the display cannot be measured.
@@ -1496,7 +1559,7 @@ final class LostTalesChatOverlayRenderer {
      * top edge in the caller's stack space.
      */
     /**
-     * What the unread divider says: how many messages stand above it,
+     * What the unread divider says: how many messages stand below it,
      * and the day its run began when that was not today. Messages from
      * an earlier day are dated; today's are simply counted. Empty
      * without a divider.
@@ -1509,7 +1572,8 @@ final class LostTalesChatOverlayRenderer {
             return "";
         }
         // The divider's own row stands directly above the first unread
-        // message's; a day's rule carrying it stands one further up.
+        // message's; a day's rule carrying it stands further up, past
+        // its gap, and the count passes over filler rows.
         int firstUnread = dividerIndex >= 0 ? dividerIndex
                 : dividerDateIndex - 1;
         int count = ChatWindowLines.messagesThrough(lines, firstUnread);
@@ -1545,7 +1609,9 @@ final class LostTalesChatOverlayRenderer {
         if (right <= left) {
             return;
         }
-        float ruleTop = top + 5.0F;
+        // The rule on the capitals' middle row, the date's capitals
+        // centred on it.
+        float ruleTop = top + DIVIDER_RULE_OFFSET;
         int textWidth = label.length() == 0 ? 0
                 : font.getStringWidth(label);
         if (textWidth > 0 && textWidth < right - left - 24.0F) {
@@ -1574,7 +1640,7 @@ final class LostTalesChatOverlayRenderer {
             fillRect(gapRight, ruleTop + 1.0F, gapRight + 1.0F,
                     ruleTop + 2.0F, cap);
             LostTalesChatVisualStyle.drawColored(font, label, textX,
-                    Math.round(top + 2.0F), rgb, alpha);
+                    Math.round(top + ROW_TEXT_TOP), rgb, alpha);
         } else {
             // No room for the date: the rule alone, strongest at the
             // centre exactly as the halves would meet.
@@ -1781,7 +1847,7 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /** Edge of one toolbar button's square. */
-    private static final int TOOLBAR_BUTTON_SIZE = 12;
+    static final int TOOLBAR_BUTTON_SIZE = 12;
     /** Answer the message. */
     static final int TOOLBAR_REPLY = 1;
     /** Take a copy of the message. */
@@ -1797,7 +1863,9 @@ final class LostTalesChatOverlayRenderer {
      * notice shows only Copy.
      *
      * <p>Drawn in the stack's space, so it rides the scroll with the
-     * message it belongs to, and inside the message's own top row rather
+     * message it belongs to: {@code top} is the row's place before the
+     * slide, the caller translates by the slide and {@code originY}
+     * includes it. It stands inside the message's own top row rather
      * than floating above it: the row under the pointer is what keeps
      * the message hovered, and a toolbar reaching past it would hover
      * the message above instead and take itself away. The screen
@@ -2005,7 +2073,8 @@ final class LostTalesChatOverlayRenderer {
      *
      * <p>Answered against the line above (older, further along the
      * list), skipping the wrapped continuation lines that carry no
-     * timestamp of their own.</p>
+     * timestamp of their own. A day's rule above the line opens the turn
+     * again: the same clock reading on another day is another minute.</p>
      */
     static boolean opensItsMinute(List<ChatLine> lines, int lineIndex) {
         ChatLine line = lines.get(lineIndex);
@@ -2017,6 +2086,9 @@ final class LostTalesChatOverlayRenderer {
             ChatLine older = lines.get(index);
             if (older == null) {
                 continue;
+            }
+            if (ChatWindowLines.isDateDivider(older)) {
+                return true;
             }
             String above = timestampText(older.func_151461_a());
             if (above.length() > 0) {
@@ -2305,7 +2377,7 @@ final class LostTalesChatOverlayRenderer {
                     // them. Centred in the line band exactly as an
                     // inline emoji is.
                     float markTop = y - HEAD_TOP_OFFSET
-                            + ChatInlineIcons.CONTENT_TOP_OFFSET;
+                            + centredBoxTop(CONTENT_BOX_HEIGHT);
                     ChatEmojiRenderer.drawShadow(minecraft, mark,
                             x + HEAD_LEFT_OFFSET
                                     + LostTalesChatVisualStyle.SHADOW_OFFSET,
@@ -2324,15 +2396,15 @@ final class LostTalesChatOverlayRenderer {
                 if (marker.npcIdentity) {
                     LostTalesCharacterHeadIconRenderer.drawNpcHead(
                             minecraft, marker.skinId,
-                            x + HEAD_LEFT_OFFSET, y, 8.0F, 1.0F, opacity);
+                            x + HEAD_LEFT_OFFSET, y, HEAD_SIZE, 1.0F, opacity);
                 } else if (marker.accountIdentity) {
                     LostTalesCharacterHeadIconRenderer.drawAccountHead(
                             minecraft, marker.senderId,
-                            x + HEAD_LEFT_OFFSET, y, 8.0F, 1.0F, opacity);
+                            x + HEAD_LEFT_OFFSET, y, HEAD_SIZE, 1.0F, opacity);
                 } else {
                     LostTalesCharacterHeadIconRenderer.drawSnapshotHead(
                             minecraft, marker.senderId, marker.skinId,
-                            x + HEAD_LEFT_OFFSET, y, 8.0F, 1.0F, opacity);
+                            x + HEAD_LEFT_OFFSET, y, HEAD_SIZE, 1.0F, opacity);
                 }
                 return;
             }
@@ -2345,9 +2417,8 @@ final class LostTalesChatOverlayRenderer {
 
     /**
      * Flat shadow of the head's base face, one pixel down-right like the
-     * text shadow (the half-pixel portrait offset lands it on the same
-     * grid). Silhouette mode gives every skin the same shadow colour
-     * instead of a darkened copy of its own pixels.
+     * text shadow, on whole pixels. Silhouette mode gives every skin the
+     * same shadow colour instead of a darkened copy of its own pixels.
      */
     private static void drawHeadShadow(
             Minecraft minecraft, ChatHeadMarker.Data marker,
@@ -2362,16 +2433,16 @@ final class LostTalesChatOverlayRenderer {
         try {
             if (marker.npcIdentity) {
                 LostTalesCharacterHeadIconRenderer.drawTintedNpcHeadBase(
-                        minecraft, marker.skinId, shadowX, shadowY, 8.0F,
+                        minecraft, marker.skinId, shadowX, shadowY, HEAD_SIZE,
                         1.0F, 1.0F, 1.0F, opacity);
             } else if (marker.accountIdentity) {
                 LostTalesCharacterHeadIconRenderer.drawTintedAccountHeadBase(
-                        minecraft, marker.senderId, shadowX, shadowY, 8.0F,
+                        minecraft, marker.senderId, shadowX, shadowY, HEAD_SIZE,
                         1.0F, 1.0F, 1.0F, opacity);
             } else {
                 LostTalesCharacterHeadIconRenderer.drawTintedSnapshotHeadBase(
                         minecraft, marker.senderId, marker.skinId,
-                        shadowX, shadowY, 8.0F,
+                        shadowX, shadowY, HEAD_SIZE,
                         1.0F, 1.0F, 1.0F, opacity);
             }
         } finally {

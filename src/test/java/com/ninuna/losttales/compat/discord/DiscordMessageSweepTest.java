@@ -89,5 +89,41 @@ public final class DiscordMessageSweepTest {
             sweep.track(message(Integer.toString(1000 + index), "x", ""));
         }
         assertEquals(128, sweep.size());
+        for (int index = 0; index < 200; index++) {
+            sweep.watch(Integer.toString(5000 + index));
+        }
+        assertEquals(128, sweep.size());
+    }
+
+    /**
+     * A message relayed before the watch began, as after a reload or a
+     * restart, is watched without its stamp: the first page only teaches
+     * the stamp, and from then on it is watched like any other.
+     */
+    @Test
+    public void aMessageWatchedWithoutItsStampLearnsItFirst() {
+        DiscordMessageSweep sweep = new DiscordMessageSweep();
+        sweep.watch("100");
+        sweep.watch("100");
+        assertEquals(1, sweep.size());
+        // Edited while nothing watched: not reported.
+        assertTrue(sweep.apply(Arrays.asList(
+                message("100", "edited before", "2026-09-01T00:00:00Z"),
+                message("300", "newer", ""))).edited.isEmpty());
+        assertEquals(1, sweep.apply(Arrays.asList(
+                message("100", "edited again", "2026-09-01T00:01:00Z"),
+                message("300", "newer", ""))).edited.size());
+        // Gone from a covering page, it was deleted like any other.
+        sweep.watch("200");
+        assertEquals(Arrays.asList("200"), sweep.apply(Arrays.asList(
+                message("100", "edited again", "2026-09-01T00:01:00Z"),
+                message("300", "newer", ""))).deletedIds);
+        // A message already watched keeps the stamp it has.
+        DiscordMessageSweep tracked = new DiscordMessageSweep();
+        tracked.track(message("100", "hello", ""));
+        tracked.watch("100");
+        assertEquals(1, tracked.apply(Arrays.asList(
+                message("100", "hello there", "2026-09-01T00:00:00Z")))
+                .edited.size());
     }
 }

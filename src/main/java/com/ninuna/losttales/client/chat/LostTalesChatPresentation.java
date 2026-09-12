@@ -15,7 +15,6 @@ import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
-import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
@@ -1349,7 +1348,9 @@ public final class LostTalesChatPresentation {
      * and still a part of it: the same line id, so the row shades,
      * copies, scrolls and goes with the message. One chip per emoji,
      * in the order each was first used; nothing for a message without
-     * reactions or one the server never named.
+     * reactions or one the server never named. An emoji the registry
+     * lacks, which a Discord member brought, is a chip like any other,
+     * drawn with a question mark.
      */
     private static void appendReactions(IChatComponent root,
                                         LostTalesChatMessagePacket packet) {
@@ -1363,16 +1364,12 @@ public final class LostTalesChatPresentation {
         root.appendSibling(ChatLayoutMarker.rowBreak());
         boolean first = true;
         for (ChatReactionSummary.Reaction reaction : reactions.getReactions()) {
-            ChatEmoji emoji = ChatEmoji.fromName(reaction.emoji);
-            if (emoji == null) {
-                continue;
-            }
             if (!first) {
                 root.appendSibling(ChatSpacerMarker.of(
                         ChatReactionMarker.BETWEEN));
             }
             first = false;
-            root.appendSibling(ChatReactionMarker.create(emoji,
+            root.appendSibling(ChatReactionMarker.create(reaction.emoji,
                     reaction.count, reaction.mine, packet.getMessageId(),
                     ChatReactionMarker.countWidth(font, reaction.count)));
         }
