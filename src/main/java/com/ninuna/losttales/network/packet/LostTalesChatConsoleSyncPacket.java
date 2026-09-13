@@ -24,14 +24,31 @@ public final class LostTalesChatConsoleSyncPacket implements IMessage {
     private static final int MAX_CONTEXT_BYTES = ChatConsoleEvent.MAX_CONTEXT_LENGTH * 4;
     private static final int MAX_PACKET_BYTES = 4
             + MAX_EVENTS * (8 + 8 + 1 + 1 + 4 + MAX_ACTOR_BYTES + 4 + MAX_TEXT_BYTES
-                    + 4 + MAX_CONTEXT_BYTES);
+                    + 4 + MAX_CONTEXT_BYTES)
+            + 8;
 
     private List<ChatConsoleEvent> events = Collections.emptyList();
+    /**
+     * Where the player the entries are for arrived, as an id on the one
+     * clock messages and entries share: the id of their own join line.
+     * An entry with a smaller id happened before they came and is
+     * history to them. Only the replay on joining states it; an entry
+     * sent as it happens is news to everyone reading.
+     */
+    private long arrivalId = Long.MIN_VALUE;
     private boolean malformed;
 
     public LostTalesChatConsoleSyncPacket() {}
 
+    /** Entries sent as they happen: news, every one of them. */
     public LostTalesChatConsoleSyncPacket(List<ChatConsoleEvent> events) {
+        this(events, Long.MIN_VALUE);
+    }
+
+    /** Entries replayed on joining, those from {@code arrivalId} on happening as their reader arrived. */
+    public LostTalesChatConsoleSyncPacket(List<ChatConsoleEvent> events,
+                                          long arrivalId) {
+        this.arrivalId = arrivalId;
         List<ChatConsoleEvent> kept = new ArrayList<ChatConsoleEvent>();
         if (events != null) {
             for (ChatConsoleEvent event : events) {
@@ -74,11 +91,16 @@ public final class LostTalesChatConsoleSyncPacket implements IMessage {
                 decoded.add(new ChatConsoleEvent(id, timestamp, kind, severity, actor, text,
                         context));
             }
+            // Appended after the entries: where the reader arrived. Entries
+            // written before it are news, as they were then.
+            this.arrivalId = buffer.readableBytes() >= 8
+                    ? buffer.readLong() : Long.MIN_VALUE;
             LostTalesPacketCodec.requireFinished(buffer);
             this.events = Collections.unmodifiableList(decoded);
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.events = Collections.emptyList();
+            this.arrivalId = Long.MIN_VALUE;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -95,11 +117,31 @@ public final class LostTalesChatConsoleSyncPacket implements IMessage {
             LostTalesPacketCodec.writeUtf8String(buffer, event.getText(), MAX_TEXT_BYTES);
             LostTalesPacketCodec.writeUtf8String(buffer, event.getContext(), MAX_CONTEXT_BYTES);
         }
+        buffer.writeLong(this.arrivalId);
     }
 
     /** The entries, oldest first; empty for a malformed payload. */
     public List<ChatConsoleEvent> getEvents() {
         return this.events;
+    }
+
+    /** Where the reader arrived, as an id; see the field. */
+    public long getArrivalId() {
+        return this.arrivalId;
+    }
+
+    /**
+     * Whether the batch is the replay a player is sent on joining rather
+     * than entries sent as they happened: what the client files against
+     * where it last read the console.
+     */
+    public boolean isReplay() {
+        return this.arrivalId != Long.MIN_VALUE;
+    }
+
+    /** Whether an entry of this batch happened before its reader arrived. */
+    public boolean saidBeforeArrival(ChatConsoleEvent event) {
+        return event == null || event.getId() < this.arrivalId;
     }
 
     public boolean isMalformed() {

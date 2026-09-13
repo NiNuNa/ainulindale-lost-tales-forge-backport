@@ -206,25 +206,32 @@ final class ChatInputField extends GuiTextField {
     }
 
     /**
-     * Height of the field's content box, which the caret, the selection
-     * wash and the previews all stand on: an emoji's ten rows, where a
-     * message row puts its boxes ({@link ChatInlineIcons#rowContentTop}),
-     * so the well lays out what is typed as the line will be laid out.
+     * Height of the band the caret and the selection wash stand on: an
+     * emoji's ten rows, the typing well's middle ten, a clear row short
+     * of the well at both ends. It is the well's own middle, not the
+     * capitals': a bar as tall as an emoji, centred on them as an emoji's
+     * box is, would touch the well's top.
      */
     private static final int CONTENT_HEIGHT =
             (int)ChatInlineIcons.CONTENT_SIZE;
 
+    /** Top of that band for text drawn at {@code textTop} in the well. */
+    static int caretTop(int textTop) {
+        return textTop - LostTalesChatOverlayRenderer.ROW_TEXT_TOP
+                + (LostTalesChatOverlayRenderer.LINE_HEIGHT
+                        - CONTENT_HEIGHT) / 2;
+    }
+
     /**
-     * The wash spans the box the content actually occupies, so it sits
-     * centred on what is selected instead of hanging low on the glyphs
-     * alone.
+     * The wash spans the caret's band, so it sits centred in the well on
+     * what is selected instead of hanging low on the glyphs alone.
      */
     private static int selectionBandTop(int textTop) {
-        return ChatInlineIcons.rowContentTop(textTop);
+        return caretTop(textTop);
     }
 
     private static int selectionBandBottom(int textTop) {
-        return ChatInlineIcons.rowContentTop(textTop) + CONTENT_HEIGHT;
+        return caretTop(textTop) + CONTENT_HEIGHT;
     }
 
     /** The caret in the palette's ivory, like the text it stands in. */
@@ -241,7 +248,7 @@ final class ChatInputField extends GuiTextField {
      * the bar keeps to the field.
      */
     static void drawCaret(int x, int textTop) {
-        int top = ChatInlineIcons.rowContentTop(textTop);
+        int top = caretTop(textTop);
         Gui.drawRect(x, top, x + CARET_WIDTH, top + CONTENT_HEIGHT,
                 LostTalesChatVisualStyle.argb(CARET_RGB, 0xFF));
     }
@@ -685,7 +692,7 @@ final class ChatInputField extends GuiTextField {
             // same slot and box the message lines give it.
             ChatInlineIcons.drawEmoji(minecraft, preview.emoji,
                     ChatInlineIcons.boxLeft(x, ChatInlineIcons.SLOT_WIDTH),
-                    ChatInlineIcons.rowBoxTop(y, ChatInlineIcons.SLOT_WIDTH),
+                    ChatInlineIcons.boxTop(y, ChatInlineIcons.SLOT_WIDTH),
                     ChatInlineIcons.contentSize(ChatInlineIcons.SLOT_WIDTH),
                     255);
             return x + preview.width;
@@ -694,7 +701,7 @@ final class ChatInputField extends GuiTextField {
                 preview.rgb, 255);
         x += this.font.getStringWidth("[");
         float boxX = ChatInlineIcons.boxLeft(x, ChatInlineIcons.SLOT_WIDTH);
-        float boxY = ChatInlineIcons.rowBoxTop(y, ChatInlineIcons.SLOT_WIDTH);
+        float boxY = ChatInlineIcons.boxTop(y, ChatInlineIcons.SLOT_WIDTH);
         float size = ChatInlineIcons.contentSize(ChatInlineIcons.SLOT_WIDTH);
         if (preview.kind == ChatShareKind.ITEM) {
             ChatInlineIcons.drawItem(minecraft, preview.stack, boxX, boxY,

@@ -117,6 +117,7 @@ import com.ninuna.losttales.chat.server.ChatHistory;
 import com.ninuna.losttales.chat.server.ChatHistoryStorage;
 import com.ninuna.losttales.chat.server.LostTalesChatRoleRosterWatcher;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
+import com.ninuna.losttales.chat.server.LostTalesServerBroadcastHook;
 import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
 import com.ninuna.losttales.world.room.CharacterRoomWorldHandler;
 import com.ninuna.losttales.world.room.CharacterRoomWorldType;
@@ -382,6 +383,7 @@ public class LostTalesCommonProxy {
         ChatConsoleStream.clear();
         ChatCommandContexts.clear();
         LostTalesChatService.clear();
+        LostTalesServerBroadcastHook.clear();
         LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
                 ChatConsoleEvent.Severity.INFO, "Server", "Server started");
         ChatAuditLog.onServerStarting();
@@ -470,6 +472,7 @@ public class LostTalesCommonProxy {
         ChatConsoleStream.clear();
         ChatCommandContexts.clear();
         LostTalesChatService.clear();
+        LostTalesServerBroadcastHook.clear();
         ChatAuditLog.onServerStopping();
         LostTalesMobAggroEventHandler.clearAll();
         LotrRaceProfileAdapter.getInstance().clear();

@@ -1799,9 +1799,14 @@ public final class LostTalesChatGui extends GuiChat
                 }
                 return;
             case INDICATOR:
+                // A left click walks the window's tabs forward and a
+                // right click back, as Ctrl+Right and Ctrl+Left do.
                 if (button == 0) {
                     this.tabActions.selectChannel(
                             ClientChatChannelState.cycle());
+                } else if (button == 1) {
+                    this.tabActions.selectChannel(
+                            ClientChatChannelState.cycleBack());
                 }
                 return;
             case SEND_BUTTON:
@@ -2065,7 +2070,8 @@ public final class LostTalesChatGui extends GuiChat
         // Composing happens where the message lives, and selecting a tab
         // clears any reply, so the target is set after the move.
         this.tabActions.selectChannel(tab);
-        this.composer.startReply(tab, id, name, excerpt);
+        this.composer.startReply(tab, id, name, excerpt,
+                LostTalesChatPresentation.headOfLine(chatLineId));
     }
 
     /**

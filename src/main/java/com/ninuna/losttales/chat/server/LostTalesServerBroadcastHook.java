@@ -5,6 +5,7 @@ import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.chat.ChatBroadcastIdMarkers;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReplyReference;
@@ -15,12 +16,17 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import cpw.mods.fml.common.FMLLog;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.IChatComponent;
 
 /**
@@ -34,9 +40,29 @@ import net.minecraft.util.IChatComponent;
  * names the same message and a click on the quote finds it. The words
  * are never changed, and a line is never delayed or refused: whatever
  * fails, the component goes out as it came.
+ *
+ * <p>A join line's id is also kept for the login replay of the player
+ * it announces ({@link #takeJoinLine}). The game announces a join just
+ * before the player's login event, so the line is the first thing said
+ * once they are there: everything with a smaller id is history to them,
+ * the line itself and everything after it is not.</p>
  */
 public final class LostTalesServerBroadcastHook {
     private static volatile boolean failureLogged;
+
+    /**
+     * How long a join line waits for its player's login replay. The two
+     * happen on the same tick; the margin only keeps a line whose replay
+     * never ran from marking a later visit.
+     */
+    private static final long JOIN_LINE_WAIT_MILLIS = 60000L;
+    /** More joins waiting than this is more than a tick holds; the oldest go. */
+    private static final int MAX_WAITING_JOIN_LINES = 64;
+    /** The waiting join lines, by the joining account's name in lower case. */
+    private static final Map<String, JoinLine> JOIN_LINES =
+            new LinkedHashMap<String, JoinLine>();
+    /** What vanilla's display name suggests on a click, before the account. */
+    private static final String WHISPER_SUGGESTION = "/msg ";
 
     private LostTalesServerBroadcastHook() {}
 
@@ -106,6 +132,10 @@ public final class LostTalesServerBroadcastHook {
         ChatHistory.record(messageId, LostTalesChatMessagePacket.SERVER_SENDER_ID,
                 SERVER_NAME, null, record, recipients,
                 ChatHistory.Audience.everyone());
+        if (ChatSystemLineClassifier.kindOf(message)
+                == ChatSystemLineClassifier.Kind.JOIN) {
+            noteJoinLine(joinerAccount(message), messageId);
+        }
         ChatComponentText mark = new ChatComponentText("");
         mark.setChatStyle(mark.getChatStyle().setChatClickEvent(new ClickEvent(
                 ClickEvent.Action.SUGGEST_COMMAND,
@@ -115,6 +145,78 @@ public final class LostTalesServerBroadcastHook {
 
     /** The name the server's lines are recorded under; the client shows its own word for it. */
     static final String SERVER_NAME = "Server";
+
+    /**
+     * The id of the line that announced {@code account}'s arrival, no
+     * longer waiting once taken, or {@link ChatMessageIds#NONE} when no
+     * line is waiting for them: another mod may have silenced the game's
+     * announcement.
+     */
+    public static synchronized long takeJoinLine(String account) {
+        if (account == null) {
+            return ChatMessageIds.NONE;
+        }
+        JoinLine line = JOIN_LINES.remove(account.toLowerCase(Locale.ROOT));
+        if (line == null || System.currentTimeMillis() - line.notedMillis
+                > JOIN_LINE_WAIT_MILLIS) {
+            return ChatMessageIds.NONE;
+        }
+        return line.messageId;
+    }
+
+    /** Cleared with the rest of the server's chat state. */
+    public static synchronized void clear() {
+        JOIN_LINES.clear();
+    }
+
+    /** Keeps a join line for the login replay of the account it announces. */
+    static synchronized void noteJoinLine(String account, long messageId) {
+        if (account == null || account.length() == 0) {
+            return;
+        }
+        String key = account.toLowerCase(Locale.ROOT);
+        JOIN_LINES.remove(key);
+        JOIN_LINES.put(key, new JoinLine(messageId, System.currentTimeMillis()));
+        Iterator<String> oldest = JOIN_LINES.keySet().iterator();
+        while (JOIN_LINES.size() > MAX_WAITING_JOIN_LINES && oldest.hasNext()) {
+            oldest.next();
+            oldest.remove();
+        }
+    }
+
+    /**
+     * The account a join line announces. The game writes the joining
+     * player in as their display name, which suggests
+     * {@code /msg <account> } on a click, and that is read first; the
+     * name's own words stand in when the click says nothing. Null for a
+     * line that is no translation or names nobody.
+     */
+    static String joinerAccount(IChatComponent message) {
+        if (!(message instanceof ChatComponentTranslation)) {
+            return null;
+        }
+        Object[] args = ((ChatComponentTranslation)message).getFormatArgs();
+        if (args == null || args.length == 0 || args[0] == null) {
+            return null;
+        }
+        if (!(args[0] instanceof IChatComponent)) {
+            return String.valueOf(args[0]).trim();
+        }
+        IChatComponent name = (IChatComponent)args[0];
+        ClickEvent click = name.getChatStyle() == null ? null
+                : name.getChatStyle().getChatClickEvent();
+        String suggestion = click == null
+                || click.getAction() != ClickEvent.Action.SUGGEST_COMMAND
+                ? null : click.getValue();
+        if (suggestion != null && suggestion.startsWith(WHISPER_SUGGESTION)) {
+            String account = suggestion.substring(
+                    WHISPER_SUGGESTION.length()).trim();
+            if (account.length() > 0) {
+                return account;
+            }
+        }
+        return name.getUnformattedText().trim();
+    }
 
     /**
      * The component as the JSON the game itself sends chat in, or
@@ -173,6 +275,17 @@ public final class LostTalesServerBroadcastHook {
             failureLogged = true;
             FMLLog.warning("[LostTales] Could not %s a server broadcast: %s",
                     what, throwable);
+        }
+    }
+
+    /** A join line waiting for its player's login replay. */
+    private static final class JoinLine {
+        final long messageId;
+        final long notedMillis;
+
+        JoinLine(long messageId, long notedMillis) {
+            this.messageId = messageId;
+            this.notedMillis = notedMillis;
         }
     }
 }

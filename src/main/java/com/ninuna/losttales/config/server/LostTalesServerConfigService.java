@@ -154,7 +154,8 @@ public final class LostTalesServerConfigService {
     /**
      * The server's files as they are on disk — the options, the roles
      * and the channels as one configuration — with the category metadata
-     * the screen shows.
+     * the screen shows and each option in its shipped definition, so the
+     * screen restores the mod's default rather than the file's value.
      */
     private static Configuration openFile() {
         Configuration config = LostTalesConfig.openServerConfiguration();
@@ -163,6 +164,7 @@ public final class LostTalesServerConfigService {
         }
         config.load();
         LostTalesConfig.applyGuiMetadata(config);
+        LostTalesConfig.applyShippedDefinitions(config);
         return config;
     }
 }

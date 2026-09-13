@@ -96,6 +96,17 @@ public final class LostTalesChatPresentation {
      */
     public static void receive(LostTalesChatMessagePacket packet,
                                boolean replayed) {
+        receive(packet, replayed, false);
+    }
+
+    /**
+     * As above for a replayed line said {@code beforeArrival}: before
+     * this player arrived. Such a line is history rather than news — it
+     * stands in its tab, and the closed feed, which shows what is
+     * happening, passes over it.
+     */
+    public static void receive(LostTalesChatMessagePacket packet,
+                               boolean replayed, boolean beforeArrival) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (packet == null || packet.isMalformed() || minecraft == null
                 || minecraft.ingameGUI == null) {
@@ -215,6 +226,7 @@ public final class LostTalesChatPresentation {
                 : confirmPendingEcho(minecraft, packet, tab);
         int chatLineId;
         receivingReplayed = replayed;
+        receivingBeforeArrival = replayed && beforeArrival;
         try {
             chatLineId = confirmed != 0 ? confirmed
                     : print(minecraft, packet, tab, mentioned,
@@ -222,6 +234,7 @@ public final class LostTalesChatPresentation {
                                     : ChatBodyKind.ANSWER, body);
         } finally {
             receivingReplayed = false;
+            receivingBeforeArrival = false;
         }
         if (mentioned || tab.isWhisper()) {
             if (mentioned) {
@@ -418,9 +431,12 @@ public final class LostTalesChatPresentation {
             }
             LostTalesChatMessagePacket updated;
             try {
+                // Cut afresh from the new words, keeping the colour the
+                // name was drawn in and the head the quote wore.
+                ChatReplyReference old = entry.packet.getReply();
                 updated = entry.packet.withReply(ChatReplyReference.of(
-                        messageId, entry.packet.getReply().getAuthor(),
-                        newText));
+                        messageId, old.getAuthor(), newText,
+                        old.getAuthorColor()).withHeadOf(old));
             } catch (RuntimeException refused) {
                 continue;
             }
@@ -521,6 +537,9 @@ public final class LostTalesChatPresentation {
         chat.printChatMessageWithOptionalDeletion(
                 build(packet, tab, showcaseIds, false, kind, body),
                 chatLineId);
+        if (receivingBeforeArrival) {
+            ageOutOfFeed(minecraft, chat, chatLineId);
+        }
         rememberPrinted(chatLineId, packet, tab, showcaseIds, kind,
                 body == null ? null : body.createCopy(), mentioned);
         return chatLineId;
@@ -897,23 +916,95 @@ public final class LostTalesChatPresentation {
     /**
      * Whether the line being printed is one the server is replaying from
      * its history rather than one just said. Set around the print by
-     * {@link #receive(LostTalesChatMessagePacket, boolean)} on the
-     * client thread, read where the line is filed and counted.
+     * {@link #receive(LostTalesChatMessagePacket, boolean, boolean)} and
+     * {@link #receiveConsoleEvent(ChatConsoleEvent, boolean, boolean)} on
+     * the client thread, read where the line is filed and counted.
      */
     private static boolean receivingReplayed;
+
+    /**
+     * Whether the line being printed was said before this player
+     * arrived: history printed while the client catches up. Set around
+     * the print by {@link #receive(LostTalesChatMessagePacket, boolean,
+     * boolean)} and {@link #receiveConsoleEvent(ChatConsoleEvent,
+     * boolean, boolean)}; the print stamps such a line as already gone
+     * from the closed feed, and it does not enter as the newest message.
+     */
+    private static boolean receivingBeforeArrival;
+
+    /**
+     * The server's id for the line being printed where the line's own id
+     * is this client's: a console entry's, which comes from the clock
+     * messages take theirs from, so the Console's read mark can move to
+     * it while the line stays this client's work. Set around the print
+     * by {@link #receiveConsoleEvent(ChatConsoleEvent, boolean,
+     * boolean)}; none for every other line.
+     */
+    private static long receivingServerId = ChatMessageIds.NONE;
+
+    /**
+     * Stamps a line said before this player arrived as one the closed
+     * feed has already let go: its arrival tick is set a whole fade back
+     * in both of the game's lists, so the feed — which shows only what
+     * arrived in its last few seconds — passes over it, while the open
+     * windows, which show a line whatever its age, keep it. The game
+     * puts a printed line at the head of each list, so only the head is
+     * looked at.
+     */
+    private static void ageOutOfFeed(Minecraft minecraft, GuiNewChat chat,
+                                     int chatLineId) {
+        int aged = minecraft.ingameGUI.getUpdateCounter()
+                - LostTalesChatOverlayRenderer.FEED_FADE_TICKS;
+        restampHead(ChatWindowLines.messageHistory(chat), chatLineId, aged);
+        List<ChatLine> drawn;
+        try {
+            drawn = LostTalesChatOverlayRenderer.getDrawnLines(chat);
+        } catch (IllegalAccessException unavailable) {
+            // The field was opened when the renderer loaded; without it
+            // the shared list is not drawn at all, so there is nothing
+            // to stamp.
+            drawn = null;
+        }
+        restampHead(drawn, chatLineId, aged);
+        ChatWindowLines.noteMutated();
+    }
+
+    /** Gives the rows at the head of {@code lines} that are the line's own that tick. */
+    private static void restampHead(List<ChatLine> lines, int chatLineId,
+                                    int updatedCounter) {
+        if (lines == null) {
+            return;
+        }
+        for (int index = 0; index < lines.size(); index++) {
+            ChatLine line = lines.get(index);
+            if (line == null || line.getChatLineID() != chatLineId) {
+                return;
+            }
+            lines.set(index, new ChatLine(updatedCounter,
+                    line.func_151461_a(), chatLineId));
+        }
+    }
 
     /** Records animation timing and the line's tab for the tab views. */
     private static void noteLinePrinted(int chatLineId, ChatTab tab,
                                         boolean mentioned,
                                         long timestampMillis) {
-        lastMessageChatLineId = chatLineId;
-        hasLastMessage = true;
-        lastMessageNanos = System.nanoTime();
-        lastMessageTab = tab;
+        // A line from before this player arrived was never news here:
+        // it does not enter as the newest message.
+        if (!receivingBeforeArrival) {
+            lastMessageChatLineId = chatLineId;
+            hasLastMessage = true;
+            lastMessageNanos = System.nanoTime();
+            lastMessageTab = tab;
+        }
+        // What the view's read mark moves to once the line is seen: the
+        // line's own id, or the id of the console entry it shows.
+        long serverId = ChatMessageIds.isServerId(receivingServerId)
+                ? receivingServerId
+                : ClientChatMessageIds.messageIdOf(chatLineId);
         ClientChatChannelViews.record(chatLineId, tab,
                 ClientChatChannelState.getSelected(), mentioned,
-                ClientChatMessageIds.messageIdOf(chatLineId),
-                timestampMillis, receivingReplayed);
+                serverId, timestampMillis, receivingReplayed);
         ClientChatChannelViews.recordTime(chatLineId, timestampMillis);
     }
 
@@ -1003,6 +1094,33 @@ public final class LostTalesChatPresentation {
                 ? signedName.trim()
                 : StatCollector.translateToLocal(
                         "chat.losttales.reply.unnamed");
+    }
+
+    /**
+     * The head a line was signed with — its sender's face, an NPC's
+     * portrait, or the mark standing for the server or the bridge — read
+     * off the message as the game keeps it whole, so a grouped
+     * continuation, which draws no header of its own, answers too. Null
+     * for a line with no sender, or one the game no longer holds.
+     */
+    static ChatHeadMarker.Data headOfLine(int chatLineId) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (chatLineId == 0 || minecraft == null
+                || minecraft.ingameGUI == null) {
+            return null;
+        }
+        List<ChatLine> messages = ChatWindowLines.messageHistory(
+                minecraft.ingameGUI.getChatGUI());
+        if (messages == null) {
+            return null;
+        }
+        for (int index = 0; index < messages.size(); index++) {
+            ChatLine message = messages.get(index);
+            if (message != null && message.getChatLineID() == chatLineId) {
+                return ChatHeadMarker.of(message.func_151461_a());
+            }
+        }
+        return null;
     }
 
     /** Whether the line belongs to the message the pointer is on. */
@@ -1561,9 +1679,12 @@ public final class LostTalesChatPresentation {
      * colour and the
      * words in the chat's ivory, so the quote reads as the line it
      * quotes rather than as a line about it. The head is the quoted
-     * sender's, from the quote when the server told it, else from the
-     * line itself when this client still holds it; a quote told
-     * neither names its author bare. Every run is the quote's — the
+     * sender's: from the quote when it was told one — the server's cut
+     * of a line it named, or this client's own of a line on its screen,
+     * an NPC's portrait included — else from the line itself when this
+     * client still holds it; a quote told neither names its author
+     * bare. A quote of the Server wears its name in the aside tone, as
+     * the Server's own lines do. Every run is the quote's — the
      * head slot included — so the whole of it answers one click and
      * lights as one. The wrapper cuts the row to one line, so a long
      * quote never pushes the answer down the window.
@@ -1583,6 +1704,7 @@ public final class LostTalesChatPresentation {
                 : quoted == null ? null : quoted.getSenderId();
         boolean accountLine = reply.hasHead() ? reply.isAccountLine()
                 : quoted != null && quoted.isAccountLine();
+        boolean npcLine = reply.hasHead() && reply.isNpcLine();
         String skinId = reply.hasHead() ? reply.getSkinId()
                 : quoted == null ? "" : quoted.getSkinId();
         // The colour the name was drawn in: the line's own when held,
@@ -1593,6 +1715,12 @@ public final class LostTalesChatPresentation {
         // from before it carried a colour; one with neither is quiet.
         int name = quoted != null ? quoted.getNameColor()
                 : reply.getAuthorColor();
+        if (senderId != null
+                && LostTalesChatMessagePacket.isSystemSender(senderId)) {
+            // The Server looks the same wherever and whenever it speaks,
+            // quoted too: its name in this client's aside tone.
+            name = LostTalesChatVisualStyle.asideRgb();
+        }
         if (name < 0) {
             name = ClientChatAccountRoles.colorOf(reply.getAuthor());
         }
@@ -1606,7 +1734,7 @@ public final class LostTalesChatPresentation {
         if (senderId != null) {
             root.appendSibling(ChatReplyMarker.applyHead(
                     text("  ", EnumChatFormatting.WHITE, true), name, id,
-                    senderId, accountLine, false, skinId));
+                    senderId, accountLine, npcLine, skinId));
         }
         root.appendSibling(ChatReplyMarker.apply(
                 text(reply.getAuthor(), nearestFormatting(name), false),
@@ -1816,6 +1944,22 @@ public final class LostTalesChatPresentation {
      * the console; nothing here decides that.
      */
     public static void receiveConsoleEvent(ChatConsoleEvent event) {
+        receiveConsoleEvent(event, false, false);
+    }
+
+    /**
+     * As above for an entry the server {@code replayed}: one of the kept
+     * entries a player is sent on joining. It sounds no cue even where
+     * it names them, and it is filed against where this player last read
+     * the Console on this server — one they had read is filed and
+     * nothing more, and the first they had not stands under the unread
+     * divider. One that happened {@code beforeArrival}, before this
+     * player arrived, is history: it stands in the Console, never in the
+     * closed feed.
+     */
+    public static void receiveConsoleEvent(ChatConsoleEvent event,
+                                           boolean replayed,
+                                           boolean beforeArrival) {
         if (event == null || !ClientChatConsoleEvents.noteShown(event.getId())) {
             return;
         }
@@ -1849,12 +1993,22 @@ public final class LostTalesChatPresentation {
                             ? EnumChatFormatting.RED : null, false));
             body = line;
         }
-        int chatLineId = printServerLine(minecraft, console, body,
-                mentioned[0], event.getTimestampMillis(),
-                ChatReplyReference.NONE, ChatMessageIds.NONE);
+        int chatLineId;
+        receivingReplayed = replayed;
+        receivingBeforeArrival = replayed && beforeArrival;
+        receivingServerId = event.getId();
+        try {
+            chatLineId = printServerLine(minecraft, console, body,
+                    mentioned[0], event.getTimestampMillis(),
+                    ChatReplyReference.NONE, ChatMessageIds.NONE);
+        } finally {
+            receivingReplayed = false;
+            receivingBeforeArrival = false;
+            receivingServerId = ChatMessageIds.NONE;
+        }
         if (mentioned[0]) {
             markPinged(chatLineId);
-            if (ChatWindowLayout.isPingAudible(console)) {
+            if (!replayed && ChatWindowLayout.isPingAudible(console)) {
                 playPingSound(minecraft);
             }
         }
@@ -2216,9 +2370,10 @@ public final class LostTalesChatPresentation {
 
     /**
      * The quote a command's first answer opens with: the command as its
-     * echo was signed, by this client's own id for it, so the quote
-     * jumps to the command. The answers after the first join its run
-     * and quote nothing; a command echoed nowhere is quoted by nothing.
+     * echo was signed — the name in its colour and the head it wore —
+     * by this client's own id for it, so the quote jumps to the command.
+     * The answers after the first join its run and quote nothing; a
+     * command echoed nowhere is quoted by nothing.
      */
     private static ChatReplyReference commandEchoQuote() {
         if (commandAnswered) {
@@ -2230,7 +2385,10 @@ public final class LostTalesChatPresentation {
         }
         return ChatReplyReference.of(lastCommandEcho.getMessageId(),
                 lastCommandEcho.getIdentityName(),
-                lastCommandEcho.getMessage(), lastCommandEcho.getNameColor());
+                lastCommandEcho.getMessage(), lastCommandEcho.getNameColor())
+                .withHead(lastCommandEcho.getSenderId(),
+                        lastCommandEcho.isAccountLine(),
+                        lastCommandEcho.getSkinId());
     }
 
     private static ChatTab commandOutputTab() {

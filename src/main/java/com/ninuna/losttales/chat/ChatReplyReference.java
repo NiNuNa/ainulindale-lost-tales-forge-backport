@@ -48,16 +48,24 @@ public final class ChatReplyReference {
     private final UUID senderId;
     private final boolean accountLine;
     private final String skinId;
+    /**
+     * Whether the quoted line is an NPC's, whose head is its portrait:
+     * {@link #skinId} then holds the portrait's texture path. Only a
+     * client quotes an NPC — its speech never reaches a server — so this
+     * never travels.
+     */
+    private final boolean npcLine;
 
     private ChatReplyReference(long messageId, String author,
                                String excerpt, int authorColor) {
-        this(messageId, author, excerpt, authorColor, null, false, "");
+        this(messageId, author, excerpt, authorColor, null, false, "",
+                false);
     }
 
     private ChatReplyReference(long messageId, String author,
                                String excerpt, int authorColor,
                                UUID senderId, boolean accountLine,
-                               String skinId) {
+                               String skinId, boolean npcLine) {
         this.messageId = messageId;
         this.author = author == null ? "" : author;
         this.excerpt = excerpt == null ? "" : excerpt;
@@ -65,6 +73,7 @@ public final class ChatReplyReference {
         this.senderId = senderId;
         this.accountLine = accountLine;
         this.skinId = skinId == null ? "" : skinId;
+        this.npcLine = npcLine;
     }
 
     /**
@@ -80,12 +89,45 @@ public final class ChatReplyReference {
         }
         return new ChatReplyReference(this.messageId, this.author,
                 this.excerpt, this.authorColor, senderId, accountLine,
-                skinId);
+                skinId, false);
+    }
+
+    /**
+     * The same quote wearing an NPC's portrait for a head, by the NPC's
+     * id and the portrait's texture path: the quote of a line in an NPC
+     * conversation, which only the client that holds it ever builds.
+     */
+    public ChatReplyReference withNpcHead(UUID npcId, String texturePath) {
+        if (!exists() || npcId == null) {
+            return this;
+        }
+        return new ChatReplyReference(this.messageId, this.author,
+                this.excerpt, this.authorColor, npcId, false, texturePath,
+                true);
+    }
+
+    /**
+     * The same quote wearing the head {@code other} wears, or none when
+     * it wears none: what a quote cut afresh keeps of the one it
+     * replaces.
+     */
+    public ChatReplyReference withHeadOf(ChatReplyReference other) {
+        if (other == null || !other.hasHead()) {
+            return this;
+        }
+        return other.npcLine
+                ? withNpcHead(other.senderId, other.skinId)
+                : withHead(other.senderId, other.accountLine, other.skinId);
     }
 
     /** Whether the quote was told whose head to wear. */
     public boolean hasHead() {
         return this.senderId != null;
+    }
+
+    /** Whether the head is an NPC's portrait rather than a player's face. */
+    public boolean isNpcLine() {
+        return this.npcLine;
     }
 
     /** The quoted sender's id, or null for a quote told no head. */

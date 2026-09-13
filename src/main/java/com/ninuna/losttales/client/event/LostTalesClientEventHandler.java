@@ -44,6 +44,7 @@ import com.ninuna.losttales.client.character.CreatorCharacterLight;
 import com.ninuna.losttales.client.gui.LostTalesGuiInventory;
 import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
+import com.ninuna.losttales.client.gui.LostTalesHudFade;
 import com.ninuna.losttales.client.gui.LostTalesHudHidingScreen;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
@@ -197,6 +198,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         // themselves persist like every other preference.
         ClientChatIgnores.clearSessionNames();
         ClientAccessoryEffectCache.clear();
+        LostTalesHudFade.reset();
         WraithWorldVisualEffect.reset();
         LostTalesQuickLootHudRenderer.resetHud();
         LotrRaceProfileAdapter.getInstance().clear();
@@ -447,6 +449,28 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
                 instanceof LostTalesHudHidingScreen;
     }
 
+    /**
+     * The HUD steps aside while the chat is open, fading out as the chat
+     * opens and back in once it closes ({@link LostTalesHudFade}). Asked
+     * about every element, cancelled ones included, so the fade finds
+     * where its layer begins and ends whatever another mod cancels.
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
+    public void fadeHudBehindChat(RenderGameOverlayEvent.Pre event) {
+        if (!isHudHidden()) {
+            LostTalesHudFade.onPre(event);
+        }
+    }
+
+    /** The overlay is done: a copy of the frame still waiting is laid back. */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void endHudFade(RenderGameOverlayEvent.Post event) {
+        if (event != null
+                && event.type == RenderGameOverlayEvent.ElementType.ALL) {
+            LostTalesHudFade.onOverlayEnd();
+        }
+    }
+
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void replaceLotrMapGui(GuiOpenEvent event) {
         if (event.gui != null && event.gui.getClass() == LOTRGuiMap.class) {
@@ -515,15 +539,25 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     public void renderHud(RenderGameOverlayEvent.Post event) {
         if (event.type == RenderGameOverlayEvent.ElementType.ALL
                 && !isHudHidden()) {
-            // Every passing notice claims its strip of the one slot, top
-            // down, in the order it is drawn here.
-            LostTalesNotificationHud.beginFrame();
-            LostTalesQuickLootHudRenderer.render(Minecraft.getMinecraft());
-            LostTalesCompassHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
-            LostTalesMapMarkerHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
-            LostTalesPartyHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
-            LostTalesQuestHudRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
-            CharacterRoomJourneyPrompt.render(Minecraft.getMinecraft());
+            Minecraft minecraft = Minecraft.getMinecraft();
+            // While the chat is open the panels step aside with the rest
+            // of the HUD, fading as one layer with it.
+            if (!LostTalesHudFade.beginPanels(minecraft)) {
+                return;
+            }
+            try {
+                // Every passing notice claims its strip of the one slot,
+                // top down, in the order it is drawn here.
+                LostTalesNotificationHud.beginFrame();
+                LostTalesQuickLootHudRenderer.render(minecraft);
+                LostTalesCompassHudRenderer.render(minecraft, event.partialTicks);
+                LostTalesMapMarkerHudRenderer.render(minecraft, event.partialTicks);
+                LostTalesPartyHudRenderer.render(minecraft, event.partialTicks);
+                LostTalesQuestHudRenderer.render(minecraft, event.partialTicks);
+                CharacterRoomJourneyPrompt.render(minecraft);
+            } finally {
+                LostTalesHudFade.endPanels(minecraft);
+            }
         }
     }
 

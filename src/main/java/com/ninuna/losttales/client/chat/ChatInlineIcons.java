@@ -17,13 +17,12 @@ import net.minecraft.item.ItemStack;
  * apparent size: the emoji sheet is drawn 1:1, an item's 16px sprite is
  * scaled onto the box, and a marker's opaque artwork (not its padded
  * atlas cell) is fitted into it by its larger edge, never stretched.</li>
- * <li>In the input bar, the pickers and the completion lists the box
- * sits {@link #CONTENT_TOP_OFFSET} above the text's top edge, which
- * centres it on the capitals as nearly as whole pixels allow, so every
- * kind shares the text's baseline relationship. A message row centres
- * the box and the text's capitals in the row each by the row's one rule
- * ({@link LostTalesChatOverlayRenderer#ROW_TEXT_TOP}), and
- * {@link #rowBoxTop} places the box from there.</li>
+ * <li>Wherever a glyph stands beside text — a message row, the input
+ * field, the pickers, the completion lists — its box sits
+ * {@link #CONTENT_TOP_OFFSET} above the text's top edge: centred on the
+ * capitals by the chat's one rule
+ * ({@link LostTalesChatOverlayRenderer#centredBoxTop}), half a pixel
+ * above their middle, since ten rows cannot be centred on seven.</li>
  * <li>On the toolbar buttons every glyph fills the same
  * {@link #CONTENT_SIZE} box centred in the button square, fitted by its
  * larger edge exactly as it is inline — the emoji 1:1, the item sprite
@@ -70,12 +69,10 @@ final class ChatInlineIcons {
     /** Common inline content box edge; also the emoji sprite's native size. */
     static final float CONTENT_SIZE = 10.0F;
     /**
-     * Box top relative to the text top in the pickers and the completion
-     * lists: two rows above the glyphs, which puts the box's middle half
-     * a pixel above the capitals' middle. A message row centres its
-     * boxes and its text each in the row and places its boxes with
-     * {@link #rowBoxTop}; the input field, whose typing well is one
-     * message row, places its boxes the same way.
+     * Box top relative to the text's top edge wherever a glyph stands
+     * beside text: two rows above the glyphs, the box's middle half a
+     * pixel above the capitals' middle — the chat's one rule for a
+     * ten-row box ({@link LostTalesChatOverlayRenderer#centredBoxTop}).
      */
     static final int CONTENT_TOP_OFFSET = -2;
     private ChatInlineIcons() {}
@@ -114,34 +111,13 @@ final class ChatInlineIcons {
     }
 
     /**
-     * Top edge of the content box for text drawn at {@code textY} in the
-     * pickers and the completion lists.
+     * Top edge of the content box for text drawn at {@code textY}, in a
+     * message row and wherever else a glyph stands beside text. A slot
+     * too narrow for the whole box centres the smaller box on the whole
+     * box's middle.
      */
     static float boxTop(float textY, int slotWidth) {
         return textY + CONTENT_TOP_OFFSET
-                + (CONTENT_SIZE - contentSize(slotWidth)) / 2.0F;
-    }
-
-    /**
-     * Top of a message row's whole content box, for text drawn at
-     * {@code textTop}: where its emojis, items and markers stand. The
-     * input field stands its caret and selection on it too.
-     */
-    static int rowContentTop(int textTop) {
-        return textTop + LostTalesChatOverlayRenderer.centredBoxTop(
-                (int)CONTENT_SIZE);
-    }
-
-    /**
-     * Top edge of the content box for text drawn at {@code textY} in a
-     * message row: the row centres the box itself
-     * ({@link LostTalesChatOverlayRenderer#centredBoxTop}), and a slot too
-     * narrow for the whole box centres the smaller box on the whole box's
-     * middle.
-     */
-    static float rowBoxTop(float textY, int slotWidth) {
-        return textY + LostTalesChatOverlayRenderer.centredBoxTop(
-                        (int)CONTENT_SIZE)
                 + (CONTENT_SIZE - contentSize(slotWidth)) / 2.0F;
     }
 
@@ -215,11 +191,25 @@ final class ChatInlineIcons {
     }
 
     /**
+     * Where a sprite {@code extent} rows tall starts when it stands in a
+     * content box {@code size} rows tall starting at {@code boxTop}: on
+     * the capitals the box stands beside. The box's middle is half a
+     * pixel above theirs, so the sprite's top is rounded down the
+     * screen, which lands a sprite of odd height on the capitals' middle
+     * exactly and one of even height half a pixel above it, as the row's
+     * rule places everything ({@link LostTalesChatOverlayRenderer#centredBoxTop}).
+     */
+    static float spriteTop(float boxTop, float size, int extent) {
+        return (float)Math.ceil(boxTop + (size - extent) / 2.0F - 0.001F);
+    }
+
+    /**
      * A cell of the chat's own icon sheet as an inline glyph: drawn 1:1
-     * on whole pixels, centred in the content box, as a flat silhouette
-     * in {@code rgb} — the shadow tone on the shadow pass — so it takes
-     * the colour of the run it stands in. The sheet's cells are smaller
-     * than the box; the box is never scaled to them.
+     * on whole pixels, centred across the slot and on the capitals the
+     * box stands beside, as a flat silhouette in {@code rgb} — the shadow
+     * tone on the shadow pass — so it takes the colour of the run it
+     * stands in. The sheet's cells are smaller than the box; the box is
+     * never scaled to them.
      */
     static void drawSheetSprite(ChatIconSheet sprite, float boxX,
                                 float boxY, float size, int rgb, int alpha,
@@ -228,7 +218,7 @@ final class ChatInlineIcons {
             return;
         }
         float x = spriteStart(boxX, size, sprite.getWidth());
-        float y = spriteStart(boxY, size, sprite.getHeight());
+        float y = spriteTop(boxY, size, sprite.getHeight());
         sprite.drawSilhouette(silhouette
                 ? LostTalesChatVisualStyle.SHADOW : rgb, x, y, alpha);
     }

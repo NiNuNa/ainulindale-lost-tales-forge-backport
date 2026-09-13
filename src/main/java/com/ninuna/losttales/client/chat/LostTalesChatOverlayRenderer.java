@@ -66,18 +66,17 @@ final class LostTalesChatOverlayRenderer {
     /** Height of a head's face, drawn one texel to one pixel. */
     static final int HEAD_SIZE = 8;
     /**
-     * Where a row's text's top edge stands below the row's top edge.
+     * Where a row's text's top edge stands below the row's top edge: its
+     * capitals centred in the row, two clear rows above them and three
+     * below, the descender and its shadow taking the first two of those
+     * three. Seven rows cannot be centred in twelve, so the capitals
+     * stand half a pixel above the row's middle.
      *
-     * <p>Everything in a message row is placed by one rule: an element
-     * {@code h} pixels tall is centred in the row on whole pixels,
-     * {@code (LINE_HEIGHT - h) / 2} rows below the row's top, the
-     * division rounding down, so an element that cannot be centred
-     * exactly puts its odd pixel below itself, never above. The text is
-     * centred by its capitals: in a twelve-pixel row they have two clear
-     * rows above them and three below, the descender and its shadow
-     * taking the first two of those three. Boxes are placed against the
-     * text through {@link #centredBoxTop}, so the row, not the text,
-     * decides where each lands.</p>
+     * <p>Everything else in the row is centred on those capitals
+     * ({@link #centredBoxTop}), since the words are what the eye reads a
+     * row by: a box of odd height lands on their middle exactly, and one
+     * of even height, which cannot, stands half a pixel above it rather
+     * than below.</p>
      */
     static final int ROW_TEXT_TOP = (LINE_HEIGHT - GLYPH_CAP_HEIGHT) / 2;
     /**
@@ -97,21 +96,27 @@ final class LostTalesChatOverlayRenderer {
      */
     static final int DIVIDER_RULE_OFFSET = ROW_TEXT_TOP + GLYPH_CAP_HEIGHT / 2;
     /**
-     * Where a head sits against the text it stands beside: centred in the
-     * row by the row's rule ({@link #ROW_TEXT_TOP}), on whole pixels — a
-     * head is pixel art at one texel to one pixel.
+     * Where a head sits against the text it stands beside: centred on the
+     * capitals by the row's rule ({@link #centredBoxTop}), on whole
+     * pixels — a head is pixel art at one texel to one pixel. Eight rows
+     * against seven, so the face starts a row above the capitals and its
+     * middle stands half a pixel above theirs.
      */
-    static final float HEAD_TOP_OFFSET = (LINE_HEIGHT - HEAD_SIZE) / 2
-            - ROW_TEXT_TOP;
+    static final float HEAD_TOP_OFFSET = centredBoxTop(HEAD_SIZE);
 
     /**
-     * Where a box {@code height} pixels tall starts against the text's top
-     * edge when it is centred in a message row by the row's rule
-     * ({@link #ROW_TEXT_TOP}): {@code (LINE_HEIGHT - height) / 2} rows
-     * below the row's top, less the rows the text stands below it.
+     * Where a box {@code height} pixels tall starts against the text's
+     * top edge: centred on the capitals, half a pixel above their middle
+     * when the two heights differ by an odd number of rows, and never
+     * past the row's own edges, so a box as tall as the row fills it.
+     * The ten-row content box of an emoji, an item or a marker starts two
+     * rows above the text's top, an eight-row head one, and the seven-row
+     * speech bubble on it.
      */
     static int centredBoxTop(int height) {
-        return (LINE_HEIGHT - height) / 2 - ROW_TEXT_TOP;
+        int top = Math.floorDiv(GLYPH_CAP_HEIGHT - height, 2);
+        return Math.max(-ROW_TEXT_TOP,
+                Math.min(LINE_HEIGHT - ROW_TEXT_TOP - height, top));
     }
     /**
      * Where the face sits inside the slot the head marker reserves: one
@@ -851,6 +856,10 @@ final class LostTalesChatOverlayRenderer {
 
         int unscaledWidth = MathHelper.ceiling_float_int(chatWidth / scale);
         FontRenderer font = minecraft.fontRenderer;
+        // The closed feed stands its lines against the edge the client
+        // chose; an open window's always start at its left.
+        ChatFeedAlignment alignment = open ? ChatFeedAlignment.LEFT
+                : ChatFeedAlignment.current();
         // Switching tabs is a hard cut for the lines: only the tabs
         // themselves ease. The stack rises with a new message only while
         // the window is still growing; full, it would only look like it
@@ -952,28 +961,33 @@ final class LostTalesChatOverlayRenderer {
                         panelRight, bottomEdge, panelAlpha,
                         LostTalesChatVisualStyle.backdropRgb());
                 if (columns.enabled) {
-                    // The timestamp column's own surface, a step darker
-                    // than the panel beside it, so the timestamps read
+                    // The timestamp column's own surface: the chat's
+                    // inset surface, plum black at two thirds, the typing
+                    // well's and a resting tab's, so the timestamps read
                     // as a margin rather than as part of the messages.
                     // The panel stops at the separator, so the two lie
-                    // side by side, never one over the other; the input
-                    // bar's typing well is the same inset surface.
+                    // side by side, never one over the other. It thins
+                    // with the game's chat opacity as the panel does.
                     fillRect(panelLeft, topEdge, messageLeft, bottomEdge,
-                            (Math.round(LostTalesChatVisualStyle.INSET_ALPHA
-                                    * opacity * opening.getOpacity()) << 24)
-                                    | LostTalesChatVisualStyle.backdropRgb());
+                            LostTalesChatVisualStyle.argb(
+                                    LostTalesChatVisualStyle.SURFACE_RGB,
+                                    Math.round(LostTalesChatVisualStyle
+                                            .INSET_ALPHA * opacity
+                                            * opening.getOpacity())));
                 }
                 // Rows the history does not reach: hatched, so the
                 // region reads as holding no messages rather than as a
-                // gap. The hatch hangs from the panel's top and its
-                // lower edge follows the stack's top exactly, entry
+                // gap. The hatch hangs from the panel's top and stops
+                // one gap short of the stack's top — the space two
+                // groups stand apart by, so the hatch reads as a stretch
+                // of its own above the history rather than as part of
+                // its first row — following the stack exactly, entry
                 // motion included. Only a history too short for the room
                 // has such rows; anything that can scroll fills it, so
                 // the head-room band above a scrolled stack stays plain
                 // panel. An empty view's invitation stands on the row
                 // the newest message would take, and that row is a
-                // message's row: the hatch stops above it rather than
-                // running under the words.
+                // message's row: the hatch keeps the same gap above it.
                 float hatchedHeight = plannedHeight
                         + (totalLineCount <= 0 ? LINE_HEIGHT : 0.0F);
                 if (totalHeight < roomUnscaled - 0.01F) {
@@ -984,7 +998,7 @@ final class LostTalesChatOverlayRenderer {
                                                     .SEPARATOR_WIDTH
                                     : panelLeft,
                             topEdge, panelRight,
-                            Math.min(0.0F, offset - hatchedHeight),
+                            hatchBottom(offset, hatchedHeight),
                             Math.round(EMPTY_HATCH_ALPHA * opacity
                                     * opening.getOpacity()));
                 }
@@ -1070,7 +1084,7 @@ final class LostTalesChatOverlayRenderer {
                     // The row's bottom edge, measured up the stack from
                     // the row the scroll rests on.
                     int y = -(rows.top(rowIndex) - Math.round(stackBase));
-                    float entry = entrySlide(line);
+                    float entry = alignment.slide(entrySlide(line));
                     // A reply's quote and a message's reaction chips are
                     // the chat's small text: drawn shrunk from where the
                     // row's first run starts, and hit where they are.
@@ -1174,13 +1188,14 @@ final class LostTalesChatOverlayRenderer {
                     if (!open) {
                         // A feed line softens the world behind its own
                         // band: the blur rides the line, fades with its
-                        // age, and thins to the right like its backdrop.
-                        // Without a fresh capture nothing is drawn.
+                        // age, and thins away from where the lines stand
+                        // like its backdrop. Without a fresh capture
+                        // nothing is drawn.
                         LostTalesGuiRegionBlur.getInstance()
                                 .drawFadedRegionInTransform(
                                         panelLeft, y - rowHeight,
                                         panelRight, y,
-                                        BACKDROP_FADE_WEIGHTS,
+                                        alignment.bandWeights(),
                                         originX + entry * scale,
                                         originY + stackOffset, scale,
                                         alpha / 255.0F);
@@ -1198,19 +1213,24 @@ final class LostTalesChatOverlayRenderer {
                                 0.0F);
                         drawChatBackdrop(panelLeft,
                                 y - rowHeight - headroom / scale,
-                                panelRight, y, alpha / 2, color);
+                                panelRight, y, alpha / 2, color,
+                                alignment.bandWeights());
                     }
-                    if (pinged) {
-                        // A mention also wears a solid bar on the
-                        // message area's left edge — just past the
+                    if (pinged && alignment.hasMentionBar()) {
+                        // A mention also wears a solid bar on the edge
+                        // the lines stand against — just past the
                         // timestamp column's separator, when there is
                         // one — the way Discord's does: the tint says
                         // the line, the bar says it at a glance from
-                        // across the window.
-                        float barLeft = panelLeft + (columns.enabled
-                                ? columns.separatorX()
-                                        + ChatTimestampColumn.SEPARATOR_WIDTH
-                                : 0.0F);
+                        // across the window. A feed of centred lines has
+                        // no such edge and wears the tint alone.
+                        float barLeft = alignment == ChatFeedAlignment.RIGHT
+                                ? panelRight - MENTION_BAR_WIDTH
+                                : panelLeft + (columns.enabled
+                                        ? columns.separatorX()
+                                                + ChatTimestampColumn
+                                                        .SEPARATOR_WIDTH
+                                        : 0.0F);
                         fillRect(barLeft, y - rowHeight - headroom / scale,
                                 barLeft + MENTION_BAR_WIDTH, y,
                                 (alpha << 24) | mentionRgb);
@@ -1278,7 +1298,9 @@ final class LostTalesChatOverlayRenderer {
                     GL11.glEnable(GL11.GL_BLEND);
                     IChatComponent component = line.func_151461_a();
                     GL11.glPushMatrix();
-                    GL11.glTranslatef(0.0F, y - (float)TEXT_OFFSET, 0.0F);
+                    GL11.glTranslatef(feedRowShift(font, component,
+                            alignment, unscaledWidth, smallPivot,
+                            smallScale), y - (float)TEXT_OFFSET, 0.0F);
                     if (smallPivot >= 0.0F) {
                         // The row keeps where its first run starts and
                         // shrinks from there, its capitals centred on a
@@ -1497,6 +1519,116 @@ final class LostTalesChatOverlayRenderer {
     static int toolbarTop(int rowBottom, int rowHeight) {
         return rowBottom - rowHeight
                 + (rowHeight - TOOLBAR_BUTTON_SIZE) / 2;
+    }
+
+    /**
+     * Where the hatch over rows the history does not reach ends, in the
+     * stack's own units above the resting baseline: one gap
+     * ({@link ChatStackRows#SPACER_HEIGHT}) short of the stack's top,
+     * which stands {@code hatchedHeight} above the baseline and moves
+     * with the stack's {@code offset}; never below the baseline.
+     */
+    static float hatchBottom(float offset, float hatchedHeight) {
+        return Math.min(0.0F,
+                offset - hatchedHeight - ChatStackRows.SPACER_HEIGHT);
+    }
+
+    /**
+     * How far the closed feed moves a row sideways for its alignment, in
+     * the stack's units and on the display's own grid, so that the row's
+     * ink, not its advance, meets the edge it stands against. A row drawn
+     * as small text shrinks from where its first run starts, so its ink
+     * ends where the shrink leaves it. Nothing for a row at the left.
+     */
+    private static float feedRowShift(FontRenderer font, IChatComponent row,
+                                      ChatFeedAlignment alignment,
+                                      float areaWidth, float smallPivot,
+                                      float smallScale) {
+        if (alignment == ChatFeedAlignment.LEFT || row == null
+                || font == null) {
+            return 0.0F;
+        }
+        float inkLeft = LostTalesChatVisualStyle.contentStart(row, false);
+        float inkRight = LostTalesChatVisualStyle.inkEnd(font, row, false);
+        if (smallPivot >= 0.0F) {
+            inkRight = smallPivot + (inkRight - smallPivot) * smallScale;
+        }
+        return snapToStackPixel(alignment.rowShift(areaWidth, inkLeft,
+                inkRight));
+    }
+
+    /**
+     * The shade along a clip's side where a line of text is cut: the
+     * history's edge fades turned on their side. {@code rgb} at
+     * {@code alpha} on the edge at {@code edgeX}, easing to nothing
+     * {@code depth} pixels in toward {@code limitX}, from {@code top} to
+     * {@code bottom}, on the same curve and in as many steps as the
+     * history's shades. A tab's name and the channel indicator's hang one
+     * from each side their marquee cuts, so a name slides into and out of
+     * sight the way the history scrolls under its rules.
+     */
+    static void drawSideFade(float edgeX, float limitX, float top,
+                             float bottom, float depth, int rgb, int alpha) {
+        int safeAlpha = Math.max(0, Math.min(255, alpha));
+        if (safeAlpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
+                || bottom <= top || depth <= 0.0F) {
+            return;
+        }
+        boolean inward = limitX > edgeX;
+        float far = inward ? Math.min(limitX, edgeX + depth)
+                : Math.max(limitX, edgeX - depth);
+        if (far == edgeX) {
+            return;
+        }
+        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
+        for (int step = 0; step < EDGE_FADE_ROWS; step++) {
+            float near = edgeX + (far - edgeX) * (step / (float)EDGE_FADE_ROWS);
+            float away = edgeX + (far - edgeX)
+                    * ((step + 1) / (float)EDGE_FADE_ROWS);
+            int nearAlpha = Math.round(safeAlpha * (1.0F
+                    - LostTalesChatMotion.smoothStep(
+                            step / (float)EDGE_FADE_ROWS)));
+            int awayAlpha = Math.round(safeAlpha * (1.0F
+                    - LostTalesChatMotion.smoothStep(
+                            (step + 1) / (float)EDGE_FADE_ROWS)));
+            // Each piece is taken left to right, so the winding is the
+            // backdrop's whichever side the shade hangs from.
+            float x0 = inward ? near : away;
+            float x1 = inward ? away : near;
+            int alpha0 = inward ? nearAlpha : awayAlpha;
+            int alpha1 = inward ? awayAlpha : nearAlpha;
+            // Same winding as the backdrop: the GUI pass culls back faces.
+            tessellator.setColorRGBA_I(rgb, alpha1);
+            tessellator.addVertex(x1, bottom, 0.0D);
+            tessellator.addVertex(x1, top, 0.0D);
+            tessellator.setColorRGBA_I(rgb, alpha0);
+            tessellator.addVertex(x0, top, 0.0D);
+            tessellator.addVertex(x0, bottom, 0.0D);
+        }
+        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+    }
+
+    /**
+     * How strongly a side fade hangs from an edge text is cut at: as far
+     * as the text has gone past the edge, up to the fade's depth. The
+     * shade comes and goes with the marquee instead of appearing, and an
+     * edge nothing is cut at wears none.
+     */
+    static float sideFadeStrength(double hiddenPixels, float depth) {
+        if (depth <= 0.0F || hiddenPixels <= 0.0D) {
+            return 0.0F;
+        }
+        return (float)Math.min(1.0D, hiddenPixels / depth);
+    }
+
+    /**
+     * How deep a side fade reaches into a clip {@code width} pixels wide:
+     * one line, as the history's top shade does, but never past a third of
+     * the clip, so a short name keeps its middle clear.
+     */
+    static float sideFadeDepth(double width) {
+        return (float)Math.max(0.0D,
+                Math.min(TOP_EDGE_FADE_HEIGHT, width / 3.0D));
     }
 
     /**
@@ -2520,10 +2652,10 @@ final class LostTalesChatOverlayRenderer {
         try {
             GL14.glBlendEquation(GL14.GL_FUNC_REVERSE_SUBTRACT);
             drawChatBackdrop(curveLeft, left, top, right, bottom, alpha,
-                    fromRgb, GL11.GL_ONE);
+                    fromRgb, GL11.GL_ONE, BACKDROP_FADE_WEIGHTS);
             GL14.glBlendEquation(GL14.GL_FUNC_ADD);
             drawChatBackdrop(curveLeft, left, top, right, bottom, alpha,
-                    toRgb, GL11.GL_ONE);
+                    toRgb, GL11.GL_ONE, BACKDROP_FADE_WEIGHTS);
         } finally {
             GL14.glBlendEquation(GL14.GL_FUNC_ADD);
         }
@@ -2543,6 +2675,18 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
+     * As above with the band's own opacity profile, sampled evenly from
+     * its left edge to its right: the closed feed's lines thin out away
+     * from whichever edge they stand against ({@link ChatFeedAlignment}).
+     */
+    private static void drawChatBackdrop(
+            float left, float top, float right, float bottom, int alpha,
+            int backdropRgb, float[] weights) {
+        drawChatBackdrop(left, left, top, right, bottom, alpha, backdropRgb,
+                GL11.GL_ONE_MINUS_SRC_ALPHA, weights);
+    }
+
+    /**
      * As above for the part of a band from {@code left} rightward, its
      * curve still running from {@code curveLeft}: a window's message
      * area starts at the timestamp column's separator, and its backdrop
@@ -2554,21 +2698,25 @@ final class LostTalesChatOverlayRenderer {
             float curveLeft, float left, float top, float right,
             float bottom, int alpha, int backdropRgb) {
         drawChatBackdrop(curveLeft, left, top, right, bottom, alpha,
-                backdropRgb, GL11.GL_ONE_MINUS_SRC_ALPHA);
+                backdropRgb, GL11.GL_ONE_MINUS_SRC_ALPHA,
+                BACKDROP_FADE_WEIGHTS);
     }
 
     /**
      * As above with the framebuffer's own share weighted by
-     * {@code destinationFactor}: {@code GL_ONE} adds the band to what
-     * is there, or, under a reversed blend equation, takes it away. The
-     * framebuffer's alpha is left as it is.
+     * {@code destinationFactor} — {@code GL_ONE} adds the band to what
+     * is there, or, under a reversed blend equation, takes it away — and
+     * the opacity profile {@code weights}, sampled evenly from the
+     * curve's left edge to the band's right, one more sample than the
+     * steps it is drawn in. The framebuffer's alpha is left as it is.
      */
     private static void drawChatBackdrop(
             float curveLeft, float left, float top, float right,
             float bottom, int alpha, int backdropRgb,
-            int destinationFactor) {
+            int destinationFactor, float[] weights) {
         int safeAlpha = Math.max(0, Math.min(255, alpha));
-        if (right <= left || bottom <= top || safeAlpha <= 0) {
+        int steps = weights == null ? 0 : weights.length - 1;
+        if (right <= left || bottom <= top || safeAlpha <= 0 || steps < 1) {
             return;
         }
         Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
@@ -2577,15 +2725,14 @@ final class LostTalesChatOverlayRenderer {
                     GL11.GL_ZERO, GL11.GL_ONE);
         }
         float width = right - curveLeft;
-        for (int step = 0; step < BACKDROP_FADE_STEPS; step++) {
-            float x0 = curveLeft + width * step / (float)BACKDROP_FADE_STEPS;
-            float x1 = curveLeft
-                    + width * (step + 1) / (float)BACKDROP_FADE_STEPS;
+        for (int step = 0; step < steps; step++) {
+            float x0 = curveLeft + width * step / (float)steps;
+            float x1 = curveLeft + width * (step + 1) / (float)steps;
             if (x1 <= left) {
                 continue;
             }
-            float w0 = BACKDROP_FADE_WEIGHTS[step];
-            float w1 = BACKDROP_FADE_WEIGHTS[step + 1];
+            float w0 = weights[step];
+            float w1 = weights[step + 1];
             if (x0 < left) {
                 w0 += (w1 - w0) * (left - x0) / (x1 - x0);
                 x0 = left;

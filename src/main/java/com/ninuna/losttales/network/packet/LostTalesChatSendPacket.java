@@ -46,6 +46,23 @@ public final class LostTalesChatSendPacket implements IMessage {
     private static final int MAX_IDENTITY_BYTES = 256;
     /** A presence flag and a UUID: the appended target-character tail. */
     static final int TARGET_ID_TAIL_BYTES = 1 + 2 * 8;
+    /**
+     * Whose line an unnamed quote is, as far as the sender can say: a
+     * line of somebody the server cannot vouch for, which is quoted
+     * without a head.
+     */
+    public static final int QUOTE_OTHER = 0;
+    /**
+     * A line of the sender's own — the echo of a command they ran, say —
+     * which the server draws with the head it signs the sender with, and
+     * only when the quote names an identity of theirs.
+     */
+    public static final int QUOTE_OWN = 1;
+    /**
+     * A line of the Server or of the Client itself, which wears the
+     * console mark: a mark that claims no more than the name beside it.
+     */
+    public static final int QUOTE_SYSTEM = 2;
 
     private String channelId = "";
     private String message = "";
@@ -101,6 +118,12 @@ public final class LostTalesChatSendPacket implements IMessage {
      */
     private String quoteAuthor = "";
     private String quoteExcerpt = "";
+    /**
+     * Whose that line is ({@link #QUOTE_OTHER}, {@link #QUOTE_OWN} or
+     * {@link #QUOTE_SYSTEM}): a claim the server checks against what it
+     * knows before it draws any head for it. Only with a quote.
+     */
+    private int quoteSource = QUOTE_OTHER;
     private boolean malformed;
 
     public LostTalesChatSendPacket() {}
@@ -178,8 +201,25 @@ public final class LostTalesChatSendPacket implements IMessage {
                                    String targetIdentity, long echoNonce,
                                    UUID targetCharacterId,
                                    String quoteAuthor, String quoteExcerpt) {
+        this(channel, message, references, target, appearanceKind,
+                appearanceCharacterId, replyToMessageId, targetIdentity,
+                echoNonce, targetCharacterId, quoteAuthor, quoteExcerpt,
+                QUOTE_OTHER);
+    }
+
+    public LostTalesChatSendPacket(ChatChannel channel, String message,
+                                   List<ChatShareReference> references,
+                                   String target, int appearanceKind,
+                                   UUID appearanceCharacterId,
+                                   long replyToMessageId,
+                                   String targetIdentity, long echoNonce,
+                                   UUID targetCharacterId,
+                                   String quoteAuthor, String quoteExcerpt,
+                                   int quoteSource) {
         this.quoteAuthor = quoteAuthor == null ? "" : quoteAuthor.trim();
         this.quoteExcerpt = quoteExcerpt == null ? "" : quoteExcerpt.trim();
+        this.quoteSource = this.quoteAuthor.length() == 0 ? QUOTE_OTHER
+                : quoteSource;
         this.targetCharacterId = targetCharacterId;
         this.echoNonce = echoNonce;
         this.targetIdentity = targetIdentity == null ? ""
@@ -261,11 +301,18 @@ public final class LostTalesChatSendPacket implements IMessage {
             // inside that tail is never read as a quote.
             this.quoteAuthor = "";
             this.quoteExcerpt = "";
+            this.quoteSource = QUOTE_OTHER;
             if (targetTail && buffer.readableBytes() >= 1) {
                 this.quoteAuthor = LostTalesPacketCodec.readUtf8String(
                         buffer, ChatReplyReference.MAX_AUTHOR_BYTES).trim();
                 this.quoteExcerpt = LostTalesPacketCodec.readUtf8String(
                         buffer, ChatReplyReference.MAX_EXCERPT_BYTES).trim();
+                // Appended after the quote: whose line it is. A quote
+                // written before it names nobody the server could vouch
+                // for, and is drawn without a head as it was then.
+                if (buffer.readableBytes() >= 1) {
+                    this.quoteSource = buffer.readUnsignedByte();
+                }
             }
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
@@ -273,6 +320,7 @@ public final class LostTalesChatSendPacket implements IMessage {
             this.malformed = true;
             this.quoteAuthor = "";
             this.quoteExcerpt = "";
+            this.quoteSource = QUOTE_OTHER;
             this.targetCharacterId = null;
             this.target = "";
             this.references = Collections.emptyList();
@@ -326,11 +374,31 @@ public final class LostTalesChatSendPacket implements IMessage {
                     ChatReplyReference.MAX_AUTHOR_BYTES);
             LostTalesPacketCodec.writeUtf8String(buffer, this.quoteExcerpt,
                     ChatReplyReference.MAX_EXCERPT_BYTES);
+            buffer.writeByte(this.quoteSource);
         }
     }
 
+    /**
+     * Whose line an unnamed quote is, from the head the quote wears on
+     * the sender's own screen: a line of the Server's or the Client's,
+     * one of the sender's own, or somebody else's — an NPC included,
+     * whose portrait means nothing to anyone else.
+     */
+    public static int quoteSourceOf(ChatReplyReference reply, UUID sender) {
+        if (reply == null || !reply.hasHead() || reply.isNpcLine()) {
+            return QUOTE_OTHER;
+        }
+        if (LostTalesChatMessagePacket.isSystemSender(reply.getSenderId())) {
+            return QUOTE_SYSTEM;
+        }
+        return reply.getSenderId().equals(sender) ? QUOTE_OWN : QUOTE_OTHER;
+    }
+
     private void validate() {
-        if (this.replyToMessageId != ChatMessageIds.NONE
+        if (this.quoteSource < QUOTE_OTHER || this.quoteSource > QUOTE_SYSTEM
+                || (this.quoteSource != QUOTE_OTHER
+                        && this.quoteAuthor.length() == 0)
+                || this.replyToMessageId != ChatMessageIds.NONE
                 && !ChatMessageIds.isServerId(this.replyToMessageId)
                 // A quote of an unnamed line and a message id are two
                 // answers to one question.
@@ -401,6 +469,8 @@ public final class LostTalesChatSendPacket implements IMessage {
     public String getQuoteAuthor() { return this.quoteAuthor; }
     /** What the unnamed line this one quotes said; empty for none. */
     public String getQuoteExcerpt() { return this.quoteExcerpt; }
+    /** Whose that line is, as the sender claims: one of the {@code QUOTE_*} constants. */
+    public int getQuoteSource() { return this.quoteSource; }
     public boolean isMalformed() { return this.malformed; }
 
     public static final class Handler implements IMessageHandler<

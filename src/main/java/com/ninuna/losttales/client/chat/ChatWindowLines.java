@@ -233,6 +233,28 @@ final class ChatWindowLines {
     }
 
     /**
+     * A fading view's runs, broken wherever a message (newest first)
+     * arrived a whole fade after the one before it. A run fades on its
+     * newest message's clock, so a line the view had already let go —
+     * history printed while this client caught up — would otherwise come
+     * back with the next line its speaker says.
+     */
+    static boolean[] heldToArrivals(boolean[] grouped,
+                                    int[] arrivalsNewestFirst) {
+        boolean[] held = grouped == null ? new boolean[0] : grouped.clone();
+        int count = Math.min(held.length,
+                arrivalsNewestFirst == null ? 0 : arrivalsNewestFirst.length);
+        for (int index = 0; index + 1 < count; index++) {
+            if (held[index] && arrivalsNewestFirst[index]
+                    - arrivalsNewestFirst[index + 1]
+                    >= LostTalesChatOverlayRenderer.FEED_FADE_TICKS) {
+                held[index] = false;
+            }
+        }
+        return held;
+    }
+
+    /**
      * The arrival tick a blank row between two runs is aged on. In a
      * fading view the row must leave with whichever neighbour leaves
      * first, which is the older run; a row kept on the newer run's clock
@@ -710,6 +732,13 @@ final class ChatWindowLines {
                     ? ChatGroupRuns.continuationsInFeed(lineIds)
                     : ChatGroupRuns.continuationsOf(lineIds,
                             runsOpenedByDays(days));
+            if (this.fading) {
+                int[] arrivals = new int[visible.size()];
+                for (int index = 0; index < visible.size(); index++) {
+                    arrivals[index] = visible.get(index).getUpdatedCounter();
+                }
+                grouped = heldToArrivals(grouped, arrivals);
+            }
             boolean[] spacers = spacersAfter(lineIds, grouped);
             Map<ChatLine, Piece> kept = new IdentityHashMap<ChatLine, Piece>(
                     this.wrapped.size() + 1);

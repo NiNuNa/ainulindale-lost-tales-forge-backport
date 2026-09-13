@@ -1149,7 +1149,8 @@ final class ChatScreenMenus {
         // Composing happens where the message lives, and selecting a tab
         // clears any reply, so the target is set after the move.
         this.tabActions.selectChannel(tab);
-        this.composer.startReply(tab, id, name, excerpt);
+        this.composer.startReply(tab, id, name, excerpt,
+                LostTalesChatPresentation.headOfLine(this.menuChatLineId));
     }
 
     /**

@@ -2,6 +2,7 @@ package com.ninuna.losttales.config.client;
 
 import com.ninuna.losttales.client.camera.CameraPresetId;
 import com.ninuna.losttales.client.camera.CameraPresetFileStore;
+import com.ninuna.losttales.config.LostTalesConfigDefinitions;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 import java.io.File;
 import net.minecraftforge.common.config.Configuration;
@@ -20,6 +21,12 @@ public final class LostTalesThirdPersonConfig {
 
     private static File loadedConfigFile;
     private static Configuration pendingGuiConfiguration;
+    /**
+     * Every camera option as the mod ships it
+     * ({@link LostTalesConfigDefinitions}): read on the first load against
+     * no file, while each field still holds its shipped value.
+     */
+    private static Configuration shipped;
 
     public static boolean enabled = false;
     public static String cameraPreset =
@@ -87,12 +94,20 @@ public final class LostTalesThirdPersonConfig {
     public static void load(File configDirectory) {
         loadedConfigFile = LostTalesConfigFiles.clientFile(configDirectory,
                 LostTalesConfigFiles.CAMERA_OPTIONS);
-        loadConfiguration(new Configuration(loadedConfigFile));
+        if (shipped == null) {
+            // Nothing has changed a field yet: read against no file, every
+            // option keeps its shipped value, and what is left is each
+            // option as it is defined.
+            Configuration definitions = new Configuration();
+            readOptions(definitions, false);
+            shipped = definitions;
+        }
+        readOptions(new Configuration(loadedConfigFile), true);
     }
 
     public static void reload() {
         if (loadedConfigFile != null) {
-            loadConfiguration(new Configuration(loadedConfigFile));
+            readOptions(new Configuration(loadedConfigFile), true);
         }
     }
 
@@ -117,9 +132,29 @@ public final class LostTalesThirdPersonConfig {
         }
     }
 
-    private static void loadConfiguration(Configuration config) {
+    /**
+     * Gives every camera option of {@code config} the definition the mod
+     * ships it with — default, comment, bounds, words — and leaves what
+     * each is set to alone ({@link LostTalesConfigDefinitions}). Nothing
+     * before the first load.
+     */
+    public static void applyShippedDefinitions(Configuration config) {
+        LostTalesConfigDefinitions.apply(shipped, config);
+    }
+
+    /**
+     * Reads every camera option of {@code config} into its field, the
+     * field's own value standing as the default of an option the
+     * configuration does not hold. From the file ({@code fromFiles}) the
+     * configuration is loaded first and written back, every option in
+     * its shipped definition, when anything changed; a configuration of
+     * no file is only read.
+     */
+    private static void readOptions(Configuration config, boolean fromFiles) {
         try {
-            config.load();
+            if (fromFiles) {
+                config.load();
+            }
 
             enabled = config.getBoolean(
                     "enabled", CATEGORY_CAMERA, enabled,
@@ -166,9 +201,11 @@ public final class LostTalesThirdPersonConfig {
                     "Distance in blocks at which an existing target lock is released. Values below the selection range are raised to match it.");
             if (targetLockReleaseRange < targetLockSelectionRange) {
                 targetLockReleaseRange = targetLockSelectionRange;
-                config.get(CATEGORY_CAMERA, "targetLockReleaseRange",
-                        targetLockReleaseRange).set(
-                        targetLockReleaseRange);
+                // Back as a value: a get naming a default would redefine
+                // the option and drop its comment.
+                config.getCategory(CATEGORY_CAMERA)
+                        .get("targetLockReleaseRange")
+                        .set(targetLockReleaseRange);
             }
             targetLockSelectionAngle = getClampedDouble(
                     config, "targetLockSelectionAngle",
@@ -290,8 +327,8 @@ public final class LostTalesThirdPersonConfig {
                     "Farthest distance allowed when holding the Lost Tales modifier key and scrolling out.");
             if (maximumZoomDistance < minimumZoomDistance) {
                 maximumZoomDistance = minimumZoomDistance;
-                config.get(CATEGORY_CAMERA, "maximumZoomDistance",
-                        maximumZoomDistance).set(maximumZoomDistance);
+                config.getCategory(CATEGORY_CAMERA)
+                        .get("maximumZoomDistance").set(maximumZoomDistance);
             }
             zoomStep = getClampedDouble(
                     config, "zoomStep", zoomStep,
@@ -372,8 +409,11 @@ public final class LostTalesThirdPersonConfig {
                     "Keep camera-relative visual body facing while swimming. Disable to retain vanilla swimming body rotation.");
             removeObsoleteProperties(config);
             applyGuiMetadata(config);
+            if (fromFiles) {
+                applyShippedDefinitions(config);
+            }
         } finally {
-            if (config.hasChanged()) {
+            if (fromFiles && config.hasChanged()) {
                 config.save();
             }
         }

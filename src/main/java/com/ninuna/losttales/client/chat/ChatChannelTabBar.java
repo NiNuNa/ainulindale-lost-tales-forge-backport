@@ -225,15 +225,18 @@ final class ChatChannelTabBar {
     static final int MIN_GRIP_WIDTH = GRIP_WIDTH + GRIP_INSET;
     /**
      * Opacity of a tab's surface, which the bar paints itself in one
-     * layer under the border artwork's ink. The artwork carries a
-     * preview of the surface behind its ink at this same alpha; the
-     * preview is cut away at draw time on {@link #TAB_INK_THRESHOLD}.
+     * layer under the border artwork's ink: the chat's inset opacity, two
+     * thirds, so a tab nobody has picked or is pointing at wears exactly
+     * the surface the typing well and the timestamp column wear. The
+     * artwork previews the surface behind its ink at about this alpha;
+     * the preview is cut away at draw time on {@link #TAB_INK_THRESHOLD}.
      */
-    private static final int TAB_SURFACE_ALPHA = 0xAB;
+    private static final int TAB_SURFACE_ALPHA =
+            LostTalesChatVisualStyle.INSET_ALPHA;
     /**
      * Fragment-alpha share separating a tab piece's ink from the
      * surface preview behind it: ink is authored fully opaque, the
-     * preview at {@link #TAB_SURFACE_ALPHA}, and only what clears the
+     * preview at about {@link #TAB_SURFACE_ALPHA}, and only what clears the
      * threshold is drawn. The surface itself is painted by the bar in a
      * single layer, so the states stay one colour instead of stacking;
      * {@link ChatIconSheetTest} keeps the artwork on the right sides of
@@ -977,7 +980,8 @@ final class ChatChannelTabBar {
         try {
             drawTabContents(font, tab, row, hovered, left, right,
                     top + INTERIOR_TOP, drawn, textAlpha,
-                    scaled(Math.round(0xFF * dim)));
+                    scaled(Math.round(0xFF * dim)),
+                    tabSurfaceRgb(selected, lit));
         } finally {
             LostTalesChatOverlayRenderer.endVerticalClip(clipped);
         }
@@ -995,7 +999,8 @@ final class ChatChannelTabBar {
     private void drawTabContents(FontRenderer font, Tab tab, Row row,
                                  Hit hovered, float left, float right,
                                  int interiorTop, TabControls drawn,
-                                 int textAlpha, int controlAlpha) {
+                                 int textAlpha, int controlAlpha,
+                                 int surfaceRgb) {
         // The words are drawn at whole coordinates inside a matrix moved
         // by whatever fraction of a pixel the tab stands on, since the
         // font draws at whole ones: the glyphs then land on the same
@@ -1025,7 +1030,7 @@ final class ChatChannelTabBar {
         double labelRoom = labelRoomExact(drawn, tab.labelWidth,
                 right - left - tab.fixedWidth);
         drawTabLabel(font, tab, textX, fraction, textY, textAlpha, left, right,
-                labelRoom);
+                labelRoom, interiorTop, surfaceRgb);
         drawTabCounters(font, tab, textX + fraction + labelRoom, textY,
                 textAlpha);
         drawTabControls(tab, hovered, drawn, left, right, interiorTop,
@@ -1037,12 +1042,17 @@ final class ChatChannelTabBar {
      * wider than its room is cut at the room's end — inside the tab's
      * own cut, both given to the scissor at once since one replaces the
      * other — and slid left by the marquee while hovered, its offset
-     * laid on a display pixel so the glyphs stay on theirs.
+     * laid on a display pixel so the glyphs stay on theirs. A cut name
+     * sinks into the edges it is cut at, as the history sinks into its
+     * rules: a shade in the tab's own tone ({@code surfaceRgb}) hangs
+     * from each side as far as the name runs past it, across the rows
+     * of the tab's interior from {@code interiorTop}.
      */
     private void drawTabLabel(FontRenderer font, Tab tab, int textX,
                               float fraction, int textY, int textAlpha,
                               float tabLeft, float tabRight,
-                              double labelRoom) {
+                              double labelRoom, int interiorTop,
+                              int surfaceRgb) {
         String text = tab.muted ? "§o" + tab.label : tab.label;
         if (tab.labelWidth <= labelRoom) {
             drawWords(font, text, textX, fraction, textY, textAlpha);
@@ -1062,9 +1072,46 @@ final class ChatChannelTabBar {
             double offset = snapped(tab.marqueeOffset, displayStep());
             drawWords(font, text, textX, (float)(fraction - offset), textY,
                     textAlpha);
+            float depth = LostTalesChatOverlayRenderer.sideFadeDepth(
+                    clipRight - clipLeft);
+            double wordsLeft = roomLeft - offset;
+            float top = interiorTop - 1;
+            float bottom = interiorTop + INTERIOR_HEIGHT + 1;
+            LostTalesChatOverlayRenderer.drawSideFade((float)clipLeft,
+                    (float)clipRight, top, bottom, depth, surfaceRgb,
+                    sideFadeAlpha(clipLeft - wordsLeft, depth, textAlpha));
+            LostTalesChatOverlayRenderer.drawSideFade((float)clipRight,
+                    (float)clipLeft, top, bottom, depth, surfaceRgb,
+                    sideFadeAlpha(wordsLeft + tab.labelWidth - clipRight,
+                            depth, textAlpha));
         } finally {
             LostTalesChatOverlayRenderer.endVerticalClip(clipped);
         }
+    }
+
+    /**
+     * The opacity of a side fade with {@code hiddenPixels} of a name past
+     * its edge, for a tab drawn at {@code textAlpha}: the history's edge
+     * shade, as strong as the name has gone out of sight.
+     */
+    static int sideFadeAlpha(double hiddenPixels, float depth,
+                             int textAlpha) {
+        return Math.round(LostTalesChatOverlayRenderer.EDGE_FADE_ALPHA
+                * LostTalesChatOverlayRenderer.sideFadeStrength(hiddenPixels,
+                        depth) * textAlpha / 255.0F);
+    }
+
+    /**
+     * The tone of a tab's one surface: the selected tab's lit plum grey,
+     * and a resting one's plum black crossed toward it as far as the
+     * pointer has lit it. A cut name's side fades are drawn in the same
+     * tone, so the name sinks into its own tab.
+     */
+    private static int tabSurfaceRgb(boolean selected, float lit) {
+        return selected ? LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB
+                : LostTalesChatVisualStyle.blend(
+                        LostTalesChatVisualStyle.SURFACE_RGB,
+                        LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB, lit);
     }
 
     /**
@@ -1181,21 +1228,17 @@ final class ChatChannelTabBar {
         // the whole tab lights together rather than in two steps.
         ChatIconSheet leftLit = null;
         ChatIconSheet rightLit = null;
-        int surfaceRgb;
+        int surfaceRgb = tabSurfaceRgb(selected, lit);
         int tipRgb;
         if (selected) {
             leftPiece = ChatIconSheet.TAB_SELECTED_LEFT;
             rightPiece = ChatIconSheet.TAB_SELECTED_RIGHT;
-            surfaceRgb = LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB;
             tipRgb = TIP_LIT_RGB;
         } else {
             leftPiece = ChatIconSheet.TAB_LEFT;
             rightPiece = ChatIconSheet.TAB_RIGHT;
             leftLit = ChatIconSheet.TAB_HOVER_LEFT;
             rightLit = ChatIconSheet.TAB_HOVER_RIGHT;
-            surfaceRgb = LostTalesChatVisualStyle.blend(
-                    LostTalesChatVisualStyle.SURFACE_RGB,
-                    LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB, lit);
             tipRgb = LostTalesChatVisualStyle.blend(TIP_RGB, TIP_LIT_RGB,
                     lit);
         }

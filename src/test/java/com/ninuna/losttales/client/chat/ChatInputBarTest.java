@@ -70,9 +70,11 @@ public final class ChatInputBarTest {
 
     /**
      * The typing well is one message row, and everything in it stands
-     * where a message row puts it: the text two rows down, the ten-row
-     * content box — previews, caret, selection — a clear row above and
-     * below. What is typed sits exactly as it will once it is sent.
+     * where a message row puts it: the text two rows down, and an emoji
+     * or item preview on the capitals, two rows above the text. The caret
+     * and the selection wash take the well's middle ten rows, a clear row
+     * short of it at both ends. What is typed sits exactly as it will
+     * once it is sent.
      */
     @Test
     public void theWellLaysItsContentOutLikeAMessageRow() {
@@ -80,13 +82,17 @@ public final class ChatInputBarTest {
         int wellTop = ChatInputBar.wellTopFor(barTop);
         int wellBottom = wellTop + LostTalesChatOverlayRenderer.LINE_HEIGHT;
         int textTop = ChatInputBar.textTopFor(barTop);
-        int contentTop = ChatInlineIcons.rowContentTop(textTop);
-        int contentBottom = contentTop + (int)ChatInlineIcons.CONTENT_SIZE;
+        int caretTop = ChatInputField.caretTop(textTop);
+        int caretBottom = caretTop + (int)ChatInlineIcons.CONTENT_SIZE;
         assertEquals(LostTalesChatOverlayRenderer.ROW_TEXT_TOP,
                 textTop - wellTop);
-        assertEquals(1, contentTop - wellTop);
-        assertEquals(1, wellBottom - contentBottom);
-        assertEquals(contentTop, ChatInlineIcons.rowBoxTop(textTop,
+        assertEquals(1, caretTop - wellTop);
+        assertEquals(1, wellBottom - caretBottom);
+        assertEquals(textTop + LostTalesChatOverlayRenderer.centredBoxTop(
+                        (int)ChatInlineIcons.CONTENT_SIZE),
+                ChatInlineIcons.boxTop(textTop, ChatInlineIcons.SLOT_WIDTH),
+                0.0F);
+        assertEquals(wellTop, ChatInlineIcons.boxTop(textTop,
                 ChatInlineIcons.SLOT_WIDTH), 0.0F);
         // Level with the bar's buttons, which are as tall.
         assertEquals(ChatInputBar.controlTopFor(barTop), wellTop);

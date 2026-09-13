@@ -621,24 +621,30 @@ final class ChatPopupMenu {
                         rowY + ROW_HEIGHT - 1,
                         LostTalesChatVisualStyle.argb(entry.color, 0xFF));
             }
+            // An icon or a head stands beside the label as it does in a
+            // message row: centred on the label's capitals by the chat's
+            // one rule, on whole pixels, since both are pixel art.
+            int labelTop = rowY + 2;
             if (entry.icon != null) {
                 ChatChannelIcons.draw(Minecraft.getMinecraft(), entry.icon,
                         this.x + this.labelX - ChatChannelIcons.SIZE
                                 - ChatChannelIcons.GAP,
-                        rowY + 0.5F, 255);
+                        labelTop + ChatInlineIcons.CONTENT_TOP_OFFSET, 255);
             } else if (entry.head != null) {
                 // A head drawn as the tabs draw theirs: eight pixels,
-                // centred in the icon column.
+                // centred across the icon column.
                 float headX = this.x + this.labelX - ChatChannelIcons.SIZE
                         - ChatChannelIcons.GAP + 1.0F;
+                float headY = labelTop
+                        + LostTalesChatOverlayRenderer.HEAD_TOP_OFFSET;
                 if (entry.head.skinId.length() == 0) {
                     LostTalesCharacterHeadIconRenderer.drawAccountHead(
                             Minecraft.getMinecraft(), entry.head.owner,
-                            headX, rowY + 1.5F, 8.0F, 1.0F, 1.0F);
+                            headX, headY, 8.0F, 1.0F, 1.0F);
                 } else {
                     LostTalesCharacterHeadIconRenderer.drawSnapshotHead(
                             Minecraft.getMinecraft(), entry.head.owner,
-                            entry.head.skinId, headX, rowY + 1.5F, 8.0F,
+                            entry.head.skinId, headX, headY, 8.0F,
                             1.0F, 1.0F);
                 }
             } else if (entry.sprite != null) {

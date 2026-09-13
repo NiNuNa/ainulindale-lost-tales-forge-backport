@@ -69,6 +69,12 @@ public class LostTalesConfigGui extends GuiConfig {
 
         config.load();
         LostTalesConfig.applyGuiMetadata(config);
+        // Each option as the mod ships it — the default its button
+        // restores, its comment and bounds — and an option that is one
+        // of a few words a button stepping through them.
+        LostTalesConfig.applyShippedDefinitions(config);
+        LostTalesCycleEntry.offerChoices(config.getCategory(
+                LostTalesConfig.CATEGORY_CLIENT));
 
         Configuration cameraConfig =
                 LostTalesThirdPersonConfig.createConfiguration();
@@ -80,8 +86,13 @@ public class LostTalesConfigGui extends GuiConfig {
                     LostTalesThirdPersonConfig.CATEGORY_CAMERA,
                     "cameraPreset",
                     LostTalesThirdPersonConfig.cameraPreset);
+            // Each option as the mod ships it; the preset's words are
+            // whichever preset files there are now.
+            LostTalesThirdPersonConfig.applyShippedDefinitions(cameraConfig);
             presetProperty.setValidValues(
                     CameraPresetFileStore.getConfigValues());
+            LostTalesCycleEntry.offerChoices(cameraConfig.getCategory(
+                    LostTalesThirdPersonConfig.CATEGORY_CAMERA));
             elements.add(group(
                     "thirdPersonCamera",
                     "losttales.config.category.client.thirdPersonCamera",
@@ -115,6 +126,7 @@ public class LostTalesConfigGui extends GuiConfig {
                 "enableChatPings", "chatPingSound", "chatBackgroundColor",
                 "chatSelectedLineColor", "chatMentionLineColor",
                 "chatSelectedMentionColor", "chatReplyHighlightColor",
+                "chatFeedAlignment", "hideHudWhileChatting",
                 "chatHistoryLines",
                 "sendChatTypingStatus", "showChatTypingIndicators",
                 "enableNpcChatStyling", "showChatSpeechBubbles",

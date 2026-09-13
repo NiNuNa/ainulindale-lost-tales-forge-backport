@@ -148,7 +148,17 @@ final class ChatOutbox {
                                 ? ClientChatChannelState.partnerCharacterIdOf(tab)
                                 : null,
                         named ? "" : reply.getAuthor(),
-                        named ? "" : reply.getExcerpt()));
+                        named ? "" : reply.getExcerpt(),
+                        // Whose the unnamed line is, as this screen shows
+                        // it: the server draws a head for it only where
+                        // it can vouch for one.
+                        named ? LostTalesChatSendPacket.QUOTE_OTHER
+                                : LostTalesChatSendPacket.quoteSourceOf(reply,
+                                        this.mc == null
+                                                || this.mc.thePlayer == null
+                                                ? null
+                                                : this.mc.thePlayer
+                                                        .getUniqueID())));
     }
 
     /**

@@ -64,6 +64,7 @@ public final class LostTalesServerConfigGui extends GuiConfig {
     private static List<IConfigElement> elementsOf(Configuration config) {
         List<IConfigElement> elements = new ArrayList<IConfigElement>();
         for (String category : new TreeSet<String>(config.getCategoryNames())) {
+            LostTalesCycleEntry.offerChoices(config.getCategory(category));
             List<IConfigElement> children =
                     new ConfigElement(config.getCategory(category)).getChildElements();
             elements.add(new DummyConfigElement.DummyCategoryElement(category,

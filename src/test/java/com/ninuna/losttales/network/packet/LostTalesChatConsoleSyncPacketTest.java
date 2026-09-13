@@ -108,4 +108,44 @@ public final class LostTalesChatConsoleSyncPacketTest {
         decoded.fromBytes(trailing);
         assertTrue(decoded.isMalformed());
     }
+
+    /**
+     * An entry sent as it happens is news; the replay on joining says
+     * where its reader arrived, as the id of their join line, and an
+     * entry with a smaller id is history to them.
+     */
+    @Test
+    public void aReplaySaysWhereItsReaderArrived() {
+        ChatConsoleEvent started = new ChatConsoleEvent(20L, 1000L,
+                ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO,
+                "Server", "Server started");
+        ChatConsoleEvent later = new ChatConsoleEvent(22L, 900L,
+                ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO,
+                "", "a new entry");
+        LostTalesChatConsoleSyncPacket live = new LostTalesChatConsoleSyncPacket(
+                Arrays.asList(started));
+        assertFalse(live.isReplay());
+        assertFalse(live.saidBeforeArrival(started));
+
+        LostTalesChatConsoleSyncPacket replay = new LostTalesChatConsoleSyncPacket(
+                Arrays.asList(started, later), 21L);
+        ByteBuf buffer = Unpooled.buffer();
+        replay.toBytes(buffer);
+        LostTalesChatConsoleSyncPacket decoded = new LostTalesChatConsoleSyncPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertTrue(decoded.isReplay());
+        assertEquals(21L, decoded.getArrivalId());
+        assertTrue(decoded.saidBeforeArrival(decoded.getEvents().get(0)));
+        assertFalse(decoded.saidBeforeArrival(decoded.getEvents().get(1)));
+
+        // Entries written without it are news, as they were then.
+        buffer = Unpooled.buffer();
+        replay.toBytes(buffer);
+        LostTalesChatConsoleSyncPacket older = new LostTalesChatConsoleSyncPacket();
+        older.fromBytes(buffer.slice(0, buffer.readableBytes() - 8));
+        assertFalse(older.isMalformed());
+        assertFalse(older.isReplay());
+        assertFalse(older.saidBeforeArrival(older.getEvents().get(0)));
+    }
 }

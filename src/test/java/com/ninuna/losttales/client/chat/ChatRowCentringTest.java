@@ -6,16 +6,16 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Everything drawn in a message row is centred in it on whole pixels by
- * one rule: an element h pixels tall starts (LINE_HEIGHT - h) / 2 rows
- * below the row's top, so an element that cannot be centred exactly puts
- * its odd pixel below itself, never above. The 10px content box has one
- * clear row above and one below, an 8px head two and two, the 7px speech
- * bubble two above and three below, and the 12px reaction chip and
- * toolbar button fill the row. The text is centred by its seven rows of
- * capitals, two clear rows above them and three below, and a divider's
- * rule and its date share the capitals' middle row. The hover rule
- * stands on the descenders' shadow row.
+ * Everything drawn in a message row is centred on the row's text by one
+ * rule. The text's seven rows of capitals stand two rows below the row's
+ * top, two clear rows above them and three below, and a box h rows tall
+ * is centred on those capitals — exactly when h is odd, and half a pixel
+ * above their middle when it is even — without ever reaching past the
+ * row. The 10px content box starts two rows above the text, an 8px head
+ * one, the 7px speech bubble on it, and the 12px reaction chip and
+ * toolbar button fill the row. A divider's rule and its date share the
+ * capitals' middle row, and the hover rule stands on the descenders'
+ * shadow row.
  */
 public final class ChatRowCentringTest {
 
@@ -59,82 +59,71 @@ public final class ChatRowCentringTest {
     }
 
     @Test
-    public void anElementThatCannotBeCentredPutsItsOddPixelBelowIt() {
-        assertOddPixelBelow(TEXT_TOP, CAPS);
-        assertOddPixelBelow(LostTalesChatOverlayRenderer.DIVIDER_RULE_OFFSET,
-                1);
-        assertOddPixelBelow(LostTalesChatOverlayRenderer.toolbarTop(LINE,
-                        LINE),
-                LostTalesChatOverlayRenderer.TOOLBAR_BUTTON_SIZE);
-        int[] boxes = {BOX, LostTalesChatOverlayRenderer.HEAD_SIZE,
-                ChatIconSheet.SPEECH_BUBBLE.getHeight(),
-                ChatReactionMarker.HEIGHT};
-        for (int height : boxes) {
-            assertOddPixelBelow(TEXT_TOP
-                    + LostTalesChatOverlayRenderer.centredBoxTop(height),
-                    height);
+    public void aBoxIsCentredOnTheCapitalsOrHalfAPixelAboveThem() {
+        int capsMiddle = 2 * TEXT_TOP + CAPS;
+        for (int height = 1; height < LINE; height++) {
+            int top = TEXT_TOP
+                    + LostTalesChatOverlayRenderer.centredBoxTop(height);
+            // Middles doubled: equal, or the box's one less, which is
+            // half a pixel higher on the screen.
+            int boxMiddle = 2 * top + height;
+            assertTrue("height " + height, boxMiddle == capsMiddle
+                    || boxMiddle == capsMiddle - 1);
+            assertEquals("height " + height, height % 2 == 1,
+                    boxMiddle == capsMiddle);
+            assertTrue(top >= 0);
+            assertTrue(top + height <= LINE);
         }
-    }
-
-    /**
-     * An element {@code height} rows tall starting {@code top} rows into
-     * the row is centred, or has exactly one clear row more below it than
-     * above it.
-     */
-    private static void assertOddPixelBelow(int top, int height) {
-        int above = top;
-        int below = LINE - top - height;
-        assertTrue(below == above || below == above + 1);
+        // A box as tall as the row fills it.
+        assertEquals(0, TEXT_TOP + LostTalesChatOverlayRenderer.centredBoxTop(
+                LINE));
+        // A one-row rule is the capitals' middle row, where a divider's
+        // rule runs.
+        assertEquals(LostTalesChatOverlayRenderer.DIVIDER_RULE_OFFSET,
+                TEXT_TOP + LostTalesChatOverlayRenderer.centredBoxTop(1));
     }
 
     @Test
-    public void theContentBoxHasOneClearRowAboveAndBelow() {
+    public void theContentBoxStandsTwoRowsAboveTheText() {
         assertEquals(10, BOX);
         int top = TEXT_TOP + LostTalesChatOverlayRenderer.centredBoxTop(BOX);
-        assertEquals(1, top);
-        assertEquals(1, LINE - top - BOX);
-        // Emoji, item and marker glyphs, the '?' tile of an unknown
-        // emoji, a chip's emoji and a mark standing for a head are all
-        // drawn in this one box, placed from the text's top edge.
+        assertEquals(0, top);
+        assertEquals(2, LINE - top - BOX);
+        // Emoji, item and marker glyphs and a mark standing for a head are
+        // all drawn in this one box, placed from the text's top edge the
+        // same way in a message row, the input field, the pickers and the
+        // completion lists.
         assertEquals(LostTalesChatOverlayRenderer.centredBoxTop(BOX),
-                ChatInlineIcons.rowBoxTop(0.0F, ChatInlineIcons.SLOT_WIDTH),
+                ChatInlineIcons.CONTENT_TOP_OFFSET);
+        assertEquals(ChatInlineIcons.CONTENT_TOP_OFFSET,
+                ChatInlineIcons.boxTop(0.0F, ChatInlineIcons.SLOT_WIDTH),
                 0.0D);
         assertEquals(BOX, ChatReactionMarker.ICON);
     }
 
     @Test
-    public void theInputBarAndThePickersKeepTheirOwnBoxOffset() {
-        // Outside the message rows the box stands two rows above the
-        // text's top edge; the message row's centring does not move it.
-        assertEquals(-2, ChatInlineIcons.CONTENT_TOP_OFFSET);
-        assertEquals(ChatInlineIcons.CONTENT_TOP_OFFSET,
-                ChatInlineIcons.boxTop(0.0F, ChatInlineIcons.SLOT_WIDTH),
-                0.0D);
-    }
-
-    @Test
-    public void aHeadHasTwoClearRowsAboveAndBelow() {
+    public void aHeadStandsOneRowAboveTheText() {
         int size = LostTalesChatOverlayRenderer.HEAD_SIZE;
         float offset = LostTalesChatOverlayRenderer.HEAD_TOP_OFFSET;
         assertEquals(8, size);
         // A whole pixel, so the face lands on its own texels.
         assertEquals(Math.floor(offset), offset, 0.0D);
         int top = TEXT_TOP + (int)offset;
-        assertEquals(2, top);
-        assertEquals(2, LINE - top - size);
+        assertEquals(1, top);
+        assertEquals(3, LINE - top - size);
         assertEquals(LostTalesChatOverlayRenderer.centredBoxTop(size),
                 (int)offset);
     }
 
     @Test
-    public void aReactionChipFillsItsRow() {
+    public void aReactionChipFillsItsRowAndCentresItsEmoji() {
         int height = ChatReactionMarker.HEIGHT;
         assertEquals(LINE, height);
         int chipTop = LostTalesChatOverlayRenderer.centredBoxTop(height);
         assertEquals(0, TEXT_TOP + chipTop);
         assertEquals(LINE, TEXT_TOP + chipTop + height);
         // Its emoji keeps one pixel of edge above and below it.
-        int emojiTop = LostTalesChatOverlayRenderer.centredBoxTop(BOX);
+        int emojiTop = LostTalesChatVisualStyle.chipEmojiTop(chipTop);
         assertEquals(1, emojiTop - chipTop);
         assertEquals(1, chipTop + height - (emojiTop + BOX));
     }
@@ -148,8 +137,7 @@ public final class ChatRowCentringTest {
         assertEquals(88, top);
         assertEquals(rowBottom - LINE, top);
         assertEquals(rowBottom, top + size);
-        // In a row one pixel taller the spare pixel goes below it, as it
-        // does for every box in a row.
+        // In a row one pixel taller the spare pixel goes below it.
         assertEquals(87, LostTalesChatOverlayRenderer.toolbarTop(100, 13));
     }
 
@@ -158,17 +146,29 @@ public final class ChatRowCentringTest {
         int height = ChatIconSheet.SPEECH_BUBBLE.getHeight();
         assertEquals(7, height);
         // A reply's quote and the typing line place it as a box of its
-        // own: two clear rows above it, the odd one below.
+        // own: as tall as the capitals, on them exactly.
         int top = LostTalesChatOverlayRenderer.centredBoxTop(height);
         assertEquals(2, TEXT_TOP + top);
         assertEquals(3, LINE - (TEXT_TOP + top + height));
-        // A link to a message centres it in the content box of the slot
+        // A link to a message stands it in the content box of the slot
         // its two spaces reserve, and lands on the same row whatever
         // width the font gives those spaces.
         for (int slot = 8; slot <= ChatInlineIcons.SLOT_WIDTH; slot++) {
-            assertEquals(top, ChatInlineIcons.spriteStart(
-                    ChatInlineIcons.rowBoxTop(0.0F, slot),
+            assertEquals(top, ChatInlineIcons.spriteTop(
+                    ChatInlineIcons.boxTop(0.0F, slot),
                     ChatInlineIcons.contentSize(slot), height), 0.0D);
+        }
+    }
+
+    @Test
+    public void aSpriteInTheContentBoxFollowsTheRowsRule() {
+        for (int extent = 1; extent <= BOX; extent++) {
+            assertEquals("extent " + extent,
+                    LostTalesChatOverlayRenderer.centredBoxTop(extent),
+                    ChatInlineIcons.spriteTop(
+                            ChatInlineIcons.boxTop(0.0F,
+                                    ChatInlineIcons.SLOT_WIDTH),
+                            ChatInlineIcons.CONTENT_SIZE, extent), 0.0D);
         }
     }
 

@@ -64,6 +64,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import cpw.mods.fml.common.FMLLog;
+import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
@@ -117,7 +118,8 @@ public final class LostTalesChatService {
                 request.getAppearanceCharacterId(),
                 request.getReplyToMessageId(), request.getTargetIdentity(),
                 request.getEchoNonce(), request.getTargetCharacterId(),
-                request.getQuoteAuthor(), request.getQuoteExcerpt());
+                request.getQuoteAuthor(), request.getQuoteExcerpt(),
+                request.getQuoteSource());
     }
 
     private static void send(EntityPlayerMP sender,
@@ -127,7 +129,8 @@ public final class LostTalesChatService {
                              UUID appearanceCharacterId,
                              long replyToMessageId, String requestedIdentity,
                              long echoNonce, UUID targetCharacterId,
-                             String quoteAuthor, String quoteExcerpt) {
+                             String quoteAuthor, String quoteExcerpt,
+                             int quoteSource) {
         String targetIdentity = requestedIdentity == null ? "" : requestedIdentity;
         if (sender == null || sender.worldObj == null
                 || sender.worldObj.isRemote || channel == null
@@ -286,11 +289,16 @@ public final class LostTalesChatService {
             // here can resolve it, so the words travel as the sender
             // saw them — bounded by the packet, stripped of formatting
             // codes like every other text off the wire, and never a
-            // quote at all without an author.
-            reply = ChatReplyReference.unanchored(
+            // quote at all without an author. It wears a head only
+            // where this server can vouch for one.
+            reply = vouchedHead(ChatReplyReference.unanchored(
                     ChatFormattingCodes.stripSectionCodes(quoteAuthor),
                     ChatFormattingCodes.stripSectionCodes(quoteExcerpt),
-                    ChatReplyReference.NO_COLOR);
+                    ChatReplyReference.NO_COLOR), quoteSource,
+                    sender.getUniqueID(), identityName, accountLine,
+                    accountLine ? "" : appearance.getSkinId(),
+                    ChatRolePresentation.nameColor(channel, roles,
+                            accountLine, presentation.nameColor));
         }
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
                 channel, sender.getUniqueID(), identityName,
@@ -560,21 +568,33 @@ public final class LostTalesChatService {
     }
 
     /**
-     * Replays the kept console entries to a player who has just joined,
-     * oldest first and in batches, if they may read the console.
+     * The head an unnamed quote may wear, from what the sender says the
+     * quoted line was and what this server can vouch for: the console
+     * mark for a line of the Server's or the Client's — a mark that
+     * claims no more than the name beside it already does — and, for a
+     * line of the sender's own, the head and name colour this reply is
+     * signed with, but only where the quote names the identity it is
+     * signed as. Anything else is quoted as it came, without a head.
      */
-    public static void sendConsoleHistory(EntityPlayerMP player) {
-        if (player == null || player.worldObj == null || player.worldObj.isRemote
-                || !ChatChannelPolicy.readsConsole(player)) {
-            return;
+    static ChatReplyReference vouchedHead(ChatReplyReference quote,
+                                          int source, UUID sender,
+                                          String identityName,
+                                          boolean accountLine, String skinId,
+                                          int nameColor) {
+        if (quote == null || !quote.exists()) {
+            return quote;
         }
-        List<ChatConsoleEvent> events = ChatConsoleStream.replay(0L);
-        for (int from = 0; from < events.size();
-             from += LostTalesChatConsoleSyncPacket.MAX_EVENTS) {
-            LostTalesNetworkHandler.CHANNEL.sendTo(new LostTalesChatConsoleSyncPacket(
-                    events.subList(from, Math.min(events.size(),
-                            from + LostTalesChatConsoleSyncPacket.MAX_EVENTS))), player);
+        if (source == LostTalesChatSendPacket.QUOTE_SYSTEM) {
+            return quote.withHead(LostTalesChatMessagePacket.SERVER_SENDER_ID,
+                    true, "");
         }
+        if (source == LostTalesChatSendPacket.QUOTE_OWN && sender != null
+                && quote.getAuthor().equals(identityName)) {
+            return ChatReplyReference.unanchored(quote.getAuthor(),
+                    quote.getExcerpt(), nameColor)
+                    .withHead(sender, accountLine, skinId);
+        }
+        return quote;
     }
 
     /** Cleared with the rest of the server's chat state. */
@@ -1637,20 +1657,30 @@ public final class LostTalesChatService {
     }
 
     /**
-     * Replays to a player who has just joined the recent messages they
-     * are entitled to, oldest first and in batches, exactly as they
-     * would have been sent them at the time. Who they are — account,
-     * the factions their characters are in, party, the channels they
-     * may read — is read from the live server here and nowhere else,
-     * and the history decides message by message against what it
-     * recorded when each was sent.
+     * Catches a player who has just joined up on what was said and done
+     * while they were away, in the order it happened: the recent
+     * messages they are entitled to, exactly as they would have been
+     * sent them at the time, and — if they may read the console — its
+     * kept entries, merged into one stream by id
+     * ({@link ChatLoginReplay}). Who they are — account, the factions
+     * their characters are in, party, the channels they may read — is
+     * read from the live server here and nowhere else, and the history
+     * decides message by message against what it recorded when each was
+     * sent. Everything before their own join line is history to them;
+     * the line itself, and whatever was said after it while the other
+     * login handlers ran, is not. With no join line to go by — another
+     * mod may silence the game's — they arrive now.
      */
-    public static void sendHistory(EntityPlayerMP player) {
+    public static void sendLoginReplay(EntityPlayerMP player) {
         if (player == null || player.worldObj == null
                 || player.worldObj.isRemote) {
             return;
         }
-        RoleplayCharacter character = CharacterActiveResolver.get(player);
+        long arrivalId = LostTalesServerBroadcastHook.takeJoinLine(
+                player.getCommandSenderName());
+        if (!ChatMessageIds.isServerId(arrivalId)) {
+            arrivalId = ChatMessageIdAllocator.next();
+        }
         Party party = PartyService.getInstance()
                 .getPartyForActiveCharacter(player);
         List<ChatChannel> readable = readableChannels(player);
@@ -1659,21 +1689,19 @@ public final class LostTalesChatService {
                         ChatChannelPolicy.ownedFactions(player),
                         party == null ? null : party.getPartyId(), readable),
                 ChatMessageIds.NONE));
-        int packets = 0;
-        for (int from = 0; from < lines.size();
-             from += LostTalesChatHistorySyncPacket.MAX_MESSAGES) {
-            LostTalesNetworkHandler.CHANNEL.sendTo(
-                    new LostTalesChatHistorySyncPacket(lines.subList(from,
-                            Math.min(lines.size(), from
-                                    + LostTalesChatHistorySyncPacket.MAX_MESSAGES))),
-                    player);
-            packets++;
+        List<ChatConsoleEvent> events = ChatChannelPolicy.readsConsole(player)
+                ? ChatConsoleStream.replay(0L)
+                : Collections.<ChatConsoleEvent>emptyList();
+        List<IMessage> packets = ChatLoginReplay.packets(lines, events,
+                arrivalId);
+        for (IMessage packet : packets) {
+            LostTalesNetworkHandler.CHANNEL.sendTo(packet, player);
         }
         // One line per login, so a replay that went missing can be told
         // apart from one that was never sent.
-        FMLLog.info("[%s] Replayed %d of %d kept chat lines in %d packets to %s",
+        FMLLog.info("[%s] Replayed %d of %d kept chat lines and %d console entries in %d packets to %s",
                 LostTalesMetaData.MOD_ID, lines.size(), ChatHistory.size(),
-                packets, player.getCommandSenderName());
+                events.size(), packets.size(), player.getCommandSenderName());
     }
 
     /**

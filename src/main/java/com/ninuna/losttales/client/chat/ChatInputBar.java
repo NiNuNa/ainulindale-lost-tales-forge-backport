@@ -633,7 +633,9 @@ final class ChatInputBar {
     /**
      * The indicator's name: whole in the room it keeps, or cut at the
      * room's end and slid by the marquee, its offset laid on a display
-     * pixel so the glyphs stay on theirs.
+     * pixel so the glyphs stay on theirs. A cut name sinks into the edges
+     * it is cut at the way a tab's does, in the bar's own tone, across
+     * the rows of the line the bar's text stands on.
      */
     private void drawIndicatorLabel(IndicatorFit fit, int textTop,
                                     boolean hovered) {
@@ -660,15 +662,32 @@ final class ChatInputBar {
                     fit.labelLeft, textTop, color, 255);
             return;
         }
-        GL11.glPushMatrix();
+        double offset = ChatChannelTabBar.snapped(this.indicatorMarquee,
+                ChatChannelTabBar.displayStep());
         try {
-            GL11.glTranslatef((float)-ChatChannelTabBar.snapped(
-                    this.indicatorMarquee, ChatChannelTabBar.displayStep()),
-                    0.0F, 0.0F);
-            LostTalesChatVisualStyle.drawColored(this.font, text,
-                    fit.labelLeft, textTop, color, 255);
+            GL11.glPushMatrix();
+            try {
+                GL11.glTranslatef((float)-offset, 0.0F, 0.0F);
+                LostTalesChatVisualStyle.drawColored(this.font, text,
+                        fit.labelLeft, textTop, color, 255);
+            } finally {
+                GL11.glPopMatrix();
+            }
+            float left = fit.labelLeft;
+            float right = fit.labelLeft + fit.labelRoom;
+            float depth = LostTalesChatOverlayRenderer.sideFadeDepth(
+                    fit.labelRoom);
+            int top = wellTopFor(this.top);
+            int bottom = top + LostTalesChatOverlayRenderer.LINE_HEIGHT;
+            LostTalesChatOverlayRenderer.drawSideFade(left, right, top,
+                    bottom, depth, LostTalesChatVisualStyle.SURFACE_RGB,
+                    ChatChannelTabBar.sideFadeAlpha(offset, depth, 255));
+            LostTalesChatOverlayRenderer.drawSideFade(right, left, top,
+                    bottom, depth, LostTalesChatVisualStyle.SURFACE_RGB,
+                    ChatChannelTabBar.sideFadeAlpha(
+                            fit.labelWidth - offset - fit.labelRoom, depth,
+                            255));
         } finally {
-            GL11.glPopMatrix();
             LostTalesChatOverlayRenderer.endVerticalClip(true);
         }
     }

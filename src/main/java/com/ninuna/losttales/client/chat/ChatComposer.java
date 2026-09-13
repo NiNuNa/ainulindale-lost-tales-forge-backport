@@ -26,6 +26,14 @@ final class ChatComposer {
      * only record the quote can be built from.
      */
     private String replyToExcerpt = "";
+    /**
+     * The head the answered line was drawn with — its sender's face, an
+     * NPC's portrait, or the mark standing for the server — and the
+     * colour its name was drawn in, so the quote wears both on this
+     * screen whatever kind of line it answers; null for a line with no
+     * sender.
+     */
+    private ChatHeadMarker.Data replyToHead;
     private ChatTab replyTab;
     private long editingMessageId = ChatMessageIds.NONE;
     private ChatTab editingTab;
@@ -35,11 +43,17 @@ final class ChatComposer {
     private int chipRight;
     private int chipBottom;
 
-    /** Starts answering a message in its tab; whatever was composed goes. */
-    void startReply(ChatTab tab, long messageId, String name, String excerpt) {
+    /**
+     * Starts answering a message in its tab, the line's {@code head} as
+     * it was drawn ({@link LostTalesChatPresentation#headOfLine}); whatever
+     * was composed goes.
+     */
+    void startReply(ChatTab tab, long messageId, String name, String excerpt,
+                    ChatHeadMarker.Data head) {
         this.replyToMessageId = messageId;
         this.replyToName = name == null ? "" : name;
         this.replyToExcerpt = excerpt == null ? "" : excerpt;
+        this.replyToHead = head;
         this.replyTab = tab;
     }
 
@@ -76,16 +90,34 @@ final class ChatComposer {
         return this.editingMessageId;
     }
 
-    /** The message a sent line answers; {@link ChatReplyReference#NONE} for none. */
+    /**
+     * The message a sent line answers; {@link ChatReplyReference#NONE}
+     * for none. It wears the answered line's head and name colour, as
+     * the quote the server cuts of a line it named does, so the line
+     * shown before the server answers already reads as the one it sends
+     * back — and a quote that never reaches a server, in an NPC
+     * conversation, has them at all.
+     */
     ChatReplyReference replyReference() {
         if (!isReplying()) {
             return ChatReplyReference.NONE;
         }
-        return this.replyToMessageId != ChatMessageIds.NONE
-                ? ChatReplyReference.of(this.replyToMessageId, this.replyToName,
-                        this.replyToExcerpt)
-                : ChatReplyReference.unanchored(this.replyToName,
-                        this.replyToExcerpt, ChatReplyReference.NO_COLOR);
+        ChatHeadMarker.Data head = this.replyToHead;
+        int color = head == null ? ChatReplyReference.NO_COLOR
+                : head.nameColor;
+        ChatReplyReference reference =
+                this.replyToMessageId != ChatMessageIds.NONE
+                        ? ChatReplyReference.of(this.replyToMessageId,
+                                this.replyToName, this.replyToExcerpt, color)
+                        : ChatReplyReference.unanchored(this.replyToName,
+                                this.replyToExcerpt, color);
+        if (head == null || head.senderId == null) {
+            return reference;
+        }
+        return head.npcIdentity
+                ? reference.withNpcHead(head.senderId, head.skinId)
+                : reference.withHead(head.senderId, head.accountIdentity,
+                        head.skinId);
     }
 
     /** Forgets the message being replied to; the chip goes with it. */
@@ -93,6 +125,7 @@ final class ChatComposer {
         this.replyToMessageId = ChatMessageIds.NONE;
         this.replyToName = "";
         this.replyToExcerpt = "";
+        this.replyToHead = null;
         this.replyTab = null;
     }
 

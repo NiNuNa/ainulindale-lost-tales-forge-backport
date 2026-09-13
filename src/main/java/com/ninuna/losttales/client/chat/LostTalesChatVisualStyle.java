@@ -62,15 +62,20 @@ final class LostTalesChatVisualStyle {
      */
     static final int POPUP_ALPHA = 0xE0;
     /**
-     * A margin or a well has a surface of its own, a step darker than
-     * the half-opacity surface beside it: two thirds. The surface beside
-     * it stops where it begins rather than running under it, so each
-     * area is one flat colour and no two backgrounds are ever laid over
-     * each other — the timestamp column beside the panel, the typing
-     * well in a hole cut out of the input bar.
+     * A margin, a well or a tab has a surface of its own, a step darker
+     * than the half-opacity surface beside it: two thirds. The surface
+     * beside it stops where it begins rather than running under it, so
+     * each area is one flat colour and no two backgrounds are ever laid
+     * over each other — the timestamp column beside the panel, the
+     * typing well in a hole cut out of the input bar, a tab in the hole
+     * the tab strip leaves for it.
      */
     static final int INSET_ALPHA = Math.round(255.0F * 2.0F / 3.0F);
-    /** The input bar's typing well, in the hole the bar leaves for it. */
+    /**
+     * The chat's inset surface: plum black, the palette's darkest, at two
+     * thirds. The typing well, the timestamp column and a tab nobody has
+     * picked or is pointing at all wear exactly this.
+     */
     static final int SURFACE_INSET = LostTalesSkyrimUiStyle.withAlpha(
             LostTalesSkyrimUiStyle.PLUM_BLACK, INSET_ALPHA);
 
@@ -98,16 +103,16 @@ final class LostTalesChatVisualStyle {
                 LostTalesColors.PLUM_BLACK);
     }
 
-    /** The line under the pointer, in the client's chosen palette colour; mauve until it chooses. */
+    /** The line under the pointer, in the client's chosen palette colour; plum grey until it chooses. */
     static int selectedLineRgb() {
         return paletteRgb(LostTalesConfig.chatSelectedLineColor,
-                LostTalesColors.MAUVE);
+                LostTalesColors.PLUM_GRAY);
     }
 
-    /** A line that @-mentions this player, in the client's chosen palette colour. */
+    /** A line that @-mentions this player, in the client's chosen palette colour; orchid until it chooses. */
     static int mentionLineRgb() {
         return paletteRgb(LostTalesConfig.chatMentionLineColor,
-                LostTalesColors.MULBERRY);
+                LostTalesColors.ORCHID);
     }
 
     /** The line a reply's quote jumped to, while it is lit, in the chosen colour. */
@@ -710,6 +715,58 @@ final class LostTalesChatVisualStyle {
         return cursor;
     }
 
+    /**
+     * Where a row's ink ends, in its text space: past its last glyph,
+     * icon or chip, leaving out trailing spaces and the spacing column
+     * the font's advance carries after a run's last glyph. What the
+     * closed feed stands a right-aligned or centred row by, so its drawn
+     * pixels meet the edge rather than the room after them.
+     */
+    static int inkEnd(FontRenderer font, IChatComponent row,
+                      boolean chatOpen) {
+        int cursor = 0;
+        int end = 0;
+        if (font == null || row == null) {
+            return end;
+        }
+        for (Object value : row) {
+            if (!(value instanceof IChatComponent)) {
+                continue;
+            }
+            IChatComponent part = (IChatComponent)value;
+            if (ChatPrefixMarker.isHidden(part, chatOpen)) {
+                continue;
+            }
+            int width = partWidth(font, part, chatOpen);
+            if (drawsSlot(part)) {
+                end = cursor + width;
+            } else if (ChatLayoutMarker.decode(part) == null
+                    && ChatSpacerMarker.decode(part) < 0) {
+                String text = part.getUnformattedTextForChat();
+                if (text.trim().length() > 0) {
+                    end = cursor + width - trailingSpaceWidth(font, text) - 1;
+                }
+            }
+            cursor += width;
+        }
+        return Math.max(0, end);
+    }
+
+    /**
+     * Whether a run draws something across the whole slot it takes — a
+     * head or the mark standing for one, an emoji, a shared item's or
+     * marker's icon, a bubble, a reaction chip — rather than glyphs.
+     */
+    private static boolean drawsSlot(IChatComponent part) {
+        ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
+        return ChatHeadMarker.headOf(part) != null
+                || ChatReplyMarker.isIconSlot(part)
+                || ChatReactionMarker.isMarker(part)
+                || ChatEmojiMarker.decode(part) != null
+                || ChatChannelLinkMarker.isIconSlot(part)
+                || (share != null && share.icon);
+    }
+
     /** Whether the game's chat-links option is on: what gates a link, a command, a share. */
     static boolean chatLinksEnabled() {
         Minecraft minecraft = Minecraft.getMinecraft();
@@ -857,7 +914,7 @@ final class LostTalesChatVisualStyle {
                 if (ChatEmojiMarker.reservesFullSlot(text)) {
                     ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(), emoji,
                             ChatInlineIcons.boxLeft(cursor, width),
-                            ChatInlineIcons.rowBoxTop(y, width),
+                            ChatInlineIcons.boxTop(y, width),
                             ChatInlineIcons.contentSize(width), alpha,
                             shadowPass);
                 }
@@ -893,7 +950,7 @@ final class LostTalesChatVisualStyle {
                 Integer linkColor = ChatChannelLinkMarker.colorOf(part);
                 ChatInlineIcons.drawSheetSprite(ChatIconSheet.SPEECH_BUBBLE,
                         ChatInlineIcons.boxLeft(cursor, width),
-                        ChatInlineIcons.rowBoxTop(y, width),
+                        ChatInlineIcons.boxTop(y, width),
                         ChatInlineIcons.contentSize(width),
                         !colours || linkColor == null ? IVORY
                                 : linkColor.intValue(),
@@ -1084,14 +1141,14 @@ final class LostTalesChatVisualStyle {
         Gui.drawRect(left, top + 1, left + 1, bottom - 1, edge);
         Gui.drawRect(right - 1, top + 1, right, bottom - 1, edge);
         beginContent();
+        int emojiTop = chipEmojiTop(top);
         if (chip.emoji != null) {
             ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(), chip.emoji,
-                    left + ChatReactionMarker.PAD,
-                    y + LostTalesChatOverlayRenderer.centredBoxTop(
-                            ChatReactionMarker.ICON),
+                    left + ChatReactionMarker.PAD, emojiTop,
                     ChatInlineIcons.CONTENT_SIZE, alpha);
         } else {
-            drawUnknownEmoji(font, left + ChatReactionMarker.PAD, y, alpha);
+            drawUnknownEmoji(font, left + ChatReactionMarker.PAD, emojiTop,
+                    y, alpha);
         }
         beginContent();
         drawColored(font, chip.countText(), left + ChatReactionMarker.PAD
@@ -1099,19 +1156,30 @@ final class LostTalesChatVisualStyle {
                 chip.mine && colours ? accent : IVORY, alpha);
     }
 
+    /**
+     * Where a reaction chip's emoji starts, for a chip starting at
+     * {@code chipTop}: a pixel of the chip's edge above it and below, so
+     * it is centred in the chip rather than on the capitals, which would
+     * stand it on the chip's top edge.
+     */
+    static int chipEmojiTop(int chipTop) {
+        return chipTop
+                + (ChatReactionMarker.HEIGHT - ChatReactionMarker.ICON) / 2;
+    }
+
     /** The glyph that stands in for an emoji the game has no sprite for. */
     private static final String UNKNOWN_EMOJI_GLYPH = "?";
 
     /**
-     * An emoji the game has no sprite for, in the emoji's own cell: a
-     * tile the size of a sprite with its corners cut, and a question
-     * mark in ivory centred on it, whole pixels throughout. The tile
-     * keeps the chip's shape and makes the mark read as an icon.
+     * An emoji the game has no sprite for, in the emoji's own cell from
+     * {@code top}: a tile the size of a sprite with its corners cut, and
+     * a question mark in ivory on it, standing on the row's text line at
+     * {@code y}, whole pixels throughout. The tile keeps the chip's shape
+     * and makes the mark read as an icon.
      */
-    private static void drawUnknownEmoji(FontRenderer font, int x, int y,
-                                         int alpha) {
+    private static void drawUnknownEmoji(FontRenderer font, int x, int top,
+                                         int y, int alpha) {
         int size = ChatReactionMarker.ICON;
-        int top = y + LostTalesChatOverlayRenderer.centredBoxTop(size);
         int tile = argb(LostTalesColors.rgb(LostTalesColors.PLUM_GRAY), alpha);
         Gui.drawRect(x + 1, top, x + size - 1, top + size, tile);
         Gui.drawRect(x, top + 1, x + 1, top + size - 1, tile);
@@ -1222,7 +1290,7 @@ final class LostTalesChatVisualStyle {
                                       int alpha, boolean shadowPass) {
         Minecraft minecraft = Minecraft.getMinecraft();
         float boxX = ChatInlineIcons.boxLeft(cursor, slotWidth);
-        float boxY = ChatInlineIcons.rowBoxTop(y, slotWidth);
+        float boxY = ChatInlineIcons.boxTop(y, slotWidth);
         float size = ChatInlineIcons.contentSize(slotWidth);
         if (share.kind == ChatShareKind.ITEM) {
             ItemStack stack = ClientChatShowcaseStore.getItem(share.showcaseId);

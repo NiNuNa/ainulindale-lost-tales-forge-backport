@@ -72,6 +72,12 @@ public final class LostTalesConfig {
     private static File loadedRolesFile;
     private static File loadedChannelsFile;
     private static Configuration pendingGuiConfiguration;
+    /**
+     * Every option as the mod ships it ({@link LostTalesConfigDefinitions}):
+     * read on the first load against no file, while each field still
+     * holds its shipped value. Null until then.
+     */
+    private static Configuration shipped;
 
 
     public static boolean showLostTalesHud = true;
@@ -167,8 +173,8 @@ public final class LostTalesConfig {
      * numbers, so every choice is one of the palette's colours.
      */
     static final String DEFAULT_CHAT_BACKGROUND_COLOR = "PLUM_BLACK";
-    static final String DEFAULT_CHAT_SELECTED_LINE_COLOR = "MAUVE";
-    static final String DEFAULT_CHAT_MENTION_LINE_COLOR = "MULBERRY";
+    static final String DEFAULT_CHAT_SELECTED_LINE_COLOR = "PLUM_GRAY";
+    static final String DEFAULT_CHAT_MENTION_LINE_COLOR = "ORCHID";
     static final String DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR = "APRICOT";
     /**
      * A colour option's value that follows another colour instead of
@@ -183,13 +189,24 @@ public final class LostTalesConfig {
     public static String chatSelectedMentionColor = CHAT_COLOR_AUTOMATIC;
     /** The line a reply's quote jumps to, lit while the eye finds it. */
     public static String chatReplyHighlightColor = DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR;
+    /** The edges the closed-chat feed's lines may stand against. */
+    static final String[] CHAT_FEED_ALIGNMENTS = {"LEFT", "CENTRE", "RIGHT"};
+    /** Which of them the feed's lines stand against: the left until chosen. */
+    public static String chatFeedAlignment = CHAT_FEED_ALIGNMENTS[0];
+    /**
+     * Whether the game's HUD and the mod's panels fade out while the chat
+     * screen is open, leaving the world and the chat.
+     */
+    public static boolean hideHudWhileChatting = true;
     public static boolean enableChatAnimations = true;
     /**
      * Developer aid: a local PNG drawn on the local player instead of the
      * account skin, with a chosen arm width. Empty path disables it.
      */
     public static String devSkinOverridePath = "";
-    public static String devSkinOverrideBodyType = "";
+    /** The override skin's arm widths, as the option names them. */
+    static final String[] DEV_SKIN_BODY_TYPES = {"wide", "slim"};
+    public static String devSkinOverrideBodyType = DEV_SKIN_BODY_TYPES[0];
     /** Draw the jacket, sleeve, and trouser overlays of 64x64 skins. */
     public static boolean showSkinOverlays = true;
     /** Feminine chest physics on/off and bounce strength (0 to 1). */
@@ -273,8 +290,12 @@ public final class LostTalesConfig {
     public static boolean enableGuiAnimations = true;
     public static int guiAnimationDurationMillis = 220;
     public static double guiAnimationScale = 1.0D;
-    public static String guiAnimationEasingStyle = "BACK";
-    public static String guiAnimationDirection = "DOWN";
+    /** The foreground's easing styles, as the option names them. */
+    static final String[] GUI_EASING_STYLES = {"BACK", "CUBIC", "SMOOTH"};
+    public static String guiAnimationEasingStyle = GUI_EASING_STYLES[0];
+    /** Where the foreground flies in toward its place from, or nowhere. */
+    static final String[] GUI_DIRECTIONS = {"DOWN", "UP", "LEFT", "RIGHT", "NONE"};
+    public static String guiAnimationDirection = GUI_DIRECTIONS[0];
     public static boolean reducedGuiMotion = false;
     public static boolean enableGuiBackground = true;
     public static double guiBackgroundOpacity = 0.65D;
@@ -412,10 +433,40 @@ public final class LostTalesConfig {
         loadedServerFile = serverFile;
         loadedRolesFile = rolesFile == null ? serverFile : rolesFile;
         loadedChannelsFile = channelsFile == null ? serverFile : channelsFile;
-        Configuration config = openSided();
+        if (shipped == null) {
+            // Nothing has changed a field yet: read against no file at
+            // all, every option keeps the value the mod ships, and the
+            // configuration left over is each option as it is defined.
+            Configuration definitions = new Configuration();
+            defineOptions(definitions);
+            shipped = definitions;
+        }
+        readOptions(openSided(), true);
+    }
+
+    /**
+     * Reads every option into {@code definitions}, a configuration of no
+     * file, as it is defined: the first load's first step, taken while
+     * each field still holds its shipped value.
+     */
+    static void defineOptions(Configuration definitions) {
+        readOptions(definitions, false);
+    }
+
+    /**
+     * Reads every option of {@code config} into its field, the field's
+     * own value standing as the default of an option the configuration
+     * does not hold. From the files ({@code fromFiles}) the configuration
+     * is loaded first, and written back — every value as read and put
+     * right, every option in its shipped definition — when anything
+     * changed; a configuration of no file is only read.
+     */
+    private static void readOptions(Configuration config, boolean fromFiles) {
         boolean retiredDropped;
         try {
-            config.load();
+            if (fromFiles) {
+                config.load();
+            }
             // After the load, not before it: Forge's Configuration reads
             // the file in its constructor and reads it again here, into
             // the same category objects, so a key dropped beforehand is
@@ -444,12 +495,12 @@ public final class LostTalesConfig {
                     chargeTierOneTicks + 1, chargeTierTwoTicks);
             chargeTierThreeTicks = Math.max(
                     chargeTierTwoTicks + 1, chargeTierThreeTicks);
-            config.get(CATEGORY_RANGED_COMBAT,
-                    "chargeTierTwoTicks", chargeTierTwoTicks)
-                    .set(chargeTierTwoTicks);
-            config.get(CATEGORY_RANGED_COMBAT,
-                    "chargeTierThreeTicks", chargeTierThreeTicks)
-                    .set(chargeTierThreeTicks);
+            // Put right, the values go back as values: a get naming a
+            // default would redefine the options and drop their comments.
+            config.getCategory(CATEGORY_RANGED_COMBAT)
+                    .get("chargeTierTwoTicks").set(chargeTierTwoTicks);
+            config.getCategory(CATEGORY_RANGED_COMBAT)
+                    .get("chargeTierThreeTicks").set(chargeTierThreeTicks);
             chargeTierOneDamageMultiplier = getBoundedDouble(
                     config, "chargeTierOneDamageMultiplier",
                     chargeTierOneDamageMultiplier, 1.0D, 3.0D,
@@ -692,10 +743,9 @@ public final class LostTalesConfig {
                     <= closeMapTerrainTransitionStartZoom) {
                 closeMapTerrainTransitionEndZoom = Math.min(9.25D,
                         closeMapTerrainTransitionStartZoom + 0.05D);
-                config.get(CATEGORY_CLIENT,
-                        "closeMapTerrainTransitionEndZoom",
-                        closeMapTerrainTransitionEndZoom).set(
-                        closeMapTerrainTransitionEndZoom);
+                config.getCategory(CATEGORY_CLIENT)
+                        .get("closeMapTerrainTransitionEndZoom")
+                        .set(closeMapTerrainTransitionEndZoom);
             }
             hiddenMapLegendCategories = config.get(
                     CATEGORY_CLIENT,
@@ -1219,6 +1269,18 @@ public final class LostTalesConfig {
                     "Palette colour a chat line is lit in when a reply's quote jumps to it. Also set from a chat window's own menu.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR);
+            Property feedAlignmentProperty = config.get(
+                    CATEGORY_CLIENT, "chatFeedAlignment", chatFeedAlignment,
+                    "Which edge the closed chat feed's lines stand against: LEFT, CENTRE, or RIGHT. Each line's background thins out away from that edge, from the middle to both sides for CENTRE.");
+            feedAlignmentProperty.setValidValues(CHAT_FEED_ALIGNMENTS);
+            chatFeedAlignment = normalizeFeedAlignment(
+                    feedAlignmentProperty.getString());
+            hideHudWhileChatting = config.getBoolean(
+                    "hideHudWhileChatting",
+                    CATEGORY_CLIENT,
+                    hideHudWhileChatting,
+                    "Fade the game's HUD (hotbar, health, crosshair and the rest) and the Lost Tales panels out while the chat screen is open, and back in when it closes."
+            );
             devSkinOverridePath = config.getString(
                     "devSkinOverridePath",
                     CATEGORY_CLIENT,
@@ -1229,7 +1291,8 @@ public final class LostTalesConfig {
                     "devSkinOverrideBodyType",
                     CATEGORY_CLIENT,
                     devSkinOverrideBodyType,
-                    "Arm width for the override skin: wide or slim. Anything else means wide."
+                    "Arm width for the override skin: wide or slim. Anything else means wide.",
+                    DEV_SKIN_BODY_TYPES
             );
             showSkinOverlays = config.getBoolean(
                     "showSkinOverlays",
@@ -1271,8 +1334,8 @@ public final class LostTalesConfig {
             );
             if (isLegacyChatPingSound(chatPingSound)) {
                 chatPingSound = DEFAULT_CHAT_PING_SOUND;
-                config.get(CATEGORY_CLIENT, "chatPingSound",
-                        DEFAULT_CHAT_PING_SOUND).set(chatPingSound);
+                config.getCategory(CATEGORY_CLIENT).get("chatPingSound")
+                        .set(chatPingSound);
             }
             enableNpcChatStyling = config.getBoolean(
                     "enableNpcChatStyling",
@@ -1335,16 +1398,14 @@ public final class LostTalesConfig {
                     CATEGORY_CLIENT, "guiAnimationEasingStyle",
                     guiAnimationEasingStyle,
                     "Foreground easing style: BACK, CUBIC, or SMOOTH.");
-            guiEasingProperty.setValidValues(new String[] {
-                    "BACK", "CUBIC", "SMOOTH"});
+            guiEasingProperty.setValidValues(GUI_EASING_STYLES);
             guiAnimationEasingStyle = normalizeGuiEasing(
                     guiEasingProperty.getString());
             Property guiDirectionProperty = config.get(
                     CATEGORY_CLIENT, "guiAnimationDirection",
                     guiAnimationDirection,
                     "Direction the foreground flies toward its resting position: DOWN, UP, LEFT, RIGHT, or NONE.");
-            guiDirectionProperty.setValidValues(new String[] {
-                    "DOWN", "UP", "LEFT", "RIGHT", "NONE"});
+            guiDirectionProperty.setValidValues(GUI_DIRECTIONS);
             guiAnimationDirection = normalizeGuiDirection(
                     guiDirectionProperty.getString());
             reducedGuiMotion = config.getBoolean(
@@ -1579,9 +1640,12 @@ public final class LostTalesConfig {
             }
             syncLinkedHudOptions();
             clampHudOffsets();
-            writeCurrentValues(config);
+            if (fromFiles) {
+                writeCurrentValues(config);
+                applyShippedDefinitions(config);
+            }
         } finally {
-            if (config.hasChanged()) {
+            if (fromFiles && config.hasChanged()) {
                 config.save();
             }
         }
@@ -2021,6 +2085,9 @@ public final class LostTalesConfig {
         try {
             config.load();
             writeCurrentValues(config);
+            // Written back value by value, each option lost its default
+            // and its comment; its definition puts them back.
+            applyShippedDefinitions(config);
         } finally {
             if (config.hasChanged()) {
                 config.save();
@@ -2050,6 +2117,18 @@ public final class LostTalesConfig {
                 "losttales.config.category.roles");
         config.getCategory(CATEGORY_CHANNELS).setLanguageKey(
                 "losttales.config.category.channels");
+    }
+
+    /**
+     * Gives every option of {@code config} the definition the mod ships
+     * it with — its default, its comment, its bounds and its words — and
+     * leaves what each is set to alone ({@link LostTalesConfigDefinitions}):
+     * what a config screen needs to restore a default the file cannot
+     * hold, and what a save writes above each value. Nothing before the
+     * first load.
+     */
+    public static void applyShippedDefinitions(Configuration config) {
+        LostTalesConfigDefinitions.apply(shipped, config);
     }
 
     /** A legacy key's string, or empty when the file no longer has it. */
@@ -2133,6 +2212,12 @@ public final class LostTalesConfig {
                 chatSelectedMentionColor).set(chatSelectedMentionColor);
         config.get(CATEGORY_CLIENT, "chatReplyHighlightColor",
                 chatReplyHighlightColor).set(chatReplyHighlightColor);
+        Property feedAlignmentProperty = config.get(
+                CATEGORY_CLIENT, "chatFeedAlignment", chatFeedAlignment);
+        feedAlignmentProperty.set(chatFeedAlignment);
+        feedAlignmentProperty.setValidValues(CHAT_FEED_ALIGNMENTS);
+        config.get(CATEGORY_CLIENT, "hideHudWhileChatting",
+                hideHudWhileChatting).set(hideHudWhileChatting);
         config.get(CATEGORY_CLIENT, "enableChatAnimations",
                 enableChatAnimations).set(enableChatAnimations);
         config.get(CATEGORY_CLIENT, "chatAnimationDurationMillis",
@@ -2156,14 +2241,12 @@ public final class LostTalesConfig {
                 CATEGORY_CLIENT, "guiAnimationEasingStyle",
                 guiAnimationEasingStyle);
         guiEasingProperty.set(guiAnimationEasingStyle);
-        guiEasingProperty.setValidValues(new String[] {
-                "BACK", "CUBIC", "SMOOTH"});
+        guiEasingProperty.setValidValues(GUI_EASING_STYLES);
         Property guiDirectionProperty = config.get(
                 CATEGORY_CLIENT, "guiAnimationDirection",
                 guiAnimationDirection);
         guiDirectionProperty.set(guiAnimationDirection);
-        guiDirectionProperty.setValidValues(new String[] {
-                "DOWN", "UP", "LEFT", "RIGHT", "NONE"});
+        guiDirectionProperty.setValidValues(GUI_DIRECTIONS);
         config.get(CATEGORY_CLIENT, "reducedGuiMotion",
                 reducedGuiMotion).set(reducedGuiMotion);
         config.get(CATEGORY_CLIENT, "enableGuiBackground",
@@ -2438,6 +2521,21 @@ public final class LostTalesConfig {
                 ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
         return "CUBIC".equals(normalized) || "SMOOTH".equals(normalized)
                 ? normalized : "BACK";
+    }
+
+    /**
+     * The feed alignment a config value names, case and surrounding space
+     * aside: {@code LEFT}, {@code CENTRE} — {@code CENTER} is read as it —
+     * or {@code RIGHT}, and the left for anything else.
+     */
+    public static String normalizeFeedAlignment(String value) {
+        String normalized = value == null
+                ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
+        if ("CENTER".equals(normalized)) {
+            return "CENTRE";
+        }
+        return "CENTRE".equals(normalized) || "RIGHT".equals(normalized)
+                ? normalized : CHAT_FEED_ALIGNMENTS[0];
     }
 
     private static String normalizeGuiDirection(String value) {

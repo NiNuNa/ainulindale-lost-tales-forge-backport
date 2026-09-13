@@ -611,11 +611,12 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     }
 
     /**
-     * Recent lines the server replays on joining, oldest first, each
-     * shown through the path a live line takes — ignored accounts
-     * dropped the same way — without the cues a live line earns: no
-     * sound, no echo to confirm, and no speech bubble over a head that
-     * spoke before this player arrived.
+     * Entries of the operator console: one as it happens, or the kept
+     * ones the server replays on joining, which sound no cue and are
+     * filed against where this player last read the Console — one read
+     * before is not unread again. An entry from before this player
+     * arrived is history: it stands in the Console, and the closed feed
+     * passes over it.
      */
     @Override
     public void handleChatConsole(LostTalesChatConsoleSyncPacket packet) {
@@ -623,10 +624,20 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             return;
         }
         for (ChatConsoleEvent event : packet.getEvents()) {
-            LostTalesChatPresentation.receiveConsoleEvent(event);
+            LostTalesChatPresentation.receiveConsoleEvent(event,
+                    packet.isReplay(), packet.saidBeforeArrival(event));
         }
     }
 
+    /**
+     * Recent lines the server replays, oldest first, each shown through
+     * the path a live line takes — ignored accounts dropped the same way
+     * — without the cues a live line earns: no sound, no echo to
+     * confirm, and no speech bubble over a head that spoke before this
+     * player arrived. A line said before the player arrived is history:
+     * it stands in its tab, and the closed feed, which shows what is
+     * happening, passes over it.
+     */
     @Override
     public void handleChatHistory(LostTalesChatHistorySyncPacket packet) {
         if (packet == null || packet.isMalformed()) {
@@ -634,7 +645,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         }
         for (LostTalesChatMessagePacket line : packet.getMessages()) {
             if (!isIgnoredLine(line)) {
-                LostTalesChatPresentation.receive(line, true);
+                LostTalesChatPresentation.receive(line, true,
+                        packet.saidBeforeArrival(line));
             }
         }
     }

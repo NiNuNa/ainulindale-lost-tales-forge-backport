@@ -148,18 +148,21 @@ public final class ClientChatChannelViews {
     }
 
     /**
-     * As above, for a line the server named ({@code messageId}), said
-     * at {@code timestampMillis}. A {@code replayed} line is one the
-     * server is catching this player up on: one this player was shown
-     * before — no newer than the view's read mark on this server — is
-     * filed and nothing else, and the first one they were not stands
-     * under the unread divider, in the tab in front as in any other, the
-     * way a messenger marks where its reader left off.
+     * As above, for a line the server named, said at
+     * {@code timestampMillis}. {@code serverId} is where the view's read
+     * mark moves once the line is seen: a message's own id, or for a
+     * console line the id of the entry it shows, which comes from the
+     * same clock. A {@code replayed} line is one the server is catching
+     * this player up on: one this player was shown before — no newer
+     * than the view's read mark on this server — is filed and nothing
+     * else, and the first one they were not stands under the unread
+     * divider, in the tab in front as in any other, the way a messenger
+     * marks where its reader left off.
      */
     public static synchronized void record(int chatLineId, ChatTab tab,
                                            ChatTab selected,
                                            boolean mentionsLocalPlayer,
-                                           long messageId,
+                                           long serverId,
                                            long timestampMillis,
                                            boolean replayed) {
         if (tab == null) {
@@ -173,15 +176,15 @@ public final class ClientChatChannelViews {
             iterator.remove();
         }
         invalidateCache();
-        boolean named = ChatMessageIds.isServerId(messageId);
+        boolean named = ChatMessageIds.isServerId(serverId);
         if (named) {
             Long newest = NEWEST_MESSAGE_BY_VIEW.get(view);
-            if (newest == null || messageId > newest.longValue()) {
-                NEWEST_MESSAGE_BY_VIEW.put(view, Long.valueOf(messageId));
+            if (newest == null || serverId > newest.longValue()) {
+                NEWEST_MESSAGE_BY_VIEW.put(view, Long.valueOf(serverId));
             }
         }
         String server = ClientChatSession.currentKey();
-        if (replayed && named && messageId
+        if (replayed && named && serverId
                 <= ClientChatReadMarks.lastRead(server, view)) {
             // Shown before this player left: filed, and nothing to count.
             return;
@@ -219,7 +222,7 @@ public final class ClientChatChannelViews {
             } else if (named) {
                 // In front and at the newest line: shown as it arrived,
                 // in the feed or the open window, so it is read.
-                ClientChatReadMarks.markRead(server, view, messageId);
+                ClientChatReadMarks.markRead(server, view, serverId);
             }
             return;
         }

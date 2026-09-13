@@ -89,6 +89,26 @@ final class ChatHeadMarker {
         return decode(component) != null;
     }
 
+    /**
+     * The head a whole line was signed with — the first head marker among
+     * its runs, which is the line's own, since a reply's quote carries
+     * its head on the quote's marker — or null for a line with none.
+     */
+    static Data of(IChatComponent line) {
+        if (line == null) {
+            return null;
+        }
+        for (Object value : line) {
+            if (value instanceof IChatComponent) {
+                Data head = decode((IChatComponent)value);
+                if (head != null) {
+                    return head;
+                }
+            }
+        }
+        return null;
+    }
+
     private static String encodeText(String value) {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(
                 (value == null ? "" : value).getBytes(UTF_8));

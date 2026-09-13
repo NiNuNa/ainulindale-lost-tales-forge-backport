@@ -88,9 +88,49 @@ public final class LostTalesChatHistorySyncPacketTest {
         assertTrue(decoded.getMessages().isEmpty());
     }
 
+    /**
+     * The login replay says where its reader arrived, as the id of their
+     * own join line: a line with a smaller id is history to them, that
+     * line and every later one were said as they arrived — whatever the
+     * lines' clocks say. Any other batch is all history.
+     */
+    @Test
+    public void aReplaySaysWhereItsReaderArrived() {
+        LostTalesChatHistorySyncPacket packet = new LostTalesChatHistorySyncPacket(
+                Arrays.asList(line(10L, "first", 9000L),
+                        line(11L, "joined", 1000L)), 11L);
+        ByteBuf buffer = Unpooled.buffer();
+        packet.toBytes(buffer);
+        LostTalesChatHistorySyncPacket decoded = new LostTalesChatHistorySyncPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(11L, decoded.getArrivalId());
+        assertTrue(decoded.saidBeforeArrival(decoded.getMessages().get(0)));
+        assertFalse(decoded.saidBeforeArrival(decoded.getMessages().get(1)));
+
+        LostTalesChatHistorySyncPacket page = new LostTalesChatHistorySyncPacket(
+                Collections.singletonList(line(Long.MAX_VALUE - 1L, "older")));
+        assertEquals(Long.MAX_VALUE, page.getArrivalId());
+        assertTrue(page.saidBeforeArrival(page.getMessages().get(0)));
+
+        // A batch written without it is history, as it was then.
+        buffer = Unpooled.buffer();
+        packet.toBytes(buffer);
+        LostTalesChatHistorySyncPacket older = new LostTalesChatHistorySyncPacket();
+        older.fromBytes(buffer.slice(0, buffer.readableBytes() - 8));
+        assertFalse(older.isMalformed());
+        assertEquals(Long.MAX_VALUE, older.getArrivalId());
+        assertTrue(older.saidBeforeArrival(older.getMessages().get(1)));
+    }
+
     private static LostTalesChatMessagePacket line(long id, String text) {
+        return line(id, text, 5000L);
+    }
+
+    private static LostTalesChatMessagePacket line(long id, String text,
+                                                   long timestampMillis) {
         return new LostTalesChatMessagePacket(ChatChannel.OOC, UUID.randomUUID(),
-                "Aldric", "alice", "", 0, 0, text, 5000L, "", null, "", "", 0, true,
-                id, ChatReplyReference.NONE, "");
+                "Aldric", "alice", "", 0, 0, text, timestampMillis, "", null, "", "",
+                0, true, id, ChatReplyReference.NONE, "");
     }
 }

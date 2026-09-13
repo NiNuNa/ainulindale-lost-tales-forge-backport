@@ -9,6 +9,7 @@ import com.ninuna.losttales.config.LostTalesConfigFiles;
 import java.io.File;
 import java.lang.reflect.Field;
 import net.minecraftforge.common.config.Configuration;
+import net.minecraftforge.common.config.Property;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -120,6 +121,34 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
         assertEquals(100.0D, migrated.get(
                 LostTalesThirdPersonConfig.CATEGORY_CAMERA,
                 "headTrackingAngle", 0.0D).getDouble(0.0D), 0.0D);
+    }
+
+    /**
+     * The screen reads the file afresh, and the file holds only the value
+     * saved; dressed in the camera's definitions it restores the shipped
+     * default and keeps the value.
+     */
+    @Test
+    public void aSavedOptionStillRestoresTheShippedDefault() throws Exception {
+        File directory = temporaryFolder.newFolder("defaults-config");
+        initializeForgeHome(directory.getParentFile());
+        LostTalesThirdPersonConfig.load(directory);
+        Configuration screen = LostTalesThirdPersonConfig.createConfiguration();
+        screen.load();
+        screen.getCategory(LostTalesThirdPersonConfig.CATEGORY_CAMERA)
+                .get("distanceMultiplier").set(1.73D);
+        LostTalesThirdPersonConfig.savePendingGuiConfiguration();
+        LostTalesThirdPersonConfig.reload();
+
+        Configuration reopened = LostTalesThirdPersonConfig.createConfiguration();
+        reopened.load();
+        Property distance = reopened.getCategory(
+                LostTalesThirdPersonConfig.CATEGORY_CAMERA).get("distanceMultiplier");
+        assertEquals("1.73", distance.getDefault());
+        LostTalesThirdPersonConfig.applyShippedDefinitions(reopened);
+        assertEquals(1.73D, distance.getDouble(), 0.0D);
+        assertEquals("1.0", distance.getDefault());
+        assertTrue(distance.comment.contains("camera distance"));
     }
 
     private static void initializeForgeHome(File directory) throws Exception {
