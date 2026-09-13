@@ -42,8 +42,11 @@ public final class LostTalesSpeechBubbleRenderer {
     private static final int MAX_WIDTH = 150;
     /** Where the lowest row sits above the speaker's head. */
     private static final double BUBBLE_Y_OFFSET = 0.5D;
-    /** Speech is a local thing; past this nothing is drawn at all. */
-    private static final double MAX_DISTANCE = 48.0D;
+    /**
+     * How far speech bubbles reach before the server states its Proximity
+     * radius, and what a server that never states it leaves in force.
+     */
+    private static final double UNSTATED_RANGE = 48.0D;
     /** Rows of speech drawn over one head at most, newest kept. */
     private static final int MAX_ROWS = 4;
     private static final int ROW_STRIDE = 10;
@@ -55,7 +58,8 @@ public final class LostTalesSpeechBubbleRenderer {
     private static final float EMOJI_SIZE = 8.0F;
     private static final int EMOJI_ADVANCE = 9;
     /** The chat's black behind the words: half, as the chat's own is. */
-    private static final int BACKDROP_ALPHA = 0x80;
+    private static final int BACKDROP_ALPHA =
+            LostTalesChatVisualStyle.SURFACE_ALPHA;
     /**
      * How far LOTR's floating alignment is lifted so it clears what a
      * speaker wears: the anchor, plus a name and the rows of speech that
@@ -106,6 +110,15 @@ public final class LostTalesSpeechBubbleRenderer {
     }
 
     /**
+     * How far a bubble is drawn: the server's Proximity radius, the range
+     * speech carries; the unstated range until the server says.
+     */
+    private static double bubbleRange() {
+        int radius = ClientChatChannelState.getProximityRadius();
+        return radius > 0 ? radius : UNSTATED_RANGE;
+    }
+
+    /**
      * Called for one speaker as they are rendered. {@code x}, {@code y}
      * and {@code z} are the offsets the render pass was given, so the
      * speaker's feet are exactly there.
@@ -120,7 +133,13 @@ public final class LostTalesSpeechBubbleRenderer {
                 || ChatSpeechBubbles.isEmpty()) {
             return;
         }
-        if (x * x + y * y + z * z > MAX_DISTANCE * MAX_DISTANCE) {
+        // Speech carries as far as the server's Proximity radius, measured
+        // between the speaker and the player as the server measures it.
+        double range = bubbleRange();
+        double distanceSquared = minecraft.thePlayer != null
+                ? speaker.getDistanceSqToEntity(minecraft.thePlayer)
+                : x * x + y * y + z * z;
+        if (distanceSquared > range * range) {
             return;
         }
         // LOTR draws an NPC's speech itself unless the coremod took that
@@ -236,7 +255,7 @@ public final class LostTalesSpeechBubbleRenderer {
     /** One row: its runs of text and its emoji, left to right. */
     private static void drawRow(Minecraft minecraft, FontRenderer font,
                                 Row row, int left, int y, int alpha) {
-        int shadowAlpha = Math.round(160.0F * row.opacity);
+        int shadowAlpha = LostTalesChatVisualStyle.shadowAlpha(alpha);
         int x = left;
         for (int index = 0; index < row.parts.size(); index++) {
             ChatEmojiParser.Segment part = row.parts.get(index);
@@ -248,12 +267,14 @@ public final class LostTalesSpeechBubbleRenderer {
             }
             String text = part.getText();
             if (shadowAlpha >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
-                font.drawString(text, x + 1, y + 1,
-                        (shadowAlpha << 24)
-                                | LostTalesChatVisualStyle.SHADOW);
+                font.drawString(text,
+                        x + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                        y + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                        LostTalesChatVisualStyle.argb(
+                                LostTalesChatVisualStyle.SHADOW, shadowAlpha));
             }
             font.drawString(text, x, y,
-                    (alpha << 24) | (row.rgb & 0xFFFFFF));
+                    LostTalesChatVisualStyle.argb(row.rgb, alpha));
             x += font.getStringWidth(text);
         }
     }

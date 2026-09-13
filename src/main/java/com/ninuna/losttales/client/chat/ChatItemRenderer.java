@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
+import java.nio.FloatBuffer;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
@@ -11,6 +12,7 @@ import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.client.IItemRenderer;
 import net.minecraftforge.client.MinecraftForgeClient;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
 /**
@@ -29,9 +31,21 @@ import org.lwjgl.opengl.GL11;
  * raises the alpha test to one half, which would hold the cube opaque
  * and then drop it at half fade, so those are posed exactly as vanilla
  * poses them but drawn here, with blending on.</p>
+ *
+ * <p>An icon is lit as the hotbar lights it: the two lamps are aimed in
+ * the plain screen frame rather than inside the chat's own scales, the
+ * icon is scaled alike on every axis — the chat's matrices scale across
+ * the screen and not into it, which would tilt a block's faces against
+ * the lamps — and every normal is kept at unit length, since a block
+ * shrunk to chat size would otherwise catch a fraction of the light.
+ * Its shadow takes no part in depth: a block's faces lean toward the
+ * eye, and a copy of it one pixel down and right would stand nearer
+ * than the block along its right-hand side and cover it there.</p>
  */
 final class ChatItemRenderer {
     private static final float VANILLA_ICON_SIZE = 16.0F;
+    /** The matrix read back to match depth to the scale across the screen. */
+    private static final FloatBuffer MATRIX = BufferUtils.createFloatBuffer(16);
     /** Blocks as cubes, without a world; vanilla's own is private. */
     private static final RenderBlocks BLOCK_RENDERER = new RenderBlocks();
     /** The depth RenderItem adds for its effect-capable GUI pass. */
@@ -41,7 +55,7 @@ final class ChatItemRenderer {
 
     static void draw(Minecraft minecraft, ItemStack stack,
                      float x, float y, float size, int alpha) {
-        drawInternal(minecraft, stack, x, y, size, alpha, true);
+        drawInternal(minecraft, stack, x, y, size, alpha, false);
     }
 
     static void drawShadow(Minecraft minecraft, ItemStack stack,
@@ -49,7 +63,7 @@ final class ChatItemRenderer {
                            int shadowRgb, int alpha) {
         LostTalesSilhouetteRenderState.begin(shadowRgb);
         try {
-            drawInternal(minecraft, stack, x, y, size, alpha, false);
+            drawInternal(minecraft, stack, x, y, size, alpha, true);
         } finally {
             LostTalesSilhouetteRenderState.end();
         }
@@ -57,7 +71,7 @@ final class ChatItemRenderer {
 
     private static void drawInternal(Minecraft minecraft, ItemStack stack,
                                      float x, float y, float size,
-                                     int alpha, boolean effects) {
+                                     int alpha, boolean shadow) {
         if (minecraft == null || stack == null || stack.getItem() == null
                 || size <= 0.0F || alpha <= 3 || minecraft.fontRenderer == null) {
             return;
@@ -74,21 +88,37 @@ final class ChatItemRenderer {
                 | GL11.GL_CURRENT_BIT | GL11.GL_TEXTURE_BIT);
         GL11.glPushMatrix();
         try {
-            GL11.glTranslatef(x, y, 0.0F);
-            GL11.glScalef(scale, scale, 1.0F);
-            GL11.glEnable(GL11.GL_DEPTH_TEST);
-            GL11.glEnable(GL11.GL_BLEND);
+            // The lamps are aimed in the plain screen frame, as the hotbar
+            // aims them: aimed inside the chat's own scales, they would
+            // lean with them.
+            GL11.glPushMatrix();
+            GL11.glLoadIdentity();
             RenderHelper.enableGUIStandardItemLighting();
+            GL11.glPopMatrix();
+            GL11.glTranslatef(x, y, 0.0F);
+            matchDepthToScaleAcross();
+            GL11.glScalef(scale, scale, scale);
+            // Every normal back at unit length whatever the scale, or a
+            // block shrunk to chat size catches a fraction of the light.
+            GL11.glEnable(GL11.GL_NORMALIZE);
+            GL11.glEnable(GL11.GL_BLEND);
+            if (shadow) {
+                // Nothing of the shadow may stand nearer than the icon it
+                // falls from, so it takes no part in depth at all.
+                GL11.glDisable(GL11.GL_DEPTH_TEST);
+            } else {
+                GL11.glEnable(GL11.GL_DEPTH_TEST);
+            }
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             LostTalesSilhouetteRenderState.beginConstantAlpha(
                     opacity / 255.0F);
             try {
-                if (effects && opacity == 255) {
+                if (!shadow && opacity == 255) {
                     // Full strength: vanilla's own pass, glint and any
                     // mod renderer included.
                     renderer.renderItemAndEffectIntoGUI(minecraft.fontRenderer,
                             minecraft.getTextureManager(), stack, 0, 0);
-                } else if (effects && hasCustomRenderer(stack)) {
+                } else if (!shadow && hasCustomRenderer(stack)) {
                     renderer.renderItemAndEffectIntoGUI(minecraft.fontRenderer,
                             minecraft.getTextureManager(), stack, 0, 0);
                 } else if (rendersAsCube(stack)) {
@@ -109,6 +139,27 @@ final class ChatItemRenderer {
             GL11.glPopMatrix();
             GL11.glPopAttrib();
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        }
+    }
+
+    /**
+     * Scales depth by as much as the current matrix scales across the
+     * screen, so what follows is scaled alike on every axis: the chat's
+     * matrices — its scale, a small row's, the screen's opening — scale
+     * across the screen and leave depth alone, and a block drawn in them
+     * would have its faces tilted against the lamps.
+     */
+    private static void matchDepthToScaleAcross() {
+        MATRIX.clear();
+        GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, MATRIX);
+        float across = (float)Math.sqrt(MATRIX.get(0) * MATRIX.get(0)
+                + MATRIX.get(1) * MATRIX.get(1)
+                + MATRIX.get(2) * MATRIX.get(2));
+        float depth = (float)Math.sqrt(MATRIX.get(8) * MATRIX.get(8)
+                + MATRIX.get(9) * MATRIX.get(9)
+                + MATRIX.get(10) * MATRIX.get(10));
+        if (across > 0.0F && depth > 0.0F) {
+            GL11.glScalef(1.0F, 1.0F, across / depth);
         }
     }
 

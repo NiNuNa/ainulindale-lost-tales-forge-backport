@@ -96,7 +96,8 @@ final class ChatHover {
     LostTalesChatHoverCard.Found person;
     /**
      * Whether a press on the line or the window does something: a run
-     * that answers a click, a person, or a window it brings forward.
+     * that answers a click, a person, a window it brings forward, or a
+     * stack of windows it cycles.
      */
     boolean acts;
 

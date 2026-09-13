@@ -548,14 +548,29 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             ClientChatChannelState.setCanEditServerConfig(
                     packet.canEditServerConfig());
             ClientChatChannelState.setRoleMask(packet.getRoleMask());
+            ClientChatChannelState.setRoleSplit(packet.hasRoleSplit(),
+                    packet.getAccountRoleMask(),
+                    packet.getCharacterRoleMasks());
+            ClientChatChannelState.setProximityRadius(
+                    packet.getProximityRadius());
             java.util.LinkedHashMap<String, Integer> holders =
                     new java.util.LinkedHashMap<String, Integer>();
+            java.util.HashMap<String, Integer> accountRoles =
+                    new java.util.HashMap<String, Integer>();
+            java.util.HashMap<String, java.util.UUID> characters =
+                    new java.util.HashMap<String, java.util.UUID>();
             for (LostTalesChatAccessPacket.RoleHolder holder
                     : packet.getRoleHolders()) {
                 holders.put(holder.getName(),
                         Integer.valueOf(holder.getMask()));
+                accountRoles.put(holder.getName(),
+                        Integer.valueOf(holder.getAccountMask()));
+                if (holder.getCharacterId() != null) {
+                    characters.put(holder.getName(), holder.getCharacterId());
+                }
             }
-            ClientChatChannelState.setRoleHolders(holders);
+            ClientChatChannelState.setRoleHolders(holders, accountRoles,
+                    characters);
             ClientChatChannelState.setMutedSenders(packet.getMutedSenders());
             // So a mention of this player is coloured from the first
             // frame, rather than only once they have said something.
@@ -563,7 +578,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                 ClientChatAccountRoles.remember(
                         Minecraft.getMinecraft().thePlayer
                                 .getCommandSenderName(),
-                        packet.getRoleMask());
+                        packet.getAccountRoleMask());
             }
         }
     }

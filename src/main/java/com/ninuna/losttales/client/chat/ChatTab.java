@@ -274,8 +274,8 @@ public final class ChatTab {
         if (separator >= 0) {
             String rest = trimmed.substring(separator + 1);
             // Only a conversation, and only one written as a conversation:
-            // an id naming a character here was written when a scoped
-            // channel was keyed by one, and names no conversation now.
+            // an id naming a character here names no conversation, so it
+            // reads as unknown.
             if (!rest.toLowerCase(Locale.ROOT).startsWith(SCOPE_MARK)) {
                 return null;
             }

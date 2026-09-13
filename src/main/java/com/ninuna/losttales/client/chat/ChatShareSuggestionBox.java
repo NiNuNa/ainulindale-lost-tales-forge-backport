@@ -7,7 +7,6 @@ import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.entity.player.EntityPlayer;
 
 /**
@@ -22,7 +21,10 @@ final class ChatShareSuggestionBox {
     static final int MAX_ROWS = 8;
     private static final int ROW_HEIGHT = 12;
     private static final int PADDING = 2;
-    /** Matches the other popups' gap above the input row. */
+    /**
+     * How far above the input anchor ({@link ChatInputBar#inputAnchor})
+     * the box ends: one pixel clear of the bar's top.
+     */
     private static final int BOTTOM_MARGIN = 15;
     /** Candidate snapshots are refreshed at most this often while open. */
     private static final long REFRESH_INTERVAL_NANOS = 250L * 1000000L;
@@ -175,24 +177,17 @@ final class ChatShareSuggestionBox {
         int top = boxTop(screenHeight);
         int bottom = screenHeight - BOTTOM_MARGIN;
         int hoveredRow = rowAt(font, mouseX, mouseY, screenHeight, inputX);
+        if (hoveredRow >= 0) {
+            this.selectedIndex = hoveredRow;
+        }
         regions.add(inputX, top, inputX + width, bottom);
-        Gui.drawRect(inputX, top, inputX + width, bottom,
-                LostTalesChatVisualStyle.argb(
-                        LostTalesChatVisualStyle.SURFACE_RGB, 0xE0));
+        LostTalesChatVisualStyle.drawPopupList(inputX, top, inputX + width,
+                bottom, top + PADDING, ROW_HEIGHT,
+                this.selectedIndex < this.matches.size()
+                        ? this.selectedIndex : -1);
         for (int row = 0; row < this.matches.size(); row++) {
             ChatShareCandidates.Entry entry = this.matches.get(row);
             int rowTop = top + PADDING + row * ROW_HEIGHT;
-            boolean hovered = row == hoveredRow;
-            if (hovered) {
-                this.selectedIndex = row;
-            }
-            if (row == this.selectedIndex) {
-                Gui.drawRect(inputX + 1, rowTop, inputX + width - 1,
-                        rowTop + ROW_HEIGHT,
-                        LostTalesChatVisualStyle.argb(
-                                LostTalesChatVisualStyle
-                                        .SURFACE_HIGHLIGHT_RGB, 0xC8));
-            }
             drawIcon(minecraft, entry, inputX + 3, rowTop + 1);
             LostTalesChatVisualStyle.drawPlain(font, entry.label(),
                     inputX + 3 + ICON_SLOT + 4, rowTop + 2,

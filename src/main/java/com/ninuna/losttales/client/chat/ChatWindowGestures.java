@@ -210,7 +210,8 @@ final class ChatWindowGestures {
      */
     boolean onDragMove(int mouseX, int mouseY) {
         if (this.scrollbarDrag != null) {
-            dragScrollbar(mouseY);
+            dragScrollbar(ChatWindowPlacement.preciseMouseY(this.mc,
+                    this.screenHeight));
             return true;
         }
         if (this.windowResize != null) {
@@ -352,12 +353,11 @@ final class ChatWindowGestures {
             }
             float thumbHeight = frame.scrollbarThumbBottom
                     - frame.scrollbarThumbTop;
-            float offset = mouseY >= frame.scrollbarThumbTop
-                    && mouseY < frame.scrollbarThumbBottom
-                            ? (float)(mouseY - frame.scrollbarThumbTop)
-                            : thumbHeight / 2.0F;
+            float offset = frame.scrollbarThumbContains(mouseX, mouseY)
+                    ? (float)(mouseY - frame.scrollbarThumbTop)
+                    : thumbHeight / 2.0F;
             this.scrollbarDrag = new ScrollbarDrag(frame.windowId, offset);
-            dragScrollbar((int)Math.floor(mouseY));
+            dragScrollbar(mouseY);
             return true;
         }
         return false;
@@ -366,8 +366,10 @@ final class ChatWindowGestures {
     /**
      * Maps the pointer onto the history: where the thumb's top sits in
      * the travel it has is where the view sits in what it can reach.
+     * The pointer is read to the display pixel, as the grab measured
+     * it, so the thumb stays on the spot it was taken hold of.
      */
-    private void dragScrollbar(int mouseY) {
+    private void dragScrollbar(double mouseY) {
         ChatWindowFrame frame = this.scrollbarDrag == null ? null
                 : ChatWindowFrame.find(this.scrollbarDrag.windowId);
         if (frame == null || frame.view == null || frame.lines == null) {
@@ -380,7 +382,7 @@ final class ChatWindowGestures {
         if (travel <= 0.0F) {
             return;
         }
-        float top = mouseY - this.scrollbarDrag.grabOffset;
+        float top = (float)(mouseY - this.scrollbarDrag.grabOffset);
         float taken = (frame.scrollbarTrackBottom - thumbHeight - top)
                 / travel;
         // The thumb's travel is the stack's height in pixels, and the
@@ -519,7 +521,7 @@ final class ChatWindowGestures {
      * One classification, in one order: what is drawn above the windows
      * — the pickers, the completion lists, the settings menu, the input
      * bar group — owns the pointer first; the resize border comes next,
-     * ahead of the tab strip it overlaps along the window's top edge;
+     * ahead of the tab strip along the window's top edge;
      * the strip and the windows themselves come last. Hover, the cursor,
      * mouse-down and the drag it starts all ask this same question, so
      * what the pointer shows is what the press does.
@@ -562,33 +564,32 @@ final class ChatWindowGestures {
     /**
      * Whether the point lies within the window as it was drawn — its
      * strip, its messages and its bar — rather than on the border
-     * outside it.
+     * outside it: the one test the window's own hover and press ask.
      */
     static boolean coversPoint(ChatWindowFrame frame, double mouseX,
                                double mouseY) {
-        double left = frame.drawnLeft();
-        double right = left + (frame.boxRight - frame.boxLeft);
-        double top = frame.boxTop + frame.motionY;
-        double bottom = frame.boxBottom + frame.motionY;
-        return mouseX > left && mouseX < right
-                && mouseY > top && mouseY < bottom;
+        return frame.contains(mouseX, mouseY);
     }
 
-    /** Which edge or corner of one window's box a point lies on. */
+    /**
+     * Which edge or corner of one window's box a point lies on: the
+     * band {@link #RESIZE_BORDER} pixels wide just outside the pixels
+     * the window draws, never on them.
+     */
     static ResizeEdge edgeAt(ChatWindowFrame frame, double mouseX,
                              double mouseY) {
         double left = frame.drawnLeft();
         double right = left + (frame.boxRight - frame.boxLeft);
         double top = frame.boxTop + frame.motionY;
         double bottom = frame.boxBottom + frame.motionY;
-        if (mouseX < left - RESIZE_BORDER || mouseX > right + RESIZE_BORDER
+        if (mouseX < left - RESIZE_BORDER || mouseX >= right + RESIZE_BORDER
                 || mouseY < top - RESIZE_BORDER
-                || mouseY > bottom + RESIZE_BORDER) {
+                || mouseY >= bottom + RESIZE_BORDER) {
             return null;
         }
-        boolean onLeft = mouseX <= left;
+        boolean onLeft = mouseX < left;
         boolean onRight = mouseX >= right;
-        boolean onTop = mouseY <= top;
+        boolean onTop = mouseY < top;
         boolean onBottom = mouseY >= bottom;
         if (!onLeft && !onRight && !onTop && !onBottom) {
             // Inside the window: its tabs, messages and bar own this.

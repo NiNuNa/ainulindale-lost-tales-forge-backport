@@ -24,7 +24,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumChatFormatting;
 
 /**
- * The chat's input field, drawn the way the rest of the chat is drawn.
+ * The chat's text fields — the input, and the pickers' search — drawn
+ * the way the rest of the chat is drawn.
  *
  * <p>Vanilla's {@code GuiTextField} draws its text with
  * {@code drawStringWithShadow}, whose shadow is a quarter of the text's
@@ -66,6 +67,9 @@ import net.minecraft.util.EnumChatFormatting;
  * {@link #setSelectionPos}), so no key needs handling of its own; an
  * incomplete or unresolvable token is plain text and edits as such.</p>
  *
+ * <p>A search field shows what is typed as it is ({@link #plainText}):
+ * no mention colours, no previews and no markup.</p>
+ *
  * <p>Two of vanilla's fields have no accessor — how far the text is
  * scrolled and the caret's blink — so they are read reflectively by both
  * their names, verified to be the ints they are. Without them the field
@@ -88,11 +92,23 @@ final class ChatInputField extends GuiTextField {
     private String styledText;
     /** Every character's markup style, or null for text without markup. */
     private int[] styles;
+    /** Whether what is typed is shown as it is, as a search field's is. */
+    private boolean plainText;
 
     ChatInputField(FontRenderer font, int x, int y, int width, int height) {
         super(font, x, y, width, height);
         this.font = font;
         this.fieldHeight = height;
+    }
+
+    /**
+     * Shows what is typed as it is — no mention colours, no previews, no
+     * markup — as a search field's text, which is looked up rather than
+     * sent, should be.
+     */
+    ChatInputField plainText() {
+        this.plainText = true;
+        return this;
     }
 
     /** Whether the field can be drawn in the chat's own style. */
@@ -168,13 +184,9 @@ final class ChatInputField extends GuiTextField {
             int headEnd = caretInside ? caret : visible.length();
             cursorX = drawRuns(visible, colors, 0, headEnd, left, top);
         }
-        // Vanilla puts the caret between characters while there is text
-        // to its right, and after the last one otherwise. The bar stands
-        // on the boundary between the two runs; the runs themselves are
-        // never shifted for it, so the text stays still as the caret
-        // walks through it.
-        boolean caretBetween = getCursorPosition() < text.length()
-                || text.length() >= getMaxStringLength();
+        // The caret stands on the boundary between the two runs; the
+        // runs themselves are never shifted for it, so the text stays
+        // still as the caret walks through it.
         int caretX = cursorX;
         if (!caretInside) {
             caretX = caret > 0 ? left + getWidth() : left;
@@ -183,14 +195,7 @@ final class ChatInputField extends GuiTextField {
             drawRuns(visible, colors, caret, visible.length(), cursorX, top);
         }
         if (caretVisible) {
-            if (caretBetween) {
-                Gui.drawRect(caretX, top - 1, caretX + 1,
-                        top + 1 + this.font.FONT_HEIGHT,
-                        LostTalesChatVisualStyle.argb(CARET_RGB, 0xFF));
-            } else {
-                LostTalesChatVisualStyle.drawColored(this.font, "_", caretX,
-                        top, CARET_RGB, 255);
-            }
+            drawCaret(caretX, top);
         }
         if (selection != caret && caretInside) {
             int selectionX = left + this.font.getStringWidth(
@@ -201,29 +206,45 @@ final class ChatInputField extends GuiTextField {
     }
 
     /**
-     * Height of the selection wash: from the top of an emoji box, two
-     * rows above the glyph tops, down to the row under the descenders.
-     * The bar's own measure, not the message row's.
+     * Height of the field's content box, which the caret, the selection
+     * wash and the previews all stand on: an emoji's ten rows, where a
+     * message row puts its boxes ({@link ChatInlineIcons#rowContentTop}),
+     * so the well lays out what is typed as the line will be laid out.
      */
-    private static final int SELECTION_BAND_HEIGHT = 11;
+    private static final int CONTENT_HEIGHT =
+            (int)ChatInlineIcons.CONTENT_SIZE;
 
     /**
-     * The wash spans the band the content actually occupies, so it sits
+     * The wash spans the box the content actually occupies, so it sits
      * centred on what is selected instead of hanging low on the glyphs
      * alone.
      */
     private static int selectionBandTop(int textTop) {
-        return textTop + ChatInlineIcons.CONTENT_TOP_OFFSET;
+        return ChatInlineIcons.rowContentTop(textTop);
     }
 
     private static int selectionBandBottom(int textTop) {
-        return textTop + ChatInlineIcons.CONTENT_TOP_OFFSET
-                + SELECTION_BAND_HEIGHT;
+        return ChatInlineIcons.rowContentTop(textTop) + CONTENT_HEIGHT;
     }
 
     /** The caret in the palette's ivory, like the text it stands in. */
     private static final int CARET_RGB =
             LostTalesColors.rgb(LostTalesColors.IVORY);
+    /** The caret's width: a one-pixel bar wherever it stands. */
+    static final int CARET_WIDTH = 1;
+
+    /**
+     * The caret: a one-pixel ivory bar as tall as the field's content
+     * box, a clear row short of the well at both ends, wherever it
+     * stands. After the last character vanilla draws an underscore
+     * instead, which hangs past the field's end and out of the well;
+     * the bar keeps to the field.
+     */
+    static void drawCaret(int x, int textTop) {
+        int top = ChatInlineIcons.rowContentTop(textTop);
+        Gui.drawRect(x, top, x + CARET_WIDTH, top + CONTENT_HEIGHT,
+                LostTalesChatVisualStyle.argb(CARET_RGB, 0xFF));
+    }
 
     /**
      * The colour of every character of the visible text: ivory, except
@@ -234,6 +255,9 @@ final class ChatInputField extends GuiTextField {
         int[] colors = new int[visible.length()];
         for (int index = 0; index < colors.length; index++) {
             colors[index] = LostTalesChatVisualStyle.IVORY;
+        }
+        if (this.plainText) {
+            return colors;
         }
         ChatChannel channel = ClientChatChannelState.getSelectedChannel();
         int cursor = 0;
@@ -359,6 +383,9 @@ final class ChatInputField extends GuiTextField {
      * send will make — become previews; the rest stay literal text.
      */
     private List<TokenPreview> previewsFor(String text) {
+        if (this.plainText) {
+            return Collections.emptyList();
+        }
         if (text.equals(this.previewedText)) {
             return this.previews;
         }
@@ -572,17 +599,8 @@ final class ChatInputField extends GuiTextField {
                 && caretInside;
         int caretX = left + displayedX(text, resolved, scrollOffset,
                 Math.max(scrollOffset, Math.min(caret, visibleEnd)));
-        boolean caretBetween = caret < text.length()
-                || text.length() >= getMaxStringLength();
         if (caretVisible) {
-            if (caretBetween) {
-                Gui.drawRect(caretX, top - 1, caretX + 1,
-                        top + 1 + this.font.FONT_HEIGHT,
-                        LostTalesChatVisualStyle.argb(CARET_RGB, 0xFF));
-            } else {
-                LostTalesChatVisualStyle.drawColored(this.font, "_", caretX,
-                        top, CARET_RGB, 255);
-            }
+            drawCaret(caretX, top);
         }
         int selection = getSelectionEnd();
         if (selection != caret && caretInside) {
@@ -631,6 +649,9 @@ final class ChatInputField extends GuiTextField {
      * null for text carrying no markup at all, the common case.
      */
     private int[] stylesFor(String text) {
+        if (this.plainText) {
+            return null;
+        }
         if (text.equals(this.styledText)) {
             return this.styles;
         }
@@ -664,7 +685,7 @@ final class ChatInputField extends GuiTextField {
             // same slot and box the message lines give it.
             ChatInlineIcons.drawEmoji(minecraft, preview.emoji,
                     ChatInlineIcons.boxLeft(x, ChatInlineIcons.SLOT_WIDTH),
-                    ChatInlineIcons.boxTop(y, ChatInlineIcons.SLOT_WIDTH),
+                    ChatInlineIcons.rowBoxTop(y, ChatInlineIcons.SLOT_WIDTH),
                     ChatInlineIcons.contentSize(ChatInlineIcons.SLOT_WIDTH),
                     255);
             return x + preview.width;
@@ -673,7 +694,7 @@ final class ChatInputField extends GuiTextField {
                 preview.rgb, 255);
         x += this.font.getStringWidth("[");
         float boxX = ChatInlineIcons.boxLeft(x, ChatInlineIcons.SLOT_WIDTH);
-        float boxY = ChatInlineIcons.boxTop(y, ChatInlineIcons.SLOT_WIDTH);
+        float boxY = ChatInlineIcons.rowBoxTop(y, ChatInlineIcons.SLOT_WIDTH);
         float size = ChatInlineIcons.contentSize(ChatInlineIcons.SLOT_WIDTH);
         if (preview.kind == ChatShareKind.ITEM) {
             ChatInlineIcons.drawItem(minecraft, preview.stack, boxX, boxY,

@@ -14,9 +14,8 @@ import net.minecraft.util.IChatComponent;
  * is then read by exactly the same test, which is why the shape is
  * matched rather than replaced.</p>
  *
- * <p>Four places asked the question and two answered it, each with its
- * own edge behaviour: one omitted the action check, one assumed the
- * prefix was there. Everything that asks now asks here.</p>
+ * <p>Every question about a line's sender is answered here, so every
+ * caller gets the same action check and the same prefix check.</p>
  */
 final class ChatSenderSpan {
 

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
 
 /**
  * The command tab-completion list, shown above the input like the emoji
@@ -14,15 +13,17 @@ import net.minecraft.client.gui.Gui;
  * the candidates arrive asynchronously from the server — and the screen
  * clears it on any keystroke that is not another Tab. The highlighted
  * row is the candidate currently standing in the field; walking the list
- * (Tab, or Up and Down) replaces the word, exactly as vanilla's cycling
- * replaced it.
+ * (Tab, or Up and Down) replaces the word, as vanilla's cycling does.
  */
 final class ChatCommandSuggestionBox {
     /** Rows shown; more candidates fold into a trailing count. */
     static final int MAX_ROWS = 8;
     private static final int ROW_HEIGHT = 11;
     private static final int PADDING = 2;
-    /** Matches the tab row's gap above the input row. */
+    /**
+     * How far above the input anchor ({@link ChatInputBar#inputAnchor})
+     * the box ends: one pixel clear of the bar's top.
+     */
     private static final int BOTTOM_MARGIN = 15;
 
     private List<String> candidates = Collections.emptyList();
@@ -90,21 +91,11 @@ final class ChatCommandSuggestionBox {
         int hoveredRow = candidateAt(font, mouseX, mouseY, screenHeight,
                 inputX);
         regions.add(inputX, top, inputX + width, bottom);
-        Gui.drawRect(inputX, top, inputX + width, bottom,
-                LostTalesChatVisualStyle.argb(
-                        LostTalesChatVisualStyle.SURFACE_RGB, 0xE0));
         int shown = Math.min(this.candidates.size(), MAX_ROWS);
+        LostTalesChatVisualStyle.drawPopupList(inputX, top, inputX + width,
+                bottom, top + PADDING, ROW_HEIGHT, litRow(hoveredRow, shown));
         for (int row = 0; row < shown; row++) {
             int rowTop = top + PADDING + row * ROW_HEIGHT;
-            boolean hovered = row == hoveredRow;
-            if (row == this.selectedIndex || hovered) {
-                Gui.drawRect(inputX + 1, rowTop, inputX + width - 1,
-                        rowTop + ROW_HEIGHT,
-                        LostTalesChatVisualStyle.argb(
-                                LostTalesChatVisualStyle
-                                        .SURFACE_HIGHLIGHT_RGB,
-                                row == this.selectedIndex ? 0xC8 : 0x60));
-            }
             LostTalesChatVisualStyle.drawColored(font,
                     this.candidates.get(row), inputX + 4, rowTop + 2,
                     LostTalesChatVisualStyle.IVORY, 255);
@@ -115,16 +106,19 @@ final class ChatCommandSuggestionBox {
                     inputX + 4, top + PADDING + shown * ROW_HEIGHT + 2,
                     LostTalesChatVisualStyle.IVORY, 160);
         }
-        // Cycling past the fold still highlights: the list scrolls no
-        // further, so the fold row stands for wherever the walk is.
-        if (this.selectedIndex >= MAX_ROWS) {
-            int rowTop = top + PADDING + shown * ROW_HEIGHT;
-            Gui.drawRect(inputX + 1, rowTop, inputX + width - 1,
-                    rowTop + ROW_HEIGHT,
-                    LostTalesChatVisualStyle.argb(
-                            LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
-                            0x60));
+    }
+
+    /**
+     * The one row lit: the one under the pointer, which a press takes,
+     * else the candidate standing in the field. Cycling past the fold
+     * lights the fold row: the list scrolls no further, so the fold
+     * stands for wherever the walk is.
+     */
+    private int litRow(int hoveredRow, int shown) {
+        if (hoveredRow >= 0) {
+            return hoveredRow;
         }
+        return this.selectedIndex >= MAX_ROWS ? shown : this.selectedIndex;
     }
 
     private int boxWidth(FontRenderer font) {

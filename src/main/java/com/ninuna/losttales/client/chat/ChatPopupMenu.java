@@ -325,7 +325,8 @@ final class ChatPopupMenu {
         if (this.filter != null) {
             // The field's prompt and the shortcut beside it are content
             // too: a list narrower than they are would cut them off.
-            widest = Math.max(widest, font.getStringWidth(this.filterPrompt)
+            widest = Math.max(widest, ChatInputField.CARET_WIDTH + 1
+                    + font.getStringWidth(this.filterPrompt)
                     + SWATCH_GAP + hintWidth(Minecraft.getMinecraft()));
         }
         this.width = Math.max(MIN_WIDTH,
@@ -403,11 +404,12 @@ final class ChatPopupMenu {
     }
 
     /**
-     * The search field above the rows: what has been typed, or the
-     * prompt in the sand the section labels wear while it is empty, the
-     * shortcut that opens the list at the right end, and a caret
-     * blinking after the text so it is plain the field is taking keys.
-     * A hairline under it parts it from the rows.
+     * The search field above the rows: what has been typed, or while it
+     * is empty the prompt in the chat's aside tone and italics, as the
+     * input bar's hint is; the shortcut that opens the list at the right
+     * end; and the chat's caret blinking after the text so it is plain
+     * the field is taking keys. A hairline under it parts it from the
+     * rows.
      */
     private void drawSearchField(FontRenderer font) {
         if (this.filter == null) {
@@ -418,8 +420,11 @@ final class ChatPopupMenu {
         String typed = this.filter.toString();
         int quiet = LostTalesColors.rgb(LostTalesColors.SAND);
         if (typed.length() == 0) {
-            LostTalesChatVisualStyle.drawColored(font, this.filterPrompt,
-                    this.x + PADDING_X, textY, quiet, 255);
+            // A pixel clear of the caret waiting at the field's start.
+            LostTalesChatVisualStyle.drawColored(font,
+                    "§o" + this.filterPrompt, this.x + PADDING_X
+                            + ChatInputField.CARET_WIDTH + 1, textY,
+                    LostTalesChatVisualStyle.asideRgb(), 255);
         } else {
             LostTalesChatVisualStyle.drawPlain(font, typed,
                     this.x + PADDING_X, textY, 255);
@@ -451,10 +456,8 @@ final class ChatPopupMenu {
         }
         if ((System.nanoTime() - this.filterNanos) % CARET_BLINK_NANOS
                 < CARET_BLINK_NANOS / 2L) {
-            int caretX = this.x + PADDING_X + font.getStringWidth(typed);
-            Gui.drawRect(caretX, textY - 1, caretX + 1, textY + 8,
-                    LostTalesChatVisualStyle.argb(
-                            LostTalesChatVisualStyle.IVORY, 0xFF));
+            ChatInputField.drawCaret(
+                    this.x + PADDING_X + font.getStringWidth(typed), textY);
         }
         Gui.drawRect(this.x + PADDING_X, top + this.fieldHeight - 1,
                 this.x + this.width - PADDING_X, top + this.fieldHeight,
@@ -563,20 +566,7 @@ final class ChatPopupMenu {
         if (!isOpen() || font == null) {
             return;
         }
-        Gui.drawRect(this.x, this.y, this.x + this.width,
-                this.y + this.height, LostTalesChatVisualStyle.SURFACE);
-        // A one-pixel outline, so the list reads as a panel of its own.
-        int outline = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB, 0xE0);
-        Gui.drawRect(this.x, this.y, this.x + this.width, this.y + 1, outline);
-        Gui.drawRect(this.x, this.y + this.height - 1, this.x + this.width,
-                this.y + this.height, outline);
-        Gui.drawRect(this.x, this.y, this.x + 1, this.y + this.height,
-                outline);
-        Gui.drawRect(this.x + this.width - 1, this.y, this.x + this.width,
-                this.y + this.height, outline);
         advanceScrollEasing();
-        drawSearchField(font);
         Entry hovered = entryAt(mouseX, mouseY);
         // Rows are laid out from the drawn offset — whole rows pick where
         // the list starts, the fraction slides it — and clipped to the
@@ -585,6 +575,21 @@ final class ChatPopupMenu {
         int firstRow = (int)Math.floor(this.renderedScrollRows);
         int rowY = this.y + PADDING_Y + this.fieldHeight - (int)Math.round(
                 (this.renderedScrollRows - firstRow) * ROW_HEIGHT);
+        // The popups' one surface, the hovered row lit in it rather than
+        // over it and cut to the band the rows glide in.
+        int rowsTop = this.y + PADDING_Y + this.fieldHeight;
+        int rowsBottom = this.y + this.height - PADDING_Y;
+        int litTop = hovered == null ? rowsTop : rowY
+                + (this.entries.indexOf(hovered) - firstRow) * ROW_HEIGHT;
+        LostTalesChatVisualStyle.drawPopup(this.x, this.y,
+                this.x + this.width, this.y + this.height, 1.0F, this.x,
+                Math.max(rowsTop, litTop), this.x + this.width,
+                hovered == null ? rowsTop
+                        : Math.min(rowsBottom, litTop + ROW_HEIGHT));
+        int outline = LostTalesChatVisualStyle.argb(
+                LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
+                LostTalesChatVisualStyle.POPUP_ALPHA);
+        drawSearchField(font);
         int last = Math.min(this.entries.size(),
                 firstRow + this.visibleRows + 1);
         boolean clipped = LostTalesChatOverlayRenderer.beginVerticalClip(
@@ -605,11 +610,6 @@ final class ChatPopupMenu {
                         outline);
                 rowY += ROW_HEIGHT;
                 continue;
-            }
-            if (entry == hovered) {
-                Gui.drawRect(this.x + 1, rowY, this.x + this.width - 1,
-                        rowY + ROW_HEIGHT,
-                        LostTalesChatVisualStyle.SURFACE_HOVER);
             }
             if (entry.color >= 0) {
                 // The channel's colour as a one-pixel upright bar the

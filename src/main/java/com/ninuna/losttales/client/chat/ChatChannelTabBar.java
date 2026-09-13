@@ -311,16 +311,16 @@ final class ChatChannelTabBar {
     private float gripFade;
     /** Seconds since the row was last drawn; what the fades step by. */
     private double frameElapsed;
+    /** The row's own lower cut, handed down to each tab's contents. */
+    private double rowClipBottom = Double.NaN;
+    /** {@link Row#fractionX} of the row being drawn, for {@link #clipX}. */
+    private double clipFractionX;
     /**
      * Where the run of controls after the tabs is drawn: attached to the
      * edge the tabs are drawn to this frame, so it carries along with a
      * closing tab's neighbours and stands in its new place at once when
      * a tab opens.
      */
-    /** The row's own lower cut, handed down to each tab's contents. */
-    private double rowClipBottom = Double.NaN;
-    /** {@link Row#fractionX} of the row being drawn, for {@link #clipX}. */
-    private double clipFractionX;
     private float drawnTabsRight;
     /** That edge measured from the row's left. */
     private float drawnTabsRightOffset;
@@ -488,7 +488,6 @@ final class ChatChannelTabBar {
         return rowBottom - ROW_HEIGHT;
     }
 
-    /** Whether a GUI-space point lies in the row's vertical band. */
     /**
      * Whether a screen y lies in the row's band as drawn: the row is laid
      * out in whole pixels and drawn moved by its fraction, so the band
@@ -582,6 +581,22 @@ final class ChatChannelTabBar {
     }
 
     /**
+     * Whether a point lies on the strip as drawn: the row's band, from
+     * the strip's inset left edge to where the window's edge really
+     * stands, the stretch its surface covers and its region claims.
+     */
+    boolean stripContains(FontRenderer font, Row row, double mouseX,
+                          double mouseY) {
+        if (row == null || !inRowBand(row, mouseY)) {
+            return false;
+        }
+        layout(font, row);
+        double localX = mouseX - row.offsetX - row.fractionX;
+        return localX >= row.left - STRIP_INSET
+                && localX < this.endEdge + this.endFraction + STRIP_INSET;
+    }
+
+    /**
      * Insertion index for a run of tabs carried over this row, into the
      * row's <em>full</em> tab list. The row's tabs make one more place
      * than there are tabs, and the run takes the one its own centre has
@@ -632,8 +647,8 @@ final class ChatChannelTabBar {
         // a tab the hand is only passing over — so the row simply
         // answers nothing until the tab is put down. Nor while the
         // window's edge is under the hand: the row's band and the top
-        // resize border meet on one scanline, and a resize glides the
-        // band under a pointer that stands still on that line, so
+        // resize border meet at the window's top edge, and a resize
+        // glides the band under a pointer that stands still there, so
         // asking would light and unlight a tab every other frame.
         Hit hovered = row.dragging != null || row.resizing ? null
                 : hitAt(font, row, mouseX, mouseY);
@@ -646,9 +661,10 @@ final class ChatChannelTabBar {
         // included, as the end controls hanging from it do.
         float stripRight = row.offsetX + this.endEdge + this.endFraction
                 + STRIP_INSET;
-        LostTalesChatOverlayRenderer.fillRect(
-                row.offsetX + row.left - STRIP_INSET, rowTop(bottom),
-                stripRight, bottom - 1,
+        // Every tab's footprint is left out of it: a tab wears its own
+        // surface in a single layer, never over this one.
+        drawStripAround(row, tabs, row.offsetX + row.left - STRIP_INSET,
+                rowTop(bottom), stripRight, bottom - 1,
                 LostTalesChatVisualStyle.argb(
                         LostTalesChatVisualStyle.SURFACE_RGB,
                         scaled(LostTalesChatVisualStyle.SURFACE_ALPHA)));
@@ -830,6 +846,65 @@ final class ChatChannelTabBar {
         int result = Math.round(alpha * this.alphaScale);
         return result < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
                 ? 0 : result;
+    }
+
+    /**
+     * The strip's surface over {@code [left, right)} by {@code [top,
+     * bottom)} with every tab's footprint left out, so each tab wears its
+     * own surface in a single layer and the two never lie one over the
+     * other. A tab's footprint is its body from the row under its top
+     * down to the strip's end, and its top row a pixel in from each side:
+     * the chamfer its border artwork cuts, where the strip shows. Read
+     * column by column, so wherever tabs overlap — a carried one over
+     * its neighbours — the highest of them decides where the strip stops.
+     */
+    private void drawStripAround(Row row, List<Tab> tabs, float left,
+                                 float top, float right, float bottom,
+                                 int argb) {
+        int count = tabs.size();
+        float[] lefts = new float[count];
+        float[] rights = new float[count];
+        int[] tops = new int[count];
+        float[] edges = new float[count * 4 + 2];
+        int edgeCount = 0;
+        edges[edgeCount++] = left;
+        edges[edgeCount++] = right;
+        for (int index = 0; index < count; index++) {
+            Tab tab = tabs.get(index);
+            lefts[index] = row.offsetX + drawnX(row, tab);
+            rights[index] = lefts[index] + drawnWidth(row, tab);
+            tops[index] = row.rowBottom - HEIGHT
+                    - (tab.tab.equals(row.selected) ? LIFT : 0);
+            float[] tabEdges = {lefts[index], lefts[index] + 1.0F,
+                    rights[index] - 1.0F, rights[index]};
+            for (float edge : tabEdges) {
+                if (edge > left && edge < right) {
+                    edges[edgeCount++] = edge;
+                }
+            }
+        }
+        java.util.Arrays.sort(edges, 0, edgeCount);
+        for (int index = 0; index + 1 < edgeCount; index++) {
+            float from = edges[index];
+            float to = edges[index + 1];
+            if (to <= from) {
+                continue;
+            }
+            float middle = (from + to) / 2.0F;
+            float cover = bottom;
+            for (int tabIndex = 0; tabIndex < count; tabIndex++) {
+                if (middle < lefts[tabIndex] || middle >= rights[tabIndex]) {
+                    continue;
+                }
+                boolean chamfer = middle < lefts[tabIndex] + 1.0F
+                        || middle >= rights[tabIndex] - 1.0F;
+                cover = Math.min(cover, tops[tabIndex] + (chamfer ? 1 : 0));
+            }
+            if (cover > top) {
+                LostTalesChatOverlayRenderer.fillRect(from, top, to, cover,
+                        argb);
+            }
+        }
     }
 
     private void drawTab(FontRenderer font, Tab tab, Row row,
@@ -1243,12 +1318,12 @@ final class ChatChannelTabBar {
      * GUI's own units. The finest the screen has, and what everything
      * else in the chat lays its pixel art on.
      */
-    private static double displayStep() {
+    static double displayStep() {
         return 1.0D / ChatWindowFrame.displayScaleFactor();
     }
 
     /** {@code value} laid on the nearest whole display pixel. */
-    private static double snapped(double value, double step) {
+    static double snapped(double value, double step) {
         return Math.round(value / step) * step;
     }
 
@@ -1466,8 +1541,7 @@ final class ChatChannelTabBar {
     }
 
     /** One step toward {@code target}, arriving rather than creeping. */
-    private static float eased(float current, float target,
-                               double elapsed) {
+    static float eased(float current, float target, double elapsed) {
         float value = (float)LostTalesChatMotion.approach(current, target,
                 elapsed, SLIDE_SECONDS);
         // Inside one display pixel there is nothing left to draw, and
@@ -1784,10 +1858,6 @@ final class ChatChannelTabBar {
                 y + (CONTROL_SIZE - resting.getHeight()) / 2, alpha);
     }
 
-    /**
-     * The y that centres a sprite of the given height in the strip above
-     * the window's top rule, which takes the strip's last row.
-     */
     /**
      * Where a control of {@code height} pixels stands to sit in the
      * middle of the strip. The strip's last row is the window's top

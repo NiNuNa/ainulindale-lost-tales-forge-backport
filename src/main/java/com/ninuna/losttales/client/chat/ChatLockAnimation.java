@@ -47,11 +47,11 @@ final class ChatLockAnimation {
             {0, 59, 6, 8}, {0, 68, 5, 8}, {10, 68, 5, 8}, {10, 59, 5, 8},
             {10, 50, 5, 8}, {10, 42, 5, 7}, {10, 35, 5, 6}, {10, 27, 5, 7}};
 
-    /** Sheet column each colourway's block starts at. */
     /** How far the lock has crossed to its hovered colourway, and when. */
     private float hoverFade;
     private long hoverFadeNanos;
 
+    /** Sheet column each colourway's block starts at. */
     private static final int RESTING_U = 50;
     private static final int OPEN_HOVER_U = 66;
     private static final int SHUT_HOVER_U = 82;
@@ -108,7 +108,6 @@ final class ChatLockAnimation {
     private long turnStartedNanos;
     private long hoverStartedNanos;
     private boolean previouslyLocked;
-    private boolean previouslyHovered;
     private boolean seen;
     private long lastSeenNanos;
 
@@ -229,7 +228,6 @@ final class ChatLockAnimation {
             this.seen = true;
             this.swing = locked ? 1.0F : 0.0F;
             this.previouslyLocked = locked;
-            this.previouslyHovered = hovered;
         }
         if (locked != this.previouslyLocked) {
             this.previouslyLocked = locked;
@@ -238,7 +236,6 @@ final class ChatLockAnimation {
             this.direction = locked ? 1.0F : -1.0F;
             this.turnStartedNanos = nowNanos;
         }
-        this.previouslyHovered = hovered;
         double sinceDrawn = this.hoverFadeNanos == 0L ? 0.0D
                 : (nowNanos - this.hoverFadeNanos) / 1.0E9D;
         this.hoverFadeNanos = nowNanos;

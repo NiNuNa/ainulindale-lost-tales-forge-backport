@@ -36,6 +36,8 @@ final class ChatWindowFrame {
     private static int measuredWidth;
     private static int measuredHeight;
     private static int measuredFactor = 1;
+    private static int measuredGuiScale = -1;
+    private static boolean measuredUnicode;
 
     final String windowId;
     final ChatLineBands bands = new ChatLineBands();
@@ -195,6 +197,12 @@ final class ChatWindowFrame {
                 && x >= this.scrollbarLeft && x < this.scrollbarRight
                 && y >= this.scrollbarTrackTop
                 && y < this.scrollbarTrackBottom;
+    }
+
+    /** Whether the point lies on the scrollbar's thumb drawn this frame. */
+    boolean scrollbarThumbContains(double x, double y) {
+        return scrollbarContains(x, y) && y >= this.scrollbarThumbTop
+                && y < this.scrollbarThumbBottom;
     }
 
     /** Whether the point lies on the pill drawn this frame. */
@@ -386,18 +394,26 @@ final class ChatWindowFrame {
     }
 
     /**
-     * Display pixels per GUI pixel. Measured once per display size: this
-     * is asked several times for every window of every frame, and the
-     * answer only changes when the window does.
+     * Display pixels per GUI pixel. It is asked several times for every
+     * window of every frame, so it is measured once for each display
+     * size, GUI Scale option and font choice — everything the answer is
+     * made of. The option and the font change it with the window left
+     * as it is; without them in the key, everything laid on display
+     * pixels would land between them after a scale change.
      */
     static int displayScaleFactor() {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft == null || minecraft.displayWidth <= 0
-                || minecraft.displayHeight <= 0) {
+                || minecraft.displayHeight <= 0
+                || minecraft.gameSettings == null) {
             return 1;
         }
+        int guiScale = minecraft.gameSettings.guiScale;
+        boolean unicode = minecraft.func_152349_b();
         if (minecraft.displayWidth == measuredWidth
-                && minecraft.displayHeight == measuredHeight) {
+                && minecraft.displayHeight == measuredHeight
+                && guiScale == measuredGuiScale
+                && unicode == measuredUnicode) {
             return measuredFactor;
         }
         try {
@@ -406,6 +422,8 @@ final class ChatWindowFrame {
                     minecraft.displayHeight).getScaleFactor());
             measuredWidth = minecraft.displayWidth;
             measuredHeight = minecraft.displayHeight;
+            measuredGuiScale = guiScale;
+            measuredUnicode = unicode;
         } catch (RuntimeException unavailable) {
             return 1;
         }
@@ -628,8 +646,7 @@ final class ChatWindowFrame {
 
     /**
      * Top of the window's input bar at rest. The bar has an entrance of
-     * its own and does not ride the window's opening motion, exactly as
-     * the single input bar did before windows had their own.
+     * its own and does not ride the window's opening motion.
      */
     double barTop() {
         return this.restingBarTop;
@@ -648,9 +665,16 @@ final class ChatWindowFrame {
         return this.stackTop - ChatWindowPlacement.HISTORY_TOP_MARGIN;
     }
 
-    /** Whether the point is inside this window's box. */
+    /**
+     * Whether the point lies within the window as it is drawn — its
+     * strip, its messages and its bar, opening motion included — from
+     * its first pixel up to the pixel past its last, as everything it
+     * draws is measured. The border outside it is the resize band's.
+     */
     boolean contains(double x, double y) {
-        return x >= this.boxLeft && x < this.boxRight
-                && y >= this.boxTop && y < this.boxBottom;
+        double left = drawnLeft();
+        double top = this.boxTop + this.motionY;
+        return x >= left && x < left + (this.boxRight - this.boxLeft)
+                && y >= top && y < top + (this.boxBottom - this.boxTop);
     }
 }

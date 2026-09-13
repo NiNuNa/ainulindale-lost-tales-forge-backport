@@ -140,8 +140,11 @@ public final class LostTalesChatAccessPacketTest {
         ByteBuf buffer = Unpooled.buffer();
         packet.toBytes(buffer);
         // Everything the older payload carried, up to and including the
-        // two flags, and nothing after them.
-        ByteBuf older = buffer.copy(0, buffer.readableBytes() - 2);
+        // two flags, and nothing after them: the capability count (2),
+        // the defined channels' count (1), the account's roles (4), the
+        // own characters' count (2), the roster split's count (2) and the
+        // Proximity radius (2) all go.
+        ByteBuf older = buffer.copy(0, buffer.readableBytes() - 13);
         LostTalesChatAccessPacket decoded = new LostTalesChatAccessPacket();
         decoded.fromBytes(older);
         assertFalse(decoded.isMalformed());

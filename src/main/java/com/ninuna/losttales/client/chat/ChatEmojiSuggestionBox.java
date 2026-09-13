@@ -6,7 +6,6 @@ import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
 
 /**
  * Live shortcode completion list shown above the chat input while an
@@ -17,7 +16,10 @@ final class ChatEmojiSuggestionBox {
     static final int MAX_ROWS = 8;
     private static final int ROW_HEIGHT = 12;
     private static final int PADDING = 2;
-    /** Matches the channel selector's gap above the input row. */
+    /**
+     * How far above the input anchor ({@link ChatInputBar#inputAnchor})
+     * the box ends: one pixel clear of the bar's top.
+     */
     private static final int BOTTOM_MARGIN = 15;
 
     private List<ChatEmoji> matches = Collections.emptyList();
@@ -122,24 +124,17 @@ final class ChatEmojiSuggestionBox {
         int top = boxTop(screenHeight);
         int bottom = screenHeight - BOTTOM_MARGIN;
         int hoveredRow = rowAt(font, mouseX, mouseY, screenHeight, inputX);
+        if (hoveredRow >= 0) {
+            this.selectedIndex = hoveredRow;
+        }
         regions.add(inputX, top, inputX + width, bottom);
-        Gui.drawRect(inputX, top, inputX + width, bottom,
-                LostTalesChatVisualStyle.argb(
-                        LostTalesChatVisualStyle.SURFACE_RGB, 0xE0));
+        LostTalesChatVisualStyle.drawPopupList(inputX, top, inputX + width,
+                bottom, top + PADDING, ROW_HEIGHT,
+                this.selectedIndex < this.matches.size()
+                        ? this.selectedIndex : -1);
         for (int row = 0; row < this.matches.size(); row++) {
             ChatEmoji emoji = this.matches.get(row);
             int rowTop = top + PADDING + row * ROW_HEIGHT;
-            boolean hovered = row == hoveredRow;
-            if (hovered) {
-                this.selectedIndex = row;
-            }
-            if (row == this.selectedIndex) {
-                Gui.drawRect(inputX + 1, rowTop, inputX + width - 1,
-                        rowTop + ROW_HEIGHT,
-                        LostTalesChatVisualStyle.argb(
-                                LostTalesChatVisualStyle
-                                        .SURFACE_HIGHLIGHT_RGB, 0xC8));
-            }
             ChatInlineIcons.drawEmoji(minecraft, emoji,
                     ChatInlineIcons.boxLeft(inputX + 3,
                             ChatInlineIcons.SLOT_WIDTH),

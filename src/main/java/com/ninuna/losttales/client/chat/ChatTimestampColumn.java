@@ -27,8 +27,9 @@ import net.minecraft.client.gui.FontRenderer;
  * message content starts.
  *
  * <p>The column is sized for the widest {@code [HH:mm]} the font can
- * produce rather than for any one timestamp, so it never changes width
- * as the clock turns.</p>
+ * produce, at the small size the timestamps are drawn at, rather than
+ * for any one timestamp, so it never changes width as the clock
+ * turns.</p>
  */
 final class ChatTimestampColumn {
     /** Gap at the window edge, around the separator, and before text. */
@@ -54,15 +55,15 @@ final class ChatTimestampColumn {
         if (!LostTalesConfig.showChatTimestamps || font == null) {
             return DISABLED;
         }
-        int digit = 0;
-        for (char candidate = '0'; candidate <= '9'; candidate++) {
-            digit = Math.max(digit, font.getCharWidth(candidate));
-        }
+        int digit = LostTalesChatVisualStyle.widestDigitWidth(font);
         // Each width carries a column of spacing after its glyph; the
         // last of them is past the ink, so it is not part of the column.
-        return new ChatTimestampColumn(true,
-                font.getCharWidth('[') + digit * 4 + font.getCharWidth(':')
-                        + font.getCharWidth(']') - 1);
+        int ink = font.getCharWidth('[') + digit * 4
+                + font.getCharWidth(':') + font.getCharWidth(']') - 1;
+        // The timestamps are small text; the column holds them at the
+        // size they are drawn at, rounded up to whole pixels.
+        return new ChatTimestampColumn(true, (int)Math.ceil(
+                ink * LostTalesChatVisualStyle.stackSmallScale()));
     }
 
     /** No column at all; what the closed feed always uses. */

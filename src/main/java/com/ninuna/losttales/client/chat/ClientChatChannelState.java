@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import java.util.HashMap;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelAccess;
@@ -71,7 +72,6 @@ public final class ClientChatChannelState {
     private static long cachedFactionNanos;
     /** Server-stated operator status; the Admin tab exists only with it. */
     private static boolean adminAccess;
-    /** The server's word on whether this player may moderate the chat. */
     /**
      * Every capability the server says this player holds, by id. The
      * menus ask this rather than a flag of their own, so a capability
@@ -79,11 +79,24 @@ public final class ClientChatChannelState {
      */
     private static java.util.Set<String> capabilities =
             java.util.Collections.emptySet();
+    /** The server's word on whether this player may moderate the chat. */
     private static boolean canModerate;
     /** The server's word on whether this player may edit its settings. */
     private static boolean canEditServerConfig;
     /** Server-stated roles of this player; what {@code @Operator} reaches. */
     private static int roleMask;
+    /**
+     * The account's own roles apart from the character being played, and
+     * the roles assigned to each of this player's own characters, as the
+     * server stated them; until it does, the played mask stands for the
+     * account and no character's own roles are known.
+     */
+    private static boolean roleSplitStated;
+    private static int accountRoleMask;
+    private static final Map<UUID, Integer> CHARACTER_ROLES =
+            new HashMap<UUID, Integer>();
+    /** The server's Proximity radius in blocks; zero until it says. */
+    private static int proximityRadius;
     /**
      * The gates before the server's first word: what a fresh server file
      * states, read for a player with no role — the Operator channel
@@ -112,8 +125,19 @@ public final class ClientChatChannelState {
      */
     private static final LinkedHashMap<String, Integer> ROLE_HOLDERS =
             new LinkedHashMap<String, Integer>();
-    /** Unsent input kept across closing and reopening the chat screen. */
-    /** Unsent text per tab, oldest first; bounded, whispers included. */
+    /**
+     * Each roster holder's account roles apart from what it wears as the
+     * identity it plays, and the character it plays, by account name in
+     * lower case.
+     */
+    private static final Map<String, Integer> ROLE_HOLDER_ACCOUNT_ROLES =
+            new HashMap<String, Integer>();
+    private static final Map<String, UUID> ROLE_HOLDER_CHARACTERS =
+            new HashMap<String, UUID>();
+    /**
+     * Unsent text per tab, kept across closing and reopening the chat
+     * screen: oldest first, bounded, whispers included.
+     */
     private static final Map<ChatTab, String> DRAFTS =
             new LinkedHashMap<ChatTab, String>();
     private static final int MAX_DRAFTS = 64;
@@ -504,7 +528,7 @@ public final class ClientChatChannelState {
      */
     public static synchronized int displayColor(ChatTab tab) {
         if (tab == null) {
-            return 0xFFFFFF;
+            return LostTalesChatVisualStyle.IVORY;
         }
         Integer partner = PARTNER_COLORS.get(tab);
         if (partner != null) {
@@ -582,7 +606,7 @@ public final class ClientChatChannelState {
 
     public static synchronized int displayColor(ChatChannel channel) {
         if (channel == null) {
-            return 0xFFFFFF;
+            return LostTalesChatVisualStyle.IVORY;
         }
         if (channel == ChatChannel.FACTION) {
             String factionId = wornFactionId(channel);
@@ -676,6 +700,62 @@ public final class ClientChatChannelState {
         return roleMask;
     }
 
+    /**
+     * The server's statement of the roles apart by identity: the
+     * account's own, and each of this player's own characters' own.
+     */
+    public static synchronized void setRoleSplit(boolean stated,
+            int accountMask, Map<UUID, Integer> characterRoles) {
+        roleSplitStated = stated;
+        accountRoleMask = stated && ChatAccountRole.isValidMask(accountMask)
+                ? accountMask : 0;
+        CHARACTER_ROLES.clear();
+        if (stated && characterRoles != null) {
+            for (Map.Entry<UUID, Integer> entry : characterRoles.entrySet()) {
+                if (entry.getKey() != null && entry.getValue() != null
+                        && ChatAccountRole.isValidMask(
+                                entry.getValue().intValue())) {
+                    CHARACTER_ROLES.put(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+    }
+
+    /**
+     * The roles this player's account wears on its own: what an account
+     * line is signed with, and what every character of the account wears
+     * too. The played mask until the server states the two apart.
+     */
+    public static synchronized int getAccountRoleMask() {
+        return roleSplitStated ? accountRoleMask : roleMask;
+    }
+
+    /**
+     * The roles one of this player's own characters wears: the account's
+     * together with those assigned to that character. Until the server
+     * states them apart, the played mask for the character being played
+     * and none for any other.
+     */
+    public static synchronized int ownCharacterRoles(UUID characterId,
+                                                     boolean played) {
+        if (!roleSplitStated) {
+            return played ? roleMask : 0;
+        }
+        Integer own = characterId == null ? null
+                : CHARACTER_ROLES.get(characterId);
+        return accountRoleMask | (own == null ? 0 : own.intValue());
+    }
+
+    /** The server's Proximity radius, for how far speech bubbles reach. */
+    public static synchronized void setProximityRadius(int radius) {
+        proximityRadius = Math.max(0, radius);
+    }
+
+    /** The server's Proximity radius in blocks; zero until it says. */
+    public static synchronized int getProximityRadius() {
+        return proximityRadius;
+    }
+
     /** The roles this player holds, in precedence order. */
     public static synchronized List<ChatAccountRole> localRoles() {
         return ChatAccountRole.fromMask(roleMask);
@@ -706,6 +786,36 @@ public final class ClientChatChannelState {
     /** Replaces the online role roster with the server's statement. */
     public static synchronized void setRoleHolders(
             Map<String, Integer> holders) {
+        setRoleHolders(holders, null, null);
+    }
+
+    /**
+     * Replaces the online role roster with the server's statement, each
+     * holder's own account roles and played character with it; a holder
+     * missing from {@code accountRoles} is taken to hold its roles as the
+     * account.
+     */
+    public static synchronized void setRoleHolders(
+            Map<String, Integer> holders, Map<String, Integer> accountRoles,
+            Map<String, UUID> characters) {
+        ROLE_HOLDER_ACCOUNT_ROLES.clear();
+        ROLE_HOLDER_CHARACTERS.clear();
+        if (accountRoles != null) {
+            for (Map.Entry<String, Integer> entry : accountRoles.entrySet()) {
+                if (entry.getKey() != null && entry.getValue() != null) {
+                    ROLE_HOLDER_ACCOUNT_ROLES.put(rosterKey(entry.getKey()),
+                            entry.getValue());
+                }
+            }
+        }
+        if (characters != null) {
+            for (Map.Entry<String, UUID> entry : characters.entrySet()) {
+                if (entry.getKey() != null && entry.getValue() != null) {
+                    ROLE_HOLDER_CHARACTERS.put(rosterKey(entry.getKey()),
+                            entry.getValue());
+                }
+            }
+        }
         ROLE_HOLDERS.clear();
         if (holders != null) {
             for (Map.Entry<String, Integer> entry : holders.entrySet()) {
@@ -729,9 +839,19 @@ public final class ClientChatChannelState {
         }
         List<String> names = new ArrayList<String>();
         for (Map.Entry<String, Integer> entry : ROLE_HOLDERS.entrySet()) {
-            if ((entry.getValue().intValue() & role.bit()) != 0) {
-                names.add(entry.getKey());
+            if ((entry.getValue().intValue() & role.bit()) == 0) {
+                continue;
             }
+            // A role the account holds is the account's; one only the
+            // played character holds is that character's, named as the
+            // character when this client knows its name.
+            String key = rosterKey(entry.getKey());
+            Integer account = ROLE_HOLDER_ACCOUNT_ROLES.get(key);
+            String character = account == null
+                    || (account.intValue() & role.bit()) != 0 ? null
+                    : ChatMentionColors.characterNameOf(
+                            ROLE_HOLDER_CHARACTERS.get(key));
+            names.add(character != null ? character : entry.getKey());
         }
         return names;
     }
@@ -750,6 +870,41 @@ public final class ClientChatChannelState {
             }
         }
         return 0;
+    }
+
+    /**
+     * The roles the roster says an online account holds on its own, apart
+     * from the character it plays; zero for one it does not list.
+     */
+    public static synchronized int rosterAccountRolesOf(String account) {
+        int worn = rosterRolesOf(account);
+        if (worn == 0) {
+            return 0;
+        }
+        Integer own = ROLE_HOLDER_ACCOUNT_ROLES.get(rosterKey(account));
+        return own == null ? worn : own.intValue() & worn;
+    }
+
+    /**
+     * The roles the roster says one identity of an online account wears:
+     * the character it is playing wears everything the roster lists, any
+     * other character the account's own roles alone — the only ones this
+     * client can know for it.
+     */
+    public static synchronized int rosterRolesOf(String account,
+                                                 UUID characterId) {
+        if (characterId == null) {
+            return rosterAccountRolesOf(account);
+        }
+        UUID played = account == null ? null
+                : ROLE_HOLDER_CHARACTERS.get(rosterKey(account));
+        return characterId.equals(played) ? rosterRolesOf(account)
+                : rosterAccountRolesOf(account);
+    }
+
+    /** An account name as the roster's side tables key it. */
+    private static String rosterKey(String account) {
+        return account.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     /** Applies the server's statement of Operator-channel access. */
@@ -883,9 +1038,15 @@ public final class ClientChatChannelState {
         canEditServerConfig = false;
         capabilities = java.util.Collections.emptySet();
         roleMask = 0;
+        roleSplitStated = false;
+        accountRoleMask = 0;
+        CHARACTER_ROLES.clear();
+        proximityRadius = 0;
         readableChannels = DEFAULT_READABLE;
         sendableChannels = DEFAULT_SENDABLE;
         ROLE_HOLDERS.clear();
+        ROLE_HOLDER_ACCOUNT_ROLES.clear();
+        ROLE_HOLDER_CHARACTERS.clear();
         MUTED_SENDERS.clear();
         DRAFTS.clear();
         SENT_HISTORY.clear();
@@ -897,14 +1058,6 @@ public final class ClientChatChannelState {
         return roster == null ? null : roster.getActiveCharacter();
     }
 
-    /**
-     * The normalized faction id of the identity the channel's tab speaks
-     * as — the character chosen or locked for the tab, else the active
-     * character — or empty for the account and for a character without
-     * a faction. The Faction channel's label, colour and availability
-     * all read this, so they follow the worn identity as the server's
-     * routing does.
-     */
     /**
      * The conversation of a scoped channel this player is reading.
      *
@@ -998,6 +1151,14 @@ public final class ClientChatChannelState {
                 : ChatTab.of(channel, scopeKeyRead(channel));
     }
 
+    /**
+     * The normalized faction id of the identity the channel's tab speaks
+     * as — the character chosen or locked for the tab, else the active
+     * character — or empty for the account and for a character without
+     * a faction. The Faction channel's label, colour and availability
+     * all read this, so they follow the worn identity as the server's
+     * routing does.
+     */
     public static synchronized String wornFactionId(ChatChannel channel) {
         ClientChatAppearances.Appearance worn =
                 ClientChatAppearances.effectiveFor(tabRead(channel));

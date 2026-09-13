@@ -170,6 +170,32 @@ final class ChatReplyMarker {
         return payload(component) != null;
     }
 
+    /**
+     * Whether a drawn row is a reply's quote: its first run that is not
+     * layout, a gap or nothing at all is a run of the quote.
+     */
+    static boolean isQuoteRow(IChatComponent row) {
+        if (row == null) {
+            return false;
+        }
+        for (Object value : row) {
+            if (!(value instanceof IChatComponent)) {
+                continue;
+            }
+            IChatComponent part = (IChatComponent)value;
+            if (isMarker(part)) {
+                return true;
+            }
+            if (ChatLayoutMarker.isMarker(part)
+                    || ChatSpacerMarker.isMarker(part)
+                    || part.getUnformattedTextForChat().length() == 0) {
+                continue;
+            }
+            return false;
+        }
+        return false;
+    }
+
     private static String payload(IChatComponent component) {
         if (component == null || component.getChatStyle() == null) {
             return null;

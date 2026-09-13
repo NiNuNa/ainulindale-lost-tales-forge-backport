@@ -15,7 +15,6 @@ import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
 import com.ninuna.losttales.config.LostTalesConfig;
-import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatCommandContextPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatReactPacket;
@@ -122,7 +121,6 @@ public final class LostTalesChatGui extends GuiChat
     private int hoverTipY;
     private URI clickedLinkUri;
     private boolean openAnimationStarted;
-    /** The tab-strip control under the pointer as the windows were drawn. */
     /**
      * What the pointer is on this frame, found once before anything is
      * drawn: what every highlight, tip and card of the frame and the
@@ -309,7 +307,7 @@ public final class LostTalesChatGui extends GuiChat
         LostTalesChatVisualStyle.drawColored(this.fontRendererObj,
                 "§o" + this.fontRendererObj.trimStringToWidth(text,
                         room - (textX - x)),
-                textX, y, ChatComposer.ASIDE_RGB, alpha);
+                textX, y, LostTalesChatVisualStyle.asideRgb(), alpha);
     }
 
     /**
@@ -700,9 +698,9 @@ public final class LostTalesChatGui extends GuiChat
             return;
         }
         int wheelPixels = ChatWheelStep.historyPixels(lines);
-        // Vanilla scrolled its own (now unused) offset above; the visible
-        // history scrolls per channel view instead, in the window under
-        // the pointer (the main one elsewhere).
+        // super.handleMouseInput() scrolls vanilla's own offset, which is
+        // unused; the visible history scrolls per channel view instead,
+        // in the window under the pointer, else the one being typed into.
         ChatWindowFrame frame = ChatWindowFrame.drawnAt(mouseX, mouseY);
         if (frame == null) {
             frame = this.bar.activeFrame();
@@ -851,13 +849,13 @@ public final class LostTalesChatGui extends GuiChat
             this.bar.drawBar(barRight);
             this.bar.drawCharacterSelectionButton(controlX, controlY,
                     this.menus.isKindOpen(ChatScreenMenus.POPUP_CHARACTERS));
-            this.bar.drawIndicator(controlX, controlY);
+            this.bar.drawIndicator(barRight, controlX, controlY);
             this.bar.drawToolbarToggle(barRight, controlX, controlY);
             this.bar.drawPickers(barRight,
                     onPicker ? barX : ChatHover.AWAY,
                     onPicker ? barY : ChatHover.AWAY,
                     mouseX, mouseY - Math.round(entrance));
-            this.bar.drawSendDivider(barRight);
+            this.bar.drawDividers(barRight);
             this.bar.drawSendButton(barRight, controlX, controlY);
             this.bar.drawCounter(barRight);
             this.completion.draw(anchor, this.inputField.xPosition,
@@ -1019,7 +1017,7 @@ public final class LostTalesChatGui extends GuiChat
         if (this.bar.isInsideCharacterButton(barX, barY)) {
             return new ChatHover(ChatHover.Kind.CHARACTER_BUTTON);
         }
-        if (this.bar.isInsideIndicator(barX, barY)) {
+        if (this.bar.isInsideIndicator(barX, barY, barRight)) {
             return new ChatHover(ChatHover.Kind.INDICATOR);
         }
         if (this.bar.isInsideSendButton(barX, barY, barRight)) {
@@ -1073,9 +1071,12 @@ public final class LostTalesChatGui extends GuiChat
             }
         }
         // A window that is not the one being typed in answers to a press
-        // by becoming it, so all of it acts.
+        // by becoming it, so all of it acts; the one being typed in
+        // answers by cycling the stack, where another lies under it.
         ChatWindowFrame under = ChatWindowFrame.drawnAt(x, y);
         boolean focuses = under != null && bringsForward(under);
+        boolean cycles = under != null && under == this.bar.activeFrame()
+                && cycleTargetAt(x, y) != null;
         LostTalesChatOverlayRenderer.Hit hit =
                 LostTalesChatOverlayRenderer.hitAt(this.mc, (float)x, (float)y);
         if (hit != null) {
@@ -1083,7 +1084,7 @@ public final class LostTalesChatGui extends GuiChat
             hover.line = hit;
             hover.frame = hit.band != null ? hit.band.frame : under;
             hover.person = LostTalesChatHoverCard.locate(this.mc, hit);
-            hover.acts = hover.person != null || focuses
+            hover.acts = hover.person != null || focuses || cycles
                     || ChatInteractions.isClick(ChatInteractions.actionOf(
                             hit.component, this.mc.gameSettings.chatLinks));
             return hover;
@@ -1091,7 +1092,7 @@ public final class LostTalesChatGui extends GuiChat
         if (under != null) {
             ChatHover hover = new ChatHover(ChatHover.Kind.WINDOW);
             hover.frame = under;
-            hover.acts = focuses;
+            hover.acts = focuses || cycles;
             return hover;
         }
         return ChatHover.NONE;
@@ -1117,8 +1118,8 @@ public final class LostTalesChatGui extends GuiChat
             ChatChannelTabBar.Hit hit = row.dragging != null || row.resizing
                     ? null : frame.tabBar.hitAt(this.fontRendererObj, row,
                             x, y);
-            if (hit == null && !(ChatChannelTabBar.inRowBand(row, y)
-                    && x >= frame.boxLeft && x < frame.boxRight)) {
+            if (hit == null && !frame.tabBar.stripContains(
+                    this.fontRendererObj, row, x, y)) {
                 continue;
             }
             ChatHover hover = new ChatHover(hit != null
@@ -1271,7 +1272,7 @@ public final class LostTalesChatGui extends GuiChat
                         StatCollector.translateToLocal(
                                 "gui.losttales.chat.no_channels"), room),
                 textX, top + (EMPTY_STATE_HEIGHT - 8) / 2,
-                LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE), 0xFF);
+                LostTalesChatVisualStyle.asideRgb(), 0xFF);
         this.regions.add(this.emptyPlusLeft, this.emptyPlusTop,
                 this.emptyPlusRight, this.emptyPlusBottom);
     }
@@ -1499,8 +1500,7 @@ public final class LostTalesChatGui extends GuiChat
         if (y < 2) {
             y = this.hoverTipY + 12;
         }
-        drawRect(x, y, x + tipWidth, y + 12,
-                LostTalesChatVisualStyle.SURFACE);
+        LostTalesChatVisualStyle.drawPopup(x, y, x + tipWidth, y + 12, 1.0F);
         LostTalesChatVisualStyle.drawPlain(this.fontRendererObj,
                 this.hoverTip, x + 4, y + 2, 255);
     }
@@ -1897,7 +1897,7 @@ public final class LostTalesChatGui extends GuiChat
             // Nothing in the window answered, and the window was already
             // the one in front: the press cycles the stack instead.
             if (alreadyInFront) {
-                cycleWindowsAt(mouseX, mouseY);
+                cycleWindowsAt(x, y);
             }
             return;
         }
@@ -1908,42 +1908,49 @@ public final class LostTalesChatGui extends GuiChat
      * Sends the window in front at this point to the back and brings the
      * one under it forward, moving the input with it — so pressing the
      * same empty spot again and again walks through everything stacked
-     * there and comes back round. Answers whether there was a stack to
-     * cycle: a window standing on its own, or a point outside its
-     * messages, is left alone.
+     * there and comes back round.
      */
-    private boolean cycleWindowsAt(int mouseX, int mouseY) {
-        List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
-        ChatWindowFrame front = null;
-        ChatWindowFrame under = null;
-        for (int index = frames.size() - 1; index >= 0; index--) {
-            ChatWindowFrame frame = frames.get(index);
-            if (!frame.contains(mouseX, mouseY)) {
-                continue;
-            }
-            if (front == null) {
-                front = frame;
-            } else {
-                under = frame;
-                break;
-            }
-        }
-        // Only the message area cycles. The strip and the grip move the
-        // window, the bar is the input, and both have already had this
-        // press; what is left is the history, which is where the player
-        // is pointing when they mean "the one behind this".
-        if (front == null || under == null
-                || mouseY < front.tabRowBottom()
-                || mouseY >= front.barTop()) {
-            return false;
-        }
-        ChatWindow behind = ChatWindowLayout.window(under.windowId);
-        if (behind == null) {
-            return false;
+    private void cycleWindowsAt(double x, double y) {
+        ChatWindowFrame front = ChatWindowFrame.drawnAt(x, y);
+        ChatWindowFrame under = cycleTargetAt(x, y);
+        ChatWindow behind = under == null ? null
+                : ChatWindowLayout.window(under.windowId);
+        if (front == null || behind == null) {
+            return;
         }
         ChatWindowLayout.lower(front.windowId);
         this.tabActions.selectWindow(behind);
-        return true;
+    }
+
+    /**
+     * The window a press at this point brings forward by cycling the
+     * stack: the one under the window in front here, while the point is
+     * in the front window's messages; else null, for a window standing
+     * on its own or a point outside its messages. The pointer's hand and
+     * the press both ask this.
+     */
+    private static ChatWindowFrame cycleTargetAt(double x, double y) {
+        List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
+        ChatWindowFrame front = null;
+        for (int index = frames.size() - 1; index >= 0; index--) {
+            ChatWindowFrame frame = frames.get(index);
+            if (!frame.contains(x, y)) {
+                continue;
+            }
+            if (front != null) {
+                return ChatWindowLayout.window(frame.windowId) == null
+                        ? null : frame;
+            }
+            // Only the message area cycles. The strip and the grip move
+            // the window and the bar is the input; what is left is the
+            // history, which is where the player is pointing when they
+            // mean "the one behind this".
+            if (y < frame.tabRowBottom() || y >= frame.barTop()) {
+                return null;
+            }
+            front = frame;
+        }
+        return null;
     }
 
     /**

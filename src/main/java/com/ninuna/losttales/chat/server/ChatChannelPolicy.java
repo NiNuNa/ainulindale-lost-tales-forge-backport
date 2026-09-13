@@ -1,5 +1,7 @@
 package com.ninuna.losttales.chat.server;
 
+import com.ninuna.losttales.chat.ChatRoleCatalog;
+import java.util.LinkedHashMap;
 import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
@@ -367,6 +369,27 @@ public final class ChatChannelPolicy {
         } catch (RuntimeException unreadable) {
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * The roles assigned to each of the player's own characters apart
+     * from the account's, by character id; a character with none is left
+     * out. What the access packet tells the client, so a line signed as
+     * any of the player's characters wears that character's roles and no
+     * other's.
+     */
+    public static Map<UUID, Integer> ownCharacterRoles(EntityPlayerMP player) {
+        Map<UUID, Integer> roles = new LinkedHashMap<UUID, Integer>();
+        ChatRoleCatalog catalog = ChatRoleCatalog.server();
+        for (RoleplayCharacter character : charactersOf(player)) {
+            UUID id = character == null ? null : character.getCharacterId();
+            int mask = id == null ? 0
+                    : ChatAccountRoleResolver.assignedMask(catalog, null, id);
+            if (mask != 0) {
+                roles.put(id, Integer.valueOf(mask));
+            }
+        }
+        return roles;
     }
 
     private static double proximityDistanceSquared() {

@@ -170,9 +170,17 @@ public final class LostTalesConfig {
     static final String DEFAULT_CHAT_SELECTED_LINE_COLOR = "MAUVE";
     static final String DEFAULT_CHAT_MENTION_LINE_COLOR = "MULBERRY";
     static final String DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR = "APRICOT";
+    /**
+     * A colour option's value that follows another colour instead of
+     * naming a palette entry: the selected mention's, which is by
+     * default the mention colour a shade lighter.
+     */
+    public static final String CHAT_COLOR_AUTOMATIC = "AUTO";
     public static String chatBackgroundColor = DEFAULT_CHAT_BACKGROUND_COLOR;
     public static String chatSelectedLineColor = DEFAULT_CHAT_SELECTED_LINE_COLOR;
     public static String chatMentionLineColor = DEFAULT_CHAT_MENTION_LINE_COLOR;
+    /** A line that mentions this player, under the pointer; automatic until chosen. */
+    public static String chatSelectedMentionColor = CHAT_COLOR_AUTOMATIC;
     /** The line a reply's quote jumps to, lit while the eye finds it. */
     public static String chatReplyHighlightColor = DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR;
     public static boolean enableChatAnimations = true;
@@ -1197,6 +1205,13 @@ public final class LostTalesConfig {
                     "Palette colour of a chat line that @-mentions you. Also set from a chat window's own menu.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_MENTION_LINE_COLOR);
+            chatSelectedMentionColor = automaticOrPaletteName(config.getString(
+                    "chatSelectedMentionColor",
+                    CATEGORY_CLIENT,
+                    chatSelectedMentionColor,
+                    "Palette colour of a chat line that @-mentions you while it is under the pointer. AUTO, the default, is the mention colour one shade lighter on its own ramp of the palette, or the selected-line colour where the mention colour is already its ramp's lightest. Also set from a chat window's own menu.",
+                    automaticOrPaletteNames()
+            ));
             chatReplyHighlightColor = paletteName(config.getString(
                     "chatReplyHighlightColor",
                     CATEGORY_CLIENT,
@@ -1269,7 +1284,7 @@ public final class LostTalesConfig {
                     "showChatSpeechBubbles",
                     CATEGORY_CLIENT,
                     showChatSpeechBubbles,
-                    "Show what a player says in character over their head, the way LOTR shows an NPC's speech. In-character channels only (Global, Proximity, Party, Faction); never OOC & Discord, whispers, the operator channel or the console."
+                    "Show what a player says in character over their head, the way LOTR shows an NPC's speech, as far as the server's Proximity radius. In-character channels only (Global, Proximity, Party, Faction and whispers); never OOC & Discord, the operator channel or the console."
             );
             enableChatAnimations = config.getBoolean(
                     "enableChatAnimations",
@@ -1969,6 +1984,27 @@ public final class LostTalesConfig {
         return value.trim().toUpperCase(java.util.Locale.ROOT);
     }
 
+    /**
+     * A colour option that may follow another colour: automatic
+     * ({@link #CHAT_COLOR_AUTOMATIC}) or a palette entry's name, and
+     * automatic for anything else.
+     */
+    static String automaticOrPaletteName(String value) {
+        return value != null
+                && CHAT_COLOR_AUTOMATIC.equalsIgnoreCase(value.trim())
+                ? CHAT_COLOR_AUTOMATIC
+                : paletteName(value, CHAT_COLOR_AUTOMATIC);
+    }
+
+    /** What such an option offers: automatic, then the palette. */
+    private static String[] automaticOrPaletteNames() {
+        String[] palette = LostTalesColors.paletteNames();
+        String[] names = new String[palette.length + 1];
+        names[0] = CHAT_COLOR_AUTOMATIC;
+        System.arraycopy(palette, 0, names, 1, palette.length);
+        return names;
+    }
+
     private static double clampPercent(double value) {
         if (Double.isNaN(value) || Double.isInfinite(value)) {
             return 0.0D;
@@ -2093,6 +2129,8 @@ public final class LostTalesConfig {
                 chatSelectedLineColor).set(chatSelectedLineColor);
         config.get(CATEGORY_CLIENT, "chatMentionLineColor",
                 chatMentionLineColor).set(chatMentionLineColor);
+        config.get(CATEGORY_CLIENT, "chatSelectedMentionColor",
+                chatSelectedMentionColor).set(chatSelectedMentionColor);
         config.get(CATEGORY_CLIENT, "chatReplyHighlightColor",
                 chatReplyHighlightColor).set(chatReplyHighlightColor);
         config.get(CATEGORY_CLIENT, "enableChatAnimations",

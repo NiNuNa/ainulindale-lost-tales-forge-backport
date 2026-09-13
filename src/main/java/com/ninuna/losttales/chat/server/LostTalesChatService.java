@@ -1157,6 +1157,10 @@ public final class LostTalesChatService {
         boolean moderator = LostTalesPermissions.has(player,
                 LostTalesCapability.CHAT_MODERATE);
         int roles = ChatChannelPolicy.playedRoles(player);
+        // The account's own roles apart from the played character's: what
+        // capabilities are granted through, and what the client signs an
+        // account line with and every character of the account wears.
+        int accountRoles = ChatAccountRoleResolver.resolve(player) & roles;
         // The second flag stays on the wire for older clients, whose
         // separate Discord tab it gates; OOC & Discord exists for
         // everyone, so it is always granted, which keeps that tab open
@@ -1179,7 +1183,10 @@ public final class LostTalesChatService {
                         moderator,
                         LostTalesPermissions.has(player,
                                 LostTalesCapability.SERVER_CONFIG),
-                        heldCapabilityIds(player)),
+                        heldCapabilityIds(player, accountRoles),
+                        accountRoles,
+                        ChatChannelPolicy.ownCharacterRoles(player),
+                        LostTalesConfig.chatProximityRadius),
                 player);
     }
 
@@ -1189,11 +1196,11 @@ public final class LostTalesChatService {
      * answer here, and never trusted back: the server decides again on
      * the request the menu makes.
      */
-    private static List<String> heldCapabilityIds(EntityPlayerMP player) {
-        // The account's roles are resolved once, not once per
-        // capability: resolving reads the catalogue and, for a faction
-        // source, LOTR's player data.
-        int accountRoles = ChatAccountRoleResolver.resolve(player);
+    private static List<String> heldCapabilityIds(EntityPlayerMP player,
+                                                  int accountRoles) {
+        // The account's roles are resolved once by the caller, not once
+        // per capability: resolving reads the catalogue and, for a
+        // faction source, LOTR's player data.
         ChatRoleCatalog roles = ChatRoleCatalog.server();
         LostTalesPermissionCatalog permissions = LostTalesPermissionCatalog.current();
         List<String> held = new ArrayList<String>();
@@ -1306,7 +1313,8 @@ public final class LostTalesChatService {
         List<String> entries = new ArrayList<String>(holders.size());
         for (LostTalesChatAccessPacket.RoleHolder holder : holders) {
             entries.add(holder.getName().toLowerCase(java.util.Locale.ROOT)
-                    + ':' + holder.getMask());
+                    + ':' + holder.getMask() + ':' + holder.getAccountMask()
+                    + ':' + holder.getCharacterId());
         }
         Collections.sort(entries);
         StringBuilder signature = new StringBuilder();
@@ -1335,11 +1343,16 @@ public final class LostTalesChatService {
             }
             int mask = ChatChannelPolicy.playedRoles(player);
             if (mask != 0) {
+                // The account's own roles apart, and the character it
+                // plays, so a client credits a character's own role to
+                // that character rather than to the account.
+                RoleplayCharacter active = CharacterActiveResolver.get(player);
                 holders.add(new LostTalesChatAccessPacket.RoleHolder(
                         player.getGameProfile() == null
                                 ? player.getCommandSenderName()
                                 : player.getGameProfile().getName(),
-                        mask));
+                        mask, ChatAccountRoleResolver.resolve(player) & mask,
+                        active == null ? null : active.getCharacterId()));
             }
         }
         return holders;

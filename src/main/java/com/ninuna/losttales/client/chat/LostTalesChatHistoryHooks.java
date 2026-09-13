@@ -82,9 +82,9 @@ public final class LostTalesChatHistoryHooks {
      * the method for each of its entries, re-adding nothing (its refresh
      * flag says the message is already filed). Vanilla never notices,
      * because vanilla prints with the id zero and the delete never runs;
-     * every Lost Tales line carries an id of its own, so a refresh —
-     * from a resize, a GUI-scale change or a window being made wider —
-     * emptied the history as it walked it.</p>
+     * every Lost Tales line carries an id of its own, so without this
+     * hook a refresh — from a resize, a GUI-scale change or a window
+     * being made wider — would empty the history as it walks it.</p>
      *
      * <p>Deleting is right when a line is being replaced and wrong when
      * it is being laid out again, which is exactly what the flag says.</p>

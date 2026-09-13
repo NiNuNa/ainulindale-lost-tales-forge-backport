@@ -1,5 +1,7 @@
 package com.ninuna.losttales.network.packet;
 
+import java.util.Map;
+import java.util.LinkedHashMap;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
@@ -58,6 +60,16 @@ import java.util.UUID;
  * which is what the client offers its menus on: a capability the code
  * gains later needs no flag of its own here. The two flags above stay
  * for a payload written before the list did, and say the same thing.</p>
+ *
+ * <p>After the channels a server defines travel the roles told apart by
+ * identity — the account's own mask, the mask assigned to each of the
+ * player's own characters, and for every roster holder the account's own
+ * mask and the character it is playing — and the server's Proximity
+ * radius. A role given to an account is worn by the account and every
+ * character of it, one given to a character by that character alone,
+ * and these fields are how a client tells the two apart. A payload
+ * written before they travelled states neither: the played mask stands
+ * for the account, and the radius is unknown.</p>
  */
 public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_HOLDERS = 256;
@@ -83,6 +95,10 @@ public final class LostTalesChatAccessPacket implements IMessage {
             ChatChannelDescriptor.MAX_DISPLAY_NAME_LENGTH * 4;
     /** An enum constant's name, for the facts a channel is described by. */
     private static final int MAX_ENUM_NAME_BYTES = 32;
+    /** More own characters than a roster could hold is a broken payload. */
+    private static final int MAX_OWN_CHARACTERS = 32;
+    /** The Proximity radius's own upper bound in the server's config. */
+    public static final int MAX_PROXIMITY_RADIUS = 512;
 
     private static final int MAX_PACKET_BYTES = 16
             + MAX_HOLDERS * (MAX_HOLDER_NAME_BYTES + 8)
@@ -91,7 +107,9 @@ public final class LostTalesChatAccessPacket implements IMessage {
             + 2 + MAX_CAPABILITIES * MAX_CAPABILITY_ID_BYTES
             + 2 + 2 * MAX_CHANNEL_IDS * (MAX_CHANNEL_ID_BYTES + 2)
             + 1 + MAX_CHANNEL_IDS * (MAX_CHANNEL_ID_BYTES
-                    + MAX_CHANNEL_NAME_BYTES + 4 * MAX_ENUM_NAME_BYTES + 16);
+                    + MAX_CHANNEL_NAME_BYTES + 4 * MAX_ENUM_NAME_BYTES + 16)
+            + 4 + 2 + MAX_OWN_CHARACTERS * 20
+            + 2 + MAX_HOLDERS * 21 + 2;
     /**
      * Every channel this build knows, by id: what a payload written
      * without a channel answer reads as, and what a client falls back to.
@@ -142,6 +160,19 @@ public final class LostTalesChatAccessPacket implements IMessage {
      * told. Empty from a server that defines none.
      */
     private List<ChatChannelDescriptor> definedChannels = Collections.emptyList();
+    /**
+     * The account's own roles, apart from the character being played:
+     * what an account line wears, and what every character of the
+     * account wears too. The played mask stands for it in a payload that
+     * does not state the two apart.
+     */
+    private int accountRoleMask;
+    /** Whether the payload stated the roles apart by identity. */
+    private boolean rolesSplit;
+    /** The roles assigned to each of the player's own characters, by id. */
+    private Map<UUID, Integer> characterRoleMasks = Collections.emptyMap();
+    /** The server's Proximity radius in blocks; zero when unstated. */
+    private int proximityRadius;
     private boolean malformed;
 
     public LostTalesChatAccessPacket() {}
@@ -205,6 +236,44 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                      List<String> sendableChannels,
                                      boolean canModerate, boolean canEditServerConfig,
                                      List<String> capabilities) {
+        this(adminAccess, discordAccess, roleMask, roleHolders, mutedSenders,
+                catalog, readableChannels, sendableChannels, canModerate,
+                canEditServerConfig, capabilities, roleMask,
+                Collections.<UUID, Integer>emptyMap(), 0);
+    }
+
+    /**
+     * The whole statement: everything above, the account's own roles
+     * apart from the played character's, the roles assigned to each of
+     * the player's own characters, and the server's Proximity radius.
+     */
+    public LostTalesChatAccessPacket(boolean adminAccess,
+                                     boolean discordAccess, int roleMask,
+                                     List<RoleHolder> roleHolders,
+                                     List<UUID> mutedSenders,
+                                     List<ChatAccountRole> catalog,
+                                     List<String> readableChannels,
+                                     List<String> sendableChannels,
+                                     boolean canModerate, boolean canEditServerConfig,
+                                     List<String> capabilities,
+                                     int accountRoleMask,
+                                     Map<UUID, Integer> characterRoleMasks,
+                                     int proximityRadius) {
+        this.accountRoleMask = accountRoleMask & roleMask;
+        this.rolesSplit = true;
+        Map<UUID, Integer> characters = new LinkedHashMap<UUID, Integer>();
+        if (characterRoleMasks != null) {
+            for (Map.Entry<UUID, Integer> entry : characterRoleMasks.entrySet()) {
+                if (entry.getKey() != null && entry.getValue() != null
+                        && entry.getValue().intValue() != 0
+                        && characters.size() < MAX_OWN_CHARACTERS) {
+                    characters.put(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+        this.characterRoleMasks = Collections.unmodifiableMap(characters);
+        this.proximityRadius = Math.max(0,
+                Math.min(MAX_PROXIMITY_RADIUS, proximityRadius));
         List<String> held = new ArrayList<String>();
         if (capabilities != null) {
             for (String capability : capabilities) {
@@ -383,14 +452,82 @@ public final class LostTalesChatAccessPacket implements IMessage {
                     defined.add(readChannel(buffer));
                 }
             }
-            LostTalesPacketCodec.requireFinished(buffer);
-            for (RoleHolder holder : holders) {
-                if ((holder.getMask() & ~known.knownMask()) != 0) {
-                    throw new LostTalesPacketCodec.DecodeException("invalid role holder");
+            // Appended after the defined channels: the roles told apart by
+            // identity, then the Proximity radius. A payload written before
+            // they travelled states neither, and the played mask stands for
+            // the account.
+            boolean split = buffer.readableBytes() >= 4;
+            int accountRoles = split ? buffer.readInt() : roleMask;
+            Map<UUID, Integer> characters = new LinkedHashMap<UUID, Integer>();
+            int[] holderAccountRoles = new int[holders.size()];
+            UUID[] holderCharacters = new UUID[holders.size()];
+            boolean holdersSplit = false;
+            int radius = 0;
+            if (split) {
+                int characterCount = buffer.readUnsignedShort();
+                if (characterCount > MAX_OWN_CHARACTERS) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "too many characters");
+                }
+                for (int index = 0; index < characterCount; index++) {
+                    UUID id = new UUID(buffer.readLong(), buffer.readLong());
+                    int mask = buffer.readInt();
+                    if (mask == 0 || characters.containsKey(id)) {
+                        throw new LostTalesPacketCodec.DecodeException(
+                                "invalid character roles");
+                    }
+                    characters.put(id, Integer.valueOf(mask));
+                }
+                int holderCount = buffer.readUnsignedShort();
+                if (holderCount != 0 && holderCount != holders.size()) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid role holder split");
+                }
+                holdersSplit = holderCount > 0;
+                for (int index = 0; index < holderCount; index++) {
+                    holderAccountRoles[index] = buffer.readInt();
+                    holderCharacters[index] = buffer.readBoolean()
+                            ? new UUID(buffer.readLong(), buffer.readLong())
+                            : null;
+                }
+                radius = buffer.readUnsignedShort();
+                if (radius > MAX_PROXIMITY_RADIUS) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid proximity radius");
                 }
             }
-            this.roleMask = (roleMask & ~known.knownMask()) != 0 ? 0 : roleMask;
-            this.roleHolders = Collections.unmodifiableList(holders);
+            LostTalesPacketCodec.requireFinished(buffer);
+            int knownMask = known.knownMask();
+            List<RoleHolder> stated = new ArrayList<RoleHolder>(holders.size());
+            for (int index = 0; index < holders.size(); index++) {
+                RoleHolder holder = holders.get(index);
+                if ((holder.getMask() & ~knownMask) != 0) {
+                    throw new LostTalesPacketCodec.DecodeException("invalid role holder");
+                }
+                if (!holdersSplit) {
+                    stated.add(holder);
+                    continue;
+                }
+                if ((holderAccountRoles[index] & ~holder.getMask()) != 0) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid role holder split");
+                }
+                stated.add(new RoleHolder(holder.getName(), holder.getMask(),
+                        holderAccountRoles[index], holderCharacters[index]));
+            }
+            for (Integer mask : characters.values()) {
+                if ((mask.intValue() & ~knownMask) != 0) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid character roles");
+                }
+            }
+            this.roleMask = (roleMask & ~knownMask) != 0 ? 0 : roleMask;
+            this.accountRoleMask = (accountRoles & ~knownMask) != 0 ? 0
+                    : accountRoles & this.roleMask;
+            this.rolesSplit = split;
+            this.characterRoleMasks = Collections.unmodifiableMap(characters);
+            this.proximityRadius = radius;
+            this.roleHolders = Collections.unmodifiableList(stated);
             this.mutedSenders = Collections.unmodifiableList(muted);
             this.catalog = Collections.unmodifiableList(known.roles());
             this.readableChannels = Collections.unmodifiableList(readable);
@@ -413,6 +550,10 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.canEditServerConfig = false;
             this.capabilities = Collections.emptyList();
             this.definedChannels = Collections.emptyList();
+            this.accountRoleMask = 0;
+            this.rolesSplit = false;
+            this.characterRoleMasks = Collections.emptyMap();
+            this.proximityRadius = 0;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -557,6 +698,25 @@ public final class LostTalesChatAccessPacket implements IMessage {
             buffer.writeInt(channel.getDisplayColor());
             buffer.writeBoolean(channel.isBridgeable());
         }
+        // Then the roles told apart by identity, and the Proximity radius.
+        buffer.writeInt(this.accountRoleMask);
+        buffer.writeShort(this.characterRoleMasks.size());
+        for (Map.Entry<UUID, Integer> entry : this.characterRoleMasks.entrySet()) {
+            buffer.writeLong(entry.getKey().getMostSignificantBits());
+            buffer.writeLong(entry.getKey().getLeastSignificantBits());
+            buffer.writeInt(entry.getValue().intValue());
+        }
+        buffer.writeShort(this.roleHolders.size());
+        for (RoleHolder holder : this.roleHolders) {
+            buffer.writeInt(holder.getAccountMask());
+            UUID character = holder.getCharacterId();
+            buffer.writeBoolean(character != null);
+            if (character != null) {
+                buffer.writeLong(character.getMostSignificantBits());
+                buffer.writeLong(character.getLeastSignificantBits());
+            }
+        }
+        buffer.writeShort(this.proximityRadius);
     }
 
     public boolean hasAdminAccess() { return this.adminAccess; }
@@ -585,20 +745,52 @@ public final class LostTalesChatAccessPacket implements IMessage {
     public boolean canEditServerConfig() { return this.canEditServerConfig; }
     /** Every capability the server says this player holds, by id. */
     public List<String> getCapabilities() { return this.capabilities; }
+    /**
+     * The account's own roles, apart from the character being played;
+     * the played mask when the payload did not state the two apart.
+     */
+    public int getAccountRoleMask() { return this.accountRoleMask; }
+    /** Whether the payload stated the roles apart by identity. */
+    public boolean hasRoleSplit() { return this.rolesSplit; }
+    /** The roles assigned to each of the player's own characters, by id. */
+    public Map<UUID, Integer> getCharacterRoleMasks() {
+        return this.characterRoleMasks;
+    }
+    /** The server's Proximity radius in blocks; zero when unstated. */
+    public int getProximityRadius() { return this.proximityRadius; }
     public boolean isMalformed() { return this.malformed; }
 
-    /** One online account and the roles it holds; masks are never zero. */
+    /**
+     * One online account and the roles it wears as the identity it is
+     * playing — masks are never zero — with the account's own roles
+     * apart from them and the character it plays, where the payload
+     * stated them.
+     */
     public static final class RoleHolder {
         private final String name;
         private final int mask;
+        private final int accountMask;
+        private final UUID characterId;
 
         public RoleHolder(String name, int mask) {
+            this(name, mask, mask, null);
+        }
+
+        public RoleHolder(String name, int mask, int accountMask,
+                          UUID characterId) {
             this.name = name == null ? "" : name;
             this.mask = mask;
+            this.accountMask = accountMask & mask;
+            this.characterId = characterId;
         }
 
         public String getName() { return this.name; }
+        /** The roles worn as the identity being played. */
         public int getMask() { return this.mask; }
+        /** The account's own roles, worn by every character of it. */
+        public int getAccountMask() { return this.accountMask; }
+        /** The character the account is playing; null for none or unstated. */
+        public UUID getCharacterId() { return this.characterId; }
     }
 
     public static final class Handler implements IMessageHandler<

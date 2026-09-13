@@ -19,6 +19,13 @@ final class ChatLineBands {
     private float[] right = new float[INITIAL_CAPACITY];
     private float[] top = new float[INITIAL_CAPACITY];
     private float[] bottom = new float[INITIAL_CAPACITY];
+    /**
+     * Per band, how a row drawn small maps onto its own text space: the
+     * text-space x that keeps its place, and the share of its size it is
+     * drawn at; 0 and 1 for a row at the words' own size.
+     */
+    private float[] pivot = new float[INITIAL_CAPACITY];
+    private float[] rowScale = new float[INITIAL_CAPACITY];
     private int count;
     private float scale = 1.0F;
     private Object source;
@@ -38,6 +45,18 @@ final class ChatLineBands {
      */
     void add(int lineViewIndex, float bandLeft, float bandRight,
              float bandTop, float bandBottom) {
+        add(lineViewIndex, bandLeft, bandRight, bandTop, bandBottom, 0.0F,
+                1.0F);
+    }
+
+    /**
+     * As above, for a row drawn at {@code rowScale} of its size about the
+     * text-space x {@code rowPivot}, which keeps its place: a row of the
+     * chat's small text, hit where it is drawn.
+     */
+    void add(int lineViewIndex, float bandLeft, float bandRight,
+             float bandTop, float bandBottom, float rowPivot,
+             float rowScale) {
         if (this.count == this.viewIndex.length) {
             int capacity = this.viewIndex.length * 2;
             this.viewIndex = Arrays.copyOf(this.viewIndex, capacity);
@@ -45,12 +64,16 @@ final class ChatLineBands {
             this.right = Arrays.copyOf(this.right, capacity);
             this.top = Arrays.copyOf(this.top, capacity);
             this.bottom = Arrays.copyOf(this.bottom, capacity);
+            this.pivot = Arrays.copyOf(this.pivot, capacity);
+            this.rowScale = Arrays.copyOf(this.rowScale, capacity);
         }
         this.viewIndex[this.count] = lineViewIndex;
         this.left[this.count] = bandLeft;
         this.right[this.count] = bandRight;
         this.top[this.count] = Math.min(bandTop, bandBottom);
         this.bottom[this.count] = Math.max(bandTop, bandBottom);
+        this.pivot[this.count] = rowPivot;
+        this.rowScale[this.count] = rowScale > 0.0F ? rowScale : 1.0F;
         this.count++;
     }
 
@@ -98,8 +121,13 @@ final class ChatLineBands {
         return this.scale;
     }
 
-    /** Converts a screen x into the line's own (unscaled) text space. */
+    /**
+     * Converts a screen x into the line's own (unscaled) text space: the
+     * row's own, for a row drawn small, so its runs are found by the
+     * widths they are laid out with.
+     */
     float localX(int band, float screenX) {
-        return (screenX - this.left[band]) / this.scale;
+        float x = (screenX - this.left[band]) / this.scale;
+        return this.pivot[band] + (x - this.pivot[band]) / this.rowScale[band];
     }
 }

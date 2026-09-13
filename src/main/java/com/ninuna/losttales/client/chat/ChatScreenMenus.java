@@ -79,6 +79,8 @@ final class ChatScreenMenus {
             "window_color_selected";
     private static final String ENTRY_WINDOW_COLOR_MENTION =
             "window_color_mention";
+    private static final String ENTRY_WINDOW_COLOR_SELECTED_MENTION =
+            "window_color_selected_mention";
     private static final String ENTRY_WINDOW_COLOR_REPLY =
             "window_color_reply";
     /** Marks a palette row; the rest of the id is the palette entry's name. */
@@ -318,9 +320,10 @@ final class ChatScreenMenus {
      * default shape. A locked window never reaches this menu: it offers
      * no cog, so the entries that would be refused are never shown.
      * Below them, the chat's colours: the history panel, the line under
-     * the pointer and a line that mentions this player, each row wearing
-     * the colour it stands for and opening the palette to change it —
-     * a client preference, so every window shows the choice at once.
+     * the pointer, a line that mentions this player, that line under the
+     * pointer and the light a reply's quote leaves, each row wearing the
+     * colour it stands for and opening the palette to change it — a
+     * client preference, so every window shows the choice at once.
      */
     void openWindowPopup(ChatWindow window, int anchorX, int anchorBottom) {
         if (window == null) {
@@ -345,6 +348,8 @@ final class ChatScreenMenus {
                 "gui.losttales.chat.window.color.selected"));
         entries.add(colorRow(ENTRY_WINDOW_COLOR_MENTION,
                 "gui.losttales.chat.window.color.mention"));
+        entries.add(colorRow(ENTRY_WINDOW_COLOR_SELECTED_MENTION,
+                "gui.losttales.chat.window.color.selected_mention"));
         entries.add(colorRow(ENTRY_WINDOW_COLOR_REPLY,
                 "gui.losttales.chat.window.color.reply"));
         this.popup.open(POPUP_WINDOW, null, entries, this.font,
@@ -352,22 +357,31 @@ final class ChatScreenMenus {
                 this.screenHeight);
     }
 
-    /** One of the window menu's colour rows, chipped in its current colour. */
+    /** One of the window menu's colour rows, chipped in the colour it comes to now. */
     private static ChatPopupMenu.Entry colorRow(String id, String labelKey) {
         return new ChatPopupMenu.Entry(id,
                 StatCollector.translateToLocal(labelKey), false,
-                LostTalesColors.rgb(LostTalesColors.paletteColor(
-                        currentColorName(id), LostTalesColors.PLUM_BLACK)),
+                ENTRY_WINDOW_COLOR_SELECTED_MENTION.equals(id)
+                        ? LostTalesChatVisualStyle.selectedMentionLineRgb()
+                        : LostTalesColors.rgb(LostTalesColors.paletteColor(
+                                currentColorName(id),
+                                LostTalesColors.PLUM_BLACK)),
                 null).asChip();
     }
 
-    /** The palette entry a colour row currently stands for. */
+    /**
+     * What a colour row's option holds: a palette entry's name, or — for
+     * the selected mention — automatic.
+     */
     private static String currentColorName(String role) {
         if (ENTRY_WINDOW_COLOR_SELECTED.equals(role)) {
             return LostTalesConfig.chatSelectedLineColor;
         }
         if (ENTRY_WINDOW_COLOR_MENTION.equals(role)) {
             return LostTalesConfig.chatMentionLineColor;
+        }
+        if (ENTRY_WINDOW_COLOR_SELECTED_MENTION.equals(role)) {
+            return LostTalesConfig.chatSelectedMentionColor;
         }
         if (ENTRY_WINDOW_COLOR_REPLY.equals(role)) {
             return LostTalesConfig.chatReplyHighlightColor;
@@ -377,16 +391,33 @@ final class ChatScreenMenus {
 
     /**
      * The palette, in the window menu's place: every entry as a chip
-     * beside its name, the one in use named in honey. Choosing one is
-     * the whole change — the option is written to the client file and
-     * every window is drawn in it from the next frame.
+     * beside its name, the one in use named in honey — for the selected
+     * mention, the automatic choice before them. Choosing one is the
+     * whole change — the option is written to the client file and every
+     * window is drawn in it from the next frame.
      */
     private void openColorPopup(String role) {
         this.colorRole = role;
         String current = currentColorName(role);
         String[] names = LostTalesColors.paletteNames();
         List<ChatPopupMenu.Entry> entries =
-                new ArrayList<ChatPopupMenu.Entry>(names.length);
+                new ArrayList<ChatPopupMenu.Entry>(names.length + 1);
+        if (ENTRY_WINDOW_COLOR_SELECTED_MENTION.equals(role)) {
+            // Automatic first: the mention colour a shade lighter,
+            // chipped in the colour that comes to now.
+            ChatPopupMenu.Entry automatic = new ChatPopupMenu.Entry(
+                    ENTRY_COLOR_PREFIX + LostTalesConfig.CHAT_COLOR_AUTOMATIC,
+                    StatCollector.translateToLocal(
+                            "gui.losttales.chat.window.color.automatic"),
+                    false,
+                    LostTalesChatVisualStyle.automaticSelectedMentionRgb(),
+                    null).asChip();
+            if (!LostTalesColors.isPaletteName(current)) {
+                automatic.withLabelColor(
+                        LostTalesColors.rgb(LostTalesColors.HONEY));
+            }
+            entries.add(automatic);
+        }
         for (int index = 0; index < names.length; index++) {
             ChatPopupMenu.Entry entry = new ChatPopupMenu.Entry(
                     ENTRY_COLOR_PREFIX + names[index], paletteLabel(names[index]),
@@ -416,13 +447,18 @@ final class ChatScreenMenus {
             return;
         }
         String name = entry.id.substring(ENTRY_COLOR_PREFIX.length());
-        if (!LostTalesColors.isPaletteName(name)) {
+        boolean automatic = LostTalesConfig.CHAT_COLOR_AUTOMATIC.equals(name)
+                && ENTRY_WINDOW_COLOR_SELECTED_MENTION.equals(this.colorRole);
+        if (!automatic && !LostTalesColors.isPaletteName(name)) {
             return;
         }
         if (ENTRY_WINDOW_COLOR_SELECTED.equals(this.colorRole)) {
             LostTalesConfig.chatSelectedLineColor = name;
         } else if (ENTRY_WINDOW_COLOR_MENTION.equals(this.colorRole)) {
             LostTalesConfig.chatMentionLineColor = name;
+        } else if (ENTRY_WINDOW_COLOR_SELECTED_MENTION.equals(
+                this.colorRole)) {
+            LostTalesConfig.chatSelectedMentionColor = name;
         } else if (ENTRY_WINDOW_COLOR_REPLY.equals(this.colorRole)) {
             LostTalesConfig.chatReplyHighlightColor = name;
         } else {
@@ -1382,6 +1418,7 @@ final class ChatScreenMenus {
         if (ENTRY_WINDOW_COLOR_BACKGROUND.equals(entry.id)
                 || ENTRY_WINDOW_COLOR_SELECTED.equals(entry.id)
                 || ENTRY_WINDOW_COLOR_MENTION.equals(entry.id)
+                || ENTRY_WINDOW_COLOR_SELECTED_MENTION.equals(entry.id)
                 || ENTRY_WINDOW_COLOR_REPLY.equals(entry.id)) {
             openColorPopup(entry.id);
             return true;

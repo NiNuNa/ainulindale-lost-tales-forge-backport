@@ -71,7 +71,6 @@ public final class LostTalesChatPresentation {
     private static final LinkedHashSet<Integer> pingedChatLineIds =
             new LinkedHashSet<Integer>();
     private static final int[] NO_SHOWCASES = new int[0];
-    /** What opens a reply's quote row: a turned arrow, as Discord's is. */
     /**
      * One cue stands for every ping inside this window. A burst of
      * mentions — an achievement naming half the server, two lines
@@ -107,7 +106,7 @@ public final class LostTalesChatPresentation {
         // this client's Console colour, as a live one does.
         if (LostTalesChatMessagePacket.isSystemSender(packet.getSenderId())) {
             packet = packet.withNameColor(
-                    ClientChatChannelState.displayColor(ChatChannel.CONSOLE));
+                    LostTalesChatVisualStyle.asideRgb());
         }
         if (ChatMessageIds.isServerId(packet.getMessageId())
                 && ClientChatMessages.get(packet.getMessageId()) != null) {
@@ -452,9 +451,9 @@ public final class LostTalesChatPresentation {
      * rather than something the sender wrote.
      */
     private static IChatComponent markEdited(IChatComponent line) {
-        // The quiet tone the reply chip and the typing line wear too:
-        // the three are the chat's asides, and they read as one set.
-        int color = LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
+        // The chat's aside tone, which the timestamps, the reply chip
+        // and the typing line wear too: they read as one set.
+        int color = LostTalesChatVisualStyle.asideRgb();
         ChatComponentText mark = text(
                 StatCollector.translateToLocal("gui.losttales.chat.edited"),
                 nearestFormatting(color), false);
@@ -2011,7 +2010,7 @@ public final class LostTalesChatPresentation {
         return new LostTalesChatMessagePacket(tab.getChannel(),
                 senderId, name, name, "",
                 LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
-                ClientChatChannelState.displayColor(ChatChannel.CONSOLE),
+                LostTalesChatVisualStyle.asideRgb(),
                 copyTextOf(body), timestampMillis, "", null, "",
                 tab.isWhisper() ? tab.getPartner() : "", 0, true,
                 // The server's own id when it named the line, so every
@@ -2696,7 +2695,7 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * {@code [HH:mm] } in the palette's rose beige — a quiet grey a step
+     * {@code [HH:mm] } in the Console's rose grey — a quiet tone a step
      * below the sand body text — with the time itself — digits and their
      * colon — italic; the brackets stay upright. Marked as a timestamp
      * run, so the closed feed leaves it out: the feed is a glance at
@@ -2709,9 +2708,9 @@ public final class LostTalesChatPresentation {
         }
         String formatted = "[" + ChatTimestampFormatter.format(
                 timestampMillis) + "] ";
-        // The Console's colour, which the Server's name wears too: the
-        // chat's one tone for what is said about a line rather than in it.
-        int color = ClientChatChannelState.displayColor(ChatChannel.CONSOLE);
+        // The chat's aside tone: what is said about a line rather than
+        // in it.
+        int color = LostTalesChatVisualStyle.asideRgb();
         int index = 0;
         while (index < formatted.length()) {
             boolean time = isTimeCharacter(formatted.charAt(index));
@@ -3003,12 +3002,6 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * Splits a run of message text so that every {@code @name} reaching
-     * somebody is a piece of its own in that somebody's colour, and the
-     * words around it stay as they were typed. A name that reaches
-     * nobody is left alone: it is only text with an at-sign in front.
-     */
-    /**
      * The channel pass over one run of body text: a word behind a
      * {@code #} that names a channel — {@code #ooc}, {@code #Global} —
      * is drawn as {@code #Name} in the channel's colour and links to
@@ -3097,6 +3090,12 @@ public final class LostTalesChatPresentation {
                 : ChatChannelLinkMarker.apply(run, color, tabId, chatLineId);
     }
 
+    /**
+     * Splits a run of message text so that every {@code @name} reaching
+     * somebody is a piece of its own in that somebody's colour, and the
+     * words around it stay as they were typed. A name that reaches
+     * nobody is left alone: it is only text with an at-sign in front.
+     */
     private static void appendMentions(ChatComponentText root, String text,
                                        ChatChannel channel) {
         int literalStart = 0;

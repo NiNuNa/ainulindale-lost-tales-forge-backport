@@ -239,11 +239,16 @@ final class LostTalesChatHoverCard {
         // The Server's card says what it is answering: the command the
         // line under the pointer was the answer to.
         addDetail(lines, "gui.losttales.chat.card.command", target.note);
-        // The roles belong to the account behind the identity, whichever
-        // channel the line was said in: a role not worn on an in-character
-        // line is still held, and the card is where it shows.
+        // The roles the identity wears, whichever channel the line was
+        // said in: an account its own, a character the account's and its
+        // own. A role not worn on an in-character line is still held, and
+        // the card is where it shows.
+        int worn = target.accountIdentity || details == null
+                ? ChatMentionColors.rolesFor(account)
+                : ChatMentionColors.rolesFor(account,
+                        details.getCharacterId());
         addDetail(lines, "gui.losttales.chat.card.roles", target.npcIdentity
-                ? "" : roleNames(ChatMentionColors.rolesFor(account)));
+                ? "" : roleNames(worn));
         // An NPC's faction is what its speech was captured with, and the
         // brief card says it too: without it the card is a name alone.
         if (full || target.npcIdentity) {
@@ -310,7 +315,8 @@ final class LostTalesChatHoverCard {
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(0.0F, 0.0F, 300.0F);
-            LostTalesSkyrimUiStyle.drawPanel(x, y, width, height);
+            LostTalesChatVisualStyle.drawPopup(x, y, x + width, y + height,
+                    1.0F);
             drawHead(minecraft, target, x + PADDING, y + PADDING);
             int textX = x + PADDING + HEAD_SIZE + 6;
             int textY = y + PADDING;
@@ -419,7 +425,8 @@ final class LostTalesChatHoverCard {
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(0.0F, 0.0F, 300.0F);
-            LostTalesSkyrimUiStyle.drawPanel(x, y, width, height);
+            LostTalesChatVisualStyle.drawPopup(x, y, x + width, y + height,
+                    1.0F);
             int textX = x + PADDING;
             int textY = y + PADDING;
             drawColored(font, name, textX, textY, role.getColor());
@@ -830,9 +837,9 @@ final class LostTalesChatHoverCard {
     }
 
     /**
-     * A tooltip of plain lines, drawn as every other card is: the chat's
-     * panel, the chat's shadow, and vanilla's colour codes in the
-     * palette's own tones. What the achievement and text hover cards
+     * A tooltip of plain lines, drawn as every other popup is: the
+     * chat's popup surface, the chat's shadow, and vanilla's colour
+     * codes in the palette's own tones. What the achievement and text hover cards
      * and the shared-marker tooltip draw with, in place of vanilla's
      * hovering text, so nothing hanging off a chat line reads in vanilla's
      * colours beside the chat's.
@@ -857,7 +864,8 @@ final class LostTalesChatHoverCard {
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(0.0F, 0.0F, 300.0F);
-            LostTalesSkyrimUiStyle.drawPanel(x, y, width, height);
+            LostTalesChatVisualStyle.drawPopup(x, y, x + width, y + height,
+                    1.0F);
             int textY = y + PADDING;
             for (int index = 0; index < lines.size(); index++) {
                 LostTalesChatVisualStyle.drawLegacyFormatted(font,

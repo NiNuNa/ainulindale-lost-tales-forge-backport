@@ -102,6 +102,21 @@ public class LostTalesColors {
             CLAY, RUST, MAROON, SALMON, ORCHID, MULBERRY,
             DARK_MULBERRY, WINE, CRIMSON, CORAL, APRICOT, HONEY};
     private static final Map<String, Integer> PALETTE_BY_NAME = paletteByName();
+    /**
+     * The palette's ramps as the sheet lays them out, each one hue
+     * stepping from its darkest entry to its lightest: the cool blues,
+     * the plums up to ivory, the greens, the browns, the pinks and the
+     * reds. Every entry stands on exactly one of them.
+     */
+    private static final String[][] RAMPS = {
+            {"DUSK_VIOLET", "INDIGO", "SLATE_BLUE", "STEEL_BLUE", "TEAL",
+                    "SEAFOAM"},
+            {"PLUM_BLACK", "PLUM_DARK", "PLUM_GRAY", "MAUVE", "ROSE_GRAY",
+                    "ROSE_BEIGE", "SAND", "IVORY"},
+            {"HARBOR_BLUE", "SEA_GREEN", "FERN_GREEN", "MEADOW_GREEN"},
+            {"MAROON", "RUST", "CLAY", "TAN", "PARCHMENT"},
+            {"DARK_MULBERRY", "MULBERRY", "ORCHID", "SALMON"},
+            {"WINE", "CRIMSON", "CORAL", "APRICOT", "HONEY"}};
 
     private static Map<String, Integer> paletteByName() {
         Map<String, Integer> byName = new HashMap<String, Integer>();
@@ -134,6 +149,27 @@ public class LostTalesColors {
         }
         Integer value = PALETTE_BY_NAME.get(name.trim().toUpperCase(Locale.ROOT));
         return value == null ? fallback : value.intValue();
+    }
+
+    /**
+     * The name of the palette entry one shade lighter than {@code name}
+     * on its own ramp — orchid for mulberry, salmon for orchid — or null
+     * for a ramp's lightest entry and for a name that is not the
+     * palette's. Case and surrounding space do not count.
+     */
+    public static String lighterStep(String name) {
+        if (!isPaletteName(name)) {
+            return null;
+        }
+        String key = name.trim().toUpperCase(Locale.ROOT);
+        for (String[] ramp : RAMPS) {
+            for (int index = 0; index < ramp.length; index++) {
+                if (ramp[index].equals(key)) {
+                    return index + 1 < ramp.length ? ramp[index + 1] : null;
+                }
+            }
+        }
+        return null;
     }
 
     /** Strips the alpha byte so a renderer can supply its own opacity. */

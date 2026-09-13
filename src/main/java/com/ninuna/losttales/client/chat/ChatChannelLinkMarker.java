@@ -29,8 +29,6 @@ final class ChatChannelLinkMarker {
     static final String ICON_SLOT = "  ";
     /** What stands between the channel's name and the bubble. */
     static final String MESSAGE_SEPARATOR = " > ";
-    /** What separates a channel's name from a message's id as typed. */
-    static final char MESSAGE_ID_SEPARATOR = '/';
 
     private ChatChannelLinkMarker() {}
 

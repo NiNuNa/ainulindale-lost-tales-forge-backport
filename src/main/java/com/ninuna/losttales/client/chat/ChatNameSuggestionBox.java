@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
 
 /**
  * Live {@code @Name} completion list shown above the chat input, the
@@ -33,7 +32,10 @@ final class ChatNameSuggestionBox {
     /** The face's box and the gap after it, shared by every row. */
     private static final int ICON_SIZE = 8;
     private static final int ICON_GAP = 3;
-    /** Matches the tab row's gap above the input row. */
+    /**
+     * How far above the input anchor ({@link ChatInputBar#inputAnchor})
+     * the box ends: one pixel clear of the bar's top.
+     */
     private static final int BOTTOM_MARGIN = 15;
 
     private List<ChatMentionCandidate> matches = Collections.emptyList();
@@ -147,23 +149,16 @@ final class ChatNameSuggestionBox {
         int top = boxTop(screenHeight);
         int bottom = screenHeight - BOTTOM_MARGIN;
         int hoveredRow = rowAt(font, mouseX, mouseY, screenHeight, inputX);
+        if (hoveredRow >= 0) {
+            this.selectedIndex = hoveredRow;
+        }
         regions.add(inputX, top, inputX + width, bottom);
-        Gui.drawRect(inputX, top, inputX + width, bottom,
-                LostTalesChatVisualStyle.argb(
-                        LostTalesChatVisualStyle.SURFACE_RGB, 0xE0));
+        LostTalesChatVisualStyle.drawPopupList(inputX, top, inputX + width,
+                bottom, top + PADDING, ROW_HEIGHT,
+                this.selectedIndex < this.matches.size()
+                        ? this.selectedIndex : -1);
         for (int row = 0; row < this.matches.size(); row++) {
             int rowTop = top + PADDING + row * ROW_HEIGHT;
-            boolean hovered = row == hoveredRow;
-            if (hovered) {
-                this.selectedIndex = row;
-            }
-            if (row == this.selectedIndex) {
-                Gui.drawRect(inputX + 1, rowTop, inputX + width - 1,
-                        rowTop + ROW_HEIGHT,
-                        LostTalesChatVisualStyle.argb(
-                                LostTalesChatVisualStyle
-                                        .SURFACE_HIGHLIGHT_RGB, 0xC8));
-            }
             ChatMentionCandidate candidate = this.matches.get(row);
             drawFace(minecraft, candidate, inputX + 4, rowTop + 1);
             LostTalesChatVisualStyle.drawColored(font,
@@ -173,10 +168,6 @@ final class ChatNameSuggestionBox {
         }
     }
 
-    /**
-     * The player's head in the row's icon box, with the chat's shadow
-     * under it. A role has none: its colour is what names it.
-     */
     /**
      * The colour a row's name is drawn in: the same resolution a mention
      * of that name gets in a line of the selected channel — a role its
@@ -190,6 +181,10 @@ final class ChatNameSuggestionBox {
         return color >= 0 ? color : LostTalesChatVisualStyle.IVORY;
     }
 
+    /**
+     * The player's head in the row's icon box, with the chat's shadow
+     * under it. A role has none: its colour is what names it.
+     */
     private static void drawFace(Minecraft minecraft,
                                  ChatMentionCandidate candidate,
                                  int x, int y) {

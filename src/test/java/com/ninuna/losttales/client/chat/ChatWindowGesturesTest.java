@@ -38,15 +38,16 @@ public final class ChatWindowGesturesTest {
     public void theBorderOutsideAWindowAnswersWithItsEdgeOrCorner() {
         int border = ChatWindowGestures.RESIZE_BORDER;
         int corner = ChatWindowGestures.RESIZE_CORNER;
-        // Just outside each edge, mid-way along it.
+        // Just outside each edge, mid-way along it: the band is the
+        // border's width of whole pixels outside the window's own.
         assertEquals(ChatWindowGestures.ResizeEdge.LEFT,
                 ChatWindowGestures.edgeAt(this.frame, 100 - border, 100));
         assertEquals(ChatWindowGestures.ResizeEdge.RIGHT,
-                ChatWindowGestures.edgeAt(this.frame, 300 + border, 100));
+                ChatWindowGestures.edgeAt(this.frame, 300 + border - 1, 100));
         assertEquals(ChatWindowGestures.ResizeEdge.TOP,
                 ChatWindowGestures.edgeAt(this.frame, 200, 50 - border));
         assertEquals(ChatWindowGestures.ResizeEdge.BOTTOM,
-                ChatWindowGestures.edgeAt(this.frame, 200, 150 + border));
+                ChatWindowGestures.edgeAt(this.frame, 200, 150 + border - 1));
         // On an edge but near its end: the corner reaches along it.
         assertEquals(ChatWindowGestures.ResizeEdge.TOP_LEFT,
                 ChatWindowGestures.edgeAt(this.frame, 100 + corner, 50 - 1));
@@ -59,10 +60,33 @@ public final class ChatWindowGesturesTest {
         // Beyond the border, and inside the window, is nobody's edge.
         assertNull(ChatWindowGestures.edgeAt(this.frame, 100 - border - 1,
                 100));
+        assertNull(ChatWindowGestures.edgeAt(this.frame, 300 + border, 100));
         assertNull(ChatWindowGestures.edgeAt(this.frame, 200, 100));
         assertTrue(ChatWindowGestures.coversPoint(this.frame, 200, 100));
-        assertFalse(ChatWindowGestures.coversPoint(this.frame, 100, 100));
         assertFalse(ChatWindowGestures.coversPoint(this.frame, 200, 160));
+    }
+
+    /**
+     * The window's first pixel and its last are the window's, whatever
+     * asks: the resize band begins outside them, so its hover, its press
+     * and the window's own never claim the same point.
+     */
+    @Test
+    public void aWindowsEdgePixelsAreItsOwnAndNotTheBorders() {
+        assertTrue(ChatWindowGestures.coversPoint(this.frame, 100, 100));
+        assertTrue(this.frame.contains(100, 50));
+        assertTrue(this.frame.contains(299.5, 149.5));
+        assertNull(ChatWindowGestures.edgeAt(this.frame, 100, 100));
+        assertNull(ChatWindowGestures.edgeAt(this.frame, 299.5, 100));
+        assertNull(ChatWindowGestures.edgeAt(this.frame, 200, 50));
+        assertFalse(this.frame.contains(99.5, 100));
+        assertFalse(this.frame.contains(300, 100));
+        assertEquals(ChatWindowGestures.ResizeEdge.LEFT,
+                ChatWindowGestures.edgeAt(this.frame, 99.5, 100));
+        assertEquals(ChatWindowGestures.ResizeEdge.RIGHT,
+                ChatWindowGestures.edgeAt(this.frame, 300, 100));
+        assertEquals(ChatWindowGestures.ResizeEdge.TOP,
+                ChatWindowGestures.edgeAt(this.frame, 200, 49.5));
     }
 
     @Test

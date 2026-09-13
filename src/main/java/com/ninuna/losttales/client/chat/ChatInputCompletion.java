@@ -451,8 +451,9 @@ final class ChatInputCompletion {
     /**
      * Draws whichever lists are open above the input, each brought up
      * to date with the field first. Called inside the bar's own
-     * transform; {@code anchor} is the bar's top and {@code inputX} the
-     * field's left edge in that space.
+     * transform; {@code anchor} is the bar's input anchor
+     * ({@link ChatInputBar#inputAnchor}, fourteen pixels below its top)
+     * and {@code inputX} the field's left edge in that space.
      */
     void draw(int anchor, int inputX, double mouseX, double mouseY) {
         if (LostTalesConfig.enableChatEmojis) {

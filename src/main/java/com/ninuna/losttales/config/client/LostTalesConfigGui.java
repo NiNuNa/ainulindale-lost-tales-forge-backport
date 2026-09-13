@@ -114,7 +114,7 @@ public class LostTalesConfigGui extends GuiConfig {
                 "enableChatMessageGrouping", "enableChatBackgroundBlur",
                 "enableChatPings", "chatPingSound", "chatBackgroundColor",
                 "chatSelectedLineColor", "chatMentionLineColor",
-                "chatReplyHighlightColor",
+                "chatSelectedMentionColor", "chatReplyHighlightColor",
                 "chatHistoryLines",
                 "sendChatTypingStatus", "showChatTypingIndicators",
                 "enableNpcChatStyling", "showChatSpeechBubbles",

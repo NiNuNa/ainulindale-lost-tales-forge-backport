@@ -251,7 +251,6 @@ public final class ChatWindowLayout {
         return result;
     }
 
-    /** Brings a window to the front of the stack; not a layout change. */
     /**
      * Sends a window behind every other one, the reverse of
      * {@link #raise}. The whole order is written down first: windows
@@ -274,6 +273,7 @@ public final class ChatWindowLayout {
         STACK.add(0, windowId);
     }
 
+    /** Brings a window to the front of the stack; not a layout change. */
     public static synchronized void raise(String windowId) {
         if (window(windowId) == null) {
             return;
@@ -1023,12 +1023,6 @@ public final class ChatWindowLayout {
     }
 
     /**
-     * The window at the head of a stuck chain — the one whose stored
-     * position the others are placed from. A window that is stuck to
-     * nothing is its own root, and a chain that somehow closed on itself
-     * stops at the window it started from.
-     */
-    /**
      * Every window stuck to this one, however many hops away and in
      * whichever direction the sticking runs, the window itself included.
      * A stuck group moves as one piece, so a drag carries all of them.
@@ -1064,6 +1058,12 @@ public final class ChatWindowLayout {
         return group;
     }
 
+    /**
+     * The window at the head of a stuck chain — the one whose stored
+     * position the others are placed from. A window that is stuck to
+     * nothing is its own root, and a chain that somehow closed on itself
+     * stops short of the window it started from.
+     */
     public static synchronized ChatWindow linkRoot(ChatWindow window) {
         ChatWindow root = window;
         for (int step = 0; step < MAX_WINDOWS && root != null

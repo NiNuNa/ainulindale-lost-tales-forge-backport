@@ -104,7 +104,8 @@ final class ChatMentionColors {
         if (appearance == null) {
             return colorOf(candidate.getDisplayName(), channel);
         }
-        int roleColor = roleColorFor(candidate.getAccountName());
+        int roleColor = roleColorFor(candidate.getAccountName(),
+                appearance.getCharacterId());
         return LotrFactionColors.forFactionId(appearance.getStartingFactionId(),
                 roleColor >= 0 ? roleColor : PLAYER_RGB);
     }
@@ -137,10 +138,18 @@ final class ChatMentionColors {
         return primary.isNone() ? -1 : primary.getColor();
     }
 
+    /** A character identity's primary role colour, or -1 for none. */
+    private static int roleColorFor(String account, UUID characterId) {
+        ChatAccountRole primary = ChatAccountRole.primary(
+                rolesFor(account, characterId));
+        return primary.isNone() ? -1 : primary.getColor();
+    }
+
     /**
-     * Every role this client knows the account to hold, or zero: what
-     * the server's role roster lists it as, else what the roles store
-     * has seen the name signed with, and for the local player what the
+     * Every role this client knows the account to hold on its own — worn
+     * by the account and by every character of it — or zero: what the
+     * server's role roster lists it as, else what the roles store has
+     * seen the name signed with, and for the local player what the
      * server granted with the chat access — the first of them that
      * answers, so a role holder is coloured before they have said
      * anything. The roster comes first because it is the server's
@@ -151,7 +160,7 @@ final class ChatMentionColors {
         if (account == null || account.trim().length() == 0) {
             return 0;
         }
-        int listed = ClientChatChannelState.rosterRolesOf(account);
+        int listed = ClientChatChannelState.rosterAccountRolesOf(account);
         if (listed != 0) {
             return listed;
         }
@@ -163,9 +172,56 @@ final class ChatMentionColors {
         if (minecraft != null && minecraft.thePlayer != null
                 && account.trim().equalsIgnoreCase(
                         minecraft.thePlayer.getCommandSenderName())) {
-            return ClientChatChannelState.getRoleMask();
+            return ClientChatChannelState.getAccountRoleMask();
         }
         return 0;
+    }
+
+    /**
+     * Every role this client knows a character identity to wear: the
+     * account's own together with the character's — for the local
+     * player's own characters, and for the character each roster holder
+     * is playing, as the server stated them. For any other character of
+     * another player only the account's roles can be known, and those
+     * are what it shows.
+     */
+    static int rolesFor(String account, UUID characterId) {
+        if (characterId == null) {
+            return rolesFor(account);
+        }
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft != null && minecraft.thePlayer != null
+                && account != null
+                && account.trim().equalsIgnoreCase(
+                        minecraft.thePlayer.getCommandSenderName())) {
+            CharacterRosterSnapshot snapshot =
+                    ClientCharacterRosterCache.getSnapshot();
+            CharacterSummary active = snapshot == null
+                    ? null : snapshot.getActiveCharacter();
+            return ClientChatChannelState.ownCharacterRoles(characterId,
+                    active != null
+                            && characterId.equals(active.getCharacterId()));
+        }
+        int worn = ClientChatChannelState.rosterRolesOf(account, characterId);
+        return worn != 0 ? worn : rolesFor(account);
+    }
+
+    /**
+     * The name of the character with the id, as the synced appearances
+     * know it; null for none.
+     */
+    static String characterNameOf(UUID characterId) {
+        if (characterId == null) {
+            return null;
+        }
+        for (CharacterAppearance appearance
+                : ClientCharacterAppearanceCache.snapshot().values()) {
+            if (appearance != null && appearance.hasCharacter()
+                    && characterId.equals(appearance.getCharacterId())) {
+                return normalized(appearance.getCharacterName());
+            }
+        }
+        return null;
     }
 
     /**

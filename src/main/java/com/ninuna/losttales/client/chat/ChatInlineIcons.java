@@ -70,11 +70,12 @@ final class ChatInlineIcons {
     /** Common inline content box edge; also the emoji sprite's native size. */
     static final float CONTENT_SIZE = 10.0F;
     /**
-     * Box top relative to the text top in the input bar, the pickers and
-     * the completion lists: two rows above the glyphs, which puts the
-     * box's middle half a pixel above the capitals' middle. A message
-     * row centres its boxes and its text each in the row, and places
-     * its boxes with {@link #rowBoxTop}.
+     * Box top relative to the text top in the pickers and the completion
+     * lists: two rows above the glyphs, which puts the box's middle half
+     * a pixel above the capitals' middle. A message row centres its
+     * boxes and its text each in the row and places its boxes with
+     * {@link #rowBoxTop}; the input field, whose typing well is one
+     * message row, places its boxes the same way.
      */
     static final int CONTENT_TOP_OFFSET = -2;
     private ChatInlineIcons() {}
@@ -114,11 +115,21 @@ final class ChatInlineIcons {
 
     /**
      * Top edge of the content box for text drawn at {@code textY} in the
-     * input bar, the pickers and the completion lists.
+     * pickers and the completion lists.
      */
     static float boxTop(float textY, int slotWidth) {
         return textY + CONTENT_TOP_OFFSET
                 + (CONTENT_SIZE - contentSize(slotWidth)) / 2.0F;
+    }
+
+    /**
+     * Top of a message row's whole content box, for text drawn at
+     * {@code textTop}: where its emojis, items and markers stand. The
+     * input field stands its caret and selection on it too.
+     */
+    static int rowContentTop(int textTop) {
+        return textTop + LostTalesChatOverlayRenderer.centredBoxTop(
+                (int)CONTENT_SIZE);
     }
 
     /**

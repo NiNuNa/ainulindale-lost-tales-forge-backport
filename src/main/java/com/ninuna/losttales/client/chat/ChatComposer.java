@@ -3,7 +3,6 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
-import com.ninuna.losttales.gui.style.LostTalesColors;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.util.StatCollector;
@@ -18,12 +17,6 @@ import net.minecraft.util.StatCollector;
  * never survives moving away from the message.
  */
 final class ChatComposer {
-    /**
-     * The chat's asides — the reply chip, the typing line, the
-     * timestamps — all wear this one quiet tone.
-     */
-    static final int ASIDE_RGB = LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
-
     private long replyToMessageId = ChatMessageIds.NONE;
     private String replyToName = "";
     /**
@@ -201,8 +194,8 @@ final class ChatComposer {
         this.chipTop = crossY - 2;
         this.chipRight = crossX + ChatIconSheet.CLOSE.getWidth() + 2;
         this.chipBottom = crossY + ChatIconSheet.CLOSE.getHeight() + 2;
-        LostTalesChatVisualStyle.drawColored(font, label, x, y, ASIDE_RGB,
-                alpha);
+        LostTalesChatVisualStyle.drawColored(font, label, x, y,
+                LostTalesChatVisualStyle.asideRgb(), alpha);
         ChatIconSheet cross = chipContains(mouseX, mouseY)
                 ? ChatIconSheet.CLOSE_HOVER : ChatIconSheet.CLOSE;
         cross.drawWithShadow(crossX, crossY, alpha);
