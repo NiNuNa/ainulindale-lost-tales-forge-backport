@@ -31,8 +31,6 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
     private static final int ROW_HEIGHT = 12;
     /** Marker lists are refreshed at most this often while open. */
     private static final long REFRESH_INTERVAL_NANOS = 500L * 1000000L;
-    private static final String BUTTON_ICON =
-            LostTalesCompassMarkerIcon.POINT_OF_INTEREST.name();
     private static final String TYPE_KEY_PREFIX =
             "gui.losttales.chat.marker.type.";
 
@@ -227,9 +225,12 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
     }
 
     @Override
-    void drawButtonIcon(Minecraft minecraft, int left, int top,
-                        float lit) {
-        ChatInlineIcons.drawMarkerButton(minecraft, BUTTON_ICON,
-                LostTalesChatVisualStyle.IVORY, left, top, BUTTON_SIZE);
+    ChatIconSheet buttonGlyph() {
+        return ChatIconSheet.MAP_MARKER;
+    }
+
+    @Override
+    ChatIconSheet buttonGlyphLit() {
+        return ChatIconSheet.MAP_MARKER_HOVER;
     }
 }

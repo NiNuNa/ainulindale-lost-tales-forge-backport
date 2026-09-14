@@ -8,10 +8,12 @@ import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The chat's own artwork, one sprite sheet: the emoji and item buttons,
- * the send arrow, the tab row's controls and their hover states, the
- * tab borders, the window grip, and the hatch laid over empty message
- * rows. Each constant is a cell of {@code textures/gui/chat.png} in
+ * The chat's own artwork, one sprite sheet: the four picker buttons and
+ * the send button, the tab row's controls and their hover states, the
+ * window's fullscreen control, the search fields' magnifiers, the tab
+ * borders, the framed buttons' corners, the window grip, and the hatch
+ * laid over empty message rows. Each
+ * constant is a cell of {@code textures/gui/chat.png} in
  * texels; the sheet is drawn 1:1 in GUI pixels, so a sprite's width and
  * height are also its size on screen. The padlock's frames are the one
  * thing not held here: they are a regular grid, and
@@ -24,8 +26,22 @@ enum ChatIconSheet {
     /** The dagger the item picker's button carries. */
     ITEM(22, 0, 10, 10),
     ITEM_HOVER(32, 0, 10, 10),
-    /** The input bar's send arrow; it has no hover artwork of its own. */
-    SEND(88, 1, 8, 8),
+    /**
+     * The map-marker and quest pickers' buttons: the round the emoji
+     * button wears, holding a marker's ring and a quest's mark, each with
+     * its lit cell to the right.
+     */
+    MAP_MARKER(43, 0, 10, 10),
+    MAP_MARKER_HOVER(54, 0, 10, 10),
+    QUEST(65, 0, 10, 10),
+    QUEST_HOVER(76, 0, 10, 10),
+    /**
+     * The input bar's send button, resting and hovered: ten-pixel cells
+     * like the emoji and item buttons', crossing from one to the other
+     * as theirs do.
+     */
+    SEND(87, 0, 10, 10),
+    SEND_HOVER(98, 0, 10, 10),
     PLUS(0, 11, 5, 5),
     PLUS_HOVER(6, 11, 5, 5),
     /**
@@ -40,10 +56,41 @@ enum ChatIconSheet {
     CLOSE_HOVER(18, 11, 5, 5),
     COG(24, 11, 5, 5),
     COG_HOVER(30, 11, 5, 5),
-    /** The bubble the typing line is announced with. */
-    SPEECH_BUBBLE(14, 17, 9, 7),
+    /** The bubble the typing line is announced with, its tail included. */
+    SPEECH_BUBBLE(23, 18, 9, 6),
     GRIP(0, 17, 6, 8),
     GRIP_HOVER(7, 17, 6, 8),
+    /**
+     * The window's fullscreen control: four corners pointing out while
+     * the window keeps its own size, pointing in while it fills the
+     * screen, each with its lit artwork.
+     */
+    FULLSCREEN(39, 18, 5, 5),
+    FULLSCREEN_HOVER(51, 18, 5, 5),
+    FULLSCREEN_EXIT(33, 18, 5, 5),
+    FULLSCREEN_EXIT_HOVER(45, 18, 5, 5),
+    /**
+     * The magnifier a search field opens with, in two sizes: eight
+     * pixels for a field one chat row tall, ten for one as tall as the
+     * key icons it carries.
+     */
+    SEARCH(14, 17, 8, 8),
+    SEARCH_LARGE(32, 26, 10, 10),
+    /**
+     * A framed button's four corners, resting and lit: six-texel cells
+     * whose innermost column and row are the frame's edges, stretched
+     * between the corners to any size ({@link ChatFramedButton}). Like
+     * the tab pieces they bring ink alone; their backdrop texels preview
+     * the surface the button paints itself.
+     */
+    FRAME_TOP_LEFT(0, 79, 6, 6),
+    FRAME_TOP_RIGHT(7, 79, 6, 6),
+    FRAME_BOTTOM_LEFT(0, 86, 6, 6),
+    FRAME_BOTTOM_RIGHT(7, 86, 6, 6),
+    FRAME_LIT_TOP_LEFT(14, 79, 6, 6),
+    FRAME_LIT_TOP_RIGHT(21, 79, 6, 6),
+    FRAME_LIT_BOTTOM_LEFT(14, 86, 6, 6),
+    FRAME_LIT_BOTTOM_RIGHT(21, 86, 6, 6),
     /** The favourite heart: plain, and filled in the palette's wine. */
     HEART(36, 11, 5, 5),
     HEART_FAVORITE(42, 11, 5, 5),
@@ -71,12 +118,12 @@ enum ChatIconSheet {
      * selected pair is two rows taller: the tab it draws stands that
      * much above the resting ones.
      */
-    TAB_LEFT(0, 59, 4, 18),
-    TAB_RIGHT(5, 59, 4, 18),
-    TAB_HOVER_LEFT(10, 59, 4, 18),
-    TAB_HOVER_RIGHT(15, 59, 4, 18),
-    TAB_SELECTED_LEFT(20, 56, 4, 21),
-    TAB_SELECTED_RIGHT(25, 56, 4, 21),
+    TAB_LEFT(0, 59, 4, 19),
+    TAB_RIGHT(5, 59, 4, 19),
+    TAB_HOVER_LEFT(10, 59, 4, 19),
+    TAB_HOVER_RIGHT(15, 59, 4, 19),
+    TAB_SELECTED_LEFT(20, 56, 4, 22),
+    TAB_SELECTED_RIGHT(25, 56, 4, 22),
     /**
      * The hatch laid over message rows the history does not reach: a
      * 45° line every eight texels. The pattern's period divides the
@@ -105,8 +152,8 @@ enum ChatIconSheet {
     CHEVRON_5_HOVER(6, 55, 5, 3);
 
     static final String TEXTURE_PATH = "textures/gui/chat.png";
-    static final int SHEET_WIDTH = 97;
-    static final int SHEET_HEIGHT = 90;
+    static final int SHEET_WIDTH = 108;
+    static final int SHEET_HEIGHT = 92;
     private static final ResourceLocation TEXTURE =
             new ResourceLocation("losttales", TEXTURE_PATH);
 
@@ -287,6 +334,43 @@ enum ChatIconSheet {
     /** The sprite at its own size, 1:1, at the given opacity. */
     void draw(float x, float y, int alpha) {
         draw(this.u, this.v, this.width, this.height, x, y, alpha);
+    }
+
+    /**
+     * A strip of the sheet stretched over a region: {@code width} by
+     * {@code height} texels from {@code (u, v)} laid over the region at
+     * the given opacity. Only ever one row or one column stretched along
+     * its length, which the sheet's nearest-texel sampling keeps flat; a
+     * framed button's edges are drawn this way.
+     */
+    static void drawStretched(int u, int v, int width, int height, float x,
+                              float y, float regionWidth, float regionHeight,
+                              int alpha) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || regionWidth <= 0.0F || regionHeight <= 0.0F
+                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        minecraft.getTextureManager().bindTexture(TEXTURE);
+        LostTalesChatVisualStyle.beginContent();
+        GL11.glColor4f(1.0F, 1.0F, 1.0F,
+                MathHelper.clamp_float(alpha / 255.0F, 0.0F, 1.0F));
+        try {
+            float u0 = u / (float)SHEET_WIDTH;
+            float u1 = (u + width) / (float)SHEET_WIDTH;
+            float v0 = v / (float)SHEET_HEIGHT;
+            float v1 = (v + height) / (float)SHEET_HEIGHT;
+            Tessellator tessellator = Tessellator.instance;
+            tessellator.startDrawingQuads();
+            tessellator.addVertexWithUV(x, y + regionHeight, 0.0D, u0, v1);
+            tessellator.addVertexWithUV(x + regionWidth, y + regionHeight,
+                    0.0D, u1, v1);
+            tessellator.addVertexWithUV(x + regionWidth, y, 0.0D, u1, v0);
+            tessellator.addVertexWithUV(x, y, 0.0D, u0, v0);
+            tessellator.draw();
+        } finally {
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        }
     }
 
     /** Any cell of the sheet at its own size, 1:1, at the given opacity. */

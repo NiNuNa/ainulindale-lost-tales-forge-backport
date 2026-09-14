@@ -38,9 +38,15 @@ import org.lwjgl.opengl.GL11;
  * the screen and not into it, which would tilt a block's faces against
  * the lamps — and every normal is kept at unit length, since a block
  * shrunk to chat size would otherwise catch a fraction of the light.
- * Its shadow takes no part in depth: a block's faces lean toward the
- * eye, and a copy of it one pixel down and right would stand nearer
- * than the block along its right-hand side and cover it there.</p>
+ * Its shadow writes no depth: a block's faces lean toward the eye, and
+ * a copy of it one pixel down and right would stand nearer than the
+ * block along its right-hand side and cover it there.</p>
+ *
+ * <p>In a window cutting holes for its framed buttons, the icon and its
+ * shadow take their depth from a slab behind everything the window
+ * draws ({@link LostTalesChatOverlayRenderer#squeezeItemDepth}): the
+ * icon still sorts its own faces, neither reaches into a hole, and what
+ * the window draws after them covers them as it covers the words.</p>
  */
 final class ChatItemRenderer {
     private static final float VANILLA_ICON_SIZE = 16.0F;
@@ -80,12 +86,14 @@ final class ChatItemRenderer {
         float scale = size / VANILLA_ICON_SIZE;
         int opacity = Math.min(255, alpha);
         // RenderItem leaves lighting on, the depth function and mask changed,
-        // and (for enchanted stacks) the glint's additive blend func behind;
-        // any of those garbles the text and head icon drawn after it. Saving
-        // and restoring the whole affected state is the only reliable fence.
+        // and (for enchanted stacks) the glint's additive blend func behind,
+        // and the icon may take a squeezed depth range; any of those garbles
+        // the text and head icon drawn after it. Saving and restoring the
+        // whole affected state is the only reliable fence.
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT
                 | GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_LIGHTING_BIT
-                | GL11.GL_CURRENT_BIT | GL11.GL_TEXTURE_BIT);
+                | GL11.GL_CURRENT_BIT | GL11.GL_TEXTURE_BIT
+                | GL11.GL_VIEWPORT_BIT);
         GL11.glPushMatrix();
         try {
             // The lamps are aimed in the plain screen frame, as the hotbar
@@ -102,12 +110,22 @@ final class ChatItemRenderer {
             // block shrunk to chat size catches a fraction of the light.
             GL11.glEnable(GL11.GL_NORMALIZE);
             GL11.glEnable(GL11.GL_BLEND);
+            boolean holes = LostTalesChatOverlayRenderer.squeezeItemDepth();
             if (shadow) {
                 // Nothing of the shadow may stand nearer than the icon it
-                // falls from, so it takes no part in depth at all.
-                GL11.glDisable(GL11.GL_DEPTH_TEST);
+                // falls from, so it writes no depth; among holes it is
+                // still tested against them.
+                if (holes) {
+                    GL11.glEnable(GL11.GL_DEPTH_TEST);
+                    GL11.glDepthMask(false);
+                } else {
+                    GL11.glDisable(GL11.GL_DEPTH_TEST);
+                }
             } else {
+                // Tested and written, so a block's own faces sort,
+                // whatever the chat around it does with depth.
                 GL11.glEnable(GL11.GL_DEPTH_TEST);
+                GL11.glDepthMask(true);
             }
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             LostTalesSilhouetteRenderState.beginConstantAlpha(

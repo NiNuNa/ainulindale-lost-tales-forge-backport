@@ -1097,7 +1097,7 @@ public final class LostTalesConfig {
                     discordPollIntervalSeconds,
                     2,
                     60,
-                    "Server only: how often each bound Discord channel is read for new messages, in seconds."
+                    "Server only: how often each bound Discord channel is read for new messages while the bot's gateway connection is down, in seconds. Lines said in the game are posted to Discord as soon as they are said, whatever this is."
             );
             // An older file bound one Discord channel through single keys.
             // They become entries of the list below once, and are dropped,

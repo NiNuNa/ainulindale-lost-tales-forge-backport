@@ -68,9 +68,7 @@ final class ChatInputLine {
 
     /**
      * Where the divider after the indicator stands: a gap past the
-     * indicator's last pixel of ink. The indicator's box ends here, so
-     * the divider parts the indicator from the well for the pointer as
-     * it does for the eye.
+     * indicator's frame.
      */
     static int dividerAfter(int indicatorInkRight) {
         return indicatorInkRight + ChatInputBar.BAR_GAP;

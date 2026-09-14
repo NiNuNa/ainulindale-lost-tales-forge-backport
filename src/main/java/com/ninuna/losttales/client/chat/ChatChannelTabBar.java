@@ -45,9 +45,10 @@ import org.lwjgl.opengl.GL11;
  * the restore {@code +} follows the last tab, since what it opens joins
  * that row, and the window's own controls are gathered against the
  * right edge beside the grip that moves it, in the order a title bar
- * reads them — the lock, a hairline, the settings cog and the close
- * cross, another hairline, then the grip. All of them keep their room
- * however many tabs there are, all of them are centred on the same row
+ * reads them — the lock, a hairline, the settings cog, the fullscreen
+ * control and the close cross, another hairline, then the grip. All of
+ * them keep their room however many tabs there are, all of them are
+ * centred on the same row
  * of the strip, and the bare stretch left between the two ends drags
  * the window as the grip does. Geometry is computed once per change of
  * inputs and reused by drawing and hit testing, so a frame allocates
@@ -188,12 +189,15 @@ final class ChatChannelTabBar {
     private static final int PLUS_WIDTH = ChatIconSheet.PLUS.getWidth();
     private static final int COG_WIDTH = ChatIconSheet.COG.getWidth();
     private static final int CLOSE_WIDTH = ChatIconSheet.CLOSE.getWidth();
+    private static final int FULLSCREEN_WIDTH =
+            ChatIconSheet.FULLSCREEN.getWidth();
     private static final int GRIP_WIDTH = ChatIconSheet.GRIP.getWidth();
     /**
-     * The tab search control at the row's left end: the sheet's chevron
-     * run, pointing down while its panel is away and folding up to a
-     * rule and over as the panel opens. Every frame is the same width,
-     * so the row's geometry does not move as it plays.
+     * The tab search control at the row's left end: a framed button with
+     * the sheet's chevron run centred in it, pointing down while its
+     * panel is away and folding up to a rule and over as the panel
+     * opens. The button keeps one size however the run plays, so the
+     * row's geometry does not move.
      */
     private static final ChatIconSheet[] SEARCH_FRAMES = {
             ChatIconSheet.CHEVRON_1, ChatIconSheet.CHEVRON_2,
@@ -203,8 +207,13 @@ final class ChatChannelTabBar {
             ChatIconSheet.CHEVRON_1_HOVER, ChatIconSheet.CHEVRON_2_HOVER,
             ChatIconSheet.CHEVRON_3_HOVER, ChatIconSheet.CHEVRON_4_HOVER,
             ChatIconSheet.CHEVRON_5_HOVER};
-    private static final int SEARCH_WIDTH =
-            SEARCH_FRAMES[0].getWidth();
+    /**
+     * The search button's square: the chevron's width with the frame's
+     * inset either side. Square, so the chevron's three rows stand in its
+     * middle exactly, three clear rows above and below them.
+     */
+    private static final int SEARCH_SIZE = SEARCH_FRAMES[0].getWidth()
+            + 2 * ChatFramedButton.INSET;
     /**
      * How far the strip reaches left of {@link Row#left}: the row is
      * laid out from the first thing standing in it, and the surface it
@@ -212,15 +221,15 @@ final class ChatChannelTabBar {
      */
     private static final int STRIP_INSET = 2;
     /**
-     * Clear space either side of the search control: the window's edge,
-     * this, the control, this again, and then the first tab.
+     * Clear space either side of the search button: the window's edge,
+     * this, the button, this again, and then the first tab.
      */
     private static final int SEARCH_MARGIN = 3;
-    /** Where the search control's ink begins, measured from the row's left. */
-    private static final int SEARCH_INSET = SEARCH_MARGIN - STRIP_INSET;
-    /** Where the row's tabs begin: past the search control and its gaps. */
+    /** Where the search button begins, measured from the row's left. */
+    private static final int SEARCH_LEFT = SEARCH_MARGIN - STRIP_INSET;
+    /** Where the row's tabs begin: past the search button and its gaps. */
     private static final int SEARCH_RUN =
-            SEARCH_INSET + SEARCH_WIDTH + SEARCH_MARGIN;
+            SEARCH_LEFT + SEARCH_SIZE + SEARCH_MARGIN;
     /** Room the grip keeps at the row's right end: its glyph and inset. */
     static final int MIN_GRIP_WIDTH = GRIP_WIDTH + GRIP_INSET;
     /**
@@ -308,8 +317,10 @@ final class ChatChannelTabBar {
      * artwork. A control the pointer leaves crosses back the same way,
      * so nothing in the strip ever swaps in one frame.
      */
+    private float searchFade;
     private float restoreFade;
     private float windowSettingsFade;
+    private float windowFullscreenFade;
     private float windowCloseFade;
     private float gripFade;
     /** Seconds since the row was last drawn; what the fades step by. */
@@ -347,8 +358,12 @@ final class ChatChannelTabBar {
     private boolean showRestore;
     private int lockX = -1;
     private int restoreX = -1;
-    /** Left edge of the window's own cog and cross; -1 when absent. */
+    /**
+     * Left edge of the window's own cog, fullscreen control and cross;
+     * -1 when absent.
+     */
     private int windowSettingsX = -1;
+    private int windowFullscreenX = -1;
     private int windowCloseX = -1;
     /** Left edge of the hairline between the last tab and the +. */
     private int tabDividerX = -1;
@@ -363,12 +378,13 @@ final class ChatChannelTabBar {
 
     /**
      * What a point in the row resolves to. {@code SETTINGS} and
-     * {@code CLOSE} carry a tab and act on it; {@code WINDOW_SETTINGS}
-     * and {@code WINDOW_CLOSE} carry none and act on the window.
+     * {@code CLOSE} carry a tab and act on it; {@code WINDOW_SETTINGS},
+     * {@code WINDOW_FULLSCREEN} and {@code WINDOW_CLOSE} carry none and
+     * act on the window.
      */
     enum HitKind {
         TAB, CLOSE, SETTINGS, SEARCH, LOCK, RESTORE, WINDOW_SETTINGS,
-        WINDOW_CLOSE, GRIP
+        WINDOW_FULLSCREEN, WINDOW_CLOSE, GRIP
     }
 
     static final class Hit {
@@ -433,11 +449,17 @@ final class ChatChannelTabBar {
         /** Whether a close cross is offered on the selected tab. */
         boolean closable;
         /**
-         * Whether the window's own cog and cross are offered. A locked
-         * window keeps the tabs and the size it has, so it offers
-         * neither; its padlock is what unlocks it again.
+         * Whether the window's own cog, fullscreen control and cross are
+         * offered. A locked window keeps the tabs and the size it has, so
+         * it offers none of them; its padlock is what unlocks it again.
          */
         boolean windowControls;
+        /**
+         * How far the window has travelled toward filling the screen,
+         * 0..1: the fullscreen control crosses from its outward corners
+         * to its inward ones with it.
+         */
+        float fullscreenShare;
         /** Whether the restore control is offered after the row. */
         boolean showRestore;
         /** Whether this row's tab search panel is open right now. */
@@ -474,6 +496,14 @@ final class ChatChannelTabBar {
          * itself after the drag stops.
          */
         boolean resizing;
+        /**
+         * Whether the window is gliding to or from filling the screen.
+         * Like a resize, the row then takes the layout it is given at
+         * once, so the tabs travel with the window's edges as one piece
+         * instead of easing after them; unlike one, it goes on answering
+         * the pointer, since no hand is on an edge.
+         */
+        boolean gliding;
     }
 
     /**
@@ -529,7 +559,10 @@ final class ChatChannelTabBar {
             }
             return new Hit(HitKind.TAB, tab.tab, tab.labelWidth > tab.labelRoom);
         }
-        if (hitsControl(localX, row.left + SEARCH_INSET, SEARCH_WIDTH)) {
+        // The search button answers across its frame's width, down the
+        // whole strip, as the strip's other controls answer across theirs.
+        int searchLeft = row.left + SEARCH_LEFT;
+        if (localX >= searchLeft && localX < searchLeft + SEARCH_SIZE) {
             return new Hit(HitKind.SEARCH, null);
         }
         if (hitsControl(localX, this.lockX, LOCK_WIDTH)) {
@@ -540,6 +573,9 @@ final class ChatChannelTabBar {
         }
         if (hitsControl(localX, this.windowSettingsX, COG_WIDTH)) {
             return new Hit(HitKind.WINDOW_SETTINGS, null);
+        }
+        if (hitsControl(localX, this.windowFullscreenX, FULLSCREEN_WIDTH)) {
+            return new Hit(HitKind.WINDOW_FULLSCREEN, null);
         }
         if (hitsControl(localX, this.windowCloseX, CLOSE_WIDTH)) {
             return new Hit(HitKind.WINDOW_CLOSE, null);
@@ -666,8 +702,13 @@ final class ChatChannelTabBar {
                 + STRIP_INSET;
         // Every tab's footprint is left out of it: a tab wears its own
         // surface in a single layer, never over this one.
+        // The search button stands in a hole of its own.
+        int searchLeft = row.offsetX + row.left + SEARCH_LEFT;
+        int searchTop = centredInStrip(bottom, SEARCH_SIZE);
         drawStripAround(row, tabs, row.offsetX + row.left - STRIP_INSET,
-                rowTop(bottom), stripRight, bottom - 1,
+                rowTop(bottom), stripRight, bottom - 1, searchLeft,
+                searchTop, searchLeft + SEARCH_SIZE,
+                searchTop + SEARCH_SIZE,
                 LostTalesChatVisualStyle.argb(
                         LostTalesChatVisualStyle.SURFACE_RGB,
                         scaled(LostTalesChatVisualStyle.SURFACE_ALPHA)));
@@ -771,13 +812,13 @@ final class ChatChannelTabBar {
             GL11.glPopMatrix();
             // The tab search sits at the row's left end, before the
             // first tab, where a browser keeps it.
-            drawSearch(row.offsetX + row.left + SEARCH_INSET, bottom,
-                    row.searchOpen,
+            drawSearch(searchLeft, searchTop, row.searchOpen,
                     hovered != null && hovered.kind == HitKind.SEARCH);
             // The window's own controls, in the order a title bar
-            // reads: the lock (drawn above), a hairline, its settings
-            // and close, another hairline, then the grip — all hanging
-            // from the edge as it really stands, like the grip.
+            // reads: the lock (drawn above), a hairline, its settings,
+            // fullscreen and close, another hairline, then the grip —
+            // all hanging from the edge as it really stands, like the
+            // grip.
             GL11.glPushMatrix();
             GL11.glTranslatef(this.endFraction, 0.0F, 0.0F);
             try {
@@ -790,6 +831,14 @@ final class ChatChannelTabBar {
                     drawEndControl(ChatIconSheet.COG, ChatIconSheet.COG_HOVER,
                             this.windowSettingsFade,
                             row.offsetX + this.windowSettingsX, bottom);
+                }
+                if (this.windowFullscreenX >= 0) {
+                    this.windowFullscreenFade = fade(
+                            this.windowFullscreenFade, hovered,
+                            HitKind.WINDOW_FULLSCREEN);
+                    drawFullscreenControl(row.fullscreenShare,
+                            this.windowFullscreenFade,
+                            row.offsetX + this.windowFullscreenX, bottom);
                 }
                 if (this.windowCloseX >= 0) {
                     this.windowCloseFade = fade(this.windowCloseFade, hovered,
@@ -860,15 +909,20 @@ final class ChatChannelTabBar {
      * the chamfer its border artwork cuts, where the strip shows. Read
      * column by column, so wherever tabs overlap — a carried one over
      * its neighbours — the highest of them decides where the strip stops.
+     * The search button's footprint, a box standing in the strip, is left
+     * out too, all but its four corner pixels, which the frame's rounding
+     * leaves to the strip.
      */
     private void drawStripAround(Row row, List<Tab> tabs, float left,
                                  float top, float right, float bottom,
+                                 float holeLeft, float holeTop,
+                                 float holeRight, float holeBottom,
                                  int argb) {
         int count = tabs.size();
         float[] lefts = new float[count];
         float[] rights = new float[count];
         int[] tops = new int[count];
-        float[] edges = new float[count * 4 + 2];
+        float[] edges = new float[count * 4 + 6];
         int edgeCount = 0;
         edges[edgeCount++] = left;
         edges[edgeCount++] = right;
@@ -884,6 +938,13 @@ final class ChatChannelTabBar {
                 if (edge > left && edge < right) {
                     edges[edgeCount++] = edge;
                 }
+            }
+        }
+        float[] holeEdges = {holeLeft, holeLeft + 1.0F, holeRight - 1.0F,
+                holeRight};
+        for (float edge : holeEdges) {
+            if (edge > left && edge < right) {
+                edges[edgeCount++] = edge;
             }
         }
         java.util.Arrays.sort(edges, 0, edgeCount);
@@ -902,6 +963,23 @@ final class ChatChannelTabBar {
                 boolean chamfer = middle < lefts[tabIndex] + 1.0F
                         || middle >= rights[tabIndex] - 1.0F;
                 cover = Math.min(cover, tops[tabIndex] + (chamfer ? 1 : 0));
+            }
+            if (middle >= holeLeft && middle < holeRight) {
+                // Above and below the button; its corner pixels stay the
+                // strip's.
+                boolean corner = middle < holeLeft + 1.0F
+                        || middle >= holeRight - 1.0F;
+                float cutTop = holeTop + (corner ? 1.0F : 0.0F);
+                float cutBottom = holeBottom - (corner ? 1.0F : 0.0F);
+                if (Math.min(cover, cutTop) > top) {
+                    LostTalesChatOverlayRenderer.fillRect(from, top, to,
+                            Math.min(cover, cutTop), argb);
+                }
+                if (cover > Math.max(top, cutBottom)) {
+                    LostTalesChatOverlayRenderer.fillRect(from,
+                            Math.max(top, cutBottom), to, cover, argb);
+                }
+                continue;
             }
             if (cover > top) {
                 LostTalesChatOverlayRenderer.fillRect(from, top, to, cover,
@@ -1403,14 +1481,16 @@ final class ChatChannelTabBar {
         double[] exact = new double[tabs.size()];
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
-            if (!animate || isCarried(row, tab.tab) || row.resizing) {
+            if (!animate || isCarried(row, tab.tab) || row.resizing
+                    || row.gliding) {
                 // Its own size at once: a carried tab is not being
                 // resized but carried, and a tab in a window whose edge
-                // is under the hand is part of the very geometry being
-                // dragged — a width still easing there is a width
-                // trailing the input, and the whole row must follow the
-                // edge as one layout rather than as tabs chasing
-                // targets of their own.
+                // is under the hand — or gliding to or from filling the
+                // screen — is part of the very geometry that is moving:
+                // a width still easing there is a width trailing the
+                // window, and the whole row must follow its edge as one
+                // layout rather than as tabs chasing targets of their
+                // own.
                 tab.drawnWidth = (float)tab.exactWidth;
             } else {
                 tab.drawnWidth = eased(tab.drawnWidth, (float)tab.exactWidth,
@@ -1450,10 +1530,10 @@ final class ChatChannelTabBar {
                 // instead of arriving the instant the button comes up.
                 tab.slide = (float)(draggedLeft(row, tab) - row.left
                         - tab.drawnLeftOffset);
-            } else if (!animate || row.resizing) {
-                // A resize snaps travel too: a slide still paying off
-                // mid-drag would hold part of the row off the layout
-                // the edge is being dragged to.
+            } else if (!animate || row.resizing || row.gliding) {
+                // A resize or a glide snaps travel too: a slide still
+                // paying off would hold part of the row off the layout
+                // the edge is moving to.
                 tab.slide = 0.0F;
             } else {
                 tab.slide = eased(tab.slide, 0.0F, elapsed);
@@ -1943,6 +2023,29 @@ final class ChatChannelTabBar {
                 scaled(0xFF));
     }
 
+    /**
+     * The window's fullscreen control, centred in the strip like the cog
+     * and the cross beside it: four corners pointing out while the
+     * window keeps its own size, pointing in while it fills the screen.
+     * The two glyphs cross over exactly as far as the window has
+     * travelled between its two boxes, so the control turns with the
+     * window rather than swapping in a frame, and each crosses to its
+     * lit artwork under the pointer as every end control does.
+     */
+    private void drawFullscreenControl(float share, float fade, int x,
+                                       int rowBottom) {
+        int alpha = scaled(0xFF);
+        int y = centredInStrip(rowBottom,
+                ChatIconSheet.FULLSCREEN.getHeight());
+        float inward = Math.max(0.0F, Math.min(1.0F, share));
+        ChatIconSheet.drawPairWithShadow(ChatIconSheet.FULLSCREEN,
+                ChatIconSheet.FULLSCREEN_HOVER, fade, x, y,
+                Math.round(alpha * (1.0F - inward)));
+        ChatIconSheet.drawPairWithShadow(ChatIconSheet.FULLSCREEN_EXIT,
+                ChatIconSheet.FULLSCREEN_EXIT_HOVER, fade, x, y,
+                Math.round(alpha * inward));
+    }
+
     /** Whether the pointer is on that control of that very tab. */
     private static boolean onControl(Hit hovered, Tab tab, HitKind kind) {
         return hovered != null && hovered.kind == kind
@@ -1967,16 +2070,23 @@ final class ChatChannelTabBar {
     }
 
     /**
-     * The tab search control: the chevron whose run says whether its
-     * panel is out, centred in the strip like every other control the
-     * row carries. The frames differ in height, so the run is centred in
-     * the strip's control band rather than pinned to one row of it.
+     * The tab search control: a framed button in the hole the strip
+     * leaves for it, lit while the pointer is on it or its panel is out —
+     * the way a main-menu button lights while it is hovered or chosen —
+     * with the chevron whose run says whether the panel is out centred in
+     * the frame.
      */
-    private void drawSearch(int x, int rowBottom, boolean open,
+    private void drawSearch(int left, int top, boolean open,
                             boolean hovered) {
+        this.searchFade = LostTalesChatVisualStyle.hoverFade(this.searchFade,
+                hovered || open, this.frameElapsed);
+        ChatFramedButton.drawSurface(left, top, SEARCH_SIZE, SEARCH_SIZE,
+                this.searchFade, scaled(TAB_SURFACE_ALPHA));
         this.searchChevron.advance(open, hovered);
-        this.searchChevron.draw(x, rowTop(rowBottom), SEARCH_WIDTH,
-                ROW_HEIGHT - 1, scaled(0xFF));
+        this.searchChevron.draw(left, top, SEARCH_SIZE, SEARCH_SIZE,
+                scaled(0xFF));
+        ChatFramedButton.drawInk(left, top, SEARCH_SIZE, SEARCH_SIZE,
+                this.searchFade, scaled(0xFF));
     }
 
     /** The drag handle at the strip's right end, where a title bar keeps it. */
@@ -2010,6 +2120,7 @@ final class ChatChannelTabBar {
             this.lockX = -1;
             this.restoreX = -1;
             this.windowSettingsX = -1;
+            this.windowFullscreenX = -1;
             this.windowCloseX = -1;
             this.tabDividerX = -1;
             this.firstDividerX = -1;
@@ -2254,15 +2365,18 @@ final class ChatChannelTabBar {
         if (row.windowControls) {
             this.windowSettingsX = controlX;
             controlX += COG_WIDTH + END_CONTROL_GAP;
+            this.windowFullscreenX = controlX;
+            controlX += FULLSCREEN_WIDTH + END_CONTROL_GAP;
             this.windowCloseX = controlX;
             controlX += CLOSE_WIDTH + END_CONTROL_GAP;
             this.secondDividerX = controlX;
             controlX += DIVIDER_WIDTH + END_CONTROL_GAP;
         } else {
             // A locked window keeps its tabs, its size and its place, so
-            // it offers neither control; its lock alone divides off the
-            // grip.
+            // it offers none of its controls; its lock alone divides off
+            // the grip.
             this.windowSettingsX = -1;
+            this.windowFullscreenX = -1;
             this.windowCloseX = -1;
             this.secondDividerX = -1;
         }
@@ -2494,7 +2608,8 @@ final class ChatChannelTabBar {
     private static int windowControlsWidth(boolean unlocked) {
         return LOCK_WIDTH + END_CONTROL_GAP
                 + DIVIDER_WIDTH + END_CONTROL_GAP
-                + (unlocked ? COG_WIDTH + END_CONTROL_GAP + CLOSE_WIDTH
+                + (unlocked ? COG_WIDTH + END_CONTROL_GAP
+                        + FULLSCREEN_WIDTH + END_CONTROL_GAP + CLOSE_WIDTH
                         + END_CONTROL_GAP + DIVIDER_WIDTH + END_CONTROL_GAP
                         : 0);
     }
@@ -2691,7 +2806,9 @@ final class ChatChannelTabBar {
         net.minecraft.client.gui.ScaledResolution resolution =
                 new net.minecraft.client.gui.ScaledResolution(minecraft,
                         minecraft.displayWidth, minecraft.displayHeight);
-        ChatWindowPlacement.Box box = ChatWindowPlacement.windowBounds(
+        // Measured in the window's own box: a window filling the screen
+        // goes back to it, and must still hold every tab it took there.
+        ChatWindowPlacement.Box box = ChatWindowPlacement.restingBounds(
                 window, minecraft, resolution.getScaledWidth(),
                 resolution.getScaledHeight());
         // The row spans the window minus the two-pixel insets the screen

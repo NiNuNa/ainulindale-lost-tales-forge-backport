@@ -62,6 +62,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatConsoleSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatHistorySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatReactionSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatDeliveryMarkPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigResultPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -332,6 +333,12 @@ public class LostTalesCommonProxy {
 
     /** The reactions on a message on screen changed; the client redraws its line. */
     public void handleChatReactions(LostTalesChatReactionSyncPacket packet) {}
+
+    /**
+     * How the Discord post of a line this player said is going; the
+     * client marks its own line.
+     */
+    public void handleChatDeliveryMark(LostTalesChatDeliveryMarkPacket packet) {}
 
     public void handleChatHistory(LostTalesChatHistorySyncPacket packet) {}
 

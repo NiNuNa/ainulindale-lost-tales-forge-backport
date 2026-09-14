@@ -47,6 +47,8 @@ final class ChatStackRows {
     private int dividerIndex = -1;
     /** The gap under the divider's own line, inside the divider's row. */
     private int dividerGapBelow;
+    /** The height reaction rows were laid out at: it follows the display. */
+    private int reactionHeight;
 
     /** Lays the rows of a view's line list out, the divider's row included. */
     void reset(List<ChatLine> lines, int dividerIndex) {
@@ -55,6 +57,7 @@ final class ChatStackRows {
         this.dividerIndex = dividerIndex;
         this.dividerGapBelow = dividerIndex >= 0
                 ? gapBeside(lines, dividerIndex) : 0;
+        this.reactionHeight = reactionRowHeight();
         int rows = this.sourceSize + (dividerIndex >= 0 ? 1 : 0);
         ensureCapacity(rows);
         this.count = rows;
@@ -66,7 +69,7 @@ final class ChatStackRows {
             } else {
                 int line = LostTalesChatOverlayRenderer.lineOfRow(row,
                         dividerIndex);
-                height = heightOf(lines.get(line));
+                height = heightOf(lines.get(line), this.reactionHeight);
             }
             this.tops[row + 1] = this.tops[row] + height;
         }
@@ -94,19 +97,49 @@ final class ChatStackRows {
         }
     }
 
-    /** True when the rows describe the given list with the given divider. */
+    /**
+     * True when the rows describe the given list with the given divider,
+     * at the height a reaction row takes on the display as it is now.
+     */
     boolean describes(List<ChatLine> lines, int size, int dividerIndex) {
         return this.source == lines && this.sourceSize == size
-                && this.dividerIndex == dividerIndex;
+                && this.dividerIndex == dividerIndex
+                && this.reactionHeight == reactionRowHeight();
     }
 
     /**
      * The height a line's row takes: {@link #SPACER_HEIGHT} for a blank
-     * row, between two runs or beside a day's rule, and a whole line for
-     * any other.
+     * row, between two runs or beside a day's rule, a message's reaction
+     * row as tall as its chips need ({@link #reactionRowHeight}), and a
+     * whole line for any other.
      */
     static int heightOf(ChatLine line) {
-        return ChatWindowLines.isSpacer(line) ? SPACER_HEIGHT : LINE_HEIGHT;
+        return heightOf(line, reactionRowHeight());
+    }
+
+    private static int heightOf(ChatLine line, int reactionHeight) {
+        if (ChatWindowLines.isSpacer(line)) {
+            return SPACER_HEIGHT;
+        }
+        return line != null && ChatReactionMarker.isReactionRow(
+                line.func_151461_a()) ? reactionHeight : LINE_HEIGHT;
+    }
+
+    /**
+     * How tall a reaction row is on this display: a whole line, or as
+     * tall as its chips — framed buttons drawn at the chat's small size —
+     * where they cannot shrink into one: at GUI scale 1, which has no
+     * smaller size, and at 4, where three quarters of a chip is more than
+     * a line.
+     */
+    static int reactionRowHeight() {
+        return reactionRowHeight(LostTalesChatVisualStyle.stackSmallScale());
+    }
+
+    /** As above for small text drawn at {@code smallScale} of the words. */
+    static int reactionRowHeight(float smallScale) {
+        return Math.max(LINE_HEIGHT, (int)Math.ceil(
+                ChatReactionMarker.HEIGHT * smallScale - 0.001F));
     }
 
     /**

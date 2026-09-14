@@ -390,7 +390,9 @@ public final class LostTalesChatService {
         // Discord renders, share tokens as the text they were typed as.
         // The message's own id and the reply it resolved travel with it,
         // so the post can be linked to its Discord copy and a reply can
-        // point at the Discord original.
+        // point at the Discord original; so does the sender's id, since
+        // the sender alone is told when the post is slow or will not
+        // arrive.
         if (DiscordBridgePolicy.relaysOutbound(ChatMessageOrigin.PLAYER, channel)) {
             LostTalesDiscordBridge.getInstance().relayToDiscord(channel,
                     factionId,
@@ -399,7 +401,7 @@ public final class LostTalesChatService {
                             presentation.title),
                     DiscordAvatarUrl.forPlayer(sender),
                     DiscordMessageSanitizer.outbound(message),
-                    packet.getMessageId(), reply);
+                    packet.getMessageId(), reply, sender.getUniqueID());
         }
     }
 

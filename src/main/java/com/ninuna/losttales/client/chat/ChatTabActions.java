@@ -231,6 +231,19 @@ final class ChatTabActions {
     }
 
     /**
+     * Lets a window fill the screen, or gives it back the place and size
+     * it had, which filling the screen leaves as they were. The window
+     * comes to the front either way, since it is the one being looked at.
+     */
+    void setWindowFullscreen(ChatWindow window, boolean fullscreen) {
+        if (window == null) {
+            return;
+        }
+        ChatWindowLayout.raise(window.getId());
+        ChatWindowLayout.setFullscreen(window.getId(), fullscreen, true);
+    }
+
+    /**
      * Locks or unlocks a window, and with it whether it is stuck to a
      * neighbour: a window locked while it touches another sticks to it
      * and moves with it from then on, and unlocking lets go again. The
@@ -269,7 +282,10 @@ final class ChatTabActions {
                 continue;
             }
             ChatWindow candidate = ChatWindowLayout.window(other.windowId);
-            if (candidate != null && touchingSide(frame, candidate) != null) {
+            // A window filling the screen has no edge of its own to be
+            // stuck to.
+            if (candidate != null && !candidate.isFullscreen()
+                    && touchingSide(frame, candidate) != null) {
                 return candidate;
             }
         }

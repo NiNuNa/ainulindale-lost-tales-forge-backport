@@ -1193,6 +1193,12 @@ public final class LostTalesChatPresentation {
      */
     private static final Map<Integer, HoverFade> HOVER_FADES =
             new HashMap<Integer, HoverFade>();
+    /**
+     * How far each reaction chip has lit under the pointer, by message
+     * and emoji, kept and forgotten the same way.
+     */
+    private static final Map<String, HoverFade> CHIP_FADES =
+            new HashMap<String, HoverFade>();
     private static long frameIndex;
     private static long frameNanos;
     private static double frameElapsedSeconds;
@@ -1217,6 +1223,12 @@ public final class LostTalesChatPresentation {
         while (stale.hasNext()) {
             if (stale.next().frame < frameIndex - 1) {
                 stale.remove();
+            }
+        }
+        Iterator<HoverFade> staleChips = CHIP_FADES.values().iterator();
+        while (staleChips.hasNext()) {
+            if (staleChips.next().frame < frameIndex - 1) {
+                staleChips.remove();
             }
         }
     }
@@ -1248,6 +1260,37 @@ public final class LostTalesChatPresentation {
         }
         if (fade.value <= 0.0F && !hovered) {
             HOVER_FADES.remove(key);
+            return 0.0F;
+        }
+        return fade.value;
+    }
+
+    /**
+     * The share of its lit artwork a reaction chip wears this frame, on
+     * the crossfade and the clock a message's shade steps on: a chip
+     * under the pointer crosses to it and back rather than switching.
+     */
+    static float chipHoverFade(ChatReactionMarker.Data chip,
+                               boolean hovered) {
+        if (chip == null || !LostTalesConfig.enableChatAnimations) {
+            return hovered ? 1.0F : 0.0F;
+        }
+        String key = chip.messageId + ":" + chip.key;
+        HoverFade fade = CHIP_FADES.get(key);
+        if (fade == null) {
+            if (!hovered) {
+                return 0.0F;
+            }
+            fade = new HoverFade();
+            CHIP_FADES.put(key, fade);
+        }
+        if (fade.frame != frameIndex) {
+            fade.frame = frameIndex;
+            fade.value = LostTalesChatVisualStyle.hoverFade(fade.value,
+                    hovered, frameElapsedSeconds);
+        }
+        if (fade.value <= 0.0F && !hovered) {
+            CHIP_FADES.remove(key);
             return 0.0F;
         }
         return fade.value;
@@ -1337,6 +1380,7 @@ public final class LostTalesChatPresentation {
         lastCommandEchoLineId = 0;
         lastCommandEcho = null;
         HOVER_FADES.clear();
+        CHIP_FADES.clear();
         ChatSpoilerMarker.clear();
     }
 
@@ -1363,6 +1407,7 @@ public final class LostTalesChatPresentation {
         commandAnswered = false;
         ANSWERED_COMMANDS.clear();
         HOVER_FADES.clear();
+        CHIP_FADES.clear();
         frameNanos = 0L;
         commandTab = null;
         commandUntilMillis = 0L;

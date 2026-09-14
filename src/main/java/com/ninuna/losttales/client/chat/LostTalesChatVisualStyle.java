@@ -15,6 +15,7 @@ import java.util.List;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
+import org.lwjgl.opengl.GL11;
 
 /**
  * Lost Tales' ivory text and plum-black shadow treatment for chat. Every
@@ -1106,65 +1107,97 @@ final class LostTalesChatVisualStyle {
     }
 
     /**
-     * One reaction chip: a pill one pixel taller than the emoji on
-     * either side, centred in its row, corners cut, holding the emoji at
-     * its native size and the count. A chip the reader is in wears the accent on its
-     * edge and its count; the hovered one takes the hover fill, the way
-     * every panel row in the palette does. An emoji the registry lacks
-     * is drawn as {@link #drawUnknownEmoji}.
+     * One reaction chip: a framed button holding the emoji at its native
+     * size and the count, the emoji's box the frame's inset in from every
+     * edge and the count's capitals half a pixel above the box's middle,
+     * the text's top at {@code y}. A chip the reader is in stands lit, the
+     * way a chosen main-menu button does, its count in the accent; the
+     * pointer lights any other on the controls' crossfade. Drawn half a
+     * step in front of the hole the history leaves for it
+     * ({@link LostTalesChatOverlayRenderer#CHIP_DEPTH}). An emoji the
+     * registry lacks is drawn as {@link #drawUnknownEmoji}.
      */
     private static void drawReactionChip(FontRenderer font,
                                          ChatReactionMarker.Data chip,
                                          int x, int y, int alpha,
                                          boolean hovered, boolean colours) {
         int left = x;
-        int right = x + chip.width;
-        int top = y + LostTalesChatOverlayRenderer.centredBoxTop(
-                ChatReactionMarker.HEIGHT);
-        int bottom = top + ChatReactionMarker.HEIGHT;
+        int top = y - ChatReactionMarker.TEXT_DROP;
         int accent = LostTalesColors.rgb(LostTalesColors.HONEY);
-        int fill = argb(SURFACE_RGB, Math.round(alpha * 0.9F));
-        int edge = argb(chip.mine && colours ? accent : hovered ? IVORY
-                : LostTalesColors.rgb(LostTalesColors.BORDER_DIM), alpha);
-        Gui.drawRect(left + 1, top + 1, right - 1, bottom - 1, fill);
-        if (hovered) {
-            // The hover wash panel rows wear, at its own opacity, laid
-            // over the chip's fill rather than in place of it, so the
-            // ivory count stays readable on it.
-            Gui.drawRect(left + 1, top + 1, right - 1, bottom - 1,
-                    argb(LostTalesColors.rgb(LostTalesColors.PANEL_HOVER),
-                            Math.round((LostTalesColors.PANEL_HOVER >>> 24)
-                                    * alpha / 255.0F)));
+        float lit = chip.mine ? 1.0F
+                : LostTalesChatPresentation.chipHoverFade(chip, hovered);
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(0.0F, 0.0F,
+                    LostTalesChatOverlayRenderer.CHIP_DEPTH);
+            ChatFramedButton.drawSurface(left, top, chip.width,
+                    ChatReactionMarker.HEIGHT, lit,
+                    Math.round(alpha * INSET_ALPHA / 255.0F));
+            beginContent();
+            int emojiTop = chipEmojiTop(top);
+            if (chip.emoji != null) {
+                ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(),
+                        chip.emoji, left + ChatReactionMarker.PAD, emojiTop,
+                        ChatInlineIcons.CONTENT_SIZE, alpha);
+            } else {
+                drawUnknownEmoji(font, left + ChatReactionMarker.PAD,
+                        emojiTop, y, alpha);
+            }
+            beginContent();
+            drawColored(font, chip.countText(), left + ChatReactionMarker.PAD
+                    + ChatReactionMarker.ICON + ChatReactionMarker.GAP, y,
+                    chip.mine && colours ? accent : IVORY, alpha);
+            ChatFramedButton.drawInk(left, top, chip.width,
+                    ChatReactionMarker.HEIGHT, lit, alpha);
+        } finally {
+            GL11.glPopMatrix();
         }
-        Gui.drawRect(left + 1, top, right - 1, top + 1, edge);
-        Gui.drawRect(left + 1, bottom - 1, right - 1, bottom, edge);
-        Gui.drawRect(left, top + 1, left + 1, bottom - 1, edge);
-        Gui.drawRect(right - 1, top + 1, right, bottom - 1, edge);
-        beginContent();
-        int emojiTop = chipEmojiTop(top);
-        if (chip.emoji != null) {
-            ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(), chip.emoji,
-                    left + ChatReactionMarker.PAD, emojiTop,
-                    ChatInlineIcons.CONTENT_SIZE, alpha);
-        } else {
-            drawUnknownEmoji(font, left + ChatReactionMarker.PAD, emojiTop,
-                    y, alpha);
-        }
-        beginContent();
-        drawColored(font, chip.countText(), left + ChatReactionMarker.PAD
-                + ChatReactionMarker.ICON + ChatReactionMarker.GAP, y,
-                chip.mine && colours ? accent : IVORY, alpha);
     }
 
     /**
      * Where a reaction chip's emoji starts, for a chip starting at
-     * {@code chipTop}: a pixel of the chip's edge above it and below, so
-     * it is centred in the chip rather than on the capitals, which would
-     * stand it on the chip's top edge.
+     * {@code chipTop}: the frame's inset below the chip's top edge, and
+     * the same inset above its foot, so it stands in the chip's middle.
      */
     static int chipEmojiTop(int chipTop) {
         return chipTop
                 + (ChatReactionMarker.HEIGHT - ChatReactionMarker.ICON) / 2;
+    }
+
+    /**
+     * Where a reaction row's chips stand in its text space, two numbers
+     * to a chip — its left edge and its width — found by the walk that
+     * draws the row, so the holes cut for them fit the chips exactly.
+     */
+    static int[] chipBoxes(FontRenderer font, IChatComponent row,
+                           boolean chatOpen) {
+        if (font == null || row == null) {
+            return new int[0];
+        }
+        int[] boxes = new int[8];
+        int count = 0;
+        int cursor = 0;
+        for (Object value : row) {
+            if (!(value instanceof IChatComponent)) {
+                continue;
+            }
+            IChatComponent part = (IChatComponent)value;
+            if (ChatPrefixMarker.isHidden(part, chatOpen)) {
+                continue;
+            }
+            ChatReactionMarker.Data reaction = ChatReactionMarker.decode(part);
+            if (reaction != null) {
+                if (count + 2 > boxes.length) {
+                    boxes = java.util.Arrays.copyOf(boxes, boxes.length * 2);
+                }
+                boxes[count++] = cursor;
+                boxes[count++] = reaction.width;
+                cursor += reaction.width;
+                continue;
+            }
+            cursor += partWidth(font, part, chatOpen);
+        }
+        return java.util.Arrays.copyOf(boxes, count);
     }
 
     /** The glyph that stands in for an emoji the game has no sprite for. */

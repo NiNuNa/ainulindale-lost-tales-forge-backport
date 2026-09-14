@@ -34,7 +34,7 @@ import java.util.UUID;
  *
  * <pre>
  * window w1 locked=false x=0.00 y=0.00 active=console tabs=console,admin
- * window w2 locked=true x=62.50 y=100.00 lines=12.40 width=320 active=all tabs=all,ooc,party link=w1:above
+ * window w2 locked=true x=62.50 y=100.00 lines=12.40 width=320 fullscreen=true active=all tabs=all,ooc,party link=w1:above
  * feed x=0.00 y=100.00
  * toolbar collapsed=false
  * closed faction
@@ -237,6 +237,7 @@ public final class ChatWindowLayoutStore {
         // which is what every file written before resizing carries.
         double maxLines = 0.0D;
         int width = 0;
+        boolean fullscreen = false;
         for (int index = 2; index < parts.length; index++) {
             String part = parts[index];
             int equals = part.indexOf('=');
@@ -274,10 +275,13 @@ public final class ChatWindowLayoutStore {
                 maxLines = parseLines(value);
             } else if ("width".equals(key)) {
                 width = parseChatWidth(value);
+            } else if ("fullscreen".equals(key)) {
+                fullscreen = "true".equalsIgnoreCase(value);
             }
         }
         return new ChatWindowLayout.WindowSpec(id, tabs, active, locked,
-                offsetX, offsetY, linkTarget, linkSide, maxLines, width);
+                offsetX, offsetY, linkTarget, linkSide, maxLines, width,
+                fullscreen);
     }
 
     /** A stored chat width; anything unreadable follows the slider. */
@@ -327,6 +331,9 @@ public final class ChatWindowLayoutStore {
             }
             if (spec.width > 0) {
                 line.append(" width=").append(spec.width);
+            }
+            if (spec.fullscreen) {
+                line.append(" fullscreen=true");
             }
             if (spec.activeTab != null) {
                 line.append(" active=").append(spec.activeTab.id());

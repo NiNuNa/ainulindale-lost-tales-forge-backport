@@ -56,6 +56,60 @@ public final class ChatIconSheetTest {
     }
 
     /**
+     * A cell holds the whole of its artwork: no texel just outside it
+     * touches one inside it, sideways or at a corner. A re-export that
+     * grows a sprite past its cell — a speech bubble's tail below it —
+     * fails here instead of shipping cropped.
+     */
+    @Test
+    public void everyCellHoldsItsWholeArtwork() throws Exception {
+        BufferedImage sheet = readSheet();
+        for (ChatIconSheet icon : ChatIconSheet.values()) {
+            int u = icon.getTextureU();
+            int v = icon.getTextureV();
+            for (int y = v; y < v + icon.getHeight(); y++) {
+                for (int x = u; x < u + icon.getWidth(); x++) {
+                    if (!opaqueAt(sheet, x, y)) {
+                        continue;
+                    }
+                    for (int dy = -1; dy <= 1; dy++) {
+                        for (int dx = -1; dx <= 1; dx++) {
+                            int nx = x + dx;
+                            int ny = y + dy;
+                            boolean inside = nx >= u
+                                    && nx < u + icon.getWidth()
+                                    && ny >= v
+                                    && ny < v + icon.getHeight();
+                            assertFalse(icon + " is cut off: its artwork "
+                                            + "goes on at " + nx + "," + ny,
+                                    !inside && opaqueAt(sheet, nx, ny));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static boolean opaqueAt(BufferedImage sheet, int x, int y) {
+        return x >= 0 && y >= 0 && x < sheet.getWidth()
+                && y < sheet.getHeight()
+                && (sheet.getRGB(x, y) >>> 24) > 0;
+    }
+
+    private static BufferedImage readSheet() throws Exception {
+        InputStream stream = ChatIconSheetTest.class.getResourceAsStream(
+                "/assets/losttales/" + ChatIconSheet.TEXTURE_PATH);
+        assertNotNull("Chat icon sheet is missing", stream);
+        try {
+            BufferedImage sheet = ImageIO.read(stream);
+            assertNotNull("Chat icon sheet is not a readable PNG", sheet);
+            return sheet;
+        } finally {
+            stream.close();
+        }
+    }
+
+    /**
      * The bar paints a tab's surface itself and keeps only the border
      * pieces' <em>ink</em>, cutting everything under
      * {@link ChatChannelTabBar#TAB_INK_THRESHOLD} away at draw time —
@@ -78,6 +132,15 @@ public final class ChatIconSheetTest {
             assertInkOrPreview(sheet, ChatIconSheet.TAB_HOVER_RIGHT);
             assertInkOrPreview(sheet, ChatIconSheet.TAB_SELECTED_LEFT);
             assertInkOrPreview(sheet, ChatIconSheet.TAB_SELECTED_RIGHT);
+            // A framed button's corners are cut the same way.
+            assertInkOrPreview(sheet, ChatIconSheet.FRAME_TOP_LEFT);
+            assertInkOrPreview(sheet, ChatIconSheet.FRAME_TOP_RIGHT);
+            assertInkOrPreview(sheet, ChatIconSheet.FRAME_BOTTOM_LEFT);
+            assertInkOrPreview(sheet, ChatIconSheet.FRAME_BOTTOM_RIGHT);
+            assertInkOrPreview(sheet, ChatIconSheet.FRAME_LIT_TOP_LEFT);
+            assertInkOrPreview(sheet, ChatIconSheet.FRAME_LIT_TOP_RIGHT);
+            assertInkOrPreview(sheet, ChatIconSheet.FRAME_LIT_BOTTOM_LEFT);
+            assertInkOrPreview(sheet, ChatIconSheet.FRAME_LIT_BOTTOM_RIGHT);
         } finally {
             stream.close();
         }
@@ -127,9 +190,43 @@ public final class ChatIconSheetTest {
         // centred on the control from either side.
         assertSameSize(ChatIconSheet.TOGGLE_1, ChatIconSheet.TOGGLE_5);
         assertSameSize(ChatIconSheet.TOGGLE_2, ChatIconSheet.TOGGLE_4);
+        assertSameSize(ChatIconSheet.SEND, ChatIconSheet.SEND_HOVER);
+        assertSameSize(ChatIconSheet.FULLSCREEN,
+                ChatIconSheet.FULLSCREEN_HOVER);
+        assertSameSize(ChatIconSheet.FULLSCREEN_EXIT,
+                ChatIconSheet.FULLSCREEN_EXIT_HOVER);
+        // The fullscreen control crosses between its two glyphs on one
+        // spot, so they are one size.
+        assertSameSize(ChatIconSheet.FULLSCREEN,
+                ChatIconSheet.FULLSCREEN_EXIT);
+        // The send button takes the square the other bar buttons take.
+        assertSameSize(ChatIconSheet.EMOJI, ChatIconSheet.SEND);
+        // So do the map-marker and quest buttons, in both states.
+        assertSameSize(ChatIconSheet.EMOJI, ChatIconSheet.MAP_MARKER);
+        assertSameSize(ChatIconSheet.MAP_MARKER,
+                ChatIconSheet.MAP_MARKER_HOVER);
+        assertSameSize(ChatIconSheet.EMOJI, ChatIconSheet.QUEST);
+        assertSameSize(ChatIconSheet.QUEST, ChatIconSheet.QUEST_HOVER);
+        // A framed button's corners are one square in both colourways.
+        assertSameSize(ChatIconSheet.FRAME_TOP_LEFT,
+                ChatIconSheet.FRAME_TOP_RIGHT);
+        assertSameSize(ChatIconSheet.FRAME_TOP_LEFT,
+                ChatIconSheet.FRAME_BOTTOM_LEFT);
+        assertSameSize(ChatIconSheet.FRAME_TOP_LEFT,
+                ChatIconSheet.FRAME_BOTTOM_RIGHT);
+        assertSameSize(ChatIconSheet.FRAME_TOP_LEFT,
+                ChatIconSheet.FRAME_LIT_TOP_LEFT);
+        assertSameSize(ChatIconSheet.FRAME_LIT_TOP_LEFT,
+                ChatIconSheet.FRAME_LIT_TOP_RIGHT);
+        assertSameSize(ChatIconSheet.FRAME_LIT_TOP_LEFT,
+                ChatIconSheet.FRAME_LIT_BOTTOM_LEFT);
+        assertSameSize(ChatIconSheet.FRAME_LIT_TOP_LEFT,
+                ChatIconSheet.FRAME_LIT_BOTTOM_RIGHT);
         // The tab controls share one square.
         assertEquals(ChatIconSheet.CLOSE.getWidth(),
                 ChatIconSheet.COG.getWidth());
+        assertEquals(ChatIconSheet.CLOSE.getWidth(),
+                ChatIconSheet.FULLSCREEN.getWidth());
     }
 
     /**

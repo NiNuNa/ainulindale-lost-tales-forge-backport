@@ -909,6 +909,7 @@ public final class ClientChatChannelViews {
         invalidateCache();
         ChatGroupRuns.clear();
         ClientChatMessageIds.clear();
+        ClientChatDeliveryMarks.clear();
         ClientChatMessages.clear();
         ClientChatPendingEchoes.clear();
         ChatWindowLines.clear();
@@ -951,6 +952,7 @@ public final class ClientChatChannelViews {
         invalidateCache();
         ChatGroupRuns.clear();
         ClientChatMessageIds.clear();
+        ClientChatDeliveryMarks.clear();
         ClientChatMessages.clear();
         ClientChatPendingEchoes.clear();
         ChatWindowLines.clear();

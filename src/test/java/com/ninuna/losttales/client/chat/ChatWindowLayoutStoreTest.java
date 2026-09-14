@@ -41,6 +41,29 @@ public final class ChatWindowLayoutStoreTest {
     }
 
     /**
+     * A window filling the screen says so in its line and keeps its own
+     * place and size beside it, which is what it goes back to; a window
+     * without the word is at its own size, as every older file's are.
+     */
+    @Test
+    public void aWindowFillingTheScreenRoundTrips() {
+        ChatWindowLayoutStore.load(Arrays.asList(
+                "window w1 locked=false x=10.00 y=20.00 lines=6.00"
+                        + " fullscreen=true active=console tabs=console,admin",
+                "window w2 locked=false x=0.00 y=100.00 active=all tabs=all"));
+        ChatWindow first = ChatWindowLayout.window("w1");
+        assertTrue(first.isFullscreen());
+        assertEquals(10.0D, first.getOffsetX(), 0.0001D);
+        assertEquals(6.0D, first.getMaxLines(), 0.0001D);
+        assertFalse(ChatWindowLayout.window("w2").isFullscreen());
+        List<String> described = ChatWindowLayoutStore.describe();
+        assertTrue(described.get(1).contains(" fullscreen=true"));
+        assertFalse(described.get(2).contains("fullscreen"));
+        ChatWindowLayoutStore.load(described);
+        assertEquals(described, ChatWindowLayoutStore.describe());
+    }
+
+    /**
      * A window arranged around a channel the server defines is read at
      * start-up, when only the built-in channels exist, so its tab cannot
      * be resolved and is skipped. Once the server's channels are in

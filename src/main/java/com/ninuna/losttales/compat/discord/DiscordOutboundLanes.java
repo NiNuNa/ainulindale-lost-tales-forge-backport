@@ -11,7 +11,9 @@ import java.util.Map;
  * What the bridge has to send, one lane per webhook. Discord limits
  * each webhook on its own, so a limit on one must hold only that
  * webhook's posts: every lane keeps its items in order and a clock of
- * its own saying when it may next be worked, and the worker takes the
+ * its own saying when it may next be worked — the time Discord asked for
+ * after a limit, or a pause that grows with every failed send in a
+ * row — and the worker takes the
  * lanes that are due one after another. A lane holds at most
  * {@link #MAX_PER_LANE} items and refuses more, so a webhook that stays
  * limited cannot grow without bound. Worker thread only; nothing here
@@ -22,6 +24,12 @@ import java.util.Map;
 final class DiscordOutboundLanes<T> {
     /** Items a webhook may have waiting; past it the newest are refused. */
     static final int MAX_PER_LANE = 128;
+    /**
+     * The pause after a lane's first failed send in a row, doubling with
+     * each one after it up to {@link #MAX_RETRY_MILLIS}.
+     */
+    static final long MIN_RETRY_MILLIS = 5000L;
+    static final long MAX_RETRY_MILLIS = 60000L;
 
     private final Map<String, Lane<T>> lanes = new LinkedHashMap<String, Lane<T>>();
 
@@ -66,6 +74,7 @@ final class DiscordOutboundLanes<T> {
         Lane<T> lane = this.lanes.get(webhook);
         if (lane != null) {
             lane.items.poll();
+            lane.headFailures = 0;
         }
     }
 
@@ -77,11 +86,55 @@ final class DiscordOutboundLanes<T> {
         }
     }
 
+    /**
+     * Holds a webhook's lane back after a failed send: for
+     * {@link #MIN_RETRY_MILLIS} after the first failure in a row and twice
+     * as long after each one that follows, up to
+     * {@link #MAX_RETRY_MILLIS}, so a webhook that keeps failing is asked
+     * less and less often while every other lane goes on. Answers when
+     * the lane may be worked again.
+     */
+    long failed(String webhook, long nowMillis) {
+        Lane<T> lane = this.lanes.get(webhook);
+        if (lane == null) {
+            return nowMillis;
+        }
+        lane.failures = Math.min(lane.failures + 1, 31);
+        lane.headFailures++;
+        long wait = MIN_RETRY_MILLIS;
+        for (int step = 1; step < lane.failures && wait < MAX_RETRY_MILLIS;
+                step++) {
+            wait *= 2L;
+        }
+        lane.notBeforeMillis = nowMillis + Math.min(MAX_RETRY_MILLIS, wait);
+        return lane.notBeforeMillis;
+    }
+
+    /** Ends a webhook's run of failures: its next one waits the shortest pause. */
+    void succeeded(String webhook) {
+        Lane<T> lane = this.lanes.get(webhook);
+        if (lane != null) {
+            lane.failures = 0;
+        }
+    }
+
+    /**
+     * Failed sends of the item at the head of a webhook's lane since it
+     * came to the head: what an item is given up by. The lane keeps the
+     * count, since one correction can wait in several lanes at once and
+     * each gives it up on its own tries.
+     */
+    int headFailures(String webhook) {
+        Lane<T> lane = this.lanes.get(webhook);
+        return lane == null ? 0 : lane.headFailures;
+    }
+
     /** Forgets everything waiting for a webhook: what a refused webhook gets. */
     void drop(String webhook) {
         Lane<T> lane = this.lanes.get(webhook);
         if (lane != null) {
             lane.items.clear();
+            lane.headFailures = 0;
         }
     }
 
@@ -124,5 +177,9 @@ final class DiscordOutboundLanes<T> {
     private static final class Lane<T> {
         final ArrayDeque<T> items = new ArrayDeque<T>();
         long notBeforeMillis;
+        /** Failed sends in a row; what the next pause is worked out from. */
+        int failures;
+        /** Failed sends of the item now at the head, since it came there. */
+        int headFailures;
     }
 }

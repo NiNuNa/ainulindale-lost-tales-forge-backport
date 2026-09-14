@@ -159,12 +159,13 @@ final class ChatEmojiPicker extends ChatPickerPanel {
     }
 
     @Override
-    void drawButtonIcon(Minecraft minecraft, int left, int top, float lit) {
-        ChatIconSheet.drawPairWithShadow(ChatIconSheet.EMOJI,
-                ChatIconSheet.EMOJI_HOVER, lit,
-                left + (BUTTON_SIZE - ChatIconSheet.EMOJI.getWidth()) / 2,
-                top + (BUTTON_SIZE - ChatIconSheet.EMOJI.getHeight()) / 2,
-                255);
+    ChatIconSheet buttonGlyph() {
+        return ChatIconSheet.EMOJI;
+    }
+
+    @Override
+    ChatIconSheet buttonGlyphLit() {
+        return ChatIconSheet.EMOJI_HOVER;
     }
 
     /** The emoji cell under the mouse while the picker is open, else null. */

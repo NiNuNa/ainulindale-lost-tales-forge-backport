@@ -16,8 +16,11 @@ import java.nio.charset.Charset;
  * so the mod carries no library: a bot-authorised GET of a channel's
  * messages, a webhook POST, and a bot-authorised PATCH of the channel's
  * topic. Bodies are bounded, timeouts are short, and a reply is returned
- * as status plus text — the caller decides what a status means. The
- * token and the webhook URL never reach a log.
+ * as status, text and what its headers say of the rate limit — the
+ * caller decides what a status means. A reply read to its end leaves its
+ * connection in the JVM's keep-alive pool, so the next call to Discord
+ * skips the TCP and TLS handshake. The token and the webhook URL never
+ * reach a log.
  *
  * <p>Java 8's {@code HttpURLConnection} refuses {@code PATCH} as a
  * method name, so the topic write opens as a POST and sets the method
@@ -37,14 +40,24 @@ final class DiscordHttp {
 
     private DiscordHttp() {}
 
-    /** A reply: the HTTP status and the body, empty when there was none. */
+    /**
+     * A reply: the HTTP status, the body (empty when there was none), and
+     * what the reply's headers say of the rate limit it was answered
+     * under ({@link DiscordRateLimit#NONE} when they say nothing).
+     */
     static final class Reply {
         final int status;
         final String body;
+        final DiscordRateLimit limit;
 
         Reply(int status, String body) {
+            this(status, body, DiscordRateLimit.NONE);
+        }
+
+        Reply(int status, String body, DiscordRateLimit limit) {
             this.status = status;
             this.body = body == null ? "" : body;
+            this.limit = limit == null ? DiscordRateLimit.NONE : limit;
         }
 
         boolean isSuccess() {
@@ -265,6 +278,11 @@ final class DiscordHttp {
 
     private static Reply exchange(HttpURLConnection connection, String body)
             throws IOException {
+        // A reply read to its end hands its socket back to the JVM's
+        // keep-alive pool for the next call; only an exchange that broke
+        // off part way closes it, since what is left on it cannot be
+        // trusted.
+        boolean complete = false;
         try {
             if (body != null) {
                 byte[] bytes = body.getBytes(UTF_8);
@@ -278,11 +296,34 @@ final class DiscordHttp {
                 }
             }
             int status = connection.getResponseCode();
+            DiscordRateLimit limit = rateLimitOf(connection);
             InputStream stream = status >= 400
                     ? connection.getErrorStream() : connection.getInputStream();
-            return new Reply(status, readBounded(stream));
+            Reply reply = new Reply(status, readBounded(stream), limit);
+            complete = true;
+            return reply;
         } finally {
-            connection.disconnect();
+            if (!complete) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    /**
+     * What a reply's headers say of the rate limit it was answered
+     * under. The headers are advice: a reply whose headers cannot be
+     * read stands without them.
+     */
+    private static DiscordRateLimit rateLimitOf(HttpURLConnection connection) {
+        try {
+            return DiscordRateLimit.parse(
+                    connection.getHeaderField("X-RateLimit-Remaining"),
+                    connection.getHeaderField("X-RateLimit-Reset-After"),
+                    connection.getHeaderField("X-RateLimit-Bucket"),
+                    connection.getHeaderField("X-RateLimit-Global"),
+                    connection.getHeaderField("X-RateLimit-Scope"));
+        } catch (RuntimeException unreadable) {
+            return DiscordRateLimit.NONE;
         }
     }
 

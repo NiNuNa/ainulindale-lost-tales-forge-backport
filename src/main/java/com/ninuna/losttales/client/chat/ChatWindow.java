@@ -8,10 +8,10 @@ import java.util.List;
 /**
  * One chat window in the client layout: an ordered row of tabs, the tab
  * currently in front, a lock, a position, how many message lines it may
- * show, and optionally a link to another window it sits directly above
- * or below, keeping its gap as that window grows, shrinks or moves.
- * Instances are owned and mutated only by {@link ChatWindowLayout};
- * everyone else reads them.
+ * show, whether it fills the screen, and optionally a link to another
+ * window it sits directly above or below, keeping its gap as that window
+ * grows, shrinks or moves. Instances are owned and mutated only by
+ * {@link ChatWindowLayout}; everyone else reads them.
  */
 public final class ChatWindow {
     private final String id;
@@ -32,6 +32,12 @@ public final class ChatWindow {
     private String linkTarget;
     /** Which side of its target this window sits on. */
     private LinkSide linkSide = LinkSide.BELOW;
+    /**
+     * Whether the window fills the screen between its margins. Its own
+     * position and size stay as they were throughout, and are what it
+     * goes back to when it lets the screen go.
+     */
+    private boolean fullscreen;
 
     /**
      * Where a stuck window sits relative to the one it is stuck to. Two
@@ -96,6 +102,9 @@ public final class ChatWindow {
     public LinkSide getLinkSide() { return this.linkSide; }
     public boolean isLinked() { return this.linkTarget != null; }
 
+    /** Whether the window fills the screen rather than its own box. */
+    public boolean isFullscreen() { return this.fullscreen; }
+
     /** Tabs in row order, including channels currently unavailable. */
     public List<ChatTab> getTabs() {
         return Collections.unmodifiableList(this.tabs);
@@ -140,6 +149,8 @@ public final class ChatWindow {
     void setMaxLines(double maxLines) { this.maxLines = maxLines; }
 
     void setWidth(int width) { this.width = width; }
+
+    void setFullscreen(boolean fullscreen) { this.fullscreen = fullscreen; }
 
     void setOffsets(double offsetX, double offsetY) {
         this.offsetX = offsetX;

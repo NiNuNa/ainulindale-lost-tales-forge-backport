@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatDeliveryMark;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.share.ChatShareKind;
@@ -119,6 +120,23 @@ public final class LostTalesChatGui extends GuiChat
     private String hoverTip = "";
     private int hoverTipX;
     private int hoverTipY;
+    /**
+     * The longest gap between the two presses of a double click on a
+     * window's strip: the desktop's usual half second.
+     */
+    private static final long DOUBLE_CLICK_NANOS = 500L * 1000000L;
+    /**
+     * The last press on a window's bare strip or grip — which window,
+     * when, where, and which of the screen's presses it was — so a second
+     * press there completes a double click.
+     */
+    private String stripPressWindowId;
+    private long stripPressNanos;
+    private int stripPressX;
+    private int stripPressY;
+    private int stripPressNumber;
+    /** The screen's presses, counted: a double click is two in a row. */
+    private int pressCount;
     private URI clickedLinkUri;
     private boolean openAnimationStarted;
     /**
@@ -466,7 +484,7 @@ public final class LostTalesChatGui extends GuiChat
     }
 
     /**
-     * Sends what is in the field — Enter and the arrow button both end
+     * Sends what is in the field — Enter and the send button both end
      * here. Vanilla closes the screen on Enter; here the screen stays
      * open for the next message and only Escape (or the player) closes
      * it, swapping back to the feed.
@@ -776,6 +794,12 @@ public final class LostTalesChatGui extends GuiChat
         double pointerX = pointerX();
         double pointerY = pointerY();
         this.hover = resolveHover(pointerX, pointerY);
+        // The floating controls light from the same answer.
+        ChatWindowFrame.noteHoveredControls(
+                this.hover.is(ChatHover.Kind.MESSAGE_TOOLBAR)
+                        ? this.hover.frame : null, this.hover.toolbarKind,
+                this.hover.is(ChatHover.Kind.JUMP_PILL)
+                        ? this.hover.frame : null);
         this.regions.reset();
         this.hoverTip = tipFor(this.hover);
         this.hoverTipX = mouseX;
@@ -912,10 +936,17 @@ public final class LostTalesChatGui extends GuiChat
      */
     private int shadedLine(double x, double y) {
         switch (this.hover.kind) {
+            case MESSAGE_TOOLBAR:
+                // A toolbar's buttons reach past its message's row; on
+                // them the message stays the hovered one.
+                if (this.hover.frame != null
+                        && !this.gestures.isDragging()) {
+                    return this.hover.frame.toolbarChatLineId;
+                }
+                return hoveredMessageLine((float)x, (float)y);
             case LINE:
             case WINDOW:
             case NONE:
-            case MESSAGE_TOOLBAR:
             case SCROLLBAR:
             case JUMP_PILL:
                 return hoveredMessageLine((float)x, (float)y);
@@ -1093,6 +1124,11 @@ public final class LostTalesChatGui extends GuiChat
             ChatHover hover = new ChatHover(ChatHover.Kind.WINDOW);
             hover.frame = under;
             hover.acts = focuses || cycles;
+            // A stamp or a delivery mark is part of its window and
+            // answers a press as the window does; resting on one reads it
+            // out.
+            hover.stampLineId = under.stampLineAt(x, y);
+            hover.markLineId = under.markLineAt(x, y);
             return hover;
         }
         return ChatHover.NONE;
@@ -1190,6 +1226,9 @@ public final class LostTalesChatGui extends GuiChat
                                         == LostTalesChatOverlayRenderer.TOOLBAR_REPLY
                                         ? "gui.losttales.chat.message.reply"
                                         : "gui.losttales.chat.message.copy");
+            case WINDOW:
+                return hover.markLineId != 0 ? markTip(hover.markLineId)
+                        : stampTip(hover.stampLineId);
             case CHARACTER_BUTTON:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.character_selection.tip");
@@ -1209,6 +1248,34 @@ public final class LostTalesChatGui extends GuiChat
             default:
                 return "";
         }
+    }
+
+    /**
+     * The whole date and time a stamp stands for — the day of the week
+     * included, as Discord reads out a message's time — or nothing where
+     * no stamp is under the pointer.
+     */
+    private static String stampTip(int chatLineId) {
+        Long said = chatLineId == 0 ? null
+                : ClientChatChannelViews.timeOf(chatLineId);
+        return said == null ? ""
+                : ChatTimestampFormatter.formatFull(said.longValue());
+    }
+
+    /**
+     * What a delivery mark says under the pointer: that Discord still has
+     * the line to come, or never took it, and why.
+     */
+    private static String markTip(int chatLineId) {
+        ChatDeliveryMark.State state =
+                ClientChatDeliveryMarks.stateOf(chatLineId);
+        if (state == ChatDeliveryMark.State.NONE) {
+            return "";
+        }
+        String tip = StatCollector.translateToLocal(state.langKey());
+        String why = ClientChatDeliveryMarks.reasonOf(chatLineId).langKey();
+        return why.length() == 0 ? tip
+                : tip + ": " + StatCollector.translateToLocal(why);
     }
 
     private static ChatWindowFrame frameFor(ChatWindow window) {
@@ -1332,6 +1399,10 @@ public final class LostTalesChatGui extends GuiChat
                 // windows already drawn into the front window's blur, so
                 // an overlapped window stays visible — softened —
                 // behind the one in front.
+                // Measured where the window stands this frame, a window
+                // gliding to or from the screen included.
+                ChatWindowFrame.of(window).advanceFullscreen(
+                        window.isFullscreen());
                 ChatWindowPlacement.Box box = ChatWindowPlacement
                         .windowBounds(window, this.mc, this.width,
                                 this.height);
@@ -1411,11 +1482,13 @@ public final class LostTalesChatGui extends GuiChat
         row.locked = window.isLocked();
         row.moving = this.gestures.isMovingWindow(window.getId());
         row.resizing = this.gestures.isResizingWindow(window.getId());
+        row.gliding = frame.isFullscreenGliding();
         // A locked window keeps the tabs and the size it has, so it
         // offers neither a tab cross nor the window's own controls: they
         // are all refused anyway, and would only mislead.
         row.closable = ClientChatChannelState.isClosable(row.selected);
         row.windowControls = !window.isLocked();
+        row.fullscreenShare = frame.fullscreenShare(window.isFullscreen());
         row.showRestore = !window.isLocked()
                 && (!ChatScreenMenus.restorableChannels().isEmpty()
                         || ChatScreenMenus.hasWhisperCandidates(this.mc));
@@ -1469,6 +1542,10 @@ public final class LostTalesChatGui extends GuiChat
             case WINDOW_SETTINGS:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.window.settings");
+            case WINDOW_FULLSCREEN:
+                return StatCollector.translateToLocal(window.isFullscreen()
+                        ? "gui.losttales.chat.window.exit_fullscreen"
+                        : "gui.losttales.chat.window.fullscreen");
             case WINDOW_CLOSE:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.window.close");
@@ -1697,6 +1774,7 @@ public final class LostTalesChatGui extends GuiChat
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
+        this.pressCount++;
         // What a press lands on is found at the pointer's exact position,
         // the way the hover finds it; whole pixels only for the input
         // field and for where a menu opens.
@@ -2264,11 +2342,13 @@ public final class LostTalesChatGui extends GuiChat
             return false;
         }
         if (hit == null) {
-            // The strip itself belongs to the window, and moves it.
+            // The strip itself belongs to the window, and moves it; a
+            // double click on it lets the window fill the screen or gives
+            // the screen back, as a title bar does.
             ChatTabSelection.clear();
             this.tabActions.selectWindow(window);
             if (!window.isLocked()) {
-                this.gestures.armWindowDrag(frame, mouseX, mouseY, true);
+                pressStrip(window, frame, mouseX, mouseY);
             }
             return true;
         }
@@ -2352,18 +2432,54 @@ public final class LostTalesChatGui extends GuiChat
                 this.menus.openWindowPopup(window, mouseX,
                         ChatChannelTabBar.rowTop(row.rowBottom) - 2);
                 return true;
+            case WINDOW_FULLSCREEN:
+                this.tabActions.setWindowFullscreen(window,
+                        !window.isFullscreen());
+                return true;
             case WINDOW_CLOSE:
                 this.tabActions.closeWindow(window);
                 return true;
             case GRIP:
                 if (!window.isLocked()) {
-                    this.gestures.armWindowDrag(frame, mouseX, mouseY,
-                            true);
+                    pressStrip(window, frame, mouseX, mouseY);
                 }
                 return true;
             default:
                 return true;
         }
+    }
+
+    /**
+     * A press on a window's bare strip or grip: the first of a double
+     * click takes hold of the window to move it; the second — the very
+     * next press, on the same window, within {@link #DOUBLE_CLICK_NANOS}
+     * and a drag's threshold of the first — lets it fill the screen or
+     * gives the screen back.
+     */
+    private void pressStrip(ChatWindow window, ChatWindowFrame frame,
+                            int mouseX, int mouseY) {
+        long now = System.nanoTime();
+        boolean second = window.getId().equals(this.stripPressWindowId)
+                && this.stripPressNumber == this.pressCount - 1
+                && now - this.stripPressNanos <= DOUBLE_CLICK_NANOS
+                && Math.abs(mouseX - this.stripPressX)
+                        <= ChatWindowGestures.DRAG_THRESHOLD
+                && Math.abs(mouseY - this.stripPressY)
+                        <= ChatWindowGestures.DRAG_THRESHOLD;
+        if (second) {
+            // A double click is spent by its second press; a third
+            // press starts another.
+            this.stripPressWindowId = null;
+            this.tabActions.setWindowFullscreen(window,
+                    !window.isFullscreen());
+            return;
+        }
+        this.stripPressWindowId = window.getId();
+        this.stripPressNumber = this.pressCount;
+        this.stripPressNanos = now;
+        this.stripPressX = mouseX;
+        this.stripPressY = mouseY;
+        this.gestures.armWindowDrag(frame, mouseX, mouseY, true);
     }
 
     @Override

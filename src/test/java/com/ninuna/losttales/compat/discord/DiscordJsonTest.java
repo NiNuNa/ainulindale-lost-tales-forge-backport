@@ -13,6 +13,44 @@ import static org.junit.Assert.assertTrue;
 
 public final class DiscordJsonTest {
 
+    /**
+     * Discord refuses a whole post for a name its rules do not allow, so
+     * each forbidden piece is given a look-alike of the same length and
+     * the name still reads as itself.
+     */
+    @Test
+    public void webhookNamesDiscordRefusesAreGivenLookAlikes() {
+        assertEquals("Aragorn, the Gondor Farmer",
+                DiscordJson.webhookUsername("Aragorn, the Gondor Farmer"));
+        String raw = "Mr@Discord#1: CLYDE```";
+        String name = DiscordJson.webhookUsername(raw);
+        assertEquals(raw.length(), name.length());
+        assertFalse(name.contains("@"));
+        assertFalse(name.contains("#"));
+        assertFalse(name.contains(":"));
+        assertFalse(name.contains("```"));
+        assertFalse(name.toLowerCase(java.util.Locale.ROOT).contains("discord"));
+        assertFalse(name.toLowerCase(java.util.Locale.ROOT).contains("clyde"));
+        // Two that overlap on a shared letter are both broken.
+        assertFalse(DiscordJson.webhookUsername("Discordiscord")
+                .toLowerCase(java.util.Locale.ROOT).contains("discord"));
+        assertFalse("everyone".equalsIgnoreCase(
+                DiscordJson.webhookUsername("Everyone")));
+        assertFalse("here".equalsIgnoreCase(DiscordJson.webhookUsername("here")));
+        assertEquals("", DiscordJson.webhookUsername("   "));
+        assertEquals("", DiscordJson.webhookUsername(null));
+        StringBuilder longName = new StringBuilder();
+        for (int index = 0; index < 100; index++) {
+            longName.append('a');
+        }
+        assertEquals(80, DiscordJson.webhookUsername(longName.toString())
+                .length());
+        JsonObject body = new JsonParser().parse(
+                DiscordJson.webhookLineBody("A@B", "", "hi"))
+                .getAsJsonObject();
+        assertEquals("A＠B", body.get("username").getAsString());
+    }
+
     @Test
     public void channelListingsParseOldestFirstWithAuthorsAndMentions() {
         String json = "["

@@ -12,6 +12,9 @@ public final class ChatTimestampFormatter {
     /** The day written out: {@code September 19, 2026}. */
     private static final SimpleDateFormat DAY_FORMAT =
             new SimpleDateFormat("MMMM d, yyyy", Locale.ROOT);
+    /** The whole moment: {@code Monday, September 14, 2026 at 19:04}. */
+    private static final SimpleDateFormat FULL_FORMAT =
+            new SimpleDateFormat("EEEE, MMMM d, yyyy 'at' HH:mm", Locale.ROOT);
 
     private ChatTimestampFormatter() {}
 
@@ -42,5 +45,14 @@ public final class ChatTimestampFormatter {
      */
     public static synchronized String formatDay(long timestampMillis) {
         return DAY_FORMAT.format(new Date(Math.max(0L, timestampMillis)));
+    }
+
+    /**
+     * The moment written out whole — the day of the week, the date and
+     * the time — the way a stamp reads out under the pointer, as Discord
+     * reads out a message's time.
+     */
+    public static synchronized String formatFull(long timestampMillis) {
+        return FULL_FORMAT.format(new Date(Math.max(0L, timestampMillis)));
     }
 }

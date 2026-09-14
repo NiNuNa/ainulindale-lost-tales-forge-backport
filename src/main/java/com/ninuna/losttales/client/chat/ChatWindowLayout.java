@@ -926,6 +926,27 @@ public final class ChatWindowLayout {
         return true;
     }
 
+    /**
+     * Lets a window fill the screen, or gives it back its own box: its
+     * position, width and height are kept as they were throughout, and
+     * are what it returns to. {@code persist} is false while a drag that
+     * took a window out of the screen is still moving, so the file is
+     * written once, on release.
+     */
+    public static synchronized boolean setFullscreen(String windowId,
+                                                     boolean fullscreen,
+                                                     boolean persist) {
+        ChatWindow window = window(windowId);
+        if (window == null || window.isFullscreen() == fullscreen) {
+            return false;
+        }
+        window.setFullscreen(fullscreen);
+        if (persist) {
+            changed();
+        }
+        return true;
+    }
+
     /** Brings a tab to the front of its own window; not a layout change. */
     public static synchronized boolean setActiveTab(ChatTab tab) {
         ChatWindow window = windowOf(tab);
@@ -1218,6 +1239,7 @@ public final class ChatWindowLayout {
                 window.setOffsets(clampPercent(spec.offsetX),
                         clampPercent(spec.offsetY));
                 window.setLocked(spec.locked);
+                window.setFullscreen(spec.fullscreen);
                 window.setMaxLines(clampWindowLines(spec.maxLines));
                 window.setWidth(clampChatWidth(spec.width));
                 window.setActiveTab(spec.activeTab);
@@ -1306,7 +1328,7 @@ public final class ChatWindowLayout {
                     window.isLocked(), window.getOffsetX(),
                     window.getOffsetY(), window.getLinkTarget(),
                     window.getLinkSide(), window.getMaxLines(),
-                    window.getWidth()));
+                    window.getWidth(), window.isFullscreen()));
         }
         return result;
     }
@@ -1354,8 +1376,9 @@ public final class ChatWindowLayout {
         // the row lands at the size the window opens at, the way a tab
         // torn off a row is placed, so a window that opens with one line
         // stands a step below the reference's row rather than a whole
-        // full-height window below it.
-        ChatWindowPlacement.Box from = ChatWindowPlacement.windowBounds(
+        // full-height window below it. A reference filling the screen is
+        // measured by the box it goes back to.
+        ChatWindowPlacement.Box from = ChatWindowPlacement.restingBounds(
                 reference, minecraft, screenWidth, screenHeight);
         int width = ChatWindowPlacement.windowWidth(created, minecraft);
         double height = ChatWindowPlacement.currentHeight(created, minecraft);
@@ -1465,6 +1488,8 @@ public final class ChatWindowLayout {
         final double maxLines;
         /** The window's own width; 0 follows the game setting. */
         final int width;
+        /** Whether the window fills the screen rather than its own box. */
+        final boolean fullscreen;
 
         WindowSpec(String id, List<?> tabs, Object activeTab,
                    boolean locked, double offsetX, double offsetY) {
@@ -1498,6 +1523,14 @@ public final class ChatWindowLayout {
                    boolean locked, double offsetX, double offsetY,
                    String linkTarget, ChatWindow.LinkSide linkSide,
                    double maxLines, int width) {
+            this(id, tabs, activeTab, locked, offsetX, offsetY, linkTarget,
+                    linkSide, maxLines, width, false);
+        }
+
+        WindowSpec(String id, List<?> tabs, Object activeTab,
+                   boolean locked, double offsetX, double offsetY,
+                   String linkTarget, ChatWindow.LinkSide linkSide,
+                   double maxLines, int width, boolean fullscreen) {
             this.id = id;
             List<ChatTab> converted = new ArrayList<ChatTab>();
             if (tabs != null) {
@@ -1519,6 +1552,7 @@ public final class ChatWindowLayout {
             this.linkAbove = this.linkSide == ChatWindow.LinkSide.ABOVE;
             this.maxLines = clampWindowLines(maxLines);
             this.width = clampChatWidth(width);
+            this.fullscreen = fullscreen;
         }
 
         private static ChatTab toTab(Object value) {

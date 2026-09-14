@@ -32,7 +32,7 @@ public final class LostTalesDiscordBridgeIntakeTest {
                     "ooc=GAME_TO_DISCORD;webhook=" + HOOK_A,
                     "ooc=GAME_TO_DISCORD;webhook=" + HOOK_B));
             bridge.relayToDiscord(ChatChannel.OOC, "", "Aragorn", "", "first",
-                    1000L, null);
+                    1000L, null, null);
             bridge.relayTyping(ChatChannel.OOC, "");
             assertEquals(Arrays.asList("ooc", "ooc#2"), bridge.queuedPostsOf(old));
 
@@ -42,7 +42,7 @@ public final class LostTalesDiscordBridgeIntakeTest {
                     "ooc=GAME_TO_DISCORD;webhook=" + HOOK_B,
                     "ooc=DISCORD_TO_GAME;channel=5"));
             bridge.relayToDiscord(ChatChannel.OOC, "", "Aragorn", "", "second",
-                    1001L, null);
+                    1001L, null, null);
             bridge.relayTyping(ChatChannel.OOC, "");
 
             assertEquals("the old worker holds only what was queued under its bindings",
@@ -64,15 +64,41 @@ public final class LostTalesDiscordBridgeIntakeTest {
             Thread old = bridge.installIdleWorker(bound(
                     "ooc=GAME_TO_DISCORD;webhook=" + HOOK_A));
             bridge.relayToDiscord(ChatChannel.OOC, "", "Aragorn", "", "line",
-                    1000L, null);
+                    1000L, null, null);
             bridge.relayTyping(ChatChannel.OOC, "");
             bridge.stop();
             assertTrue(bridge.queuedPostsOf(old).isEmpty());
             assertTrue(bridge.typingOf(old).isEmpty());
             // With no worker, nothing is queued anywhere.
             bridge.relayToDiscord(ChatChannel.OOC, "", "Aragorn", "", "late",
-                    1001L, null);
+                    1001L, null, null);
             assertTrue(bridge.queuedPostsOf(old).isEmpty());
+        } finally {
+            bridge.stop();
+        }
+    }
+
+    /**
+     * A line goes out through every binding that posts it or through
+     * none: an intake with room for fewer than all of its posts queues
+     * none of them.
+     */
+    @Test
+    public void aLineTheIntakeHasNoRoomForQueuesNoneOfItsPosts() {
+        LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
+        try {
+            Thread idle = bridge.installIdleWorker(bound(
+                    "ooc=GAME_TO_DISCORD;webhook=" + HOOK_A,
+                    "ooc=GAME_TO_DISCORD;webhook=" + HOOK_B));
+            // Removals fill the intake to one place short.
+            for (int index = 1; index < LostTalesDiscordBridge.MAX_QUEUED_OUTBOUND;
+                    index++) {
+                bridge.relayDelete(index, ChatChannel.OOC, "");
+            }
+            bridge.relayToDiscord(ChatChannel.OOC, "", "Aragorn", "", "two posts",
+                    5000L, null, null);
+            assertTrue("neither post of the line is queued",
+                    bridge.queuedPostsOf(idle).isEmpty());
         } finally {
             bridge.stop();
         }

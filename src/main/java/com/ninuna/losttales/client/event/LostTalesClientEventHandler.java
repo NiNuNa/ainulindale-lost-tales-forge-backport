@@ -36,6 +36,7 @@ import com.ninuna.losttales.client.chat.ClientChatIgnores;
 import com.ninuna.losttales.client.chat.ClientChatReadMarks;
 import com.ninuna.losttales.client.chat.ClientChatSession;
 import com.ninuna.losttales.client.chat.ClientChatChannelViews;
+import com.ninuna.losttales.client.chat.ClientChatDeliveryMarks;
 import com.ninuna.losttales.client.chat.ClientChatTypingState;
 import com.ninuna.losttales.client.chat.ClientChatShowcaseStore;
 import com.ninuna.losttales.client.chat.LostTalesChatPresentation;
@@ -189,6 +190,9 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         // else instead; see onClientConnect. Only what describes the
         // connection itself goes here.
         ClientChatTypingState.clear();
+        // What the server said about this session's Discord posts is not
+        // said again on the next join.
+        ClientChatDeliveryMarks.clear();
         // How far each conversation here was read is written down, so
         // the next join's replay starts its unread run where this one
         // left off.

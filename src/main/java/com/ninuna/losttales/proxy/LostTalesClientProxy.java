@@ -81,12 +81,14 @@ import com.ninuna.losttales.network.packet.LostTalesChatConsoleSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatHistorySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatReactionSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatDeliveryMarkPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigResultPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerConfigSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.client.chat.ClientChatAccountRoles;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
+import com.ninuna.losttales.client.chat.ClientChatDeliveryMarks;
 import com.ninuna.losttales.client.chat.ClientChatIgnores;
 import com.ninuna.losttales.client.chat.ClientChatReadMarks;
 import com.ninuna.losttales.client.chat.ClientChatTypingState;
@@ -608,6 +610,14 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleChatReactions(LostTalesChatReactionSyncPacket packet) {
         LostTalesChatPresentation.applyReactions(packet);
+    }
+
+    @Override
+    public void handleChatDeliveryMark(LostTalesChatDeliveryMarkPacket packet) {
+        if (packet != null && !packet.isMalformed()) {
+            ClientChatDeliveryMarks.apply(packet.getMessageId(),
+                    packet.getState(), packet.getReason());
+        }
     }
 
     /**

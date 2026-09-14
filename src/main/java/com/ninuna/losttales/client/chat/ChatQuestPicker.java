@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
 import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -58,11 +57,12 @@ final class ChatQuestPicker extends ChatPickerPanel {
     }
 
     @Override
-    void drawButtonIcon(Minecraft minecraft, int left, int top,
-                        float lit) {
-        // The quest map marker, the same glyph quests carry on the map.
-        ChatInlineIcons.drawMarkerButton(minecraft,
-                LostTalesCompassMarkerIcon.QUEST.name(),
-                LostTalesChatVisualStyle.IVORY, left, top, BUTTON_SIZE);
+    ChatIconSheet buttonGlyph() {
+        return ChatIconSheet.QUEST;
+    }
+
+    @Override
+    ChatIconSheet buttonGlyphLit() {
+        return ChatIconSheet.QUEST_HOVER;
     }
 }

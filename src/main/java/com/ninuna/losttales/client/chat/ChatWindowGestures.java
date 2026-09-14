@@ -4,6 +4,7 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -143,7 +144,7 @@ final class ChatWindowGestures {
         if (this.windowResize != null && this.windowResize.active) {
             updateResize();
         } else if (this.windowDrag != null && this.windowDrag.active) {
-            moveDraggedWindow();
+            moveDraggedWindow(mouseX, mouseY);
         } else if (this.tabDrag != null && this.tabDrag.active) {
             dragTabs(this.tabDrag, mouseX, mouseY);
         }
@@ -228,7 +229,7 @@ final class ChatWindowGestures {
                 this.bar.closePickers();
             }
             if (this.windowDrag.active) {
-                moveDraggedWindow();
+                moveDraggedWindow(mouseX, mouseY);
             }
             return true;
         }
@@ -550,7 +551,10 @@ final class ChatWindowGestures {
                 return null;
             }
             ChatWindow window = ChatWindowLayout.window(frame.windowId);
-            if (window == null || window.isLocked()) {
+            // A window filling the screen, or gliding to or from it, has
+            // the screen's size or a passing one, not its own to change.
+            if (window == null || window.isLocked()
+                    || outOfItsOwnBox(window)) {
                 continue;
             }
             ResizeEdge edge = edgeAt(frame, mouseX, mouseY);
@@ -681,7 +685,7 @@ final class ChatWindowGestures {
     private void updateResize() {
         WindowResize resize = this.windowResize;
         ChatWindow window = ChatWindowLayout.window(resize.windowId);
-        if (window == null || window.isLocked()) {
+        if (window == null || window.isLocked() || outOfItsOwnBox(window)) {
             this.windowResize = null;
             return;
         }
@@ -839,6 +843,11 @@ final class ChatWindowGestures {
         String snapTargetId;
         /** Which side of that target the dragged window sits on. */
         ChatWindow.LinkSide snapSide = ChatWindow.LinkSide.BELOW;
+        /**
+         * Whether the hold was taken afresh in the window's own box, as
+         * it is once for a window carried out of the screen it filled.
+         */
+        boolean rebased;
 
         WindowDrag(String windowId, double grabOffsetX, double grabOffsetY,
                    int pressX, int pressY, boolean active) {
@@ -869,13 +878,24 @@ final class ChatWindowGestures {
 
     /**
      * Keeps the dragged window's percent position under the pointer,
-     * from the raw mouse so the motion is as fine as the display.
+     * from the raw mouse so the motion is as fine as the display. A
+     * window filling the screen stays put until the pointer has really
+     * travelled, and then gives the screen back under it.
      */
-    private void moveDraggedWindow() {
+    private void moveDraggedWindow(int mouseX, int mouseY) {
         ChatWindow window = ChatWindowLayout.window(this.windowDrag.windowId);
         if (window == null || window.isLocked()) {
             this.windowDrag = null;
             return;
+        }
+        if (!this.windowDrag.rebased && outOfItsOwnBox(window)) {
+            // Pressed but not yet carried: a press that never travels
+            // leaves the window where it stands.
+            if (!travelled(mouseX, mouseY, this.windowDrag.pressX,
+                    this.windowDrag.pressY)) {
+                return;
+            }
+            holdInOwnBox(window);
         }
         ChatWindowPlacement.Anchor anchor = ChatWindowPlacement.constrainWindow(
                 window, this.mc,
@@ -888,24 +908,30 @@ final class ChatWindowGestures {
         if (group.size() > 1) {
             // Stuck windows move as one piece: every one of them takes
             // the same step the dragged one took, in both directions, so
-            // the group keeps its shape whichever way it is carried.
-            ChatWindowFrame frame = ChatWindowFrame.find(window.getId());
-            if (frame == null) {
-                return;
+            // the group keeps its shape whichever way it is carried. The
+            // step is measured between resting boxes, all read before any
+            // of them moves; a resting box is also where a window that
+            // has just given the screen back is going.
+            List<ChatWindowPlacement.Box> resting =
+                    new ArrayList<ChatWindowPlacement.Box>(group.size());
+            for (int index = 0; index < group.size(); index++) {
+                resting.add(ChatWindowPlacement.restingBounds(
+                        group.get(index), this.mc, this.screenWidth,
+                        this.screenHeight));
             }
-            double deltaX = anchor.x - frame.boxLeft;
-            double deltaY = anchor.baseline - frame.baseline;
+            int dragged = group.indexOf(window);
+            ChatWindowPlacement.Box origin = dragged >= 0
+                    ? resting.get(dragged)
+                    : ChatWindowPlacement.restingBounds(window, this.mc,
+                            this.screenWidth, this.screenHeight);
+            double deltaX = anchor.x - origin.x;
+            double deltaY = anchor.baseline - origin.baseline();
             for (int index = 0; index < group.size(); index++) {
                 ChatWindow member = group.get(index);
-                ChatWindowFrame memberFrame =
-                        ChatWindowFrame.find(member.getId());
-                if (memberFrame == null) {
-                    continue;
-                }
+                ChatWindowPlacement.Box at = resting.get(index);
                 ChatWindowPlacement.Anchor moved =
                         ChatWindowPlacement.constrainWindow(member, this.mc,
-                                memberFrame.boxLeft + deltaX,
-                                memberFrame.baseline + deltaY,
+                                at.x + deltaX, at.baseline() + deltaY,
                                 this.screenWidth, this.screenHeight);
                 ChatWindowLayout.setPosition(member.getId(),
                         ChatWindowPlacement.windowPercentX(member, moved.x,
@@ -921,6 +947,49 @@ final class ChatWindowGestures {
                         this.screenWidth),
                 ChatWindowPlacement.windowPercentY(snapped.baseline, this.mc,
                         this.screenHeight), false);
+    }
+
+    /**
+     * Whether a window stands anywhere but in its own box: filling the
+     * screen, or still gliding to or from it. Its edges are not its own
+     * to resize then, and a drag takes hold of it afresh.
+     */
+    private static boolean outOfItsOwnBox(ChatWindow window) {
+        return window.isFullscreen()
+                || ChatWindowPlacement.fullscreenShare(window) > 0.0D;
+    }
+
+    /**
+     * Takes hold of a window carried off by its strip while it stands
+     * outside its own box — filling the screen, or still gliding to or
+     * from it — the way a maximised browser window comes down when its
+     * tabs are dragged: it lets the screen go, and the pointer holds its
+     * own box the same share of the way across the strip and at the same
+     * depth, so the window shrinks toward the hand and moves on under it.
+     */
+    private void holdInOwnBox(ChatWindow window) {
+        ChatWindowFrame frame = ChatWindowFrame.find(window.getId());
+        ChatWindowLayout.setFullscreen(window.getId(), false, false);
+        if (frame == null || !frame.drawn) {
+            this.windowDrag.rebased = true;
+            return;
+        }
+        double pointerX = ChatWindowPlacement.preciseMouseX(this.mc,
+                this.screenWidth);
+        double pointerY = ChatWindowPlacement.preciseMouseY(this.mc,
+                this.screenHeight);
+        double drawnWidth = frame.boxRight - frame.boxLeft;
+        double across = drawnWidth <= 0.0D ? 0.5D : Math.max(0.0D,
+                Math.min(1.0D, (pointerX - frame.boxLeft) / drawnWidth));
+        int width = ChatWindowPlacement.windowWidth(window, this.mc);
+        double height = ChatWindowPlacement.currentHeight(window, this.mc);
+        int barHeight = ChatWindowPlacement.barHeight(this.mc);
+        double depth = pointerY - frame.boxTop;
+        WindowDrag held = new WindowDrag(window.getId(), across * width,
+                depth - (height - barHeight), this.windowDrag.pressX,
+                this.windowDrag.pressY, true);
+        held.rebased = true;
+        this.windowDrag = held;
     }
 
     /**
@@ -945,7 +1014,9 @@ final class ChatWindowGestures {
         for (int index = 0; index < frames.size(); index++) {
             ChatWindowFrame frame = frames.get(index);
             ChatWindow other = ChatWindowLayout.window(frame.windowId);
-            if (other == null || other == window
+            // A window filling the screen has no edge of its own to be
+            // stuck to.
+            if (other == null || other == window || other.isFullscreen()
                     || window.getId().equals(other.getLinkTarget())) {
                 continue;
             }
@@ -1433,9 +1504,16 @@ final class ChatWindowGestures {
         this.tabActions.selectChannel(drag.tab);
     }
 
-    /** Keeps a torn-off window's row under the pointer as it moves. */
+    /**
+     * Keeps a torn-off window's row under the pointer as it moves. A
+     * window filling the screen gives it back the moment it is carried,
+     * taking its own size again with the tab still under the hand.
+     */
     private void carryWindow(TabDrag drag, ChatWindow window, int mouseX,
                              int mouseY) {
+        if (window.isFullscreen()) {
+            ChatWindowLayout.setFullscreen(window.getId(), false, false);
+        }
         ChatWindowPlacement.Anchor anchor = carriedAnchor(window, drag,
                 mouseX, mouseY);
         ChatWindowLayout.setPosition(window.getId(),

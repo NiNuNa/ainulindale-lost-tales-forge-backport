@@ -46,6 +46,12 @@ final class ChatPopupMenu {
     /** Seam between a shortcut's key icons and the + joining them. */
     private static final int KEY_GAP = 2;
     private static final int[] NO_KEYS = new int[0];
+    /**
+     * Room the search field's magnifier takes before what is typed: the
+     * glyph and the gap an icon keeps from its label in these lists.
+     */
+    private static final int SEARCH_ICON_RUN =
+            ChatIconSheet.SEARCH_LARGE.getWidth() + ChatChannelIcons.GAP;
 
     /** Width of the upright colour bar before a channel's name, and its gap. */
     private static final int SWATCH_WIDTH = 1;
@@ -325,7 +331,8 @@ final class ChatPopupMenu {
         if (this.filter != null) {
             // The field's prompt and the shortcut beside it are content
             // too: a list narrower than they are would cut them off.
-            widest = Math.max(widest, ChatInputField.CARET_WIDTH + 1
+            widest = Math.max(widest, SEARCH_ICON_RUN
+                    + ChatInputField.CARET_WIDTH + 1
                     + font.getStringWidth(this.filterPrompt)
                     + SWATCH_GAP + hintWidth(Minecraft.getMinecraft()));
         }
@@ -404,12 +411,12 @@ final class ChatPopupMenu {
     }
 
     /**
-     * The search field above the rows: what has been typed, or while it
-     * is empty the prompt in the chat's aside tone and italics, as the
-     * input bar's hint is; the shortcut that opens the list at the right
-     * end; and the chat's caret blinking after the text so it is plain
-     * the field is taking keys. A hairline under it parts it from the
-     * rows.
+     * The search field above the rows: the magnifier it opens with; what
+     * has been typed, or while it is empty the prompt in the chat's aside
+     * tone and italics, as the input bar's hint is; the shortcut that
+     * opens the list at the right end; and the chat's caret blinking
+     * after the text so it is plain the field is taking keys. A hairline
+     * under it parts it from the rows.
      */
     private void drawSearchField(FontRenderer font) {
         if (this.filter == null) {
@@ -419,15 +426,21 @@ final class ChatPopupMenu {
         int textY = top + (this.fieldHeight - 1 - 8) / 2;
         String typed = this.filter.toString();
         int quiet = LostTalesColors.rgb(LostTalesColors.SAND);
+        // The magnifier stands on the capitals of what is typed beside
+        // it, as every icon in a chat row does.
+        ChatIconSheet.SEARCH_LARGE.drawWithShadow(this.x + PADDING_X,
+                textY + LostTalesChatOverlayRenderer.centredBoxTop(
+                        ChatIconSheet.SEARCH_LARGE.getHeight()), 255);
+        int textX = this.x + PADDING_X + SEARCH_ICON_RUN;
         if (typed.length() == 0) {
             // A pixel clear of the caret waiting at the field's start.
             LostTalesChatVisualStyle.drawColored(font,
-                    "§o" + this.filterPrompt, this.x + PADDING_X
+                    "§o" + this.filterPrompt, textX
                             + ChatInputField.CARET_WIDTH + 1, textY,
                     LostTalesChatVisualStyle.asideRgb(), 255);
         } else {
-            LostTalesChatVisualStyle.drawPlain(font, typed,
-                    this.x + PADDING_X, textY, 255);
+            LostTalesChatVisualStyle.drawPlain(font, typed, textX, textY,
+                    255);
         }
         if (this.filterHint.length > 0 && typed.length() == 0) {
             // The shortcut as the keys themselves, in the mod's own key
@@ -456,8 +469,8 @@ final class ChatPopupMenu {
         }
         if ((System.nanoTime() - this.filterNanos) % CARET_BLINK_NANOS
                 < CARET_BLINK_NANOS / 2L) {
-            ChatInputField.drawCaret(
-                    this.x + PADDING_X + font.getStringWidth(typed), textY);
+            ChatInputField.drawCaret(textX + font.getStringWidth(typed),
+                    textY);
         }
         Gui.drawRect(this.x + PADDING_X, top + this.fieldHeight - 1,
                 this.x + this.width - PADDING_X, top + this.fieldHeight,

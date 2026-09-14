@@ -1,7 +1,11 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
+import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
+import com.ninuna.losttales.config.LostTalesConfig;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -13,7 +17,8 @@ import net.minecraft.client.gui.ScaledResolution;
 
 /**
  * Per-window render state: the line bands the last draw recorded, the
- * line list they index into, the tab row, and the window's box on screen.
+ * line list they index into, the tab row, the window's box on screen,
+ * and how far that box stands toward filling the screen.
  * Frames are keyed by window id and outlive the chat screen, so tab
  * easing and hit testing stay continuous across opening and closing;
  * a frame whose window no longer exists is pruned on the next draw.
@@ -123,6 +128,31 @@ final class ChatWindowFrame {
     float motionX;
     float motionY;
     /**
+     * How far the window stands toward filling the screen, eased from
+     * the moment it took the screen or let it go, so its box glides
+     * between its own and the screen's rather than jumping.
+     */
+    private final LostTalesUiTransition fullscreenMotion =
+            new LostTalesUiTransition();
+    /** Whether {@link #fullscreenMotion} has been advanced at all yet. */
+    private boolean fullscreenSeen;
+    /**
+     * How long the row still counts a finished glide as gliding. The
+     * frame a glide settles on moves the edges its last step, and the
+     * tabs have to take that step with them rather than ease after it.
+     */
+    private static final long GLIDE_TAIL_NANOS = 100L * 1000000L;
+    /** When an advance last found the glide still moving; 0 before one has. */
+    private long fullscreenGlideNanos;
+    /**
+     * The timestamps drawn this frame, and the delivery marks, each with
+     * the chat line id it belongs to, in screen GUI pixels. Recorded from
+     * the draw itself, like the toolbar, so the tip either shows answers
+     * exactly where it stands.
+     */
+    private final LineBoxes stamps = new LineBoxes();
+    private final LineBoxes marks = new LineBoxes();
+    /**
      * The jump-to-present button drawn this frame, in screen GUI
      * pixels; width zero while none was drawn. Recorded from the draw
      * itself, like the bands, so the click and the pixels cannot
@@ -138,17 +168,28 @@ final class ChatWindowFrame {
      * The hovered message's toolbar as drawn this frame, in screen GUI
      * pixels; width zero while none was drawn. Recorded from the draw
      * itself, like the jump button, so the click and the pixels cannot
-     * disagree. {@link #toolbarKinds} says which control each equal
-     * share of its width is, left to right, so a message offering fewer
-     * of them needs no separate bookkeeping.
+     * disagree. {@link #toolbarKinds} says which control each button
+     * is, left to right, one {@link #toolbarStride} apart, so a message
+     * offering fewer of them needs no separate bookkeeping.
      */
     float toolbarLeft;
     float toolbarTop;
     float toolbarRight;
     float toolbarBottom;
+    float toolbarStride;
     int[] toolbarKinds = NO_KINDS;
     /** The message the toolbar belongs to, by chat line id. */
     int toolbarChatLineId;
+    /**
+     * The toolbar control the pointer is on this frame, by kind, or -1:
+     * set from the screen's one answer about the pointer before the
+     * windows are drawn ({@link #noteHoveredControls}).
+     */
+    int hoveredToolbarKind = -1;
+    /** How far each toolbar control has lit, by kind, and on whose toolbar. */
+    private final float[] toolbarFades = new float[4];
+    private int toolbarFadesLineId;
+    long toolbarFadeNanos;
 
     private static final int[] NO_KINDS = new int[0];
 
@@ -165,14 +206,43 @@ final class ChatWindowFrame {
         if (!toolbarContains(x, y)) {
             return -1;
         }
-        float share = (this.toolbarRight - this.toolbarLeft)
-                / this.toolbarKinds.length;
-        int index = (int)((x - this.toolbarLeft) / Math.max(1.0F, share));
+        // The gap after a button belongs to it, so the toolbar has no
+        // dead pixels between its buttons.
+        int index = (int)((x - this.toolbarLeft)
+                / Math.max(1.0F, this.toolbarStride));
         return this.toolbarKinds[Math.max(0,
                 Math.min(this.toolbarKinds.length - 1, index))];
     }
+    /**
+     * Starts the toolbar's fades afresh when it has moved to another
+     * message, so a control lit on one message's toolbar does not come
+     * up lit on the next one's.
+     */
+    void startToolbarFades(int chatLineId) {
+        if (chatLineId != this.toolbarFadesLineId) {
+            Arrays.fill(this.toolbarFades, 0.0F);
+            this.toolbarFadesLineId = chatLineId;
+        }
+    }
+
+    /** Advances one toolbar control's fade and answers how far it has lit. */
+    float toolbarFade(int kind, double elapsed) {
+        if (kind < 0 || kind >= this.toolbarFades.length) {
+            return 0.0F;
+        }
+        this.toolbarFades[kind] = LostTalesChatVisualStyle.hoverFade(
+                this.toolbarFades[kind], kind == this.hoveredToolbarKind,
+                elapsed);
+        return this.toolbarFades[kind];
+    }
+
     /** When the fly-in was last advanced. */
     long jumpButtonNanos;
+    /** Whether the pointer is on the jump-to-present button this frame. */
+    boolean jumpHovered;
+    /** How far the jump-to-present button has lit, and when it last moved. */
+    float jumpFade;
+    long jumpFadeNanos;
     /**
      * The scrollbar's thumb as drawn this frame, in screen GUI pixels;
      * width zero while none was drawn. The track it slides in is the
@@ -257,6 +327,26 @@ final class ChatWindowFrame {
     }
 
     /** Drops frames of windows that no longer exist. */
+    /**
+     * Notes which of the windows' floating controls the pointer is on
+     * this frame — a toolbar control by kind, or a jump-to-present
+     * button — and that it is on none of the others.
+     */
+    static synchronized void noteHoveredControls(
+            ChatWindowFrame toolbarFrame, int toolbarKind,
+            ChatWindowFrame jumpFrame) {
+        for (ChatWindowFrame frame : FRAMES.values()) {
+            frame.hoveredToolbarKind = -1;
+            frame.jumpHovered = false;
+        }
+        if (toolbarFrame != null) {
+            toolbarFrame.hoveredToolbarKind = toolbarKind;
+        }
+        if (jumpFrame != null) {
+            jumpFrame.jumpHovered = true;
+        }
+    }
+
     static synchronized void prune(List<ChatWindow> windows) {
         if (FRAMES.size() <= windows.size()) {
             return;
@@ -428,6 +518,122 @@ final class ChatWindowFrame {
             return 1;
         }
         return measuredFactor;
+    }
+
+    /**
+     * Moves the window's fullscreen motion on to this instant, toward
+     * the state the window is in. Called once a frame before the window
+     * is measured; the first call stands the window in its state rather
+     * than travelling into it.
+     */
+    void advanceFullscreen(boolean fullscreen) {
+        if (this.fullscreenSeen && !this.fullscreenMotion.isSettled()) {
+            this.fullscreenGlideNanos = System.nanoTime();
+        }
+        this.fullscreenSeen = true;
+        this.fullscreenMotion.advance(System.nanoTime(), fullscreen,
+                LostTalesConfig.enableChatAnimations
+                        ? Math.max(1, LostTalesConfig
+                                .chatAnimationDurationMillis)
+                        : 0,
+                LostTalesUiEasing.SMOOTH);
+    }
+
+    /**
+     * How far the window stands toward filling the screen, 0..1, as the
+     * motion was last advanced; before it has been, the state itself.
+     */
+    float fullscreenShare(boolean fullscreen) {
+        if (!this.fullscreenSeen) {
+            return fullscreen ? 1.0F : 0.0F;
+        }
+        return this.fullscreenMotion.clamped();
+    }
+
+    /**
+     * Whether the window is gliding to or from filling the screen, the
+     * frame the glide settles on and a moment after it included.
+     */
+    boolean isFullscreenGliding() {
+        return this.fullscreenSeen && (!this.fullscreenMotion.isSettled()
+                || System.nanoTime() - this.fullscreenGlideNanos
+                        < GLIDE_TAIL_NANOS);
+    }
+
+    /** Forgets the stamps of the frame before; the draw records its own. */
+    void clearStamps() {
+        this.stamps.clear();
+    }
+
+    /** Records one stamp as drawn, in screen GUI pixels. */
+    void recordStamp(float left, float top, float right, float bottom,
+                     int chatLineId) {
+        this.stamps.add(left, top, right, bottom, chatLineId);
+    }
+
+    /** The chat line id of the stamp drawn under the point, or 0. */
+    int stampLineAt(double x, double y) {
+        return this.drawn ? this.stamps.at(x, y) : 0;
+    }
+
+    /** Forgets the delivery marks of the frame before. */
+    void clearMarks() {
+        this.marks.clear();
+    }
+
+    /** Records one delivery mark as drawn, in screen GUI pixels. */
+    void recordMark(float left, float top, float right, float bottom,
+                    int chatLineId) {
+        this.marks.add(left, top, right, bottom, chatLineId);
+    }
+
+    /** The chat line id of the delivery mark drawn under the point, or 0. */
+    int markLineAt(double x, double y) {
+        return this.drawn ? this.marks.at(x, y) : 0;
+    }
+
+    /**
+     * Boxes a draw puts on screen, four edges to a box — left, top, right,
+     * bottom — each answering for one chat line.
+     */
+    private static final class LineBoxes {
+        private float[] boxes = new float[32];
+        private int[] lines = new int[8];
+        private int count;
+
+        void clear() {
+            this.count = 0;
+        }
+
+        void add(float left, float top, float right, float bottom,
+                 int chatLineId) {
+            if (right <= left || bottom <= top) {
+                return;
+            }
+            if (this.count == this.lines.length) {
+                this.lines = Arrays.copyOf(this.lines, this.count * 2);
+                this.boxes = Arrays.copyOf(this.boxes, this.count * 8);
+            }
+            int at = this.count * 4;
+            this.boxes[at] = left;
+            this.boxes[at + 1] = top;
+            this.boxes[at + 2] = right;
+            this.boxes[at + 3] = bottom;
+            this.lines[this.count++] = chatLineId;
+        }
+
+        /** The chat line id of the box under the point, or 0. */
+        int at(double x, double y) {
+            for (int index = 0; index < this.count; index++) {
+                int at = index * 4;
+                if (x >= this.boxes[at] && x < this.boxes[at + 2]
+                        && y >= this.boxes[at + 1]
+                        && y < this.boxes[at + 3]) {
+                    return this.lines[index];
+                }
+            }
+            return 0;
+        }
     }
 
     /** Records where the drawn message stack ended up this frame. */

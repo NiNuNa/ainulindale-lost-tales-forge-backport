@@ -42,6 +42,12 @@ abstract class ChatPickerPanel {
     static final int BUTTON_ANCHOR_OFFSET = 14;
     static final int PADDING = 4;
     static final int SEARCH_HEIGHT = 12;
+    /**
+     * Room the search row's magnifier takes before the field: the glyph
+     * and the gap an icon keeps from its label in the chat's lists.
+     */
+    private static final int SEARCH_ICON_RUN =
+            ChatIconSheet.SEARCH.getWidth() + ChatChannelIcons.GAP;
     static final int LABEL_HEIGHT = 10;
     /** Anchor-to-panel-bottom distance: the panel ends just above the
      *  bar the buttons stand in. */
@@ -282,16 +288,14 @@ abstract class ChatPickerPanel {
               int anchorRight, int screenHeight, double pointerX,
               double pointerY, int tipX, int tipY) {
         this.hoveredEntry = null;
-        drawButton(minecraft, regions, anchorRight, screenHeight,
-                pointerX, pointerY);
+        drawButton(regions, anchorRight, screenHeight, pointerX, pointerY);
         drawPanel(minecraft, regions, anchorRight, screenHeight,
                 pointerX, pointerY);
         drawTooltip(minecraft.fontRenderer, tipX, tipY, anchorRight);
     }
 
-    private void drawButton(Minecraft minecraft, ChatPointerRegions regions,
-                            int anchorRight, int screenHeight,
-                            double mouseX, double mouseY) {
+    private void drawButton(ChatPointerRegions regions, int anchorRight,
+                            int screenHeight, double mouseX, double mouseY) {
         int left = buttonLeft(anchorRight);
         int top = buttonTop(screenHeight);
         boolean lifted = this.targetOpen || isInsideButton(mouseX, mouseY,
@@ -302,11 +306,16 @@ abstract class ChatPickerPanel {
         this.buttonFadeNanos = now;
         this.buttonFade = LostTalesChatVisualStyle.hoverFade(this.buttonFade,
                 lifted, elapsed);
-        // A bare icon with the shared shadow; hover and open states lift it
-        // a pixel rather than painting a backdrop, and the icon crosses to
-        // its lit artwork rather than swapping to it.
-        drawButtonIcon(minecraft, left, top - (lifted ? 1 : 0),
-                this.buttonFade);
+        // A bare glyph with the shared shadow, centred in the button's
+        // square; hover and open states lift it a pixel rather than
+        // painting a backdrop, and the glyph crosses to its lit artwork
+        // rather than swapping to it.
+        ChatIconSheet glyph = buttonGlyph();
+        ChatIconSheet.drawPairWithShadow(glyph, buttonGlyphLit(),
+                this.buttonFade,
+                left + (BUTTON_SIZE - glyph.getWidth()) / 2,
+                top - (lifted ? 1 : 0)
+                        + (BUTTON_SIZE - glyph.getHeight()) / 2, 255);
         regions.add(left, top, left + BUTTON_SIZE, top + BUTTON_SIZE);
     }
 
@@ -399,11 +408,11 @@ abstract class ChatPickerPanel {
     }
 
     /**
-     * The search row as the chat's menus draw theirs: what has been
-     * typed, in the chat's own text field; while it is empty, the prompt
-     * in the chat's aside tone and italics, as the input bar's hint is,
-     * a pixel clear of the caret; and a hairline under it that parts it
-     * from the list.
+     * The search row as the chat's menus draw theirs: the magnifier it
+     * opens with; what has been typed, in the chat's own text field;
+     * while it is empty, the prompt in the chat's aside tone and
+     * italics, as the input bar's hint is, a pixel clear of the caret;
+     * and a hairline under it that parts it from the list.
      */
     private void drawSearchRow(FontRenderer font, Layout layout, int alpha) {
         Gui.drawRect(layout.left + PADDING, layout.bodyTop - 1,
@@ -411,6 +420,11 @@ abstract class ChatPickerPanel {
                 LostTalesChatVisualStyle.argb(
                         LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
                         Math.min(alpha, 0xA0)));
+        // The magnifier stands on the capitals of what is typed beside
+        // it, as every icon in a chat row does.
+        ChatIconSheet.SEARCH.drawWithShadow(layout.left + PADDING + 1,
+                layout.searchY + LostTalesChatOverlayRenderer.centredBoxTop(
+                        ChatIconSheet.SEARCH.getHeight()), alpha);
         if (this.searchField == null) {
             return;
         }
@@ -489,15 +503,17 @@ abstract class ChatPickerPanel {
     }
 
     /**
-     * The field in line with the section labels under it, leaving the
-     * caret its column at the far end.
+     * The field after the magnifier, which stands in line with the
+     * section labels under it, leaving the caret its column at the far
+     * end.
      */
     private void positionSearchField(Layout layout) {
         if (this.searchField != null) {
-            this.searchField.xPosition = layout.left + PADDING + 1;
+            this.searchField.xPosition = layout.left + PADDING + 1
+                    + SEARCH_ICON_RUN;
             this.searchField.yPosition = layout.searchY;
             this.searchField.width = panelWidth() - PADDING * 2 - 2
-                    - ChatInputField.CARET_WIDTH;
+                    - ChatInputField.CARET_WIDTH - SEARCH_ICON_RUN;
             this.searchField.height = SEARCH_HEIGHT - 3;
         }
     }
@@ -644,13 +660,11 @@ abstract class ChatPickerPanel {
     /** The text a chosen cell inserts at the input cursor. */
     abstract String insertionText(Entry entry);
 
-    /**
-     * The button's own glyph. {@code lit} is how far it has crossed to
-     * its hovered artwork, 0 at rest and 1 under the pointer; a button
-     * whose glyph has only one state ignores it.
-     */
-    abstract void drawButtonIcon(Minecraft minecraft, int left, int top,
-                                 float lit);
+    /** The button's glyph, a cell of the chat's sheet. */
+    abstract ChatIconSheet buttonGlyph();
+
+    /** The same glyph lit, which the button crosses to under the pointer. */
+    abstract ChatIconSheet buttonGlyphLit();
 
     static final class Section {
         final String label;

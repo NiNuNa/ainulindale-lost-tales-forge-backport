@@ -73,7 +73,10 @@ final class ChatHover {
         SCROLLBAR,
         /** A run of a line. */
         LINE,
-        /** A window's lines where no run stands. */
+        /**
+         * A window's lines where no run stands, its timestamp column
+         * included; a stamp there reads out its whole date.
+         */
         WINDOW
     }
 
@@ -91,6 +94,16 @@ final class ChatHover {
     ChatPickerPanel.Entry pickerEntry;
     ChatInputCompletion.Slot suggestion;
     int toolbarKind = -1;
+    /**
+     * On a window's lines, the chat line id of the message whose stamp
+     * is under the pointer; 0 anywhere else.
+     */
+    int stampLineId;
+    /**
+     * On a window's lines, the chat line id of the message whose
+     * delivery mark is under the pointer; 0 anywhere else.
+     */
+    int markLineId;
     ChatWindowGestures.ResizeTarget resize;
     LostTalesChatOverlayRenderer.Hit line;
     LostTalesChatHoverCard.Found person;

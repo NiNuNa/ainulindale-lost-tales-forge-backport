@@ -27,19 +27,33 @@ import net.minecraft.util.IChatComponent;
  */
 final class ChatReactionMarker {
     private static final String PREFIX = "losttales-chat-reaction:";
-    /** Clear pixels between the chip's edge and what it holds. */
-    static final int PAD = 3;
+    /**
+     * From the chip's edge to what it holds: a chip is a framed button,
+     * so the frame's edge and its padding.
+     */
+    static final int PAD = ChatFramedButton.INSET;
     /** The emoji, drawn one texel to one pixel. */
     static final int ICON = (int)ChatInlineIcons.CONTENT_SIZE;
     /**
-     * The chip's height: the emoji with one pixel of edge above and below
-     * it. A message row is as tall, so a chip fills its row.
+     * The chip's height: the emoji with the frame's inset above and below
+     * it. Taller than a message row, so a reaction row is made as tall as
+     * its chips wherever the chat's small size cannot shrink them into a
+     * line ({@link ChatStackRows#reactionRowHeight}).
      */
-    static final int HEIGHT = ICON + 2;
+    static final int HEIGHT = ICON + 2 * PAD;
+    /**
+     * How far below the chip's top edge the count's text starts: a row
+     * below the emoji's box, so the count's capitals stand half a pixel
+     * above the box's middle.
+     */
+    static final int TEXT_DROP = PAD + 1;
     /** Between the emoji and the count. */
     static final int GAP = 2;
-    /** After the count: the font's own trailing column and one more. */
-    static final int TRAIL = 2;
+    /**
+     * After the count: the font's own trailing column, standing for one
+     * of the padding's pixels, then the rest of the frame's inset.
+     */
+    static final int TRAIL = PAD - 1;
     /** Between two chips. */
     static final int BETWEEN = 2;
     /** A digit's advance when no font can be asked: the game's own. */

@@ -2,6 +2,7 @@ package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatDeliveryMark;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.server.ChatHistory;
@@ -12,6 +13,9 @@ import com.ninuna.losttales.compat.discord.gateway.DiscordGatewayProtocol;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.google.gson.JsonObject;
 import com.ninuna.losttales.core.LostTalesClassTransformer;
+import com.ninuna.losttales.network.LostTalesNetworkHandler;
+import com.ninuna.losttales.network.packet.LostTalesChatDeliveryMarkPacket;
+import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -30,9 +34,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 
 /**
@@ -43,7 +51,7 @@ import net.minecraft.server.MinecraftServer;
  * down, posts the game's lines and the server's notices
  * to the webhooks they name, and keeps every bound Discord channel's
  * topic saying whether the server is up, while the server thread only
- * ever touches the running worker's two bounded queues and its wanted
+ * ever touches the running worker's bounded queues and its wanted
  * topics. Which game channel
  * is tied to which Discord channels, and which way, is
  * {@link DiscordChannelBindings}: OOC &amp; Discord by default, and any
@@ -71,11 +79,18 @@ import net.minecraft.server.MinecraftServer;
  * the inbound side (or the topic) for the session with one severe log
  * line; a rate limit is honoured for exactly the time Discord asks, and
  * on a webhook it holds back that webhook's posts alone, each webhook
- * being a lane of its own ({@link DiscordOutboundLanes}); any other
+ * being a lane of its own ({@link DiscordOutboundLanes}); a lane whose
+ * bucket Discord's headers say is spent waits for the reset instead of
+ * sending into the limit ({@link DiscordRateBuckets}); any other
  * failure backs off, doubling up to a minute, and is logged once
  * on the way down and once on the way back. The webhook's own posts
  * come back as bot messages and are ignored, so nothing echoes. The
  * token and the webhook URL are never logged.</p>
+ *
+ * <p>A player's own line that is slow to reach Discord, or will not
+ * reach it, is marked on that player's screen alone: the worker follows
+ * each line's posts ({@link DiscordDeliveryTracker}), and the server
+ * thread sends what it finds to the sender while they are online.</p>
  *
  * <p>Everything done to a message's Discord copy once it exists — the
  * bot's reactions, edits and deletions, reply headers and jump links
@@ -89,15 +104,44 @@ public final class LostTalesDiscordBridge {
     private static final LostTalesDiscordBridge INSTANCE =
             new LostTalesDiscordBridge();
     private static final int MAX_QUEUED_INBOUND = 256;
-    private static final int MAX_QUEUED_OUTBOUND = 256;
+    /**
+     * Entries a worker's intake holds. A line with no room for every
+     * post it makes queues none of them.
+     */
+    static final int MAX_QUEUED_OUTBOUND = 256;
     /** Shortest gap between two typing pings; Discord's own lasts ten
      *  seconds, so anything more often is spent for nothing. */
     private static final long TYPING_INTERVAL_MILLIS = 8000L;
     private static final int MAX_INBOUND_PER_TICK = 8;
+    /** Delivery marks sent to their senders a tick, at most. */
+    private static final int MAX_MARKS_PER_TICK = 16;
+    /** Delivery marks a worker holds for the server thread, at most. */
+    private static final int MAX_QUEUED_MARKS = 256;
     /** Members remembered by name for the mute command. */
     private static final int MAX_RECENT_AUTHORS = 256;
-    private static final long MIN_BACKOFF_MILLIS = 5000L;
-    private static final long MAX_BACKOFF_MILLIS = 60000L;
+    private static final long MIN_BACKOFF_MILLIS =
+            DiscordOutboundLanes.MIN_RETRY_MILLIS;
+    private static final long MAX_BACKOFF_MILLIS =
+            DiscordOutboundLanes.MAX_RETRY_MILLIS;
+    /**
+     * Tries a webhook post, edit or removal gets before it is given up:
+     * with its lane's pause doubling from five seconds, about a minute
+     * and a quarter of the webhook failing, after which that one entry
+     * no longer holds up the ones behind it.
+     */
+    private static final int MAX_SEND_ATTEMPTS = 5;
+    /**
+     * The shortest pause between two passes of the worker that nothing
+     * woke, so a lane or a read already due cannot spin it.
+     */
+    private static final long MIN_PASS_GAP_MILLIS = 250L;
+    /**
+     * What a send answers besides a pause Discord asked for: the entry
+     * is done without reaching Discord, or Discord took it. Only a
+     * delivery ends a lane's run of failures.
+     */
+    private static final long SPENT = 0L;
+    private static final long DELIVERED = -1L;
     /**
      * How long a stop waits for the worker's last posts: enough for a
      * webhook post and a topic write on a healthy link, and a bound on
@@ -324,6 +368,10 @@ public final class LostTalesDiscordBridge {
                         + "posts within %d ms; leaving them", LostTalesMetaData.MOD_ID,
                         Long.valueOf(STOP_JOIN_MILLIS));
             }
+            // No tick drains a stopped worker, so what it said as it
+            // stopped, above all that the lines it never sent will not
+            // arrive, goes to their senders now.
+            sendMarks(running, MAX_QUEUED_MARKS);
             running.forgetIntake();
         }
         this.bindings = DiscordChannelBindings.EMPTY;
@@ -416,32 +464,43 @@ public final class LostTalesDiscordBridge {
     /**
      * Queues a game line for Discord through every binding of its
      * channel — for the Faction channel, of the sender's faction — that
-     * posts; dropped where none does, and when the queue is full. Each
-     * post is the line as plain text under the sender's name and
-     * picture; a Discord channel holds one game channel's lines, so
-     * nothing on the post need say which. {@code messageId} is the
-     * line's own name, kept so each post's Discord copy can be linked
-     * back to it; {@code reply} is the quote the line was distributed
-     * with, opening the post as a line of subtext — pointing at the
-     * Discord original in that very channel when the bridge knows it.
+     * posts; dropped where none does. Each post is the line as plain
+     * text under the sender's name and picture; a Discord channel holds
+     * one game channel's lines, so nothing on the post need say which.
+     * {@code messageId} is the line's own name, kept so each post's
+     * Discord copy can be linked back to it; {@code reply} is the quote
+     * the line was distributed with, opening the post as a line of
+     * subtext — pointing at the Discord original in that very channel
+     * when the bridge knows it. {@code senderId} is the account that said
+     * the line, told alone how its posts go: a clock while they wait, a
+     * crimson mark when one will not arrive. A line the queue has no room
+     * for is queued nowhere, and its sender is told at once.
      */
     public void relayToDiscord(ChatChannel channel, String factionId,
                                String username, String avatarUrl,
                                String message, long messageId,
-                               ChatReplyReference reply) {
+                               ChatReplyReference reply, UUID senderId) {
         Worker running = this.worker;
-        if (running == null || message == null || message.length() == 0) {
+        if (running == null || !running.posts || message == null
+                || message.length() == 0) {
             return;
         }
+        long queuedAt = System.currentTimeMillis();
+        List<Outbound> copies = new ArrayList<Outbound>();
         // Each id is looked up in the bindings of the worker it is
         // queued for, so it names the entry it was taken from.
         for (DiscordChannelBinding binding : running.bindings.forGame(channel, factionId)) {
             if (binding.sendsToDiscord()) {
-                enqueueOutbound(running, new Outbound(Outbound.Kind.POST, username,
+                copies.add(new Outbound(Outbound.Kind.POST, username,
                         avatarUrl, message, messageId,
                         reply == null ? ChatReplyReference.NONE : reply, null,
-                        binding.id(), channel, factionId));
+                        binding.id(), channel, factionId, senderId, queuedAt));
             }
+        }
+        if (!copies.isEmpty() && !enqueueOutbound(running, copies)) {
+            sendMark(new DiscordDeliveryTracker.Mark(senderId, messageId,
+                    ChatDeliveryMark.State.FAILED,
+                    ChatDeliveryMark.Reason.QUEUE_FULL));
         }
     }
 
@@ -546,19 +605,31 @@ public final class LostTalesDiscordBridge {
         enqueueOutbound(this.worker, entry);
     }
 
+    private boolean enqueueOutbound(Worker running, Outbound entry) {
+        return enqueueOutbound(running, Collections.singletonList(entry));
+    }
+
     /**
-     * Queues an entry for {@code running} alone. Each worker has an
+     * Queues entries for {@code running} alone and wakes it, so they go
+     * out as soon as they are queued rather than at the worker's next
+     * pass: all of them, or none when the intake has no room for all,
+     * which is what the posts of one line need. Each worker has an
      * intake of its own, so a worker still finishing after a reload
      * never takes an entry queued for the next one, whose bindings and
-     * ids it does not share.
+     * ids it does not share. Only the server thread adds to an intake,
+     * so the room counted here is still there when the entries go in.
+     * Answers whether they were queued.
      */
-    private void enqueueOutbound(Worker running, Outbound entry) {
-        if (running == null || !running.posts
-                || running.outboundCount.get() >= MAX_QUEUED_OUTBOUND) {
-            return;
+    private boolean enqueueOutbound(Worker running, List<Outbound> entries) {
+        if (running == null || !running.posts || entries.isEmpty()
+                || running.outboundCount.get() + entries.size()
+                        > MAX_QUEUED_OUTBOUND) {
+            return false;
         }
-        running.outboundCount.incrementAndGet();
-        running.outbound.add(entry);
+        running.outboundCount.addAndGet(entries.size());
+        running.outbound.addAll(entries);
+        running.wake();
+        return true;
     }
 
     /**
@@ -581,10 +652,15 @@ public final class LostTalesDiscordBridge {
         if (running == null) {
             return;
         }
+        boolean asked = false;
         for (DiscordChannelBinding binding : running.bindings.forGame(channel, factionId)) {
             if (binding.sendsToDiscord()) {
                 running.typingRequests.add(binding.id());
+                asked = true;
             }
+        }
+        if (asked) {
+            running.wake();
         }
     }
 
@@ -664,8 +740,9 @@ public final class LostTalesDiscordBridge {
 
     /**
      * Delivers queued Discord messages on the server thread, a few per
-     * tick, and restates the wanted topic from the live player list when
-     * something asked for it.
+     * tick, sends the worker's delivery marks to their senders, and
+     * restates the wanted topic from the live player list when something
+     * asked for it.
      */
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
@@ -687,6 +764,7 @@ public final class LostTalesDiscordBridge {
             }
             delivered++;
         }
+        sendMarks(running, MAX_MARKS_PER_TICK);
         if (this.statusRefreshRequested && running.manages) {
             this.statusRefreshRequested = false;
             MinecraftServer server = MinecraftServer.getServer();
@@ -695,6 +773,41 @@ public final class LostTalesDiscordBridge {
                         server.getCurrentPlayerCount(),
                         server.getMaxPlayers()));
             }
+        }
+    }
+
+    /**
+     * Sends at most {@code limit} of a worker's delivery marks to their
+     * senders. Server thread.
+     */
+    private static void sendMarks(Worker from, int limit) {
+        int handled = 0;
+        DiscordDeliveryTracker.Mark mark;
+        while (handled < limit && (mark = from.marks.poll()) != null) {
+            from.markCount.decrementAndGet();
+            sendMark(mark);
+            handled++;
+        }
+    }
+
+    /**
+     * Tells a line's sender how its post is going while they are online;
+     * a sender who has left is not told. Server thread.
+     */
+    private static void sendMark(DiscordDeliveryTracker.Mark mark) {
+        if (mark.senderId == null || !ChatMessageIds.isServerId(mark.messageId)) {
+            return;
+        }
+        EntityPlayerMP sender = LostTalesServerPlayers.findOnline(mark.senderId);
+        if (sender == null) {
+            return;
+        }
+        try {
+            LostTalesNetworkHandler.CHANNEL.sendTo(new LostTalesChatDeliveryMarkPacket(
+                    mark.messageId, mark.state, mark.reason), sender);
+        } catch (RuntimeException exception) {
+            FMLLog.warning("[%s] Could not tell a player how their Discord post "
+                    + "is going: %s", LostTalesMetaData.MOD_ID, exception.toString());
         }
     }
 
@@ -1195,11 +1308,26 @@ public final class LostTalesDiscordBridge {
         final ChatChannel channel;
         /** The faction a Faction line was said to; empty otherwise. */
         final String factionScope;
+        /**
+         * The account that said a player's line, told how its post goes;
+         * null for anything else.
+         */
+        final UUID senderId;
+        /** When a player's line was queued, by the server's clock; 0 otherwise. */
+        final long queuedAtMillis;
 
         Outbound(Kind kind, String username, String avatarUrl,
                  String message, long messageId, ChatReplyReference reply,
                  DiscordNotice notice, String bindingKey, ChatChannel channel,
                  String factionScope) {
+            this(kind, username, avatarUrl, message, messageId, reply, notice,
+                    bindingKey, channel, factionScope, null, 0L);
+        }
+
+        Outbound(Kind kind, String username, String avatarUrl,
+                 String message, long messageId, ChatReplyReference reply,
+                 DiscordNotice notice, String bindingKey, ChatChannel channel,
+                 String factionScope, UUID senderId, long queuedAtMillis) {
             this.kind = kind;
             this.username = username;
             this.avatarUrl = avatarUrl;
@@ -1210,6 +1338,14 @@ public final class LostTalesDiscordBridge {
             this.bindingKey = bindingKey == null ? "" : bindingKey;
             this.channel = channel;
             this.factionScope = factionScope == null ? "" : factionScope;
+            this.senderId = senderId;
+            this.queuedAtMillis = queuedAtMillis;
+        }
+
+        /** Whether this is a player's line whose sender is told how its post goes. */
+        boolean isTracked() {
+            return this.kind == Kind.POST && this.notice == null
+                    && this.senderId != null;
         }
     }
 
@@ -1275,6 +1411,23 @@ public final class LostTalesDiscordBridge {
         private final DiscordOutboundLanes<Outbound> lanes =
                 new DiscordOutboundLanes<Outbound>();
         /**
+         * What the headers of Discord's replies said of its buckets, so a
+         * lane waits for its bucket to reset instead of sending into a
+         * 429.
+         */
+        private final DiscordRateBuckets buckets = new DiscordRateBuckets();
+        /** Where the posts of the players' own lines have got. */
+        private final DiscordDeliveryTracker tracker = new DiscordDeliveryTracker();
+        /**
+         * What the senders are to be told, waiting for the server thread,
+         * and how much of it: at most {@link #MAX_QUEUED_MARKS}.
+         */
+        final Queue<DiscordDeliveryTracker.Mark> marks =
+                new ConcurrentLinkedQueue<DiscordDeliveryTracker.Mark>();
+        final AtomicInteger markCount = new AtomicInteger();
+        /** Whether a mark dropped for want of room has been said this session. */
+        private boolean markDropLogged;
+        /**
          * When a typing ping was last sent per binding. Discord shows its
          * own indicator for about ten seconds from one, so repeating it
          * faster than that buys nothing and only spends the rate limit.
@@ -1282,8 +1435,27 @@ public final class LostTalesDiscordBridge {
         private final Map<String, Long> typingSentMillis = new HashMap<String, Long>();
         /** The bot itself was refused: nothing is read for the session. */
         private boolean readingDisabled;
-        private boolean healthy = true;
+        /**
+         * Whether reading is going through: said once when it starts
+         * failing and once when it comes back.
+         */
+        private boolean readsHealthy = true;
+        /**
+         * The lanes whose sends are failing, each said once when it
+         * starts and once when it delivers again; the empty name stands
+         * for a failure no one lane owns.
+         */
+        private final Set<String> failingLanes = new HashSet<String>();
+        /** The pause after a failed read, doubling with each one in a row. */
         private long backoffMillis = MIN_BACKOFF_MILLIS;
+        /** When the bound channels are next read, while the gateway is down. */
+        private long nextReadMillis;
+        /**
+         * Released whenever something is queued for this worker, so a
+         * line said in the game is posted at once instead of at the next
+         * pass; the passes themselves stay one at a time.
+         */
+        private final Semaphore wake = new Semaphore(0);
         /**
          * Where each webhook posts, as Discord answered. An answer is
          * kept for the session; a null stands for a webhook Discord
@@ -1327,6 +1499,8 @@ public final class LostTalesDiscordBridge {
         /** Posts each full lane has refused, for the warning that says so. */
         private final Map<String, Integer> droppedByLane =
                 new HashMap<String, Integer>();
+        /** The kinds of request and status Discord refused outright, each said once. */
+        private final Set<String> refusalsLogged = new HashSet<String>();
 
         Worker(DiscordChannelBindings bindings, boolean reads, boolean posts,
                boolean manages) {
@@ -1352,6 +1526,11 @@ public final class LostTalesDiscordBridge {
             interrupt();
         }
 
+        /** Wakes the worker for a pass now: something is waiting to be sent. */
+        void wake() {
+            this.wake.release();
+        }
+
         /**
          * Drops what still waits in the intake once the stop has waited
          * as long as it will: what was not sent by then is left, and a
@@ -1368,33 +1547,32 @@ public final class LostTalesDiscordBridge {
         public void run() {
             probe();
             while (this.running) {
-                long sleepMillis = Math.max(2L, Math.min(60L,
+                long readMillis = Math.max(2L, Math.min(60L,
                         LostTalesConfig.discordPollIntervalSeconds)) * 1000L;
-                try {
-                    // While the gateway is up it hears every message and
-                    // every edit; polling stands in only while it is down.
-                    if (this.reads && !this.readingDisabled && !gatewayLive) {
-                        poll();
-                        sweepChannels();
-                    }
-                    if (this.posts) {
-                        flushOutbound(false);
-                        flushTyping();
-                    }
-                    recovered();
-                } catch (RateLimited limited) {
-                    sleepMillis = Math.max(sleepMillis, limited.retryAfterMillis);
-                } catch (IOException exception) {
-                    sleepMillis = failed(exception.toString());
-                } catch (RuntimeException exception) {
-                    sleepMillis = failed(exception.toString());
+                // While the gateway is up it hears every message and every
+                // edit; reading stands in only while it is down, on a
+                // clock of its own, so a line said in the game never waits
+                // for a read and a failed read never holds a post back.
+                boolean reading = this.reads && !this.readingDisabled
+                        && !gatewayLive;
+                if (reading && System.currentTimeMillis()
+                        >= this.nextReadMillis) {
+                    // Timed from the end of the read, however long it took.
+                    long wait = read(readMillis);
+                    this.nextReadMillis = System.currentTimeMillis() + wait;
                 }
-                // A webhook Discord limited is worked again as soon as
-                // its own clock allows, not at the next poll.
-                long nextLane = this.lanes.nextDueMillis();
-                if (nextLane != Long.MAX_VALUE) {
-                    sleepMillis = Math.max(250L, Math.min(sleepMillis,
-                            nextLane - System.currentTimeMillis()));
+                if (this.posts) {
+                    try {
+                        drainOutbound();
+                        flushTyping();
+                        flushOutbound(false);
+                        postSucceeded("");
+                    } catch (RuntimeException exception) {
+                        postFailed("", exception.toString());
+                    }
+                    // A line still waiting when its clock is due gets one,
+                    // however the pass went.
+                    emitMarks(this.tracker.due(System.currentTimeMillis()));
                 }
                 // The topic keeps its own clock: a limit on it must not
                 // hold the chat back, nor a chat failure the topic.
@@ -1404,30 +1582,81 @@ public final class LostTalesDiscordBridge {
                 if (!this.running) {
                     break;
                 }
+                // Asleep until the next read, until a webhook held back
+                // may be worked again or until a waiting line's clock is
+                // due, and woken at once by anything queued: what makes a
+                // line said in the game cross as soon as it is said.
+                long now = System.currentTimeMillis();
+                long sleepMillis = readMillis;
+                if (reading) {
+                    sleepMillis = Math.min(sleepMillis,
+                            this.nextReadMillis - now);
+                }
+                long nextLane = this.lanes.nextDueMillis();
+                if (nextLane != Long.MAX_VALUE) {
+                    sleepMillis = Math.min(sleepMillis, nextLane - now);
+                }
+                long nextClock = this.tracker.nextDueMillis();
+                if (nextClock != Long.MAX_VALUE) {
+                    sleepMillis = Math.min(sleepMillis, nextClock - now);
+                }
                 try {
-                    Thread.sleep(sleepMillis);
+                    if (this.wake.tryAcquire(Math.max(MIN_PASS_GAP_MILLIS,
+                            sleepMillis), TimeUnit.MILLISECONDS)) {
+                        // One pass answers every wake that came before it.
+                        this.wake.drainPermits();
+                    }
                 } catch (InterruptedException interrupted) {
                     break;
                 }
             }
             sendLast();
+            // What still waits now will not go out; its senders are told.
+            emitMarks(this.tracker.abandon());
+        }
+
+        /**
+         * Reads every bound channel once, while the gateway is down, and
+         * answers how long until the next read: the poll interval, what
+         * Discord asked for when it limited the read, or a pause that
+         * grows with every failure in a row.
+         */
+        private long read(long readMillis) {
+            try {
+                poll();
+                sweepChannels();
+                readSucceeded();
+                return readMillis;
+            } catch (RateLimited limited) {
+                return Math.max(readMillis, limited.retryAfterMillis);
+            } catch (IOException exception) {
+                return readFailed(exception.toString());
+            } catch (RuntimeException exception) {
+                return readFailed(exception.toString());
+            }
         }
 
         /**
          * Sends a typing ping into every bound channel asked for since
-         * the last pass whose last ping is old enough. A refusal is
-         * dropped rather than retried: presence is only worth saying
-         * while it is still true.
+         * the last pass whose last ping is old enough and whose words are
+         * not already waiting to be posted. A refusal is dropped rather
+         * than retried: presence is only worth saying while it is still
+         * true.
          */
         private void flushTyping() {
             if (typingRequests.isEmpty()) {
                 return;
             }
             String token = LostTalesConfig.discordBotToken.trim();
+            Set<String> posting = postingBindings();
             for (String key : new ArrayList<String>(typingRequests)) {
                 typingRequests.remove(key);
                 DiscordChannelBinding binding = this.bindings.byId(key);
-                if (binding == null || token.length() == 0) {
+                if (binding == null || token.length() == 0
+                        // The words are already on their way, and a
+                        // webhook's post does not end the bot's typing on
+                        // Discord: an indicator sent now would outlast them.
+                        || posting.contains(key)) {
                     continue;
                 }
                 long now = System.currentTimeMillis();
@@ -1465,6 +1694,20 @@ public final class LostTalesDiscordBridge {
             return info == null || info.channelId == null ? "" : info.channelId;
         }
 
+        /** The bindings a game line is waiting on a lane to be posted through. */
+        private Set<String> postingBindings() {
+            Set<String> posting = new HashSet<String>();
+            for (String webhook : this.lanes.webhooks()) {
+                for (Outbound waiting : this.lanes.items(webhook)) {
+                    if (waiting.kind == Outbound.Kind.POST
+                            && waiting.notice == null) {
+                        posting.add(waiting.bindingKey);
+                    }
+                }
+            }
+            return posting;
+        }
+
         /**
          * One best-effort pass at what is still queued when the bridge
          * stops — the farewell, the offline topic — with no retry and no
@@ -1475,10 +1718,6 @@ public final class LostTalesDiscordBridge {
                 if (this.posts) {
                     flushOutbound(true);
                 }
-            } catch (IOException exception) {
-                FMLLog.info("[%s] Discord bridge could not send its last "
-                        + "post: %s", LostTalesMetaData.MOD_ID,
-                        exception.toString());
             } catch (RuntimeException exception) {
                 FMLLog.info("[%s] Discord bridge could not send its last "
                         + "post: %s", LostTalesMetaData.MOD_ID,
@@ -1940,36 +2179,192 @@ public final class LostTalesDiscordBridge {
         /**
          * Sends what is queued: the intake is sorted into one lane per
          * webhook, and every lane that is due is worked in order until
-         * it is empty or Discord limits its webhook — which holds that
-         * lane back for exactly the time asked and nobody else's. A
-         * final attempt, at shutdown, works every lane once whatever
-         * its clock says and leaves what is limited.
+         * it is empty, Discord limits its webhook, or a send fails. A
+         * limit holds that lane back for exactly the time asked and a
+         * failure for a pause that doubles with every failure in a row,
+         * that lane alone and never anybody else's. A request whose
+         * bucket Discord's headers say is spent waits for the bucket to
+         * reset, with everything behind it, rather than going out into
+         * the limit. An entry is given up after {@link #MAX_SEND_ATTEMPTS}
+         * failed tries at the head of a lane, so no one post can hold its
+         * webhook up for good. A final attempt, at shutdown, works every
+         * lane once whatever its clock says and leaves what does not go.
          */
-        private void flushOutbound(boolean finalAttempt) throws IOException {
+        private void flushOutbound(boolean finalAttempt) {
             drainOutbound();
             long now = System.currentTimeMillis();
             for (String webhook : this.lanes.due(finalAttempt ? Long.MAX_VALUE : now)) {
                 if (this.postingDisabled.contains(webhook)) {
-                    this.lanes.drop(webhook);
+                    dropLane(webhook);
                     continue;
                 }
                 Outbound next;
                 while ((next = this.lanes.peek(webhook)) != null) {
-                    long wait = send(webhook, next);
-                    if (wait > 0L) {
+                    if (!finalAttempt) {
+                        long held = heldUntil(webhook, next,
+                                System.currentTimeMillis());
+                        if (held > 0L) {
+                            this.lanes.delay(webhook, held);
+                            if (next.isTracked()) {
+                                this.tracker.limited(next.messageId);
+                            }
+                            break;
+                        }
+                    }
+                    long outcome;
+                    try {
+                        outcome = send(webhook, next);
+                    } catch (IOException exception) {
+                        sendFailed(webhook, next, exception, finalAttempt);
+                        break;
+                    } catch (RuntimeException exception) {
+                        sendFailed(webhook, next, exception, finalAttempt);
+                        break;
+                    }
+                    if (outcome > 0L) {
                         if (finalAttempt) {
                             FMLLog.info("[%s] Discord limited the bridge's last "
                                     + "post; leaving it", LostTalesMetaData.MOD_ID);
                         }
-                        this.lanes.delay(webhook, System.currentTimeMillis() + wait);
+                        this.lanes.delay(webhook,
+                                System.currentTimeMillis() + outcome);
+                        if (next.isTracked()) {
+                            this.tracker.limited(next.messageId);
+                        }
                         break;
                     }
                     this.lanes.poll(webhook);
+                    if (outcome == DELIVERED) {
+                        this.lanes.succeeded(webhook);
+                        postSucceeded(webhook);
+                        if (next.isTracked()) {
+                            emitMark(this.tracker.delivered(next.messageId));
+                        }
+                    }
                     if (this.postingDisabled.contains(webhook)) {
-                        this.lanes.drop(webhook);
+                        dropLane(webhook);
                         break;
                     }
                 }
+            }
+        }
+
+        /**
+         * A send that threw. On the last attempt at shutdown it is said
+         * and left. Otherwise its lane is held back for the lane's next
+         * pause, and the entry is given up once it has failed
+         * {@link #MAX_SEND_ATTEMPTS} times at the head of that lane —
+         * counted by the lane, since one correction can wait in several.
+         */
+        private void sendFailed(String webhook, Outbound entry,
+                                Exception exception, boolean finalAttempt) {
+            if (finalAttempt) {
+                FMLLog.info("[%s] Discord bridge could not send its last "
+                        + "post: %s", LostTalesMetaData.MOD_ID,
+                        exception.toString());
+                return;
+            }
+            postFailed(webhook, exception.toString());
+            this.lanes.failed(webhook, System.currentTimeMillis());
+            if (entry.isTracked()) {
+                this.tracker.failed(entry.messageId);
+            }
+            if (this.lanes.headFailures(webhook) >= MAX_SEND_ATTEMPTS) {
+                this.lanes.poll(webhook);
+                FMLLog.warning("[%s] Discord bridge gave up on a %s after %d "
+                        + "tries: %s", LostTalesMetaData.MOD_ID,
+                        entryKind(entry), Integer.valueOf(MAX_SEND_ATTEMPTS),
+                        exception.toString());
+                if (entry.isTracked()) {
+                    emitMark(this.tracker.lost(entry.messageId,
+                            ChatDeliveryMark.Reason.GAVE_UP));
+                }
+            }
+        }
+
+        /**
+         * Forgets everything waiting for a webhook that is off; the
+         * senders of the players' lines among it are told they will not
+         * arrive.
+         */
+        private void dropLane(String webhook) {
+            for (Outbound waiting : this.lanes.items(webhook)) {
+                if (waiting.isTracked()) {
+                    emitMark(this.tracker.lost(waiting.messageId,
+                            ChatDeliveryMark.Reason.WEBHOOK_OFF));
+                }
+            }
+            this.lanes.drop(webhook);
+        }
+
+        /**
+         * When an entry on {@code lane} may be sent, or 0 for now: the
+         * reset of its route's bucket while Discord's headers say the
+         * bucket is spent, and for the bot's reactions the end of its
+         * global limit too.
+         */
+        private long heldUntil(String lane, Outbound next, long nowMillis) {
+            String route = routeOf(next);
+            long held = this.buckets.holdUntil(route, lane, nowMillis);
+            if (DiscordRateBuckets.ROUTE_REACTION.equals(route)) {
+                held = Math.max(held, this.buckets.globalHoldUntil(nowMillis));
+            }
+            return held;
+        }
+
+        /** The Discord route an entry's request goes to, whose bucket limits it. */
+        private String routeOf(Outbound entry) {
+            switch (entry.kind) {
+                case POST:
+                    return DiscordRateBuckets.ROUTE_WEBHOOK_POST;
+                case EDIT:
+                    return DiscordRateBuckets.ROUTE_WEBHOOK_EDIT;
+                case DELETE:
+                    return DiscordRateBuckets.ROUTE_WEBHOOK_DELETE;
+                default:
+                    return DiscordRateBuckets.ROUTE_REACTION;
+            }
+        }
+
+        /**
+         * Hands a mark to the server thread. With {@link #MAX_QUEUED_MARKS}
+         * already waiting, the mark is dropped, and that is said once.
+         */
+        private void emitMark(DiscordDeliveryTracker.Mark mark) {
+            if (mark == null) {
+                return;
+            }
+            if (this.markCount.get() >= MAX_QUEUED_MARKS) {
+                if (!this.markDropLogged) {
+                    this.markDropLogged = true;
+                    FMLLog.warning("[%s] Discord bridge has %d delivery marks "
+                            + "waiting for the server; newer ones are dropped "
+                            + "until it catches up", LostTalesMetaData.MOD_ID,
+                            Integer.valueOf(MAX_QUEUED_MARKS));
+                }
+                return;
+            }
+            this.markCount.incrementAndGet();
+            this.marks.add(mark);
+        }
+
+        private void emitMarks(List<DiscordDeliveryTracker.Mark> batch) {
+            for (DiscordDeliveryTracker.Mark mark : batch) {
+                emitMark(mark);
+            }
+        }
+
+        /** What an entry is, for a log line: never its words or its webhook. */
+        private String entryKind(Outbound entry) {
+            switch (entry.kind) {
+                case POST:
+                    return entry.notice != null ? "notice" : "post";
+                case EDIT:
+                    return "edit";
+                case DELETE:
+                    return "removal";
+                default:
+                    return "reaction";
             }
         }
 
@@ -1980,7 +2375,9 @@ public final class LostTalesDiscordBridge {
          * copy of its message, or still has its post waiting — the
          * intake is in order, so the post is always ahead of the
          * correction in its lane. A lane that is full refuses the
-         * newest, as the intake itself does.
+         * newest, as the intake itself does. The sender of a player's
+         * line is told at once when a post of it is refused here, by a
+         * full lane or a webhook that is off.
          */
         private void drainOutbound() {
             Outbound next;
@@ -1989,8 +2386,18 @@ public final class LostTalesDiscordBridge {
                 if (next.kind == Outbound.Kind.POST) {
                     DiscordChannelBinding binding = this.bindings.byId(next.bindingKey);
                     String webhook = binding == null ? "" : binding.getWebhookUrl();
-                    if (webhook.length() > 0 && !this.postingDisabled.contains(webhook)) {
-                        queueOnLane(webhook, next);
+                    if (next.isTracked()) {
+                        this.tracker.queued(next.messageId, next.senderId,
+                                next.queuedAtMillis);
+                    }
+                    if (webhook.length() == 0 || this.postingDisabled.contains(webhook)) {
+                        if (next.isTracked()) {
+                            emitMark(this.tracker.lost(next.messageId,
+                                    ChatDeliveryMark.Reason.WEBHOOK_OFF));
+                        }
+                    } else if (!queueOnLane(webhook, next) && next.isTracked()) {
+                        emitMark(this.tracker.lost(next.messageId,
+                                ChatDeliveryMark.Reason.QUEUE_FULL));
                     }
                     continue;
                 }
@@ -2061,8 +2468,9 @@ public final class LostTalesDiscordBridge {
         /**
          * The bot's own reaction put on, or taken off, the copy of a
          * message that lives on {@code lane}. Answers how long Discord
-         * asked to wait when it limited the request, and zero when the
-         * entry is spent: no live copy there, no channel to name, no bot
+         * asked to wait when it limited the request, {@link #DELIVERED}
+         * when it took the reaction, and {@link #SPENT} when the entry is
+         * done without it: no live copy there, no channel to name, no bot
          * token, or Discord refusing — said once, since the one usual
          * cause is a permission the bot lacks. A custom emoji from a
          * server the bot is not in is refused as Unknown Emoji, and said
@@ -2098,9 +2506,18 @@ public final class LostTalesDiscordBridge {
                             copy.discordId, next.message)
                     : DiscordHttp.deleteOwnReaction(token, channelId,
                             copy.discordId, next.message);
+            long now = System.currentTimeMillis();
+            this.buckets.observe(DiscordRateBuckets.ROUTE_REACTION, lane,
+                    reply.limit, now);
             if (reply.status == 429) {
                 long asked = DiscordJson.retryAfterMillis(reply.body);
-                return asked > 0L ? asked : MIN_BACKOFF_MILLIS;
+                long wait = asked > 0L ? asked : MIN_BACKOFF_MILLIS;
+                if (reply.limit.global) {
+                    // The bot's own limit: every reaction waits it out,
+                    // whichever lane it is on.
+                    this.buckets.holdGlobal(now + wait);
+                }
+                return wait;
             }
             if (reply.status == 400 && DiscordJson.errorCode(reply.body)
                     == DiscordJson.ERROR_UNKNOWN_EMOJI) {
@@ -2130,7 +2547,7 @@ public final class LostTalesDiscordBridge {
                 throw new IOException("Discord replied HTTP " + reply.status
                         + " to a reaction");
             }
-            return 0L;
+            return DELIVERED;
         }
 
         /**
@@ -2138,10 +2555,11 @@ public final class LostTalesDiscordBridge {
          * is full — a webhook Discord keeps limiting — saying so once
          * per lane, with a count of what it has cost since, so a
          * silent gap in a channel can be read back to its cause.
+         * Answers whether the entry was queued.
          */
-        private void queueOnLane(String webhook, Outbound entry) {
+        private boolean queueOnLane(String webhook, Outbound entry) {
             if (this.lanes.add(webhook, entry)) {
-                return;
+                return true;
             }
             Integer dropped = this.droppedByLane.get(webhook);
             int count = (dropped == null ? 0 : dropped.intValue()) + 1;
@@ -2152,18 +2570,21 @@ public final class LostTalesDiscordBridge {
                         + "dropped until it catches up", LostTalesMetaData.MOD_ID,
                         Integer.valueOf(DiscordOutboundLanes.MAX_PER_LANE));
             }
+            return false;
         }
 
         /**
          * Sends one entry through a webhook: a line or a notice posted,
          * or the copy that went through this webhook corrected. Answers
          * how long Discord asked the webhook to wait when it limited the
-         * request — the entry then stays at its lane's head — and zero
-         * when the entry is spent, sent or not: a webhook Discord
+         * request — the entry then stays at its lane's head —
+         * {@link #DELIVERED} when Discord took it, and {@link #SPENT}
+         * when the entry is done without reaching it: a webhook Discord
          * refuses outright (deleted, or its URL wrong) is off for the
          * session with one log line; a copy Discord no longer has, or a
          * message that never went through this webhook, is nothing to
-         * correct. Any other failure is the bridge's, and backs off.
+         * correct; a request Discord refuses is not sent again. Any
+         * other failure throws, and its lane backs off.
          */
         private long send(String webhook, Outbound next) throws IOException {
             if (next.kind == Outbound.Kind.REACT
@@ -2198,9 +2619,14 @@ public final class LostTalesDiscordBridge {
                                                 next.message,
                                                 outboundResolver(webhook))))
                         : DiscordHttp.deleteWebhookMessage(webhook, copy.discordId);
-                if (reply.status == 404) {
-                    return 0L;
-                }
+            }
+            // What the reply says of the webhook's bucket, a limit's own
+            // reply among them: what the lane's next request waits by.
+            this.buckets.observe(routeOf(next), webhook, reply.limit,
+                    System.currentTimeMillis());
+            if (next.kind != Outbound.Kind.POST && reply.status == 404) {
+                // The copy is gone from Discord: nothing is left to correct.
+                return 0L;
             }
             if (reply.status == 429) {
                 long asked = DiscordJson.retryAfterMillis(reply.body);
@@ -2219,6 +2645,22 @@ public final class LostTalesDiscordBridge {
                         + "restarts", LostTalesMetaData.MOD_ID,
                         binding == null ? next.bindingKey : binding.id(),
                         Integer.valueOf(reply.status));
+                if (next.isTracked()) {
+                    emitMark(this.tracker.lost(next.messageId,
+                            ChatDeliveryMark.Reason.WEBHOOK_OFF));
+                }
+                return 0L;
+            }
+            if (reply.status >= 400 && reply.status < 500) {
+                // Discord refused the request itself — a name or a
+                // message it will not take, a copy the webhook may not
+                // touch — so sending it again cannot succeed: it is spent
+                // here rather than holding the webhook's lane.
+                noteRefused(next, reply);
+                if (next.isTracked()) {
+                    emitMark(this.tracker.lost(next.messageId,
+                            ChatDeliveryMark.Reason.REFUSED));
+                }
                 return 0L;
             }
             if (!reply.isSuccess()) {
@@ -2240,7 +2682,25 @@ public final class LostTalesDiscordBridge {
                         header, destinationOf(webhook), webhook,
                         next.bindingKey);
             }
-            return 0L;
+            return DELIVERED;
+        }
+
+        /**
+         * Says once for each kind of request and status that Discord
+         * refused one outright, with the error it gave, since every such
+         * refusal is something that does not reach Discord.
+         */
+        private void noteRefused(Outbound entry, DiscordHttp.Reply reply) {
+            String kind = entryKind(entry);
+            if (!this.refusalsLogged.add(kind + ':' + reply.status)) {
+                return;
+            }
+            FMLLog.warning("[%s] Discord refused a webhook %s (HTTP %d, "
+                    + "error %s) and it was not sent; further refusals like "
+                    + "it are not logged. Discord refuses a post whose name "
+                    + "or text it will not take", LostTalesMetaData.MOD_ID,
+                    kind, Integer.valueOf(reply.status),
+                    String.valueOf(DiscordJson.errorCode(reply.body)));
         }
 
         /**
@@ -2374,11 +2834,16 @@ public final class LostTalesDiscordBridge {
                             : "Discord refused the webhook, so it is not asked again.");
         }
 
-        private long failed(String reason) {
-            if (this.healthy) {
-                this.healthy = false;
-                FMLLog.warning("[%s] Discord bridge failing, retrying with "
-                        + "backoff: %s", LostTalesMetaData.MOD_ID, reason);
+        /**
+         * A read that failed: said once until reading goes through again,
+         * and answered with the pause before the next read, which doubles
+         * with every failure in a row up to a minute.
+         */
+        private long readFailed(String reason) {
+            if (this.readsHealthy) {
+                this.readsHealthy = false;
+                FMLLog.warning("[%s] Discord bridge failing to read, retrying "
+                        + "with backoff: %s", LostTalesMetaData.MOD_ID, reason);
             }
             long wait = this.backoffMillis;
             this.backoffMillis = Math.min(MAX_BACKOFF_MILLIS,
@@ -2386,13 +2851,46 @@ public final class LostTalesDiscordBridge {
             return wait;
         }
 
-        private void recovered() {
-            if (!this.healthy) {
-                this.healthy = true;
-                FMLLog.info("[%s] Discord bridge recovered",
+        private void readSucceeded() {
+            if (!this.readsHealthy) {
+                this.readsHealthy = true;
+                FMLLog.info("[%s] Discord bridge reading again",
                         LostTalesMetaData.MOD_ID);
             }
             this.backoffMillis = MIN_BACKOFF_MILLIS;
+        }
+
+        /**
+         * A send through {@code lane} that failed: said once until that
+         * lane delivers again, so one dead webhook beside a healthy one
+         * is not reported over and over. The pause before the next try
+         * is the lane's own.
+         */
+        private void postFailed(String lane, String reason) {
+            if (this.failingLanes.add(lane)) {
+                FMLLog.warning("[%s] Discord bridge failing to post%s, "
+                        + "retrying with backoff: %s", LostTalesMetaData.MOD_ID,
+                        laneName(lane), reason);
+            }
+        }
+
+        private void postSucceeded(String lane) {
+            if (this.failingLanes.remove(lane)) {
+                FMLLog.info("[%s] Discord bridge posting again%s",
+                        LostTalesMetaData.MOD_ID, laneName(lane));
+            }
+        }
+
+        /**
+         * How a lane is named in a log line: the Discord channel its
+         * webhook posts to when that is already known, never its URL.
+         */
+        private String laneName(String lane) {
+            DiscordJson.ChannelInfo info = lane.length() == 0 ? null
+                    : this.webhookInfos.get(lane);
+            return info == null || info.channelId == null
+                    || info.channelId.length() == 0 ? ""
+                    : " to channel " + info.channelId;
         }
     }
 

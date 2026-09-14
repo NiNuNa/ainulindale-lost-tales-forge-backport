@@ -480,6 +480,71 @@ public final class DiscordJson {
         return body.toString();
     }
 
+    /** The longest name Discord takes for a webhook post. */
+    private static final int MAX_WEBHOOK_NAME = 80;
+
+    /**
+     * A game name as a webhook post may carry it. Discord's naming rules
+     * refuse a name holding {@code @}, {@code #}, {@code :} or three
+     * backticks, one containing "discord" or "clyde", and the names
+     * "everyone" and "here", and refuse the whole post with it. Each is
+     * given a look-alike Discord takes rather than dropped, so the name
+     * still reads as itself, and the name is cut to Discord's eighty
+     * characters. Empty when nothing is left; the post then goes out
+     * under the webhook's own name.
+     */
+    static String webhookUsername(String name) {
+        if (name == null) {
+            return "";
+        }
+        String cleaned = name.trim()
+                .replace("```", "ˋˋˋ")
+                .replace('@', '＠')
+                .replace('#', '＃')
+                .replace(':', '꞉');
+        cleaned = disguise(cleaned, "discord", 4, 'ο', 'Ο');
+        cleaned = disguise(cleaned, "clyde", 2, 'у', 'Υ');
+        if ("everyone".equalsIgnoreCase(cleaned)) {
+            cleaned = disguise(cleaned, cleaned, 0, 'е', 'Е');
+        } else if ("here".equalsIgnoreCase(cleaned)) {
+            cleaned = disguise(cleaned, cleaned, 1, 'е', 'Е');
+        }
+        if (cleaned.length() > MAX_WEBHOOK_NAME) {
+            int end = MAX_WEBHOOK_NAME;
+            if (Character.isHighSurrogate(cleaned.charAt(end - 1))) {
+                end--;
+            }
+            cleaned = cleaned.substring(0, end).trim();
+        }
+        return cleaned;
+    }
+
+    /**
+     * The text with the letter at {@code at} of every occurrence of
+     * {@code word}, in any case, swapped for a look-alike of that case.
+     */
+    private static String disguise(String text, String word, int at,
+                                   char lower, char upper) {
+        StringBuilder out = null;
+        int index = 0;
+        while (index + word.length() <= text.length()) {
+            if (text.regionMatches(true, index, word, 0, word.length())) {
+                if (out == null) {
+                    out = new StringBuilder(text);
+                }
+                char original = text.charAt(index + at);
+                out.setCharAt(index + at,
+                        Character.isUpperCase(original) ? upper : lower);
+                // A match overlapping this one would hold the letter just
+                // swapped, so the next can only start after it.
+                index += at + 1;
+            } else {
+                index++;
+            }
+        }
+        return out == null ? text : out.toString();
+    }
+
     /**
      * The body of a game line: the text under the sender's name and,
      * when given, a picture, pinging nobody. {@code content} is the line
@@ -490,8 +555,9 @@ public final class DiscordJson {
                                          String content) {
         JsonObject body = new JsonObject();
         body.addProperty("content", content == null ? "" : content);
-        if (username != null && username.length() > 0) {
-            body.addProperty("username", username);
+        String name = webhookUsername(username);
+        if (name.length() > 0) {
+            body.addProperty("username", name);
         }
         if (avatarUrl != null && avatarUrl.length() > 0) {
             body.addProperty("avatar_url", avatarUrl);

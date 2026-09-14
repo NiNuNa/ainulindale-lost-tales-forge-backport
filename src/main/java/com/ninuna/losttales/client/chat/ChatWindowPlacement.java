@@ -328,15 +328,31 @@ public final class ChatWindowPlacement {
     }
 
     /**
-     * The window's box for the given screen size. A window linked to
+     * The window's box for the given screen size, as it is drawn: its
+     * {@link #restingBounds}, or the screen's box while it fills the
+     * screen, gliding between the two as it takes the screen or lets it
+     * go ({@link #withFullscreen}).
+     */
+    public static Box windowBounds(ChatWindow window, Minecraft minecraft,
+                                   int screenWidth, int screenHeight) {
+        return withFullscreen(window, restingBounds(window, minecraft,
+                screenWidth, screenHeight), minecraft, screenWidth,
+                screenHeight);
+    }
+
+    /**
+     * The window's box from its own place and size. A window linked to
      * another takes its place from its target — a margin above or below
      * it, following chains — and is kept on screen like any other. No
      * window is a border for another: windows may overlap, and a growing
      * one never loses lines to a neighbour. Stored anchors never change;
      * it is all recomputed every frame and undoes itself as lines go.
+     * Links are followed between resting boxes, so a window filling the
+     * screen never moves the windows stuck to it; this is also the box
+     * it goes back to, and what a drag measures a window from.
      */
-    public static Box windowBounds(ChatWindow window, Minecraft minecraft,
-                                   int screenWidth, int screenHeight) {
+    public static Box restingBounds(ChatWindow window, Minecraft minecraft,
+                                    int screenWidth, int screenHeight) {
         List<ChatWindow> windows = ChatWindowLayout.windows();
         int count = windows.size();
         int index = windows.indexOf(window);
@@ -445,6 +461,101 @@ public final class ChatWindowPlacement {
                 room);
     }
 
+
+    /**
+     * The window's box as it is drawn this instant: its resting box, the
+     * screen's while it fills the screen, and a share of the way between
+     * the two while it glides from one to the other.
+     */
+    static Box withFullscreen(ChatWindow window, Box resting,
+                              Minecraft minecraft, int screenWidth,
+                              int screenHeight) {
+        double share = fullscreenShare(window);
+        if (share <= 0.0D) {
+            return resting;
+        }
+        int width = (int)Math.round(boxWidthForChatWidth(drawnChatWidth(
+                window, minecraft, screenWidth, share), minecraft));
+        return between(resting, fullscreenBounds(minecraft, screenWidth,
+                screenHeight), width, share, minecraft);
+    }
+
+    /**
+     * A box {@code share} of the way from one box to another, every edge
+     * moving straight to where it is going: the left edge, the baseline
+     * and the message room each a share of the way, so the tab row and
+     * the bar arrive together. {@code width} is the width the lines are
+     * laid out to at that share, which the box takes whole.
+     */
+    static Box between(Box from, Box to, int width, double share,
+                       Minecraft minecraft) {
+        double room = from.room + (to.room - from.room) * share;
+        double height = heightForRoom(room, minecraft);
+        double baseline = from.baseline()
+                + (to.baseline() - from.baseline()) * share;
+        return new Box(from.x + (to.x - from.x) * share,
+                baseline - (height - from.barHeight), width, height,
+                from.barHeight, room);
+    }
+
+    /**
+     * The box a window fills the screen with: everything between the
+     * screen margins, its lines laid out to that width.
+     */
+    static Box fullscreenBounds(Minecraft minecraft, int screenWidth,
+                                int screenHeight) {
+        int margin = HudPlacementLayout.SCREEN_MARGIN;
+        int barHeight = barHeight(minecraft);
+        int width = (int)Math.round(boxWidthForChatWidth(
+                fullscreenChatWidth(minecraft, screenWidth), minecraft));
+        double room = Math.max(1.0D, screenHeight - 2.0D * margin
+                - rowHeight(minecraft) - HISTORY_TOP_MARGIN - barHeight);
+        return new Box(margin, margin, width, heightForRoom(room, minecraft),
+                barHeight, room);
+    }
+
+    /** The chat width a window filling the screen is laid out at. */
+    static int fullscreenChatWidth(Minecraft minecraft, int screenWidth) {
+        return Math.max(ChatWindowLayout.MIN_CHAT_WIDTH, chatWidthForBox(
+                screenWidth - 2 * HudPlacementLayout.SCREEN_MARGIN,
+                minecraft));
+    }
+
+    /**
+     * The chat width a window is laid out at this instant: its own
+     * width, the screen's while it fills the screen, and a share of the
+     * way between the two while it glides from one to the other, so its
+     * lines re-wrap as the box grows rather than all at once.
+     */
+    public static int drawnChatWidth(ChatWindow window, Minecraft minecraft,
+                                     int screenWidth) {
+        return drawnChatWidth(window, minecraft, screenWidth,
+                fullscreenShare(window));
+    }
+
+    private static int drawnChatWidth(ChatWindow window, Minecraft minecraft,
+                                      int screenWidth, double share) {
+        int own = chatWidth(window, minecraft);
+        if (share <= 0.0D) {
+            return own;
+        }
+        return (int)Math.round(own + (fullscreenChatWidth(minecraft,
+                screenWidth) - own) * share);
+    }
+
+    /**
+     * How far the window stands toward filling the screen this instant:
+     * where its frame's motion was last advanced to, or the state itself
+     * for a window not drawn yet.
+     */
+    static double fullscreenShare(ChatWindow window) {
+        if (window == null) {
+            return 0.0D;
+        }
+        ChatWindowFrame frame = ChatWindowFrame.find(window.getId());
+        return frame == null ? (window.isFullscreen() ? 1.0D : 0.0D)
+                : frame.fullscreenShare(window.isFullscreen());
+    }
 
     /**
      * Pushes a baseline down when the box above it would cross the top

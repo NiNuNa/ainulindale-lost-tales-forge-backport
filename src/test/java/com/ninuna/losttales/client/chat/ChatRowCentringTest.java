@@ -12,7 +12,7 @@ import static org.junit.Assert.assertTrue;
  * is centred on those capitals — exactly when h is odd, and half a pixel
  * above their middle when it is even — without ever reaching past the
  * row. The 10px content box starts two rows above the text, an 8px head
- * one, the 7px speech bubble on it, and the 12px reaction chip and
+ * one, the 6px speech bubble on it, and the 12px reaction chip and
  * toolbar button fill the row. A divider's rule and its date share the
  * capitals' middle row, and the hover rule stands on the descenders'
  * shadow row.
@@ -116,40 +116,68 @@ public final class ChatRowCentringTest {
     }
 
     @Test
-    public void aReactionChipFillsItsRowAndCentresItsEmoji() {
+    public void aReactionChipIsAFramedButtonCentredInItsRow() {
         int height = ChatReactionMarker.HEIGHT;
-        assertEquals(LINE, height);
-        int chipTop = LostTalesChatOverlayRenderer.centredBoxTop(height);
-        assertEquals(0, TEXT_TOP + chipTop);
-        assertEquals(LINE, TEXT_TOP + chipTop + height);
-        // Its emoji keeps one pixel of edge above and below it.
-        int emojiTop = LostTalesChatVisualStyle.chipEmojiTop(chipTop);
-        assertEquals(1, emojiTop - chipTop);
-        assertEquals(1, chipTop + height - (emojiTop + BOX));
+        // The emoji's box with the frame's inset above and below it.
+        assertEquals(BOX + 2 * ChatFramedButton.INSET, height);
+        // A reaction row grows to hold its chips only where the small
+        // size cannot shrink them into a line: GUI scale 1 draws them
+        // whole and 4 at three quarters; 2 and 3 fit a line as they are.
+        assertEquals(18, ChatStackRows.reactionRowHeight(1.0F));
+        assertEquals(LINE, ChatStackRows.reactionRowHeight(0.5F));
+        assertEquals(LINE, ChatStackRows.reactionRowHeight(2.0F / 3.0F));
+        assertEquals(14, ChatStackRows.reactionRowHeight(0.75F));
+        // At full size a chip fills its row exactly.
+        float textTop = LostTalesChatOverlayRenderer.reactionTextTop(100, 18,
+                1.0F);
+        float chipTop = textTop - ChatReactionMarker.TEXT_DROP;
+        assertEquals(82.0F, chipTop, 0.0F);
+        assertEquals(100.0F, chipTop + height, 0.0F);
+        // Its emoji has the inset above and below it, and the count's
+        // capitals stand half a pixel above the emoji's middle.
+        int emojiTop = LostTalesChatVisualStyle.chipEmojiTop(0);
+        assertEquals(ChatFramedButton.INSET, emojiTop);
+        assertEquals(ChatFramedButton.INSET, height - (emojiTop + BOX));
+        float capsMiddle = ChatReactionMarker.TEXT_DROP + CAPS / 2.0F;
+        float emojiMiddle = emojiTop + BOX / 2.0F;
+        assertEquals(0.5F, emojiMiddle - capsMiddle, 0.0F);
+        // At half size, GUI scale 2, it is centred in a line and lands on
+        // whole display pixels.
+        float half = LostTalesChatOverlayRenderer.reactionTextTop(100, LINE,
+                0.5F) - ChatReactionMarker.TEXT_DROP * 0.5F;
+        assertEquals(89.5F, half, 0.0F);
+        assertEquals(0.0F, (half * 2.0F) % 1.0F, 0.0F);
     }
 
     @Test
-    public void theToolbarFillsItsRow() {
+    public void theToolbarStandsOnItsRowsCapitals() {
         int size = LostTalesChatOverlayRenderer.TOOLBAR_BUTTON_SIZE;
-        assertEquals(LINE, size);
+        // A framed button: an emoji's box, then two clear pixels, the ink
+        // and a ring of surface either side of it.
+        assertEquals(BOX + 8, size);
         int rowBottom = 100;
         int top = LostTalesChatOverlayRenderer.toolbarTop(rowBottom, LINE);
-        assertEquals(88, top);
-        assertEquals(rowBottom - LINE, top);
-        assertEquals(rowBottom, top + size);
-        // In a row one pixel taller the spare pixel goes below it.
-        assertEquals(87, LostTalesChatOverlayRenderer.toolbarTop(100, 13));
+        // Taller than the row, so centred on its capitals and half a pixel
+        // up: four rows above the row, two below it.
+        assertEquals(84, top);
+        assertEquals(4, rowBottom - LINE - top);
+        assertEquals(2, top + size - rowBottom);
+        // Its react button's emoji stands exactly where a row's does.
+        assertEquals(rowBottom - LINE + TEXT_TOP
+                        + LostTalesChatOverlayRenderer.centredBoxTop(BOX),
+                top + (size - BOX) / 2);
     }
 
     @Test
     public void theSpeechBubbleTakesOneRowWhereverItIsDrawn() {
         int height = ChatIconSheet.SPEECH_BUBBLE.getHeight();
-        assertEquals(7, height);
+        assertEquals(6, height);
         // A reply's quote and the typing line place it as a box of its
-        // own: as tall as the capitals, on them exactly.
+        // own: six rows, the pill and its tail, half a pixel above the
+        // capitals' middle — on their top row, a row above their foot.
         int top = LostTalesChatOverlayRenderer.centredBoxTop(height);
         assertEquals(2, TEXT_TOP + top);
-        assertEquals(3, LINE - (TEXT_TOP + top + height));
+        assertEquals(4, LINE - (TEXT_TOP + top + height));
         // A link to a message stands it in the content box of the slot
         // its two spaces reserve, and lands on the same row whatever
         // width the font gives those spaces.

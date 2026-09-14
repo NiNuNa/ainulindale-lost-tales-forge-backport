@@ -51,6 +51,56 @@ public final class DiscordOutboundLanesTest {
         assertTrue(lanes.due(Long.MAX_VALUE).isEmpty());
     }
 
+    /**
+     * A failed send holds its own lane back, longer after each failure
+     * in a row up to a minute, and a success starts the pauses over.
+     */
+    @Test
+    public void aFailingLaneWaitsLongerEachTimeAndStartsOverAfterASuccess() {
+        DiscordOutboundLanes<String> lanes = new DiscordOutboundLanes<String>();
+        lanes.add("failing", "f1");
+        lanes.add("fine", "o1");
+        long shortest = DiscordOutboundLanes.MIN_RETRY_MILLIS;
+        assertEquals(1000L + shortest, lanes.failed("failing", 1000L));
+        // Only the failing lane waits.
+        assertEquals(Collections.singletonList("fine"), lanes.due(1000L));
+        assertEquals(1000L + 2L * shortest, lanes.failed("failing", 1000L));
+        assertEquals(1000L + 4L * shortest, lanes.failed("failing", 1000L));
+        for (int index = 0; index < 10; index++) {
+            lanes.failed("failing", 1000L);
+        }
+        assertEquals(1000L + DiscordOutboundLanes.MAX_RETRY_MILLIS,
+                lanes.failed("failing", 1000L));
+        lanes.succeeded("failing");
+        assertEquals(1000L + shortest, lanes.failed("failing", 1000L));
+        // A lane that never existed has nothing to hold back.
+        assertEquals(1000L, lanes.failed("none", 1000L));
+    }
+
+    /**
+     * An item's failures are counted by the lane it waits in, from when
+     * it came to the head: one correction waiting in two lanes is given
+     * up by each on its own count.
+     */
+    @Test
+    public void anItemsFailuresAreCountedByItsLane() {
+        DiscordOutboundLanes<String> lanes = new DiscordOutboundLanes<String>();
+        lanes.add("a", "edit");
+        lanes.add("b", "edit");
+        lanes.add("a", "next");
+        lanes.failed("a", 0L);
+        lanes.failed("a", 0L);
+        assertEquals(2, lanes.headFailures("a"));
+        assertEquals(0, lanes.headFailures("b"));
+        lanes.poll("a");
+        assertEquals(0, lanes.headFailures("a"));
+        lanes.failed("a", 0L);
+        assertEquals(1, lanes.headFailures("a"));
+        lanes.drop("a");
+        assertEquals(0, lanes.headFailures("a"));
+        assertEquals(0, lanes.headFailures("none"));
+    }
+
     @Test
     public void aLaneIsBoundedAndCanBeDropped() {
         DiscordOutboundLanes<Integer> lanes = new DiscordOutboundLanes<Integer>();

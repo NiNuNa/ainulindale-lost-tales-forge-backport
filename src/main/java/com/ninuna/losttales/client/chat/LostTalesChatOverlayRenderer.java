@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatDeliveryMark;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
@@ -8,6 +9,7 @@ import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRende
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.lang.reflect.Field;
+import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -21,6 +23,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.StatCollector;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import net.minecraft.client.renderer.OpenGlHelper;
 import org.lwjgl.opengl.GLContext;
@@ -81,8 +84,9 @@ final class LostTalesChatOverlayRenderer {
     static final int ROW_TEXT_TOP = (LINE_HEIGHT - GLYPH_CAP_HEIGHT) / 2;
     /**
      * How far above a row's bottom edge its text's top edge stands.
-     * Everything drawn against the text — heads, emoji, items, reaction
-     * chips, timestamps — is placed from there.
+     * Everything drawn against the text — heads, emoji, items,
+     * timestamps — is placed from there; a reaction row centres its
+     * chips in the row instead ({@link #reactionTextTop}).
      */
     static final int TEXT_OFFSET = LINE_HEIGHT - ROW_TEXT_TOP;
     /**
@@ -110,7 +114,7 @@ final class LostTalesChatOverlayRenderer {
      * when the two heights differ by an odd number of rows, and never
      * past the row's own edges, so a box as tall as the row fills it.
      * The ten-row content box of an emoji, an item or a marker starts two
-     * rows above the text's top, an eight-row head one, and the seven-row
+     * rows above the text's top, an eight-row head one, and the six-row
      * speech bubble on it.
      */
     static int centredBoxTop(int height) {
@@ -146,6 +150,11 @@ final class LostTalesChatOverlayRenderer {
      * blur behind the band so the two thin out together.
      */
     static final float[] BACKDROP_FADE_WEIGHTS = backdropFadeWeights();
+    /**
+     * The opacity profile of a surface laid in one flat colour, as the
+     * timestamp column is: the same at both ends.
+     */
+    private static final float[] FLAT_WEIGHTS = {1.0F, 1.0F};
 
     private static float[] backdropFadeWeights() {
         float[] weights = new float[BACKDROP_FADE_STEPS + 1];
@@ -307,6 +316,10 @@ final class LostTalesChatOverlayRenderer {
                                        int screenHeight,
                                        LostTalesGuiAnimationSample opening) {
         ChatWindowFrame frame = ChatWindowFrame.of(window);
+        // Only the stamps and marks this draw puts on screen answer the
+        // pointer.
+        frame.clearStamps();
+        frame.clearMarks();
         List<ChatTab> tabs = ChatWindowFrame.visibleTabs(window);
         ChatTab view = ChatWindowFrame.activeTab(window, tabs);
         ChatLineFilter filter = ChatLineFilter.of(view);
@@ -316,7 +329,11 @@ final class LostTalesChatOverlayRenderer {
         // reserves room for, which the open screen does not draw. Only
         // a window whose history cannot be read falls back to that
         // shared list.
-        int chatWidth = ChatWindowPlacement.chatWidth(window, minecraft);
+        // A window filling the screen, or gliding to or from it, is laid
+        // out at the width it is drawn at this instant.
+        frame.advanceFullscreen(window.isFullscreen());
+        int chatWidth = ChatWindowPlacement.drawnChatWidth(window, minecraft,
+                screenWidth);
         List<ChatLine> own = ChatWindowLines.forWindow(minecraft, chat,
                 window, filter, chatWidth);
         List<ChatLine> lines = own != null ? own
@@ -929,6 +946,10 @@ final class LostTalesChatOverlayRenderer {
         // The panel's opacity, shared by every stretch of it a line
         // recolours, so the stretch and the panel beside it are one.
         int panelAlpha = backdropAlpha(opacity, opening) / 2;
+        // The timestamp column's opacity: the inset surface's two thirds,
+        // thinning with the game's chat opacity as the panel does.
+        int columnAlpha = Math.round(LostTalesChatVisualStyle.INSET_ALPHA
+                * opacity * opening.getOpacity());
         // A window whose history can fill its room keeps its row on the
         // window's own top edge, so it does not move as the stack
         // scrolls under it — the trailing scroll room included; so does
@@ -944,11 +965,54 @@ final class LostTalesChatOverlayRenderer {
                 : ChatWindowFrame.snapToDisplayPixels(
                         restingY + stackOffset - plannedHeight * scale));
 
+        // A scrolled view starts below the baseline: every row whose top
+        // the scroll slid into the trailing strip, clipped where the
+        // strip's reveal ends. A blank row in the strip leaves room for
+        // part of the row under it.
+        int firstRow = rows.firstRowShown(scrollRow, offset,
+                (clipBottom - restingY) / scale);
+        int firstLine = Math.max(0, lineOfRow(firstRow, dividerIndex));
+        // The floating controls — the hovered message's toolbar and the
+        // jump-to-present button — are placed before anything is drawn,
+        // so the panel, the lines and the shades can leave them holes.
+        ToolbarPlace toolbar = open ? placeToolbar(minecraft, lines,
+                firstLine, lastRow, dividerIndex, rows, stackBase, opacity,
+                opening) : null;
+        int[] toolbarKinds = toolbar == null ? new int[0]
+                : offeredToolbar(toolbar.chatLineId);
+        // Clear of the scrollbar's track at the panel's right edge.
+        float toolbarLeft = panelRight - 1.0F - SCROLLBAR_WIDTH
+                - TOOLBAR_GAP - toolbarWidth(toolbarKinds.length);
+        boolean jumpShown = open && advanceJumpButton(frame, scrollLines);
+        // Centred across the panel, on a whole pixel.
+        float jumpLeft = Math.round((panelLeft + panelRight
+                - JUMP_BUTTON_SIZE) / 2.0F);
+        float jumpTop = jumpButtonTop(frame, bottomEdge, originY, scale);
+        Holes holes = new Holes();
+        for (int index = 0; index < toolbarKinds.length; index++) {
+            holes.add(toolbarLeft + index * TOOLBAR_STRIDE,
+                    toolbar.top + offset, TOOLBAR_BUTTON_SIZE,
+                    TOOLBAR_BUTTON_SIZE, CONTROL_DEPTH, 1.0F);
+        }
+        if (jumpShown) {
+            holes.add(jumpLeft, jumpTop, JUMP_BUTTON_SIZE, JUMP_BUTTON_SIZE,
+                    CONTROL_DEPTH, 1.0F);
+        }
+        if (open) {
+            // The reaction chips are framed buttons too, in the stack.
+            placeChipHoles(holes, minecraft, font, lines, firstLine,
+                    lastRow, dividerIndex, rows, stackBase, opacity,
+                    opening, alignment, unscaledWidth, offset);
+        }
+
         GL11.glPushMatrix();
         boolean clipped = false;
+        boolean masked = false;
         try {
             GL11.glTranslatef(originX, originY, 0.0F);
             GL11.glScalef(scale, scale, 1.0F);
+            masked = beginHoles(panelLeft, topEdge, panelRight, bottomEdge,
+                    holes);
             if (open) {
                 // One backdrop for the whole message area between the
                 // rules, laid before the stack: a window has one panel,
@@ -971,9 +1035,7 @@ final class LostTalesChatOverlayRenderer {
                     fillRect(panelLeft, topEdge, messageLeft, bottomEdge,
                             LostTalesChatVisualStyle.argb(
                                     LostTalesChatVisualStyle.SURFACE_RGB,
-                                    Math.round(LostTalesChatVisualStyle
-                                            .INSET_ALPHA * opacity
-                                            * opening.getOpacity())));
+                                    columnAlpha));
                 }
                 // Rows the history does not reach: hatched, so the
                 // region reads as holding no messages rather than as a
@@ -1005,10 +1067,6 @@ final class LostTalesChatOverlayRenderer {
             }
             // Only the message stack is offset; the panel and the shades
             // belong to the window's own edges and stay on them.
-            // Where the hovered message's toolbar goes, filled in by the
-            // stack as it draws it.
-            float hoveredTop = 0.0F;
-            int hoveredLineId = 0;
             GL11.glPushMatrix();
             try {
                 GL11.glTranslatef(0.0F, offset, 0.0F);
@@ -1016,18 +1074,13 @@ final class LostTalesChatOverlayRenderer {
                 // cut gives up shows the panel drawn unclipped above.
                 clipped = open && beginVerticalClip(minecraft, clipTop,
                         clipBottom, true);
-
-                // A scrolled view starts below the baseline: every row
-                // whose top the scroll slid into the trailing strip,
-                // clipped where the strip's reveal ends. A blank row in
-                // the strip leaves room for part of the row under it.
-                int firstRow = rows.firstRowShown(scrollRow, offset,
-                        (clipBottom - restingY) / scale);
-                int firstLine = Math.max(0,
-                        lineOfRow(firstRow, dividerIndex));
                 String dividerLabel = unreadDividerLabel(frame, lines,
                         dividerIndex, dividerDateIndex);
                 float smallScale = LostTalesChatVisualStyle.stackSmallScale();
+                // The message whose lowest row of words has taken its
+                // delivery mark: the stack walks upward, so that row is the
+                // first of the message it reaches.
+                int markedLineId = 0;
                 // The line in the topmost slot owns the head-room above
                 // it: its band reaches up to the rule instead of being
                 // cut flush on its glyphs. A window with a fixed height
@@ -1069,17 +1122,8 @@ final class LostTalesChatOverlayRenderer {
                     fade = Math.max(0.0D,
                             Math.min(1.0D, fade * 10.0D));
                     fade *= fade;
-                    int alpha = open ? 255 : (int)(255.0D * fade);
-                    // A message still on its way is faint until the
-                    // server's own copy of it arrives to take its place.
-                    if (ClientChatPendingEchoes.isPending(
-                            line.getChatLineID())) {
-                        alpha = Math.round(alpha
-                                * ClientChatPendingEchoes.PENDING_OPACITY);
-                    }
-                    alpha = (int)(alpha * opacity);
-                    alpha = (int)(alpha * entryOpacity(line));
-                    alpha = (int)(alpha * opening.getOpacity());
+                    int alpha = lineAlpha(open ? 255 : (int)(255.0D * fade),
+                            line, opacity, opening);
                     eligibleHeight += rowHeight;
                     // The row's bottom edge, measured up the stack from
                     // the row the scroll rests on.
@@ -1178,6 +1222,34 @@ final class LostTalesChatOverlayRenderer {
                                     panelRight, y, panelAlpha, backdropRgb,
                                     bandRgb);
                         }
+                        if (columns.enabled && hoverFade > 0.0F) {
+                            // The line under the pointer lights its row of
+                            // the timestamp column too, so the stamp that
+                            // belongs to it is found at a glance: the
+                            // column's own surface recoloured in place, at
+                            // the column's two thirds, toward the colour
+                            // the line's panel lights to. The column is
+                            // never what the pointer selects a line on.
+                            int litRgb = lineBandRgb(backdropRgb,
+                                    LostTalesChatVisualStyle.selectedLineRgb(),
+                                    pinged, mentionRgb,
+                                    LostTalesChatVisualStyle
+                                            .selectedMentionLineRgb(),
+                                    lineShare(line), flash,
+                                    LostTalesChatVisualStyle.replyHighlightRgb(),
+                                    LostTalesChatVisualStyle
+                                            .selectedReplyHighlightRgb(),
+                                    1.0F);
+                            recolour(panelLeft, panelLeft,
+                                    y - rowHeight - headroom / scale,
+                                    messageLeft, y, columnAlpha,
+                                    LostTalesChatVisualStyle.SURFACE_RGB,
+                                    LostTalesChatVisualStyle.blend(
+                                            LostTalesChatVisualStyle
+                                                    .SURFACE_RGB,
+                                            litRgb, hoverFade),
+                                    FLAT_WEIGHTS);
+                        }
                     }
                     // The closed feed has no panel — each of its lines
                     // fades on its own — so there each brings its own
@@ -1235,13 +1307,6 @@ final class LostTalesChatOverlayRenderer {
                                 barLeft + MENTION_BAR_WIDTH, y,
                                 (alpha << 24) | mentionRgb);
                     }
-                    if (hoveredLine) {
-                        // The loop walks upward, so the last hovered row
-                        // it draws is the message's topmost: where the
-                        // toolbar stands, once the stack is done.
-                        hoveredTop = toolbarTop(y, rowHeight);
-                        hoveredLineId = line.getChatLineID();
-                    }
                     GL11.glPopMatrix();
                     if (dividerHere) {
                         // The unread divider's own row, directly above
@@ -1284,29 +1349,48 @@ final class LostTalesChatOverlayRenderer {
                             // and its words on the next are stamped
                             // between them, the way a reply's quote, name
                             // and words already were.
+                            int stampX = Math.round(panelLeft)
+                                    + columns.timestampX();
+                            int stampY = y - TEXT_OFFSET + messageCentreShift(
+                                    lines, lineIndex, rows, dividerIndex);
                             drawTimestampRuns(font, line.func_151461_a(),
-                                    Math.round(panelLeft)
-                                            + columns.timestampX(),
-                                    y - TEXT_OFFSET + messageCentreShift(
-                                            lines, lineIndex, rows,
-                                            dividerIndex),
-                                    stampAlpha);
+                                    stampX, stampY, stampAlpha);
+                            if (stamped) {
+                                // Where the stamp stands on screen, for the
+                                // tip that reads out its whole date; one the
+                                // pointer only brings out goes as the
+                                // pointer reaches for it, so it is left out.
+                                recordStamp(frame, font, line, stampX,
+                                        stampY, originX,
+                                        originY + stackOffset, scale,
+                                        clipTop, clipBottom);
+                            }
                         }
                     }
                     GL11.glPushMatrix();
                     GL11.glTranslatef(entry, 0.0F, 0.0F);
                     GL11.glEnable(GL11.GL_BLEND);
                     IChatComponent component = line.func_151461_a();
+                    float rowShift = feedRowShift(font, component, alignment,
+                            unscaledWidth, smallPivot, smallScale);
+                    // A reaction row's chips are centred in the row, which
+                    // is as tall as they need; any other row's text stands
+                    // on the row's own line.
+                    boolean reactionRow =
+                            ChatReactionMarker.isReactionRow(component);
                     GL11.glPushMatrix();
-                    GL11.glTranslatef(feedRowShift(font, component,
-                            alignment, unscaledWidth, smallPivot,
-                            smallScale), y - (float)TEXT_OFFSET, 0.0F);
+                    GL11.glTranslatef(rowShift, reactionRow
+                            ? reactionTextTop(y, rowHeight,
+                                    smallPivot >= 0.0F ? smallScale : 1.0F)
+                            : y - (float)TEXT_OFFSET, 0.0F);
                     if (smallPivot >= 0.0F) {
                         // The row keeps where its first run starts and
                         // shrinks from there, its capitals centred on a
                         // message's and each of its pixels a small one.
                         GL11.glTranslatef(smallPivot * (1.0F - smallScale),
-                                LostTalesChatVisualStyle.stackSmallTopOffset(),
+                                reactionRow ? 0.0F
+                                        : LostTalesChatVisualStyle
+                                                .stackSmallTopOffset(),
                                 0.0F);
                         GL11.glScalef(smallScale, smallScale, 1.0F);
                     }
@@ -1315,6 +1399,22 @@ final class LostTalesChatOverlayRenderer {
                             component, marker, 0, 0, alpha, open);
                     drawHead(minecraft, font, component,
                             HEAD_TOP_OFFSET, alpha, open);
+                    if (open && line.getChatLineID() != markedLineId
+                            && !ChatWindowLines.isSpacer(line)
+                            && !ChatReactionMarker.isReactionRow(component)
+                            && !ChatReplyMarker.isQuoteRow(component)) {
+                        // A line of the player's own the Discord bridge has
+                        // not posted yet, or could not post, says so after
+                        // the message's lowest row of words.
+                        markedLineId = line.getChatLineID();
+                        drawDeliveryMark(frame, font, component,
+                                markedLineId, alpha,
+                                panelRight - entry - rowShift,
+                                originX + (entry + rowShift) * scale,
+                                originY + stackOffset
+                                        + (y - TEXT_OFFSET) * scale,
+                                scale, clipTop, clipBottom);
+                    }
                     GL11.glPopMatrix();
                     GL11.glPopMatrix();
                     GL11.glDisable(GL11.GL_ALPHA_TEST);
@@ -1354,27 +1454,6 @@ final class LostTalesChatOverlayRenderer {
                         LostTalesChatVisualStyle.asideRgb(),
                         inviteAlpha);
             }
-            frame.toolbarLeft = 0.0F;
-            frame.toolbarTop = 0.0F;
-            frame.toolbarRight = 0.0F;
-            frame.toolbarBottom = 0.0F;
-            frame.toolbarKinds = new int[0];
-            frame.toolbarChatLineId = 0;
-            if (open && hoveredLineId != 0) {
-                // Slid with the stack, as the row it belongs to is: the
-                // pixels and the rectangle recorded for the click both
-                // stand at the row's own place.
-                GL11.glPushMatrix();
-                try {
-                    GL11.glTranslatef(0.0F, offset, 0.0F);
-                    drawMessageToolbar(frame, hoveredLineId, panelRight,
-                            hoveredTop, Math.round(255.0F * opacity
-                                    * opening.getOpacity()),
-                            originX, originY + stackOffset, scale);
-                } finally {
-                    GL11.glPopMatrix();
-                }
-            }
             if (open) {
                 if (columns.enabled) {
                     // The separator stands over the lines, so a message
@@ -1394,15 +1473,22 @@ final class LostTalesChatOverlayRenderer {
                 // passing under one fades out before it is cut. They lie
                 // over everything the history drew — its backdrop, the
                 // hatch, the timestamp column and its separator, the
-                // messages and the unread divider — and under what
-                // stands on the window rather than in it: the
-                // jump-to-present button below, and the tab row and
-                // input bar the screen draws after this.
+                // messages and the unread divider — and leave the
+                // floating controls' holes as all of it does: those stand
+                // on the window rather than in it, like the tab row and
+                // the input bar the screen draws after this.
+                // In front of the chips, so the shades fade them by the
+                // rules as they fade the words beside them.
+                GL11.glPushMatrix();
+                GL11.glTranslatef(0.0F, 0.0F, SHADE_DEPTH);
                 drawEdgeFade(panelLeft, panelRight, topEdge, bottomEdge,
                         TOP_EDGE_FADE_HEIGHT, fadeAlpha);
                 drawEdgeFade(panelLeft, panelRight, bottomEdge, topEdge,
                         BOTTOM_EDGE_FADE_HEIGHT, fadeAlpha);
+                GL11.glPopMatrix();
             }
+            endHoles(masked);
+            masked = false;
             frame.scrollbarRight = 0.0F;
             if (open) {
                 // The thumb is sized in the stack's own pixels — the
@@ -1415,48 +1501,54 @@ final class LostTalesChatOverlayRenderer {
                         opacity * opening.getOpacity(), originX, originY,
                         scale);
             }
-            // A view scrolled away from the newest line grows a small
-            // arrow button at the panel's right edge, flying in from
-            // below the bottom rule; clicking it glides the view home.
-            // Recorded on the frame exactly as drawn, so the click and
-            // the pixels cannot disagree.
+            // The floating controls, each in the hole everything under it
+            // left: the hovered message's toolbar, slid with the stack as
+            // the row it belongs to is, and the jump-to-present button a
+            // view scrolled away from the newest line grows at the panel's
+            // foot, flying in from below the bottom rule. Both live inside
+            // the history, cut on its rules by the clip that cuts a line,
+            // so the button emerges through the rule instead of fading in
+            // over it; both are recorded on the frame exactly as drawn, so
+            // the click and the pixels cannot disagree.
+            frame.toolbarLeft = 0.0F;
+            frame.toolbarTop = 0.0F;
+            frame.toolbarRight = 0.0F;
+            frame.toolbarBottom = 0.0F;
+            frame.toolbarKinds = new int[0];
+            frame.toolbarChatLineId = 0;
             frame.jumpPillLeft = 0.0F;
             frame.jumpPillTop = 0.0F;
             frame.jumpPillRight = 0.0F;
             frame.jumpPillBottom = 0.0F;
-            if (open) {
-                boolean wanted = frame.view != null && scrollLines > 0.5D;
-                long buttonNow = System.nanoTime();
-                if (!LostTalesConfig.enableChatAnimations) {
-                    frame.jumpButtonProgress = wanted ? 1.0F : 0.0F;
-                } else {
-                    double elapsed = frame.jumpButtonNanos == 0L ? 0.0D
-                            : (buttonNow - frame.jumpButtonNanos) / 1.0E9D;
-                    frame.jumpButtonProgress =
-                            (float)LostTalesChatMotion.approach(
-                                    frame.jumpButtonProgress,
-                                    wanted ? 1.0D : 0.0D, elapsed, 0.1D);
-                }
-                frame.jumpButtonNanos = buttonNow;
-                if (frame.jumpButtonProgress > 0.02F) {
-                    // The button lives inside the history: the same
-                    // clip that cuts a scrolling line on the bottom
-                    // rule cuts it while it flies in, so it emerges
-                    // through the rule instead of fading in over it.
-                    boolean buttonClipped = beginVerticalClip(minecraft,
-                            clipTop, clipBottom, true);
-                    try {
-                        drawJumpButton(minecraft, frame, panelLeft,
-                                panelRight, bottomEdge,
-                                Math.round(255.0F * opacity
-                                        * opening.getOpacity()),
-                                originX, originY, scale);
-                    } finally {
-                        endVerticalClip(buttonClipped);
+            if (toolbar != null || jumpShown) {
+                int controlAlpha = Math.round(255.0F * opacity
+                        * opening.getOpacity());
+                boolean controlsClipped = beginVerticalClip(minecraft,
+                        clipTop, clipBottom, true);
+                try {
+                    if (toolbar != null) {
+                        GL11.glPushMatrix();
+                        try {
+                            GL11.glTranslatef(0.0F, offset, 0.0F);
+                            drawMessageToolbar(frame, toolbar.chatLineId,
+                                    toolbarKinds, toolbarLeft, toolbar.top,
+                                    controlAlpha, originX,
+                                    originY + stackOffset, scale);
+                        } finally {
+                            GL11.glPopMatrix();
+                        }
                     }
+                    if (jumpShown) {
+                        drawJumpButton(minecraft, frame, jumpLeft, jumpTop,
+                                bottomEdge, controlAlpha, originX, originY,
+                                scale);
+                    }
+                } finally {
+                    endVerticalClip(controlsClipped);
                 }
             }
         } finally {
+            endHoles(masked);
             GL11.glPopMatrix();
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glEnable(GL11.GL_ALPHA_TEST);
@@ -1511,14 +1603,15 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * Where the hovered message's toolbar stands, given the bottom edge
-     * and height of the message's topmost row: centred on the row by the
-     * row's rule ({@link #ROW_TEXT_TOP}), whatever that row's height. A
-     * message row as tall as a button is filled by the toolbar exactly.
+     * Where the hovered message's toolbar starts, for the message's
+     * topmost row ending at {@code rowBottom}: its buttons are taller than
+     * a row, so the toolbar is centred on the row's capitals, half a pixel
+     * above their middle, and its react button's emoji stands exactly
+     * where an emoji in the row stands.
      */
     static int toolbarTop(int rowBottom, int rowHeight) {
-        return rowBottom - rowHeight
-                + (rowHeight - TOOLBAR_BUTTON_SIZE) / 2;
+        return rowBottom - rowHeight + ROW_TEXT_TOP
+                + Math.floorDiv(GLYPH_CAP_HEIGHT - TOOLBAR_BUTTON_SIZE, 2);
     }
 
     /**
@@ -1952,80 +2045,319 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * The surface of a control floating over the history — the jump
-     * button, a message's toolbar — at the popups' opacity, scaled by
-     * the control's own {@code alpha}.
+     * Edge of the jump-to-present button's square: the down chevron's
+     * width with the frame's inset either side. Square, so the chevron's
+     * three rows stand in its middle exactly too.
      */
-    private static int floatingSurface(int alpha) {
-        return (Math.round(alpha * LostTalesChatVisualStyle.POPUP_ALPHA
-                / 255.0F) << 24) | LostTalesChatVisualStyle.SURFACE_RGB;
-    }
-
-    /** Edge of the jump-to-present button's square. */
-    private static final int JUMP_BUTTON_SIZE = 12;
+    private static final int JUMP_BUTTON_SIZE =
+            ChatIconSheet.CHEVRON_1.getWidth() + 2 * ChatFramedButton.INSET;
 
     /**
-     * The jump-to-present button of a scrolled-back view: a small square
-     * with a downward arrow centred across the panel, flying in from
-     * below the bottom rule as {@code jumpButtonProgress} rises — the
-     * bar drawn over the strip hides whatever still lies beyond the rule
-     * — and sliding back out when the view comes home. Drawn in the
-     * window's local space; the screen rectangle it lands on is recorded
-     * on the frame, so the click resolves against exactly what is on
-     * screen.
+     * Advances the jump-to-present button's fly-in: out while the view is
+     * scrolled away from the newest line, home again once it is not.
+     * Answers whether any of the button shows.
+     */
+    private static boolean advanceJumpButton(ChatWindowFrame frame,
+                                             double scrollLines) {
+        boolean wanted = frame.view != null && scrollLines > 0.5D;
+        long now = System.nanoTime();
+        if (!LostTalesConfig.enableChatAnimations) {
+            frame.jumpButtonProgress = wanted ? 1.0F : 0.0F;
+        } else {
+            double elapsed = frame.jumpButtonNanos == 0L ? 0.0D
+                    : (now - frame.jumpButtonNanos) / 1.0E9D;
+            frame.jumpButtonProgress = (float)LostTalesChatMotion.approach(
+                    frame.jumpButtonProgress, wanted ? 1.0D : 0.0D, elapsed,
+                    0.1D);
+        }
+        frame.jumpButtonNanos = now;
+        return frame.jumpButtonProgress > 0.02F;
+    }
+
+    /**
+     * The jump-to-present button's top edge in the window's units: at the
+     * panel's foot a pixel above the bottom rule, lowered past it by as
+     * much of the fly-in as is still to come, and laid on a whole display
+     * pixel so the frame's pixel art keeps its texels whole as it flies.
+     */
+    private static float jumpButtonTop(ChatWindowFrame frame,
+                                       float bottomEdge, float originY,
+                                       float scale) {
+        float slide = (1.0F - Math.min(1.0F, frame.jumpButtonProgress))
+                * (JUMP_BUTTON_SIZE + 3.0F);
+        float top = bottomEdge - 1.0F - JUMP_BUTTON_SIZE + slide;
+        return (float)((ChatWindowFrame.snapToDisplayPixels(
+                originY + top * scale) - originY) / scale);
+    }
+
+    /**
+     * The jump-to-present button of a scrolled-back view: a framed button
+     * centred across the panel with the sheet's down chevron in it — the
+     * tab search's, at rest — lit under the pointer, standing in the hole
+     * the history left for it. Drawn in the window's local space; the
+     * screen rectangle it lands on is recorded on the frame, so the click
+     * resolves against exactly what is on screen.
      */
     private static void drawJumpButton(Minecraft minecraft,
-                                       ChatWindowFrame frame,
-                                       float panelLeft, float panelRight,
-                                       float bottomEdge,
+                                       ChatWindowFrame frame, float left,
+                                       float top, float bottomEdge,
                                        int alpha, float originX,
                                        float originY, float scale) {
         if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
-        float slide = (1.0F - Math.min(1.0F, frame.jumpButtonProgress))
-                * (JUMP_BUTTON_SIZE + 3.0F);
-        // Centred across the panel, and rounded to a whole pixel: the
-        // square's outline is one pixel wide and its arrow is drawn a
-        // pixel at a time, so half a pixel of offset would blur both.
-        float left = Math.round((panelLeft + panelRight
-                - JUMP_BUTTON_SIZE) / 2.0F);
-        float right = left + JUMP_BUTTON_SIZE;
-        float top = bottomEdge - 1.0F - JUMP_BUTTON_SIZE + slide;
-        float bottom = top + JUMP_BUTTON_SIZE;
-        // The popups' surface inside a honey outline, which says it is a
-        // control, the way the tabs' accents do; the two lie side by
-        // side rather than one over the other.
-        fillRect(left + 1.0F, top + 1.0F, right - 1.0F, bottom - 1.0F,
-                floatingSurface(alpha));
-        int outline = (alpha << 24)
-                | LostTalesColors.rgb(LostTalesColors.HONEY);
-        fillRect(left, top, right, top + 1.0F, outline);
-        fillRect(left, bottom - 1.0F, right, bottom, outline);
-        fillRect(left, top + 1.0F, left + 1.0F, bottom - 1.0F, outline);
-        fillRect(right - 1.0F, top + 1.0F, right, bottom - 1.0F, outline);
-        // The arrow: a pixel chevron pointing down, centred.
-        int ivory = (alpha << 24) | LostTalesChatVisualStyle.IVORY;
-        float centre = left + JUMP_BUTTON_SIZE / 2.0F;
-        float arrowTop = top + 4.0F;
-        fillRect(centre - 3.0F, arrowTop, centre + 3.0F,
-                arrowTop + 1.0F, ivory);
-        fillRect(centre - 2.0F, arrowTop + 1.0F, centre + 2.0F,
-                arrowTop + 2.0F, ivory);
-        fillRect(centre - 1.0F, arrowTop + 2.0F, centre + 1.0F,
-                arrowTop + 3.0F, ivory);
+        long now = System.nanoTime();
+        double elapsed = frame.jumpFadeNanos == 0L ? 0.0D
+                : (now - frame.jumpFadeNanos) / 1.0E9D;
+        frame.jumpFadeNanos = now;
+        frame.jumpFade = LostTalesChatVisualStyle.hoverFade(frame.jumpFade,
+                frame.jumpHovered, elapsed);
+        ChatFramedButton.drawSurface(left, top, JUMP_BUTTON_SIZE,
+                JUMP_BUTTON_SIZE, frame.jumpFade, Math.round(alpha
+                        * LostTalesChatVisualStyle.INSET_ALPHA / 255.0F));
+        ChatIconSheet.drawPairWithShadow(ChatIconSheet.CHEVRON_1,
+                ChatIconSheet.CHEVRON_1_HOVER, frame.jumpFade,
+                left + (JUMP_BUTTON_SIZE
+                        - ChatIconSheet.CHEVRON_1.getWidth()) / 2,
+                top + (JUMP_BUTTON_SIZE
+                        - ChatIconSheet.CHEVRON_1.getHeight()) / 2, alpha);
+        ChatFramedButton.drawInk(left, top, JUMP_BUTTON_SIZE,
+                JUMP_BUTTON_SIZE, frame.jumpFade, alpha);
         // What is waiting below, so a view scrolled back says how much
         // it has not seen rather than only that there is more. In the
         // divider's own crimson, which is the colour this chat says
         // "unread" in, on the button's right shoulder.
-        drawWaitingCount(minecraft, frame, right, top, alpha);
+        drawWaitingCount(minecraft, frame, left + JUMP_BUTTON_SIZE, top,
+                alpha);
         frame.jumpPillLeft = originX + left * scale;
         frame.jumpPillTop = originY + top * scale;
-        frame.jumpPillRight = originX + right * scale;
+        frame.jumpPillRight = originX + (left + JUMP_BUTTON_SIZE) * scale;
         // The clip cuts the flying-in button on the bottom rule; the
         // hitbox ends where the pixels do.
-        frame.jumpPillBottom = Math.min(originY + bottom * scale,
+        frame.jumpPillBottom = Math.min(
+                originY + (top + JUMP_BUTTON_SIZE) * scale,
                 originY + bottomEdge * scale);
+    }
+
+    /**
+     * The depths the window's layers stand at while its holes are cut
+     * ({@link #beginHoles}), against the GUI's own depth of zero, which
+     * the history is drawn at. From the back: the window's box, far
+     * behind; the slab an item icon's own depth is squeezed into
+     * ({@link #squeezeItemDepth}); the history; the reaction chips'
+     * holes, and the chips half a step in front of them; the edge shades,
+     * in front of the chips so they fade a chip by the rules as they fade
+     * the words beside it; and the floating controls' holes, in front of
+     * everything, so nothing the history draws reaches into them. Every
+     * layer stands at least half a step from the next: two chains of
+     * transforms can round one depth a hair apart, so no layer may need
+     * to meet another's exactly.
+     */
+    static final float BASE_DEPTH = -500.0F;
+    static final float ITEM_FAR_DEPTH = BASE_DEPTH + 0.5F;
+    static final float ITEM_NEAR_DEPTH = -0.5F;
+    static final float CHIP_HOLE_DEPTH = 1.0F;
+    static final float CHIP_DEPTH = 1.5F;
+    static final float SHADE_DEPTH = 2.0F;
+    static final float CONTROL_DEPTH = 3.0F;
+
+    /**
+     * Where an item icon's depth range starts and ends in the depth
+     * buffer while holes are cut — {@link #ITEM_NEAR_DEPTH} and
+     * {@link #ITEM_FAR_DEPTH} as the window's matrices place them — and
+     * NaN while none are.
+     */
+    private static double itemDepthNear = Double.NaN;
+    private static double itemDepthFar = Double.NaN;
+    /** Scratch for reading the matrices and the depth range back. */
+    private static final FloatBuffer GL_FLOATS =
+            BufferUtils.createFloatBuffer(16);
+    private static final float[] MODELVIEW = new float[16];
+    private static final float[] PROJECTION = new float[16];
+
+    /** The holes one window's draw cuts, six numbers to a hole. */
+    private static final class Holes {
+        private float[] data = new float[6 * 8];
+        private int count;
+
+        /**
+         * A framed button's footprint at {@code depth}, less its four
+         * corner pixels, each {@code corner} across.
+         */
+        void add(float left, float top, float width, float height,
+                 float depth, float corner) {
+            if (width <= 0.0F || height <= 0.0F) {
+                return;
+            }
+            if ((this.count + 1) * 6 > this.data.length) {
+                this.data = java.util.Arrays.copyOf(this.data,
+                        this.data.length * 2);
+            }
+            int at = this.count * 6;
+            this.data[at] = left;
+            this.data[at + 1] = top;
+            this.data[at + 2] = left + width;
+            this.data[at + 3] = top + height;
+            this.data[at + 4] = depth;
+            this.data[at + 5] = corner;
+            this.count++;
+        }
+    }
+
+    /**
+     * Cuts the framed buttons' holes out of everything the window draws
+     * until {@link #endHoles}. The depth test, off for the rest of the
+     * chat, is turned on; the window's box is laid down far behind the
+     * GUI's own depth and each hole at its layer's depth — a button's
+     * footprint less its four corner pixels, which stay with what is
+     * around it — without writing a colour. Everything the window then
+     * draws at the GUI's depth — the backdrop, the lines' highlights, the
+     * text — passes everywhere but in the holes, so each button stands on
+     * nothing but what is behind the window, at its own opacity; what is
+     * drawn a layer in front passes the holes of the layers behind it.
+     */
+    private static boolean beginHoles(float left, float top, float right,
+                                      float bottom, Holes holes) {
+        if (holes.count <= 0) {
+            return false;
+        }
+        GL11.glEnable(GL11.GL_DEPTH_TEST);
+        GL11.glDepthMask(true);
+        GL11.glDepthFunc(GL11.GL_ALWAYS);
+        GL11.glColorMask(false, false, false, false);
+        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(false);
+        tessellator.setColorRGBA_I(0, 255);
+        depthQuad(tessellator, left, top, right, bottom, BASE_DEPTH);
+        for (int index = 0; index < holes.count; index++) {
+            int at = index * 6;
+            float holeLeft = holes.data[at];
+            float holeTop = holes.data[at + 1];
+            float holeRight = holes.data[at + 2];
+            float holeBottom = holes.data[at + 3];
+            double depth = holes.data[at + 4];
+            float corner = holes.data[at + 5];
+            depthQuad(tessellator, holeLeft + corner, holeTop,
+                    holeRight - corner, holeTop + corner, depth);
+            depthQuad(tessellator, holeLeft, holeTop + corner, holeRight,
+                    holeBottom - corner, depth);
+            depthQuad(tessellator, holeLeft + corner, holeBottom - corner,
+                    holeRight - corner, holeBottom, depth);
+        }
+        LostTalesSkyrimUiStyle.endQuads(tessellator, false);
+        GL11.glColorMask(true, true, true, true);
+        // Nothing drawn from here writes a depth but an item icon, whose
+        // depth goes in behind the history, so every layer is tested
+        // against the mask alone.
+        GL11.glDepthMask(false);
+        GL11.glDepthFunc(GL11.GL_LEQUAL);
+        placeItemDepth(left, top);
+        return true;
+    }
+
+    /**
+     * Ends what {@link #beginHoles} began: the mask is cleared from the
+     * depth buffer, so nothing drawn after the window is held out of its
+     * holes, and the chat draws without the depth test again.
+     */
+    private static void endHoles(boolean began) {
+        if (!began) {
+            return;
+        }
+        itemDepthNear = Double.NaN;
+        itemDepthFar = Double.NaN;
+        GL11.glDepthMask(true);
+        GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
+        GL11.glDepthFunc(GL11.GL_LEQUAL);
+        GL11.glDisable(GL11.GL_DEPTH_TEST);
+    }
+
+    /**
+     * Squeezes the depth of what is drawn next into the slab between the
+     * window's box and the history while holes are cut, and answers
+     * whether they are. An item icon drawn in it still sorts its own
+     * faces, stays out of every hole as the words beside it do, and
+     * leaves behind a depth that everything the window draws after it
+     * passes. The caller saves and restores the depth range
+     * ({@code GL_VIEWPORT_BIT}).
+     */
+    static boolean squeezeItemDepth() {
+        if (Double.isNaN(itemDepthNear)) {
+            return false;
+        }
+        GL11.glDepthRange(itemDepthNear, itemDepthFar);
+        return true;
+    }
+
+    /**
+     * Finds where the item slab's two ends land in the depth buffer under
+     * the window's matrices. A slab that does not come out between the
+     * history and the window's box is not used, and the icons draw at
+     * their own depth.
+     */
+    private static void placeItemDepth(float x, float y) {
+        itemDepthNear = Double.NaN;
+        itemDepthFar = Double.NaN;
+        GL_FLOATS.clear();
+        GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, GL_FLOATS);
+        GL_FLOATS.get(MODELVIEW);
+        GL_FLOATS.clear();
+        GL11.glGetFloat(GL11.GL_PROJECTION_MATRIX, GL_FLOATS);
+        GL_FLOATS.get(PROJECTION);
+        GL_FLOATS.clear();
+        GL11.glGetFloat(GL11.GL_DEPTH_RANGE, GL_FLOATS);
+        double rangeNear = GL_FLOATS.get(0);
+        double rangeFar = GL_FLOATS.get(1);
+        double history = bufferDepth(MODELVIEW, PROJECTION, rangeNear,
+                rangeFar, x, y, 0.0F);
+        double near = bufferDepth(MODELVIEW, PROJECTION, rangeNear,
+                rangeFar, x, y, ITEM_NEAR_DEPTH);
+        double far = bufferDepth(MODELVIEW, PROJECTION, rangeNear,
+                rangeFar, x, y, ITEM_FAR_DEPTH);
+        double box = bufferDepth(MODELVIEW, PROJECTION, rangeNear,
+                rangeFar, x, y, BASE_DEPTH);
+        // Nearer is smaller, as GL_LEQUAL reads it.
+        if (history < near && near < far && far < box) {
+            itemDepthNear = near;
+            itemDepthFar = far;
+        }
+    }
+
+    /**
+     * Where a point lands in the depth buffer: carried through the
+     * modelview and the projection, each a column at a time as OpenGL
+     * keeps them, then from the clip volume's depth onto the depth range
+     * in force.
+     */
+    static double bufferDepth(float[] modelview, float[] projection,
+                              double rangeNear, double rangeFar,
+                              float x, float y, float z) {
+        double eyeX = modelview[0] * (double)x + modelview[4] * (double)y
+                + modelview[8] * (double)z + modelview[12];
+        double eyeY = modelview[1] * (double)x + modelview[5] * (double)y
+                + modelview[9] * (double)z + modelview[13];
+        double eyeZ = modelview[2] * (double)x + modelview[6] * (double)y
+                + modelview[10] * (double)z + modelview[14];
+        double eyeW = modelview[3] * (double)x + modelview[7] * (double)y
+                + modelview[11] * (double)z + modelview[15];
+        double clipZ = projection[2] * eyeX + projection[6] * eyeY
+                + projection[10] * eyeZ + projection[14] * eyeW;
+        double clipW = projection[3] * eyeX + projection[7] * eyeY
+                + projection[11] * eyeZ + projection[15] * eyeW;
+        return rangeNear
+                + (rangeFar - rangeNear) * (clipZ / clipW + 1.0D) / 2.0D;
+    }
+
+    /** One quad of the depth mask, wound as the GUI pass's quads are. */
+    private static void depthQuad(Tessellator tessellator, float left,
+                                  float top, float right, float bottom,
+                                  double depth) {
+        if (right <= left || bottom <= top) {
+            return;
+        }
+        tessellator.addVertex(left, bottom, depth);
+        tessellator.addVertex(right, bottom, depth);
+        tessellator.addVertex(right, top, depth);
+        tessellator.addVertex(left, top, depth);
     }
 
     /**
@@ -2059,42 +2391,179 @@ final class LostTalesChatOverlayRenderer {
                 LostTalesChatVisualStyle.IVORY, alpha);
     }
 
-    /** Edge of one toolbar button's square. */
-    static final int TOOLBAR_BUTTON_SIZE = 12;
+    /**
+     * Edge of one toolbar button's square: an emoji's box with the
+     * frame's inset either side.
+     */
+    static final int TOOLBAR_BUTTON_SIZE = CONTENT_BOX_HEIGHT
+            + 2 * ChatFramedButton.INSET;
+    /** Clear pixels between two of the toolbar's buttons, and after the last. */
+    static final int TOOLBAR_GAP = 2;
+    /** From one toolbar button's left edge to the next one's. */
+    static final int TOOLBAR_STRIDE = TOOLBAR_BUTTON_SIZE + TOOLBAR_GAP;
     /** Answer the message. */
     static final int TOOLBAR_REPLY = 1;
     /** Take a copy of the message. */
     static final int TOOLBAR_COPY = 2;
     /** React to the message. */
     static final int TOOLBAR_REACT = 3;
+    /** The reply glyph's ink, and the copy glyph's. */
+    private static final int REPLY_GLYPH_WIDTH = 6;
+    private static final int REPLY_GLYPH_HEIGHT = 5;
+    private static final int COPY_GLYPH_WIDTH = 8;
+    private static final int COPY_GLYPH_HEIGHT = 7;
+
+    /** Where the hovered message's toolbar stands, in the stack's units, and whose it is. */
+    private static final class ToolbarPlace {
+        final float top;
+        final int chatLineId;
+
+        ToolbarPlace(float top, int chatLineId) {
+            this.top = top;
+            this.chatLineId = chatLineId;
+        }
+    }
 
     /**
-     * The hovered message's own controls, at the top right of it: react
-     * to it, reply to it and copy it — what the message's menu offers,
-     * where the pointer already is. React is left out for a message the
-     * server never named, Reply for one nobody can answer, so a console
-     * notice shows only Copy.
-     *
-     * <p>Drawn in the stack's space, so it rides the scroll with the
-     * message it belongs to: {@code top} is the row's place before the
-     * slide, the caller translates by the slide and {@code originY}
-     * includes it. It stands inside the message's own top row rather
-     * than floating above it: the row under the pointer is what keeps
-     * the message hovered, and a toolbar reaching past it would hover
-     * the message above instead and take itself away. The screen
-     * rectangle is recorded on the frame, so the click resolves against
-     * exactly what was drawn.</p>
+     * A line's opacity from {@code base} — full in an open window, its
+     * age's fade in the closed feed: a message still on its way is faint
+     * until the server's own copy of it arrives to take its place, and
+     * every line carries the chat opacity, its own entrance and the
+     * opening fade.
      */
-    private static void drawMessageToolbar(ChatWindowFrame frame,
-                                           int chatLineId,
-                                           float panelRight, float top,
-                                           int alpha, float originX,
-                                           float originY, float scale) {
-        if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
-            return;
+    private static int lineAlpha(int base, ChatLine line, float opacity,
+                                 LostTalesGuiAnimationSample opening) {
+        int alpha = base;
+        if (ClientChatPendingEchoes.isPending(line.getChatLineID())) {
+            alpha = Math.round(alpha
+                    * ClientChatPendingEchoes.PENDING_OPACITY);
         }
-        // Replying needs a channel this player may speak in; copying
-        // needs only a message.
+        alpha = (int)(alpha * opacity);
+        alpha = (int)(alpha * entryOpacity(line));
+        alpha = (int)(alpha * opening.getOpacity());
+        return alpha;
+    }
+
+    /**
+     * Where the hovered message's toolbar stands this frame, found before
+     * anything is drawn so everything under it can leave it a hole: on
+     * the message's topmost row the stack draws, found by the same tests
+     * the stack skips a row by. Null while no drawn line is hovered.
+     */
+    private static ToolbarPlace placeToolbar(Minecraft minecraft,
+                                             List<ChatLine> lines,
+                                             int firstLine, int lastRow,
+                                             int dividerIndex,
+                                             ChatStackRows rows,
+                                             float stackBase, float opacity,
+                                             LostTalesGuiAnimationSample opening) {
+        ToolbarPlace place = null;
+        for (int lineIndex = firstLine; lineIndex < lines.size();
+             lineIndex++) {
+            int rowIndex = rowOfLine(lineIndex, dividerIndex);
+            if (rowIndex > lastRow) {
+                break;
+            }
+            ChatLine line = lines.get(lineIndex);
+            if (line == null || !LostTalesChatPresentation.isHoveredLine(
+                    line.getChatLineID())) {
+                continue;
+            }
+            if (ChatWindowLines.isSpacer(line) && !olderNeighbourShown(
+                    minecraft, lines, lineIndex, dividerIndex, lastRow,
+                    true)) {
+                continue;
+            }
+            if (lineAlpha(255, line, opacity, opening)
+                    < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
+                    || ChatWindowLines.dateDividerLabel(line) != null) {
+                continue;
+            }
+            // The stack walks upward, so the last row found is the
+            // message's topmost.
+            int rowBottom = -(rows.top(rowIndex) - Math.round(stackBase));
+            place = new ToolbarPlace(toolbarTop(rowBottom,
+                    rows.height(rowIndex)), line.getChatLineID());
+        }
+        return place;
+    }
+
+    /**
+     * Where a reaction row's text starts, in the stack's units, for the
+     * row ending at {@code rowBottom}: its chips — framed buttons, drawn
+     * at {@code rowScale} of the words — centred in the row, which is
+     * made tall enough for them ({@link ChatStackRows#reactionRowHeight}),
+     * and each chip's count a row below the top of the emoji's box.
+     */
+    static float reactionTextTop(int rowBottom, int rowHeight,
+                                 float rowScale) {
+        return rowBottom - rowHeight
+                + (rowHeight - ChatReactionMarker.HEIGHT * rowScale) / 2.0F
+                + ChatReactionMarker.TEXT_DROP * rowScale;
+    }
+
+    /**
+     * Adds a hole for every reaction chip the stack draws this frame,
+     * where it draws it: each chip is a framed button, standing on
+     * nothing but what is behind the window. Found by the tests the stack
+     * skips a row by, and laid out by the walk that draws the row.
+     */
+    private static void placeChipHoles(Holes holes, Minecraft minecraft,
+                                       FontRenderer font,
+                                       List<ChatLine> lines, int firstLine,
+                                       int lastRow, int dividerIndex,
+                                       ChatStackRows rows, float stackBase,
+                                       float opacity,
+                                       LostTalesGuiAnimationSample opening,
+                                       ChatFeedAlignment alignment,
+                                       float areaWidth, float offset) {
+        float smallScale = LostTalesChatVisualStyle.stackSmallScale();
+        for (int lineIndex = firstLine; lineIndex < lines.size();
+             lineIndex++) {
+            int rowIndex = rowOfLine(lineIndex, dividerIndex);
+            if (rowIndex > lastRow) {
+                break;
+            }
+            ChatLine line = lines.get(lineIndex);
+            if (line == null || ChatWindowLines.isSpacer(line)) {
+                continue;
+            }
+            IChatComponent row = line.func_151461_a();
+            if (!ChatReactionMarker.isReactionRow(row)
+                    || lineAlpha(255, line, opacity, opening)
+                            < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
+                    || ChatWindowLines.dateDividerLabel(line) != null) {
+                continue;
+            }
+            int[] chips = LostTalesChatVisualStyle.chipBoxes(font, row, true);
+            if (chips.length == 0) {
+                continue;
+            }
+            float pivot = smallRowPivot(row, true, smallScale);
+            float rowScale = pivot >= 0.0F ? smallScale : 1.0F;
+            int rowBottom = -(rows.top(rowIndex) - Math.round(stackBase));
+            float chipTop = reactionTextTop(rowBottom, rows.height(rowIndex),
+                    rowScale) - ChatReactionMarker.TEXT_DROP * rowScale
+                    + offset;
+            float rowLeft = alignment.slide(entrySlide(line))
+                    + feedRowShift(font, row, alignment, areaWidth, pivot,
+                            smallScale)
+                    + (pivot >= 0.0F ? pivot * (1.0F - smallScale) : 0.0F);
+            for (int index = 0; index + 1 < chips.length; index += 2) {
+                holes.add(rowLeft + chips[index] * rowScale, chipTop,
+                        chips[index + 1] * rowScale,
+                        ChatReactionMarker.HEIGHT * rowScale,
+                        CHIP_HOLE_DEPTH, rowScale);
+            }
+        }
+    }
+
+    /**
+     * The controls a message's toolbar offers, left to right: React for a
+     * message the server named, Reply for one somebody may answer, and
+     * Copy always, so a console notice shows Copy alone.
+     */
+    private static int[] offeredToolbar(int chatLineId) {
         List<Integer> offered = new ArrayList<Integer>(3);
         if (LostTalesChatPresentation.isReactable(chatLineId)) {
             offered.add(Integer.valueOf(TOOLBAR_REACT));
@@ -2103,40 +2572,82 @@ final class LostTalesChatOverlayRenderer {
             offered.add(Integer.valueOf(TOOLBAR_REPLY));
         }
         offered.add(Integer.valueOf(TOOLBAR_COPY));
-        float right = panelRight - 2.0F;
-        float left = right - offered.size() * TOOLBAR_BUTTON_SIZE;
-        float bottom = top + TOOLBAR_BUTTON_SIZE;
-        fillRect(left + 1.0F, top + 1.0F, right - 1.0F, bottom - 1.0F,
-                floatingSurface(alpha));
-        int outline = (alpha << 24)
-                | LostTalesColors.rgb(LostTalesColors.HONEY);
-        fillRect(left, top, right, top + 1.0F, outline);
-        fillRect(left, bottom - 1.0F, right, bottom, outline);
-        fillRect(left, top + 1.0F, left + 1.0F, bottom - 1.0F, outline);
-        fillRect(right - 1.0F, top + 1.0F, right, bottom - 1.0F, outline);
-        int ivory = (alpha << 24) | LostTalesChatVisualStyle.IVORY;
         int[] kinds = new int[offered.size()];
-        for (int index = 0; index < offered.size(); index++) {
+        for (int index = 0; index < kinds.length; index++) {
             kinds[index] = offered.get(index).intValue();
-            float buttonLeft = left + index * TOOLBAR_BUTTON_SIZE;
-            if (index > 0) {
-                // A hairline between them, so they read as controls of
-                // their own rather than as one wide button.
-                fillRect(buttonLeft - 0.5F, top + 2.0F, buttonLeft + 0.5F,
-                        bottom - 2.0F, outline);
-            }
-            if (kinds[index] == TOOLBAR_REACT) {
-                drawReactGlyph(buttonLeft, top, alpha);
-            } else if (kinds[index] == TOOLBAR_REPLY) {
-                drawReplyGlyph(buttonLeft, top, ivory);
+        }
+        return kinds;
+    }
+
+    /** The width of a toolbar of {@code count} buttons, the gaps between them included. */
+    static int toolbarWidth(int count) {
+        return count <= 0 ? 0
+                : count * TOOLBAR_BUTTON_SIZE + (count - 1) * TOOLBAR_GAP;
+    }
+
+    /**
+     * The hovered message's own controls, at the top right of it: react
+     * to it, reply to it and copy it — what the message's menu offers,
+     * where the pointer already is — each a framed button standing in the
+     * hole the history left for it, lit under the pointer.
+     *
+     * <p>Drawn in the stack's space, so it rides the scroll with the
+     * message it belongs to: {@code top} is the row's place before the
+     * slide, the caller translates by the slide and {@code originY}
+     * includes it. The buttons are taller than the row and reach past it;
+     * while the pointer is on one, the message it belongs to stays the
+     * hovered one. The screen rectangle is recorded on the frame, so the
+     * click resolves against exactly what was drawn.</p>
+     */
+    private static void drawMessageToolbar(ChatWindowFrame frame,
+                                           int chatLineId, int[] kinds,
+                                           float left, float top,
+                                           int alpha, float originX,
+                                           float originY, float scale) {
+        if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
+                || kinds.length == 0) {
+            return;
+        }
+        long now = System.nanoTime();
+        double elapsed = frame.toolbarFadeNanos == 0L ? 0.0D
+                : (now - frame.toolbarFadeNanos) / 1.0E9D;
+        frame.toolbarFadeNanos = now;
+        frame.startToolbarFades(chatLineId);
+        int surfaceAlpha = Math.round(alpha
+                * LostTalesChatVisualStyle.INSET_ALPHA / 255.0F);
+        int ivory = (alpha << 24) | LostTalesChatVisualStyle.IVORY;
+        for (int index = 0; index < kinds.length; index++) {
+            int kind = kinds[index];
+            float buttonLeft = left + index * TOOLBAR_STRIDE;
+            float lit = frame.toolbarFade(kind, elapsed);
+            ChatFramedButton.drawSurface(buttonLeft, top,
+                    TOOLBAR_BUTTON_SIZE, TOOLBAR_BUTTON_SIZE, lit,
+                    surfaceAlpha);
+            if (kind == TOOLBAR_REACT) {
+                drawReactGlyph(buttonLeft + (TOOLBAR_BUTTON_SIZE
+                                - CONTENT_BOX_HEIGHT) / 2,
+                        top + (TOOLBAR_BUTTON_SIZE - CONTENT_BOX_HEIGHT) / 2,
+                        alpha);
+            } else if (kind == TOOLBAR_REPLY) {
+                drawReplyGlyph(buttonLeft + (TOOLBAR_BUTTON_SIZE
+                                - REPLY_GLYPH_WIDTH) / 2,
+                        top + (TOOLBAR_BUTTON_SIZE - REPLY_GLYPH_HEIGHT) / 2,
+                        ivory);
             } else {
-                drawCopyGlyph(buttonLeft, top, ivory);
+                drawCopyGlyph(buttonLeft + (TOOLBAR_BUTTON_SIZE
+                                - COPY_GLYPH_WIDTH) / 2,
+                        top + (TOOLBAR_BUTTON_SIZE - COPY_GLYPH_HEIGHT) / 2,
+                        ivory);
             }
+            ChatFramedButton.drawInk(buttonLeft, top, TOOLBAR_BUTTON_SIZE,
+                    TOOLBAR_BUTTON_SIZE, lit, alpha);
         }
         frame.toolbarLeft = originX + left * scale;
         frame.toolbarTop = originY + top * scale;
-        frame.toolbarRight = originX + right * scale;
-        frame.toolbarBottom = originY + bottom * scale;
+        frame.toolbarRight = originX + (left + toolbarWidth(kinds.length))
+                * scale;
+        frame.toolbarBottom = originY + (top + TOOLBAR_BUTTON_SIZE) * scale;
+        frame.toolbarStride = TOOLBAR_STRIDE * scale;
         frame.toolbarKinds = kinds;
         frame.toolbarChatLineId = chatLineId;
     }
@@ -2145,32 +2656,32 @@ final class LostTalesChatOverlayRenderer {
     private static void drawReactGlyph(float x, float y, int alpha) {
         LostTalesChatVisualStyle.beginContent();
         ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(),
-                ChatEmoji.SLIGHT_SMILE, x + 1.0F, y + 1.0F,
-                ChatInlineIcons.CONTENT_SIZE, alpha);
+                ChatEmoji.SLIGHT_SMILE, x, y, ChatInlineIcons.CONTENT_SIZE,
+                alpha);
     }
 
-    /** An arrow turning back on itself: answer this. */
+    /** An arrow turning back on itself, its ink from {@code (x, y)}: answer this. */
     private static void drawReplyGlyph(float x, float y, int argb) {
         // The head, three pixel steps down to a point at the left.
-        fillRect(x + 3.0F, y + 5.0F, x + 4.0F, y + 6.0F, argb);
-        fillRect(x + 4.0F, y + 4.0F, x + 5.0F, y + 7.0F, argb);
-        fillRect(x + 5.0F, y + 3.0F, x + 6.0F, y + 8.0F, argb);
+        fillRect(x, y + 2.0F, x + 1.0F, y + 3.0F, argb);
+        fillRect(x + 1.0F, y + 1.0F, x + 2.0F, y + 4.0F, argb);
+        fillRect(x + 2.0F, y, x + 3.0F, y + 5.0F, argb);
         // The shaft, and the tail turning up behind it.
-        fillRect(x + 5.0F, y + 5.0F, x + 9.0F, y + 6.0F, argb);
-        fillRect(x + 8.0F, y + 3.0F, x + 9.0F, y + 6.0F, argb);
+        fillRect(x + 2.0F, y + 2.0F, x + 6.0F, y + 3.0F, argb);
+        fillRect(x + 5.0F, y, x + 6.0F, y + 3.0F, argb);
     }
 
-    /** Two leaves, one behind the other: take a copy of this. */
+    /** Two leaves, one behind the other, their ink from {@code (x, y)}: take a copy of this. */
     private static void drawCopyGlyph(float x, float y, int argb) {
         // The leaf behind, an outline open at its covered corner.
-        fillRect(x + 5.0F, y + 3.0F, x + 10.0F, y + 4.0F, argb);
-        fillRect(x + 9.0F, y + 3.0F, x + 10.0F, y + 8.0F, argb);
-        fillRect(x + 7.0F, y + 7.0F, x + 10.0F, y + 8.0F, argb);
+        fillRect(x + 3.0F, y, x + 8.0F, y + 1.0F, argb);
+        fillRect(x + 7.0F, y, x + 8.0F, y + 5.0F, argb);
+        fillRect(x + 5.0F, y + 4.0F, x + 8.0F, y + 5.0F, argb);
         // The leaf in front, whole.
-        fillRect(x + 2.0F, y + 5.0F, x + 8.0F, y + 6.0F, argb);
-        fillRect(x + 2.0F, y + 5.0F, x + 3.0F, y + 10.0F, argb);
-        fillRect(x + 7.0F, y + 5.0F, x + 8.0F, y + 10.0F, argb);
-        fillRect(x + 2.0F, y + 9.0F, x + 8.0F, y + 10.0F, argb);
+        fillRect(x, y + 2.0F, x + 6.0F, y + 3.0F, argb);
+        fillRect(x, y + 2.0F, x + 1.0F, y + 7.0F, argb);
+        fillRect(x + 5.0F, y + 2.0F, x + 6.0F, y + 7.0F, argb);
+        fillRect(x, y + 6.0F, x + 6.0F, y + 7.0F, argb);
     }
 
     /**
@@ -2308,13 +2819,16 @@ final class LostTalesChatOverlayRenderer {
     /**
      * How far below its own row's baseline the stamp of the message at
      * {@code lineIndex} stands, so that it is centred on the message's
-     * whole height: half the rows below the stamped row (the wrapped
-     * words, its reaction row left out) less half the rows above it (a
-     * reply's quote). The rows of
-     * one message share its chat line id and stand together in the
-     * list, wrapped continuations toward the newer end and a leading
-     * row toward the older; a blank row or a day's rule ends the
-     * message on either side. Zero for a message on one row.
+     * words: from the row its body opens on — the row under a name that
+     * stands on a row of its own, or the stamped row itself for a
+     * grouped line and a line with no name — down to its last wrapped
+     * row, its reaction row left out. The name's row and a reply's quote
+     * above it are not the words, so the stamp stands beside the words
+     * rather than between them and the name. The rows of one message
+     * share its chat line id and stand together in the list, wrapped
+     * continuations toward the newer end and a leading row toward the
+     * older; a blank row or a day's rule ends the message. Zero for a
+     * message on one row.
      */
     static int messageCentreShift(List<ChatLine> lines, int lineIndex,
                                   ChatStackRows rows, int dividerIndex) {
@@ -2323,33 +2837,167 @@ final class LostTalesChatOverlayRenderer {
             return 0;
         }
         int id = stamped.getChatLineID();
-        int below = 0;
-        for (int index = lineIndex - 1; index >= 0; index--) {
-            ChatLine newer = lines.get(index);
-            if (newer == null || newer.getChatLineID() != id
-                    || ChatWindowLines.isFiller(newer)) {
+        // The row the words open on: the one the body's chevron stands
+        // on, the stamped row's own or one below it. A line with no
+        // chevron anywhere — a system line — is words from its first
+        // row down.
+        int bodyRow = lineIndex;
+        if (!opensBody(stamped)) {
+            for (int index = lineIndex - 1; index >= 0; index--) {
+                ChatLine newer = lines.get(index);
+                if (!sameMessage(newer, id)) {
+                    break;
+                }
+                if (opensBody(newer)) {
+                    bodyRow = index;
+                    break;
+                }
+            }
+        }
+        int nameHeight = 0;
+        int wordsHeight = 0;
+        for (int index = lineIndex; index >= 0; index--) {
+            ChatLine row = lines.get(index);
+            if (index != lineIndex && !sameMessage(row, id)) {
                 break;
             }
-            if (ChatReactionMarker.isReactionRow(newer.func_151461_a())) {
+            if (ChatReactionMarker.isReactionRow(row.func_151461_a())) {
                 // What readers answered with is not the message: the
                 // stamp stays centred on the words.
                 continue;
             }
-            below += rows.height(rowOfLine(index, dividerIndex));
-        }
-        int above = 0;
-        for (int index = lineIndex + 1; index < lines.size(); index++) {
-            ChatLine older = lines.get(index);
-            if (older == null || older.getChatLineID() != id
-                    || ChatWindowLines.isFiller(older)) {
-                break;
+            int height = rows.height(rowOfLine(index, dividerIndex));
+            if (index > bodyRow) {
+                nameHeight += height;
+            } else {
+                wordsHeight += height;
             }
-            above += rows.height(rowOfLine(index, dividerIndex));
         }
-        // Rows below the stamped one are further down the screen, rows
-        // above it further up: the stamp moves down by half the
-        // difference. Halves round toward the name's row.
-        return (below - above) / 2;
+        // The stamp is laid out on the stamped row and moves down by the
+        // distance from that row's middle to the middle of the words.
+        // Halves round up the screen, as everything the chat centres
+        // does.
+        int stampedHeight = rows.height(rowOfLine(lineIndex, dividerIndex));
+        return Math.floorDiv(2 * nameHeight + wordsHeight - stampedHeight, 2);
+    }
+
+    /** Whether the row is part of the message with chat line id {@code id}. */
+    private static boolean sameMessage(ChatLine row, int id) {
+        return row != null && row.getChatLineID() == id
+                && !ChatWindowLines.isFiller(row);
+    }
+
+    /** Whether the row is the one a message's body opens on, behind its chevron. */
+    private static boolean opensBody(ChatLine row) {
+        for (Object value : row.func_151461_a()) {
+            if (value instanceof IChatComponent
+                    && ChatBodyMarker.isMarker((IChatComponent)value)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Clear pixels between a line's last words and its delivery mark. */
+    private static final int DELIVERY_MARK_GAP = 3;
+    /** The retrying mark's clock: as tall as the capitals, and as wide. */
+    private static final int DELIVERY_CLOCK_SIZE = GLYPH_CAP_HEIGHT;
+
+    /**
+     * The mark a line of the player's own wears while the Discord bridge
+     * has not posted it yet, or after it could not: a small clock in the
+     * chat's aside tone while it is tried again, a crimson "!" once
+     * Discord refused it or the bridge gave up, standing on the capitals a
+     * gap past the row's last words and never past the panel's scrollbar.
+     * Drawn in the row's text space, where the text's top is zero and the
+     * panel's right edge stands {@code textSpaceRight} along; the box it
+     * lands on is recorded on the frame, so the tip saying why answers
+     * exactly where the mark stands.
+     */
+    private static void drawDeliveryMark(ChatWindowFrame frame,
+                                         FontRenderer font,
+                                         IChatComponent row, int chatLineId,
+                                         int alpha, float textSpaceRight,
+                                         float screenX, float screenTop,
+                                         float scale, float clipTop,
+                                         float clipBottom) {
+        ChatDeliveryMark.State state =
+                ClientChatDeliveryMarks.stateOf(chatLineId);
+        if (state == ChatDeliveryMark.State.NONE || font == null
+                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        boolean failed = state == ChatDeliveryMark.State.FAILED;
+        // The advance ends in the font's one-pixel gap; the ink is the rest.
+        int width = failed ? Math.max(1, font.getStringWidth("!") - 1)
+                : DELIVERY_CLOCK_SIZE;
+        int x = Math.min(LostTalesChatVisualStyle.inkEnd(font, row, true)
+                        + DELIVERY_MARK_GAP,
+                (int)Math.floor(textSpaceRight - 2.0F - SCROLLBAR_WIDTH)
+                        - width);
+        if (failed) {
+            LostTalesChatVisualStyle.beginContent();
+            LostTalesChatVisualStyle.drawColored(font, "!", x, 0,
+                    UNREAD_DIVIDER_RGB, alpha);
+        } else {
+            drawDeliveryClock(x, 0, alpha);
+        }
+        frame.recordMark(screenX + (x - 1) * scale,
+                Math.max(clipTop, screenTop - scale),
+                screenX + (x + width + 1) * scale,
+                Math.min(clipBottom,
+                        screenTop + (GLYPH_CAP_HEIGHT + 1) * scale),
+                chatLineId);
+    }
+
+    /** The retrying mark: a clock at a quarter past, with the chat's shadow. */
+    private static void drawDeliveryClock(int x, int y, int alpha) {
+        int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
+        if (shadow > 0) {
+            drawClockPixels(x + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                    y + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                    LostTalesChatVisualStyle.argb(
+                            LostTalesChatVisualStyle.SHADOW, shadow));
+        }
+        drawClockPixels(x, y, LostTalesChatVisualStyle.argb(
+                LostTalesChatVisualStyle.asideRgb(), alpha));
+    }
+
+    /** The clock's pixels, seven rows round, from {@code (x, y)}. */
+    private static void drawClockPixels(float x, float y, int argb) {
+        // The rim.
+        fillRect(x + 2.0F, y, x + 5.0F, y + 1.0F, argb);
+        fillRect(x + 1.0F, y + 1.0F, x + 2.0F, y + 2.0F, argb);
+        fillRect(x + 5.0F, y + 1.0F, x + 6.0F, y + 2.0F, argb);
+        fillRect(x, y + 2.0F, x + 1.0F, y + 5.0F, argb);
+        fillRect(x + 6.0F, y + 2.0F, x + 7.0F, y + 5.0F, argb);
+        fillRect(x + 1.0F, y + 5.0F, x + 2.0F, y + 6.0F, argb);
+        fillRect(x + 5.0F, y + 5.0F, x + 6.0F, y + 6.0F, argb);
+        fillRect(x + 2.0F, y + 6.0F, x + 5.0F, y + 7.0F, argb);
+        // The hands, at a quarter past.
+        fillRect(x + 3.0F, y + 2.0F, x + 4.0F, y + 4.0F, argb);
+        fillRect(x + 4.0F, y + 3.0F, x + 5.0F, y + 4.0F, argb);
+    }
+
+    /**
+     * Records a drawn stamp's box on the frame in screen GUI pixels: from
+     * the stamp's left edge across its text, as tall as its small text
+     * with a pixel to spare above, kept inside the room the window shows.
+     */
+    private static void recordStamp(ChatWindowFrame frame, FontRenderer font,
+                                    ChatLine line, int x, int y,
+                                    float originX, float originY, float scale,
+                                    float clipTop, float clipBottom) {
+        float small = LostTalesChatVisualStyle.stackSmallScale();
+        float textTop = y + LostTalesChatVisualStyle.stackSmallTopOffset();
+        float width = font.getStringWidth(
+                timestampText(line.func_151461_a()).trim()) * small;
+        frame.recordStamp(originX + x * scale,
+                Math.max(clipTop, originY + (textTop - 1.0F) * scale),
+                originX + (x + width) * scale,
+                Math.min(clipBottom, originY
+                        + (textTop + font.FONT_HEIGHT * small) * scale),
+                line.getChatLineID());
     }
 
     /** The line's timestamp runs as one string, empty when it has none. */
@@ -2644,18 +3292,30 @@ final class LostTalesChatOverlayRenderer {
                                          float top, float right,
                                          float bottom, int alpha,
                                          int fromRgb, int toRgb) {
+        recolour(curveLeft, left, top, right, bottom, alpha, fromRgb, toRgb,
+                BACKDROP_FADE_WEIGHTS);
+    }
+
+    /**
+     * As above for a surface with the opacity profile {@code weights}:
+     * the panel's thinning one, or {@link #FLAT_WEIGHTS} for one laid in
+     * a single flat colour, as the timestamp column is.
+     */
+    private static void recolour(float curveLeft, float left, float top,
+                                 float right, float bottom, int alpha,
+                                 int fromRgb, int toRgb, float[] weights) {
         if (!canRecolour()) {
             drawChatBackdrop(curveLeft, left, top, right, bottom, alpha,
-                    toRgb);
+                    toRgb, GL11.GL_ONE_MINUS_SRC_ALPHA, weights);
             return;
         }
         try {
             GL14.glBlendEquation(GL14.GL_FUNC_REVERSE_SUBTRACT);
             drawChatBackdrop(curveLeft, left, top, right, bottom, alpha,
-                    fromRgb, GL11.GL_ONE, BACKDROP_FADE_WEIGHTS);
+                    fromRgb, GL11.GL_ONE, weights);
             GL14.glBlendEquation(GL14.GL_FUNC_ADD);
             drawChatBackdrop(curveLeft, left, top, right, bottom, alpha,
-                    toRgb, GL11.GL_ONE, BACKDROP_FADE_WEIGHTS);
+                    toRgb, GL11.GL_ONE, weights);
         } finally {
             GL14.glBlendEquation(GL14.GL_FUNC_ADD);
         }

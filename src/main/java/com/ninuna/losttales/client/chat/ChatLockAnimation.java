@@ -43,18 +43,18 @@ final class ChatLockAnimation {
      * bottom on the control's baseline.
      */
     private static final int[][] FRAMES = {
-            {0, 27, 9, 7}, {0, 35, 9, 6}, {0, 42, 8, 7}, {0, 50, 7, 8},
-            {0, 59, 6, 8}, {0, 68, 5, 8}, {10, 68, 5, 8}, {10, 59, 5, 8},
-            {10, 50, 5, 8}, {10, 42, 5, 7}, {10, 35, 5, 6}, {10, 27, 5, 7}};
+            {0, 43, 9, 7}, {0, 51, 9, 6}, {0, 58, 8, 7}, {0, 66, 7, 8},
+            {0, 75, 6, 8}, {0, 84, 5, 8}, {10, 84, 5, 8}, {10, 75, 5, 8},
+            {10, 66, 5, 8}, {10, 58, 5, 7}, {10, 51, 5, 6}, {10, 43, 5, 7}};
 
     /** How far the lock has crossed to its hovered colourway, and when. */
     private float hoverFade;
     private long hoverFadeNanos;
 
     /** Sheet column each colourway's block starts at. */
-    private static final int RESTING_U = 50;
-    private static final int OPEN_HOVER_U = 66;
-    private static final int SHUT_HOVER_U = 82;
+    private static final int RESTING_U = 61;
+    private static final int OPEN_HOVER_U = 77;
+    private static final int SHUT_HOVER_U = 93;
 
     /** Room the turn needs: the widest frame by the tallest. */
     static final int WIDTH = 9;
