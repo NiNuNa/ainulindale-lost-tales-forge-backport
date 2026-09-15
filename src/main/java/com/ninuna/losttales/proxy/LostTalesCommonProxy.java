@@ -107,6 +107,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
+import com.ninuna.losttales.chat.ChatChannelIconCatalog;
 import com.ninuna.losttales.chat.moderation.ChatAuditLog;
 import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
@@ -471,6 +472,7 @@ public class LostTalesCommonProxy {
         PartyTrackingSyncManager.clear();
         LostTalesChatRoleRosterWatcher.clear();
         ChatChannel.resetToBuiltIn();
+        ChatChannelIconCatalog.resetToDefaults();
         ChatMessageIdAllocator.reset();
         // The save takes the history's last state before the store is
         // cleared: the worlds are saved after this event, and what

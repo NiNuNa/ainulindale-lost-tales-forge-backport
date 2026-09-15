@@ -940,7 +940,11 @@ final class LostTalesChatVisualStyle {
                             shadowPass);
                 }
             } else if (share != null && share.icon) {
-                width = measure(font, formatting, text, colours);
+                // An item's slot declares its width; a marker's is its
+                // two spaces.
+                int declared = ChatInlineIcons.declaredWidth(part);
+                width = declared >= 0 ? declared
+                        : measure(font, formatting, text, colours);
                 if (ChatEmojiMarker.reservesFullSlot(text)) {
                     drawShareIcon(share, cursor, y, width, alpha,
                             shadowPass);

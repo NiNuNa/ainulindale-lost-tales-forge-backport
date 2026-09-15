@@ -2147,29 +2147,29 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * Height of the jump-to-present button: the down chevron's width
-     * with the frame's inset either side, so the chevron's three rows
-     * and the label's capitals both stand in its middle exactly.
+     * Height of the jump-to-present button: the framed buttons' one
+     * height. The label's capitals and the chevron's three rows stand
+     * in its middle, the odd row below each.
      */
-    private static final int JUMP_BUTTON_HEIGHT =
-            ChatIconSheet.CHEVRON_1.getWidth() + 2 * ChatFramedButton.INSET;
+    private static final int JUMP_BUTTON_HEIGHT = ChatFramedButton.HEIGHT;
+    /** Clear pixels between the jump button's chevron and its label. */
+    private static final int JUMP_ICON_GAP = 2;
 
-    /** What the jump-to-present button says, before its chevron. */
+    /** What the jump-to-present button says, after its chevron. */
     private static String jumpButtonLabel() {
         return StatCollector.translateToLocal("gui.losttales.chat.jump_to_present");
     }
 
     /**
-     * Width of the jump-to-present button: the label's ink, the gap an
-     * icon keeps from its label, the chevron, and the frame's inset at
-     * either end. The last glyph's width includes a column of spacing
-     * after it, which is not ink.
+     * Width of the jump-to-present button: the chevron, the gap, the
+     * label's ink, and the wide inset at either end. The last glyph's
+     * width includes a column of spacing after it, which is not ink.
      */
     private static int jumpButtonWidth(FontRenderer font) {
         int label = font == null ? 0
                 : Math.max(0, font.getStringWidth(jumpButtonLabel()) - 1);
-        return ChatFramedButton.INSET + label + ChatChannelIcons.GAP
-                + ChatIconSheet.CHEVRON_1.getWidth() + ChatFramedButton.INSET;
+        return ChatFramedButton.WIDE_INSET + ChatIconSheet.CHEVRON_1.getWidth()
+                + JUMP_ICON_GAP + label + ChatFramedButton.WIDE_INSET;
     }
 
     /**
@@ -2207,8 +2207,8 @@ final class LostTalesChatOverlayRenderer {
 
     /**
      * The jump-to-present button of a scrolled-back view: a framed button
-     * centred across the panel, its label in ivory and the sheet's down
-     * chevron — the tab search's, at rest — after it, lit under the
+     * centred across the panel, the sheet's down chevron — the tab
+     * search's, at rest — and its label in ivory after it, lit under the
      * pointer, standing in the hole the history left for it. Drawn in
      * the window's local space; the screen rectangle it lands on is
      * recorded on the frame, so the click resolves against exactly what
@@ -2239,9 +2239,12 @@ final class LostTalesChatOverlayRenderer {
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(left, top, 0.0F);
-            // The label's capitals in the button's middle.
+            // The label's capitals in the button's middle, the icon gap
+            // past the chevron.
             LostTalesChatVisualStyle.drawColored(minecraft.fontRenderer,
-                    jumpButtonLabel(), ChatFramedButton.INSET,
+                    jumpButtonLabel(), ChatFramedButton.WIDE_INSET
+                            + ChatIconSheet.CHEVRON_1.getWidth()
+                            + JUMP_ICON_GAP,
                     (JUMP_BUTTON_HEIGHT - GLYPH_CAP_HEIGHT) / 2,
                     LostTalesChatVisualStyle.IVORY, alpha);
             // What is waiting below, so a view scrolled back says how
@@ -2252,11 +2255,10 @@ final class LostTalesChatOverlayRenderer {
         } finally {
             GL11.glPopMatrix();
         }
-        // The chevron the icon gap past the label's ink.
+        // The chevron first, the wide inset in from the frame's edge.
         ChatIconSheet.drawPairWithShadow(ChatIconSheet.CHEVRON_1,
                 ChatIconSheet.CHEVRON_1_HOVER, frame.jumpFade,
-                left + width - ChatFramedButton.INSET
-                        - ChatIconSheet.CHEVRON_1.getWidth(),
+                left + ChatFramedButton.WIDE_INSET,
                 top + (JUMP_BUTTON_HEIGHT
                         - ChatIconSheet.CHEVRON_1.getHeight()) / 2, alpha);
         ChatFramedButton.drawInk(left, top, width, JUMP_BUTTON_HEIGHT,
@@ -2525,11 +2527,10 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * Edge of one toolbar button's square: an emoji's box with the
-     * frame's inset either side.
+     * Edge of one toolbar button's square: the framed buttons' one
+     * height, an emoji's box with the frame's inset either side.
      */
-    static final int TOOLBAR_BUTTON_SIZE = CONTENT_BOX_HEIGHT
-            + 2 * ChatFramedButton.INSET;
+    static final int TOOLBAR_BUTTON_SIZE = ChatFramedButton.HEIGHT;
     /** Clear pixels between two of the toolbar's buttons, and after the last. */
     static final int TOOLBAR_GAP = 2;
     /** From one toolbar button's left edge to the next one's. */

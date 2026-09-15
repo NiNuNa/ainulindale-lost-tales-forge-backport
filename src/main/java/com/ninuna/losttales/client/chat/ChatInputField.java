@@ -564,10 +564,16 @@ final class ChatInputField extends GuiTextField {
                                  ItemStack stack, String markerIcon,
                                  String name, int rgb, int iconRgb) {
         int width = this.font.getStringWidth("[")
-                + ChatInlineIcons.SLOT_WIDTH
+                + slotWidth(token.kind)
                 + this.font.getStringWidth(" " + name + "]");
         return new TokenPreview(token.start, token.end, token.kind, stack,
                 markerIcon, name, rgb, iconRgb, width);
+    }
+
+    /** The slot a shared thing's icon takes, as the message lines give it. */
+    private static int slotWidth(ChatShareKind kind) {
+        return kind == ChatShareKind.ITEM ? ChatInlineIcons.itemSlotWidth()
+                : ChatInlineIcons.SLOT_WIDTH;
     }
 
     /**
@@ -700,9 +706,10 @@ final class ChatInputField extends GuiTextField {
         LostTalesChatVisualStyle.drawColored(this.font, "[", x, y,
                 preview.rgb, 255);
         x += this.font.getStringWidth("[");
-        float boxX = ChatInlineIcons.boxLeft(x, ChatInlineIcons.SLOT_WIDTH);
-        float boxY = ChatInlineIcons.boxTop(y, ChatInlineIcons.SLOT_WIDTH);
-        float size = ChatInlineIcons.contentSize(ChatInlineIcons.SLOT_WIDTH);
+        int slot = slotWidth(preview.kind);
+        float boxX = ChatInlineIcons.boxLeft(x, slot);
+        float boxY = ChatInlineIcons.boxTop(y, slot);
+        float size = ChatInlineIcons.contentSize(slot);
         if (preview.kind == ChatShareKind.ITEM) {
             ChatInlineIcons.drawItem(minecraft, preview.stack, boxX, boxY,
                     size, 255);
@@ -710,7 +717,7 @@ final class ChatInputField extends GuiTextField {
             ChatInlineIcons.drawMarker(minecraft, preview.markerIcon,
                     preview.iconRgb, boxX, boxY, size, 255);
         }
-        x += ChatInlineIcons.SLOT_WIDTH;
+        x += slot;
         String tail = " " + preview.name + "]";
         LostTalesChatVisualStyle.drawColored(this.font, tail, x, y,
                 preview.rgb, 255);
@@ -958,10 +965,8 @@ final class ChatInputField extends GuiTextField {
     public void mouseClicked(int mouseX, int mouseY, int button) {
         String text = getText();
         List<TokenPreview> resolved = previewsFor(text);
-        boolean inside = mouseX >= this.xPosition
-                && mouseX < this.xPosition + getWidth()
-                && mouseY >= this.yPosition
-                && mouseY < this.yPosition + this.fieldHeight;
+        boolean inside = ChatHitBox.contains(mouseX, mouseY, this.xPosition,
+                this.yPosition, getWidth(), this.fieldHeight);
         if (resolved.isEmpty() || !isStyled() || !inside || button != 0
                 || !isFocused()) {
             super.mouseClicked(mouseX, mouseY, button);

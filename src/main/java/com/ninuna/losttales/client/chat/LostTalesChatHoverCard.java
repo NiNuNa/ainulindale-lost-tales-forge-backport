@@ -830,10 +830,12 @@ final class LostTalesChatHoverCard {
                 x, y, color, 255);
     }
 
+    /** Whether the point lies between two corners, whichever way round they are given. */
     static boolean contains(float x, float y, float left, float top,
                             float right, float bottom) {
-        return x >= Math.min(left, right) && x < Math.max(left, right)
-                && y >= Math.min(top, bottom) && y < Math.max(top, bottom);
+        return ChatHitBox.contains(x, y, Math.min(left, right),
+                Math.min(top, bottom), Math.abs(right - left),
+                Math.abs(bottom - top));
     }
 
     /**

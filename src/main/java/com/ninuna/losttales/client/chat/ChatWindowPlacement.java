@@ -37,7 +37,8 @@ import org.lwjgl.input.Mouse;
 public final class ChatWindowPlacement {
     /** Height of a window's bar strip ({@link ChatInputBar#HEIGHT}):
      *  its first row is the window's bottom rule, as the tab strip's
-     *  last row is the top one.
+     *  last row is the top one, and its last row is the window's bottom
+     *  frame edge.
      *  <p>The strips are deliberately UI chrome and do not follow the
      *  vanilla chat-scale setting, exactly as vanilla's own input line
      *  does not: the setting scales what is read (the message stride,
@@ -55,11 +56,12 @@ public final class ChatWindowPlacement {
     /**
      * The tool strip between the tab row's rule and the history: the
      * window's room for the controls that read its history, a band of
-     * the selected tab's surface as tall as the input bar, so the two
-     * strips framing the history match. Chrome like the strips, so it
-     * keeps its size at every chat scale.
+     * the selected tab's surface seventeen rows tall, its last row the
+     * window's top rule, and a handle on the window like the row above
+     * it. Chrome like the strips, so it keeps its size at every chat
+     * scale.
      */
-    public static final int TOOL_STRIP_HEIGHT = INPUT_HEIGHT;
+    public static final int TOOL_STRIP_HEIGHT = 17;
     /**
      * Head-room between the window's top rule and the topmost line's
      * glyphs, owned by that line — its band extends up through it to the

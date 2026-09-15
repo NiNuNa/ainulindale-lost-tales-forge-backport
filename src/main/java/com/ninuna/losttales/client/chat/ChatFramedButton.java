@@ -19,12 +19,12 @@ import org.lwjgl.opengl.GL11;
  * that surface and are cut away on the tab pieces' ink threshold, as a
  * tab's are.</p>
  *
- * <p>The tab row's search control, the input bar's channel indicator,
- * the jump-to-present button, a hovered message's toolbar and the
- * reaction chips are framed buttons: their content centred inside, at
- * least {@link #PADDING} clear pixels from the ink — {@link #WIDE_PADDING}
- * for the two standing in the window's strips, the search control and
- * the indicator, which have the room for it.</p>
+ * <p>The tab row's search control, the input bar's character button and
+ * channel indicator, the jump-to-present button, a hovered message's
+ * toolbar and the reaction chips are framed buttons: their content
+ * centred inside, at least {@link #PADDING} clear pixels from the ink —
+ * {@link #WIDE_PADDING} for the search control, the character button,
+ * the indicator and the jump button, which have the room for it.</p>
  */
 final class ChatFramedButton {
     /** A corner cell's size; a frame is at least two corners each way. */
@@ -39,9 +39,18 @@ final class ChatFramedButton {
     static final int PADDING = 2;
     /** From the footprint's outer edge to what the button holds. */
     static final int INSET = EDGE + PADDING;
-    /** The strips' buttons keep a wider clearing round what they hold. */
+    /** The strips' buttons and the jump button keep a wider clearing round what they hold. */
     static final int WIDE_PADDING = 3;
     static final int WIDE_INSET = EDGE + WIDE_PADDING;
+    /**
+     * The one height of the framed buttons standing in a row of
+     * controls — the character button, the channel indicator, the
+     * jump-to-present button, the toolbar's buttons and the reaction
+     * chips: an icon's box with the inset above and below it, so they
+     * read as one row whatever each holds. The tab search keeps its own
+     * square in the strip.
+     */
+    static final int HEIGHT = ChatChannelIcons.SIZE + 2 * INSET;
 
     private ChatFramedButton() {}
 

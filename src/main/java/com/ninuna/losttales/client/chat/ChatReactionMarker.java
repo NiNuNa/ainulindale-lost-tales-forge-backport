@@ -35,12 +35,13 @@ final class ChatReactionMarker {
     /** The emoji, drawn one texel to one pixel. */
     static final int ICON = (int)ChatInlineIcons.CONTENT_SIZE;
     /**
-     * The chip's height: the emoji with the frame's inset above and below
-     * it. Taller than a message row, so a reaction row is made as tall as
-     * its chips wherever the chat's small size cannot shrink them into a
-     * line ({@link ChatStackRows#reactionRowHeight}).
+     * The chip's height: the framed buttons' one height, the emoji with
+     * the frame's inset above and below it. Taller than a message row,
+     * so a reaction row is made as tall as its chips wherever the chat's
+     * small size cannot shrink them into a line
+     * ({@link ChatStackRows#reactionRowHeight}).
      */
-    static final int HEIGHT = ICON + 2 * PAD;
+    static final int HEIGHT = ChatFramedButton.HEIGHT;
     /**
      * How far below the chip's top edge the count's text starts: a row
      * below the emoji's box, so the count's capitals stand half a pixel

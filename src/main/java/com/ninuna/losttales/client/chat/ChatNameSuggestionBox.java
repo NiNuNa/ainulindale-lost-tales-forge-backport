@@ -112,10 +112,9 @@ final class ChatNameSuggestionBox {
         if (!isActive()) {
             return false;
         }
-        int width = boxWidth(font);
         int top = boxTop(screenHeight);
-        return mouseX >= inputX && mouseX < inputX + width
-                && mouseY >= top && mouseY < screenHeight - BOTTOM_MARGIN;
+        return ChatHitBox.contains(mouseX, mouseY, inputX, top,
+                boxWidth(font), screenHeight - BOTTOM_MARGIN - top);
     }
 
     /**

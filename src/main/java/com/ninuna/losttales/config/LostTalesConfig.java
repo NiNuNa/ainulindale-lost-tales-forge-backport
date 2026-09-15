@@ -15,6 +15,7 @@ import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelDescriptor;
 import com.ninuna.losttales.chat.ChatChannelGates;
+import com.ninuna.losttales.chat.ChatChannelIconCatalog;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.LostTalesMetaData;
@@ -243,6 +244,8 @@ public final class LostTalesConfig {
     /** The roles a channel asks for, to read and to send. */
     public static String[] chatChannelDefinitions = new String[0];
     public static String[] chatChannelRoles = new String[0];
+    /** The icon a channel wears before its name, by channel id. */
+    public static String[] chatChannelIcons = new String[0];
     /**
      * The server's Discord bridge; read on the server only. The token
      * and the webhook URL are secrets: they stay in this file and are
@@ -1078,6 +1081,12 @@ public final class LostTalesConfig {
                     new String[] {ChatRoleConfig.DEFAULT_ADMIN_GATE},
                     "The roles a channel asks for, one channel per line as <channel>=read:<role,role|any|none>;send:<role,role|any|none>. A side left out or set to any is open to everyone the channel already admits; none closes it; a side naming a role that does not exist is closed until the entry is fixed. A fresh file starts with the Operator channel asking for the operator role on both sides, and that line is put back whenever it is missing; to open the channel on purpose, keep the line and set its sides to any."
             );
+            chatChannelIcons = config.getStringList(
+                    "icons",
+                    CATEGORY_CHANNELS,
+                    new String[0],
+                    "The icon a channel wears before its name, on its tab and wherever the name stands alone, one channel per line as <channel id>=emoji:<name> or <channel id>=item:<item id>[@<damage>], for example admin=item:minecraft:iron_sword or trade=emoji:moneybag. Built-in channels and the ones defined above alike; a channel not named here keeps the emoji the mod gives it, and a client without the item shows that emoji too."
+            );
             installChatRoles();
             discordEnabled = config.getBoolean(
                     "enabled",
@@ -1726,6 +1735,10 @@ public final class LostTalesConfig {
                         warnings.warn(message);
                     }
                 });
+        // The icons the channels wear, read once every channel is in
+        // force, so one the file defines above may be given one.
+        ChatChannelIconCatalog.install(
+                ChatRoleConfig.parseChannelIcons(chatChannelIcons, warnings));
         // The Operator channel's gate is put back when its line is
         // missing, before the gates are read, and the value written back
         // with the rest of the file at the end of this load.
@@ -2192,6 +2205,7 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CHANNELS, "definitions", chatChannelDefinitions)
                 .set(chatChannelDefinitions);
         config.get(CATEGORY_CHANNELS, "gates", chatChannelRoles).set(chatChannelRoles);
+        config.get(CATEGORY_CHANNELS, "icons", chatChannelIcons).set(chatChannelIcons);
         config.get(CATEGORY_CLIENT, "showTimestamps",
                 showChatTimestamps).set(showChatTimestamps);
         config.get(CATEGORY_CLIENT, "enableChatEmojis",

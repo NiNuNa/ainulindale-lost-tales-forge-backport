@@ -555,6 +555,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                     packet.getCharacterRoleMasks());
             ClientChatChannelState.setProximityRadius(
                     packet.getProximityRadius());
+            ClientChatChannelState.setChannelIcons(packet.getChannelIcons());
             java.util.LinkedHashMap<String, Integer> holders =
                     new java.util.LinkedHashMap<String, Integer>();
             java.util.HashMap<String, Integer> accountRoles =

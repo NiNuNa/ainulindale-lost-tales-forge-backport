@@ -76,32 +76,29 @@ import org.lwjgl.opengl.GL11;
  * history it stands on.</p>
  */
 final class ChatChannelTabBar {
-    /** Height of a resting tab's border pieces; the selected pair adds
-     *  the lift. */
+    /** Height of a resting tab's border pieces; the selected pair is
+     *  one row taller, the row it stands on the rule with. */
     private static final int PIECE_HEIGHT =
             ChatIconSheet.TAB_LEFT.getHeight();
     /**
-     * Body height of a resting tab: the sheet's resting border pieces
-     * whole, and under them the strip's rule, which is the strip's last
-     * row and the one row a resting tab does not draw on. The selected
-     * tab stands over that rule — its border pieces end on the rule
-     * row, joining the tool strip under it in one surface, as a
-     * browser's chosen tab joins the bar below — and rises out of the
-     * row above the others, its interior rising with it rather than
-     * growing.
+     * Body height of a tab: the sheet's resting border pieces whole,
+     * and under them the strip's rule, which is the strip's last row
+     * and the one row a resting tab does not draw on. The selected tab
+     * stands over that rule — its pieces are a row taller and end on
+     * the rule row, their feet on it, joining the tool strip under it
+     * in one surface, as a browser's chosen tab joins the bar below.
      */
     static final int HEIGHT = PIECE_HEIGHT + 1;
     /**
-     * Rows the selected tab's top stands above a resting tab's: its
-     * pieces are three rows taller and stand one row lower, on the
-     * rule.
+     * Rows the selected tab's top stands above a resting tab's: the
+     * selected pieces' extra rows less the rule row they stand on, so
+     * none — every tab stands at one top.
      */
     static final int LIFT = ChatIconSheet.TAB_SELECTED_LEFT.getHeight()
             - PIECE_HEIGHT - 1;
     /**
-     * Clear rows the strip keeps above the selected tab, which rises to
-     * the top of the row's tabs: the strip is this much taller than the
-     * tab standing tallest in it.
+     * Clear rows the strip keeps above its tabs: the strip is this much
+     * taller than the tab standing tallest in it.
      */
     static final int HEADROOM = 2;
     /** Full height of the row: a resting tab, the lift and the head-room. */
@@ -109,7 +106,7 @@ final class ChatChannelTabBar {
     /** Width of a tab's border pieces inside the tab; the same in every state. */
     private static final int BORDER_WIDTH = ChatIconSheet.TAB_LEFT.getWidth();
     /**
-     * How far the selected pieces reach past the tab's edges: their
+     * How far the selected pieces reach past the tab's sides: their
      * feet, on the rule's row, spread this far out on either side, and
      * the rule's two pieces begin where the feet end.
      */
@@ -160,7 +157,11 @@ final class ChatChannelTabBar {
     static final int END_CONTROL_SIZE = 9;
     /** Clear space between the row's end controls, ink edge to ink edge. */
     private static final int END_CONTROL_GAP = 5;
-    /** Slack a press on an end control is allowed either side of its ink. */
+    /**
+     * Clear pixels round an end control's ink that answer with it, on
+     * every side: a five-pixel glyph is a small thing to hit exactly,
+     * and with them it answers on the {@link #END_CONTROL_SIZE} square.
+     */
     private static final int END_CONTROL_SLACK = 2;
     /**
      * Share of a neighbour a dragged tab crosses before it takes that
@@ -250,12 +251,23 @@ final class ChatChannelTabBar {
      */
     private static final int STRIP_INSET = 2;
     /**
-     * Clear space either side of the search button: the window's edge,
-     * this, the button, this again, and then the first tab.
+     * The window's left frame edge: the strip's first column, drawn on
+     * the border, one pixel wide. The gaps are measured from it rather
+     * than from the strip's edge, so the frame counts toward none.
+     */
+    private static final int FRAME_EDGE_WIDTH =
+            ChatTimestampColumn.BORDER_WIDTH;
+    /**
+     * Clear space either side of the search button: the window's frame
+     * edge, this, the button, this again, and then the first tab.
      */
     private static final int SEARCH_MARGIN = 3;
-    /** Where the search button begins, measured from the row's left. */
-    private static final int SEARCH_LEFT = SEARCH_MARGIN - STRIP_INSET;
+    /**
+     * Where the search button begins, measured from the row's left: the
+     * margin past the frame edge.
+     */
+    private static final int SEARCH_LEFT =
+            FRAME_EDGE_WIDTH + SEARCH_MARGIN - STRIP_INSET;
     /** Where the row's tabs begin: past the search button and its gaps. */
     private static final int SEARCH_RUN =
             SEARCH_LEFT + SEARCH_SIZE + SEARCH_MARGIN;
@@ -563,8 +575,24 @@ final class ChatChannelTabBar {
     }
 
     /**
+     * Whether a screen y lies in the strip's whole band as drawn: the
+     * row's band and the tool strip under its rule, down to the window's
+     * top rule, which is the tool strip's last row.
+     */
+    static boolean inStripBand(Row row, double mouseY) {
+        double y = mouseY - row.fractionY;
+        return y >= rowTop(row.rowBottom)
+                && y < row.rowBottom + ChatWindowPlacement.TOOL_STRIP_HEIGHT;
+    }
+
+    /**
      * What lies under a GUI-space point: a tab, one of the selected tab's
-     * controls, an end control, the grip, or nothing.
+     * controls, an end control, the grip, or nothing. Every control
+     * answers on its own box and nowhere else — the search button on its
+     * frame, an end control on its square, a tab's cog and cross on
+     * their squares — and each box is read from the same numbers the
+     * control is drawn with, so where a control lights and where it
+     * answers cannot differ.
      */
     Hit hitAt(FontRenderer font, Row row, double mouseX, double mouseY) {
         if (!inRowBand(row, mouseY)) {
@@ -572,68 +600,71 @@ final class ChatChannelTabBar {
         }
         List<Tab> tabs = layout(font, row);
         double localX = mouseX - row.offsetX - row.fractionX;
+        double localY = mouseY - row.fractionY;
         if (tabs.isEmpty()) {
             return null;
         }
+        int bottom = row.rowBottom;
         for (int index = 0; index < tabs.size(); index++) {
             Tab tab = tabs.get(index);
             if (localX < tab.x || localX >= tab.x + tab.width) {
                 continue;
             }
-            if (tab.closeX >= 0 && localX >= tab.closeX - 1
-                    && localX < tab.closeX + CONTROL_SIZE + 1) {
+            int tabTop = tabTop(bottom, tab.tab.equals(row.selected));
+            if (tab.closeX >= 0 && tabControlBox(tab.closeX, tabTop)
+                    .contains(localX, localY)) {
                 return new Hit(HitKind.CLOSE, tab.tab);
             }
-            if (tab.settingsX >= 0 && localX >= tab.settingsX - 1
-                    && localX < tab.settingsX + CONTROL_SIZE + 1) {
+            if (tab.settingsX >= 0 && tabControlBox(tab.settingsX, tabTop)
+                    .contains(localX, localY)) {
                 return new Hit(HitKind.SETTINGS, tab.tab);
             }
             return new Hit(HitKind.TAB, tab.tab, tab.labelWidth > tab.labelRoom);
         }
-        // The search button answers across its frame's width, down the
-        // whole strip, as the strip's other controls answer across theirs.
-        int searchLeft = row.left + SEARCH_LEFT;
-        if (localX >= searchLeft && localX < searchLeft + SEARCH_SIZE) {
+        if (searchBox(row.left, bottom).contains(localX, localY)) {
             return new Hit(HitKind.SEARCH, null);
         }
-        if (hitsControl(localX, this.lockX, LOCK_WIDTH)) {
+        // A control the row is not showing (a negative x) is never hit.
+        if (this.lockX >= 0 && lockBox(this.lockX, bottom)
+                .contains(localX, localY)) {
             return new Hit(HitKind.LOCK, null);
         }
-        if (hitsControl(localX, this.restoreX, this.restoreWidth)) {
+        if (this.restoreX >= 0 && endControlBox(this.restoreX,
+                this.restoreWidth, ChatIconSheet.PLUS.getHeight(), bottom)
+                .contains(localX, localY)) {
             return new Hit(HitKind.RESTORE, null);
         }
-        if (hitsControl(localX, this.windowSettingsX, COG_WIDTH)) {
+        if (this.windowSettingsX >= 0 && endControlBox(this.windowSettingsX,
+                COG_WIDTH, ChatIconSheet.COG.getHeight(), bottom)
+                .contains(localX, localY)) {
             return new Hit(HitKind.WINDOW_SETTINGS, null);
         }
-        if (hitsControl(localX, this.windowFullscreenX, FULLSCREEN_WIDTH)) {
+        if (this.windowFullscreenX >= 0 && endControlBox(
+                this.windowFullscreenX, FULLSCREEN_WIDTH,
+                ChatIconSheet.FULLSCREEN.getHeight(), bottom)
+                .contains(localX, localY)) {
             return new Hit(HitKind.WINDOW_FULLSCREEN, null);
         }
-        if (hitsControl(localX, this.windowCloseX, CLOSE_WIDTH)) {
+        if (this.windowCloseX >= 0 && endControlBox(this.windowCloseX,
+                CLOSE_WIDTH, ChatIconSheet.CLOSE.getHeight(), bottom)
+                .contains(localX, localY)) {
             return new Hit(HitKind.WINDOW_CLOSE, null);
         }
         if (localX >= this.controlsRight && localX < row.right) {
-            // A locked window's grip is inert: no hover, no tip, no drag.
+            // The stretch past the controls drags the window, the whole
+            // band of it; only the grip's own glyph lights. A locked
+            // window's grip is inert: no hover, no tip, no drag.
             return row.locked ? null : new Hit(HitKind.GRIP, null);
         }
         return null;
     }
 
     /**
-     * Whether a point in the row lies on an end control: its ink, and a
-     * little either side of it, since the controls are laid out by ink
-     * and a five-pixel glyph is a small thing to hit exactly. A control
-     * the row is not showing (a negative x) is never hit.
-     */
-    private static boolean hitsControl(double localX, int x, int width) {
-        return x >= 0 && localX >= x - END_CONTROL_SLACK
-                && localX < x + width + END_CONTROL_SLACK;
-    }
-
-    /**
-     * Whether the point lies on the grip's own glyph rather than
-     * anywhere in the empty stretch that also drags the window. The
-     * glyph is what the hover highlight and the move tip answer to, so
-     * neither follows a pointer resting on the bare strip.
+     * Whether the point lies on the grip's own glyph — with the end
+     * controls' clearing round it — rather than anywhere in the empty
+     * stretch that also drags the window. The glyph is what the hover
+     * highlight and the move tip answer to, so neither follows a pointer
+     * resting on the bare strip.
      */
     boolean isOverGripHandle(FontRenderer font, Row row, double mouseX,
                              double mouseY) {
@@ -645,19 +676,21 @@ final class ChatChannelTabBar {
             return false;
         }
         double localX = mouseX - row.offsetX - row.fractionX;
-        int right = row.right - GRIP_INSET;
-        return localX >= right - ChatIconSheet.GRIP.getWidth()
-                && localX < right;
+        double localY = mouseY - row.fractionY;
+        return gripGlyphBox(row.right, row.rowBottom)
+                .grown(END_CONTROL_SLACK).contains(localX, localY);
     }
 
     /**
-     * Whether a point lies on the strip as drawn: the row's band, from
-     * the strip's inset left edge to where the window's edge really
-     * stands, the stretch its surface covers and its region claims.
+     * Whether a point lies on the strip as drawn: the row's band and the
+     * tool strip under it, from the strip's inset left edge to where the
+     * window's edge really stands, the stretch its surface covers and
+     * its region claims. The tool strip is the strip's: it moves the
+     * window as the bare row does.
      */
     boolean stripContains(FontRenderer font, Row row, double mouseX,
                           double mouseY) {
-        if (row == null || !inRowBand(row, mouseY)) {
+        if (row == null || !inStripBand(row, mouseY)) {
             return false;
         }
         layout(font, row);
@@ -733,9 +766,11 @@ final class ChatChannelTabBar {
                 + STRIP_INSET;
         // Every tab's footprint is left out of it: a tab wears its own
         // surface in a single layer, never over this one.
-        // The search button stands in a hole of its own.
-        int searchLeft = row.offsetX + row.left + SEARCH_LEFT;
-        int searchTop = centredInStrip(bottom, SEARCH_SIZE);
+        // The search button stands in a hole of its own, in the box it
+        // answers on.
+        ChatHitBox search = searchBox(row.left, bottom);
+        int searchLeft = row.offsetX + (int)search.left;
+        int searchTop = (int)search.top;
         drawStripAround(row, tabs, row.offsetX + row.left - STRIP_INSET,
                 rowTop(bottom), stripRight, bottom - 1, searchLeft,
                 searchTop, searchLeft + SEARCH_SIZE,
@@ -929,7 +964,8 @@ final class ChatChannelTabBar {
         }
         // The tool strip under the strip's rule: a band of exactly the
         // selected tab's surface, the window's room for the controls
-        // that read its history rather than pick a tab, empty for now.
+        // that read its history rather than pick a tab, empty for now,
+        // and a handle on the window like the strip above it.
         // Its last row is a rule of its own — the window's top rule,
         // which the history's clip and its top shade hang from — on one
         // row of the history's backdrop, as the strip's rule stands.
@@ -1007,8 +1043,8 @@ final class ChatChannelTabBar {
             Tab tab = tabs.get(index);
             lefts[index] = row.offsetX + drawnX(row, tab);
             rights[index] = lefts[index] + drawnWidth(row, tab);
-            tops[index] = row.rowBottom - HEIGHT
-                    - (tab.tab.equals(row.selected) ? LIFT : 0);
+            tops[index] = tabTop(row.rowBottom,
+                    tab.tab.equals(row.selected));
             float[] tabEdges = {lefts[index], lefts[index] + 1.0F,
                     rights[index] - 1.0F, rights[index]};
             for (float edge : tabEdges) {
@@ -1078,9 +1114,9 @@ final class ChatChannelTabBar {
         // nothing sweeps across the tabs between.
         int lift = selected ? LIFT : 0;
         int top = rowBottom - HEIGHT - lift;
-        // A resting tab draws its border pieces whole and stops one row
-        // short of the strip's last row, its rule; the selected one
-        // rises out of the row above the others and stands on the rule.
+        // Every tab draws its border pieces whole from one top; a
+        // resting tab's stop one row short of the strip's last row, its
+        // rule, and the selected tab's, a row taller, end on it.
         float left = row.offsetX + drawnX(row, tab);
         float width = drawnWidth(row, tab);
         float right = left + width;
@@ -2149,8 +2185,83 @@ final class ChatChannelTabBar {
      * remainder is spent below, which puts every control the strip
      * carries on one centre row whatever each of them measures.
      */
-    private static int centredInStrip(int rowBottom, int height) {
+    static int centredInStrip(int rowBottom, int height) {
         return rowTop(rowBottom) + (ROW_HEIGHT - 1 - height) / 2;
+    }
+
+    /**
+     * The top of a tab's rows in a row ending at {@code rowBottom}: a
+     * resting tab's, or the selected tab's, lifted by {@link #LIFT}.
+     */
+    static int tabTop(int rowBottom, boolean selected) {
+        return rowBottom - HEIGHT - (selected ? LIFT : 0);
+    }
+
+    /* ---- The boxes the strip's controls are drawn in and answer on ---- */
+
+    /**
+     * The search button's frame, where it is drawn: a framed button
+     * answers on its frame and nowhere else.
+     */
+    static ChatHitBox searchBox(int rowLeft, int rowBottom) {
+        return new ChatHitBox(rowLeft + SEARCH_LEFT,
+                centredInStrip(rowBottom, SEARCH_SIZE), SEARCH_SIZE,
+                SEARCH_SIZE);
+    }
+
+    /** An end control's ink, centred in the strip where it is drawn. */
+    static ChatHitBox endControlInk(int x, int width, int height,
+                                    int rowBottom) {
+        return new ChatHitBox(x, centredInStrip(rowBottom, height), width,
+                height);
+    }
+
+    /**
+     * What an end control answers on: its ink with
+     * {@link #END_CONTROL_SLACK} clear pixels on every side, which makes
+     * a five-pixel glyph the {@link #END_CONTROL_SIZE} square the chat
+     * draws its small controls in elsewhere.
+     */
+    static ChatHitBox endControlBox(int x, int width, int height,
+                                    int rowBottom) {
+        return endControlInk(x, width, height, rowBottom)
+                .grown(END_CONTROL_SLACK);
+    }
+
+    /**
+     * The top of the lock's artwork: its resting body centred in the
+     * strip like its neighbours, the room the swing needs above it.
+     */
+    private static int lockTop(int rowBottom) {
+        return centredInStrip(rowBottom, ChatLockAnimation.SHUT_HEIGHT)
+                - (ChatLockAnimation.HEIGHT - ChatLockAnimation.SHUT_HEIGHT);
+    }
+
+    /**
+     * What the lock answers on: its whole artwork, shackle included,
+     * with the end controls' clearing.
+     */
+    static ChatHitBox lockBox(int x, int rowBottom) {
+        return new ChatHitBox(x, lockTop(rowBottom), LOCK_WIDTH,
+                ChatLockAnimation.HEIGHT).grown(END_CONTROL_SLACK);
+    }
+
+    /**
+     * A tab's cog or cross: its {@link #CONTROL_SIZE} square, centred in
+     * the interior of a tab whose rows start at {@code tabTop}, as it is
+     * drawn.
+     */
+    static ChatHitBox tabControlBox(double x, int tabTop) {
+        return new ChatHitBox(x,
+                centredInInterior(tabTop + INTERIOR_TOP, CONTROL_SIZE),
+                CONTROL_SIZE, CONTROL_SIZE);
+    }
+
+    /** The grip's glyph, where it is drawn against the row's right edge. */
+    static ChatHitBox gripGlyphBox(int rowRight, int rowBottom) {
+        return new ChatHitBox(rowRight - GRIP_INSET - GRIP_WIDTH,
+                centredInStrip(rowBottom, ChatIconSheet.GRIP.getHeight()),
+                GRIP_WIDTH, ChatIconSheet.GRIP.getHeight());
     }
 
     /**
@@ -2165,11 +2276,8 @@ final class ChatChannelTabBar {
         // would leave the resting lock a row below its neighbours, so
         // the resting shape is what is centred and the swing reaches up
         // out of the strip's middle.
-        this.lockAnimation.draw(x,
-                centredInStrip(rowBottom, ChatLockAnimation.SHUT_HEIGHT)
-                        - (ChatLockAnimation.HEIGHT
-                                - ChatLockAnimation.SHUT_HEIGHT),
-                locked, hovered, scaled(0xFF));
+        this.lockAnimation.draw(x, lockTop(rowBottom), locked, hovered,
+                scaled(0xFF));
     }
 
     /**
@@ -2179,9 +2287,10 @@ final class ChatChannelTabBar {
      */
     private void drawEndControl(ChatIconSheet resting, ChatIconSheet hovered,
                                 float fade, int x, int rowBottom) {
-        ChatIconSheet.drawPairWithShadow(resting, hovered, fade, x,
-                centredInStrip(rowBottom, resting.getHeight()),
-                scaled(0xFF));
+        ChatHitBox ink = endControlInk(x, resting.getWidth(),
+                resting.getHeight(), rowBottom);
+        ChatIconSheet.drawPairWithShadow(resting, hovered, fade,
+                (int)ink.left, (int)ink.top, scaled(0xFF));
     }
 
     /**
@@ -2196,8 +2305,8 @@ final class ChatChannelTabBar {
     private void drawFullscreenControl(float share, float fade, int x,
                                        int rowBottom) {
         int alpha = scaled(0xFF);
-        int y = centredInStrip(rowBottom,
-                ChatIconSheet.FULLSCREEN.getHeight());
+        int y = (int)endControlInk(x, FULLSCREEN_WIDTH,
+                ChatIconSheet.FULLSCREEN.getHeight(), rowBottom).top;
         float inward = Math.max(0.0F, Math.min(1.0F, share));
         ChatIconSheet.drawPairWithShadow(ChatIconSheet.FULLSCREEN,
                 ChatIconSheet.FULLSCREEN_HOVER, fade, x, y,
@@ -2255,11 +2364,10 @@ final class ChatChannelTabBar {
         if (right - left < MIN_GRIP_WIDTH) {
             return;
         }
+        ChatHitBox glyph = gripGlyphBox(right, rowBottom);
         ChatIconSheet.drawPairWithShadow(ChatIconSheet.GRIP,
-                ChatIconSheet.GRIP_HOVER, fade,
-                right - GRIP_INSET - ChatIconSheet.GRIP.getWidth(),
-                centredInStrip(rowBottom, ChatIconSheet.GRIP.getHeight()),
-                scaled(0xFF));
+                ChatIconSheet.GRIP_HOVER, fade, (int)glyph.left,
+                (int)glyph.top, scaled(0xFF));
     }
 
     /**

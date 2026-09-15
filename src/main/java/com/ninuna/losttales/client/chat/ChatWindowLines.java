@@ -442,10 +442,14 @@ final class ChatWindowLines {
         }
         int width = Math.max(1, wrapWidth);
         boolean colours = LostTalesChatVisualStyle.chatColoursEnabled();
+        // An item's slot is laid out for the display scale, so a change
+        // of GUI scale lays the lines out again.
+        int displayScale = ChatWindowFrame.displayScaleFactor();
         Cached cached = CACHE.get(viewId);
         if (cached == null || !cached.describes(width, colours, chatOpen,
-                fading, filter)) {
-            cached = new Cached(width, colours, chatOpen, fading, filter);
+                displayScale, fading, filter)) {
+            cached = new Cached(width, colours, chatOpen, displayScale,
+                    fading, filter);
             CACHE.put(viewId, cached);
         }
         cached.refresh(minecraft.fontRenderer, messages, filter,
@@ -669,6 +673,8 @@ final class ChatWindowLines {
         private final int wrapWidth;
         private final boolean colours;
         private final boolean chatOpen;
+        /** Display pixels per GUI pixel: an item slot's width follows it. */
+        private final int displayScale;
         /** Whether this view drops its lines a few seconds after they arrive. */
         private final boolean fading;
         private final ChatLineFilter filter;
@@ -680,18 +686,22 @@ final class ChatWindowLines {
         List<ChatLine> lines = Collections.emptyList();
 
         Cached(int wrapWidth, boolean colours, boolean chatOpen,
-               boolean fading, ChatLineFilter filter) {
+               int displayScale, boolean fading, ChatLineFilter filter) {
             this.wrapWidth = wrapWidth;
             this.colours = colours;
             this.chatOpen = chatOpen;
+            this.displayScale = displayScale;
             this.fading = fading;
             this.filter = filter;
         }
 
         boolean describes(int wrapWidth, boolean colours, boolean chatOpen,
-                          boolean fading, ChatLineFilter filter) {
+                          int displayScale, boolean fading,
+                          ChatLineFilter filter) {
             return this.wrapWidth == wrapWidth && this.colours == colours
-                    && this.chatOpen == chatOpen && this.fading == fading
+                    && this.chatOpen == chatOpen
+                    && this.displayScale == displayScale
+                    && this.fading == fading
                     && this.filter.equals(filter);
         }
 

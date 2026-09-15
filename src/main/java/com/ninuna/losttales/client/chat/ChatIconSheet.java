@@ -115,15 +115,16 @@ enum ChatIconSheet {
      * top, the line that runs down the tab's side, and the tab's own
      * interior tone behind them, so a tab is these two with a line
      * between their tips and that same tone filling the span. The
-     * selected pair is two rows taller: the tab it draws stands that
-     * much above the resting ones.
+     * selected pair is one row taller than the resting one and a texel
+     * wider: each piece ends in a foot on its last row, which stands on
+     * the strip's rule, reaching one texel out past the tab's side.
      */
     TAB_LEFT(0, 59, 4, 19),
     TAB_RIGHT(5, 59, 4, 19),
     TAB_HOVER_LEFT(10, 59, 4, 19),
     TAB_HOVER_RIGHT(15, 59, 4, 19),
-    TAB_SELECTED_LEFT(20, 56, 6, 22),
-    TAB_SELECTED_RIGHT(27, 56, 6, 22),
+    TAB_SELECTED_LEFT(20, 58, 5, 20),
+    TAB_SELECTED_RIGHT(26, 58, 5, 20),
     /**
      * The hatch laid over message rows the history does not reach: a
      * 45° line every eight texels. The pattern's period divides the

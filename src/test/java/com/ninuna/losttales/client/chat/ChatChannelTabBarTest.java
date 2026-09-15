@@ -22,6 +22,88 @@ public final class ChatChannelTabBarTest {
     private static final int CONTROL =
             ChatChannelTabBar.CONTROL_GAP + ChatChannelTabBar.CONTROL_SIZE;
 
+    /**
+     * Every control of the strip answers on the box it is drawn in and
+     * nowhere else: the search button on its frame, an end control on
+     * the nine-pixel square round its glyph, a tab's cog or cross on its
+     * square in the tab. The rows of the band above and below a box
+     * answer nothing.
+     */
+    @Test
+    public void everyControlAnswersOnItsOwnBox() {
+        int rowBottom = 100;
+        int rowTop = ChatChannelTabBar.rowTop(rowBottom);
+        ChatHitBox search = ChatChannelTabBar.searchBox(40, rowBottom);
+        assertEquals(search.width, search.height, EPSILON);
+        // The strip begins two pixels left of the row, on the window's
+        // one-pixel frame edge; the button stands three clear pixels
+        // inside that edge, and the first tab three past the button.
+        int stripInset = 2;
+        assertEquals(40 - stripInset + 1 + 3, search.left, EPSILON);
+        assertEquals(search.right() + 3,
+                40 + ChatChannelTabBar.tabRunLeftInset() - stripInset, EPSILON);
+        assertEquals(ChatChannelTabBar.centredInStrip(rowBottom,
+                (int)search.height), search.top, EPSILON);
+        assertTrue(search.top > rowTop);
+        assertTrue(search.bottom() < rowBottom);
+        double middleX = search.left + search.width / 2.0D;
+        assertTrue(search.contains(middleX, search.top));
+        assertTrue(search.contains(middleX, search.bottom() - 1));
+        assertFalse(search.contains(middleX, search.top - 1));
+        assertFalse(search.contains(middleX, search.bottom()));
+        assertFalse(search.contains(middleX, rowBottom - 1));
+        assertFalse(search.contains(search.left - 1, search.top));
+
+        ChatHitBox glyph = ChatChannelTabBar.endControlBox(70, 5, 5, rowBottom);
+        assertEquals(ChatChannelTabBar.END_CONTROL_SIZE, glyph.width, EPSILON);
+        assertEquals(ChatChannelTabBar.END_CONTROL_SIZE, glyph.height, EPSILON);
+        assertEquals(68, glyph.left, EPSILON);
+        assertEquals(ChatChannelTabBar.centredInStrip(rowBottom,
+                ChatChannelTabBar.END_CONTROL_SIZE), glyph.top, EPSILON);
+        assertTrue(glyph.contains(72, glyph.top + 4));
+        assertFalse(glyph.contains(72, rowBottom - 1));
+        assertFalse(glyph.contains(72, rowTop));
+        // The ink itself is what the control is drawn with.
+        ChatHitBox ink = ChatChannelTabBar.endControlInk(70, 5, 5, rowBottom);
+        assertEquals(70, ink.left, EPSILON);
+        assertEquals(glyph.top + 2, ink.top, EPSILON);
+
+        int liftedTop = ChatChannelTabBar.tabTop(rowBottom, true);
+        assertEquals(ChatChannelTabBar.tabTop(rowBottom, false)
+                - ChatChannelTabBar.LIFT, liftedTop);
+        ChatHitBox control = ChatChannelTabBar.tabControlBox(50, liftedTop);
+        assertEquals(ChatChannelTabBar.CONTROL_SIZE, control.width, EPSILON);
+        assertEquals(ChatChannelTabBar.CONTROL_SIZE, control.height, EPSILON);
+        assertTrue(control.top >= liftedTop);
+        assertTrue(control.bottom() <= liftedTop + ChatChannelTabBar.HEIGHT);
+        // A resting tab's control stands the lift lower than the selected tab's.
+        assertEquals(control.top + ChatChannelTabBar.LIFT,
+                ChatChannelTabBar.tabControlBox(50,
+                        ChatChannelTabBar.tabTop(rowBottom, false)).top,
+                EPSILON);
+    }
+
+    /**
+     * The strip's band, which moves the window, is the row and the tool
+     * strip under its rule together, down to the window's top rule; the
+     * tabs and controls answer in the row alone.
+     */
+    @Test
+    public void theToolStripIsPartOfTheStripsBand() {
+        ChatChannelTabBar.Row row = new ChatChannelTabBar.Row();
+        row.rowBottom = 100;
+        int rowTop = ChatChannelTabBar.rowTop(100);
+        int toolBottom = 100 + ChatWindowPlacement.TOOL_STRIP_HEIGHT;
+        assertEquals(17, ChatWindowPlacement.TOOL_STRIP_HEIGHT);
+        assertTrue(ChatChannelTabBar.inStripBand(row, rowTop));
+        assertFalse(ChatChannelTabBar.inStripBand(row, rowTop - 1));
+        assertTrue(ChatChannelTabBar.inRowBand(row, 99));
+        assertFalse(ChatChannelTabBar.inRowBand(row, 100));
+        assertTrue(ChatChannelTabBar.inStripBand(row, 100));
+        assertTrue(ChatChannelTabBar.inStripBand(row, toolBottom - 1));
+        assertFalse(ChatChannelTabBar.inStripBand(row, toolBottom));
+    }
+
     /** The marquee: still, out, rest, back, rest — on the clock alone. */
     @Test
     public void marqueeWaitsThenSlidesOutRestsAndSlidesBack() {

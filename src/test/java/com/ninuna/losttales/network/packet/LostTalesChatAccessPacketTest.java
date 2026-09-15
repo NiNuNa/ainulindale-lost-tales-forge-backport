@@ -253,6 +253,74 @@ public final class LostTalesChatAccessPacketTest {
     }
 
     /**
+     * The icons the server puts on its channels ride at the very end,
+     * after the Proximity radius; a payload written before them names
+     * none, and one naming an icon that reads as nothing is refused.
+     */
+    @Test
+    public void theChannelIconsRoundTripAndDefaultToNone() {
+        java.util.Map<String, com.ninuna.losttales.chat.ChatChannelIconSpec> icons =
+                new java.util.LinkedHashMap<String,
+                        com.ninuna.losttales.chat.ChatChannelIconSpec>();
+        icons.put(ChatChannel.ADMIN.getId(),
+                com.ninuna.losttales.chat.ChatChannelIconSpec.parse(
+                        "item:minecraft:iron_sword"));
+        icons.put(ChatChannel.PARTY.getId(),
+                com.ninuna.losttales.chat.ChatChannelIconSpec.parse("emoji:joy"));
+        LostTalesChatAccessPacket packet = new LostTalesChatAccessPacket(false, true, 0,
+                Collections.<LostTalesChatAccessPacket.RoleHolder>emptyList(),
+                Collections.<UUID>emptyList(), ChatRoleCatalog.builtIn().roles(),
+                LostTalesChatAccessPacket.allChannelIds(),
+                LostTalesChatAccessPacket.allChannelIds(), false, false,
+                Collections.<String>emptyList(), 0,
+                Collections.<UUID, Integer>emptyMap(), 64, icons);
+        ByteBuf buffer = Unpooled.buffer();
+        packet.toBytes(buffer);
+        LostTalesChatAccessPacket decoded = new LostTalesChatAccessPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(64, decoded.getProximityRadius());
+        assertEquals(icons, decoded.getChannelIcons());
+        assertEquals(new java.util.ArrayList<String>(icons.keySet()),
+                new java.util.ArrayList<String>(decoded.getChannelIcons().keySet()));
+
+        // Written by a build before the icons: the same payload cut off
+        // after the radius.
+        LostTalesChatAccessPacket bare = new LostTalesChatAccessPacket(false, true, 0,
+                Collections.<LostTalesChatAccessPacket.RoleHolder>emptyList(),
+                Collections.<UUID>emptyList(), ChatRoleCatalog.builtIn().roles(),
+                LostTalesChatAccessPacket.allChannelIds(),
+                LostTalesChatAccessPacket.allChannelIds(), false, false,
+                Collections.<String>emptyList(), 0,
+                Collections.<UUID, Integer>emptyMap(), 64);
+        ByteBuf older = Unpooled.buffer();
+        bare.toBytes(older);
+        older.writerIndex(older.writerIndex() - 1);
+        LostTalesChatAccessPacket fromOlder = new LostTalesChatAccessPacket();
+        fromOlder.fromBytes(older);
+        assertFalse(fromOlder.isMalformed());
+        assertEquals(64, fromOlder.getProximityRadius());
+        assertTrue(fromOlder.getChannelIcons().isEmpty());
+
+        // An icon that reads as nothing is a broken payload, not a guess.
+        ByteBuf broken = Unpooled.buffer();
+        bare.toBytes(broken);
+        broken.writerIndex(broken.writerIndex() - 1);
+        broken.writeByte(1);
+        writeString(broken, ChatChannel.ADMIN.getId());
+        writeString(broken, "item:");
+        LostTalesChatAccessPacket refused = new LostTalesChatAccessPacket();
+        refused.fromBytes(broken);
+        assertTrue(refused.isMalformed());
+    }
+
+    private static void writeString(ByteBuf buffer, String text) {
+        byte[] bytes = text.getBytes(java.nio.charset.Charset.forName("UTF-8"));
+        cpw.mods.fml.common.network.ByteBufUtils.writeVarInt(buffer, bytes.length, 2);
+        buffer.writeBytes(bytes);
+    }
+
+    /**
      * The channel answer travels as ids, so a channel is named by the
      * string that is its permanent wire surface rather than by where its
      * constant happens to sit.

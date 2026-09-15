@@ -1,18 +1,25 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.character.sync.CharacterAppearance;
+import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelIconSpec;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import cpw.mods.fml.common.FMLLog;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.compat.lotr.LotrFactionBannerResolver;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 
 /**
@@ -22,10 +29,13 @@ import net.minecraft.item.ItemStack;
  * (the Stewards' banner when the faction has none), for a whisper with
  * a player the partner's own head, exactly as their lines show it, and
  * for an NPC conversation the NPC's portrait as its speech showed it. A
- * whisper whose partner this client cannot place yet, an NPC whose
- * portrait has not been seen, or a faction tab without LOTR's banner
- * item wears an emoji. Purely decorative: the catalogue names and ids
- * are untouched.
+ * server may choose a channel's icon itself, an emoji or an item, in its
+ * channels file; the choice arrives with the chat access and stands
+ * before the code's own emoji and the faction banner. A whisper whose
+ * partner this client cannot place yet, an NPC whose portrait has not
+ * been seen, a faction tab without LOTR's banner item, or a channel
+ * given an item this client does not have wears an emoji. Purely
+ * decorative: the catalogue names and ids are untouched.
  */
 final class ChatChannelIcons {
     /** Icons are drawn at the sheet's own sprite size, never scaled. */
@@ -45,8 +55,78 @@ final class ChatChannelIcons {
      */
     private static final Map<UUID, String> NPC_FACTIONS =
             new LinkedHashMap<UUID, String>();
+    /** The icons the server chose, by channel id; empty until it says. */
+    private static Map<String, ChatChannelIconSpec> CHOSEN =
+            Collections.emptyMap();
+    /**
+     * The item each chosen item icon resolved to on this client, by
+     * channel id, resolved the first time the channel is drawn; a null
+     * value marks an item this client does not have, reported once.
+     */
+    private static final Map<String, ItemStack> RESOLVED =
+            new HashMap<String, ItemStack>();
 
     private ChatChannelIcons() {}
+
+    /**
+     * Puts the server's choice of icons in force, replacing the last;
+     * what each item resolves to is asked again from here.
+     */
+    static synchronized void install(Map<String, ChatChannelIconSpec> icons) {
+        Map<String, ChatChannelIconSpec> chosen =
+                new HashMap<String, ChatChannelIconSpec>();
+        if (icons != null) {
+            for (Map.Entry<String, ChatChannelIconSpec> entry
+                    : icons.entrySet()) {
+                if (entry.getKey() != null && entry.getValue() != null) {
+                    chosen.put(entry.getKey().trim().toLowerCase(Locale.ROOT),
+                            entry.getValue());
+                }
+            }
+        }
+        CHOSEN = chosen;
+        RESOLVED.clear();
+    }
+
+    /** The server's choices go with the server. */
+    static synchronized void forgetChannelIcons() {
+        CHOSEN = Collections.emptyMap();
+        RESOLVED.clear();
+    }
+
+    private static synchronized ChatChannelIconSpec chosen(ChatChannel channel) {
+        return channel == null ? null
+                : CHOSEN.get(channel.getId().toLowerCase(Locale.ROOT));
+    }
+
+    /**
+     * The item the server chose for the channel, or null for a channel
+     * wearing an emoji or given an item this client does not have.
+     */
+    static synchronized ItemStack itemIconOf(ChatChannel channel) {
+        ChatChannelIconSpec spec = chosen(channel);
+        if (spec == null || spec.getKind() != ChatChannelIconSpec.Kind.ITEM) {
+            return null;
+        }
+        String key = channel.getId().toLowerCase(Locale.ROOT);
+        if (RESOLVED.containsKey(key)) {
+            return RESOLVED.get(key);
+        }
+        ItemStack stack = resolveItem(spec);
+        RESOLVED.put(key, stack);
+        if (stack == null) {
+            FMLLog.warning("[%s] Channel '%s' is given the item '%s', which "
+                            + "this client does not have; its emoji is shown",
+                    LostTalesMetaData.MOD_ID, channel.getId(), spec.getName());
+        }
+        return stack;
+    }
+
+    private static ItemStack resolveItem(ChatChannelIconSpec spec) {
+        Object registered = Item.itemRegistry.getObject(spec.getName());
+        return registered instanceof Item
+                ? new ItemStack((Item)registered, 1, spec.getMeta()) : null;
+    }
 
     /** Remembers the portrait an NPC's speech was drawn with, for its tab. */
     static synchronized void rememberNpcPortrait(ChatTab tab,
@@ -106,6 +186,15 @@ final class ChatChannelIcons {
         }
         float inset = (SIZE - HEAD_SIZE) / 2.0F;
         int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
+        if (!tab.isNpc() && !tab.isWhisper()) {
+            // The server's own choice of item stands before everything
+            // else, drawn as an item's icon in a line is.
+            ItemStack chosen = itemIconOf(tab.getChannel());
+            if (chosen != null) {
+                ChatInlineIcons.drawItem(minecraft, chosen, x, y, SIZE, alpha);
+                return;
+            }
+        }
         if (tab.getChannel() == ChatChannel.FACTION) {
             ItemStack banner = LotrFactionBannerResolver.bannerFor(
                     ClientChatChannelState.wornFactionId(ChatChannel.FACTION));
@@ -211,9 +300,22 @@ final class ChatChannelIcons {
         return iconOf(tab.getChannel());
     }
 
+    /**
+     * The emoji a channel wears: the server's choice when it chose an
+     * emoji this build has, the code's own otherwise — which is also
+     * what stands in for a chosen item this client cannot draw.
+     */
     static ChatEmoji iconOf(ChatChannel channel) {
         if (channel == null) {
             return null;
+        }
+        ChatChannelIconSpec chosen = chosen(channel);
+        if (chosen != null
+                && chosen.getKind() == ChatChannelIconSpec.Kind.EMOJI) {
+            ChatEmoji named = ChatEmoji.fromName(chosen.getName());
+            if (named != null) {
+                return named;
+            }
         }
         // By the channel itself rather than a name, so a channel a server
         // defines falls through to the same face every unknown one wears.

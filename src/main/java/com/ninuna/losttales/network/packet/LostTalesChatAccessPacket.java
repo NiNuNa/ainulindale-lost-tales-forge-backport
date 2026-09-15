@@ -10,6 +10,8 @@ import com.ninuna.losttales.chat.ChatPresentationMode;
 import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.chat.ChatChannelDescriptor;
 import com.ninuna.losttales.chat.ChatChannelAccess;
+import com.ninuna.losttales.chat.ChatChannelIconCatalog;
+import com.ninuna.losttales.chat.ChatChannelIconSpec;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -89,6 +91,9 @@ public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_CHANNEL_ID_BYTES = 16;
     /** More channel ids than this is a broken payload, not an access answer. */
     private static final int MAX_CHANNEL_IDS = 64;
+    /** A channel icon's text is plain ASCII, so its bytes are its characters. */
+    private static final int MAX_CHANNEL_ICON_BYTES =
+            ChatChannelIconSpec.MAX_TEXT_LENGTH;
     /** A channel's shown name is bounded like a role's text. */
     /** Four bytes per character is the most UTF-8 spends on one. */
     private static final int MAX_CHANNEL_NAME_BYTES =
@@ -109,7 +114,9 @@ public final class LostTalesChatAccessPacket implements IMessage {
             + 1 + MAX_CHANNEL_IDS * (MAX_CHANNEL_ID_BYTES
                     + MAX_CHANNEL_NAME_BYTES + 4 * MAX_ENUM_NAME_BYTES + 16)
             + 4 + 2 + MAX_OWN_CHARACTERS * 20
-            + 2 + MAX_HOLDERS * 21 + 2;
+            + 2 + MAX_HOLDERS * 21 + 2
+            + 1 + ChatChannelIconCatalog.MAX_ICONS
+                    * (MAX_CHANNEL_ID_BYTES + MAX_CHANNEL_ICON_BYTES + 4);
     /**
      * Every channel this build knows, by id: what a payload written
      * without a channel answer reads as, and what a client falls back to.
@@ -173,6 +180,13 @@ public final class LostTalesChatAccessPacket implements IMessage {
     private Map<UUID, Integer> characterRoleMasks = Collections.emptyMap();
     /** The server's Proximity radius in blocks; zero when unstated. */
     private int proximityRadius;
+    /**
+     * The icons the server puts on its channels, by channel id: the
+     * channels file's choice, appended after the radius so a payload
+     * written before it names none.
+     */
+    private Map<String, ChatChannelIconSpec> channelIcons =
+            Collections.emptyMap();
     private boolean malformed;
 
     public LostTalesChatAccessPacket() {}
@@ -259,6 +273,26 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                      int accountRoleMask,
                                      Map<UUID, Integer> characterRoleMasks,
                                      int proximityRadius) {
+        this(adminAccess, discordAccess, roleMask, roleHolders, mutedSenders,
+                catalog, readableChannels, sendableChannels, canModerate,
+                canEditServerConfig, capabilities, accountRoleMask,
+                characterRoleMasks, proximityRadius,
+                Collections.<String, ChatChannelIconSpec>emptyMap());
+    }
+
+    public LostTalesChatAccessPacket(boolean adminAccess,
+                                     boolean discordAccess, int roleMask,
+                                     List<RoleHolder> roleHolders,
+                                     List<UUID> mutedSenders,
+                                     List<ChatAccountRole> catalog,
+                                     List<String> readableChannels,
+                                     List<String> sendableChannels,
+                                     boolean canModerate, boolean canEditServerConfig,
+                                     List<String> capabilities,
+                                     int accountRoleMask,
+                                     Map<UUID, Integer> characterRoleMasks,
+                                     int proximityRadius,
+                                     Map<String, ChatChannelIconSpec> channelIcons) {
         this.accountRoleMask = accountRoleMask & roleMask;
         this.rolesSplit = true;
         Map<UUID, Integer> characters = new LinkedHashMap<UUID, Integer>();
@@ -319,6 +353,26 @@ public final class LostTalesChatAccessPacket implements IMessage {
         this.readableChannels = channelIds(readableChannels);
         this.sendableChannels = channelIds(sendableChannels);
         this.definedChannels = definedChannels();
+        this.channelIcons = channelIcons(channelIcons);
+    }
+
+    /** The given icons, keyed by trimmed id, deduplicated and bounded. */
+    private static Map<String, ChatChannelIconSpec> channelIcons(
+            Map<String, ChatChannelIconSpec> icons) {
+        Map<String, ChatChannelIconSpec> kept =
+                new LinkedHashMap<String, ChatChannelIconSpec>();
+        if (icons != null) {
+            for (Map.Entry<String, ChatChannelIconSpec> entry
+                    : icons.entrySet()) {
+                String id = entry.getKey() == null ? "" : entry.getKey().trim();
+                if (id.length() > 0 && entry.getValue() != null
+                        && !kept.containsKey(id)
+                        && kept.size() < ChatChannelIconCatalog.MAX_ICONS) {
+                    kept.put(id, entry.getValue());
+                }
+            }
+        }
+        return Collections.unmodifiableMap(kept);
     }
 
     /** The channels in force that this build does not have of its own. */
@@ -496,6 +550,30 @@ public final class LostTalesChatAccessPacket implements IMessage {
                             "invalid proximity radius");
                 }
             }
+            // Appended after the radius: the icons the channels wear, by
+            // id. A payload written before them names none.
+            Map<String, ChatChannelIconSpec> icons =
+                    new LinkedHashMap<String, ChatChannelIconSpec>();
+            if (buffer.readableBytes() >= 1) {
+                int iconCount = buffer.readUnsignedByte();
+                if (iconCount > ChatChannelIconCatalog.MAX_ICONS) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "too many channel icons");
+                }
+                for (int index = 0; index < iconCount; index++) {
+                    String id = LostTalesPacketCodec.readUtf8String(
+                            buffer, MAX_CHANNEL_ID_BYTES).trim();
+                    ChatChannelIconSpec icon = ChatChannelIconSpec.parse(
+                            LostTalesPacketCodec.readUtf8String(
+                                    buffer, MAX_CHANNEL_ICON_BYTES));
+                    if (id.length() == 0 || icon == null
+                            || icons.containsKey(id)) {
+                        throw new LostTalesPacketCodec.DecodeException(
+                                "invalid channel icon");
+                    }
+                    icons.put(id, icon);
+                }
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             int knownMask = known.knownMask();
             List<RoleHolder> stated = new ArrayList<RoleHolder>(holders.size());
@@ -536,6 +614,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.canEditServerConfig = editConfig;
             this.capabilities = Collections.unmodifiableList(held);
             this.definedChannels = Collections.unmodifiableList(defined);
+            this.channelIcons = Collections.unmodifiableMap(icons);
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.adminAccess = false;
@@ -554,6 +633,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.rolesSplit = false;
             this.characterRoleMasks = Collections.emptyMap();
             this.proximityRadius = 0;
+            this.channelIcons = Collections.emptyMap();
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -717,6 +797,15 @@ public final class LostTalesChatAccessPacket implements IMessage {
             }
         }
         buffer.writeShort(this.proximityRadius);
+        // Then the icons the channels wear, by id.
+        buffer.writeByte(this.channelIcons.size());
+        for (Map.Entry<String, ChatChannelIconSpec> entry
+                : this.channelIcons.entrySet()) {
+            LostTalesPacketCodec.writeUtf8String(buffer, entry.getKey(),
+                    MAX_CHANNEL_ID_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer,
+                    entry.getValue().toText(), MAX_CHANNEL_ICON_BYTES);
+        }
     }
 
     public boolean hasAdminAccess() { return this.adminAccess; }
@@ -758,6 +847,10 @@ public final class LostTalesChatAccessPacket implements IMessage {
     }
     /** The server's Proximity radius in blocks; zero when unstated. */
     public int getProximityRadius() { return this.proximityRadius; }
+    /** The icons the server puts on its channels, by id; empty when unstated. */
+    public Map<String, ChatChannelIconSpec> getChannelIcons() {
+        return this.channelIcons;
+    }
     public boolean isMalformed() { return this.malformed; }
 
     /**

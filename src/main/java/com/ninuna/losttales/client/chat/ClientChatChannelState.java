@@ -7,6 +7,7 @@ import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatRoleConfig;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatChannelGates;
+import com.ninuna.losttales.chat.ChatChannelIconSpec;
 import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
@@ -749,6 +750,11 @@ public final class ClientChatChannelState {
     /** The server's Proximity radius, for how far speech bubbles reach. */
     public static synchronized void setProximityRadius(int radius) {
         proximityRadius = Math.max(0, radius);
+    }
+
+    /** The icons the server puts on its channels; see {@link ChatChannelIcons#install}. */
+    public static void setChannelIcons(Map<String, ChatChannelIconSpec> icons) {
+        ChatChannelIcons.install(icons);
     }
 
     /** The server's Proximity radius in blocks; zero until it says. */

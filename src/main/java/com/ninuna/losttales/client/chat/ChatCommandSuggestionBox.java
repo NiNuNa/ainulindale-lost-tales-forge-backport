@@ -62,9 +62,9 @@ final class ChatCommandSuggestionBox {
         if (!isActive()) {
             return false;
         }
-        return mouseX >= inputX && mouseX < inputX + boxWidth(font)
-                && mouseY >= boxTop(screenHeight)
-                && mouseY < screenHeight - BOTTOM_MARGIN;
+        int top = boxTop(screenHeight);
+        return ChatHitBox.contains(mouseX, mouseY, inputX, top,
+                boxWidth(font), screenHeight - BOTTOM_MARGIN - top);
     }
 
     /** The candidate index under the mouse, or -1. Fold row answers -1. */

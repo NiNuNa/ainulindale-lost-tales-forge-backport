@@ -480,8 +480,8 @@ final class ChatPopupMenu {
     }
 
     boolean contains(double mouseX, double mouseY) {
-        return isOpen() && mouseX >= this.x && mouseX < this.x + this.width
-                && mouseY >= this.y && mouseY < this.y + this.height;
+        return isOpen() && ChatHitBox.contains(mouseX, mouseY, this.x, this.y,
+                this.width, this.height);
     }
 
     /** Moves the list's target by whole rows; beyond either end it stays
@@ -528,14 +528,31 @@ final class ChatPopupMenu {
      * only on its own square, so the row around it keeps its meaning.
      */
     Entry lockControlAt(double mouseX, double mouseY) {
-        Entry entry = rowAt(mouseX, mouseY);
+        int index = rowIndexAt(mouseX, mouseY);
+        Entry entry = index < 0 ? null : this.entries.get(index);
         if (entry == null || entry.lockControl == null) {
             return null;
         }
-        int left = lockLeft();
-        return mouseX >= left
-                && mouseX < left + ChatChannelTabBar.END_CONTROL_SIZE
-                ? entry : null;
+        return lockBox(index).contains(mouseX, mouseY) ? entry : null;
+    }
+
+    /**
+     * The lock's square on its row: the end-control square its artwork
+     * stands in, centred on the row as the artwork is drawn.
+     */
+    private ChatHitBox lockBox(int index) {
+        return new ChatHitBox(lockLeft(), rowTop(index)
+                + (ROW_HEIGHT - ChatChannelTabBar.END_CONTROL_SIZE) / 2,
+                ChatChannelTabBar.END_CONTROL_SIZE,
+                ChatChannelTabBar.END_CONTROL_SIZE);
+    }
+
+    /** Where row {@code index} is drawn this frame, gliding with the scroll. */
+    private int rowTop(int index) {
+        int firstRow = (int)Math.floor(this.renderedScrollRows);
+        return this.y + PADDING_Y + this.fieldHeight - (int)Math.round(
+                (this.renderedScrollRows - firstRow) * ROW_HEIGHT)
+                + (index - firstRow) * ROW_HEIGHT;
     }
 
     private int lockLeft() {
@@ -545,16 +562,21 @@ final class ChatPopupMenu {
 
     /** The entry drawn under the point, whatever kind it is, or null. */
     private Entry rowAt(double mouseX, double mouseY) {
+        int index = rowIndexAt(mouseX, mouseY);
+        return index < 0 ? null : this.entries.get(index);
+    }
+
+    /** The index of the entry drawn under the point, or -1 for none. */
+    private int rowIndexAt(double mouseX, double mouseY) {
         if (!contains(mouseX, mouseY)
                 || mouseY < this.y + PADDING_Y + this.fieldHeight
                 || mouseY >= this.y + this.height - PADDING_Y) {
-            return null;
+            return -1;
         }
         int index = (int)Math.floor(
                 (mouseY - this.y - PADDING_Y - this.fieldHeight)
                 / (double)ROW_HEIGHT + this.renderedScrollRows);
-        return index >= 0 && index < this.entries.size()
-                ? this.entries.get(index) : null;
+        return index >= 0 && index < this.entries.size() ? index : -1;
     }
 
     /**

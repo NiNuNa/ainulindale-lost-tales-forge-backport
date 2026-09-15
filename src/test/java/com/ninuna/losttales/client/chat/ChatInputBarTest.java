@@ -69,6 +69,33 @@ public final class ChatInputBarTest {
     }
 
     /**
+     * Every framed button standing in a row of controls is one height:
+     * an icon's box with the inset above and below it. The character
+     * button is that square with the head centred, the wide inset on
+     * every side, and the bar's framed buttons stand a whole row inside
+     * the well at either end so they centre on the bar exactly.
+     */
+    @Test
+    public void theFramedButtonsShareOneHeight() {
+        assertEquals(18, ChatFramedButton.HEIGHT);
+        assertEquals(ChatChannelIcons.SIZE + 2 * ChatFramedButton.INSET,
+                ChatFramedButton.HEIGHT);
+        assertEquals(LostTalesChatOverlayRenderer.CONTENT_BOX_HEIGHT
+                + 2 * ChatFramedButton.INSET, ChatFramedButton.HEIGHT);
+        assertEquals(ChatFramedButton.HEIGHT,
+                LostTalesChatOverlayRenderer.TOOLBAR_BUTTON_SIZE);
+        assertEquals(ChatFramedButton.HEIGHT, ChatReactionMarker.HEIGHT);
+        assertEquals(ChatReactionMarker.ICON + 2 * ChatReactionMarker.PAD,
+                ChatReactionMarker.HEIGHT);
+        assertEquals(ChatFramedButton.HEIGHT,
+                ChatInputBar.CHARACTER_BUTTON_SIZE);
+        assertEquals(LostTalesChatOverlayRenderer.HEAD_SIZE
+                        + 2 * ChatFramedButton.WIDE_INSET,
+                ChatInputBar.CHARACTER_BUTTON_SIZE);
+        assertEquals(2, ChatInputBar.CONTENT_HEIGHT - ChatFramedButton.HEIGHT);
+    }
+
+    /**
      * The typing well is one message row, and everything in it stands
      * where a message row puts it: the text two rows down, and an emoji
      * or item preview on the capitals, two rows above the text. The caret
@@ -85,10 +112,13 @@ public final class ChatInputBarTest {
         int caretTop = ChatInputField.caretTop(textTop);
         int caretBottom = caretTop + (int)ChatInlineIcons.CONTENT_SIZE;
         // The well stands the clearance below the rule and as far above
-        // the bar's end, and is as tall as the indicator's frame beside
-        // it: the icon's box with the wide inset above and below.
+        // the bar's bottom frame edge, its last row, which counts toward
+        // no gap; and it is the icon's box with the wide inset above and
+        // below, a row taller at either end than the framed buttons
+        // beside it.
         assertEquals(1 + ChatInputBar.CLEARANCE, wellTop - barTop);
-        assertEquals(ChatInputBar.CLEARANCE,
+        assertEquals(1, ChatInputBar.BAR_BORDER_WIDTH);
+        assertEquals(ChatInputBar.CLEARANCE + ChatInputBar.BAR_BORDER_WIDTH,
                 barTop + ChatInputBar.HEIGHT - wellBottom);
         assertEquals(ChatChannelIcons.SIZE + 2 * ChatFramedButton.WIDE_INSET,
                 ChatInputBar.CONTENT_HEIGHT);

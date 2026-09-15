@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelAccess;
+import com.ninuna.losttales.chat.ChatChannelIconCatalog;
 import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatEpithet;
@@ -1208,7 +1209,8 @@ public final class LostTalesChatService {
                         heldCapabilityIds(player, accountRoles),
                         accountRoles,
                         ChatChannelPolicy.ownCharacterRoles(player),
-                        LostTalesConfig.chatProximityRadius),
+                        LostTalesConfig.chatProximityRadius,
+                        ChatChannelIconCatalog.current()),
                 player);
     }
 

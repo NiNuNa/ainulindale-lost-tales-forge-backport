@@ -1210,9 +1210,6 @@ public final class LostTalesChatGui extends GuiChat
             case EMPTY_PLUS:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.tab.restore");
-            case JUMP_PILL:
-                return StatCollector.translateToLocal(
-                        "gui.losttales.chat.jump_to_present.tip");
             case REPLY_CHIP:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.message.cancel_reply");
@@ -1345,9 +1342,9 @@ public final class LostTalesChatGui extends GuiChat
 
     /** Whether the point is on the empty state's + as drawn last frame. */
     private boolean emptyStateContains(double mouseX, double mouseY) {
-        return this.emptyPlusRight > this.emptyPlusLeft
-                && mouseX >= this.emptyPlusLeft && mouseX < this.emptyPlusRight
-                && mouseY >= this.emptyPlusTop && mouseY < this.emptyPlusBottom;
+        return ChatHitBox.contains(mouseX, mouseY, this.emptyPlusLeft,
+                this.emptyPlusTop, this.emptyPlusRight - this.emptyPlusLeft,
+                this.emptyPlusBottom - this.emptyPlusTop);
     }
 
     /** Whether the box crosses any of the boxes already drawn. */
@@ -1883,7 +1880,7 @@ public final class LostTalesChatGui extends GuiChat
                         closedPopupKind)) {
                     this.menus.openCharacterSelectionMenu(
                             this.bar.characterButtonLeft(),
-                            this.bar.barControlTop() - 2);
+                            this.bar.characterButtonTop() - 2);
                 }
                 return;
             case INDICATOR:

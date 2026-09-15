@@ -924,6 +924,7 @@ public final class ClientChatChannelViews {
         ChatWindowLayout.closeConversations();
         ClientChatChannelState.forgetConversationHistory();
         ChatChannelIcons.forgetPortraits();
+        ChatChannelIcons.forgetChannelIcons();
     }
 
     /**

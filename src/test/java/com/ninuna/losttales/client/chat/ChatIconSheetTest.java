@@ -242,8 +242,7 @@ public final class ChatIconSheetTest {
      * interior filling the span between them, so the two must be the
      * same size within a state, and the pieces of every state the same
      * width — the layout reserves one border width per end. The
-     * selected pair is taller by the lift the row already makes room
-     * for.
+     * selected pair is a row taller and a foot wider.
      */
     @Test
     public void tabBordersPairUpAcrossStates() {
@@ -258,13 +257,14 @@ public final class ChatIconSheetTest {
         assertEquals(ChatIconSheet.TAB_LEFT.getWidth()
                         + ChatChannelTabBar.SELECTED_FOOT,
                 ChatIconSheet.TAB_SELECTED_LEFT.getWidth());
-        assertTrue(ChatChannelTabBar.SELECTED_FOOT > 0);
-        // The selected pieces are taller by the lift and one row more:
-        // the selected tab rises the lift above a resting one and
-        // stands one row lower, on the rule.
+        assertEquals(1, ChatChannelTabBar.SELECTED_FOOT);
+        // The selected pieces are one row taller: the row they stand on
+        // the rule with. Every tab stands at one top, so there is no
+        // lift; a sheet with taller selected pieces would lift the tab.
         assertEquals(ChatChannelTabBar.LIFT + 1,
                 ChatIconSheet.TAB_SELECTED_LEFT.getHeight()
                         - ChatIconSheet.TAB_LEFT.getHeight());
+        assertEquals(0, ChatChannelTabBar.LIFT);
         // A tab draws its pieces whole and stands on the window's top
         // rule, so the row is one row taller than the artwork; a
         // re-export at another height moves the row with it.

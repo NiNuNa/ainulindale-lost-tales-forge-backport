@@ -184,8 +184,8 @@ abstract class ChatPickerPanel {
                            int anchorRight, int anchorY) {
         int left = buttonLeft(anchorRight);
         int top = buttonTop(anchorY);
-        return mouseX >= left && mouseX < left + BUTTON_SIZE
-                && mouseY >= top && mouseY < top + BUTTON_SIZE;
+        return ChatHitBox.contains(mouseX, mouseY, left, top, BUTTON_SIZE,
+                BUTTON_SIZE);
     }
 
     boolean isInsidePanel(double mouseX, double mouseY,
@@ -194,9 +194,8 @@ abstract class ChatPickerPanel {
             return false;
         }
         Layout layout = buildLayout(anchorRight, screenHeight);
-        return mouseX >= layout.left && mouseX < layout.left + panelWidth()
-                && mouseY >= layout.top
-                && mouseY < layout.top + layout.height;
+        return ChatHitBox.contains(mouseX, mouseY, layout.left, layout.top,
+                panelWidth(), layout.height);
     }
 
     /**

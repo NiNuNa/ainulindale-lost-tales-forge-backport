@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemStack;
@@ -18,8 +19,10 @@ import java.nio.FloatBuffer;
  * bold spaces reserved in the message) and fills a {@link #CONTENT_SIZE}
  * square content box centred in it, so every kind reads at the same
  * apparent size: the emoji sheet is drawn 1:1, an item's 16px sprite is
- * scaled onto the box, and a marker's opaque artwork (not its padded
- * atlas cell) is fitted into it by its larger edge, never stretched.</li>
+ * drawn at the whole display pixels per texel nearest the box, in a
+ * slot that widens to hold it ({@link #itemSlotWidth}), and a marker's
+ * opaque artwork (not its padded atlas cell) is fitted into it by its
+ * larger edge, never stretched.</li>
  * <li>Wherever a glyph stands beside text — a message row, the input
  * field, the pickers, the completion lists — its box sits
  * {@link #CONTENT_TOP_OFFSET} above the text's top edge: centred on the
@@ -78,6 +81,14 @@ final class ChatInlineIcons {
      * ten-row box ({@link LostTalesChatOverlayRenderer#centredBoxTop}).
      */
     static final int CONTENT_TOP_OFFSET = -2;
+    /** An item icon's sixteen texels; vanilla's item icon size. */
+    static final int ICON_TEXELS = 16;
+    /**
+     * How far past its box an item icon may reach on each side, in GUI
+     * pixels, to keep every texel whole: the clear rows a message row
+     * keeps around the content box and a tab keeps around its icon.
+     */
+    static final int ITEM_OVERFLOW = 1;
     private ChatInlineIcons() {}
 
     /**
@@ -88,6 +99,16 @@ final class ChatInlineIcons {
      * about where the next glyph starts.
      */
     static int declaredWidth(net.minecraft.util.IChatComponent part) {
+        return declaredWidth(part, -1);
+    }
+
+    /**
+     * The same, with an item slot's width taken for the given display
+     * scale factor rather than the display's own; a negative factor asks
+     * the display.
+     */
+    static int declaredWidth(net.minecraft.util.IChatComponent part,
+                             int displayScaleFactor) {
         ChatHeadMarker.Data head = ChatHeadMarker.headOf(part);
         if (head != null) {
             return head.mark() != null
@@ -100,7 +121,59 @@ final class ChatInlineIcons {
         if (chip >= 0) {
             return chip;
         }
+        // An item's slot is as wide as the icon's nearest crisp size,
+        // so the icon never stands in a neighbour's pixels; a marker's
+        // slot stays its two spaces.
+        ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
+        if (share != null && share.icon && share.kind == ChatShareKind.ITEM) {
+            return displayScaleFactor < 0 ? itemSlotWidth()
+                    : itemSlotWidth(displayScaleFactor);
+        }
         return ChatSpacerMarker.decode(part);
+    }
+
+    /**
+     * The whole display pixels per texel an icon of {@code texels} is
+     * drawn at in a box {@code box} display pixels wide: the count whose
+     * icon is nearest the box in size, a tie going to the smaller, unless
+     * that icon would reach past {@code room}, in which case the largest
+     * that fits the box; zero when not even one pixel per texel fits the
+     * room. Sixteen texels in a ten-pixel box: half size at GUI scale 2,
+     * one and a third at 3, eight tenths at 4, close to one at 5.
+     */
+    static int wholePixelsPerTexel(double box, double room, int texels) {
+        if (texels <= 0 || box <= 0.0D) {
+            return 0;
+        }
+        int lower = (int)Math.floor(box / texels + 1.0E-6D);
+        int upper = lower + 1;
+        int nearest = upper * texels - box < box - lower * texels
+                ? upper : lower;
+        if (nearest * texels > room + 1.0E-6D) {
+            nearest = lower;
+        }
+        return Math.max(0, nearest);
+    }
+
+    /**
+     * The slot an inline item icon reserves: the emoji's, widened to the
+     * whole GUI pixels the icon's nearest crisp size needs wherever that
+     * reaches past the box — eleven at GUI scales 3 and 6 — so what
+     * follows starts clear of it.
+     */
+    static int itemSlotWidth() {
+        return itemSlotWidth(ChatWindowFrame.displayScaleFactor());
+    }
+
+    static int itemSlotWidth(int displayScaleFactor) {
+        int factor = Math.max(1, displayScaleFactor);
+        int ratio = wholePixelsPerTexel(CONTENT_SIZE * factor,
+                (CONTENT_SIZE + 2 * ITEM_OVERFLOW) * factor, ICON_TEXELS);
+        if (ratio <= 0) {
+            return SLOT_WIDTH;
+        }
+        return Math.max(SLOT_WIDTH, (int)Math.ceil(
+                ratio * ICON_TEXELS / (double)factor - 1.0E-6D));
     }
 
     /** Content edge for a slot; a degraded slot narrower than ten shrinks it. */
@@ -160,14 +233,17 @@ final class ChatInlineIcons {
     }
 
     /**
-     * An item's icon in its box, crisp and never cut: drawn at the most
-     * whole display pixels per texel that fit the box, from an origin on
-     * the display grid, so its pixel art keeps every texel whole the way
-     * the emoji do rather than being squeezed into the box. Only where
-     * not even one pixel per texel fits — GUI scale 1, sixteen texels in
-     * a ten-pixel box — is the icon squeezed to the box as it always
-     * was, uneven pixels and all, rather than cut. The faction banner
-     * is drawn the same way.
+     * An item's icon in its box, crisp and never cut: drawn at the whole
+     * display pixels per texel nearest the box's size, a tie going to the
+     * smaller, from an origin on the display grid, so its pixel art keeps
+     * every texel whole the way the emoji do rather than being squeezed
+     * into the box. The nearest size may reach {@link #ITEM_OVERFLOW}
+     * past the box on each side, into the clear rows around it; one that
+     * would reach further gives way to the largest that fits the box.
+     * Only where not even one pixel per texel fits the room — GUI scale
+     * 1, sixteen texels in a ten-pixel box — is the icon squeezed to the
+     * box as it always was, uneven pixels and all, rather than cut. The
+     * faction banner and a channel's chosen item are drawn the same way.
      */
     static void drawItem(Minecraft minecraft, ItemStack stack,
                          float boxX, float boxY, float size, int alpha,
@@ -191,9 +267,10 @@ final class ChatInlineIcons {
         }
         int factor = ChatWindowFrame.displayScaleFactor();
         double unit = factor * scaleX;
-        int ratio = (int)Math.floor(size * unit / ICON_TEXELS + 0.001D);
-        // Not one whole pixel per texel fits: squeezed to the box, as
-        // the box is all the room there is.
+        int ratio = wholePixelsPerTexel(size * unit,
+                (size + 2 * ITEM_OVERFLOW) * unit, ICON_TEXELS);
+        // Not one whole pixel per texel fits the room: squeezed to the
+        // box, as the box is all the room there is.
         float drawn = ratio <= 0 ? size : (float)(ratio * ICON_TEXELS / unit);
         // Centred in the box, on the display grid.
         double originX = ChatWindowFrame.snapToDisplayPixels(
@@ -210,8 +287,6 @@ final class ChatInlineIcons {
         }
     }
 
-    /** An icon's sixteen texels; vanilla's item icon size. */
-    private static final int ICON_TEXELS = 16;
 
     /** Marker artwork fitted into the box, in {@code rgb}. */
     static void drawMarker(Minecraft minecraft, String iconName, int rgb,

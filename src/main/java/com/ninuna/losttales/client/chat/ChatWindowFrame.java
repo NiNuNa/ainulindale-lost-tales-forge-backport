@@ -215,10 +215,10 @@ final class ChatWindowFrame {
 
     /** Whether the point lies on the toolbar drawn this frame. */
     boolean toolbarContains(double x, double y) {
-        return this.drawn && this.toolbarRight > this.toolbarLeft
-                && this.toolbarKinds.length > 0
-                && x >= this.toolbarLeft && x < this.toolbarRight
-                && y >= this.toolbarTop && y < this.toolbarBottom;
+        return this.drawn && this.toolbarKinds.length > 0
+                && ChatHitBox.contains(x, y, this.toolbarLeft, this.toolbarTop,
+                        this.toolbarRight - this.toolbarLeft,
+                        this.toolbarBottom - this.toolbarTop);
     }
 
     /** The control under the point, or -1 when the point is not on one. */
@@ -960,9 +960,8 @@ final class ChatWindowFrame {
      * draws is measured. The border outside it is the resize band's.
      */
     boolean contains(double x, double y) {
-        double left = drawnLeft();
-        double top = this.boxTop + this.motionY;
-        return x >= left && x < left + (this.boxRight - this.boxLeft)
-                && y >= top && y < top + (this.boxBottom - this.boxTop);
+        return ChatHitBox.contains(x, y, drawnLeft(),
+                this.boxTop + this.motionY, this.boxRight - this.boxLeft,
+                this.boxBottom - this.boxTop);
     }
 }

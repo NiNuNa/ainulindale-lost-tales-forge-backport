@@ -34,19 +34,30 @@ final class ChatInputBar {
     /** Clear rows between the bar's edges and what stands on it. */
     static final int CLEARANCE = 2;
     /**
-     * Height of what stands on the bar: the channel indicator's frame —
-     * the icon's box with the strips' wide inset above and below it —
-     * and the typing well, level with it, so the two read as one row of
-     * controls. The bar's buttons are shorter and centred on the same
-     * middle.
+     * Height of the typing well: the icon's box with the strips' wide
+     * inset above and below it, one message row in its middle. The
+     * bar's framed buttons — the character button and the channel
+     * indicator — are the framed buttons' one height, a row inside the
+     * well at either end and centred on its middle; the bar's other
+     * buttons are shorter and centred on the same middle.
      */
     static final int CONTENT_HEIGHT =
             ChatChannelIcons.SIZE + 2 * ChatFramedButton.WIDE_INSET;
     /**
-     * Height of the bar strip: the window's bottom rule, then what
-     * stands on the bar with the clearance above and below it.
+     * The window's frame edge where the bar carries it: the bar's own
+     * left edge, drawn on the border, and its bottom edge, the bar's
+     * last pixel row. Both are the bar's stretch of the window's frame,
+     * so they have that frame's width, and neither counts toward a gap
+     * or the clearance: those start a pixel in.
      */
-    static final int HEIGHT = 1 + CLEARANCE + CONTENT_HEIGHT + CLEARANCE;
+    static final int BAR_BORDER_WIDTH = ChatTimestampColumn.BORDER_WIDTH;
+    /**
+     * Height of the bar strip: the window's bottom rule, then what
+     * stands on the bar with the clearance above and below it, then the
+     * bar's bottom frame edge.
+     */
+    static final int HEIGHT = 1 + CLEARANCE + CONTENT_HEIGHT + CLEARANCE
+            + BAR_BORDER_WIDTH;
     /** The pickers and lists take the bar's top plus this as their floor. */
     private static final int INPUT_ANCHOR_BELOW_BAR = 14;
     /** The send button is the rightmost bar control. */
@@ -59,13 +70,6 @@ final class ChatInputBar {
     private static final int COUNTER_FULL_RGB =
             LostTalesColors.rgb(LostTalesColors.SALMON);
     static final float NOTICE_LIFETIME_MILLIS = 1400.0F;
-    /**
-     * The bar's own left frame edge: drawn on the border, one pixel
-     * wide, so the gap after it starts a pixel in. It is the bar's
-     * stretch of the window's frame edge, so it has that edge's width.
-     */
-    private static final int BAR_BORDER_WIDTH =
-            ChatTimestampColumn.BORDER_WIDTH;
     /**
      * Clear space between the things standing on the bar, and before
      * the first of them. Measured in ink, like every other gap the chat
@@ -86,10 +90,14 @@ final class ChatInputBar {
      * its name for it: about a dozen letters.
      */
     static final int COMFORTABLE_FIELD_WIDTH = 64;
-    /** The head's inset inside the character button's square, and its size. */
-    private static final int CHARACTER_HEAD_INSET = 2;
+    /**
+     * The character button: a framed button at the framed buttons' one
+     * height and as wide, square, the head in its middle exactly with
+     * the strips' wide inset round it on every side.
+     */
     private static final int CHARACTER_HEAD_SIZE =
             LostTalesChatOverlayRenderer.HEAD_SIZE;
+    static final int CHARACTER_BUTTON_SIZE = ChatFramedButton.HEIGHT;
     /** The chevron's frames, pointing right through upright to left. */
     private static final ChatIconSheet[] TOGGLE_FRAMES = {
             ChatIconSheet.TOGGLE_1, ChatIconSheet.TOGGLE_2,
@@ -118,7 +126,9 @@ final class ChatInputBar {
     private long indicatorNanos;
     /** How far the indicator's frame has lit under the pointer. */
     private float indicatorFade;
-    /** How far the send button has crossed to its lit artwork, and when. */
+    /** How far the character button's frame has lit, and when it last moved. */
+    private float characterFade;
+    private long characterNanos;    /** How far the send button has crossed to its lit artwork, and when. */
     private float sendFade;
     private long sendFadeNanos;
     /**
@@ -258,9 +268,10 @@ final class ChatInputBar {
     }
 
     /**
-     * Top of the bar's square controls, centred in the rows below the
-     * bottom rule: the strip's first row is the rule, so the bar's own
-     * furniture lives in the rows after it.
+     * Top of the bar's square controls, centred in the rows between the
+     * bottom rule and the bar's bottom frame edge: the strip's first
+     * row is the rule and its last the edge, so the bar's own furniture
+     * lives in the rows between them.
      */
     int barControlTop() {
         return controlTopFor(this.top);
@@ -277,8 +288,8 @@ final class ChatInputBar {
 
     /** {@link #barControlTop} for a bar strip starting at {@code barTop}. */
     static int controlTopFor(int barTop) {
-        return barTop + 1 + (ChatWindowPlacement.INPUT_HEIGHT - 1
-                - ChatPickerPanel.BUTTON_SIZE) / 2;
+        int interior = ChatWindowPlacement.INPUT_HEIGHT - 1 - BAR_BORDER_WIDTH;
+        return barTop + 1 + (interior - ChatPickerPanel.BUTTON_SIZE) / 2;
     }
 
     /**
@@ -348,10 +359,8 @@ final class ChatInputBar {
     boolean isInsideToolbarToggle(double mouseX, double mouseY, int barRight) {
         int toggleLeft = toolbarToggleLeft(barRight);
         int controlTop = barControlTop();
-        return mouseX >= toggleLeft
-                && mouseX < toggleLeft + ChatPickerPanel.BUTTON_SIZE
-                && mouseY >= controlTop
-                && mouseY < controlTop + ChatPickerPanel.BUTTON_SIZE;
+        return ChatHitBox.contains(mouseX, mouseY, toggleLeft, controlTop,
+                ChatPickerPanel.BUTTON_SIZE, ChatPickerPanel.BUTTON_SIZE);
     }
 
     /** The bars' entrance from below, timed from the screen's opening. */
@@ -509,14 +518,25 @@ final class ChatInputBar {
         int frameTop = indicatorFrameTop();
         float opacity = LostTalesChatVisualStyle.chatOpacity(this.mc);
         int surface = LostTalesChatVisualStyle.surfaceArgb(opacity);
-        // Up to the divider after the indicator, around the indicator's
-        // frame, whose corner pixels the frame's rounding leaves to the
-        // bar; from the divider on, around the typing well.
+        // Up to the indicator's frame, around the character button's;
+        // from there to the divider after the indicator, around the
+        // indicator's frame — each frame's corner pixels are the bar's,
+        // outside the frame's rounding; from the divider on, around the
+        // typing well.
+        int characterLeft = characterButtonLeft();
+        int characterTop = characterButtonTop();
         LostTalesChatVisualStyle.fillAround(this.left, this.top + 1,
+                fit.frameLeft, barBottom, characterLeft, characterTop,
+                characterLeft + CHARACTER_BUTTON_SIZE,
+                characterTop + CHARACTER_BUTTON_SIZE, surface);
+        ChatFramedButton.fillCorners(characterLeft, characterTop,
+                CHARACTER_BUTTON_SIZE, CHARACTER_BUTTON_SIZE, surface);
+        LostTalesChatVisualStyle.fillAround(fit.frameLeft, this.top + 1,
                 line.leftDividerX, barBottom, fit.frameLeft, frameTop,
-                fit.frameRight, frameTop + CONTENT_HEIGHT, surface);
+                fit.frameRight, frameTop + ChatFramedButton.HEIGHT, surface);
         ChatFramedButton.fillCorners(fit.frameLeft, frameTop,
-                fit.frameRight - fit.frameLeft, CONTENT_HEIGHT, surface);
+                fit.frameRight - fit.frameLeft, ChatFramedButton.HEIGHT,
+                surface);
         LostTalesChatVisualStyle.fillAround(line.leftDividerX, this.top + 1,
                 barRight, barBottom, line.wellLeft, wellTop, line.wellRight,
                 wellBottom, surface);
@@ -560,7 +580,7 @@ final class ChatInputBar {
             drawBarSurface(frame, fit, line, barRight);
             drawHint(line, draft, tab);
             drawDraft(line, draft);
-            drawCharacterHead(tab, characterButtonLeft(), barControlTop(), 0);
+            drawCharacterButton(tab, 0.0F);
             drawIndicatorFrame(fit, 0.0F, false);
             int toggleLeft = toolbarToggleLeft(barRight);
             this.toolbarToggle.drawSettled(ChatWindowLayout.isToolbarCollapsed(),
@@ -737,22 +757,23 @@ final class ChatInputBar {
         int frameTop = indicatorFrameTop();
         int frameWidth = fit.frameRight - fit.frameLeft;
         ChatFramedButton.drawSurface(fit.frameLeft, frameTop, frameWidth,
-                CONTENT_HEIGHT, lit,
+                ChatFramedButton.HEIGHT, lit,
                 Math.round(LostTalesChatVisualStyle.INSET_ALPHA
                         * LostTalesChatVisualStyle.chatOpacity(this.mc)));
         int textTop = barTextTop();
         if (fit.iconLeft >= 0) {
-            // The icon's box stands in the frame's middle, the name's
-            // capitals half a pixel above the box's.
+            // The icon's box stands in the frame's middle, the inset
+            // above and below it, the name's capitals half a pixel
+            // above the box's.
             LostTalesChatVisualStyle.beginContent();
             ChatChannelIcons.draw(this.mc, fit.channel, fit.iconLeft,
-                    frameTop + ChatFramedButton.WIDE_INSET, 255);
+                    frameTop + ChatFramedButton.INSET, 255);
         }
         if (fit.labelRoom > 0) {
             drawIndicatorLabel(fit, textTop, lit, marquee);
         }
         ChatFramedButton.drawInk(fit.frameLeft, frameTop, frameWidth,
-                CONTENT_HEIGHT, lit, 255);
+                ChatFramedButton.HEIGHT, lit, 255);
     }
 
     /**
@@ -800,20 +821,28 @@ final class ChatInputBar {
                         fit.labelWidth - offset - fit.labelRoom, depth));
     }
 
-    /** Left edge of the character-selection button, the bar's first control. */
+    /**
+     * Left edge of the character button's frame, the bar's first
+     * control: the bar gap past the window's frame edge, which counts
+     * toward no gap.
+     */
     int characterButtonLeft() {
-        return this.left + BAR_BORDER_WIDTH + BAR_GAP - CHARACTER_HEAD_INSET;
+        return this.left + BAR_BORDER_WIDTH + BAR_GAP;
     }
 
-    /** Past the last pixel of the character button's head. */
-    private int characterButtonInkRight() {
-        return characterButtonLeft() + CHARACTER_HEAD_INSET
-                + CHARACTER_HEAD_SIZE;
+    /** Top of the character button's frame: the bar's framed buttons' top. */
+    int characterButtonTop() {
+        return framedButtonTop();
     }
 
-    /** Left edge of the channel indicator's frame: a bar gap past the head. */
+    /** Past the character button's frame. */
+    private int characterButtonRight() {
+        return characterButtonLeft() + CHARACTER_BUTTON_SIZE;
+    }
+
+    /** Left edge of the channel indicator's frame: a bar gap past the character button's. */
     private int indicatorLeft() {
-        return characterButtonInkRight() + BAR_GAP;
+        return characterButtonRight() + BAR_GAP;
     }
 
     /**
@@ -821,7 +850,16 @@ final class ChatInputBar {
      * with the typing well.
      */
     private int indicatorFrameTop() {
-        return this.top + 1 + CLEARANCE;
+        return framedButtonTop();
+    }
+
+    /**
+     * Top of the bar's framed buttons: centred on the typing well, a
+     * row inside it at either end.
+     */
+    private int framedButtonTop() {
+        return wellTopFor(this.top)
+                + (CONTENT_HEIGHT - ChatFramedButton.HEIGHT) / 2;
     }
 
     /**
@@ -912,54 +950,65 @@ final class ChatInputBar {
         }
     }
 
+    /**
+     * Whether the point is on the character button's frame: a framed
+     * button answers on its frame and nowhere else.
+     */
     boolean isInsideCharacterButton(double mouseX, double mouseY) {
-        int buttonLeft = characterButtonLeft();
-        int controlTop = barControlTop();
-        return mouseX >= buttonLeft
-                && mouseX < buttonLeft + ChatPickerPanel.BUTTON_SIZE
-                && mouseY >= controlTop
-                && mouseY < controlTop + ChatPickerPanel.BUTTON_SIZE;
+        return ChatHitBox.contains(mouseX, mouseY, characterButtonLeft(),
+                characterButtonTop(), CHARACTER_BUTTON_SIZE,
+                CHARACTER_BUTTON_SIZE);
     }
 
     /**
-     * The character-selection button: the head of whoever the selected
-     * tab would currently speak as, over the project's flat shadow like
-     * every other head in the chat, lifted a pixel under the pointer
-     * like the picker buttons, with the padlock in its corner while the
-     * choice is locked. Returns whether the pointer is on it, for the
-     * tip the screen offers.
+     * The character-selection button: a framed button like the tab
+     * search's, with the head of whoever the selected tab would
+     * currently speak as centred in it over the project's flat shadow
+     * like every other head in the chat, the frame lit under the
+     * pointer and while its menu is out, and the padlock in its corner
+     * while the choice is locked. Returns whether the pointer is on it,
+     * for the tip the screen offers.
      */
     boolean drawCharacterSelectionButton(double mouseX, double mouseY,
                                          boolean menuOpen) {
-        int buttonLeft = characterButtonLeft();
-        int controlTop = barControlTop();
         boolean hovered = isInsideCharacterButton(mouseX, mouseY);
-        drawCharacterHead(ClientChatChannelState.getSelected(), buttonLeft,
-                controlTop, menuOpen || hovered ? 1 : 0);
-        this.regions.add(buttonLeft, controlTop,
-                buttonLeft + ChatPickerPanel.BUTTON_SIZE,
-                controlTop + ChatPickerPanel.BUTTON_SIZE);
+        long now = System.nanoTime();
+        double elapsed = this.characterNanos == 0L ? 0.0D
+                : (now - this.characterNanos) / 1.0E9D;
+        this.characterNanos = now;
+        this.characterFade = LostTalesChatVisualStyle.hoverFade(
+                this.characterFade, hovered || menuOpen, elapsed);
+        drawCharacterButton(ClientChatChannelState.getSelected(),
+                this.characterFade);
+        this.regions.add(characterButtonLeft(), characterButtonTop(),
+                characterButtonRight(),
+                characterButtonTop() + CHARACTER_BUTTON_SIZE);
         return hovered;
     }
 
     /**
-     * The head of whoever {@code tab} would currently speak as, in the
-     * character button's square, lifted {@code lift} pixels, with the
-     * padlock in the square's corner while the choice is locked.
+     * The character button as laid out on the bar, lit as far as
+     * {@code lit}: its surface in the hole the bar left for it, the head
+     * of whoever {@code tab} would currently speak as in its middle, the
+     * padlock in the frame's corner while the choice is locked, and the
+     * frame's ink over all of it.
      */
-    private void drawCharacterHead(ChatTab tab, int buttonLeft,
-                                   int controlTop, int lift) {
+    private void drawCharacterButton(ChatTab tab, float lit) {
+        int left = characterButtonLeft();
+        int top = characterButtonTop();
+        ChatFramedButton.drawSurface(left, top, CHARACTER_BUTTON_SIZE,
+                CHARACTER_BUTTON_SIZE, lit,
+                Math.round(LostTalesChatVisualStyle.INSET_ALPHA
+                        * LostTalesChatVisualStyle.chatOpacity(this.mc)));
         ClientChatAppearances.Appearance shown =
                 ClientChatAppearances.effectiveFor(tab);
         UUID self = this.mc.thePlayer == null ? null
                 : this.mc.thePlayer.getUniqueID();
         if (self != null) {
-            float headX = buttonLeft + CHARACTER_HEAD_INSET;
-            // A pixel above the button's arithmetic centre: the head is
-            // one row taller than the text caps beside it, so this is
-            // what reads as level with them.
-            float headY = controlTop + 1 - lift;
+            float headX = left + ChatFramedButton.WIDE_INSET;
+            float headY = top + ChatFramedButton.WIDE_INSET;
             boolean account = shown.account || shown.skinId.length() == 0;
+            LostTalesChatVisualStyle.beginContent();
             drawButtonHeadShadow(self, account, shown.skinId, headX, headY);
             if (account) {
                 LostTalesCharacterHeadIconRenderer.drawAccountHead(
@@ -972,12 +1021,16 @@ final class ChatInputBar {
             }
         }
         if (ClientChatAppearances.isLocked(tab)) {
+            // In the frame's bottom-right corner, inside its ink, over
+            // the head's corner.
             ChatLockAnimation.drawShut(
-                    buttonLeft + ChatPickerPanel.BUTTON_SIZE
+                    left + CHARACTER_BUTTON_SIZE - ChatFramedButton.EDGE
                             - ChatLockAnimation.SHUT_WIDTH,
-                    controlTop + ChatPickerPanel.BUTTON_SIZE
+                    top + CHARACTER_BUTTON_SIZE - ChatFramedButton.EDGE
                             - ChatLockAnimation.HEIGHT, 255);
         }
+        ChatFramedButton.drawInk(left, top, CHARACTER_BUTTON_SIZE,
+                CHARACTER_BUTTON_SIZE, lit, 255);
     }
 
     /**
@@ -1017,9 +1070,8 @@ final class ChatInputBar {
     boolean isInsideIndicator(double mouseX, double mouseY, int barRight) {
         IndicatorFit fit = indicatorFit(barRight);
         int frameTop = indicatorFrameTop();
-        return mouseX >= fit.frameLeft && mouseX < fit.frameRight
-                && mouseY >= frameTop
-                && mouseY < frameTop + CONTENT_HEIGHT;
+        return ChatHitBox.contains(mouseX, mouseY, fit.frameLeft, frameTop,
+                fit.frameRight - fit.frameLeft, ChatFramedButton.HEIGHT);
     }
 
     /** The channel as the indicator names it: its shown name, as its tab does. */
@@ -1036,10 +1088,8 @@ final class ChatInputBar {
     boolean isInsideSendButton(double mouseX, double mouseY, int barRight) {
         int buttonLeft = sendButtonLeft(barRight);
         int controlTop = barControlTop();
-        return mouseX >= buttonLeft
-                && mouseX < buttonLeft + ChatPickerPanel.BUTTON_SIZE
-                && mouseY >= controlTop
-                && mouseY < controlTop + ChatPickerPanel.BUTTON_SIZE;
+        return ChatHitBox.contains(mouseX, mouseY, buttonLeft, controlTop,
+                ChatPickerPanel.BUTTON_SIZE, ChatPickerPanel.BUTTON_SIZE);
     }
 
     /**

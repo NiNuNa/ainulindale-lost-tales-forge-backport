@@ -3,6 +3,7 @@ package com.ninuna.losttales.chat;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -482,6 +483,62 @@ public final class ChatRoleConfig {
                     + "colour; the default is used");
             return LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
         }
+    }
+
+    /**
+     * The icons a config puts on channels, one per line as
+     * {@code <channel>=<icon>}, where the icon is {@code emoji:<name>} or
+     * {@code item:<id>[@<damage>]}; read once every channel is in force,
+     * so a channel the same file defines may be given one. An entry
+     * naming a channel not in force, an icon that reads as none, an emoji
+     * this build does not have, or a channel named twice is reported and
+     * skipped. An item is left to the client that draws it, which may
+     * lack the mod it comes from and shows the channel's own emoji then.
+     */
+    public static Map<String, ChatChannelIconSpec> parseChannelIcons(
+            String[] entries, Warnings warnings) {
+        Map<String, ChatChannelIconSpec> icons =
+                new LinkedHashMap<String, ChatChannelIconSpec>();
+        for (String entry : entries == null ? new String[0] : entries) {
+            if (isBlankOrComment(entry)) {
+                continue;
+            }
+            String id = keyOf(entry);
+            ChatChannel channel = ChatChannel.fromId(id);
+            if (channel == null) {
+                warnings.warn("Channel icon entry '" + entry + "' names no "
+                        + "channel in force; skipped");
+                continue;
+            }
+            if (icons.containsKey(channel.getId())) {
+                warnings.warn("Channel '" + channel.getId() + "' is given an "
+                        + "icon twice; the second was skipped");
+                continue;
+            }
+            if (icons.size() >= ChatChannelIconCatalog.MAX_ICONS) {
+                warnings.warn("Channel '" + channel.getId() + "' is past the "
+                        + ChatChannelIconCatalog.MAX_ICONS + " icons a server "
+                        + "may send; it and any after it were skipped");
+                break;
+            }
+            String text = valueOf(entry).trim();
+            ChatChannelIconSpec icon = ChatChannelIconSpec.parse(text);
+            if (icon == null) {
+                warnings.warn("Channel '" + channel.getId() + "' names '" + text
+                        + "', which is no icon: emoji:<name> or "
+                        + "item:<id>[@<damage>]; skipped");
+                continue;
+            }
+            if (icon.getKind() == ChatChannelIconSpec.Kind.EMOJI
+                    && ChatEmoji.fromName(icon.getName()) == null) {
+                warnings.warn("Channel '" + channel.getId() + "' names the "
+                        + "emoji '" + icon.getName() + "', which this build "
+                        + "does not have; skipped");
+                continue;
+            }
+            icons.put(channel.getId(), icon);
+        }
+        return icons;
     }
 
     /**

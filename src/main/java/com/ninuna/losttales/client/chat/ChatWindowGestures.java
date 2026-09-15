@@ -608,9 +608,8 @@ final class ChatWindowGestures {
         double right = left + (frame.boxRight - frame.boxLeft);
         double top = frame.boxTop + frame.motionY;
         double bottom = frame.boxBottom + frame.motionY;
-        if (mouseX < left - RESIZE_BORDER || mouseX >= right + RESIZE_BORDER
-                || mouseY < top - RESIZE_BORDER
-                || mouseY >= bottom + RESIZE_BORDER) {
+        if (!new ChatHitBox(left, top, right - left, bottom - top)
+                .grown(RESIZE_BORDER).contains(mouseX, mouseY)) {
             return null;
         }
         boolean onLeft = mouseX < left;
